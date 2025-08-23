@@ -1,0 +1,16 @@
+# Node
+node_modules/
+dist/
+.vscode/
+.env
+*.vsix
+*.log
+.DS_Store
+*.tsbuildinfo
+out/
+
+# Extension packaging
+*.vsix
+
+# OS
+Thumbs.db
