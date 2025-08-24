@@ -3,6 +3,7 @@ import { BasePanel } from './base/BasePanel';
 import { AuthenticationService } from '../services/AuthenticationService';
 import { ODataService } from '../services/ODataService';
 import { WebviewMessage } from '../types';
+import { EnvironmentManager } from './base/EnvironmentManager';
 
 interface EntityMetadata {
     LogicalName: string;
@@ -32,6 +33,7 @@ interface AttributeMetadata {
 export class MetadataBrowserPanel extends BasePanel {
     public static readonly viewType = 'metadataBrowser';
     private odataService: ODataService;
+    private environmentManager: EnvironmentManager;
 
     public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
         const column = vscode.window.activeTextEditor?.viewColumn;
@@ -55,15 +57,27 @@ export class MetadataBrowserPanel extends BasePanel {
             title: 'Metadata Browser'
         });
         this.odataService = new ODataService();
+        this.environmentManager = new EnvironmentManager(authService, (message) => this.postMessage(message));
         this._panel.onDidDispose(() => {
             MetadataBrowserPanel.currentPanel = undefined;
         }, null, this._disposables);
+
+        // Initialize after everything is set up
+        this.initialize();
+    }
+
+    protected initialize(): void {
+        // Override to ensure environment manager is initialized before updating webview
+        this.updateWebview();
     }
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
         switch (message.action) {
+            case 'loadEnvironments':
+                await this.environmentManager.loadEnvironments();
+                break;
             case 'loadEntities':
-                await this.loadEntities();
+                await this.loadEntities(message.environmentId);
                 break;
             case 'loadEntityDetails':
                 await this.loadEntityDetails(message.entityName);
@@ -74,21 +88,31 @@ export class MetadataBrowserPanel extends BasePanel {
         }
     }
 
-    private async loadEntities(): Promise<void> {
+    private async loadEntities(environmentId?: string): Promise<void> {
         try {
-            // Get environments to find current one
-            const environments = await this._authService.getEnvironments();
-            if (!environments || environments.length === 0) {
+            if (!environmentId) {
                 this._panel.webview.postMessage({
                     command: 'showError',
-                    data: { message: 'No environments configured. Please add an environment first.' }
+                    data: { message: 'Please select an environment first.' }
                 });
                 return;
             }
 
-            // Use the first environment for now - in future, add environment selection
-            const currentEnv = environments[0];
-            
+            // Store the selected environment
+            this.environmentManager.selectedEnvironmentId = environmentId;
+
+            // Get the environment details
+            const environments = await this._authService.getEnvironments();
+            const currentEnv = environments.find(env => env.id === environmentId);
+
+            if (!currentEnv) {
+                this._panel.webview.postMessage({
+                    command: 'showError',
+                    data: { message: 'Selected environment not found.' }
+                });
+                return;
+            }
+
             this._panel.webview.postMessage({
                 command: 'showLoading',
                 data: { message: 'Loading entity metadata...' }
@@ -110,7 +134,7 @@ export class MetadataBrowserPanel extends BasePanel {
                     top: 500
                 }
             );
-            
+
             this._panel.webview.postMessage({
                 command: 'entitiesLoaded',
                 data: { entities: entities.value }
@@ -134,7 +158,7 @@ export class MetadataBrowserPanel extends BasePanel {
             // Get environments to find current one
             const environments = await this._authService.getEnvironments();
             const currentEnv = environments[0];
-            
+
             // Get authentication token
             const accessToken = await this._authService.getAccessToken(currentEnv.id);
             if (!accessToken) {
@@ -151,7 +175,7 @@ export class MetadataBrowserPanel extends BasePanel {
                     expand: ['Attributes($select=LogicalName,DisplayName,SchemaName,AttributeType,IsPrimaryId,IsPrimaryName,IsCustomAttribute,RequiredLevel,MaxLength)']
                 }
             );
-            
+
             this._panel.webview.postMessage({
                 command: 'entityDetailsLoaded',
                 data: { entity: entityDetails }
@@ -166,7 +190,9 @@ export class MetadataBrowserPanel extends BasePanel {
     }
 
     private async refreshMetadata(): Promise<void> {
-        await this.loadEntities();
+        if (this.environmentManager.selectedEnvironmentId) {
+            await this.loadEntities(this.environmentManager.selectedEnvironmentId);
+        }
     }
 
     protected getHtmlContent(): string {
@@ -175,7 +201,7 @@ export class MetadataBrowserPanel extends BasePanel {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src ${this.panel.webview.cspSource} 'unsafe-inline';">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this._panel.webview.cspSource} 'unsafe-inline'; script-src ${this._panel.webview.cspSource} 'unsafe-inline';">
             <title>Metadata Browser</title>
             <style>
                 body {
@@ -186,6 +212,8 @@ export class MetadataBrowserPanel extends BasePanel {
                     padding: 0;
                     overflow: hidden;
                 }
+
+                ${this.environmentManager.getEnvironmentSelectorCss()}
 
                 .container {
                     display: flex;
@@ -533,11 +561,12 @@ export class MetadataBrowserPanel extends BasePanel {
                     <h1>Metadata Browser</h1>
                     <div class="header-actions">
                         <button id="refreshBtn" class="btn btn-primary">
-                            <span class="icon">🔄</span>
                             Refresh
                         </button>
                     </div>
                 </div>
+
+                ${this.environmentManager.getEnvironmentSelectorHtml()}
 
                 <div class="content">
                     <div class="sidebar">
@@ -590,10 +619,25 @@ export class MetadataBrowserPanel extends BasePanel {
                 let entities = [];
                 let selectedEntity = null;
 
+                ${this.environmentManager.getEnvironmentSelectorJs()}
+
+                // Override the loadDataForEnvironment function
+                function loadDataForEnvironment(environmentId) {
+                    if (environmentId) {
+                        vscode.postMessage({
+                            action: 'loadEntities',
+                            environmentId: environmentId
+                        });
+                    }
+                }
+
                 window.addEventListener('message', event => {
                     const message = event.data;
                     
-                    switch (message.command) {
+                    switch (message.command || message.action) {
+                        case 'environmentsLoaded':
+                            populateEnvironments(message.data, message.selectedEnvironmentId);
+                            break;
                         case 'entitiesLoaded':
                             handleEntitiesLoaded(message.data.entities);
                             break;

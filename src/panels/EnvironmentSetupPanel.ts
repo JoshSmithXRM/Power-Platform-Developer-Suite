@@ -43,6 +43,9 @@ export class EnvironmentSetupPanel extends BasePanel {
 
         this._editingEnvironment = editingEnvironment;
 
+        // Initialize after construction
+        this.initialize();
+
         // If editing, send the environment data to the webview after a short delay to ensure it's loaded
         if (this._editingEnvironment) {
             setTimeout(() => {

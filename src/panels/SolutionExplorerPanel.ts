@@ -5,7 +5,7 @@ import { WebviewMessage, EnvironmentConnection } from '../types';
 
 export class SolutionExplorerPanel extends BasePanel {
     public static readonly viewType = 'solutionExplorer';
-    
+
     private _selectedEnvironmentId: string | undefined;
     private _cachedSolutions: any[] | undefined;
     private _cachedEnvironments: any[] | undefined;
@@ -29,6 +29,9 @@ export class SolutionExplorerPanel extends BasePanel {
             viewType: SolutionExplorerPanel.viewType,
             title: 'Solution Explorer'
         });
+
+        // Initialize after construction
+        this.initialize();
     }
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
@@ -522,7 +525,7 @@ export class SolutionExplorerPanel extends BasePanel {
         return `
             <!-- Environment Selector -->
             <div class="environment-selector">
-                <span class="environment-label">🌐 Environment:</span>
+                <span class="environment-label">Environment:</span>
                 <select id="environmentSelect" class="environment-dropdown">
                     <option value="">Loading environments...</option>
                 </select>
@@ -530,8 +533,8 @@ export class SolutionExplorerPanel extends BasePanel {
             </div>
 
             <div class="header">
-                <h1 class="title">📦 Solution Explorer</h1>
-                <button class="refresh-btn" onclick="refreshSolutions()">🔄 Refresh</button>
+                <h1 class="title">Solution Explorer</h1>
+                <button class="refresh-btn" onclick="refreshSolutions()">Refresh</button>
             </div>
             
             <div id="content">

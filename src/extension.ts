@@ -23,7 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Initialize providers
     const environmentsProvider = new EnvironmentsProvider(authService);
-    const toolsProvider = new ToolsProvider(authService);
+    const toolsProvider = new ToolsProvider();
 
     // Register tree data providers
     vscode.window.registerTreeDataProvider('dynamics-devtools-environments', environmentsProvider);

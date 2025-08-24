@@ -36,7 +36,7 @@ export abstract class BasePanel implements IPanelBase {
             this._disposables
         );
 
-        this.initialize();
+        // Don't auto-initialize - let child classes control when to initialize
     }
 
     /**

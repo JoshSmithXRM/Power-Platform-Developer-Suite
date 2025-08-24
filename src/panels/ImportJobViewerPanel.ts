@@ -5,7 +5,7 @@ import { WebviewMessage, EnvironmentConnection } from '../types';
 
 export class ImportJobViewerPanel extends BasePanel {
     public static readonly viewType = 'importJobViewer';
-    
+
     private _cachedEnvironments: EnvironmentConnection[] | undefined;
     private _selectedEnvironmentId: string | undefined;
     private _cachedImportJobs: any[] | null = null;
@@ -30,6 +30,9 @@ export class ImportJobViewerPanel extends BasePanel {
             viewType: ImportJobViewerPanel.viewType,
             title: 'Import Job Viewer'
         });
+        
+        // Initialize after construction
+        this.initialize();
     }
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
@@ -624,7 +627,7 @@ export class ImportJobViewerPanel extends BasePanel {
         return `
             <!-- Environment Selector -->
             <div class="environment-selector">
-                <span class="environment-label">🌐 Environment:</span>
+                <span class="environment-label">Environment:</span>
                 <select id="environmentSelect" class="environment-dropdown">
                     <option value="">Loading environments...</option>
                 </select>
@@ -632,12 +635,12 @@ export class ImportJobViewerPanel extends BasePanel {
             </div>
 
             <div class="header">
-                <h1 class="title">📥 Import Job Viewer</h1>
+                <h1 class="title">Import Job Viewer</h1>
                 <div class="header-actions">
                     <button class="solution-history-btn" onclick="openSolutionHistory()" id="solutionHistoryBtn" disabled>
-                        🔗 View in Maker
+                        View in Maker
                     </button>
-                    <button class="refresh-btn" onclick="refreshImportJobs()">🔄 Refresh</button>
+                    <button class="refresh-btn" onclick="refreshImportJobs()">Refresh</button>
                 </div>
             </div>
             

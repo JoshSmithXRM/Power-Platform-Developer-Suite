@@ -1,12 +1,14 @@
 import * as vscode from 'vscode';
-import { AuthenticationService } from '../services/AuthenticationService';
 import { ToolItem } from './EnvironmentsProvider';
 
 export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
-    private _authService: AuthenticationService;
+    private _onDidChangeTreeData: vscode.EventEmitter<ToolItem | undefined | null | void> = new vscode.EventEmitter<ToolItem | undefined | null | void>();
+    readonly onDidChangeTreeData: vscode.Event<ToolItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
-    constructor(authService: AuthenticationService) {
-        this._authService = authService;
+    constructor() {}
+
+    refresh(): void {
+        this._onDidChangeTreeData.fire();
     }
 
     getTreeItem(element: ToolItem): vscode.TreeItem {
@@ -15,13 +17,37 @@ export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
 
     getChildren(element?: ToolItem): Thenable<ToolItem[]> {
         if (!element) {
-            return Promise.resolve([
-                new ToolItem('Metadata Browser', 'Browse entity metadata', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.openMetadataBrowser'),
-                new ToolItem('Query Data', 'Run custom queries', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.queryData'),
-                new ToolItem('Solution Explorer', 'Manage solutions', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.solutionExplorer'),
-                new ToolItem('Import Job Viewer', 'View solution import history', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.importJobViewer')
-            ]);
+            return Promise.resolve(this.getTools());
         }
         return Promise.resolve([]);
+    }
+
+    private getTools(): ToolItem[] {
+        return [
+            new ToolItem(
+                'Solution Explorer',
+                'Explore and manage Dynamics 365 solutions',
+                vscode.TreeItemCollapsibleState.None,
+                'dynamics-devtools.solutionExplorer'
+            ),
+            new ToolItem(
+                'Metadata Browser',
+                'Browse and explore entity metadata',
+                vscode.TreeItemCollapsibleState.None,
+                'dynamics-devtools.openMetadataBrowser'
+            ),
+            new ToolItem(
+                'Import Job Viewer',
+                'View and monitor data import jobs',
+                vscode.TreeItemCollapsibleState.None,
+                'dynamics-devtools.importJobViewer'
+            ),
+            new ToolItem(
+                'Query Data',
+                'Query and analyze data from Dynamics 365',
+                vscode.TreeItemCollapsibleState.None,
+                'dynamics-devtools.queryData'
+            ),
+        ];
     }
 }

@@ -27,6 +27,9 @@ export class QueryDataPanel extends BasePanel {
             viewType: QueryDataPanel.viewType,
             title: 'Query Data'
         });
+        
+        // Initialize after construction
+        this.initialize();
     }
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
@@ -156,7 +159,7 @@ export class QueryDataPanel extends BasePanel {
             </div>
             
             <div class="content">
-                <h1>🔍 Query Data</h1>
+                <h1>Query Data</h1>
                 <p>Run custom queries against your Dataverse environment.</p>
             </div>
             

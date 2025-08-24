@@ -67,9 +67,9 @@ export class EnvironmentCommands {
         try {
             vscode.window.showInformationMessage('Testing connection...');
             const token = await this.authService.getAccessToken(selected.env.id);
-            vscode.window.showInformationMessage(`✅ Connection successful to ${selected.env.name}!`);
+            vscode.window.showInformationMessage(`Connection successful to ${selected.env.name}!`);
         } catch (error: any) {
-            vscode.window.showErrorMessage(`❌ Connection failed: ${error.message}`);
+            vscode.window.showErrorMessage(`Connection failed: ${error.message}`);
         }
     }
 
@@ -125,9 +125,9 @@ export class EnvironmentCommands {
         if (environmentItem) {
             try {
                 await this.authService.getAccessToken(environmentItem.envId);
-                vscode.window.showInformationMessage(`✅ Connection test successful for ${environmentItem.label}!`);
+                vscode.window.showInformationMessage(`Connection test successful for ${environmentItem.label}!`);
             } catch (error: any) {
-                vscode.window.showErrorMessage(`❌ Connection test failed for ${environmentItem.label}: ${error.message}`);
+                vscode.window.showErrorMessage(`Connection test failed for ${environmentItem.label}: ${error.message}`);
             }
         } else {
             vscode.window.showErrorMessage('No environment selected');
@@ -185,9 +185,9 @@ export class EnvironmentCommands {
         if (confirm === 'Yes, Remove') {
             try {
                 await this.authService.removeEnvironment(selected.env.id);
-                vscode.window.showInformationMessage(`✅ Environment "${selected.env.name}" removed successfully!`);
+                vscode.window.showInformationMessage(`Environment "${selected.env.name}" removed successfully!`);
             } catch (error: any) {
-                vscode.window.showErrorMessage(`❌ Failed to remove environment: ${error.message}`);
+                vscode.window.showErrorMessage(`Failed to remove environment: ${error.message}`);
             }
         }
     }
