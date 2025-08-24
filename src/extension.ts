@@ -10,6 +10,7 @@ import { ToolsProvider } from './providers/ToolsProvider';
 // Commands
 import { EnvironmentCommands } from './commands/EnvironmentCommands';
 import { PanelCommands } from './commands/PanelCommands';
+import { MetadataBrowserCommands } from './commands/MetadataBrowserCommands';
 
 /**
  * Extension activation function
@@ -31,11 +32,13 @@ export function activate(context: vscode.ExtensionContext) {
     // Initialize command handlers
     const environmentCommands = new EnvironmentCommands(authService, context);
     const panelCommands = new PanelCommands(authService, context, environmentsProvider);
+    const metadataBrowserCommands = new MetadataBrowserCommands(authService, context);
 
     // Register all commands
     const commandDisposables = [
         ...environmentCommands.registerCommands(),
-        ...panelCommands.registerCommands()
+        ...panelCommands.registerCommands(),
+        ...metadataBrowserCommands.registerCommands()
     ];
 
     // Add all disposables to context

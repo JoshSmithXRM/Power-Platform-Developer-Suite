@@ -57,6 +57,11 @@
                 "command": "dynamics-devtools.openDynamics",
                 "title": "Open Dynamics",
                 "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.openMetadataBrowser",
+                "title": "Open Metadata Browser",
+                "category": "Dynamics DevTools"
             }
         ],
         "viewsContainers": {

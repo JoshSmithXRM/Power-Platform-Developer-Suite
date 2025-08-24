@@ -16,10 +16,10 @@ export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
     getChildren(element?: ToolItem): Thenable<ToolItem[]> {
         if (!element) {
             return Promise.resolve([
-                new ToolItem('📊 Entity Browser', 'Browse tables and data', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.entityBrowser'),
-                new ToolItem('🔍 Query Data', 'Run custom queries', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.queryData'),
-                new ToolItem('📦 Solution Explorer', 'Manage solutions', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.solutionExplorer'),
-                new ToolItem('📥 Import Job Viewer', 'View solution import history', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.importJobViewer')
+                new ToolItem('Metadata Browser', 'Browse entity metadata', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.openMetadataBrowser'),
+                new ToolItem('Query Data', 'Run custom queries', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.queryData'),
+                new ToolItem('Solution Explorer', 'Manage solutions', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.solutionExplorer'),
+                new ToolItem('Import Job Viewer', 'View solution import history', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.importJobViewer')
             ]);
         }
         return Promise.resolve([]);

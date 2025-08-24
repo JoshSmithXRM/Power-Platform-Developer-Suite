@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        "ms-vscode.vscode-typescript-next",
+        "dbaeumer.vscode-eslint",
+        "ms-vscode.test-adapter-converter",
+        "ms-vscode.extension-test-runner"
+    ]
+}

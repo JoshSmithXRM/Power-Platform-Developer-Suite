@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { AuthenticationService } from '../services/AuthenticationService';
 import { EnvironmentsProvider } from '../providers/EnvironmentsProvider';
-import { EntityBrowserPanel } from '../panels/EntityBrowserPanel';
 import { QueryDataPanel } from '../panels/QueryDataPanel';
 import { SolutionExplorerPanel } from '../panels/SolutionExplorerPanel';
 import { ImportJobViewerPanel } from '../panels/ImportJobViewerPanel';
@@ -21,10 +20,6 @@ export class PanelCommands {
      */
     public registerCommands(): vscode.Disposable[] {
         return [
-            vscode.commands.registerCommand('dynamics-devtools.entityBrowser', () => {
-                EntityBrowserPanel.createOrShow(this.context.extensionUri, this.authService);
-            }),
-
             vscode.commands.registerCommand('dynamics-devtools.queryData', () => {
                 QueryDataPanel.createOrShow(this.context.extensionUri, this.authService);
             }),
