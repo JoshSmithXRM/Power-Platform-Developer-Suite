@@ -699,6 +699,12 @@ class SolutionExplorerPanel {
                         this._selectedEnvironmentId = message.environmentId;
                         await this.loadSolutions(message.environmentId);
                         break;
+                    case 'openSolutionInMaker':
+                        await this.openSolutionInMaker(message.solutionId, message.solutionName);
+                        break;
+                    case 'openSolutionInClassic':
+                        await this.openSolutionInClassic(message.solutionId, message.solutionName);
+                        break;
                 }
             },
             null,
@@ -921,6 +927,72 @@ class SolutionExplorerPanel {
                 .filtered-row {
                     display: none;
                 }
+                
+                /* Solution Actions */
+                .solution-actions {
+                    display: flex;
+                    gap: 4px;
+                    justify-content: center;
+                }
+                .action-btn {
+                    background: none;
+                    border: 1px solid var(--vscode-button-border);
+                    padding: 4px 6px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    font-size: 12px;
+                    line-height: 1;
+                    min-width: 24px;
+                    height: 24px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .maker-btn {
+                    background: var(--vscode-button-background);
+                    color: var(--vscode-button-foreground);
+                }
+                .maker-btn:hover {
+                    background: var(--vscode-button-hoverBackground);
+                }
+                .classic-btn {
+                    background: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                    border: 1px solid var(--vscode-button-border);
+                }
+                .classic-btn:hover {
+                    background: var(--vscode-button-secondaryHoverBackground);
+                }
+                
+                /* Context Menu */
+                .context-menu {
+                    position: fixed;
+                    background: var(--vscode-menu-background);
+                    border: 1px solid var(--vscode-menu-border);
+                    border-radius: 4px;
+                    padding: 4px 0;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                    z-index: 1000;
+                    min-width: 180px;
+                }
+                .context-menu-item {
+                    padding: 8px 16px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    color: var(--vscode-menu-foreground);
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .context-menu-item:hover {
+                    background: var(--vscode-menu-selectionBackground);
+                    color: var(--vscode-menu-selectionForeground);
+                }
+                .context-menu-separator {
+                    height: 1px;
+                    background: var(--vscode-menu-separatorBackground);
+                    margin: 4px 0;
+                }
             </style>
         </head>
         <body>
@@ -1063,6 +1135,7 @@ class SolutionExplorerPanel {
                                         <th onclick="sortTable(5)" class="sortable">
                                             Created <span class="sort-indicator">⇅</span>
                                         </th>
+                                        <th style="width: 120px;">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="solutionsTableBody">
@@ -1076,13 +1149,25 @@ class SolutionExplorerPanel {
                         const createdDate = new Date(solution.createdon).toLocaleDateString();
                         
                         tableHtml += \`
-                            <tr>
+                            <tr data-solution-id="\${solution.solutionid}" oncontextmenu="showSolutionContextMenu(event, '\${solution.solutionid}', '\${solution.friendlyname || solution.uniquename}')">
                                 <td>\${solution.friendlyname || solution.uniquename}</td>
                                 <td>\${solution.uniquename}</td>
                                 <td>\${managedBadge}</td>
                                 <td>\${solution.version}</td>
                                 <td>\${solution.publishername || 'Unknown'}</td>
                                 <td>\${createdDate}</td>
+                                <td>
+                                    <div class="solution-actions">
+                                        <button onclick="openSolutionInMaker('\${solution.solutionid}', '\${solution.friendlyname || solution.uniquename}')" 
+                                                class="action-btn maker-btn" title="Open in Maker">
+                                            🔧
+                                        </button>
+                                        <button onclick="openSolutionInClassic('\${solution.solutionid}', '\${solution.friendlyname || solution.uniquename}')" 
+                                                class="action-btn classic-btn" title="Open in Classic">
+                                            🏛️
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                         \`;
                     });
@@ -1206,6 +1291,75 @@ class SolutionExplorerPanel {
                         case 'solutionsError':
                             displayError(message.error);
                             break;
+                    }
+                });
+                
+                // Solution Actions
+                function openSolutionInMaker(solutionId, solutionName) {
+                    vscode.postMessage({ 
+                        action: 'openSolutionInMaker', 
+                        solutionId: solutionId,
+                        solutionName: solutionName
+                    });
+                }
+                
+                function openSolutionInClassic(solutionId, solutionName) {
+                    vscode.postMessage({ 
+                        action: 'openSolutionInClassic', 
+                        solutionId: solutionId,
+                        solutionName: solutionName
+                    });
+                }
+                
+                // Context Menu Functions
+                let currentContextMenu = null;
+                
+                function showSolutionContextMenu(event, solutionId, solutionName) {
+                    event.preventDefault();
+                    hideContextMenu(); // Hide any existing menu
+                    
+                    const menu = document.createElement('div');
+                    menu.className = 'context-menu';
+                    menu.innerHTML = \`
+                        <div class="context-menu-item" onclick="openSolutionInMaker('\${solutionId}', '\${solutionName}'); hideContextMenu();">
+                            🔧 Open in Maker
+                        </div>
+                        <div class="context-menu-item" onclick="openSolutionInClassic('\${solutionId}', '\${solutionName}'); hideContextMenu();">
+                            🏛️ Open in Classic
+                        </div>
+                    \`;
+                    
+                    // Position the menu
+                    menu.style.left = event.pageX + 'px';
+                    menu.style.top = event.pageY + 'px';
+                    
+                    document.body.appendChild(menu);
+                    currentContextMenu = menu;
+                    
+                    // Adjust position if menu goes off screen
+                    const rect = menu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        menu.style.left = (event.pageX - rect.width) + 'px';
+                    }
+                    if (rect.bottom > window.innerHeight) {
+                        menu.style.top = (event.pageY - rect.height) + 'px';
+                    }
+                    
+                    return false;
+                }
+                
+                function hideContextMenu() {
+                    if (currentContextMenu) {
+                        currentContextMenu.remove();
+                        currentContextMenu = null;
+                    }
+                }
+                
+                // Hide context menu when clicking elsewhere
+                document.addEventListener('click', hideContextMenu);
+                document.addEventListener('contextmenu', (e) => {
+                    if (!e.target.closest('tr[data-solution-id]')) {
+                        hideContextMenu();
                     }
                 });
                 
@@ -1338,6 +1492,64 @@ class SolutionExplorerPanel {
                 action: 'solutionsError',
                 error: error.message
             });
+        }
+    }
+
+    private async openSolutionInMaker(solutionId: string, solutionName: string) {
+        try {
+            // Get the current environment to extract the environment ID
+            const environments = await this._authService.getEnvironments();
+            const currentEnv = environments.find(env => env.id === this._selectedEnvironmentId);
+            
+            if (!currentEnv || !currentEnv.environmentId) {
+                vscode.window.showErrorMessage(
+                    'Environment ID is not configured for this environment. Please edit the environment and add the Environment ID.'
+                );
+                return;
+            }
+
+            // Build the Maker URL (ensure clean URL construction)
+            const cleanEnvironmentId = currentEnv.environmentId.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes
+            const cleanSolutionId = solutionId.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes
+            const makerUrl = `https://make.powerapps.com/environments/${cleanEnvironmentId}/solutions/${cleanSolutionId}`;
+            
+            // Open in browser
+            vscode.env.openExternal(vscode.Uri.parse(makerUrl));
+            
+            vscode.window.showInformationMessage(`Opening solution "${solutionName}" in Maker...`);
+            
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to open solution in Maker: ${error.message}`);
+        }
+    }
+
+    private async openSolutionInClassic(solutionId: string, solutionName: string) {
+        try {
+            // Get the current environment to extract the Dataverse URL
+            const environments = await this._authService.getEnvironments();
+            const currentEnv = environments.find(env => env.id === this._selectedEnvironmentId);
+            
+            if (!currentEnv) {
+                vscode.window.showErrorMessage('Could not find current environment.');
+                return;
+            }
+
+            // Format the solution ID for classic URL (needs to be URL encoded and wrapped in braces)
+            const formattedSolutionId = encodeURIComponent(`{${solutionId.toUpperCase()}}`);
+            
+            // Build the Classic URL using the Dataverse URL (ensure no double slashes)
+            const baseUrl = currentEnv.settings.dataverseUrl.endsWith('/') 
+                ? currentEnv.settings.dataverseUrl.slice(0, -1) 
+                : currentEnv.settings.dataverseUrl;
+            const classicUrl = `${baseUrl}/tools/solution/edit.aspx?id=${formattedSolutionId}`;
+            
+            // Open in browser
+            vscode.env.openExternal(vscode.Uri.parse(classicUrl));
+            
+            vscode.window.showInformationMessage(`Opening solution "${solutionName}" in Classic...`);
+            
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to open solution in Classic: ${error.message}`);
         }
     }
 }
