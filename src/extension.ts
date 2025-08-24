@@ -8,8 +8,8 @@ import { EnvironmentsProvider } from './providers/EnvironmentsProvider';
 import { ToolsProvider } from './providers/ToolsProvider';
 
 // Commands
-import { EnvironmentCommands } from './commands/environmentCommands';
-import { PanelCommands } from './commands/panelCommands';
+import { EnvironmentCommands } from './commands/EnvironmentCommands';
+import { PanelCommands } from './commands/PanelCommands';
 
 /**
  * Extension activation function
