@@ -1,0 +1,902 @@
+import * as vscode from 'vscode';
+import { BasePanel } from './base/BasePanel';
+import { AuthenticationService } from '../services/AuthenticationService';
+import { WebviewMessage, EnvironmentConnection } from '../types';
+
+export class SolutionExplorerPanel extends BasePanel {
+    public static readonly viewType = 'solutionExplorer';
+    
+    private _selectedEnvironmentId: string | undefined;
+    private _cachedSolutions: any[] | undefined;
+    private _cachedEnvironments: any[] | undefined;
+
+    public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
+        const column = vscode.window.activeTextEditor?.viewColumn;
+
+        const panel = BasePanel.createWebviewPanel({
+            viewType: SolutionExplorerPanel.viewType,
+            title: 'Solution Explorer',
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            enableFindWidget: true
+        }, column);
+
+        new SolutionExplorerPanel(panel, extensionUri, authService);
+    }
+
+    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService) {
+        super(panel, extensionUri, authService, {
+            viewType: SolutionExplorerPanel.viewType,
+            title: 'Solution Explorer'
+        });
+    }
+
+    protected async handleMessage(message: WebviewMessage): Promise<void> {
+        switch (message.action) {
+            case 'loadEnvironments':
+                await this.loadEnvironments();
+                break;
+            case 'loadSolutions':
+                // Clear cache if environment changed or force refresh requested
+                if (this._selectedEnvironmentId !== message.environmentId || message.forceRefresh) {
+                    this._cachedSolutions = undefined;
+                }
+                // Store the selected environment
+                this._selectedEnvironmentId = message.environmentId;
+                await this.loadSolutions(message.environmentId);
+                break;
+            case 'openSolutionInMaker':
+                await this.openSolutionInMaker(message.solutionId, message.solutionName);
+                break;
+            case 'openSolutionInClassic':
+                await this.openSolutionInClassic(message.solutionId, message.solutionName);
+                break;
+        }
+    }
+
+    private async loadEnvironments() {
+        try {
+            // Use cached environments if available
+            if (this._cachedEnvironments) {
+                this.postMessage({
+                    action: 'environmentsLoaded',
+                    data: this._cachedEnvironments,
+                    selectedEnvironmentId: this._selectedEnvironmentId
+                });
+                return;
+            }
+
+            const environments = await this._authService.getEnvironments();
+
+            // Cache the environments
+            this._cachedEnvironments = environments;
+
+            this.postMessage({
+                action: 'environmentsLoaded',
+                data: environments,
+                selectedEnvironmentId: this._selectedEnvironmentId
+            });
+
+        } catch (error: any) {
+            console.error('Error loading environments:', error);
+            this.postMessage({
+                action: 'solutionsError',
+                error: `Failed to load environments: ${error.message}`
+            });
+        }
+    }
+
+    private async loadSolutions(environmentId?: string) {
+        try {
+            // Check if we have cached solutions for this environment
+            if (this._cachedSolutions && this._selectedEnvironmentId === environmentId) {
+                this.postMessage({
+                    action: 'solutionsLoaded',
+                    data: this._cachedSolutions
+                });
+                return;
+            }
+
+            // Get available environments
+            const environments = await this._authService.getEnvironments();
+
+            if (environments.length === 0) {
+                this.postMessage({
+                    action: 'solutionsError',
+                    error: 'No environments configured. Please add an environment first.'
+                });
+                return;
+            }
+
+            // Use specified environment or fall back to first one
+            let environment = environments[0];
+            if (environmentId) {
+                const foundEnv = environments.find(env => env.id === environmentId);
+                if (foundEnv) {
+                    environment = foundEnv;
+                } else {
+                    this.postMessage({
+                        action: 'solutionsError',
+                        error: 'Selected environment not found.'
+                    });
+                    return;
+                }
+            }
+
+            // Get access token for the environment
+            const token = await this._authService.getAccessToken(environment.id);
+
+            // Fetch solutions from Dataverse
+            const solutionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/solutions?$select=solutionid,uniquename,friendlyname,version,ismanaged,createdon,description&$expand=publisherid($select=uniquename,friendlyname)&$orderby=createdon desc`;
+
+            const response = await fetch(solutionsUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json() as any;
+
+            // Transform the data to include publisher name
+            const solutions = data.value.map((solution: any) => ({
+                solutionid: solution.solutionid,
+                uniquename: solution.uniquename,
+                friendlyname: solution.friendlyname,
+                version: solution.version,
+                ismanaged: solution.ismanaged,
+                createdon: solution.createdon,
+                description: solution.description,
+                publishername: solution.publisherid?.friendlyname || solution.publisherid?.uniquename || 'Unknown'
+            }));
+
+            // Cache the solutions data
+            this._cachedSolutions = solutions;
+
+            this.postMessage({
+                action: 'solutionsLoaded',
+                data: solutions
+            });
+
+        } catch (error: any) {
+            console.error('Error loading solutions:', error);
+            this.postMessage({
+                action: 'solutionsError',
+                error: error.message
+            });
+        }
+    }
+
+    private async openSolutionInMaker(solutionId: string, solutionName: string) {
+        try {
+            // Get the current environment to extract the environment ID
+            const environments = await this._authService.getEnvironments();
+            const currentEnv = environments.find(env => env.id === this._selectedEnvironmentId);
+
+            if (!currentEnv || !currentEnv.environmentId) {
+                vscode.window.showErrorMessage(
+                    'Environment ID is not configured for this environment. Please edit the environment and add the Environment ID.'
+                );
+                return;
+            }
+
+            // Build the Maker URL (ensure clean URL construction)
+            const cleanEnvironmentId = currentEnv.environmentId.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes
+            const cleanSolutionId = solutionId.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes
+            const makerUrl = `https://make.powerapps.com/environments/${cleanEnvironmentId}/solutions/${cleanSolutionId}`;
+
+            // Open in browser
+            vscode.env.openExternal(vscode.Uri.parse(makerUrl));
+
+            vscode.window.showInformationMessage(`Opening solution "${solutionName}" in Maker...`);
+
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to open solution in Maker: ${error.message}`);
+        }
+    }
+
+    private async openSolutionInClassic(solutionId: string, solutionName: string) {
+        try {
+            // Get the current environment to extract the Dataverse URL
+            const environments = await this._authService.getEnvironments();
+            const currentEnv = environments.find(env => env.id === this._selectedEnvironmentId);
+
+            if (!currentEnv) {
+                vscode.window.showErrorMessage('Could not find current environment.');
+                return;
+            }
+
+            // Format the solution ID for classic URL (needs to be URL encoded and wrapped in braces)
+            const formattedSolutionId = encodeURIComponent(`{${solutionId.toUpperCase()}}`);
+
+            // Build the Classic URL using the Dataverse URL (ensure no double slashes)
+            const baseUrl = currentEnv.settings.dataverseUrl.endsWith('/')
+                ? currentEnv.settings.dataverseUrl.slice(0, -1)
+                : currentEnv.settings.dataverseUrl;
+            const classicUrl = `${baseUrl}/tools/solution/edit.aspx?id=${formattedSolutionId}`;
+
+            // Open in browser
+            vscode.env.openExternal(vscode.Uri.parse(classicUrl));
+
+            vscode.window.showInformationMessage(`Opening solution "${solutionName}" in Classic...`);
+
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to open solution in Classic: ${error.message}`);
+        }
+    }
+
+    protected getHtmlContent(): string {
+        // Due to the large HTML content, let's keep it in a separate method for maintainability
+        return this.getSolutionExplorerHtml();
+    }
+
+    private getSolutionExplorerHtml(): string {
+        return `<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Solution Explorer</title>
+            ${this.getSolutionExplorerStyles()}
+        </head>
+        <body>
+            ${this.getSolutionExplorerBody()}
+            ${this.getSolutionExplorerScript()}
+        </body>
+        </html>`;
+    }
+
+    private getSolutionExplorerStyles(): string {
+        return `<style>
+                body {
+                    margin: 0;
+                    padding: 20px;
+                    font-family: var(--vscode-font-family);
+                    background: var(--vscode-editor-background);
+                    color: var(--vscode-editor-foreground);
+                }
+                .environment-selector {
+                    background: var(--vscode-editorWidget-background);
+                    border: 1px solid var(--vscode-editorWidget-border);
+                    border-radius: 6px;
+                    padding: 16px;
+                    margin-bottom: 20px;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .environment-label {
+                    font-weight: 600;
+                    color: var(--vscode-textLink-foreground);
+                    min-width: 80px;
+                }
+                .environment-dropdown {
+                    flex: 1;
+                    max-width: 400px;
+                    padding: 8px 12px;
+                    border: 1px solid var(--vscode-input-border);
+                    border-radius: 4px;
+                    background: var(--vscode-input-background);
+                    color: var(--vscode-input-foreground);
+                    font-family: inherit;
+                    font-size: 14px;
+                }
+                .environment-dropdown:focus {
+                    outline: none;
+                    border-color: var(--vscode-focusBorder);
+                    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+                }
+                .environment-status {
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 0.85em;
+                    font-weight: 500;
+                }
+                .environment-connected {
+                    background: var(--vscode-testing-iconPassed);
+                    color: white;
+                }
+                .environment-disconnected {
+                    background: var(--vscode-testing-iconFailed);
+                    color: white;
+                }
+                .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    padding-bottom: 10px;
+                    border-bottom: 1px solid var(--vscode-editorWidget-border);
+                }
+                .title {
+                    font-size: 1.5em;
+                    margin: 0;
+                    color: var(--vscode-textLink-foreground);
+                }
+                .refresh-btn {
+                    background: var(--vscode-button-background);
+                    color: var(--vscode-button-foreground);
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                }
+                .refresh-btn:hover {
+                    background: var(--vscode-button-hoverBackground);
+                }
+                .loading {
+                    text-align: center;
+                    padding: 40px;
+                    color: var(--vscode-descriptionForeground);
+                }
+                .error {
+                    background: var(--vscode-inputValidation-errorBackground);
+                    border: 1px solid var(--vscode-inputValidation-errorBorder);
+                    color: var(--vscode-inputValidation-errorForeground);
+                    padding: 12px;
+                    border-radius: 4px;
+                    margin: 10px 0;
+                }
+                .solutions-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    background: var(--vscode-editorWidget-background);
+                    border: 1px solid var(--vscode-editorWidget-border);
+                    border-radius: 4px;
+                }
+                .solutions-table th,
+                .solutions-table td {
+                    padding: 12px;
+                    text-align: left;
+                    border-bottom: 1px solid var(--vscode-editorWidget-border);
+                }
+                .solutions-table th {
+                    background: var(--vscode-editorGroupHeader-tabsBackground);
+                    font-weight: 600;
+                    color: var(--vscode-textLink-foreground);
+                    position: sticky;
+                    top: 0;
+                }
+                .solutions-table tr:hover {
+                    background: var(--vscode-list-hoverBackground);
+                }
+                .managed-badge {
+                    background: var(--vscode-button-background);
+                    color: var(--vscode-button-foreground);
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    font-size: 0.85em;
+                }
+                .unmanaged-badge {
+                    background: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                    border: 1px solid var(--vscode-button-border);
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    font-size: 0.85em;
+                }
+                .no-solutions {
+                    text-align: center;
+                    padding: 40px;
+                    color: var(--vscode-descriptionForeground);
+                }
+                
+                /* Sortable Table Styles */
+                .table-container {
+                    margin-top: 10px;
+                }
+                .table-controls {
+                    margin-bottom: 15px;
+                    display: flex;
+                    gap: 10px;
+                    align-items: center;
+                }
+                .filter-input {
+                    flex: 1;
+                    padding: 8px 12px;
+                    border: 1px solid var(--vscode-input-border);
+                    border-radius: 4px;
+                    background: var(--vscode-input-background);
+                    color: var(--vscode-input-foreground);
+                    font-family: inherit;
+                    font-size: 14px;
+                }
+                .filter-input:focus {
+                    outline: none;
+                    border-color: var(--vscode-focusBorder);
+                    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+                }
+                .clear-filter-btn {
+                    padding: 8px 12px;
+                    background: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                    border: 1px solid var(--vscode-button-border);
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 14px;
+                }
+                .clear-filter-btn:hover {
+                    background: var(--vscode-button-secondaryHoverBackground);
+                }
+                .sortable {
+                    cursor: pointer;
+                    user-select: none;
+                    position: relative;
+                }
+                .sortable:hover {
+                    background: var(--vscode-list-hoverBackground);
+                }
+                .sort-indicator {
+                    color: var(--vscode-descriptionForeground);
+                    font-size: 12px;
+                    margin-left: 5px;
+                }
+                .sort-asc .sort-indicator::after {
+                    content: ' ↑';
+                    color: var(--vscode-charts-blue);
+                }
+                .sort-desc .sort-indicator::after {
+                    content: ' ↓';
+                    color: var(--vscode-charts-blue);
+                }
+                .filtered-row {
+                    display: none;
+                }
+                
+                /* Solution Actions */
+                .solution-actions {
+                    display: flex;
+                    gap: 4px;
+                    justify-content: center;
+                }
+                .action-btn {
+                    background: none;
+                    border: 1px solid var(--vscode-button-border);
+                    padding: 4px 6px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    font-size: 12px;
+                    line-height: 1;
+                    min-width: 24px;
+                    height: 24px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .maker-btn {
+                    background: var(--vscode-button-background);
+                    color: var(--vscode-button-foreground);
+                }
+                .maker-btn:hover {
+                    background: var(--vscode-button-hoverBackground);
+                }
+                .classic-btn {
+                    background: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                    border: 1px solid var(--vscode-button-border);
+                }
+                .classic-btn:hover {
+                    background: var(--vscode-button-secondaryHoverBackground);
+                }
+                
+                /* Context Menu */
+                .context-menu {
+                    position: fixed;
+                    background: var(--vscode-menu-background);
+                    border: 1px solid var(--vscode-menu-border);
+                    border-radius: 4px;
+                    padding: 4px 0;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                    z-index: 1000;
+                    min-width: 180px;
+                }
+                .context-menu-item {
+                    padding: 8px 16px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    color: var(--vscode-menu-foreground);
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .context-menu-item:hover {
+                    background: var(--vscode-menu-selectionBackground);
+                    color: var(--vscode-menu-selectionForeground);
+                }
+                .context-menu-separator {
+                    height: 1px;
+                    background: var(--vscode-menu-separatorBackground);
+                    margin: 4px 0;
+                }
+            </style>`;
+    }
+
+    private getSolutionExplorerBody(): string {
+        return `
+            <!-- Environment Selector -->
+            <div class="environment-selector">
+                <span class="environment-label">🌐 Environment:</span>
+                <select id="environmentSelect" class="environment-dropdown">
+                    <option value="">Loading environments...</option>
+                </select>
+                <span id="environmentStatus" class="environment-status environment-disconnected">Disconnected</span>
+            </div>
+
+            <div class="header">
+                <h1 class="title">📦 Solution Explorer</h1>
+                <button class="refresh-btn" onclick="refreshSolutions()">🔄 Refresh</button>
+            </div>
+            
+            <div id="content">
+                <div class="loading">
+                    <p>Select an environment to load solutions...</p>
+                </div>
+            </div>`;
+    }
+
+    private getSolutionExplorerScript(): string {
+        return `<script>
+                const vscode = acquireVsCodeApi();
+                let currentEnvironmentId = '';
+                
+                // Load environments on startup
+                function loadEnvironments() {
+                    vscode.postMessage({ action: 'loadEnvironments' });
+                }
+                
+                function populateEnvironments(environments, selectedEnvironmentId) {
+                    const select = document.getElementById('environmentSelect');
+                    select.innerHTML = '<option value="">Select an environment...</option>';
+                    
+                    environments.forEach(env => {
+                        const option = document.createElement('option');
+                        option.value = env.id;
+                        option.textContent = \`\${env.name} (\${env.settings.dataverseUrl})\`;
+                        select.appendChild(option);
+                    });
+                    
+                    // Restore selected environment or auto-select first environment if available
+                    if (selectedEnvironmentId && environments.find(env => env.id === selectedEnvironmentId)) {
+                        select.value = selectedEnvironmentId;
+                        currentEnvironmentId = selectedEnvironmentId;
+                        updateEnvironmentStatus('Connected', true);
+                        loadSolutions();
+                    } else if (environments.length > 0) {
+                        select.value = environments[0].id;
+                        currentEnvironmentId = environments[0].id;
+                        updateEnvironmentStatus('Connected', true);
+                        loadSolutions();
+                    }
+                }
+                
+                function updateEnvironmentStatus(status, isConnected) {
+                    const statusElement = document.getElementById('environmentStatus');
+                    statusElement.textContent = status;
+                    statusElement.className = 'environment-status ' + 
+                        (isConnected ? 'environment-connected' : 'environment-disconnected');
+                }
+                
+                function onEnvironmentChange() {
+                    const select = document.getElementById('environmentSelect');
+                    currentEnvironmentId = select.value;
+                    
+                    if (currentEnvironmentId) {
+                        updateEnvironmentStatus('Connected', true);
+                        loadSolutions();
+                    } else {
+                        updateEnvironmentStatus('Disconnected', false);
+                        document.getElementById('content').innerHTML = 
+                            '<div class="loading"><p>Select an environment to load solutions...</p></div>';
+                    }
+                }
+                
+                function loadSolutions() {
+                    if (!currentEnvironmentId) {
+                        document.getElementById('content').innerHTML = 
+                            '<div class="error">Please select an environment first.</div>';
+                        return;
+                    }
+                    
+                    document.getElementById('content').innerHTML = '<div class="loading"><p>Loading solutions...</p></div>';
+                    vscode.postMessage({ 
+                        action: 'loadSolutions', 
+                        environmentId: currentEnvironmentId 
+                    });
+                }
+                
+                function refreshSolutions() {
+                    if (!currentEnvironmentId) {
+                        document.getElementById('content').innerHTML = 
+                            '<div class="error">Please select an environment first.</div>';
+                        return;
+                    }
+                    
+                    document.getElementById('content').innerHTML = '<div class="loading"><p>Loading solutions...</p></div>';
+                    vscode.postMessage({ 
+                        action: 'loadSolutions', 
+                        environmentId: currentEnvironmentId,
+                        forceRefresh: true
+                    });
+                }
+                
+                function displaySolutions(solutions) {
+                    const content = document.getElementById('content');
+                    
+                    if (!solutions || solutions.length === 0) {
+                        content.innerHTML = '<div class="no-solutions"><p>No solutions found in this environment.</p></div>';
+                        return;
+                    }
+                    
+                    let tableHtml = \`
+                        <div class="table-container">
+                            <div class="table-controls">
+                                <input type="text" id="solutionFilter" placeholder="🔍 Filter solutions..." class="filter-input">
+                                <button onclick="clearFilter()" class="clear-filter-btn">Clear</button>
+                            </div>
+                            <table class="solutions-table sortable-table">
+                                <thead>
+                                    <tr>
+                                        <th onclick="sortTable(0)" class="sortable">
+                                            Display Name <span class="sort-indicator">⇅</span>
+                                        </th>
+                                        <th onclick="sortTable(1)" class="sortable">
+                                            Name <span class="sort-indicator">⇅</span>
+                                        </th>
+                                        <th onclick="sortTable(2)" class="sortable">
+                                            Type <span class="sort-indicator">⇅</span>
+                                        </th>
+                                        <th onclick="sortTable(3)" class="sortable">
+                                            Version <span class="sort-indicator">⇅</span>
+                                        </th>
+                                        <th onclick="sortTable(4)" class="sortable">
+                                            Publisher <span class="sort-indicator">⇅</span>
+                                        </th>
+                                        <th onclick="sortTable(5)" class="sortable">
+                                            Created <span class="sort-indicator">⇅</span>
+                                        </th>
+                                        <th style="width: 120px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="solutionsTableBody">
+                    \`;
+                    
+                    solutions.forEach(solution => {
+                        const managedBadge = solution.ismanaged 
+                            ? '<span class="managed-badge">Managed</span>'
+                            : '<span class="unmanaged-badge">Unmanaged</span>';
+                            
+                        const createdDate = new Date(solution.createdon).toLocaleDateString();
+                        
+                        tableHtml += \`
+                            <tr data-solution-id="\${solution.solutionid}" oncontextmenu="showSolutionContextMenu(event, '\${solution.solutionid}', '\${solution.friendlyname || solution.uniquename}')">
+                                <td>\${solution.friendlyname || solution.uniquename}</td>
+                                <td>\${solution.uniquename}</td>
+                                <td>\${managedBadge}</td>
+                                <td>\${solution.version}</td>
+                                <td>\${solution.publishername || 'Unknown'}</td>
+                                <td>\${createdDate}</td>
+                                <td>
+                                    <div class="solution-actions">
+                                        <button onclick="openSolutionInMaker('\${solution.solutionid}', '\${solution.friendlyname || solution.uniquename}')" 
+                                                class="action-btn maker-btn" title="Open in Maker">
+                                            🔧
+                                        </button>
+                                        <button onclick="openSolutionInClassic('\${solution.solutionid}', '\${solution.friendlyname || solution.uniquename}')" 
+                                                class="action-btn classic-btn" title="Open in Classic">
+                                            🏛️
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        \`;
+                    });
+                    
+                    tableHtml += '</tbody></table></div>';
+                    content.innerHTML = tableHtml;
+                    
+                    // Store solutions data globally for sorting/filtering
+                    window.solutionsData = solutions;
+                    
+                    // Set up filter functionality
+                    setupTableFiltering();
+                }
+                
+                function displayError(error) {
+                    document.getElementById('content').innerHTML = 
+                        \`<div class="error">Error loading solutions: \${error}</div>\`;
+                    updateEnvironmentStatus('Error', false);
+                }
+                
+                // Sortable Table Functions
+                let currentSortColumn = -1;
+                let currentSortDirection = 'asc';
+                
+                function sortTable(columnIndex) {
+                    const table = document.querySelector('.solutions-table');
+                    const tbody = document.getElementById('solutionsTableBody');
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    
+                    // Clear previous sort indicators
+                    table.querySelectorAll('th').forEach(th => {
+                        th.classList.remove('sort-asc', 'sort-desc');
+                    });
+                    
+                    // Determine sort direction
+                    if (currentSortColumn === columnIndex) {
+                        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSortDirection = 'asc';
+                    }
+                    currentSortColumn = columnIndex;
+                    
+                    // Add sort indicator to current column
+                    const currentTh = table.querySelectorAll('th')[columnIndex];
+                    currentTh.classList.add('sort-' + currentSortDirection);
+                    
+                    // Sort rows
+                    rows.sort((a, b) => {
+                        let aVal = a.cells[columnIndex].textContent.trim();
+                        let bVal = b.cells[columnIndex].textContent.trim();
+                        
+                        // Handle different data types
+                        if (columnIndex === 3) { // Version column
+                            aVal = aVal.split('.').map(n => parseInt(n) || 0);
+                            bVal = bVal.split('.').map(n => parseInt(n) || 0);
+                            for (let i = 0; i < Math.max(aVal.length, bVal.length); i++) {
+                                const aNum = aVal[i] || 0;
+                                const bNum = bVal[i] || 0;
+                                if (aNum !== bNum) {
+                                    return currentSortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+                                }
+                            }
+                            return 0;
+                        } else if (columnIndex === 5) { // Date column
+                            aVal = new Date(aVal);
+                            bVal = new Date(bVal);
+                            return currentSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                        } else { // String columns
+                            aVal = aVal.toLowerCase();
+                            bVal = bVal.toLowerCase();
+                            if (aVal < bVal) return currentSortDirection === 'asc' ? -1 : 1;
+                            if (aVal > bVal) return currentSortDirection === 'asc' ? 1 : -1;
+                            return 0;
+                        }
+                    });
+                    
+                    // Re-append sorted rows
+                    rows.forEach(row => tbody.appendChild(row));
+                }
+                
+                function setupTableFiltering() {
+                    const filterInput = document.getElementById('solutionFilter');
+                    if (filterInput) {
+                        filterInput.addEventListener('input', filterTable);
+                    }
+                }
+                
+                function filterTable() {
+                    const filterValue = document.getElementById('solutionFilter').value.toLowerCase();
+                    const tbody = document.getElementById('solutionsTableBody');
+                    const rows = tbody.querySelectorAll('tr');
+                    
+                    rows.forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        if (text.includes(filterValue)) {
+                            row.style.display = '';
+                            row.classList.remove('filtered-row');
+                        } else {
+                            row.style.display = 'none';
+                            row.classList.add('filtered-row');
+                        }
+                    });
+                }
+                
+                function clearFilter() {
+                    document.getElementById('solutionFilter').value = '';
+                    filterTable();
+                }
+                
+                // Listen for messages from the extension
+                window.addEventListener('message', event => {
+                    const message = event.data;
+                    
+                    switch (message.action) {
+                        case 'environmentsLoaded':
+                            populateEnvironments(message.data, message.selectedEnvironmentId);
+                            break;
+                        case 'solutionsLoaded':
+                            displaySolutions(message.data);
+                            break;
+                        case 'solutionsError':
+                            displayError(message.error);
+                            break;
+                    }
+                });
+                
+                // Solution Actions
+                function openSolutionInMaker(solutionId, solutionName) {
+                    vscode.postMessage({ 
+                        action: 'openSolutionInMaker', 
+                        solutionId: solutionId,
+                        solutionName: solutionName
+                    });
+                }
+                
+                function openSolutionInClassic(solutionId, solutionName) {
+                    vscode.postMessage({ 
+                        action: 'openSolutionInClassic', 
+                        solutionId: solutionId,
+                        solutionName: solutionName
+                    });
+                }
+                
+                // Context Menu Functions
+                let currentContextMenu = null;
+                
+                function showSolutionContextMenu(event, solutionId, solutionName) {
+                    event.preventDefault();
+                    hideContextMenu(); // Hide any existing menu
+                    
+                    const menu = document.createElement('div');
+                    menu.className = 'context-menu';
+                    menu.innerHTML = \`
+                        <div class="context-menu-item" onclick="openSolutionInMaker('\${solutionId}', '\${solutionName}'); hideContextMenu();">
+                            🔧 Open in Maker
+                        </div>
+                        <div class="context-menu-item" onclick="openSolutionInClassic('\${solutionId}', '\${solutionName}'); hideContextMenu();">
+                            🏛️ Open in Classic
+                        </div>
+                    \`;
+                    
+                    // Position the menu
+                    menu.style.left = event.pageX + 'px';
+                    menu.style.top = event.pageY + 'px';
+                    
+                    document.body.appendChild(menu);
+                    currentContextMenu = menu;
+                    
+                    // Adjust position if menu goes off screen
+                    const rect = menu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        menu.style.left = (event.pageX - rect.width) + 'px';
+                    }
+                    if (rect.bottom > window.innerHeight) {
+                        menu.style.top = (event.pageY - rect.height) + 'px';
+                    }
+                    
+                    return false;
+                }
+                
+                function hideContextMenu() {
+                    if (currentContextMenu) {
+                        currentContextMenu.remove();
+                        currentContextMenu = null;
+                    }
+                }
+                
+                // Hide context menu when clicking elsewhere
+                document.addEventListener('click', hideContextMenu);
+                document.addEventListener('contextmenu', (e) => {
+                    if (!e.target.closest('tr[data-solution-id]')) {
+                        hideContextMenu();
+                    }
+                });
+                
+                // Set up event listeners
+                document.addEventListener('DOMContentLoaded', () => {
+                    document.getElementById('environmentSelect').addEventListener('change', onEnvironmentChange);
+                    loadEnvironments();
+                });
+                
+                // Load environments on startup (fallback)
+                loadEnvironments();
+            </script>`;
+    }
+}
