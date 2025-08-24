@@ -8,7 +8,8 @@ class MainPanel extends HTMLElement {
     }
 
     render() {
-        this.shadowRoot.innerHTML = `
+        if (this.shadowRoot) {
+            this.shadowRoot.innerHTML = `
             <style>
                 :host {
                     display: block;
@@ -68,6 +69,7 @@ class MainPanel extends HTMLElement {
                 </div>
             </div>
         `;
+        }
         this.setupEvents();
     }
 
@@ -82,7 +84,7 @@ class MainPanel extends HTMLElement {
         if (solutionBtn) solutionBtn.onclick = () => this.showContent('Solution Explorer');
     }
 
-    showContent(feature) {
+    showContent(feature: string) {
         const main = this.shadowRoot?.getElementById('mainContent');
         if (main) {
             main.innerHTML = `<h1>${feature}</h1><p>Feature UI coming soon...</p>`;

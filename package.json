@@ -1,0 +1,72 @@
+{
+    "name": "dynamics-devtools",
+    "displayName": "Dynamics DevTools",
+    "description": "A VSCode extension for Dynamics 365/Dataverse admin and developer tasks",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "dynamics-devtools.openPanel",
+                "title": "Open Dynamics DevTools",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.addEnvironment",
+                "title": "Add Environment",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.testConnection",
+                "title": "Test Connection",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.refreshEnvironments",
+                "title": "Refresh Environments",
+                "category": "Dynamics DevTools"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "dynamics-devtools",
+                    "title": "Dynamics DevTools",
+                    "icon": "$(database)"
+                }
+            ]
+        },
+        "views": {
+            "dynamics-devtools": [
+                {
+                    "id": "dynamics-devtools-main",
+                    "name": "Tools",
+                    "when": "true",
+                    "icon": "$(tools)"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "dependencies": {
+        "@azure/msal-node": "^2.13.0",
+        "axios": "^1.7.7",
+        "node-persist": "^4.0.2"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.74.0",
+        "@types/node": "16.x",
+        "typescript": "^4.9.4"
+    }
+}
