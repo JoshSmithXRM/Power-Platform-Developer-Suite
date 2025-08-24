@@ -211,6 +211,21 @@ class EnvironmentSetup extends HTMLElement {
                         <div class="form-help">Your Azure Active Directory tenant GUID</div>
                     </div>
                     
+                    <div class="form-group">
+                        <label class="form-label" for="environmentId">Environment ID (Optional)</label>
+                        <input type="text" id="environmentId" class="form-input" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                        <div class="form-help">Power Platform Environment GUID - Get this from the URL when you visit <strong>make.powerapps.com</strong> (e.g., make.powerapps.com/environments/<strong>your-env-id-here</strong>)</div>
+                    </div>
+                    
+                    <div class="info-box">
+                        <h4>How to find your Environment ID:</h4>
+                        <p>1. Go to <strong><a href="https://make.powerapps.com" target="_blank">make.powerapps.com</a></strong><br>
+                        2. Select your environment from the environment picker<br>
+                        3. Look at the URL - it will show: <code>make.powerapps.com/environments/<strong>your-environment-id</strong></code><br>
+                        4. Copy the GUID after "/environments/" and paste it above<br>
+                        <br><strong>Note:</strong> Environment ID is optional but recommended for direct links to Power Platform maker portal.</p>
+                    </div>
+                    
                     <div class="info-box">
                         <h4>How to find your Tenant ID:</h4>
                         <p>1. Go to <strong>Azure Portal → Azure Active Directory → Properties</strong><br>
@@ -389,6 +404,7 @@ class EnvironmentSetup extends HTMLElement {
             name: this.shadowRoot.getElementById('envName').value,
             dataverseUrl: this.shadowRoot.getElementById('dataverseUrl').value,
             tenantId: this.shadowRoot.getElementById('tenantId').value,
+            environmentId: this.shadowRoot.getElementById('environmentId').value,
             authenticationMethod: this.shadowRoot.getElementById('authMethod').value,
             clientId: this.shadowRoot.getElementById('clientId')?.value || '',
             clientSecret: this.shadowRoot.getElementById('clientSecret')?.value || '',
@@ -487,6 +503,9 @@ class EnvironmentSetup extends HTMLElement {
             console.log('Received message:', message);
             
             switch (message.action) {
+                case 'populateForm':
+                    this.populateFormWithEnvironment(message.environment);
+                    break;
                 case 'saveEnvironmentResponse':
                     this.disableButtons(false);
                     if (message.success) {
@@ -506,6 +525,53 @@ class EnvironmentSetup extends HTMLElement {
                     break;
             }
         });
+    }
+
+    populateFormWithEnvironment(environment) {
+        if (!environment) return;
+        
+        // Update form title
+        const formTitle = this.shadowRoot.querySelector('.form-title');
+        if (formTitle) {
+            formTitle.textContent = 'Edit Dynamics 365 Environment';
+        }
+        
+        const formSubtitle = this.shadowRoot.querySelector('.form-subtitle');
+        if (formSubtitle) {
+            formSubtitle.textContent = 'Update your Dynamics 365/Dataverse environment settings';
+        }
+        
+        // Update button text
+        const saveBtn = this.shadowRoot.getElementById('saveBtn');
+        if (saveBtn) {
+            saveBtn.textContent = 'Update Environment';
+        }
+        
+        // Populate basic fields
+        this.shadowRoot.getElementById('envName').value = environment.name || '';
+        this.shadowRoot.getElementById('dataverseUrl').value = environment.settings.dataverseUrl || '';
+        this.shadowRoot.getElementById('tenantId').value = environment.settings.tenantId || '';
+        this.shadowRoot.getElementById('environmentId').value = environment.environmentId || '';
+        
+        // Set authentication method
+        const authMethodSelect = this.shadowRoot.getElementById('authMethod');
+        authMethodSelect.value = environment.settings.authenticationMethod || '';
+        
+        // Trigger the change event to show the right fields
+        authMethodSelect.dispatchEvent(new Event('change'));
+        
+        // Wait a bit for the conditional fields to be shown, then populate them
+        setTimeout(() => {
+            if (environment.settings.clientId) {
+                const clientIdField = this.shadowRoot.getElementById('clientId');
+                if (clientIdField) clientIdField.value = environment.settings.clientId;
+            }
+            
+            if (environment.settings.username) {
+                const usernameField = this.shadowRoot.getElementById('username');
+                if (usernameField) usernameField.value = environment.settings.username;
+            }
+        }, 50);
     }
 }
 

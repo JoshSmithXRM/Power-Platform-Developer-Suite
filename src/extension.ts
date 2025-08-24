@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
-import fetch from 'node-fetch';
 import { AuthenticationService } from './services/AuthenticationService';
 import { AuthenticationMethod } from './models/AuthenticationMethod';
 import { EnvironmentConnection } from './models/PowerPlatformSettings';
@@ -12,10 +11,6 @@ export function activate(context: vscode.ExtensionContext) {
     const authService = AuthenticationService.getInstance(context);
 
     // Register commands for different features
-    const openDashboardCommand = vscode.commands.registerCommand('dynamics-devtools.openDashboard', () => {
-        DashboardPanel.createOrShow(context.extensionUri, authService);
-    });
-
     const addEnvironmentCommand = vscode.commands.registerCommand('dynamics-devtools.addEnvironment', () => {
         EnvironmentSetupPanel.createOrShow(context.extensionUri, authService);
     });
@@ -36,17 +31,103 @@ export function activate(context: vscode.ExtensionContext) {
         SolutionExplorerPanel.createOrShow(context.extensionUri, authService);
     });
 
-    // Register the tree data provider for the sidebar
-    const provider = new DynamicsDevToolsProvider(authService);
-    vscode.window.registerTreeDataProvider('dynamics-devtools-main', provider);
+    const environmentsProvider = new EnvironmentsProvider(authService);
+    const toolsProvider = new ToolsProvider(authService);
+    vscode.window.registerTreeDataProvider('dynamics-devtools-environments', environmentsProvider);
+    vscode.window.registerTreeDataProvider('dynamics-devtools-tools', toolsProvider);
+
+    // Register new commands for context menu and inline buttons
+    const refreshEnvironmentsCommand = vscode.commands.registerCommand('dynamics-devtools.refreshEnvironments', () => {
+        environmentsProvider.refresh();
+        vscode.window.showInformationMessage('Environments refreshed');
+    });
+
+    const openMakerCommand = vscode.commands.registerCommand('dynamics-devtools.openMaker', async (environmentItem?: EnvironmentItem) => {
+        if (environmentItem) {
+            // Use the stored environment ID if available
+            const environment = await authService.getEnvironment(environmentItem.envId);
+            const envId = environment?.environmentId || environmentItem.environmentId || 'default';
+            const makerUrl = `https://make.powerapps.com/environments/${envId}`;
+            vscode.env.openExternal(vscode.Uri.parse(makerUrl));
+        } else {
+            vscode.window.showErrorMessage('No environment selected');
+        }
+    });
+
+    const openDynamicsCommand = vscode.commands.registerCommand('dynamics-devtools.openDynamics', async (environmentItem?: EnvironmentItem) => {
+        if (environmentItem) {
+            // Open the Dataverse URL directly
+            const environment = await authService.getEnvironment(environmentItem.envId);
+            if (environment) {
+                vscode.env.openExternal(vscode.Uri.parse(environment.settings.dataverseUrl));
+            } else {
+                vscode.window.showErrorMessage('Environment not found');
+            }
+        } else {
+            vscode.window.showErrorMessage('No environment selected');
+        }
+    });
+
+    const editEnvironmentCommand = vscode.commands.registerCommand('dynamics-devtools.editEnvironment', async (environmentItem?: EnvironmentItem) => {
+        if (environmentItem) {
+            const environment = await authService.getEnvironment(environmentItem.envId);
+            if (environment) {
+                EnvironmentSetupPanel.createOrShow(context.extensionUri, authService, environment);
+            } else {
+                vscode.window.showErrorMessage('Environment not found');
+            }
+        } else {
+            vscode.window.showErrorMessage('No environment selected');
+        }
+    });
+
+    const testEnvironmentConnectionCommand = vscode.commands.registerCommand('dynamics-devtools.testEnvironmentConnection', async (environmentItem?: EnvironmentItem) => {
+        if (environmentItem) {
+            try {
+                await authService.getAccessToken(environmentItem.envId);
+                vscode.window.showInformationMessage(`✅ Connection test successful for ${environmentItem.label}!`);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`❌ Connection test failed for ${environmentItem.label}: ${error.message}`);
+            }
+        } else {
+            vscode.window.showErrorMessage('No environment selected');
+        }
+    });
+
+    const removeEnvironmentFromContextCommand = vscode.commands.registerCommand('dynamics-devtools.removeEnvironment', async (environmentItem?: EnvironmentItem) => {
+        if (environmentItem) {
+            const confirmResult = await vscode.window.showWarningMessage(
+                `Are you sure you want to remove the environment "${environmentItem.label}"?`,
+                { modal: true },
+                'Remove'
+            );
+
+            if (confirmResult === 'Remove') {
+                try {
+                    await authService.removeEnvironment(environmentItem.envId);
+                    environmentsProvider.refresh();
+                    vscode.window.showInformationMessage(`Environment "${environmentItem.label}" removed successfully!`);
+                } catch (error: any) {
+                    vscode.window.showErrorMessage(`Failed to remove environment: ${error.message}`);
+                }
+            }
+        } else {
+            await removeEnvironment(authService);
+        }
+    });
 
     context.subscriptions.push(
-        openDashboardCommand,
-        addEnvironmentCommand, 
+        addEnvironmentCommand,
         testConnectionCommand,
         openEntityBrowserCommand,
         openQueryDataCommand,
-        openSolutionExplorerCommand
+        openSolutionExplorerCommand,
+        refreshEnvironmentsCommand,
+        openMakerCommand,
+        openDynamicsCommand,
+        editEnvironmentCommand,
+        testEnvironmentConnectionCommand,
+        removeEnvironmentFromContextCommand
     );
 }
 
@@ -79,207 +160,44 @@ async function testConnection(authService: AuthenticationService) {
     }
 }
 
-export function deactivate() { }
+async function removeEnvironment(authService: AuthenticationService) {
+    const environments = await authService.getEnvironments();
 
-class DashboardPanel {
-    public static currentPanel: DashboardPanel | undefined;
-    public static readonly viewType = 'dynamicsDashboard';
+    if (environments.length === 0) {
+        vscode.window.showWarningMessage('No environments configured to remove.');
+        return;
+    }
 
-    private readonly _panel: vscode.WebviewPanel;
-    private readonly _extensionUri: vscode.Uri;
-    private readonly _authService: AuthenticationService;
-    private _disposables: vscode.Disposable[] = [];
+    const selected = await vscode.window.showQuickPick(
+        environments.map(env => ({
+            label: env.name,
+            description: env.settings.dataverseUrl,
+            detail: `Auth: ${env.settings.authenticationMethod}`,
+            env: env
+        })),
+        { placeHolder: 'Select environment to remove' }
+    );
 
-    public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
-        const column = vscode.window.activeTextEditor
-            ? vscode.window.activeTextEditor.viewColumn
-            : undefined;
+    if (!selected) return;
 
-        if (DashboardPanel.currentPanel) {
-            DashboardPanel.currentPanel._panel.reveal(column);
-            return;
+    const confirm = await vscode.window.showWarningMessage(
+        `Are you sure you want to remove "${selected.env.name}"?`,
+        { modal: true },
+        'Yes, Remove'
+    );
+
+    if (confirm === 'Yes, Remove') {
+        try {
+            await authService.removeEnvironment(selected.env.id);
+            vscode.window.showInformationMessage(`✅ Environment "${selected.env.name}" removed successfully!`);
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`❌ Failed to remove environment: ${error.message}`);
         }
-
-        const panel = vscode.window.createWebviewPanel(
-            DashboardPanel.viewType,
-            'Dynamics DevTools Dashboard',
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                localResourceRoots: [
-                    vscode.Uri.joinPath(extensionUri, 'src')
-                ]
-            }
-        );
-
-        DashboardPanel.currentPanel = new DashboardPanel(panel, extensionUri, authService);
-    }
-
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService) {
-        this._panel = panel;
-        this._extensionUri = extensionUri;
-        this._authService = authService;
-
-        this._update();
-        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    }
-
-    public dispose() {
-        DashboardPanel.currentPanel = undefined;
-        this._panel.dispose();
-
-        while (this._disposables.length) {
-            const x = this._disposables.pop();
-            if (x) {
-                x.dispose();
-            }
-        }
-    }
-
-    private async _update() {
-        const webview = this._panel.webview;
-        this._panel.title = 'Dynamics DevTools Dashboard';
-        this._panel.webview.html = await this._getHtmlForWebview(webview);
-    }
-
-    private async _getHtmlForWebview(webview: vscode.Webview) {
-        const environments = await this._authService.getEnvironments();
-        const environmentsHtml = environments.length > 0 
-            ? environments.map(env => `
-                <div class="environment-card">
-                    <h4>${env.name}</h4>
-                    <p>${env.settings.dataverseUrl}</p>
-                    <small>Auth: ${env.settings.authenticationMethod}</small>
-                </div>
-            `).join('')
-            : '<p class="no-environments">No environments configured yet.</p>';
-
-        return `<!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Dynamics DevTools Dashboard</title>
-                <style>
-                    body {
-                        margin: 0;
-                        padding: 20px;
-                        font-family: var(--vscode-font-family);
-                        background: var(--vscode-editor-background);
-                        color: var(--vscode-editor-foreground);
-                    }
-                    .welcome-header {
-                        text-align: center;
-                        margin-bottom: 30px;
-                    }
-                    .welcome-title {
-                        font-size: 2em;
-                        margin-bottom: 10px;
-                        color: var(--vscode-textLink-foreground);
-                    }
-                    .welcome-subtitle {
-                        color: var(--vscode-descriptionForeground);
-                    }
-                    .dashboard-grid {
-                        display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                        gap: 20px;
-                        margin-top: 30px;
-                    }
-                    .dashboard-card {
-                        background: var(--vscode-editorWidget-background);
-                        border: 1px solid var(--vscode-editorWidget-border);
-                        border-radius: 8px;
-                        padding: 20px;
-                    }
-                    .card-title {
-                        font-size: 1.2em;
-                        margin-bottom: 15px;
-                        color: var(--vscode-textLink-foreground);
-                    }
-                    .environment-card {
-                        background: var(--vscode-input-background);
-                        border: 1px solid var(--vscode-input-border);
-                        border-radius: 4px;
-                        padding: 12px;
-                        margin-bottom: 10px;
-                    }
-                    .environment-card h4 {
-                        margin: 0 0 5px 0;
-                        color: var(--vscode-textLink-foreground);
-                    }
-                    .environment-card p {
-                        margin: 0 0 5px 0;
-                        font-size: 0.9em;
-                    }
-                    .environment-card small {
-                        color: var(--vscode-descriptionForeground);
-                    }
-                    .no-environments {
-                        color: var(--vscode-descriptionForeground);
-                        font-style: italic;
-                        text-align: center;
-                        padding: 20px;
-                    }
-                    .quick-action {
-                        display: inline-block;
-                        background: var(--vscode-button-background);
-                        color: var(--vscode-button-foreground);
-                        padding: 8px 16px;
-                        border-radius: 4px;
-                        text-decoration: none;
-                        margin: 5px;
-                        border: none;
-                        cursor: pointer;
-                    }
-                    .quick-action:hover {
-                        background: var(--vscode-button-hoverBackground);
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="welcome-header">
-                    <h1 class="welcome-title">🚀 Welcome to Dynamics DevTools</h1>
-                    <p class="welcome-subtitle">A powerful VS Code extension for Dynamics 365/Dataverse development and administration.</p>
-                </div>
-
-                <div class="dashboard-grid">
-                    <div class="dashboard-card">
-                        <h3 class="card-title">🔗 Environment Connections</h3>
-                        ${environmentsHtml}
-                        <p style="margin-top: 15px;">
-                            <small>Use the sidebar to add or manage environment connections.</small>
-                        </p>
-                    </div>
-
-                    <div class="dashboard-card">
-                        <h3 class="card-title">🛠️ Quick Actions</h3>
-                        <p>Access these tools from the sidebar:</p>
-                        <ul>
-                            <li><strong>Entity Browser</strong> - Browse tables and data</li>
-                            <li><strong>Query Data</strong> - Run custom queries</li>
-                            <li><strong>Solution Explorer</strong> - Manage solutions</li>
-                        </ul>
-                    </div>
-
-                    <div class="dashboard-card">
-                        <h3 class="card-title">📊 Extension Status</h3>
-                        <p><strong>Environment Count:</strong> ${environments.length}</p>
-                        <p><strong>Status:</strong> ✅ Ready</p>
-                        <p><strong>Version:</strong> 0.0.1</p>
-                    </div>
-
-                    <div class="dashboard-card">
-                        <h3 class="card-title">📚 Getting Started</h3>
-                        <p>1. Click <strong>Add Environment</strong> in the sidebar to connect to your first Dynamics 365 environment</p>
-                        <p>2. Test your connection to ensure authentication works</p>
-                        <p>3. Explore the tools available in the sidebar</p>
-                    </div>
-                </div>
-            </body>
-            </html>`;
     }
 }
+
+export function deactivate() { }
+
 
 class EntityBrowserPanel {
     public static readonly viewType = 'entityBrowser';
@@ -298,9 +216,10 @@ class EntityBrowserPanel {
             EntityBrowserPanel.viewType,
             'Entity Browser',
             column || vscode.ViewColumn.One,
-            { 
+            {
                 enableScripts: true,
-                retainContextWhenHidden: true
+                retainContextWhenHidden: true,
+                enableFindWidget: true
             }
         );
 
@@ -313,7 +232,7 @@ class EntityBrowserPanel {
         this._authService = authService;
         this._update();
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-        
+
         // Handle messages from the webview
         this._panel.webview.onDidReceiveMessage(
             async (message) => {
@@ -353,7 +272,7 @@ class EntityBrowserPanel {
 
             const environmentKeys = await persistence.keys();
             const environments = [];
-            
+
             for (const key of environmentKeys) {
                 const envData = await persistence.getItem(key);
                 if (envData && envData.displayName && envData.url) {
@@ -520,9 +439,10 @@ class QueryDataPanel {
             QueryDataPanel.viewType,
             'Query Data',
             column || vscode.ViewColumn.One,
-            { 
+            {
                 enableScripts: true,
-                retainContextWhenHidden: true
+                retainContextWhenHidden: true,
+                enableFindWidget: true
             }
         );
 
@@ -535,7 +455,7 @@ class QueryDataPanel {
         this._authService = authService;
         this._update();
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-        
+
         // Handle messages from the webview
         this._panel.webview.onDidReceiveMessage(
             async (message) => {
@@ -575,7 +495,7 @@ class QueryDataPanel {
 
             const environmentKeys = await persistence.keys();
             const environments = [];
-            
+
             for (const key of environmentKeys) {
                 const envData = await persistence.getItem(key);
                 if (envData && envData.displayName && envData.url) {
@@ -746,9 +666,10 @@ class SolutionExplorerPanel {
             SolutionExplorerPanel.viewType,
             'Solution Explorer',
             column || vscode.ViewColumn.One,
-            { 
+            {
                 enableScripts: true,
-                retainContextWhenHidden: true
+                retainContextWhenHidden: true,
+                enableFindWidget: true
             }
         );
 
@@ -761,7 +682,7 @@ class SolutionExplorerPanel {
         this._authService = authService;
         this._update();
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-        
+
         // Handle messages from the webview
         this._panel.webview.onDidReceiveMessage(
             async (message) => {
@@ -937,6 +858,69 @@ class SolutionExplorerPanel {
                     padding: 40px;
                     color: var(--vscode-descriptionForeground);
                 }
+                
+                /* Sortable Table Styles */
+                .table-container {
+                    margin-top: 10px;
+                }
+                .table-controls {
+                    margin-bottom: 15px;
+                    display: flex;
+                    gap: 10px;
+                    align-items: center;
+                }
+                .filter-input {
+                    flex: 1;
+                    padding: 8px 12px;
+                    border: 1px solid var(--vscode-input-border);
+                    border-radius: 4px;
+                    background: var(--vscode-input-background);
+                    color: var(--vscode-input-foreground);
+                    font-family: inherit;
+                    font-size: 14px;
+                }
+                .filter-input:focus {
+                    outline: none;
+                    border-color: var(--vscode-focusBorder);
+                    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+                }
+                .clear-filter-btn {
+                    padding: 8px 12px;
+                    background: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                    border: 1px solid var(--vscode-button-border);
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 14px;
+                }
+                .clear-filter-btn:hover {
+                    background: var(--vscode-button-secondaryHoverBackground);
+                }
+                .sortable {
+                    cursor: pointer;
+                    user-select: none;
+                    position: relative;
+                }
+                .sortable:hover {
+                    background: var(--vscode-list-hoverBackground);
+                }
+                .sort-indicator {
+                    color: var(--vscode-descriptionForeground);
+                    font-size: 12px;
+                    margin-left: 5px;
+                }
+                .sort-asc .sort-indicator::after {
+                    content: ' ↑';
+                    color: var(--vscode-charts-blue);
+                }
+                .sort-desc .sort-indicator::after {
+                    content: ' ↓';
+                    color: var(--vscode-charts-blue);
+                }
+                .filtered-row {
+                    display: none;
+                }
             </style>
         </head>
         <body>
@@ -1053,18 +1037,35 @@ class SolutionExplorerPanel {
                     }
                     
                     let tableHtml = \`
-                        <table class="solutions-table">
-                            <thead>
-                                <tr>
-                                    <th>Display Name</th>
-                                    <th>Name</th>
-                                    <th>Type</th>
-                                    <th>Version</th>
-                                    <th>Publisher</th>
-                                    <th>Created</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                        <div class="table-container">
+                            <div class="table-controls">
+                                <input type="text" id="solutionFilter" placeholder="🔍 Filter solutions..." class="filter-input">
+                                <button onclick="clearFilter()" class="clear-filter-btn">Clear</button>
+                            </div>
+                            <table class="solutions-table sortable-table">
+                                <thead>
+                                    <tr>
+                                        <th onclick="sortTable(0)" class="sortable">
+                                            Display Name <span class="sort-indicator">⇅</span>
+                                        </th>
+                                        <th onclick="sortTable(1)" class="sortable">
+                                            Name <span class="sort-indicator">⇅</span>
+                                        </th>
+                                        <th onclick="sortTable(2)" class="sortable">
+                                            Type <span class="sort-indicator">⇅</span>
+                                        </th>
+                                        <th onclick="sortTable(3)" class="sortable">
+                                            Version <span class="sort-indicator">⇅</span>
+                                        </th>
+                                        <th onclick="sortTable(4)" class="sortable">
+                                            Publisher <span class="sort-indicator">⇅</span>
+                                        </th>
+                                        <th onclick="sortTable(5)" class="sortable">
+                                            Created <span class="sort-indicator">⇅</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="solutionsTableBody">
                     \`;
                     
                     solutions.forEach(solution => {
@@ -1086,14 +1087,109 @@ class SolutionExplorerPanel {
                         \`;
                     });
                     
-                    tableHtml += '</tbody></table>';
+                    tableHtml += '</tbody></table></div>';
                     content.innerHTML = tableHtml;
+                    
+                    // Store solutions data globally for sorting/filtering
+                    window.solutionsData = solutions;
+                    
+                    // Set up filter functionality
+                    setupTableFiltering();
                 }
                 
                 function displayError(error) {
                     document.getElementById('content').innerHTML = 
                         \`<div class="error">Error loading solutions: \${error}</div>\`;
                     updateEnvironmentStatus('Error', false);
+                }
+                
+                // Sortable Table Functions
+                let currentSortColumn = -1;
+                let currentSortDirection = 'asc';
+                
+                function sortTable(columnIndex) {
+                    const table = document.querySelector('.solutions-table');
+                    const tbody = document.getElementById('solutionsTableBody');
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    
+                    // Clear previous sort indicators
+                    table.querySelectorAll('th').forEach(th => {
+                        th.classList.remove('sort-asc', 'sort-desc');
+                    });
+                    
+                    // Determine sort direction
+                    if (currentSortColumn === columnIndex) {
+                        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSortDirection = 'asc';
+                    }
+                    currentSortColumn = columnIndex;
+                    
+                    // Add sort indicator to current column
+                    const currentTh = table.querySelectorAll('th')[columnIndex];
+                    currentTh.classList.add('sort-' + currentSortDirection);
+                    
+                    // Sort rows
+                    rows.sort((a, b) => {
+                        let aVal = a.cells[columnIndex].textContent.trim();
+                        let bVal = b.cells[columnIndex].textContent.trim();
+                        
+                        // Handle different data types
+                        if (columnIndex === 3) { // Version column
+                            aVal = aVal.split('.').map(n => parseInt(n) || 0);
+                            bVal = bVal.split('.').map(n => parseInt(n) || 0);
+                            for (let i = 0; i < Math.max(aVal.length, bVal.length); i++) {
+                                const aNum = aVal[i] || 0;
+                                const bNum = bVal[i] || 0;
+                                if (aNum !== bNum) {
+                                    return currentSortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+                                }
+                            }
+                            return 0;
+                        } else if (columnIndex === 5) { // Date column
+                            aVal = new Date(aVal);
+                            bVal = new Date(bVal);
+                            return currentSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                        } else { // String columns
+                            aVal = aVal.toLowerCase();
+                            bVal = bVal.toLowerCase();
+                            if (aVal < bVal) return currentSortDirection === 'asc' ? -1 : 1;
+                            if (aVal > bVal) return currentSortDirection === 'asc' ? 1 : -1;
+                            return 0;
+                        }
+                    });
+                    
+                    // Re-append sorted rows
+                    rows.forEach(row => tbody.appendChild(row));
+                }
+                
+                function setupTableFiltering() {
+                    const filterInput = document.getElementById('solutionFilter');
+                    if (filterInput) {
+                        filterInput.addEventListener('input', filterTable);
+                    }
+                }
+                
+                function filterTable() {
+                    const filterValue = document.getElementById('solutionFilter').value.toLowerCase();
+                    const tbody = document.getElementById('solutionsTableBody');
+                    const rows = tbody.querySelectorAll('tr');
+                    
+                    rows.forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        if (text.includes(filterValue)) {
+                            row.style.display = '';
+                            row.classList.remove('filtered-row');
+                        } else {
+                            row.style.display = 'none';
+                            row.classList.add('filtered-row');
+                        }
+                    });
+                }
+                
+                function clearFilter() {
+                    document.getElementById('solutionFilter').value = '';
+                    filterTable();
                 }
                 
                 // Listen for messages from the extension
@@ -1139,10 +1235,10 @@ class SolutionExplorerPanel {
             }
 
             const environments = await this._authService.getEnvironments();
-            
+
             // Cache the environments
             this._cachedEnvironments = environments;
-            
+
             this._panel.webview.postMessage({
                 action: 'environmentsLoaded',
                 data: environments,
@@ -1171,7 +1267,7 @@ class SolutionExplorerPanel {
 
             // Get available environments
             const environments = await this._authService.getEnvironments();
-            
+
             if (environments.length === 0) {
                 this._panel.webview.postMessage({
                     action: 'solutionsError',
@@ -1194,13 +1290,13 @@ class SolutionExplorerPanel {
                     return;
                 }
             }
-            
+
             // Get access token for the environment
             const token = await this._authService.getAccessToken(environment.id);
-            
+
             // Fetch solutions from Dataverse
             const solutionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/solutions?$select=solutionid,uniquename,friendlyname,version,ismanaged,createdon,description&$expand=publisherid($select=uniquename,friendlyname)&$orderby=createdon desc`;
-            
+
             const response = await fetch(solutionsUrl, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -1215,7 +1311,7 @@ class SolutionExplorerPanel {
             }
 
             const data = await response.json() as any;
-            
+
             // Transform the data to include publisher name
             const solutions = data.value.map((solution: any) => ({
                 solutionid: solution.solutionid,
@@ -1253,9 +1349,10 @@ class EnvironmentSetupPanel {
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private readonly _authService: AuthenticationService;
+    private readonly _editingEnvironment: EnvironmentConnection | undefined;
     private _disposables: vscode.Disposable[] = [];
 
-    public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
+    public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService, editingEnvironment?: EnvironmentConnection) {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
@@ -1267,7 +1364,7 @@ class EnvironmentSetupPanel {
 
         const panel = vscode.window.createWebviewPanel(
             EnvironmentSetupPanel.viewType,
-            'Add Dynamics 365 Environment',
+            editingEnvironment ? 'Edit Dynamics 365 Environment' : 'Add Dynamics 365 Environment',
             column || vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -1277,13 +1374,14 @@ class EnvironmentSetupPanel {
             }
         );
 
-        EnvironmentSetupPanel.currentPanel = new EnvironmentSetupPanel(panel, extensionUri, authService);
+        EnvironmentSetupPanel.currentPanel = new EnvironmentSetupPanel(panel, extensionUri, authService, editingEnvironment);
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService) {
+    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService, editingEnvironment?: EnvironmentConnection) {
         this._panel = panel;
         this._extensionUri = extensionUri;
         this._authService = authService;
+        this._editingEnvironment = editingEnvironment;
 
         this._update();
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -1311,7 +1409,7 @@ class EnvironmentSetupPanel {
     private async handleSaveEnvironment(data: any) {
         try {
             const environment: EnvironmentConnection = {
-                id: `env-${Date.now()}`, // Generate unique ID
+                id: this._editingEnvironment?.id || `env-${Date.now()}`, // Use existing ID or generate new one
                 name: data.name,
                 settings: {
                     tenantId: data.tenantId,
@@ -1323,11 +1421,15 @@ class EnvironmentSetupPanel {
                     password: data.password,
                     publicClientId: data.publicClientId
                 },
-                isActive: false,
-                lastUsed: new Date()
+                isActive: this._editingEnvironment?.isActive || false,
+                lastUsed: this._editingEnvironment?.lastUsed || new Date(),
+                environmentId: data.environmentId || undefined
             };
 
             await this._authService.saveEnvironmentSettings(environment);
+
+            // Refresh the environments tree view
+            vscode.commands.executeCommand('dynamics-devtools.refreshEnvironments');
 
             // Send success response
             this._panel.webview.postMessage({
@@ -1414,8 +1516,18 @@ class EnvironmentSetupPanel {
 
     private _update() {
         const webview = this._panel.webview;
-        this._panel.title = 'Add Dynamics 365 Environment';
+        this._panel.title = this._editingEnvironment ? 'Edit Dynamics 365 Environment' : 'Add Dynamics 365 Environment';
         this._panel.webview.html = this._getHtmlForWebview(webview);
+
+        // If editing, send the environment data to the webview after a short delay to ensure it's loaded
+        if (this._editingEnvironment) {
+            setTimeout(() => {
+                this._panel.webview.postMessage({
+                    action: 'populateForm',
+                    environment: this._editingEnvironment
+                });
+            }, 100);
+        }
     }
 
     private _getHtmlForWebview(webview: vscode.Webview) {
@@ -1444,6 +1556,112 @@ class EnvironmentSetupPanel {
     }
 }
 
+class EnvironmentsProvider implements vscode.TreeDataProvider<EnvironmentItem | ToolItem> {
+    private _onDidChangeTreeData: vscode.EventEmitter<EnvironmentItem | ToolItem | undefined | null | void> = new vscode.EventEmitter<EnvironmentItem | ToolItem | undefined | null | void>();
+    readonly onDidChangeTreeData: vscode.Event<EnvironmentItem | ToolItem | undefined | null | void> = this._onDidChangeTreeData.event;
+
+    private _authService: AuthenticationService;
+
+    constructor(authService: AuthenticationService) {
+        this._authService = authService;
+    }
+
+    refresh(): void {
+        this._onDidChangeTreeData.fire();
+    }
+
+    getTreeItem(element: EnvironmentItem | ToolItem): vscode.TreeItem {
+        return element;
+    }
+
+    async getChildren(element?: EnvironmentItem | ToolItem): Promise<(EnvironmentItem | ToolItem)[]> {
+        console.log('EnvironmentsProvider.getChildren called', element ? 'with element' : 'without element');
+
+        if (!element) {
+            const items: (EnvironmentItem | ToolItem)[] = [];
+
+            // Add configured environments
+            try {
+                console.log('Getting environments from authService...');
+                const environments = await this._authService.getEnvironments();
+                console.log('Environments retrieved:', environments.length, environments);
+
+                if (environments.length === 0) {
+                    console.log('No environments found, showing placeholder');
+                    items.push(new ToolItem('No environments configured', 'Click + to add an environment', vscode.TreeItemCollapsibleState.None, ''));
+                } else {
+                    console.log('Processing environments...');
+                    for (const env of environments) {
+                        // Extract environment ID from URL (e.g., https://org123.crm.dynamics.com -> get org123 part)
+                        let environmentId = 'default';
+                        try {
+                            const url = new URL(env.settings.dataverseUrl);
+                            const hostname = url.hostname;
+                            // Extract environment ID from hostname like org123.crm.dynamics.com
+                            const parts = hostname.split('.');
+                            if (parts.length > 0) {
+                                environmentId = parts[0];
+                            }
+                        } catch (error) {
+                            console.warn('Could not extract environment ID from URL:', env.settings.dataverseUrl);
+                        }
+
+                        const envItem = new EnvironmentItem(env.name, env.settings.dataverseUrl, env.id, environmentId);
+                        envItem.contextValue = 'environment';
+                        items.push(envItem);
+                        console.log('Added environment item:', env.name);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading environments for tree view:', error);
+            }
+
+            console.log('Returning items:', items.length);
+            return items;
+        }
+        return [];
+    }
+}
+
+class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
+    private _authService: AuthenticationService;
+
+    constructor(authService: AuthenticationService) {
+        this._authService = authService;
+    }
+
+    getTreeItem(element: ToolItem): vscode.TreeItem {
+        return element;
+    }
+
+    getChildren(element?: ToolItem): Thenable<ToolItem[]> {
+        if (!element) {
+            return Promise.resolve([
+                new ToolItem('📊 Entity Browser', 'Browse tables and data', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.entityBrowser'),
+                new ToolItem('🔍 Query Data', 'Run custom queries', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.queryData'),
+                new ToolItem('📦 Solution Explorer', 'Manage solutions', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.solutionExplorer')
+            ]);
+        }
+        return Promise.resolve([]);
+    }
+}
+
+class EnvironmentItem extends vscode.TreeItem {
+    constructor(
+        public readonly label: string,
+        public readonly description: string,
+        public readonly envId: string,
+        public readonly environmentId?: string
+    ) {
+        super(label, vscode.TreeItemCollapsibleState.None);
+        this.description = description;
+        this.tooltip = `${label} - ${description}`;
+        this.contextValue = 'environment';
+
+        // Remove the automatic command - we want right-click context menu instead
+    }
+}
+
 class DynamicsDevToolsProvider implements vscode.TreeDataProvider<ToolItem> {
     private _authService: AuthenticationService;
 
@@ -1458,7 +1676,6 @@ class DynamicsDevToolsProvider implements vscode.TreeDataProvider<ToolItem> {
     getChildren(element?: ToolItem): Thenable<ToolItem[]> {
         if (!element) {
             return Promise.resolve([
-                new ToolItem('🏠 Dashboard', 'Open main dashboard', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.openDashboard'),
                 new ToolItem('🔑 Add Environment', 'Add a new Dynamics 365 environment', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.addEnvironment'),
                 new ToolItem('🧪 Test Connection', 'Test connection to an environment', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.testConnection'),
                 new ToolItem('📊 Entity Browser', 'Browse tables and data', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.entityBrowser'),

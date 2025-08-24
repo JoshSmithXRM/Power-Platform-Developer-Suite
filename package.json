@@ -3,6 +3,7 @@
     "displayName": "Dynamics DevTools",
     "description": "A VSCode extension for Dynamics 365/Dataverse admin and developer tasks",
     "version": "0.0.1",
+    "publisher": "JoshSmithXRM",
     "engines": {
         "vscode": "^1.74.0"
     },
@@ -16,11 +17,45 @@
             {
                 "command": "dynamics-devtools.addEnvironment",
                 "title": "Add Environment",
-                "category": "Dynamics DevTools"
+                "category": "Dynamics DevTools",
+                "icon": "$(add)"
+            },
+            {
+                "command": "dynamics-devtools.removeEnvironment",
+                "title": "Remove Environment",
+                "category": "Dynamics DevTools",
+                "icon": "$(remove)"
             },
             {
                 "command": "dynamics-devtools.testConnection",
                 "title": "Test Connection",
+                "category": "Dynamics DevTools",
+                "icon": "$(beaker)"
+            },
+            {
+                "command": "dynamics-devtools.refreshEnvironments",
+                "title": "Refresh Environments",
+                "category": "Dynamics DevTools",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "dynamics-devtools.openMaker",
+                "title": "Open Maker Portal",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.editEnvironment",
+                "title": "Edit Environment",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.testEnvironmentConnection",
+                "title": "Test Environment Connection",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.openDynamics",
+                "title": "Open Dynamics",
                 "category": "Dynamics DevTools"
             }
         ],
@@ -36,10 +71,57 @@
         "views": {
             "dynamics-devtools": [
                 {
-                    "id": "dynamics-devtools-main",
+                    "id": "dynamics-devtools-tools",
                     "name": "Tools",
                     "when": "true",
                     "icon": "$(tools)"
+                },
+                {
+                    "id": "dynamics-devtools-environments",
+                    "name": "Environments",
+                    "when": "true",
+                    "icon": "$(cloud)"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "dynamics-devtools.addEnvironment",
+                    "when": "view == dynamics-devtools-environments",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "dynamics-devtools.refreshEnvironments",
+                    "when": "view == dynamics-devtools-environments",
+                    "group": "navigation@2"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "dynamics-devtools.openMaker",
+                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.openDynamics",
+                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "group": "1_open@2"
+                },
+                {
+                    "command": "dynamics-devtools.editEnvironment",
+                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "group": "2_edit@1"
+                },
+                {
+                    "command": "dynamics-devtools.testEnvironmentConnection",
+                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "group": "2_edit@2"
+                },
+                {
+                    "command": "dynamics-devtools.removeEnvironment",
+                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "group": "3_remove@1"
                 }
             ]
         }

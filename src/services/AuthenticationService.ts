@@ -415,6 +415,11 @@ export class AuthenticationService {
         return this.context.globalState.get('dynamics-devtools-environments', []);
     }
 
+    public async getEnvironment(environmentId: string): Promise<EnvironmentConnection | null> {
+        const environments = await this.getEnvironments();
+        return environments.find(env => env.id === environmentId) || null;
+    }
+
     public async getEnvironmentSettings(environmentId: string): Promise<EnvironmentConnection | null> {
         const environments = await this.getEnvironments();
         return environments.find(env => env.id === environmentId) || null;
@@ -448,4 +453,6 @@ export class AuthenticationService {
             await this.tokenStorage.clear();
         }
     }
+
+
 }

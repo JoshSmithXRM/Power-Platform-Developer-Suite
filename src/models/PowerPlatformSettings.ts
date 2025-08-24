@@ -17,4 +17,5 @@ export interface EnvironmentConnection {
     settings: PowerPlatformSettings;
     isActive: boolean;
     lastUsed?: Date;
+    environmentId?: string;
 }
