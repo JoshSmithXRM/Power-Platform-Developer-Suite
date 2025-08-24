@@ -7,7 +7,7 @@ import { EnvironmentSetupPanel } from '../panels/EnvironmentSetupPanel';
  * Environment-related commands
  */
 export class EnvironmentCommands {
-    constructor(private authService: AuthenticationService, private context: vscode.ExtensionContext) {}
+    constructor(private authService: AuthenticationService, private context: vscode.ExtensionContext) { }
 
     /**
      * Register all environment commands
@@ -74,15 +74,24 @@ export class EnvironmentCommands {
     }
 
     private async openMaker(environmentItem?: EnvironmentItem) {
-        if (environmentItem) {
-            // Use the stored environment ID if available
-            const environment = await this.authService.getEnvironment(environmentItem.envId);
-            const envId = environment?.environmentId || environmentItem.environmentId || 'default';
-            const makerUrl = `https://make.powerapps.com/environments/${envId}`;
-            vscode.env.openExternal(vscode.Uri.parse(makerUrl));
-        } else {
+        if (!environmentItem) {
             vscode.window.showErrorMessage('No environment selected');
+            return;
         }
+
+        const environment = await this.authService.getEnvironment(environmentItem.envId);
+        if (!environment) {
+            vscode.window.showErrorMessage('Environment not found');
+            return;
+        }
+
+        if (!environment.environmentId) {
+            vscode.window.showErrorMessage('Environment ID not configured. Please edit the environment and provide the Environment ID to open Power Apps Maker.');
+            return;
+        }
+
+        const makerUrl = `https://make.powerapps.com/environments/${environment.environmentId}`;
+        vscode.env.openExternal(vscode.Uri.parse(makerUrl));
     }
 
     private async openDynamics(environmentItem?: EnvironmentItem) {

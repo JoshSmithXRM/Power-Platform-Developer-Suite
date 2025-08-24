@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { AuthenticationService } from '../services/AuthenticationService';
 
 export class EnvironmentsProvider implements vscode.TreeDataProvider<EnvironmentItem | ToolItem> {
-    private _onDidChangeTreeData: vscode.EventEmitter<EnvironmentItem | ToolItem | undefined | null | void> = 
+    private _onDidChangeTreeData: vscode.EventEmitter<EnvironmentItem | ToolItem | undefined | null | void> =
         new vscode.EventEmitter<EnvironmentItem | ToolItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<EnvironmentItem | ToolItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
@@ -38,21 +38,7 @@ export class EnvironmentsProvider implements vscode.TreeDataProvider<Environment
                 } else {
                     console.log('Processing environments...');
                     for (const env of environments) {
-                        // Extract environment ID from URL (e.g., https://org123.crm.dynamics.com -> get org123 part)
-                        let environmentId = 'default';
-                        try {
-                            const url = new URL(env.settings.dataverseUrl);
-                            const hostname = url.hostname;
-                            // Extract environment ID from hostname like org123.crm.dynamics.com
-                            const parts = hostname.split('.');
-                            if (parts.length > 0) {
-                                environmentId = parts[0];
-                            }
-                        } catch (error) {
-                            console.warn('Could not extract environment ID from URL:', env.settings.dataverseUrl);
-                        }
-
-                        const envItem = new EnvironmentItem(env.name, env.settings.dataverseUrl, env.id, environmentId);
+                        const envItem = new EnvironmentItem(env.name, env.settings.dataverseUrl, env.id);
                         envItem.contextValue = 'environment';
                         items.push(envItem);
                         console.log('Added environment item:', env.name);
@@ -73,8 +59,7 @@ export class EnvironmentItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public readonly description: string,
-        public readonly envId: string,
-        public readonly environmentId?: string
+        public readonly envId: string
     ) {
         super(label, vscode.TreeItemCollapsibleState.None);
         this.description = description;
