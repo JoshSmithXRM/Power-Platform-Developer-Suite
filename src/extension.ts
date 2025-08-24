@@ -1662,31 +1662,6 @@ class EnvironmentItem extends vscode.TreeItem {
     }
 }
 
-class DynamicsDevToolsProvider implements vscode.TreeDataProvider<ToolItem> {
-    private _authService: AuthenticationService;
-
-    constructor(authService: AuthenticationService) {
-        this._authService = authService;
-    }
-
-    getTreeItem(element: ToolItem): vscode.TreeItem {
-        return element;
-    }
-
-    getChildren(element?: ToolItem): Thenable<ToolItem[]> {
-        if (!element) {
-            return Promise.resolve([
-                new ToolItem('🔑 Add Environment', 'Add a new Dynamics 365 environment', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.addEnvironment'),
-                new ToolItem('🧪 Test Connection', 'Test connection to an environment', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.testConnection'),
-                new ToolItem('📊 Entity Browser', 'Browse tables and data', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.entityBrowser'),
-                new ToolItem('🔍 Query Data', 'Run custom queries', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.queryData'),
-                new ToolItem('📦 Solution Explorer', 'Manage solutions', vscode.TreeItemCollapsibleState.None, 'dynamics-devtools.solutionExplorer')
-            ]);
-        }
-        return Promise.resolve([]);
-    }
-}
-
 class ToolItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
