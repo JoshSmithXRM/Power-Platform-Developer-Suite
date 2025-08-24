@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as os from 'os';
+import fetch from 'node-fetch';
 import { AuthenticationService } from './services/AuthenticationService';
 import { AuthenticationMethod } from './models/AuthenticationMethod';
 import { EnvironmentConnection } from './models/PowerPlatformSettings';
@@ -279,30 +282,29 @@ class DashboardPanel {
 }
 
 class EntityBrowserPanel {
-    public static currentPanel: EntityBrowserPanel | undefined;
     public static readonly viewType = 'entityBrowser';
 
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private readonly _authService: AuthenticationService;
     private _disposables: vscode.Disposable[] = [];
+    private _selectedEnvironmentId: string | undefined;
 
     public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
-        if (EntityBrowserPanel.currentPanel) {
-            EntityBrowserPanel.currentPanel._panel.reveal(column);
-            return;
-        }
-
+        // Always create a new panel instead of reusing existing one
         const panel = vscode.window.createWebviewPanel(
             EntityBrowserPanel.viewType,
             'Entity Browser',
             column || vscode.ViewColumn.One,
-            { enableScripts: true }
+            { 
+                enableScripts: true,
+                retainContextWhenHidden: true
+            }
         );
 
-        EntityBrowserPanel.currentPanel = new EntityBrowserPanel(panel, extensionUri, authService);
+        new EntityBrowserPanel(panel, extensionUri, authService);
     }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService) {
@@ -311,10 +313,22 @@ class EntityBrowserPanel {
         this._authService = authService;
         this._update();
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+        
+        // Handle messages from the webview
+        this._panel.webview.onDidReceiveMessage(
+            async (message) => {
+                switch (message.action) {
+                    case 'loadEnvironments':
+                        await this.loadEnvironments();
+                        break;
+                }
+            },
+            null,
+            this._disposables
+        );
     }
 
     public dispose() {
-        EntityBrowserPanel.currentPanel = undefined;
         this._panel.dispose();
         while (this._disposables.length) {
             const x = this._disposables.pop();
@@ -322,15 +336,175 @@ class EntityBrowserPanel {
         }
     }
 
+    private async loadEnvironments() {
+        try {
+            // Get environments from storage (this would typically come from your environment storage)
+            const persistence = require('node-persist');
+            await persistence.init({
+                dir: path.join(os.homedir(), '.dynamics-devtools', 'environments'),
+                stringify: JSON.stringify,
+                parse: JSON.parse,
+                encoding: 'utf8',
+                logging: false,
+                continuous: true,
+                interval: false,
+                ttl: false,
+            });
+
+            const environmentKeys = await persistence.keys();
+            const environments = [];
+            
+            for (const key of environmentKeys) {
+                const envData = await persistence.getItem(key);
+                if (envData && envData.displayName && envData.url) {
+                    environments.push({
+                        id: key,
+                        name: envData.displayName,
+                        url: envData.url
+                    });
+                }
+            }
+
+            // Send environments to webview
+            this._panel.webview.postMessage({
+                action: 'environmentsLoaded',
+                environments: environments
+            });
+        } catch (error) {
+            console.error('Error loading environments:', error);
+            this._panel.webview.postMessage({
+                action: 'error',
+                message: 'Failed to load environments'
+            });
+        }
+    }
+
     private _update() {
         this._panel.webview.html = `<!DOCTYPE html>
-        <html><head><title>Entity Browser</title></head>
-        <body><h1>📊 Entity Browser</h1><p>Browse your Dataverse tables and data here.</p></body></html>`;
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Entity Browser</title>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 20px;
+                    font-family: var(--vscode-font-family);
+                    background: var(--vscode-editor-background);
+                    color: var(--vscode-editor-foreground);
+                }
+                .environment-selector {
+                    background: var(--vscode-editorWidget-background);
+                    border: 1px solid var(--vscode-editorWidget-border);
+                    border-radius: 6px;
+                    padding: 16px;
+                    margin-bottom: 20px;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .environment-label {
+                    font-weight: 600;
+                    color: var(--vscode-textLink-foreground);
+                    min-width: 80px;
+                }
+                .environment-dropdown {
+                    flex: 1;
+                    max-width: 400px;
+                    padding: 8px 12px;
+                    border: 1px solid var(--vscode-input-border);
+                    border-radius: 4px;
+                    background: var(--vscode-input-background);
+                    color: var(--vscode-input-foreground);
+                    font-family: inherit;
+                    font-size: 14px;
+                }
+                .environment-status {
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 0.85em;
+                    font-weight: 500;
+                }
+                .environment-connected {
+                    background: var(--vscode-testing-iconPassed);
+                    color: white;
+                }
+                .environment-disconnected {
+                    background: var(--vscode-testing-iconFailed);
+                    color: white;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="environment-selector">
+                <span class="environment-label">🌐 Environment:</span>
+                <select id="environmentSelect" class="environment-dropdown">
+                    <option value="">Loading environments...</option>
+                </select>
+                <span id="environmentStatus" class="environment-status environment-disconnected">Disconnected</span>
+            </div>
+            
+            <h1>📊 Entity Browser</h1>
+            <p>Browse your Dataverse tables and data here.</p>
+            <div id="content">
+                <p>Select an environment to load entities...</p>
+            </div>
+            
+            <script>
+                const vscode = acquireVsCodeApi();
+                
+                function loadEnvironments() {
+                    vscode.postMessage({ action: 'loadEnvironments' });
+                }
+                
+                function populateEnvironments(environments) {
+                    const select = document.getElementById('environmentSelect');
+                    select.innerHTML = '<option value="">Select an environment...</option>';
+                    
+                    environments.forEach(env => {
+                        const option = document.createElement('option');
+                        option.value = env.id;
+                        option.textContent = \`\${env.name} (\${env.settings.dataverseUrl})\`;
+                        select.appendChild(option);
+                    });
+                    
+                    if (environments.length > 0) {
+                        select.value = environments[0].id;
+                        updateEnvironmentStatus('Connected', true);
+                    }
+                }
+                
+                function updateEnvironmentStatus(status, isConnected) {
+                    const statusElement = document.getElementById('environmentStatus');
+                    statusElement.textContent = status;
+                    statusElement.className = 'environment-status ' + 
+                        (isConnected ? 'environment-connected' : 'environment-disconnected');
+                }
+                
+                window.addEventListener('message', event => {
+                    const message = event.data;
+                    if (message.action === 'environmentsLoaded') {
+                        populateEnvironments(message.data);
+                    }
+                });
+                
+                document.addEventListener('DOMContentLoaded', () => {
+                    document.getElementById('environmentSelect').addEventListener('change', (e) => {
+                        const isConnected = e.target.value !== '';
+                        updateEnvironmentStatus(isConnected ? 'Connected' : 'Disconnected', isConnected);
+                    });
+                    loadEnvironments();
+                });
+                
+                loadEnvironments();
+            </script>
+        </body>
+        </html>`;
     }
 }
 
 class QueryDataPanel {
-    public static currentPanel: QueryDataPanel | undefined;
     public static readonly viewType = 'queryData';
 
     private readonly _panel: vscode.WebviewPanel;
@@ -341,19 +515,18 @@ class QueryDataPanel {
     public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
-        if (QueryDataPanel.currentPanel) {
-            QueryDataPanel.currentPanel._panel.reveal(column);
-            return;
-        }
-
+        // Always create a new panel instead of reusing existing one
         const panel = vscode.window.createWebviewPanel(
             QueryDataPanel.viewType,
             'Query Data',
             column || vscode.ViewColumn.One,
-            { enableScripts: true }
+            { 
+                enableScripts: true,
+                retainContextWhenHidden: true
+            }
         );
 
-        QueryDataPanel.currentPanel = new QueryDataPanel(panel, extensionUri, authService);
+        new QueryDataPanel(panel, extensionUri, authService);
     }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService) {
@@ -362,10 +535,22 @@ class QueryDataPanel {
         this._authService = authService;
         this._update();
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+        
+        // Handle messages from the webview
+        this._panel.webview.onDidReceiveMessage(
+            async (message) => {
+                switch (message.action) {
+                    case 'loadEnvironments':
+                        await this.loadEnvironments();
+                        break;
+                }
+            },
+            null,
+            this._disposables
+        );
     }
 
     public dispose() {
-        QueryDataPanel.currentPanel = undefined;
         this._panel.dispose();
         while (this._disposables.length) {
             const x = this._disposables.pop();
@@ -373,38 +558,201 @@ class QueryDataPanel {
         }
     }
 
+    private async loadEnvironments() {
+        try {
+            // Get environments from storage
+            const persistence = require('node-persist');
+            await persistence.init({
+                dir: path.join(os.homedir(), '.dynamics-devtools', 'environments'),
+                stringify: JSON.stringify,
+                parse: JSON.parse,
+                encoding: 'utf8',
+                logging: false,
+                continuous: true,
+                interval: false,
+                ttl: false,
+            });
+
+            const environmentKeys = await persistence.keys();
+            const environments = [];
+            
+            for (const key of environmentKeys) {
+                const envData = await persistence.getItem(key);
+                if (envData && envData.displayName && envData.url) {
+                    environments.push({
+                        id: key,
+                        name: envData.displayName,
+                        url: envData.url
+                    });
+                }
+            }
+
+            // Send environments to webview
+            this._panel.webview.postMessage({
+                action: 'environmentsLoaded',
+                environments: environments
+            });
+        } catch (error) {
+            console.error('Error loading environments:', error);
+            this._panel.webview.postMessage({
+                action: 'error',
+                message: 'Failed to load environments'
+            });
+        }
+    }
+
     private _update() {
         this._panel.webview.html = `<!DOCTYPE html>
-        <html><head><title>Query Data</title></head>
-        <body><h1>🔍 Query Data</h1><p>Run custom queries against your Dataverse environment.</p></body></html>`;
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Query Data</title>
+            <style>
+                body {
+                    font-family: var(--vscode-font-family);
+                    font-size: var(--vscode-font-size);
+                    color: var(--vscode-foreground);
+                    background-color: var(--vscode-editor-background);
+                    margin: 0;
+                    padding: 20px;
+                }
+                
+                .environment-selector {
+                    background-color: var(--vscode-panel-background);
+                    border: 1px solid var(--vscode-panel-border);
+                    padding: 15px;
+                    border-radius: 6px;
+                    margin-bottom: 20px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+                
+                .env-status {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background-color: var(--vscode-charts-green);
+                }
+                
+                .env-label {
+                    font-weight: 600;
+                    color: var(--vscode-foreground);
+                }
+                
+                .env-dropdown {
+                    background-color: var(--vscode-dropdown-background);
+                    color: var(--vscode-dropdown-foreground);
+                    border: 1px solid var(--vscode-dropdown-border);
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    font-family: inherit;
+                    font-size: inherit;
+                    min-width: 200px;
+                }
+                
+                .env-dropdown:focus {
+                    outline: 1px solid var(--vscode-focusBorder);
+                    outline-offset: 1px;
+                }
+                
+                h1 {
+                    color: var(--vscode-foreground);
+                    margin-bottom: 20px;
+                }
+                
+                .content {
+                    padding: 20px 0;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="environment-selector">
+                <div class="env-status"></div>
+                <span class="env-label">Environment:</span>
+                <select class="env-dropdown" id="environmentSelect">
+                    <option value="">Loading environments...</option>
+                </select>
+            </div>
+            
+            <div class="content">
+                <h1>🔍 Query Data</h1>
+                <p>Run custom queries against your Dataverse environment.</p>
+            </div>
+            
+            <script>
+                const vscode = acquireVsCodeApi();
+                
+                // Load environments on page load
+                window.addEventListener('DOMContentLoaded', () => {
+                    vscode.postMessage({ action: 'loadEnvironments' });
+                });
+                
+                // Handle messages from extension
+                window.addEventListener('message', event => {
+                    const message = event.data;
+                    switch (message.action) {
+                        case 'environmentsLoaded':
+                            const select = document.getElementById('environmentSelect');
+                            select.innerHTML = '<option value="">Select an environment...</option>';
+                            
+                            message.environments.forEach(env => {
+                                const option = document.createElement('option');
+                                option.value = env.id;
+                                option.textContent = env.name;
+                                select.appendChild(option);
+                            });
+                            
+                            // Set first environment as default if available
+                            if (message.environments.length > 0) {
+                                select.value = message.environments[0].id;
+                            }
+                            break;
+                        case 'error':
+                            console.error('Error:', message.message);
+                            break;
+                    }
+                });
+                
+                // Handle environment selection
+                document.getElementById('environmentSelect').addEventListener('change', (e) => {
+                    const selectedEnvId = e.target.value;
+                    // TODO: Implement environment switching logic
+                    console.log('Selected environment:', selectedEnvId);
+                });
+            </script>
+        </body>
+        </html>`;
     }
 }
 
 class SolutionExplorerPanel {
-    public static currentPanel: SolutionExplorerPanel | undefined;
     public static readonly viewType = 'solutionExplorer';
 
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private readonly _authService: AuthenticationService;
     private _disposables: vscode.Disposable[] = [];
+    private _selectedEnvironmentId: string | undefined;
+    private _cachedSolutions: any[] | undefined;
+    private _cachedEnvironments: any[] | undefined;
 
     public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
-        if (SolutionExplorerPanel.currentPanel) {
-            SolutionExplorerPanel.currentPanel._panel.reveal(column);
-            return;
-        }
-
+        // Always create a new panel instead of reusing existing one
         const panel = vscode.window.createWebviewPanel(
             SolutionExplorerPanel.viewType,
             'Solution Explorer',
             column || vscode.ViewColumn.One,
-            { enableScripts: true }
+            { 
+                enableScripts: true,
+                retainContextWhenHidden: true
+            }
         );
 
-        SolutionExplorerPanel.currentPanel = new SolutionExplorerPanel(panel, extensionUri, authService);
+        new SolutionExplorerPanel(panel, extensionUri, authService);
     }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService) {
@@ -413,10 +761,31 @@ class SolutionExplorerPanel {
         this._authService = authService;
         this._update();
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+        
+        // Handle messages from the webview
+        this._panel.webview.onDidReceiveMessage(
+            async (message) => {
+                switch (message.action) {
+                    case 'loadEnvironments':
+                        await this.loadEnvironments();
+                        break;
+                    case 'loadSolutions':
+                        // Clear cache if environment changed or force refresh requested
+                        if (this._selectedEnvironmentId !== message.environmentId || message.forceRefresh) {
+                            this._cachedSolutions = undefined;
+                        }
+                        // Store the selected environment
+                        this._selectedEnvironmentId = message.environmentId;
+                        await this.loadSolutions(message.environmentId);
+                        break;
+                }
+            },
+            null,
+            this._disposables
+        );
     }
 
     public dispose() {
-        SolutionExplorerPanel.currentPanel = undefined;
         this._panel.dispose();
         while (this._disposables.length) {
             const x = this._disposables.pop();
@@ -425,9 +794,455 @@ class SolutionExplorerPanel {
     }
 
     private _update() {
-        this._panel.webview.html = `<!DOCTYPE html>
-        <html><head><title>Solution Explorer</title></head>
-        <body><h1>📦 Solution Explorer</h1><p>Manage your Dataverse solutions here.</p></body></html>`;
+        this._panel.webview.html = this._getHtmlForWebview();
+    }
+
+    private _getHtmlForWebview() {
+        return `<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Solution Explorer</title>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 20px;
+                    font-family: var(--vscode-font-family);
+                    background: var(--vscode-editor-background);
+                    color: var(--vscode-editor-foreground);
+                }
+                .environment-selector {
+                    background: var(--vscode-editorWidget-background);
+                    border: 1px solid var(--vscode-editorWidget-border);
+                    border-radius: 6px;
+                    padding: 16px;
+                    margin-bottom: 20px;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .environment-label {
+                    font-weight: 600;
+                    color: var(--vscode-textLink-foreground);
+                    min-width: 80px;
+                }
+                .environment-dropdown {
+                    flex: 1;
+                    max-width: 400px;
+                    padding: 8px 12px;
+                    border: 1px solid var(--vscode-input-border);
+                    border-radius: 4px;
+                    background: var(--vscode-input-background);
+                    color: var(--vscode-input-foreground);
+                    font-family: inherit;
+                    font-size: 14px;
+                }
+                .environment-dropdown:focus {
+                    outline: none;
+                    border-color: var(--vscode-focusBorder);
+                    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+                }
+                .environment-status {
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 0.85em;
+                    font-weight: 500;
+                }
+                .environment-connected {
+                    background: var(--vscode-testing-iconPassed);
+                    color: white;
+                }
+                .environment-disconnected {
+                    background: var(--vscode-testing-iconFailed);
+                    color: white;
+                }
+                .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    padding-bottom: 10px;
+                    border-bottom: 1px solid var(--vscode-editorWidget-border);
+                }
+                .title {
+                    font-size: 1.5em;
+                    margin: 0;
+                    color: var(--vscode-textLink-foreground);
+                }
+                .refresh-btn {
+                    background: var(--vscode-button-background);
+                    color: var(--vscode-button-foreground);
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                }
+                .refresh-btn:hover {
+                    background: var(--vscode-button-hoverBackground);
+                }
+                .loading {
+                    text-align: center;
+                    padding: 40px;
+                    color: var(--vscode-descriptionForeground);
+                }
+                .error {
+                    background: var(--vscode-inputValidation-errorBackground);
+                    border: 1px solid var(--vscode-inputValidation-errorBorder);
+                    color: var(--vscode-inputValidation-errorForeground);
+                    padding: 12px;
+                    border-radius: 4px;
+                    margin: 10px 0;
+                }
+                .solutions-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    background: var(--vscode-editorWidget-background);
+                    border: 1px solid var(--vscode-editorWidget-border);
+                    border-radius: 4px;
+                }
+                .solutions-table th,
+                .solutions-table td {
+                    padding: 12px;
+                    text-align: left;
+                    border-bottom: 1px solid var(--vscode-editorWidget-border);
+                }
+                .solutions-table th {
+                    background: var(--vscode-editorGroupHeader-tabsBackground);
+                    font-weight: 600;
+                    color: var(--vscode-textLink-foreground);
+                    position: sticky;
+                    top: 0;
+                }
+                .solutions-table tr:hover {
+                    background: var(--vscode-list-hoverBackground);
+                }
+                .managed-badge {
+                    background: var(--vscode-button-background);
+                    color: var(--vscode-button-foreground);
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    font-size: 0.85em;
+                }
+                .unmanaged-badge {
+                    background: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                    border: 1px solid var(--vscode-button-border);
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    font-size: 0.85em;
+                }
+                .no-solutions {
+                    text-align: center;
+                    padding: 40px;
+                    color: var(--vscode-descriptionForeground);
+                }
+            </style>
+        </head>
+        <body>
+            <!-- Environment Selector -->
+            <div class="environment-selector">
+                <span class="environment-label">🌐 Environment:</span>
+                <select id="environmentSelect" class="environment-dropdown">
+                    <option value="">Loading environments...</option>
+                </select>
+                <span id="environmentStatus" class="environment-status environment-disconnected">Disconnected</span>
+            </div>
+
+            <div class="header">
+                <h1 class="title">📦 Solution Explorer</h1>
+                <button class="refresh-btn" onclick="refreshSolutions()">🔄 Refresh</button>
+            </div>
+            
+            <div id="content">
+                <div class="loading">
+                    <p>Select an environment to load solutions...</p>
+                </div>
+            </div>
+
+            <script>
+                const vscode = acquireVsCodeApi();
+                let currentEnvironmentId = '';
+                
+                // Load environments on startup
+                function loadEnvironments() {
+                    vscode.postMessage({ action: 'loadEnvironments' });
+                }
+                
+                function populateEnvironments(environments, selectedEnvironmentId) {
+                    const select = document.getElementById('environmentSelect');
+                    select.innerHTML = '<option value="">Select an environment...</option>';
+                    
+                    environments.forEach(env => {
+                        const option = document.createElement('option');
+                        option.value = env.id;
+                        option.textContent = \`\${env.name} (\${env.settings.dataverseUrl})\`;
+                        select.appendChild(option);
+                    });
+                    
+                    // Restore selected environment or auto-select first environment if available
+                    if (selectedEnvironmentId && environments.find(env => env.id === selectedEnvironmentId)) {
+                        select.value = selectedEnvironmentId;
+                        currentEnvironmentId = selectedEnvironmentId;
+                        updateEnvironmentStatus('Connected', true);
+                        loadSolutions();
+                    } else if (environments.length > 0) {
+                        select.value = environments[0].id;
+                        currentEnvironmentId = environments[0].id;
+                        updateEnvironmentStatus('Connected', true);
+                        loadSolutions();
+                    }
+                }
+                
+                function updateEnvironmentStatus(status, isConnected) {
+                    const statusElement = document.getElementById('environmentStatus');
+                    statusElement.textContent = status;
+                    statusElement.className = 'environment-status ' + 
+                        (isConnected ? 'environment-connected' : 'environment-disconnected');
+                }
+                
+                function onEnvironmentChange() {
+                    const select = document.getElementById('environmentSelect');
+                    currentEnvironmentId = select.value;
+                    
+                    if (currentEnvironmentId) {
+                        updateEnvironmentStatus('Connected', true);
+                        loadSolutions();
+                    } else {
+                        updateEnvironmentStatus('Disconnected', false);
+                        document.getElementById('content').innerHTML = 
+                            '<div class="loading"><p>Select an environment to load solutions...</p></div>';
+                    }
+                }
+                
+                function loadSolutions() {
+                    if (!currentEnvironmentId) {
+                        document.getElementById('content').innerHTML = 
+                            '<div class="error">Please select an environment first.</div>';
+                        return;
+                    }
+                    
+                    document.getElementById('content').innerHTML = '<div class="loading"><p>Loading solutions...</p></div>';
+                    vscode.postMessage({ 
+                        action: 'loadSolutions', 
+                        environmentId: currentEnvironmentId 
+                    });
+                }
+                
+                function refreshSolutions() {
+                    if (!currentEnvironmentId) {
+                        document.getElementById('content').innerHTML = 
+                            '<div class="error">Please select an environment first.</div>';
+                        return;
+                    }
+                    
+                    document.getElementById('content').innerHTML = '<div class="loading"><p>Loading solutions...</p></div>';
+                    vscode.postMessage({ 
+                        action: 'loadSolutions', 
+                        environmentId: currentEnvironmentId,
+                        forceRefresh: true
+                    });
+                }
+                
+                function displaySolutions(solutions) {
+                    const content = document.getElementById('content');
+                    
+                    if (!solutions || solutions.length === 0) {
+                        content.innerHTML = '<div class="no-solutions"><p>No solutions found in this environment.</p></div>';
+                        return;
+                    }
+                    
+                    let tableHtml = \`
+                        <table class="solutions-table">
+                            <thead>
+                                <tr>
+                                    <th>Display Name</th>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Version</th>
+                                    <th>Publisher</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    \`;
+                    
+                    solutions.forEach(solution => {
+                        const managedBadge = solution.ismanaged 
+                            ? '<span class="managed-badge">Managed</span>'
+                            : '<span class="unmanaged-badge">Unmanaged</span>';
+                            
+                        const createdDate = new Date(solution.createdon).toLocaleDateString();
+                        
+                        tableHtml += \`
+                            <tr>
+                                <td>\${solution.friendlyname || solution.uniquename}</td>
+                                <td>\${solution.uniquename}</td>
+                                <td>\${managedBadge}</td>
+                                <td>\${solution.version}</td>
+                                <td>\${solution.publishername || 'Unknown'}</td>
+                                <td>\${createdDate}</td>
+                            </tr>
+                        \`;
+                    });
+                    
+                    tableHtml += '</tbody></table>';
+                    content.innerHTML = tableHtml;
+                }
+                
+                function displayError(error) {
+                    document.getElementById('content').innerHTML = 
+                        \`<div class="error">Error loading solutions: \${error}</div>\`;
+                    updateEnvironmentStatus('Error', false);
+                }
+                
+                // Listen for messages from the extension
+                window.addEventListener('message', event => {
+                    const message = event.data;
+                    
+                    switch (message.action) {
+                        case 'environmentsLoaded':
+                            populateEnvironments(message.data, message.selectedEnvironmentId);
+                            break;
+                        case 'solutionsLoaded':
+                            displaySolutions(message.data);
+                            break;
+                        case 'solutionsError':
+                            displayError(message.error);
+                            break;
+                    }
+                });
+                
+                // Set up event listeners
+                document.addEventListener('DOMContentLoaded', () => {
+                    document.getElementById('environmentSelect').addEventListener('change', onEnvironmentChange);
+                    loadEnvironments();
+                });
+                
+                // Load environments on startup (fallback)
+                loadEnvironments();
+            </script>
+        </body>
+        </html>`;
+    }
+
+    private async loadEnvironments() {
+        try {
+            // Use cached environments if available
+            if (this._cachedEnvironments) {
+                this._panel.webview.postMessage({
+                    action: 'environmentsLoaded',
+                    data: this._cachedEnvironments,
+                    selectedEnvironmentId: this._selectedEnvironmentId
+                });
+                return;
+            }
+
+            const environments = await this._authService.getEnvironments();
+            
+            // Cache the environments
+            this._cachedEnvironments = environments;
+            
+            this._panel.webview.postMessage({
+                action: 'environmentsLoaded',
+                data: environments,
+                selectedEnvironmentId: this._selectedEnvironmentId
+            });
+
+        } catch (error: any) {
+            console.error('Error loading environments:', error);
+            this._panel.webview.postMessage({
+                action: 'solutionsError',
+                error: `Failed to load environments: ${error.message}`
+            });
+        }
+    }
+
+    private async loadSolutions(environmentId?: string) {
+        try {
+            // Check if we have cached solutions for this environment
+            if (this._cachedSolutions && this._selectedEnvironmentId === environmentId) {
+                this._panel.webview.postMessage({
+                    action: 'solutionsLoaded',
+                    data: this._cachedSolutions
+                });
+                return;
+            }
+
+            // Get available environments
+            const environments = await this._authService.getEnvironments();
+            
+            if (environments.length === 0) {
+                this._panel.webview.postMessage({
+                    action: 'solutionsError',
+                    error: 'No environments configured. Please add an environment first.'
+                });
+                return;
+            }
+
+            // Use specified environment or fall back to first one
+            let environment = environments[0];
+            if (environmentId) {
+                const foundEnv = environments.find(env => env.id === environmentId);
+                if (foundEnv) {
+                    environment = foundEnv;
+                } else {
+                    this._panel.webview.postMessage({
+                        action: 'solutionsError',
+                        error: 'Selected environment not found.'
+                    });
+                    return;
+                }
+            }
+            
+            // Get access token for the environment
+            const token = await this._authService.getAccessToken(environment.id);
+            
+            // Fetch solutions from Dataverse
+            const solutionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/solutions?$select=solutionid,uniquename,friendlyname,version,ismanaged,createdon,description&$expand=publisherid($select=uniquename,friendlyname)&$orderby=createdon desc`;
+            
+            const response = await fetch(solutionsUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json() as any;
+            
+            // Transform the data to include publisher name
+            const solutions = data.value.map((solution: any) => ({
+                solutionid: solution.solutionid,
+                uniquename: solution.uniquename,
+                friendlyname: solution.friendlyname,
+                version: solution.version,
+                ismanaged: solution.ismanaged,
+                createdon: solution.createdon,
+                description: solution.description,
+                publishername: solution.publisherid?.friendlyname || solution.publisherid?.uniquename || 'Unknown'
+            }));
+
+            // Cache the solutions data
+            this._cachedSolutions = solutions;
+
+            this._panel.webview.postMessage({
+                action: 'solutionsLoaded',
+                data: solutions
+            });
+
+        } catch (error: any) {
+            console.error('Error loading solutions:', error);
+            this._panel.webview.postMessage({
+                action: 'solutionsError',
+                error: error.message
+            });
+        }
     }
 }
 
