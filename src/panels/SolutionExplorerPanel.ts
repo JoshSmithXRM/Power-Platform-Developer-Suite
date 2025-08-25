@@ -435,6 +435,10 @@ export class SolutionExplorerPanel extends BasePanel {
                     rowActions: [
                         { id: 'openMaker', action: 'openInMaker', label: 'Maker', icon: '🎨' },
                         { id: 'openClassic', action: 'openInClassic', label: 'Classic', icon: '📋' }
+                    ],
+                    contextMenu: [
+                        { id: 'openMaker', action: 'openInMaker', label: 'Open in Maker' },
+                        { id: 'openClassic', action: 'openInClassic', label: 'Open in Classic' }
                     ]
                 })}
             </div>

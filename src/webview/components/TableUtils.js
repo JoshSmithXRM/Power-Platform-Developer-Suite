@@ -40,6 +40,12 @@ class TableUtils {
             this.initializeSelection(tableId);
         }
         
+        // Initialize context menu if configured
+        const contextMenuItems = JSON.parse(table.dataset.contextMenu || '[]');
+        if (contextMenuItems.length > 0) {
+            this.initializeContextMenu(tableId);
+        }
+        
         // Apply default sort if specified
         const defaultSort = JSON.parse(table.dataset.defaultSort || '{}');
         if (defaultSort.column) {
@@ -95,6 +101,22 @@ class TableUtils {
                 this.handleRowSelection(tableId, checkbox);
             }
         });
+        
+        // Handle context menu
+        table.addEventListener('contextmenu', (e) => {
+            const row = e.target.closest('tr');
+            if (row && row.dataset.rowId) {
+                this.showContextMenu(tableId, e, row);
+            }
+        });
+    }
+    
+    /**
+     * Initialize context menu functionality
+     */
+    static initializeContextMenu(tableId) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
         
         // Handle context menu
         table.addEventListener('contextmenu', (e) => {
@@ -323,7 +345,13 @@ class TableUtils {
         
         const rowData = config.originalData.find(row => String(row.id) === String(rowId));
         
-        // Send message to extension
+        // Call custom callback if provided
+        if (config.onRowAction && typeof config.onRowAction === 'function') {
+            config.onRowAction(action, rowData);
+            return;
+        }
+        
+        // Send message to extension (default behavior)
         if (typeof vscode !== 'undefined') {
             vscode.postMessage({
                 command: 'tableRowAction',
