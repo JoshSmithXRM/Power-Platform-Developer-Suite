@@ -15,6 +15,7 @@
         "Other"
     ],
     "activationEvents": [
+        "onStartupFinished",
         "onView:dynamics-devtools-tools",
         "onView:dynamics-devtools-environments",
         "onCommand:dynamics-devtools.addEnvironment",
