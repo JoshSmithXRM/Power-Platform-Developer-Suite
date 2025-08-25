@@ -8,9 +8,40 @@ This is a comprehensive VS Code extension for Microsoft Dynamics 365 / Power Pla
 - **[docs/ARCHITECTURE_GUIDE.md](../docs/ARCHITECTURE_GUIDE.md)** - Comprehensive architecture patterns and development guidelines
 
 ## Current Implementation Status
-✅ **All 7 panels implemented** following consistent architecture patterns:
-- **Production Ready**: Solution Explorer, Import Job Viewer, Query Data, Metadata Browser, Environment Setup
-- **Framework Ready**: Connection References Manager, Environment Variables Manager, Plugin Trace Viewer
+For the authoritative, versioned implementation status and release history see `CHANGELOG.md`.
+
+Use this file for short, actionable developer hints and Copilot-specific instructions (e.g., which APIs are safe to call, which panels are scaffold-only, and where to find mocks/stubs).
+
+## Release Notes & Change Management
+
+Following industry best practices based on [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/) standards.
+
+### Documentation Hierarchy
+- **[CHANGELOG.md](../CHANGELOG.md)** - Authoritative technical record following Keep a Changelog format
+- **GitHub Releases** - User-focused release announcements generated from changelog
+-- **README.md** - Current stable feature status and getting started guide
+
+### Standard Release Process
+1. **During Development**: Track all changes in `[Unreleased]` section of CHANGELOG.md
+2. **Pre-Release**: Move unreleased changes to new versioned section with ISO date (YYYY-MM-DD)
+3. **Release**: Create GitHub Release referencing changelog with user-focused highlights
+4. **Post-Release**: Update README.md feature status if significant changes occurred
+
+### Keep a Changelog Categories
+Use semantic categories in CHANGELOG.md entries:
+- **Added** - New features and capabilities
+- **Changed** - Changes in existing functionality
+- **Deprecated** - Soon-to-be removed features
+- **Removed** - Features removed in this release
+- **Fixed** - Bug fixes and corrections
+- **Security** - Security vulnerability fixes
+- **Technical** - Internal changes, architecture improvements, build system updates
+
+### Content Strategy Guidelines
+- **CHANGELOG.md**: Technical accuracy, comprehensive change tracking, developer-focused
+- **GitHub Releases**: User impact, benefits, breaking changes, migration guidance
+- **README.md**: Honest feature status, clear capability descriptions
+- **Version Numbers**: Follow semantic versioning (MAJOR.MINOR.PATCH)
 
 ## Core Development Principles
 
@@ -181,9 +212,15 @@ export class DomainCommands {
 - **Only elaborate** when the user asks for explanations or details
 
 ### Testing & Validation
-- **Inform the user when to test the build** instead of running tests automatically
+- **Inform the user when to test builds** instead of running tests automatically
 - **Let the user validate functionality** and report results back
 - **Wait for user confirmation** before proceeding with dependent changes
+
+### Change Tracking
+- **Update CHANGELOG.md [Unreleased] section** for all notable changes during development
+- **Follow Keep a Changelog categories**: Added, Changed, Deprecated, Removed, Fixed, Security, Technical
+- **Use clear, human-readable descriptions** that explain impact and context
+- **Reference issue numbers and breaking changes** when applicable
 
 ## What NOT to Do
 

@@ -5,10 +5,13 @@ A comprehensive VSCode extension for Microsoft Dynamics 365 / Power Platform dev
 
 ## Features
 
-### 🔧 **Complete Toolkit**
+### ✅ **Production Ready**
 - **Environment Management** - Add, configure, and switch between multiple Dynamics 365 environments
-- **Solution Explorer** - Browse, export, and manage Dynamics 365 solutions
-- **Import Job Viewer** - Monitor solution import status and troubleshoot failures
+- **Solution Explorer** - Browse, export, and manage Dynamics 365 solutions with advanced filtering
+- **Import Job Viewer** - Monitor solution import status and troubleshoot failures with detailed logs
+- **Environment Setup** - Guided configuration wizard with connection testing
+
+### 🚧 **Framework Ready** (UI Complete, API Integration Pending)
 - **Metadata Browser** - Explore entity metadata and schema information
 - **Query Data** - Execute OData queries and analyze results
 - **Connection References Manager** - Manage connection references across environments
@@ -147,6 +150,12 @@ We welcome contributions! Please follow these guidelines:
 - Use shared utilities (TableUtils, PanelUtils) for consistent UI
 - Implement proper error handling and user feedback
 - Test with both Service Principal and Interactive authentication
+
+## Release Notes & Where to Find Changes
+
+For authoritative, versioned change history see `CHANGELOG.md` (Keep a Changelog format).  
+Development implementation status and internal guidance for Copilot live in `.github/copilot-instructions.md`.  
+Use GitHub Releases for user-facing announcements generated from the changelog.
 
 ## License
 MIT
