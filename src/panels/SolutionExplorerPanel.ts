@@ -673,8 +673,11 @@ export class SolutionExplorerPanel extends BasePanel {
                     // Store solutions data globally for sorting/filtering
                     window.solutionsData = solutions;
                     
-                    // Set up filter functionality
+                    // Set up filter and sort functionality
                     setupTableFiltering();
+                    
+                    // Setup table sorting after table is created
+                    setupTableSorting('solutionsTable', 'uniqueName', 'asc');
                 }
                 
                 function displayError(error) {
@@ -691,9 +694,6 @@ export class SolutionExplorerPanel extends BasePanel {
                     if (filterInput) {
                         filterInput.addEventListener('input', filterTable);
                     }
-                    
-                    // Setup standardized table sorting with default sort by "uniqueName" ascending
-                    setupTableSorting('solutionsTable', 'uniqueName', 'asc');
                 }
                 
                 function filterTable() {
