@@ -152,7 +152,8 @@ export abstract class BasePanel implements IPanelBase {
     protected getCommonWebviewResources(): { 
         tableUtilsScript: vscode.Uri; 
         tableStylesSheet: vscode.Uri; 
-        panelStylesSheet: vscode.Uri; 
+        panelStylesSheet: vscode.Uri;
+        panelUtilsScript: vscode.Uri;
     } {
         return {
             tableUtilsScript: this._panel.webview.asWebviewUri(
@@ -163,6 +164,9 @@ export abstract class BasePanel implements IPanelBase {
             ),
             panelStylesSheet: this._panel.webview.asWebviewUri(
                 vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'PanelStyles.css')
+            ),
+            panelUtilsScript: this._panel.webview.asWebviewUri(
+                vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'PanelUtils.js')
             )
         };
     }

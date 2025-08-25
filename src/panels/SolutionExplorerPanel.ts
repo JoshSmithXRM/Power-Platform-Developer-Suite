@@ -254,7 +254,7 @@ export class SolutionExplorerPanel extends BasePanel {
 
     protected getHtmlContent(): string {
         // Get common webview resources
-        const { tableUtilsScript, tableStylesSheet, panelStylesSheet } = this.getCommonWebviewResources();
+        const { tableUtilsScript, tableStylesSheet, panelStylesSheet, panelUtilsScript } = this.getCommonWebviewResources();
 
         const envSelectorUtilsScript = this._panel.webview.asWebviewUri(
             vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'EnvironmentSelectorUtils.js')
@@ -327,28 +327,27 @@ export class SolutionExplorerPanel extends BasePanel {
             </div>
 
             <script src="${envSelectorUtilsScript}"></script>
+            <script src="${panelUtilsScript}"></script>
             <script src="${tableUtilsScript}"></script>
             <script>
                 const vscode = acquireVsCodeApi();
                 let currentEnvironmentId = '';
                 let solutions = [];
                 
-                // Initialize environment selector
+                // Initialize panel with PanelUtils
+                const panelUtils = PanelUtils.initializePanel({
+                    environmentSelectorId: 'environmentSelect',
+                    onEnvironmentChange: 'onEnvironmentChange',
+                    clearMessage: 'Select an environment to load solutions...'
+                });
+                
+                // Initialize environment selector and load environments
                 document.addEventListener('DOMContentLoaded', () => {
-                    EnvironmentSelectorUtils.initializeSelector('environmentSelect', {
-                        onSelectionChange: 'onEnvironmentChange'
-                    });
-                    loadEnvironments();
+                    panelUtils.loadEnvironments();
                 });
                 
                 // Load environments on startup (fallback)
-                loadEnvironments();
-                
-                // Load environments
-                function loadEnvironments() {
-                    EnvironmentSelectorUtils.setLoadingState('environmentSelect', true);
-                    vscode.postMessage({ action: 'loadEnvironments' });
-                }
+                panelUtils.loadEnvironments();
                 
                 // Handle environment selection change
                 function onEnvironmentChange(selectorId, environmentId, previousEnvironmentId) {
@@ -356,7 +355,7 @@ export class SolutionExplorerPanel extends BasePanel {
                     if (environmentId) {
                         loadSolutions();
                     } else {
-                        clearContent();
+                        panelUtils.clearContent('Select an environment to load solutions...');
                     }
                 }
                 
@@ -364,10 +363,8 @@ export class SolutionExplorerPanel extends BasePanel {
                 function loadSolutions() {
                     if (!currentEnvironmentId) return;
                     
-                    document.getElementById('content').innerHTML = '<div class="loading"><p>Loading solutions...</p></div>';
-                    
-                    vscode.postMessage({ 
-                        action: 'loadSolutions', 
+                    panelUtils.showLoading('Loading solutions...');
+                    PanelUtils.sendMessage('loadSolutions', { 
                         environmentId: currentEnvironmentId 
                     });
                 }
@@ -379,56 +376,28 @@ export class SolutionExplorerPanel extends BasePanel {
                     }
                 }
                 
-                // Clear content when no environment selected
-                function clearContent() {
-                    document.getElementById('content').innerHTML = '<div class="loading"><p>Select an environment to load solutions...</p></div>';
-                }
-                
-                // Handle messages from extension
-                window.addEventListener('message', event => {
-                    const message = event.data;
+                // Setup message handlers
+                PanelUtils.setupMessageHandler({
+                    'environmentsLoaded': (message) => {
+                        EnvironmentSelectorUtils.loadEnvironments('environmentSelect', message.data);
+                        if (message.selectedEnvironmentId) {
+                            EnvironmentSelectorUtils.setSelectedEnvironment('environmentSelect', message.selectedEnvironmentId);
+                            currentEnvironmentId = message.selectedEnvironmentId;
+                            loadSolutions();
+                        }
+                    },
                     
-                    switch (message.action) {
-                        case 'environmentsLoaded':
-                            EnvironmentSelectorUtils.loadEnvironments('environmentSelect', message.data);
-                            if (message.selectedEnvironmentId) {
-                                EnvironmentSelectorUtils.setSelectedEnvironment('environmentSelect', message.selectedEnvironmentId);
-                                currentEnvironmentId = message.selectedEnvironmentId;
-                                loadSolutions();
-                            }
-                            break;
-                            
-                        case 'solutionsLoaded':
-                            populateSolutions(message.data);
-                            break;
-                            
-                        case 'error':
-                            showError(message.message);
-                            break;
+                    'solutionsLoaded': (message) => {
+                        populateSolutions(message.data);
                     }
                 });
-                
-                // Custom renderer for solution names
-                function renderSolutionName(value, row) {
-                    return \`<a class="solution-name-link" onclick="openSolutionInMaker('\\\${row.id}'); return false;">\\\${value}</a>\`;
-                }
-                
-                // Custom renderer for solution type  
-                function renderSolutionType(value, row) {
-                    return value ? 'Managed' : 'Unmanaged';
-                }
-                
-                // Custom renderer for installed date
-                function renderInstalledDate(value, row) {
-                    return value ? new Date(value).toLocaleDateString() : 'Unknown';
-                }
                 
                 // Populate solutions table using ComponentFactory
                 function populateSolutions(solutionsData) {
                     solutions = solutionsData;
                     
                     if (solutions.length === 0) {
-                        document.getElementById('content').innerHTML = '<div class="no-solutions"><p>No solutions found in this environment.</p></div>';
+                        panelUtils.showNoData('No solutions found in this environment.');
                         return;
                     }
                     
@@ -444,7 +413,7 @@ export class SolutionExplorerPanel extends BasePanel {
                         version: solution.version,
                         type: solution.isManaged ? 'Managed' : 'Unmanaged',
                         publisherName: solution.publisherName,
-                        installedDate: solution.installedOn ? new Date(solution.installedOn).toLocaleDateString() : 'N/A'
+                        installedDate: PanelUtils.formatDate(solution.installedOn)
                     }));
                     
                     // Initialize table with TableUtils
@@ -471,15 +440,9 @@ export class SolutionExplorerPanel extends BasePanel {
                     }
                 }
                 
-                // Clear table content
-                function clearContent() {
-                    document.getElementById('content').innerHTML = '<div class="no-solutions"><p>Select an environment to load solutions.</p></div>';
-                }
-                
                 // Open solution in maker portal
                 function openSolutionInMaker(solutionId) {
-                    vscode.postMessage({
-                        action: 'openSolutionInMaker',
+                    PanelUtils.sendMessage('openSolutionInMaker', {
                         environmentId: currentEnvironmentId,
                         solutionId: solutionId
                     });
@@ -487,20 +450,10 @@ export class SolutionExplorerPanel extends BasePanel {
                 
                 // Open solution in classic UI
                 function openSolutionInClassic(solutionId) {
-                    vscode.postMessage({
-                        action: 'openSolutionInClassic',
+                    PanelUtils.sendMessage('openSolutionInClassic', {
                         environmentId: currentEnvironmentId,
                         solutionId: solutionId
                     });
-                }
-                
-                // Show error message
-                function showError(message) {
-                    document.getElementById('content').innerHTML = \`
-                        <div class="error">
-                            <strong>Error:</strong> \${message}
-                        </div>
-                    \`;
                 }
             </script>
         </body>
