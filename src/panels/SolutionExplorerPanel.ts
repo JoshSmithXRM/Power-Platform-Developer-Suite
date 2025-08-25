@@ -12,6 +12,26 @@ export class SolutionExplorerPanel extends BasePanel {
     private _cachedEnvironments: any[] | undefined;
 
     public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
+        // Try to focus existing panel first
+        const existing = BasePanel.focusExisting(SolutionExplorerPanel.viewType);
+        if (existing) {
+            return;
+        }
+
+        const column = vscode.window.activeTextEditor?.viewColumn;
+
+        const panel = BasePanel.createWebviewPanel({
+            viewType: SolutionExplorerPanel.viewType,
+            title: 'Solution Explorer',
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            enableFindWidget: true
+        }, column);
+
+        new SolutionExplorerPanel(panel, extensionUri, authService);
+    }
+
+    public static createNew(extensionUri: vscode.Uri, authService: AuthenticationService) {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         const panel = BasePanel.createWebviewPanel({
@@ -674,17 +694,6 @@ export class SolutionExplorerPanel extends BasePanel {
                     
                     // Setup standardized table sorting with default sort by "uniqueName" ascending
                     setupTableSorting('solutionsTable', 'uniqueName', 'asc');
-                    
-                    // Immediately apply the default sort to the table data
-                    setTimeout(() => {
-                        const table = document.getElementById('solutionsTable');
-                        if (table) {
-                            const header = table.querySelector('th[data-column="uniqueName"]');
-                            if (header) {
-                                header.click(); // Trigger the sort
-                            }
-                        }
-                    }, 10);
                 }
                 
                 function filterTable() {

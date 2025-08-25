@@ -36,6 +36,12 @@ export class MetadataBrowserPanel extends BasePanel {
     private environmentManager: EnvironmentManager;
 
     public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
+        // Try to focus existing panel first
+        const existing = BasePanel.focusExisting(MetadataBrowserPanel.viewType);
+        if (existing) {
+            return;
+        }
+
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         const panel = BasePanel.createWebviewPanel({
@@ -49,7 +55,19 @@ export class MetadataBrowserPanel extends BasePanel {
         new MetadataBrowserPanel(panel, extensionUri, authService);
     }
 
-    private static currentPanel: MetadataBrowserPanel | undefined;
+    public static createNew(extensionUri: vscode.Uri, authService: AuthenticationService) {
+        const column = vscode.window.activeTextEditor?.viewColumn;
+
+        const panel = BasePanel.createWebviewPanel({
+            viewType: MetadataBrowserPanel.viewType,
+            title: 'Metadata Browser',
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            enableFindWidget: true
+        }, column);
+
+        new MetadataBrowserPanel(panel, extensionUri, authService);
+    }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService) {
         super(panel, extensionUri, authService, {
@@ -58,9 +76,6 @@ export class MetadataBrowserPanel extends BasePanel {
         });
         this.odataService = new ODataService();
         this.environmentManager = new EnvironmentManager(authService, (message) => this.postMessage(message));
-        this._panel.onDidDispose(() => {
-            MetadataBrowserPanel.currentPanel = undefined;
-        }, null, this._disposables);
 
         // Initialize after everything is set up
         this.initialize();

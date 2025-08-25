@@ -11,6 +11,26 @@ export class QueryDataPanel extends BasePanel {
     private environmentManager: EnvironmentManager;
 
     public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
+        // Try to focus existing panel first
+        const existing = BasePanel.focusExisting(QueryDataPanel.viewType);
+        if (existing) {
+            return;
+        }
+
+        const column = vscode.window.activeTextEditor?.viewColumn;
+
+        const panel = BasePanel.createWebviewPanel({
+            viewType: QueryDataPanel.viewType,
+            title: 'Query Data',
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            enableFindWidget: true
+        }, column);
+
+        new QueryDataPanel(panel, extensionUri, authService);
+    }
+
+    public static createNew(extensionUri: vscode.Uri, authService: AuthenticationService) {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         const panel = BasePanel.createWebviewPanel({

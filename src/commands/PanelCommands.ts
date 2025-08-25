@@ -32,6 +32,18 @@ export class PanelCommands {
                 ImportJobViewerPanel.createOrShow(this.context.extensionUri, this.authService);
             }),
 
+            vscode.commands.registerCommand('dynamics-devtools.queryDataNew', () => {
+                QueryDataPanel.createNew(this.context.extensionUri, this.authService);
+            }),
+
+            vscode.commands.registerCommand('dynamics-devtools.solutionExplorerNew', () => {
+                SolutionExplorerPanel.createNew(this.context.extensionUri, this.authService);
+            }),
+
+            vscode.commands.registerCommand('dynamics-devtools.importJobViewerNew', () => {
+                ImportJobViewerPanel.createNew(this.context.extensionUri, this.authService);
+            }),
+
             vscode.commands.registerCommand('dynamics-devtools.refreshEnvironments', () => {
                 this.environmentsProvider.refresh();
                 vscode.window.showInformationMessage('Environments refreshed');

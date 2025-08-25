@@ -18,6 +18,16 @@ export class MetadataBrowserCommands {
                 }
 
                 MetadataBrowserPanel.createOrShow(this.context.extensionUri, this.authService);
+            }),
+
+            vscode.commands.registerCommand('dynamics-devtools.openMetadataBrowserNew', async () => {
+                const environments = await this.authService.getEnvironments();
+                if (!environments || environments.length === 0) {
+                    vscode.window.showErrorMessage('Please add an environment first.');
+                    return;
+                }
+
+                MetadataBrowserPanel.createNew(this.context.extensionUri, this.authService);
             })
         ];
     }

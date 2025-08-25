@@ -28,25 +28,29 @@ export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
                 'Solution Explorer',
                 'Explore and manage Dynamics 365 solutions',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.solutionExplorer'
+                'dynamics-devtools.solutionExplorer',
+                'solutionExplorer'
             ),
             new ToolItem(
                 'Metadata Browser',
                 'Browse and explore entity metadata',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.openMetadataBrowser'
+                'dynamics-devtools.openMetadataBrowser',
+                'metadataBrowser'
             ),
             new ToolItem(
                 'Import Job Viewer',
                 'View and monitor data import jobs',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.importJobViewer'
+                'dynamics-devtools.importJobViewer',
+                'importJobViewer'
             ),
             new ToolItem(
                 'Query Data',
                 'Query and analyze data from Dynamics 365',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.queryData'
+                'dynamics-devtools.queryData',
+                'queryData'
             ),
         ];
     }

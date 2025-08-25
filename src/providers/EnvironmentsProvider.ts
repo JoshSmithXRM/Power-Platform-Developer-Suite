@@ -73,7 +73,8 @@ export class ToolItem extends vscode.TreeItem {
         public readonly label: string,
         public readonly tooltip: string,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-        commandId?: string
+        commandId?: string,
+        contextValue?: string
     ) {
         super(label, collapsibleState);
         this.tooltip = tooltip;
@@ -82,6 +83,9 @@ export class ToolItem extends vscode.TreeItem {
                 command: commandId,
                 title: label
             };
+        }
+        if (contextValue) {
+            this.contextValue = contextValue;
         }
     }
 }

@@ -12,6 +12,7 @@ export abstract class BasePanel implements IPanelBase {
     protected _disposables: vscode.Disposable[] = [];
 
     public readonly viewType: string;
+    protected static _activePanels: Map<string, BasePanel> = new Map();
 
     constructor(
         panel: vscode.WebviewPanel,
@@ -26,6 +27,9 @@ export abstract class BasePanel implements IPanelBase {
 
         this._panel.title = config.title;
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+        // Register this panel in the active panels map
+        BasePanel._activePanels.set(this.viewType, this);
 
         // Set up message handling
         this._panel.webview.onDidReceiveMessage(
@@ -100,11 +104,26 @@ export abstract class BasePanel implements IPanelBase {
      * Dispose of the panel and clean up resources
      */
     public dispose(): void {
+        // Remove from active panels map
+        BasePanel._activePanels.delete(this.viewType);
+        
         this._panel.dispose();
         while (this._disposables.length) {
             const x = this._disposables.pop();
             if (x) x.dispose();
         }
+    }
+
+    /**
+     * Focus an existing panel or return null if none exists
+     */
+    protected static focusExisting(viewType: string): BasePanel | null {
+        const existingPanel = BasePanel._activePanels.get(viewType);
+        if (existingPanel) {
+            existingPanel._panel.reveal();
+            return existingPanel;
+        }
+        return null;
     }
 
     /**

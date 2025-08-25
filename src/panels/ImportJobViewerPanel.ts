@@ -13,6 +13,26 @@ export class ImportJobViewerPanel extends BasePanel {
     private readonly _pageSize = 5000; // Large page size to get all records
 
     public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
+        // Try to focus existing panel first
+        const existing = BasePanel.focusExisting(ImportJobViewerPanel.viewType);
+        if (existing) {
+            return;
+        }
+
+        const column = vscode.window.activeTextEditor?.viewColumn;
+
+        const panel = BasePanel.createWebviewPanel({
+            viewType: ImportJobViewerPanel.viewType,
+            title: 'Import Job Viewer',
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            enableFindWidget: true
+        }, column);
+
+        new ImportJobViewerPanel(panel, extensionUri, authService);
+    }
+
+    public static createNew(extensionUri: vscode.Uri, authService: AuthenticationService) {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         const panel = BasePanel.createWebviewPanel({

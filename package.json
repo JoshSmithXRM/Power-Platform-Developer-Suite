@@ -62,6 +62,41 @@
                 "command": "dynamics-devtools.openMetadataBrowser",
                 "title": "Open Metadata Browser",
                 "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.solutionExplorer",
+                "title": "Solution Explorer",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.solutionExplorerNew",
+                "title": "Open New Solution Explorer",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.openMetadataBrowserNew",
+                "title": "Open New Metadata Browser",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.importJobViewer",
+                "title": "Import Job Viewer",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.importJobViewerNew",
+                "title": "Open New Import Job Viewer",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.queryData",
+                "title": "Query Data",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.queryDataNew",
+                "title": "Open New Query Data",
+                "category": "Dynamics DevTools"
             }
         ],
         "viewsContainers": {
@@ -127,6 +162,26 @@
                     "command": "dynamics-devtools.removeEnvironment",
                     "when": "view == dynamics-devtools-environments && viewItem == environment",
                     "group": "3_remove@1"
+                },
+                {
+                    "command": "dynamics-devtools.solutionExplorerNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == solutionExplorer",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.openMetadataBrowserNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == metadataBrowser",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.importJobViewerNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == importJobViewer",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.queryDataNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == queryData",
+                    "group": "1_open@1"
                 }
             ]
         }
