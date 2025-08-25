@@ -1,21 +1,31 @@
 # GitHub Copilot Instructions for Dynamics DevTools
 
 ## Project Overview
-This is a VS Code extension for Microsoft Dynamics 365 / Power Platform development. The extension provides tools for managing environments, browsing entities, exploring solutions, and viewing import jobs.
+This is a comprehensive VS Code extension for Microsoft Dynamics 365 / Power Platform development and administration. The extension provides a unified toolkit with modern UI components for managing environments, browsing metadata, monitoring solutions, and performing common development tasks.
+
+**📚 For complete project information, see:**
+- **[README.md](../README.md)** - Installation, usage, and getting started guide
+- **[docs/ARCHITECTURE_GUIDE.md](../docs/ARCHITECTURE_GUIDE.md)** - Comprehensive architecture patterns and development guidelines
+
+## Current Implementation Status
+✅ **All 7 panels implemented** following consistent architecture patterns:
+- **Production Ready**: Solution Explorer, Import Job Viewer, Query Data, Metadata Browser, Environment Setup
+- **Framework Ready**: Connection References Manager, Environment Variables Manager, Plugin Trace Viewer
 
 ## Core Development Principles
 
 ### 1. File Organization & Architecture
-- **Split files logically** following the established patterns in `/src` directory
-- **Follow the modular architecture**: 
-  - `panels/` - UI components extending `BasePanel`
+- **Follow the established modular architecture** documented in [ARCHITECTURE_GUIDE.md](../docs/ARCHITECTURE_GUIDE.md)
+- **Split files logically** following the patterns in `/src` directory:
+  - `panels/` - UI components extending `BasePanel` (7 panels implemented)
   - `commands/` - Command handlers organized by domain
   - `providers/` - Tree view data providers
-  - `services/` - Business logic and API interactions
+  - `services/` - Business logic and API interactions with dependency injection
+  - `webview/components/` - Shared utilities (TableUtils, PanelUtils, etc.)
   - `types/` - Shared TypeScript types and interfaces
 - **Single Responsibility**: Each file should have one clear purpose
 - **Consistent Structure**: New panels should extend `BasePanel` class
-- **Dependency Injection**: Pass services through constructors
+- **Dependency Injection**: Use ServiceFactory for all service dependencies
 
 ### 2. Code Style Guidelines
 - **NO comments in code** - code should be self-documenting through clear naming
@@ -29,6 +39,7 @@ This is a VS Code extension for Microsoft Dynamics 365 / Power Platform developm
 - **Always consult before making architectural decisions**
 - **Discuss breaking changes or new patterns before implementation**
 - **Follow existing patterns unless there's a compelling reason to change**
+- **Reference the [ARCHITECTURE_GUIDE.md](../docs/ARCHITECTURE_GUIDE.md)** for established patterns and best practices
 
 ## Dynamics 365 & OData API Guidelines
 
@@ -205,3 +216,20 @@ export class DomainCommands {
 4. **Troubleshooting**: View import jobs → Check status → Review errors
 
 Remember: This extension is used by developers working with Microsoft Dynamics 365 and Power Platform. Users expect professional, reliable tools that integrate well with their existing development workflows.
+
+## 📚 Essential Documentation
+
+For comprehensive information about this project:
+
+1. **[README.md](../README.md)** - Start here for:
+   - Project overview and features
+   - Installation and usage instructions
+   - Development setup and workflow
+   - Troubleshooting guide
+
+2. **[docs/ARCHITECTURE_GUIDE.md](../docs/ARCHITECTURE_GUIDE.md)** - Essential for development:
+   - Complete architecture patterns and principles
+   - Panel implementation guidelines
+   - Service layer patterns and best practices
+   - Shared utilities documentation
+   - Code examples and templates

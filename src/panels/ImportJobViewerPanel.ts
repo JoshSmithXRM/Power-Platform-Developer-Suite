@@ -9,7 +9,6 @@ export class ImportJobViewerPanel extends BasePanel {
 
     private _selectedEnvironmentId: string | undefined;
     private _cachedImportJobs: any[] | null = null;
-    private readonly _pageSize = 5000;
 
     public static createOrShow(extensionUri: vscode.Uri) {
         const existing = BasePanel.focusExisting(ImportJobViewerPanel.viewType);
@@ -95,7 +94,7 @@ export class ImportJobViewerPanel extends BasePanel {
             }
 
             const token = await this._authService.getAccessToken(environment.id);
-            const importJobsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/importjobs?$orderby=createdon desc&$top=${this._pageSize}&$count=true&$select=importjobid,solutionname,progress,startedon,completedon,modifiedon,importcontext,operationcontext`;
+            const importJobsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/importjobs?$select=importjobid,solutionname,progress,startedon,completedon,modifiedon,importcontext,operationcontext`;
 
             console.log('Fetching import jobs from:', importJobsUrl);
 

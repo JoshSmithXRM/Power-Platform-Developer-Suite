@@ -4,6 +4,10 @@
     "description": "A VSCode extension for Dynamics 365/Dataverse admin and developer tasks",
     "version": "0.0.1",
     "publisher": "JoshSmithXRM",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/JoshSmithXRM/Dynamics-DevTools.git"
+    },
     "engines": {
         "vscode": "^1.74.0"
     },
