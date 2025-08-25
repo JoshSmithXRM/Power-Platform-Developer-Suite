@@ -663,137 +663,8 @@ export class SolutionExplorerPanel extends BasePanel {
                     updateEnvironmentStatus('Error', false);
                 }
                 
-                // STANDARDIZED TABLE SORTING FUNCTIONS
-                let currentSort = { column: null, direction: 'asc' };
-                
-                function setupTableSorting(tableId, defaultSortColumn = null, defaultDirection = 'desc') {
-                    const table = document.getElementById(tableId);
-                    if (!table) return;
-                    
-                    if (defaultSortColumn) {
-                        currentSort = { column: defaultSortColumn, direction: defaultDirection };
-                    }
-                    
-                    const headers = table.querySelectorAll('th.sortable');
-                    headers.forEach(header => {
-                        header.addEventListener('click', () => {
-                            const column = header.dataset.column;
-                            sortTable(tableId, column);
-                        });
-                    });
-                    
-                    if (defaultSortColumn) {
-                        applySortIndicators(tableId, defaultSortColumn, defaultDirection);
-                    }
-                }
-                
-                function sortTable(tableId, column) {
-                    const table = document.getElementById(tableId);
-                    if (!table) return;
-                    
-                    const tbody = table.querySelector('tbody');
-                    if (!tbody) return;
-                    
-                    if (currentSort.column === column) {
-                        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-                    } else {
-                        currentSort.column = column;
-                        currentSort.direction = 'asc';
-                    }
-                    
-                    const rows = Array.from(tbody.querySelectorAll('tr'));
-                    
-                    rows.sort((a, b) => {
-                        const aCell = a.querySelector(\`[data-column="\${column}"]\`);
-                        const bCell = b.querySelector(\`[data-column="\${column}"]\`);
-                        
-                        if (!aCell || !bCell) return 0;
-                        
-                        const aValue = getSortValue(aCell);
-                        const bValue = getSortValue(bCell);
-                        
-                        let comparison = 0;
-                        
-                        if (typeof aValue === 'number' && typeof bValue === 'number') {
-                            comparison = aValue - bValue;
-                        } else if (aValue instanceof Date && bValue instanceof Date) {
-                            comparison = aValue.getTime() - bValue.getTime();
-                        } else if (column === 'version') {
-                            // Special handling for version strings
-                            const aVer = String(aValue).split('.').map(n => parseInt(n) || 0);
-                            const bVer = String(bValue).split('.').map(n => parseInt(n) || 0);
-                            for (let i = 0; i < Math.max(aVer.length, bVer.length); i++) {
-                                const aNum = aVer[i] || 0;
-                                const bNum = bVer[i] || 0;
-                                if (aNum !== bNum) {
-                                    comparison = aNum - bNum;
-                                    break;
-                                }
-                            }
-                        } else {
-                            const aStr = String(aValue).toLowerCase();
-                            const bStr = String(bValue).toLowerCase();
-                            comparison = aStr.localeCompare(bStr);
-                        }
-                        
-                        return currentSort.direction === 'desc' ? -comparison : comparison;
-                    });
-                    
-                    tbody.innerHTML = '';
-                    rows.forEach(row => tbody.appendChild(row));
-                    
-                    applySortIndicators(tableId, column, currentSort.direction);
-                }
-                
-                function getSortValue(cell) {
-                    if (cell.hasAttribute('data-sort-value')) {
-                        const value = cell.getAttribute('data-sort-value');
-                        
-                        const num = parseFloat(value);
-                        if (!isNaN(num)) return num;
-                        
-                        const date = new Date(value);
-                        if (!isNaN(date.getTime())) return date;
-                        
-                        return value;
-                    }
-                    
-                    const text = cell.textContent.trim();
-                    
-                    const num = parseFloat(text);
-                    if (!isNaN(num)) return num;
-                    
-                    const date = new Date(text);
-                    if (!isNaN(date.getTime())) return date;
-                    
-                    return text;
-                }
-                
-                function applySortIndicators(tableId, sortColumn, sortDirection) {
-                    const table = document.getElementById(tableId);
-                    if (!table) return;
-                    
-                    const headers = table.querySelectorAll('th.sortable');
-                    headers.forEach(header => {
-                        header.classList.remove('sort-asc', 'sort-desc');
-                        const indicator = header.querySelector('.sort-indicator');
-                        if (indicator) {
-                            indicator.textContent = '';
-                        }
-                    });
-                    
-                    const currentHeader = table.querySelector(\`th[data-column="\${sortColumn}"]\`);
-                    if (currentHeader) {
-                        currentHeader.classList.add(\`sort-\${sortDirection}\`);
-                        
-                        let indicator = currentHeader.querySelector('.sort-indicator');
-                        if (!indicator) {
-                            indicator = document.createElement('span');
-                            indicator.className = 'sort-indicator';
-                            currentHeader.appendChild(indicator);
-                        }
-                    }
-                }
+                // Use shared table sorting functions
+                ${EnvironmentManager.getStandardizedTableSortingJs()}
                 
                 function setupTableFiltering() {
                     const filterInput = document.getElementById('solutionFilter');
@@ -801,8 +672,8 @@ export class SolutionExplorerPanel extends BasePanel {
                         filterInput.addEventListener('input', filterTable);
                     }
                     
-                    // Setup standardized table sorting
-                    setupTableSorting('solutionsTable');
+                    // Setup standardized table sorting with default sort by "displayName" ascending
+                    setupTableSorting('solutionsTable', 'displayName', 'asc');
                 }
                 
                 function filterTable() {

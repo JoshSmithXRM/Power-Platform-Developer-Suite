@@ -12,7 +12,7 @@ export class EnvironmentManager {
     constructor(
         private _authService: AuthenticationService,
         private _postMessage: (message: WebviewMessage) => void
-    ) {}
+    ) { }
 
     /**
      * Load environments and send to webview
@@ -1064,6 +1064,164 @@ export class EnvironmentManager {
                     }
                 });
             });
+        `;
+    }
+
+    /**
+     * Get just the table sorting JavaScript functions without environment management
+     */
+    public static getStandardizedTableSortingJs(): string {
+        return `
+            // ===== STANDARDIZED TABLE SORTING FUNCTIONALITY =====
+            
+            let currentSort = { column: null, direction: 'asc' };
+            
+            function setupTableSorting(tableId, defaultSortColumn = null, defaultDirection = 'desc') {
+                const table = document.getElementById(tableId);
+                if (!table) return;
+                
+                // Setup initial sort if specified
+                if (defaultSortColumn) {
+                    currentSort = { column: defaultSortColumn, direction: defaultDirection };
+                }
+                
+                // Add click handlers to sortable headers
+                const headers = table.querySelectorAll('th.sortable');
+                headers.forEach(header => {
+                    header.addEventListener('click', () => {
+                        const column = header.dataset.column;
+                        sortTable(tableId, column);
+                    });
+                });
+                
+                // Apply initial sort if specified
+                if (defaultSortColumn) {
+                    applySortIndicators(tableId, defaultSortColumn, defaultDirection);
+                }
+            }
+            
+            function sortTable(tableId, column) {
+                const table = document.getElementById(tableId);
+                if (!table) return;
+                
+                const tbody = table.querySelector('tbody');
+                if (!tbody) return;
+                
+                // Determine sort direction
+                if (currentSort.column === column) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.column = column;
+                    currentSort.direction = 'asc';
+                }
+                
+                // Get all rows
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                
+                // Sort rows
+                rows.sort((a, b) => {
+                    const aCell = a.querySelector('[data-column="' + column + '"]');
+                    const bCell = b.querySelector('[data-column="' + column + '"]');
+                    
+                    if (!aCell || !bCell) return 0;
+                    
+                    const aValue = getSortValue(aCell);
+                    const bValue = getSortValue(bCell);
+                    
+                    let comparison = 0;
+                    
+                    // Handle different data types
+                    if (typeof aValue === 'number' && typeof bValue === 'number') {
+                        comparison = aValue - bValue;
+                    } else if (aValue instanceof Date && bValue instanceof Date) {
+                        comparison = aValue.getTime() - bValue.getTime();
+                    } else if (column === 'version') {
+                        // Special handling for version strings (e.g., "1.0.0.1")
+                        const aVer = String(aValue).split('.').map(n => parseInt(n) || 0);
+                        const bVer = String(bValue).split('.').map(n => parseInt(n) || 0);
+                        for (let i = 0; i < Math.max(aVer.length, bVer.length); i++) {
+                            const aNum = aVer[i] || 0;
+                            const bNum = bVer[i] || 0;
+                            if (aNum !== bNum) {
+                                comparison = aNum - bNum;
+                                break;
+                            }
+                        }
+                    } else {
+                        // String comparison
+                        const aStr = String(aValue).toLowerCase();
+                        const bStr = String(bValue).toLowerCase();
+                        comparison = aStr.localeCompare(bStr);
+                    }
+                    
+                    return currentSort.direction === 'desc' ? -comparison : comparison;
+                });
+                
+                // Re-append sorted rows
+                tbody.innerHTML = '';
+                rows.forEach(row => tbody.appendChild(row));
+                
+                // Update sort indicators
+                applySortIndicators(tableId, column, currentSort.direction);
+            }
+            
+            function getSortValue(cell) {
+                // Check if cell has explicit sort value
+                if (cell.hasAttribute('data-sort-value')) {
+                    const value = cell.getAttribute('data-sort-value');
+                    
+                    // Try to parse as number
+                    const num = parseFloat(value);
+                    if (!isNaN(num)) return num;
+                    
+                    // Try to parse as date
+                    const date = new Date(value);
+                    if (!isNaN(date.getTime())) return date;
+                    
+                    return value;
+                }
+                
+                // Use text content
+                const text = cell.textContent.trim();
+                
+                // Try to parse as number
+                const num = parseFloat(text);
+                if (!isNaN(num)) return num;
+                
+                // Try to parse as date
+                const date = new Date(text);
+                if (!isNaN(date.getTime())) return date;
+                
+                return text;
+            }
+            
+            function applySortIndicators(tableId, sortColumn, sortDirection) {
+                const table = document.getElementById(tableId);
+                if (!table) return;
+                
+                // Clear all existing indicators
+                const headers = table.querySelectorAll('th.sortable');
+                headers.forEach(header => {
+                    header.classList.remove('sort-asc', 'sort-desc');
+                    const indicator = header.querySelector('.sort-indicator');
+                    if (indicator) {
+                        indicator.textContent = '';
+                    }
+                });
+                
+                // Add indicator to current column
+                const currentHeader = table.querySelector('th[data-column="' + sortColumn + '"]');
+                if (currentHeader) {
+                    currentHeader.classList.add('sort-' + sortDirection);
+                    
+                    let indicator = currentHeader.querySelector('.sort-indicator');
+                    if (!indicator) {
+                        indicator = document.createElement('span');
+                        indicator.className = 'sort-indicator';
+                        currentHeader.appendChild(indicator);
+                    }
+                }
+            }
         `;
     }
 }
