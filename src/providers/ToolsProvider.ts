@@ -5,7 +5,7 @@ export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<ToolItem | undefined | null | void> = new vscode.EventEmitter<ToolItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<ToolItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
-    constructor() {}
+    constructor() { }
 
     refresh(): void {
         this._onDidChangeTreeData.fire();
@@ -25,18 +25,18 @@ export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
     private getTools(): ToolItem[] {
         return [
             new ToolItem(
+                'Query Data',
+                'Query and analyze data from Dynamics 365',
+                vscode.TreeItemCollapsibleState.None,
+                'dynamics-devtools.queryData',
+                'queryData'
+            ),
+            new ToolItem(
                 'Solution Explorer',
                 'Explore and manage Dynamics 365 solutions',
                 vscode.TreeItemCollapsibleState.None,
                 'dynamics-devtools.solutionExplorer',
                 'solutionExplorer'
-            ),
-            new ToolItem(
-                'Metadata Browser',
-                'Browse and explore entity metadata',
-                vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.openMetadataBrowser',
-                'metadataBrowser'
             ),
             new ToolItem(
                 'Import Job Viewer',
@@ -46,11 +46,11 @@ export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
                 'importJobViewer'
             ),
             new ToolItem(
-                'Query Data',
-                'Query and analyze data from Dynamics 365',
+                'Metadata Browser',
+                'Browse and explore entity metadata',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.queryData',
-                'queryData'
+                'dynamics-devtools.openMetadataBrowser',
+                'metadataBrowser'
             ),
         ];
     }
