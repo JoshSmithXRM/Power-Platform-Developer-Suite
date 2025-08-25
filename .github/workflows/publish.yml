@@ -3,6 +3,13 @@ name: Publish Extension
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run a dry-run without actually publishing'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   publish:
@@ -31,6 +38,13 @@ jobs:
       run: vsce package
       
     - name: Publish to VS Code Marketplace
-      run: vsce publish -p ${{ secrets.ADO_MARKETPLACE_PAT }}
+      run: |
+        if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+          echo "Dry run mode - would publish with: vsce publish -p ***"
+          vsce package --out extension.vsix
+          echo "Package created successfully"
+        else
+          vsce publish -p ${{ secrets.ADO_MARKETPLACE_PAT }}
+        fi
       env:
         VSCE_PAT: ${{ secrets.ADO_MARKETPLACE_PAT }}
