@@ -4,6 +4,9 @@ import { EnvironmentsProvider } from '../providers/EnvironmentsProvider';
 import { QueryDataPanel } from '../panels/QueryDataPanel';
 import { SolutionExplorerPanel } from '../panels/SolutionExplorerPanel';
 import { ImportJobViewerPanel } from '../panels/ImportJobViewerPanel';
+import { ConnectionReferencesPanel } from '../panels/ConnectionReferencesPanel';
+import { EnvironmentVariablesPanel } from '../panels/EnvironmentVariablesPanel';
+import { PluginTraceViewerPanel } from '../panels/PluginTraceViewerPanel';
 
 /**
  * Panel-related commands
@@ -32,6 +35,18 @@ export class PanelCommands {
                 ImportJobViewerPanel.createOrShow(this.context.extensionUri);
             }),
 
+            vscode.commands.registerCommand('dynamics-devtools.connectionReferences', () => {
+                ConnectionReferencesPanel.createOrShow(this.context.extensionUri);
+            }),
+
+            vscode.commands.registerCommand('dynamics-devtools.environmentVariables', () => {
+                EnvironmentVariablesPanel.createOrShow(this.context.extensionUri);
+            }),
+
+            vscode.commands.registerCommand('dynamics-devtools.pluginTraceViewer', () => {
+                PluginTraceViewerPanel.createOrShow(this.context.extensionUri);
+            }),
+
             vscode.commands.registerCommand('dynamics-devtools.queryDataNew', () => {
                 QueryDataPanel.createNew(this.context.extensionUri);
             }),
@@ -42,6 +57,18 @@ export class PanelCommands {
 
             vscode.commands.registerCommand('dynamics-devtools.importJobViewerNew', () => {
                 ImportJobViewerPanel.createNew(this.context.extensionUri);
+            }),
+
+            vscode.commands.registerCommand('dynamics-devtools.connectionReferencesNew', () => {
+                ConnectionReferencesPanel.createNew(this.context.extensionUri);
+            }),
+
+            vscode.commands.registerCommand('dynamics-devtools.environmentVariablesNew', () => {
+                EnvironmentVariablesPanel.createNew(this.context.extensionUri);
+            }),
+
+            vscode.commands.registerCommand('dynamics-devtools.pluginTraceViewerNew', () => {
+                PluginTraceViewerPanel.createNew(this.context.extensionUri);
             }),
 
             vscode.commands.registerCommand('dynamics-devtools.refreshEnvironments', () => {

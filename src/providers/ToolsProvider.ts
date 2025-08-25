@@ -52,6 +52,27 @@ export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
                 'dynamics-devtools.openMetadataBrowser',
                 'metadataBrowser'
             ),
+            new ToolItem(
+                'Connection References Manager',
+                'Manage connection references across environments',
+                vscode.TreeItemCollapsibleState.None,
+                'dynamics-devtools.connectionReferences',
+                'connectionReferences'
+            ),
+            new ToolItem(
+                'Environment Variables Manager',
+                'Manage environment variables and their values',
+                vscode.TreeItemCollapsibleState.None,
+                'dynamics-devtools.environmentVariables',
+                'environmentVariables'
+            ),
+            new ToolItem(
+                'Plugin Trace Viewer',
+                'View and analyze plugin execution traces',
+                vscode.TreeItemCollapsibleState.None,
+                'dynamics-devtools.pluginTraceViewer',
+                'pluginTraceViewer'
+            ),
         ];
     }
 }

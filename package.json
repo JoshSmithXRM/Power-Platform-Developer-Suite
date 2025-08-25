@@ -97,6 +97,36 @@
                 "command": "dynamics-devtools.queryDataNew",
                 "title": "Open New Query Data",
                 "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.connectionReferences",
+                "title": "Connection References Manager",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.connectionReferencesNew",
+                "title": "Open New Connection References Manager",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.environmentVariables",
+                "title": "Environment Variables Manager",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.environmentVariablesNew",
+                "title": "Open New Environment Variables Manager",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.pluginTraceViewer",
+                "title": "Plugin Trace Viewer",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.pluginTraceViewerNew",
+                "title": "Open New Plugin Trace Viewer",
+                "category": "Dynamics DevTools"
             }
         ],
         "viewsContainers": {
@@ -104,7 +134,7 @@
                 {
                     "id": "dynamics-devtools",
                     "title": "Dynamics DevTools",
-                    "icon": "$(database)"
+                    "icon": "$(wrench)"
                 }
             ]
         },
@@ -181,6 +211,21 @@
                 {
                     "command": "dynamics-devtools.queryDataNew",
                     "when": "view == dynamics-devtools-tools && viewItem == queryData",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.connectionReferencesNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == connectionReferences",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.environmentVariablesNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == environmentVariables",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.pluginTraceViewerNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == pluginTraceViewer",
                     "group": "1_open@1"
                 }
             ]
