@@ -52,6 +52,9 @@ class EnvironmentSelectorUtils {
         const selector = document.getElementById(selectorId);
         if (!selector) return;
         
+        // Re-enable the selector
+        selector.disabled = false;
+        
         // Clear existing options
         selector.innerHTML = '';
         
@@ -67,7 +70,7 @@ class EnvironmentSelectorUtils {
         environments.forEach(env => {
             const option = document.createElement('option');
             option.value = env.id;
-            option.textContent = `${env.name} (${env.settings.serverUrl})`;
+            option.textContent = `${env.name} (${env.settings.dataverseUrl})`;
             option.selected = env.id === config.currentEnvironmentId;
             selector.appendChild(option);
         });

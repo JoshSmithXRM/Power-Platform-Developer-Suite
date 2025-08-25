@@ -323,6 +323,11 @@
     border-color: var(--vscode-focusBorder);
 }
 
+.environment-dropdown option:disabled {
+    color: var(--vscode-descriptionForeground);
+    background: var(--vscode-dropdown-background);
+}
+
 .environment-status {
     padding: 4px 8px;
     border-radius: 12px;
@@ -333,18 +338,21 @@
 }
 
 .environment-connected {
-    background: var(--vscode-testing-iconPassed);
-    color: white;
+    background: #16a085;
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.3);
 }
 
 .environment-disconnected {
-    background: var(--vscode-testing-iconFailed);
-    color: white;
+    background: #e74c3c;
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.3);
 }
 
 .environment-connecting {
-    background: var(--vscode-testing-iconQueued);
-    color: white;
+    background: #f39c12;
+    color: #2c3e50;
+    text-shadow: none;
 }
 
 /* Status Badges */
