@@ -1,7 +1,6 @@
 # Node
 node_modules/
 dist/
-.vscode/
 .env
 *.vsix
 *.log
@@ -11,6 +10,11 @@ out/
 
 # Extension packaging
 *.vsix
+
+# VS Code - User specific files
+.vscode/settings.json.user
+.vscode/workspace.code-workspace
+.vscode/*.code-snippets
 
 # OS
 Thumbs.db

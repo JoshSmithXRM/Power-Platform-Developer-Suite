@@ -1,0 +1,267 @@
+{
+    "name": "dynamics-devtools",
+    "displayName": "Dynamics DevTools",
+    "description": "A comprehensive VSCode extension for Microsoft Dynamics 365 / Power Platform development and administration",
+    "version": "0.0.1",
+    "publisher": "JoshSmithXRM",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/JoshSmithXRM/Dynamics-DevTools.git"
+    },
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onView:dynamics-devtools-tools",
+        "onView:dynamics-devtools-environments",
+        "onCommand:dynamics-devtools.addEnvironment",
+        "onCommand:dynamics-devtools.removeEnvironment",
+        "onCommand:dynamics-devtools.solutionExplorer",
+        "onCommand:dynamics-devtools.importJobViewer",
+        "onCommand:dynamics-devtools.queryData",
+        "onCommand:dynamics-devtools.openMetadataBrowser",
+        "onCommand:dynamics-devtools.connectionReferences",
+        "onCommand:dynamics-devtools.environmentVariables",
+        "onCommand:dynamics-devtools.pluginTraceViewer"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "dynamics-devtools.addEnvironment",
+                "title": "Add Environment",
+                "category": "Dynamics DevTools",
+                "icon": "$(add)"
+            },
+            {
+                "command": "dynamics-devtools.removeEnvironment",
+                "title": "Remove Environment",
+                "category": "Dynamics DevTools",
+                "icon": "$(remove)"
+            },
+            {
+                "command": "dynamics-devtools.testConnection",
+                "title": "Test Connection",
+                "category": "Dynamics DevTools",
+                "icon": "$(beaker)"
+            },
+            {
+                "command": "dynamics-devtools.refreshEnvironments",
+                "title": "Refresh Environments",
+                "category": "Dynamics DevTools",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "dynamics-devtools.openMaker",
+                "title": "Open Maker",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.editEnvironment",
+                "title": "Edit Environment",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.testEnvironmentConnection",
+                "title": "Test Environment Connection",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.openDynamics",
+                "title": "Open Dynamics",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.openMetadataBrowser",
+                "title": "Open Metadata Browser",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.solutionExplorer",
+                "title": "Solution Explorer",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.solutionExplorerNew",
+                "title": "Open New Solution Explorer",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.openMetadataBrowserNew",
+                "title": "Open New Metadata Browser",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.importJobViewer",
+                "title": "Import Job Viewer",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.importJobViewerNew",
+                "title": "Open New Import Job Viewer",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.queryData",
+                "title": "Query Data",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.queryDataNew",
+                "title": "Open New Query Data",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.connectionReferences",
+                "title": "Connection References Manager",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.connectionReferencesNew",
+                "title": "Open New Connection References Manager",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.environmentVariables",
+                "title": "Environment Variables Manager",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.environmentVariablesNew",
+                "title": "Open New Environment Variables Manager",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.pluginTraceViewer",
+                "title": "Plugin Trace Viewer",
+                "category": "Dynamics DevTools"
+            },
+            {
+                "command": "dynamics-devtools.pluginTraceViewerNew",
+                "title": "Open New Plugin Trace Viewer",
+                "category": "Dynamics DevTools"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "dynamics-devtools",
+                    "title": "Dynamics DevTools",
+                    "icon": "$(wrench)"
+                }
+            ]
+        },
+        "views": {
+            "dynamics-devtools": [
+                {
+                    "id": "dynamics-devtools-tools",
+                    "name": "Tools",
+                    "when": "true",
+                    "icon": "$(tools)"
+                },
+                {
+                    "id": "dynamics-devtools-environments",
+                    "name": "Environments",
+                    "when": "true",
+                    "icon": "$(cloud)"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "dynamics-devtools.addEnvironment",
+                    "when": "view == dynamics-devtools-environments",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "dynamics-devtools.refreshEnvironments",
+                    "when": "view == dynamics-devtools-environments",
+                    "group": "navigation@2"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "dynamics-devtools.openMaker",
+                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.openDynamics",
+                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "group": "1_open@2"
+                },
+                {
+                    "command": "dynamics-devtools.editEnvironment",
+                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "group": "2_edit@1"
+                },
+                {
+                    "command": "dynamics-devtools.testEnvironmentConnection",
+                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "group": "2_edit@2"
+                },
+                {
+                    "command": "dynamics-devtools.removeEnvironment",
+                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "group": "3_remove@1"
+                },
+                {
+                    "command": "dynamics-devtools.solutionExplorerNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == solutionExplorer",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.openMetadataBrowserNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == metadataBrowser",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.importJobViewerNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == importJobViewer",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.queryDataNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == queryData",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.connectionReferencesNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == connectionReferences",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.environmentVariablesNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == environmentVariables",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "dynamics-devtools.pluginTraceViewerNew",
+                    "when": "view == dynamics-devtools-tools && viewItem == pluginTraceViewer",
+                    "group": "1_open@1"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "dependencies": {
+        "@azure/msal-node": "^2.13.0",
+        "@types/node-fetch": "^2.6.13",
+        "axios": "^1.7.7",
+        "node-fetch": "^3.3.2",
+        "node-persist": "^4.0.2"
+    },
+    "devDependencies": {
+        "@types/node": "16.x",
+        "@types/vscode": "^1.74.0",
+        "typescript": "^4.9.4"
+    }
+}
