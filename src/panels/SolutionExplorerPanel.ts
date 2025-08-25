@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { BasePanel } from './base/BasePanel';
 import { AuthenticationService } from '../services/AuthenticationService';
+import { EnvironmentManager } from './base/EnvironmentManager';
 import { WebviewMessage, EnvironmentConnection } from '../types';
 
 export class SolutionExplorerPanel extends BasePanel {
@@ -346,53 +347,18 @@ export class SolutionExplorerPanel extends BasePanel {
                     border-radius: 4px;
                     margin: 10px 0;
                 }
-                .solutions-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    background: var(--vscode-editorWidget-background);
-                    border: 1px solid var(--vscode-editorWidget-border);
-                    border-radius: 4px;
+                
+                ${EnvironmentManager.getStandardizedTableCss()}
+                    cursor: pointer;
+                    font-weight: 500;
                 }
-                .solutions-table th,
-                .solutions-table td {
-                    padding: 12px;
-                    text-align: left;
-                    border-bottom: 1px solid var(--vscode-editorWidget-border);
-                }
-                .solutions-table th {
-                    background: var(--vscode-editorGroupHeader-tabsBackground);
-                    font-weight: 600;
-                    color: var(--vscode-textLink-foreground);
-                    position: sticky;
-                    top: 0;
-                }
-                .solutions-table tr:hover {
-                    background: var(--vscode-list-hoverBackground);
-                }
-                .managed-badge {
-                    background: var(--vscode-button-background);
-                    color: var(--vscode-button-foreground);
-                    padding: 2px 8px;
-                    border-radius: 12px;
-                    font-size: 0.85em;
-                }
-                .unmanaged-badge {
-                    background: var(--vscode-button-secondaryBackground);
-                    color: var(--vscode-button-secondaryForeground);
-                    border: 1px solid var(--vscode-button-border);
-                    padding: 2px 8px;
-                    border-radius: 12px;
-                    font-size: 0.85em;
+                .solution-name-link:hover {
+                    text-decoration: underline;
                 }
                 .no-solutions {
                     text-align: center;
                     padding: 40px;
                     color: var(--vscode-descriptionForeground);
-                }
-                
-                /* Sortable Table Styles */
-                .table-container {
-                    margin-top: 10px;
                 }
                 .table-controls {
                     margin-bottom: 15px;
@@ -428,26 +394,6 @@ export class SolutionExplorerPanel extends BasePanel {
                 .clear-filter-btn:hover {
                     background: var(--vscode-button-secondaryHoverBackground);
                 }
-                .sortable {
-                    cursor: pointer;
-                    user-select: none;
-                    position: relative;
-                }
-                .sortable:hover {
-                    background: var(--vscode-list-hoverBackground);
-                }
-                .sort-indicator {
-                    color: var(--vscode-descriptionForeground);
-                    font-size: 12px;
-                    margin-left: 5px;
-                }
-                .sort-asc .sort-indicator::after {
-                    content: ' ↑';
-                    color: var(--vscode-charts-blue);
-                }
-                .sort-desc .sort-indicator::after {
-                    content: ' ↓';
-                    color: var(--vscode-charts-blue);
                 }
                 .filtered-row {
                     display: none;
@@ -640,29 +586,29 @@ export class SolutionExplorerPanel extends BasePanel {
                     let tableHtml = \`
                         <div class="table-container">
                             <div class="table-controls">
-                                <input type="text" id="solutionFilter" placeholder="🔍 Filter solutions..." class="filter-input">
+                                <input type="text" id="solutionFilter" placeholder="Filter solutions..." class="filter-input">
                                 <button onclick="clearFilter()" class="clear-filter-btn">Clear</button>
                             </div>
-                            <table class="solutions-table sortable-table">
+                            <table class="data-table" id="solutionsTable">
                                 <thead>
                                     <tr>
-                                        <th onclick="sortTable(0)" class="sortable">
-                                            Display Name <span class="sort-indicator">⇅</span>
+                                        <th class="sortable" data-column="displayName">
+                                            Display Name <span class="sort-indicator"></span>
                                         </th>
-                                        <th onclick="sortTable(1)" class="sortable">
-                                            Name <span class="sort-indicator">⇅</span>
+                                        <th class="sortable" data-column="uniqueName">
+                                            Name <span class="sort-indicator"></span>
                                         </th>
-                                        <th onclick="sortTable(2)" class="sortable">
-                                            Type <span class="sort-indicator">⇅</span>
+                                        <th class="sortable" data-column="type">
+                                            Type <span class="sort-indicator"></span>
                                         </th>
-                                        <th onclick="sortTable(3)" class="sortable">
-                                            Version <span class="sort-indicator">⇅</span>
+                                        <th class="sortable" data-column="version">
+                                            Version <span class="sort-indicator"></span>
                                         </th>
-                                        <th onclick="sortTable(4)" class="sortable">
-                                            Publisher <span class="sort-indicator">⇅</span>
+                                        <th class="sortable" data-column="publisher">
+                                            Publisher <span class="sort-indicator"></span>
                                         </th>
-                                        <th onclick="sortTable(5)" class="sortable">
-                                            Created <span class="sort-indicator">⇅</span>
+                                        <th class="sortable" data-column="created">
+                                            Created <span class="sort-indicator"></span>
                                         </th>
                                         <th style="width: 120px;">Actions</th>
                                     </tr>
@@ -717,64 +663,136 @@ export class SolutionExplorerPanel extends BasePanel {
                     updateEnvironmentStatus('Error', false);
                 }
                 
-                // Sortable Table Functions
-                let currentSortColumn = -1;
-                let currentSortDirection = 'asc';
+                // STANDARDIZED TABLE SORTING FUNCTIONS
+                let currentSort = { column: null, direction: 'asc' };
                 
-                function sortTable(columnIndex) {
-                    const table = document.querySelector('.solutions-table');
-                    const tbody = document.getElementById('solutionsTableBody');
-                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                function setupTableSorting(tableId, defaultSortColumn = null, defaultDirection = 'desc') {
+                    const table = document.getElementById(tableId);
+                    if (!table) return;
                     
-                    // Clear previous sort indicators
-                    table.querySelectorAll('th').forEach(th => {
-                        th.classList.remove('sort-asc', 'sort-desc');
+                    if (defaultSortColumn) {
+                        currentSort = { column: defaultSortColumn, direction: defaultDirection };
+                    }
+                    
+                    const headers = table.querySelectorAll('th.sortable');
+                    headers.forEach(header => {
+                        header.addEventListener('click', () => {
+                            const column = header.dataset.column;
+                            sortTable(tableId, column);
+                        });
                     });
                     
-                    // Determine sort direction
-                    if (currentSortColumn === columnIndex) {
-                        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-                    } else {
-                        currentSortDirection = 'asc';
+                    if (defaultSortColumn) {
+                        applySortIndicators(tableId, defaultSortColumn, defaultDirection);
                     }
-                    currentSortColumn = columnIndex;
+                }
+                
+                function sortTable(tableId, column) {
+                    const table = document.getElementById(tableId);
+                    if (!table) return;
                     
-                    // Add sort indicator to current column
-                    const currentTh = table.querySelectorAll('th')[columnIndex];
-                    currentTh.classList.add('sort-' + currentSortDirection);
+                    const tbody = table.querySelector('tbody');
+                    if (!tbody) return;
                     
-                    // Sort rows
+                    if (currentSort.column === column) {
+                        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort.column = column;
+                        currentSort.direction = 'asc';
+                    }
+                    
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    
                     rows.sort((a, b) => {
-                        let aVal = a.cells[columnIndex].textContent.trim();
-                        let bVal = b.cells[columnIndex].textContent.trim();
+                        const aCell = a.querySelector(\`[data-column="\${column}"]\`);
+                        const bCell = b.querySelector(\`[data-column="\${column}"]\`);
                         
-                        // Handle different data types
-                        if (columnIndex === 3) { // Version column
-                            aVal = aVal.split('.').map(n => parseInt(n) || 0);
-                            bVal = bVal.split('.').map(n => parseInt(n) || 0);
-                            for (let i = 0; i < Math.max(aVal.length, bVal.length); i++) {
-                                const aNum = aVal[i] || 0;
-                                const bNum = bVal[i] || 0;
+                        if (!aCell || !bCell) return 0;
+                        
+                        const aValue = getSortValue(aCell);
+                        const bValue = getSortValue(bCell);
+                        
+                        let comparison = 0;
+                        
+                        if (typeof aValue === 'number' && typeof bValue === 'number') {
+                            comparison = aValue - bValue;
+                        } else if (aValue instanceof Date && bValue instanceof Date) {
+                            comparison = aValue.getTime() - bValue.getTime();
+                        } else if (column === 'version') {
+                            // Special handling for version strings
+                            const aVer = String(aValue).split('.').map(n => parseInt(n) || 0);
+                            const bVer = String(bValue).split('.').map(n => parseInt(n) || 0);
+                            for (let i = 0; i < Math.max(aVer.length, bVer.length); i++) {
+                                const aNum = aVer[i] || 0;
+                                const bNum = bVer[i] || 0;
                                 if (aNum !== bNum) {
-                                    return currentSortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+                                    comparison = aNum - bNum;
+                                    break;
                                 }
                             }
-                            return 0;
-                        } else if (columnIndex === 5) { // Date column
-                            aVal = new Date(aVal);
-                            bVal = new Date(bVal);
-                            return currentSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-                        } else { // String columns
-                            aVal = aVal.toLowerCase();
-                            bVal = bVal.toLowerCase();
-                            if (aVal < bVal) return currentSortDirection === 'asc' ? -1 : 1;
-                            if (aVal > bVal) return currentSortDirection === 'asc' ? 1 : -1;
-                            return 0;
+                        } else {
+                            const aStr = String(aValue).toLowerCase();
+                            const bStr = String(bValue).toLowerCase();
+                            comparison = aStr.localeCompare(bStr);
+                        }
+                        
+                        return currentSort.direction === 'desc' ? -comparison : comparison;
+                    });
+                    
+                    tbody.innerHTML = '';
+                    rows.forEach(row => tbody.appendChild(row));
+                    
+                    applySortIndicators(tableId, column, currentSort.direction);
+                }
+                
+                function getSortValue(cell) {
+                    if (cell.hasAttribute('data-sort-value')) {
+                        const value = cell.getAttribute('data-sort-value');
+                        
+                        const num = parseFloat(value);
+                        if (!isNaN(num)) return num;
+                        
+                        const date = new Date(value);
+                        if (!isNaN(date.getTime())) return date;
+                        
+                        return value;
+                    }
+                    
+                    const text = cell.textContent.trim();
+                    
+                    const num = parseFloat(text);
+                    if (!isNaN(num)) return num;
+                    
+                    const date = new Date(text);
+                    if (!isNaN(date.getTime())) return date;
+                    
+                    return text;
+                }
+                
+                function applySortIndicators(tableId, sortColumn, sortDirection) {
+                    const table = document.getElementById(tableId);
+                    if (!table) return;
+                    
+                    const headers = table.querySelectorAll('th.sortable');
+                    headers.forEach(header => {
+                        header.classList.remove('sort-asc', 'sort-desc');
+                        const indicator = header.querySelector('.sort-indicator');
+                        if (indicator) {
+                            indicator.textContent = '';
                         }
                     });
                     
-                    // Re-append sorted rows
-                    rows.forEach(row => tbody.appendChild(row));
+                    const currentHeader = table.querySelector(\`th[data-column="\${sortColumn}"]\`);
+                    if (currentHeader) {
+                        currentHeader.classList.add(\`sort-\${sortDirection}\`);
+                        
+                        let indicator = currentHeader.querySelector('.sort-indicator');
+                        if (!indicator) {
+                            indicator = document.createElement('span');
+                            indicator.className = 'sort-indicator';
+                            currentHeader.appendChild(indicator);
+                        }
+                    }
                 }
                 
                 function setupTableFiltering() {
@@ -782,6 +800,9 @@ export class SolutionExplorerPanel extends BasePanel {
                     if (filterInput) {
                         filterInput.addEventListener('input', filterTable);
                     }
+                    
+                    // Setup standardized table sorting
+                    setupTableSorting('solutionsTable');
                 }
                 
                 function filterTable() {

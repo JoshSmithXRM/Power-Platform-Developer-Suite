@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { BasePanel } from './base/BasePanel';
 import { AuthenticationService } from '../services/AuthenticationService';
+import { EnvironmentManager } from './base/EnvironmentManager';
 import { WebviewMessage, EnvironmentConnection } from '../types';
 
 export class ImportJobViewerPanel extends BasePanel {
@@ -30,7 +31,7 @@ export class ImportJobViewerPanel extends BasePanel {
             viewType: ImportJobViewerPanel.viewType,
             title: 'Import Job Viewer'
         });
-        
+
         // Initialize after construction
         this.initialize();
     }
@@ -504,74 +505,6 @@ export class ImportJobViewerPanel extends BasePanel {
                 .filter-input::placeholder {
                     color: var(--vscode-input-placeholderForeground);
                 }
-                /* Sortable Table Styles */
-                .sortable {
-                    cursor: pointer;
-                    user-select: none;
-                    position: relative;
-                }
-                .sortable:hover {
-                    background: var(--vscode-list-hoverBackground);
-                }
-                .sort-indicator {
-                    margin-left: 8px;
-                    opacity: 0.6;
-                }
-                .sort-asc .sort-indicator::after {
-                    content: ' ▲';
-                    color: var(--vscode-textLink-foreground);
-                }
-                .sort-desc .sort-indicator::after {
-                    content: ' ▼';
-                    color: var(--vscode-textLink-foreground);
-                }
-                .import-jobs-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    background: var(--vscode-editorWidget-background);
-                    border: 1px solid var(--vscode-editorWidget-border);
-                    border-radius: 6px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                }
-                .import-jobs-table th,
-                .import-jobs-table td {
-                    padding: 16px 12px;
-                    text-align: left;
-                    border-bottom: 1px solid var(--vscode-editorWidget-border);
-                }
-                .import-jobs-table th {
-                    background: var(--vscode-editorGroupHeader-tabsBackground);
-                    font-weight: 600;
-                    color: var(--vscode-textLink-foreground);
-                    position: sticky;
-                    top: 0;
-                    font-size: 13px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                }
-                .import-jobs-table tr {
-                    transition: background-color 0.2s ease;
-                }
-                .import-jobs-table tr:hover {
-                    background: var(--vscode-list-hoverBackground);
-                }
-                .import-jobs-table tr:last-child td {
-                    border-bottom: none;
-                }
-                .solution-name-link {
-                    color: var(--vscode-textLink-foreground);
-                    text-decoration: none;
-                    cursor: pointer;
-                    font-weight: 500;
-                }
-                .solution-name-link:hover {
-                    text-decoration: underline;
-                }
-                .progress-text {
-                    font-size: 12px;
-                    color: var(--vscode-descriptionForeground);
-                    font-weight: 500;
-                }
                 .context-info {
                     font-size: 12px;
                     color: var(--vscode-descriptionForeground);
@@ -580,46 +513,7 @@ export class ImportJobViewerPanel extends BasePanel {
                     text-overflow: ellipsis;
                     white-space: nowrap;
                 }
-                .status-badge {
-                    padding: 4px 8px;
-                    border-radius: 12px;
-                    font-size: 0.85em;
-                    font-weight: 500;
-                }
-                .status-success {
-                    background: var(--vscode-testing-iconPassed);
-                    color: white;
-                }
-                .status-failed {
-                    background: var(--vscode-testing-iconFailed);
-                    color: white;
-                }
-                .status-in-progress {
-                    background: var(--vscode-charts-orange);
-                    color: white;
-                }
-                .xml-content {
-                    margin-top: 10px;
-                    padding: 10px;
-                    background: var(--vscode-textCodeBlock-background);
-                    border-radius: 4px;
-                    font-family: 'Courier New', monospace;
-                    font-size: 12px;
-                    white-space: pre-wrap;
-                    word-break: break-all;
-                    max-height: 300px;
-                    overflow-y: auto;
-                    border: 1px solid var(--vscode-editorWidget-border);
-                }
-                .no-jobs {
-                    text-align: center;
-                    padding: 40px;
-                    color: var(--vscode-descriptionForeground);
-                }
-                .time-info {
-                    font-size: 0.9em;
-                    color: var(--vscode-descriptionForeground);
-                }
+                ${EnvironmentManager.getStandardizedTableCss()}
             </style>`;
     }
 
@@ -738,6 +632,32 @@ export class ImportJobViewerPanel extends BasePanel {
                     }
                 }
                 
+                function setupTableScrollDetection() {
+                    const tableContainer = document.getElementById('tableContainer');
+                    if (!tableContainer) return;
+                    
+                    function checkScroll() {
+                        const hasHorizontalScroll = tableContainer.scrollWidth > tableContainer.clientWidth;
+                        const hasVerticalScroll = tableContainer.scrollHeight > tableContainer.clientHeight;
+                        
+                        if (hasHorizontalScroll || hasVerticalScroll) {
+                            tableContainer.classList.add('has-scroll');
+                        } else {
+                            tableContainer.classList.remove('has-scroll');
+                        }
+                    }
+                    
+                    // Initial check
+                    checkScroll();
+                    
+                    // Check on window resize
+                    window.addEventListener('resize', checkScroll);
+                    
+                    // Check after content changes
+                    const observer = new ResizeObserver(checkScroll);
+                    observer.observe(tableContainer);
+                }
+                
                 function loadImportJobs(loadMore = false) {
                     if (!currentEnvironmentId) {
                         document.getElementById('content').innerHTML = 
@@ -773,8 +693,6 @@ export class ImportJobViewerPanel extends BasePanel {
                 }
                 
                 let allImportJobs = []; // Store all loaded jobs for filtering/sorting
-                let currentSortColumn = 2; // Default to Started column (createdon)
-                let currentSortDirection = 'desc'; // Default to descending
                 
                 function setupFilterAndSort() {
                     const filterInput = document.getElementById('solutionFilter');
@@ -782,8 +700,12 @@ export class ImportJobViewerPanel extends BasePanel {
                     if (filterInput) {
                         filterInput.addEventListener('input', applyFilter);
                     }
+                    
+                    // Setup standardized table sorting with default sort by "started" descending
+                    setupTableSorting('importJobsTable', 'started', 'desc');
                 }
                 
+                // Custom filter for import jobs - extends the standardized sorting
                 function applyFilter() {
                     const filterInput = document.getElementById('solutionFilter');
                     if (!filterInput) return;
@@ -807,63 +729,6 @@ export class ImportJobViewerPanel extends BasePanel {
                     });
                     
                     console.log('Filter applied:', visibleCount, 'of', rows.length, 'rows visible');
-                }
-                
-                function sortImportJobTable(columnIndex) {
-                    const table = document.querySelector('.import-jobs-table');
-                    const tbody = document.getElementById('importJobsTableBody');
-                    const rows = Array.from(tbody.querySelectorAll('tr'));
-                    
-                    // Clear previous sort indicators
-                    table.querySelectorAll('th').forEach(th => {
-                        th.classList.remove('sort-asc', 'sort-desc');
-                    });
-                    
-                    // Determine sort direction
-                    if (currentSortColumn === columnIndex) {
-                        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-                    } else {
-                        currentSortDirection = 'asc';
-                    }
-                    currentSortColumn = columnIndex;
-                    
-                    // Add sort indicator to current column
-                    const currentTh = table.querySelectorAll('th')[columnIndex];
-                    currentTh.classList.add('sort-' + currentSortDirection);
-                    
-                    // Sort rows
-                    rows.sort((a, b) => {
-                        let aVal = a.cells[columnIndex].textContent.trim();
-                        let bVal = b.cells[columnIndex].textContent.trim();
-                        
-                        // Handle different data types
-                        if (columnIndex === 1) { // Progress column - extract percentage
-                            aVal = parseInt(aVal.replace('%', '')) || 0;
-                            bVal = parseInt(bVal.replace('%', '')) || 0;
-                        } else if (columnIndex === 2 || columnIndex === 3) { // Date columns
-                            aVal = new Date(aVal).getTime() || 0;
-                            bVal = new Date(bVal).getTime() || 0;
-                        } else {
-                            aVal = aVal.toLowerCase();
-                            bVal = bVal.toLowerCase();
-                        }
-                        
-                        if (currentSortDirection === 'asc') {
-                            return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-                        } else {
-                            return bVal > aVal ? 1 : bVal < aVal ? -1 : 0;
-                        }
-                    });
-                    
-                    // Clear and rebuild tbody
-                    tbody.innerHTML = '';
-                    rows.forEach(row => tbody.appendChild(row));
-                    
-                    // Reapply filter if active
-                    const filterInput = document.getElementById('solutionFilter');
-                    if (filterInput && filterInput.value) {
-                        applyFilter();
-                    }
                 }
                 
                 function expandXml(importJobId, button) {
@@ -960,33 +825,33 @@ export class ImportJobViewerPanel extends BasePanel {
                     
                     if (!isAppending) {
                         tableHtml = \`
-                            <div class="table-container">
-                                <div class="filter-controls">
-                                    <input type="text" id="solutionFilter" placeholder="🔍 Filter by solution name..." class="filter-input" />
-                                </div>
-                                <table class="import-jobs-table sortable-table">
+                            <div class="filter-controls">
+                                <input type="text" id="solutionFilter" placeholder="Filter by solution name..." class="filter-input" />
+                            </div>
+                            <div class="table-container" id="tableContainer">
+                                <table class="data-table" id="importJobsTable">
                                     <thead>
                                         <tr>
-                                            <th onclick="sortImportJobTable(0)" class="sortable">
-                                                Solution Name <span class="sort-indicator">⇅</span>
+                                            <th class="sortable" data-column="solutionName">
+                                                Solution Name <span class="sort-indicator"></span>
                                             </th>
-                                            <th onclick="sortImportJobTable(1)" class="sortable">
-                                                Progress <span class="sort-indicator">⇅</span>
+                                            <th class="sortable" data-column="progress">
+                                                Progress <span class="sort-indicator"></span>
                                             </th>
-                                            <th onclick="sortImportJobTable(2)" class="sortable">
-                                                Started <span class="sort-indicator">⇅</span>
+                                            <th class="sortable" data-column="started">
+                                                Started <span class="sort-indicator"></span>
                                             </th>
-                                            <th onclick="sortImportJobTable(3)" class="sortable">
-                                                Completed <span class="sort-indicator">⇅</span>
+                                            <th class="sortable" data-column="completed">
+                                                Completed <span class="sort-indicator"></span>
                                             </th>
-                                            <th onclick="sortImportJobTable(4)" class="sortable">
-                                                Status <span class="sort-indicator">⇅</span>
+                                            <th class="sortable" data-column="status">
+                                                Status <span class="sort-indicator"></span>
                                             </th>
-                                            <th onclick="sortImportJobTable(5)" class="sortable">
-                                                Import Context <span class="sort-indicator">⇅</span>
+                                            <th class="sortable" data-column="importContext">
+                                                Import Context <span class="sort-indicator"></span>
                                             </th>
-                                            <th onclick="sortImportJobTable(6)" class="sortable">
-                                                Operation Context <span class="sort-indicator">⇅</span>
+                                            <th class="sortable" data-column="operationContext">
+                                                Operation Context <span class="sort-indicator"></span>
                                             </th>
                                         </tr>
                                     </thead>
@@ -1021,19 +886,19 @@ export class ImportJobViewerPanel extends BasePanel {
                         
                         tableHtml += \`
                             <tr>
-                                <td>
+                                <td data-column="solutionName">
                                     <a class="solution-name-link" onclick="showJobDetails('\${job.importjobid}', '\${job.solutionname || 'Unknown'}')">
                                         \${job.solutionname || 'Unknown'}
                                     </a>
                                 </td>
-                                <td>
+                                <td data-column="progress" data-sort-value="\${job.progress || 0}">
                                     <span class="progress-text">\${job.progress || 0}%</span>
                                 </td>
-                                <td><div class="time-info">\${startedOn}</div></td>
-                                <td><div class="time-info">\${completedOn}</div></td>
-                                <td>\${statusBadge}</td>
-                                <td><div class="context-info">\${job.importcontext || 'N/A'}</div></td>
-                                <td><div class="context-info">\${job.operationcontext || 'N/A'}</div></td>
+                                <td data-column="started" data-sort-value="\${job.startedon}"><div class="time-info">\${startedOn}</div></td>
+                                <td data-column="completed" data-sort-value="\${job.completedon || ''}"><div class="time-info">\${completedOn}</div></td>
+                                <td data-column="status">\${statusBadge}</td>
+                                <td data-column="importContext"><div class="context-info">\${job.importcontext || 'N/A'}</div></td>
+                                <td data-column="operationContext"><div class="context-info">\${job.operationcontext || 'N/A'}</div></td>
                             </tr>
                         \`;
                     });
@@ -1044,6 +909,9 @@ export class ImportJobViewerPanel extends BasePanel {
                         
                         // Setup filter and sort functionality
                         setupFilterAndSort();
+                        
+                        // Setup responsive table scroll detection
+                        setupTableScrollDetection();
                         
                         // Apply default sort (Started column, descending)
                         setTimeout(() => sortImportJobTable(2), 100);
@@ -1110,13 +978,7 @@ export class ImportJobViewerPanel extends BasePanel {
                         }
                         
                         // Reapply current sort after adding new rows  
-                        console.log('Reapplying sort after data load. Current sort:', currentSortColumn, currentSortDirection);
-                        setTimeout(() => {
-                            if (currentSortColumn !== -1) {
-                                console.log('Reapplying sort to column', currentSortColumn);
-                                sortImportJobTable(currentSortColumn);
-                            }
-                        }, 150);
+                        // The standardized sorting system will automatically handle re-sorting
                     }
                 }
                 
@@ -1151,6 +1013,126 @@ export class ImportJobViewerPanel extends BasePanel {
                 
                 // Load environments on startup (fallback)
                 loadEnvironments();
+
+                // ===== STANDARDIZED TABLE SORTING FUNCTIONS =====
+                let currentSort = { column: null, direction: 'asc' };
+                
+                function setupTableSorting(tableId, defaultSortColumn = null, defaultDirection = 'desc') {
+                    const table = document.getElementById(tableId);
+                    if (!table) return;
+                    
+                    if (defaultSortColumn) {
+                        currentSort = { column: defaultSortColumn, direction: defaultDirection };
+                    }
+                    
+                    const headers = table.querySelectorAll('th.sortable');
+                    headers.forEach(header => {
+                        header.addEventListener('click', () => {
+                            const column = header.dataset.column;
+                            sortTable(tableId, column);
+                        });
+                    });
+                    
+                    if (defaultSortColumn) {
+                        applySortIndicators(tableId, defaultSortColumn, defaultDirection);
+                    }
+                }
+                
+                function sortTable(tableId, column) {
+                    const table = document.getElementById(tableId);
+                    if (!table) return;
+                    
+                    const tbody = table.querySelector('tbody');
+                    if (!tbody) return;
+                    
+                    if (currentSort.column === column) {
+                        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort.column = column;
+                        currentSort.direction = 'asc';
+                    }
+                    
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    
+                    rows.sort((a, b) => {
+                        const aCell = a.querySelector(\`[data-column="\${column}"]\`);
+                        const bCell = b.querySelector(\`[data-column="\${column}"]\`);
+                        
+                        if (!aCell || !bCell) return 0;
+                        
+                        const aValue = getSortValue(aCell);
+                        const bValue = getSortValue(bCell);
+                        
+                        let comparison = 0;
+                        
+                        if (typeof aValue === 'number' && typeof bValue === 'number') {
+                            comparison = aValue - bValue;
+                        } else if (aValue instanceof Date && bValue instanceof Date) {
+                            comparison = aValue.getTime() - bValue.getTime();
+                        } else {
+                            const aStr = String(aValue).toLowerCase();
+                            const bStr = String(bValue).toLowerCase();
+                            comparison = aStr.localeCompare(bStr);
+                        }
+                        
+                        return currentSort.direction === 'desc' ? -comparison : comparison;
+                    });
+                    
+                    tbody.innerHTML = '';
+                    rows.forEach(row => tbody.appendChild(row));
+                    
+                    applySortIndicators(tableId, column, currentSort.direction);
+                }
+                
+                function getSortValue(cell) {
+                    if (cell.hasAttribute('data-sort-value')) {
+                        const value = cell.getAttribute('data-sort-value');
+                        
+                        const num = parseFloat(value);
+                        if (!isNaN(num)) return num;
+                        
+                        const date = new Date(value);
+                        if (!isNaN(date.getTime())) return date;
+                        
+                        return value;
+                    }
+                    
+                    const text = cell.textContent.trim();
+                    
+                    const num = parseFloat(text);
+                    if (!isNaN(num)) return num;
+                    
+                    const date = new Date(text);
+                    if (!isNaN(date.getTime())) return date;
+                    
+                    return text;
+                }
+                
+                function applySortIndicators(tableId, sortColumn, sortDirection) {
+                    const table = document.getElementById(tableId);
+                    if (!table) return;
+                    
+                    const headers = table.querySelectorAll('th.sortable');
+                    headers.forEach(header => {
+                        header.classList.remove('sort-asc', 'sort-desc');
+                        const indicator = header.querySelector('.sort-indicator');
+                        if (indicator) {
+                            indicator.textContent = '';
+                        }
+                    });
+                    
+                    const currentHeader = table.querySelector(\`th[data-column="\${sortColumn}"]\`);
+                    if (currentHeader) {
+                        currentHeader.classList.add(\`sort-\${sortDirection}\`);
+                        
+                        let indicator = currentHeader.querySelector('.sort-indicator');
+                        if (!indicator) {
+                            indicator = document.createElement('span');
+                            indicator.className = 'sort-indicator';
+                            currentHeader.appendChild(indicator);
+                        }
+                    }
+                }
             </script>`;
     }
 }

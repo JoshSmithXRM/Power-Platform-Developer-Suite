@@ -204,50 +204,14 @@ export class MetadataBrowserPanel extends BasePanel {
             <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this._panel.webview.cspSource} 'unsafe-inline'; script-src ${this._panel.webview.cspSource} 'unsafe-inline';">
             <title>Metadata Browser</title>
             <style>
-                body {
-                    font-family: var(--vscode-font-family);
-                    color: var(--vscode-foreground);
-                    background-color: var(--vscode-editor-background);
-                    margin: 0;
-                    padding: 0;
-                    overflow: hidden;
-                }
+                ${this.environmentManager.getBasePanelCss()}
 
-                ${this.environmentManager.getEnvironmentSelectorCss()}
-
+                /* Metadata Browser Specific Styles */
                 .container {
                     display: flex;
                     flex-direction: column;
                     height: 100vh;
                 }
-
-                .header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 16px 20px;
-                    border-bottom: 1px solid var(--vscode-panel-border);
-                    background-color: var(--vscode-editor-background);
-                }
-
-                .header h1 {
-                    margin: 0;
-                    font-size: 18px;
-                    font-weight: 600;
-                }
-
-                .header-actions {
-                    display: flex;
-                    gap: 8px;
-                }
-
-                .btn {
-                    padding: 6px 12px;
-                    border: 1px solid var(--vscode-button-border);
-                    background-color: var(--vscode-button-background);
-                    color: var(--vscode-button-foreground);
-                    border-radius: 2px;
-                    cursor: pointer;
                     font-size: 12px;
                     display: flex;
                     align-items: center;
@@ -557,16 +521,16 @@ export class MetadataBrowserPanel extends BasePanel {
         </head>
         <body>
             <div class="container">
+                ${this.environmentManager.getEnvironmentSelectorHtml()}
+
                 <div class="header">
-                    <h1>Metadata Browser</h1>
+                    <h1 class="title">Metadata Browser</h1>
                     <div class="header-actions">
-                        <button id="refreshBtn" class="btn btn-primary">
+                        <button id="refreshBtn" class="btn">
                             Refresh
                         </button>
                     </div>
                 </div>
-
-                ${this.environmentManager.getEnvironmentSelectorHtml()}
 
                 <div class="content">
                     <div class="sidebar">
@@ -619,7 +583,7 @@ export class MetadataBrowserPanel extends BasePanel {
                 let entities = [];
                 let selectedEntity = null;
 
-                ${this.environmentManager.getEnvironmentSelectorJs()}
+                ${EnvironmentManager.getEnvironmentSelectorJs()}
 
                 // Override the loadDataForEnvironment function
                 function loadDataForEnvironment(environmentId) {
