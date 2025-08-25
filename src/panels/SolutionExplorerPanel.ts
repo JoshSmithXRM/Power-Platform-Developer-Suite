@@ -146,7 +146,7 @@ export class SolutionExplorerPanel extends BasePanel {
             const token = await this._authService.getAccessToken(environment.id);
 
             // Load solutions
-            const solutionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/solutions?$select=solutionid,uniquename,friendlyname,displayname,version,ismanaged,_publisherid_value,installedon,description&$expand=publisherid($select=friendlyname)&$orderby=friendlyname&$filter=(isvisible eq true)`;
+            const solutionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/solutions?$select=solutionid,uniquename,friendlyname,version,ismanaged,_publisherid_value,installedon,description&$expand=publisherid($select=friendlyname)&$orderby=friendlyname`;
 
             const response = await fetch(solutionsUrl, {
                 headers: {
@@ -350,6 +350,53 @@ export class SolutionExplorerPanel extends BasePanel {
                 .solution-name-link:hover {
                     text-decoration: underline;
                 }
+                
+                .solutions-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 10px;
+                }
+                
+                .solutions-table th,
+                .solutions-table td {
+                    padding: 8px 12px;
+                    text-align: center;
+                    border-bottom: 1px solid var(--vscode-editorWidget-border);
+                }
+                
+                .solutions-table th {
+                    background: var(--vscode-editorGroupHeader-tabsBackground);
+                    font-weight: 600;
+                    cursor: pointer;
+                }
+                
+                .solutions-table th:hover {
+                    background: var(--vscode-list-hoverBackground);
+                }
+                
+                .solutions-table td:first-child {
+                    text-align: left;
+                }
+                
+                .solution-actions {
+                    display: flex;
+                    justify-content: center;
+                    gap: 5px;
+                }
+                
+                .action-btn {
+                    background: var(--vscode-button-secondaryBackground);
+                    border: 1px solid var(--vscode-button-border);
+                    color: var(--vscode-button-secondaryForeground);
+                    padding: 4px 8px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    font-size: 12px;
+                }
+                
+                .action-btn:hover {
+                    background: var(--vscode-button-secondaryHoverBackground);
+                }
             </style>
         </head>
         <body>
@@ -368,6 +415,28 @@ export class SolutionExplorerPanel extends BasePanel {
                 <div class="loading">
                     <p>Select an environment to load solutions...</p>
                 </div>
+            </div>
+
+            <!-- Pre-generated table template (hidden initially) -->
+            <div id="solutionsTableTemplate" style="display: none;">
+                ${ComponentFactory.createDataTable({
+                    id: 'solutionsTable',
+                    columns: [
+                        { key: 'friendlyName', label: 'Solution Name', sortable: true },
+                        { key: 'uniqueName', label: 'Unique Name', sortable: true },
+                        { key: 'version', label: 'Version', sortable: true },
+                        { key: 'type', label: 'Type', sortable: true },
+                        { key: 'publisherName', label: 'Publisher', sortable: true },
+                        { key: 'installedDate', label: 'Installed', sortable: true }
+                    ],
+                    defaultSort: { column: 'friendlyName', direction: 'asc' },
+                    filterable: true,
+                    stickyFirstColumn: false,
+                    rowActions: [
+                        { id: 'openMaker', action: 'openInMaker', label: 'Maker', icon: '🎨' },
+                        { id: 'openClassic', action: 'openInClassic', label: 'Classic', icon: '📋' }
+                    ]
+                })}
             </div>
 
             <script src="${envSelectorUtilsScript}"></script>
@@ -467,7 +536,7 @@ export class SolutionExplorerPanel extends BasePanel {
                     return value ? new Date(value).toLocaleDateString() : 'Unknown';
                 }
                 
-                // Populate solutions table
+                // Populate solutions table using ComponentFactory
                 function populateSolutions(solutionsData) {
                     solutions = solutionsData;
                     
@@ -476,94 +545,48 @@ export class SolutionExplorerPanel extends BasePanel {
                         return;
                     }
                     
-                    // Create simple table HTML
-                    let tableHtml = \`
-                        <div class="table-controls">
-                            <input type="text" id="filterInput" class="filter-input" placeholder="Filter solutions...">
-                            <button onclick="clearFilter()" class="clear-filter-btn">Clear</button>
-                        </div>
-                        <div class="table-container">
-                            <table class="solutions-table">
-                                <thead>
-                                    <tr>
-                                        <th onclick="sortTable(0)">Solution Name</th>
-                                        <th onclick="sortTable(1)">Version</th>
-                                        <th onclick="sortTable(2)">Type</th>
-                                        <th onclick="sortTable(3)">Publisher</th>
-                                        <th onclick="sortTable(4)">Installed</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                    \`;
+                    // Use pre-generated table template
+                    const template = document.getElementById('solutionsTableTemplate');
+                    document.getElementById('content').innerHTML = template.innerHTML;
                     
-                    solutions.forEach(solution => {
-                        const installedDate = solution.installedOn ? new Date(solution.installedOn).toLocaleDateString() : 'N/A';
-                        const type = solution.isManaged ? 'Managed' : 'Unmanaged';
-                        
-                        tableHtml += \`
-                            <tr>
-                                <td><a href="#" onclick="openSolutionInMaker('\\\${solution.id}'); return false;" class="solution-name-link">\\\${solution.displayName}</a></td>
-                                <td>\\\${solution.version}</td>
-                                <td>\\\${type}</td>
-                                <td>\\\${solution.publisherName || 'N/A'}</td>
-                                <td>\\\${installedDate}</td>
-                                <td class="solution-actions">
-                                    <button onclick="openSolutionInMaker('\\\${solution.id}')" class="action-btn maker-btn" title="Open in Maker">🎨</button>
-                                    <button onclick="openSolutionInClassic('\\\${solution.id}')" class="action-btn classic-btn" title="Open in Classic">📋</button>
-                                </td>
-                            </tr>
-                        \`;
+                    // Transform solutions data for the table
+                    const tableData = solutions.map(solution => ({
+                        id: solution.solutionId,
+                        friendlyName: solution.friendlyName,
+                        uniqueName: solution.uniqueName,
+                        version: solution.version,
+                        type: solution.isManaged ? 'Managed' : 'Unmanaged',
+                        publisherName: solution.publisherName,
+                        installedDate: solution.installedOn ? new Date(solution.installedOn).toLocaleDateString() : 'N/A'
+                    }));
+                    
+                    // Initialize table with TableUtils
+                    TableUtils.initializeTable('solutionsTable', {
+                        onRowAction: handleRowAction
                     });
                     
-                    tableHtml += \`
-                                </tbody>
-                            </table>
-                        </div>
-                    \`;
+                    // Load data into table
+                    TableUtils.loadTableData('solutionsTable', tableData);
                     
-                    document.getElementById('content').innerHTML = tableHtml;
-                    
-                    // Setup filter functionality
-                    const filterInput = document.getElementById('filterInput');
-                    filterInput.addEventListener('input', filterSolutions);
+                    // Apply default sort to show indicator
+                    TableUtils.sortTable('solutionsTable', 'friendlyName', 'asc');
+                }
+                
+                // Handle table row actions
+                function handleRowAction(actionId, rowData) {
+                    switch (actionId) {
+                        case 'openInMaker':
+                            openSolutionInMaker(rowData.id);
+                            break;
+                        case 'openInClassic':
+                            openSolutionInClassic(rowData.id);
+                            break;
+                    }
                 }
                 
                 // Clear table content
                 function clearContent() {
                     document.getElementById('content').innerHTML = '<div class="no-solutions"><p>Select an environment to load solutions.</p></div>';
-                }
-                
-                // Filter solutions function
-                function filterSolutions() {
-                    const filterValue = document.getElementById('filterInput').value.toLowerCase();
-                    const table = document.querySelector('.solutions-table tbody');
-                    const rows = table.querySelectorAll('tr');
-                    
-                    rows.forEach(row => {
-                        const text = row.textContent.toLowerCase();
-                        row.style.display = text.includes(filterValue) ? '' : 'none';
-                    });
-                }
-                
-                // Clear filter function
-                function clearFilter() {
-                    document.getElementById('filterInput').value = '';
-                    filterSolutions();
-                }
-                
-                // Sort table function
-                function sortTable(columnIndex) {
-                    const table = document.querySelector('.solutions-table tbody');
-                    const rows = Array.from(table.querySelectorAll('tr'));
-                    
-                    rows.sort((a, b) => {
-                        const aText = a.cells[columnIndex].textContent.trim();
-                        const bText = b.cells[columnIndex].textContent.trim();
-                        return aText.localeCompare(bText);
-                    });
-                    
-                    rows.forEach(row => table.appendChild(row));
                 }
                 
                 // Open solution in maker portal
