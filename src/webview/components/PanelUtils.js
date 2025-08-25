@@ -145,6 +145,19 @@ class PanelUtils {
     }
 
     /**
+     * Handle environments loaded message
+     */
+    static handleEnvironmentsLoaded(environments, selectedEnvironmentId) {
+        // Update environment selector with loaded environments
+        EnvironmentSelectorUtils.loadEnvironments('environmentSelect', environments);
+        
+        // Set selected environment if provided
+        if (selectedEnvironmentId) {
+            EnvironmentSelectorUtils.setSelectedEnvironment('environmentSelect', selectedEnvironmentId);
+        }
+    }
+
+    /**
      * Debounce function for search/filter inputs
      */
     static debounce(func, wait) {
