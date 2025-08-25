@@ -1,17 +1,18 @@
 import * as vscode from 'vscode';
 import { BasePanel } from './base/BasePanel';
 import { AuthenticationService } from '../services/AuthenticationService';
-import { EnvironmentManager } from './base/EnvironmentManager';
 import { ComponentFactory } from '../components/ComponentFactory';
 import { WebviewMessage, EnvironmentConnection } from '../types';
 import { ServiceFactory } from '../services/ServiceFactory';
+import { Solution, SolutionService } from '../services/SolutionService';
+import { UrlBuilderService } from '../services/UrlBuilderService';
 
 export class SolutionExplorerPanel extends BasePanel {
     public static readonly viewType = 'solutionExplorer';
 
     private _selectedEnvironmentId: string | undefined;
-    private _cachedSolutions: any[] | undefined;
-    private _cachedEnvironments: any[] | undefined;
+    private _solutionService: SolutionService;
+    private _urlBuilderService: typeof UrlBuilderService;
 
     public static createOrShow(extensionUri: vscode.Uri) {
         // Try to focus existing panel first
@@ -52,6 +53,9 @@ export class SolutionExplorerPanel extends BasePanel {
             viewType: SolutionExplorerPanel.viewType,
             title: 'Solution Explorer'
         });
+
+        this._solutionService = ServiceFactory.getSolutionService();
+        this._urlBuilderService = ServiceFactory.getUrlBuilderService();
 
         // Initialize after construction
         this.initialize();
@@ -103,7 +107,10 @@ export class SolutionExplorerPanel extends BasePanel {
     private async handleLoadEnvironments(): Promise<void> {
         try {
             const environments = await this._authService.getEnvironments();
-            const selectedEnvironmentId = this._selectedEnvironmentId || environments[0]?.id;
+            
+            // Get previously selected environment from state
+            const cachedState = await this._stateService.getPanelState(SolutionExplorerPanel.viewType);
+            const selectedEnvironmentId = this._selectedEnvironmentId || cachedState?.selectedEnvironmentId || environments[0]?.id;
 
             this._panel.webview.postMessage({
                 action: 'environmentsLoaded',
@@ -126,62 +133,35 @@ export class SolutionExplorerPanel extends BasePanel {
             this._selectedEnvironmentId = environmentId;
 
             // Use cached data if available and not forcing refresh
-            if (!forceRefresh && this._cachedSolutions && this._cachedSolutions.length > 0) {
-                this._panel.webview.postMessage({
-                    action: 'solutionsLoaded',
-                    data: this._cachedSolutions
-                });
-                return;
-            }
-
-            // Get available environments
-            const environments = await this._authService.getEnvironments();
-            const environment = environments.find(env => env.id === environmentId);
-
-            if (!environment) {
-                throw new Error('Selected environment not found');
-            }
-
-            // Get access token for the environment
-            const token = await this._authService.getAccessToken(environment.id);
-
-            // Load solutions
-            const solutionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/solutions?$select=solutionid,uniquename,friendlyname,version,ismanaged,_publisherid_value,installedon,description&$expand=publisherid($select=friendlyname)&$orderby=friendlyname`;
-
-            const response = await fetch(solutionsUrl, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json',
-                    'OData-MaxVersion': '4.0',
-                    'OData-Version': '4.0'
+            if (!forceRefresh) {
+                const cachedState = await this._stateService.getPanelState(SolutionExplorerPanel.viewType);
+                if (cachedState?.selectedEnvironmentId === environmentId && cachedState.lastUpdated) {
+                    const cacheAge = Date.now() - new Date(cachedState.lastUpdated).getTime();
+                    const maxCacheAge = 5 * 60 * 1000; // 5 minutes
+                    
+                    if (cacheAge < maxCacheAge) {
+                        // Use cached data
+                        this._panel.webview.postMessage({
+                            action: 'solutionsLoaded',
+                            data: cachedState.viewConfig?.solutions || []
+                        });
+                        return;
+                    }
                 }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            const data = await response.json();
-            const solutions = data.value || [];
+            // Load solutions using the service
+            const solutions = await this._solutionService.getSolutions(environmentId);
 
-            // Transform the data
-            const transformedSolutions = solutions.map((solution: any) => ({
-                solutionId: solution.solutionid,
-                uniqueName: solution.uniquename,
-                friendlyName: solution.friendlyname || solution.displayname,
-                displayName: solution.displayname,
-                version: solution.version,
-                isManaged: solution.ismanaged,
-                publisherName: solution.publisherid?.friendlyname || 'Unknown',
-                installedOn: solution.installedon,
-                description: solution.description
-            }));
-
-            this._cachedSolutions = transformedSolutions;
+            // Cache the results
+            await this._stateService.savePanelState(SolutionExplorerPanel.viewType, {
+                selectedEnvironmentId: environmentId,
+                viewConfig: { solutions }
+            });
 
             this._panel.webview.postMessage({
                 action: 'solutionsLoaded',
-                data: transformedSolutions
+                data: solutions
             });
 
         } catch (error: any) {
@@ -198,11 +178,11 @@ export class SolutionExplorerPanel extends BasePanel {
             const environments = await this._authService.getEnvironments();
             const environment = environments.find(env => env.id === environmentId);
 
-            if (!environment || !environment.environmentId) {
-                throw new Error('Environment or environment ID not found');
+            if (!environment) {
+                throw new Error('Environment not found');
             }
 
-            const makerUrl = `https://make.powerapps.com/environments/${environment.environmentId}/solutions/${solutionId}`;
+            const makerUrl = this._urlBuilderService.buildMakerSolutionUrl(environment, solutionId);
             await vscode.env.openExternal(vscode.Uri.parse(makerUrl));
         } catch (error: any) {
             console.error('Error opening solution in Maker:', error);
@@ -219,7 +199,7 @@ export class SolutionExplorerPanel extends BasePanel {
                 throw new Error('Environment not found');
             }
 
-            const classicUrl = `${environment.settings.dataverseUrl}/tools/solution/edit.aspx?id=${solutionId}`;
+            const classicUrl = this._urlBuilderService.buildClassicSolutionUrl(environment, solutionId);
             await vscode.env.openExternal(vscode.Uri.parse(classicUrl));
         } catch (error: any) {
             console.error('Error opening solution in Classic:', error);
