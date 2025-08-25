@@ -136,15 +136,21 @@ class PanelUtils {
 ```javascript
 class TableUtils {
     static initializeTable(tableId, config)
-    static loadTableData(tableId, data)
+    static loadTableData(tableId, data)  // ⚠️ REQUIRES: data objects must have 'id' property
     static sortTable(tableId, column, direction)
     static filterTable(tableId, searchTerm)
-    static handleRowAction(tableId, action, rowId)
+    static handleRowAction(tableId, action, rowId)  // Calls config.onRowAction(actionId, rowData)
     static showContextMenu(tableId, event, row)
 }
 ```
 
 **Purpose**: Complete table functionality including sorting, filtering, selection, actions, and context menus.
+
+**⚠️ CRITICAL REQUIREMENTS:**
+- **Data Structure**: All data objects passed to `loadTableData()` MUST have an `id` property for row actions to work
+- **Row Actions**: Configure via `rowActions` and `contextMenu` in table config
+- **Action Handlers**: Implement `onRowAction: handleRowAction` callback function
+- **HTML Content**: Table cells can contain HTML for badges, links, formatted content
 
 ### **6. EnvironmentSelectorUtils.js - Environment Management** ✅
 ```javascript
@@ -159,11 +165,48 @@ class EnvironmentSelectorUtils {
 
 **Purpose**: Complete environment selector functionality with multi-instance support.
 
-### **7. Shared Styling** ✅
+### **Shared Styling** ✅
 - **PanelStyles.css**: Common panel layout, buttons, states, environment selectors
 - **TableStyles.css**: Complete table styling including sorting indicators, context menus, filters
 
-**Purpose**: Consistent visual design across all panels, VS Code theme integration.
+**Status Badge CSS Pattern**:
+```css
+/* Status badge styles for calculated content */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+.status-badge::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+.status-completed {
+    background: rgba(0, 128, 0, 0.1);
+    color: #00b300;
+}
+.status-completed::before { background: #00b300; }
+
+.status-failed {
+    background: rgba(255, 0, 0, 0.1);
+    color: #e74c3c;
+}
+.status-failed::before { background: #e74c3c; }
+
+.status-in-progress {
+    background: rgba(255, 165, 0, 0.1);
+    color: #ff8c00;
+}
+.status-in-progress::before { background: #ff8c00; }
+```
+
+**Purpose**: Consistent visual design across all panels, VS Code theme integration, colored status indicators.
 
 ---
 
@@ -244,11 +287,24 @@ export class ExamplePanel extends BasePanel {
                 <button class="btn" onclick="refreshData()">Refresh</button>
             </div>
             
-            <div id="content">
-                <div class="loading">
-                    <p>Select an environment to continue...</p>
-                </div>
-            </div>
+            <!-- Hidden template for data table -->
+            <script type="text/template" id="dataTableTemplate">
+                ${ComponentFactory.createDataTable({
+                    id: 'dataTable',
+                    columns: this.getTableConfig().columns,
+                    defaultSort: { column: 'defaultColumn', direction: 'desc' },
+                    stickyHeader: true,
+                    stickyFirstColumn: false,
+                    filterable: true,
+                    rowActions: [
+                        { id: 'viewDetails', action: 'viewDetails', label: 'View', icon: '👁️' }
+                    ],
+                    contextMenu: [
+                        { id: 'viewDetails', action: 'viewDetails', label: 'View Details' },
+                        { id: 'openInMaker', action: 'openInMaker', label: 'Open in Maker' }
+                    ]
+                })}
+            </script>
 
             <script src="${envSelectorUtilsScript}"></script>
             <script src="${panelUtilsScript}"></script>
@@ -305,9 +361,55 @@ export class ExamplePanel extends BasePanel {
                     }
                 });
                 
-                // Panel-specific data handling
+                // Panel-specific data handling with TableUtils
                 function populateData(data) {
+                    // Transform data to include required 'id' property
+                    const tableData = data.map(item => ({
+                        id: item.primaryKey,        // ← REQUIRED for row actions
+                        ...item,
+                        status: calculateStatus(item)  // ← Can include HTML badges
+                    }));
+                    
                     // Use ComponentFactory and TableUtils for data display
+                    const content = document.getElementById('content');
+                    const template = document.getElementById('dataTableTemplate');
+                    content.innerHTML = template.innerHTML;
+                    
+                    // Initialize table with action handlers
+                    TableUtils.initializeTable('dataTable', {
+                        onRowClick: handleRowClick,
+                        onRowAction: handleRowAction    // ← Handle button/context menu actions
+                    });
+                    
+                    // Load data and apply default sorting
+                    TableUtils.loadTableData('dataTable', tableData);
+                    TableUtils.sortTable('dataTable', 'defaultColumn', 'desc');
+                }
+                
+                // Row action handler for buttons and context menu
+                function handleRowAction(actionId, rowData) {
+                    switch (actionId) {
+                        case 'viewDetails':
+                            PanelUtils.sendMessage('viewDetails', { id: rowData.id });
+                            break;
+                        case 'openInMaker':
+                            PanelUtils.sendMessage('openInMaker', { id: rowData.id });
+                            break;
+                    }
+                }
+                
+                // Status calculation with HTML badges
+                function calculateStatus(item) {
+                    if (item.completed && item.progress === 100) {
+                        return '<span class="status-badge status-completed">Completed</span>';
+                    } else if (item.completed && item.progress < 100) {
+                        return '<span class="status-badge status-failed">Failed</span>';
+                    } else if (item.started && !item.progress) {
+                        return '<span class="status-badge status-failed">Failed</span>';
+                    } else if (item.started) {
+                        return '<span class="status-badge status-in-progress">In Progress</span>';
+                    }
+                    return '<span class="status-badge status-unknown">Unknown</span>';
                 }
             </script>
         </body>
@@ -371,8 +473,8 @@ export interface TableConfig {
     id: string;
     columns: TableColumn[];
     defaultSort?: { column: string; direction: 'asc' | 'desc' };
-    rowActions?: TableAction[];
-    contextMenu?: ContextMenuItem[];
+    rowActions?: TableAction[];           // Buttons shown in action column
+    contextMenu?: ContextMenuItem[];     // Right-click context menu items
     bulkActions?: BulkAction[];
     filterable?: boolean;
     selectable?: boolean;
@@ -381,15 +483,39 @@ export interface TableConfig {
     className?: string;
 }
 
-export interface EnvironmentSelectorConfig {
-    id?: string;
-    statusId?: string;
-    label?: string;
-    placeholder?: string;
-    showStatus?: boolean;
-    onSelectionChange?: string;
+export interface TableAction {
+    id: string;              // Unique identifier for the action
+    action: string;          // Action name sent to handleRowAction
+    label: string;           // Display text
+    icon?: string;           // Icon or emoji
     className?: string;
 }
+
+export interface ContextMenuItem {
+    id: string;              // Unique identifier
+    action: string;          // Action name sent to handleRowAction  
+    label: string;           // Display text
+    type?: 'item' | 'separator';
+}
+```
+
+**⚠️ DATA REQUIREMENTS FOR TABLES:**
+```javascript
+// CORRECT: Data objects must have 'id' property for row actions
+const tableData = importJobs.map(job => ({
+    id: job.importjobid,           // ← REQUIRED for row actions
+    importjobid: job.importjobid,
+    solutionname: job.solutionname,
+    status: calculateStatus(job),   // ← Can contain HTML for badges
+    // ... other fields
+}));
+
+// Initialize table with action handlers
+TableUtils.initializeTable('myTable', {
+    onRowClick: handleRowClick,      // Optional: (rowData, rowElement) => void
+    onRowAction: handleRowAction     // Required for actions: (actionId, rowData) => void
+});
+```
 ```
 
 ### **Component Generation**
@@ -510,12 +636,37 @@ border: 1px solid var(--vscode-widget-border);
 ### **When Creating a New Panel:**
 
 1. **Extend BasePanel** with proper dependency injection
-2. **Use ComponentFactory** for all UI components
+2. **Use ComponentFactory** for all UI components  
 3. **Include common resources** via `getCommonWebviewResources()`
 4. **Use PanelUtils** for common client-side operations
 5. **Implement proper error handling** with try/catch blocks
 6. **Follow the standard message handling pattern**
 7. **Integrate StateService** for UI state persistence
+
+### **When Working with Tables:**
+
+1. **ALWAYS ensure data has 'id' property** for row actions to work
+2. **Use HTML in calculated fields** for badges, links, formatted content
+3. **Configure rowActions and contextMenu** in table config
+4. **Implement handleRowAction callback** to handle button clicks and context menu
+5. **Transform data client-side** using functions like `calculateStatus()`
+6. **Apply default sorting** after loading data with `TableUtils.sortTable()`
+
+### **When Creating Status Indicators:**
+
+1. **Use calculateStatus() pattern** for computed status fields
+2. **Return HTML with status-badge classes** for colored indicators
+3. **Include ::before pseudo-elements** for colored oval indicators  
+4. **Follow color conventions**: Green=Success, Red=Failed, Yellow=Progress, Gray=Unknown
+5. **Use rgba backgrounds** with solid text colors for accessibility
+
+### **When Adding Row Actions:**
+
+1. **Define actions in table config** with unique `id` and `action` properties
+2. **Implement handleRowAction(actionId, rowData)** callback function
+3. **Use PanelUtils.sendMessage()** to communicate with panel backend
+4. **Test both button clicks and context menu** functionality
+5. **Ensure rowData contains all needed properties** for the action
 
 ### **When Creating a New Service:**
 
