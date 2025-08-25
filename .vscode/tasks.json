@@ -41,6 +41,60 @@
 				"panel": "shared"
 			},
 			"problemMatcher": "$tsc-watch"
+		},
+		{
+			"label": "Package Extension",
+			"type": "shell",
+			"command": "vsce",
+			"args": [
+				"package"
+			],
+			"group": "build",
+			"dependsOn": "Build Extension",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Test Release",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-File",
+				"test-release.ps1",
+				"-Clean",
+				"-NewWindow",
+				"-Verbose"
+			],
+			"group": "test",
+			"dependsOn": "Package Extension",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": true,
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "Analyze Package",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-File",
+				"analyze-package.ps1",
+				"-Detailed"
+			],
+			"group": "test",
+			"dependsOn": "Package Extension",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": true,
+				"panel": "dedicated"
+			}
 		}
 	]
 }

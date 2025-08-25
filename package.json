@@ -251,7 +251,13 @@
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
-        "watch": "tsc -watch -p ./"
+        "watch": "tsc -watch -p ./",
+        "package": "vsce package",
+        "test-release": "npm run compile && npm run package && npm run install-local",
+        "install-local": "code --install-extension dynamics-devtools-0.1.3.vsix --force",
+        "uninstall-local": "code --uninstall-extension JoshSmithXRM.dynamics-devtools",
+        "clean-install": "npm run uninstall-local && npm run test-release",
+        "test-fresh": "npm run clean-install && code --new-window"
     },
     "dependencies": {
         "@azure/msal-node": "^2.13.0",
