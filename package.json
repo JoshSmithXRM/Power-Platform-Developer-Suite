@@ -2,7 +2,7 @@
     "name": "dynamics-devtools",
     "displayName": "Dynamics DevTools",
     "description": "A comprehensive VSCode extension for Microsoft Dynamics 365 / Power Platform development and administration",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "publisher": "JoshSmithXRM",
     "repository": {
         "type": "git",
