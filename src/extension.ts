@@ -33,7 +33,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerTreeDataProvider('dynamics-devtools-tools', toolsProvider);
 
     // Initialize command handlers
-    const environmentCommands = new EnvironmentCommands(authService, context);
+    const environmentCommands = new EnvironmentCommands(authService, context, environmentsProvider);
     const panelCommands = new PanelCommands(authService, context, environmentsProvider);
     const metadataBrowserCommands = new MetadataBrowserCommands(authService, context);
 

@@ -1,13 +1,17 @@
 import * as vscode from 'vscode';
 import { AuthenticationService } from '../services/AuthenticationService';
-import { EnvironmentItem } from '../providers/EnvironmentsProvider';
+import { EnvironmentItem, EnvironmentsProvider } from '../providers/EnvironmentsProvider';
 import { EnvironmentSetupPanel } from '../panels/EnvironmentSetupPanel';
 
 /**
  * Environment-related commands
  */
 export class EnvironmentCommands {
-    constructor(private authService: AuthenticationService, private context: vscode.ExtensionContext) { }
+    constructor(
+        private authService: AuthenticationService, 
+        private context: vscode.ExtensionContext,
+        private environmentsProvider: EnvironmentsProvider
+    ) { }
 
     /**
      * Register all environment commands
@@ -16,6 +20,10 @@ export class EnvironmentCommands {
         return [
             vscode.commands.registerCommand('dynamics-devtools.addEnvironment', () => {
                 EnvironmentSetupPanel.createOrShow(this.context.extensionUri);
+            }),
+
+            vscode.commands.registerCommand('dynamics-devtools.refreshEnvironments', () => {
+                this.environmentsProvider.refresh();
             }),
 
             vscode.commands.registerCommand('dynamics-devtools.testConnection', async () => {
