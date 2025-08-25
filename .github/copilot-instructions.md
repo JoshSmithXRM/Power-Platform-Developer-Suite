@@ -155,6 +155,19 @@ export class DomainCommands {
 }
 ```
 
+## Communication Guidelines
+
+### Response Style
+- **Keep responses concise and focused** on the specific task at hand
+- **Do NOT provide task summaries** unless explicitly requested by the user
+- **Confirm completion** with a brief statement like "Done" or "Updated successfully"
+- **Only elaborate** when the user asks for explanations or details
+
+### Testing & Validation
+- **Inform the user when to test the build** instead of running tests automatically
+- **Let the user validate functionality** and report results back
+- **Wait for user confirmation** before proceeding with dependent changes
+
 ## What NOT to Do
 
 ### Anti-Patterns
