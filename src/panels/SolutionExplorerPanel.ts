@@ -257,7 +257,7 @@ export class SolutionExplorerPanel extends BasePanel {
         const { tableUtilsScript, tableStylesSheet, panelStylesSheet, panelUtilsScript } = this.getCommonWebviewResources();
 
         const envSelectorUtilsScript = this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'EnvironmentSelectorUtils.js')
+            vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'environment-selector-utils.js')
         );
 
         return `<!DOCTYPE html>
@@ -336,7 +336,7 @@ export class SolutionExplorerPanel extends BasePanel {
 
     private getSolutionExplorerScript(): vscode.Uri {
         return this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'scripts', 'SolutionExplorer.js')
+            vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'solution-explorer.js')
         );
     }
 }
