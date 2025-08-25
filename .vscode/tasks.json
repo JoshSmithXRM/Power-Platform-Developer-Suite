@@ -64,7 +64,7 @@
 			"command": "pwsh",
 			"args": [
 				"-File",
-				"test-release.ps1",
+				"scripts/test-release.ps1",
 				"-Clean",
 				"-NewWindow",
 				"-Verbose"
@@ -84,7 +84,7 @@
 			"command": "pwsh",
 			"args": [
 				"-File",
-				"analyze-package.ps1",
+				"scripts/analyze-package.ps1",
 				"-Detailed"
 			],
 			"group": "test",

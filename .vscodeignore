@@ -13,10 +13,14 @@ vsc-extension-quickstart.md
 # Build artifacts
 out/test/**
 
+# Development scripts and tools
+scripts/**
+
 # Documentation that's not needed in package
-IMPLEMENTATION_PLAN.md
-PROJECT_DECISIONS.md
 .github/workflows/**
+
+# Old VSIX files (keep only the latest)
+dynamics-devtools-*.vsix
 
 # Test files
 **/test/**

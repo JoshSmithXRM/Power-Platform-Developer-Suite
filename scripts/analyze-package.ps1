@@ -80,11 +80,11 @@ if (Test-Path $ExtensionDir) {
 # Check for missing webview resources
 Write-Host "`n🔍 Webview Resource Check:" -ForegroundColor Yellow
 $WebviewPaths = @(
-    "extension/src/webview/components/PanelStyles.css",
-    "extension/src/webview/components/TableStyles.css", 
-    "extension/src/webview/components/PanelUtils.js",
-    "extension/src/webview/components/TableUtils.js",
-    "extension/src/webview/components/EnvironmentSelectorUtils.js"
+    "extension/resources/webview/css/panel-base.css",
+    "extension/resources/webview/css/table.css", 
+    "extension/resources/webview/js/panel-utils.js",
+    "extension/resources/webview/js/table-utils.js",
+    "extension/resources/webview/js/environment-selector-utils.js"
 )
 
 foreach ($Path in $WebviewPaths) {

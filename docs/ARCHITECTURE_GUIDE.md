@@ -33,17 +33,19 @@ Extension Root
 │   ├── ComponentFactory.ts        # ✅ Factory for all UI components
 │   └── [Panel-specific components as needed]
 │
-├── 📁 webview/          # Webview resources
-│   └── 📁 components/   # Client-side utilities
-│       ├── TableUtils.js           # ✅ Advanced table functionality
-│       ├── TableStyles.css         # ✅ Complete table styling
-│       ├── PanelUtils.js           # ✅ Common panel operations
-│       ├── PanelStyles.css         # ✅ Shared panel styling
-│       └── EnvironmentSelectorUtils.js  # ✅ Environment management
+├── 📁 resources/        # Webview resources (properly packaged)
+│   └── 📁 webview/      # Client-side utilities and styling
+│       ├── table-utils.js              # ✅ Advanced table functionality
+│       ├── table.css                   # ✅ Complete table styling
+│       ├── panel-utils.js              # ✅ Common panel operations
+│       ├── panel-base.css              # ✅ Shared panel styling
+│       ├── environment-selector-utils.js  # ✅ Environment management
+│       ├── environment-setup.js        # ✅ Environment configuration
+│       └── validation-utils.js         # ✅ Form validation utilities
 │
 ├── 📁 services/         # Business logic
 │   ├── AuthenticationService.ts        # ✅ Multi-method authentication
-│   ├── StateService.ts                 # ✅ Panel state persistence (5-min cache)
+│   ├── StateService.ts                 # ✅ Panel state persistence
 │   ├── SolutionService.ts              # ✅ Solution API operations
 │   ├── UrlBuilderService.ts            # ✅ URL construction utilities
 │   └── ServiceFactory.ts              # ✅ Dependency injection container
@@ -59,6 +61,9 @@ Extension Root
 │   ├── AuthenticationMethod.ts         # ✅ Auth method enumeration
 │   ├── AuthenticationResult.ts         # ✅ Auth result interface
 │   └── PowerPlatformSettings.ts        # ✅ Environment settings
+├── 📁 scripts/          # Build and deployment utilities
+│   ├── test-release.ps1                # ✅ Local release testing
+│   └── analyze-package.ps1             # ✅ Package analysis
 └── 📁 types/           # Shared TypeScript interfaces
     ├── index.ts                        # ✅ Common type definitions
     └── node-persist.d.ts               # ✅ Persistence library types
@@ -179,8 +184,8 @@ class EnvironmentSelectorUtils {
 **Purpose**: Complete environment selector functionality with multi-instance support.
 
 ### **Shared Styling** ✅
-- **PanelStyles.css**: Common panel layout, buttons, states, environment selectors
-- **TableStyles.css**: Complete table styling including sorting indicators, context menus, filters
+- **panel-base.css**: Common panel layout, buttons, states, environment selectors
+- **table.css**: Complete table styling including sorting indicators, context menus, filters
 
 **Status Badge CSS Pattern**:
 ```css
@@ -294,7 +299,7 @@ export class ExamplePanel extends BasePanel {
         const { tableUtilsScript, tableStylesSheet, panelStylesSheet, panelUtilsScript } = this.getCommonWebviewResources();
         
         const envSelectorUtilsScript = this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'EnvironmentSelectorUtils.js')
+            vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'environment-selector-utils.js')
         );
 
         return `<!DOCTYPE html>
@@ -650,8 +655,8 @@ if (cachedState?.selectedEnvironmentId === environmentId) {
 ## 🎨 STYLING ARCHITECTURE
 
 ### **CSS Organization**
-- **PanelStyles.css**: Base layout, buttons, states, environment selectors, responsive design
-- **TableStyles.css**: Complete table functionality, sorting indicators, context menus, filters
+- **panel-base.css**: Base layout, buttons, states, environment selectors, responsive design
+- **table.css**: Complete table functionality, sorting indicators, context menus, filters
 - **Panel-specific styles**: Only unique styling in each panel's `<style>` section
 
 ### **Theme Integration**
