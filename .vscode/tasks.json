@@ -4,11 +4,10 @@
 		{
 			"label": "Build Extension",
 			"type": "shell",
-			"command": "npx",
+			"command": "npm",
 			"args": [
-				"tsc",
-				"-p",
-				"."
+				"run",
+				"compile"
 			],
 			"group": {
 				"kind": "build",
@@ -25,12 +24,10 @@
 		{
 			"label": "Watch",
 			"type": "shell",
-			"command": "npx",
+			"command": "npm",
 			"args": [
-				"tsc",
-				"-watch",
-				"-p",
-				"."
+				"run",
+				"watch"
 			],
 			"group": "build",
 			"isBackground": true,
@@ -45,9 +42,10 @@
 		{
 			"label": "Package Extension",
 			"type": "shell",
-			"command": "vsce",
+			"command": "npm",
 			"args": [
-				"package"
+				"run",
+				"vsce-package"
 			],
 			"group": "build",
 			"dependsOn": "Build Extension",

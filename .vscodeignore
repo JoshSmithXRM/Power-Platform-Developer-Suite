@@ -10,8 +10,12 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 
+# Node modules (bundled by webpack)
+node_modules/**
+
 # Build artifacts
-out/test/**
+out/**
+webpack.config.js
 
 # Development scripts and tools
 scripts/**
