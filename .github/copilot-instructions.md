@@ -62,217 +62,57 @@ Use semantic categories in CHANGELOG.md entries:
 - **Prefer self-documenting code** - use clear, descriptive naming over excessive commenting
 - **Strategic comments are welcome** for:
   - Complex algorithms or business logic that isn't immediately obvious
-  - Workarounds for known issues or API limitations
-  - "Why" explanations when the "what" is clear but the reasoning isn't
-  - External dependencies or integration quirks
-  - Performance optimizations that trade readability for speed
-- **Use descriptive variable and function names**
-- **Prefer composition over inheritance** (except for UI panels)
-- **Keep functions small and focused**
-- **Use TypeScript types extensively** for better developer experience
+# GitHub Copilot Instructions for Dynamics DevTools
 
-### 3. Decision Making Process
-- **Do NOT over-engineer solutions** - prefer simple, working implementations
-- **Always consult before making architectural decisions**
-- **Discuss breaking changes or new patterns before implementation**
-- **Follow existing patterns unless there's a compelling reason to change**
-- **Reference the [ARCHITECTURE_GUIDE.md](../docs/ARCHITECTURE_GUIDE.md)** for established patterns and best practices
+## Quick start (authority and hard rules)
+- Authoritative changelog: see `CHANGELOG.md` for the canonical, versioned implementation status and release history.
+- Hard rules (non-negotiable):
+    - Never exfiltrate secrets, credentials, or sensitive data.
+    - Do not perform external network calls except when explicitly requested and permitted by the user/repo owner.
+    - Never paste raw patch diffs or terminal commands into chat output; use the repository edit and terminal workflows instead.
+    - Ask a clarifying question when requirements are ambiguous.
 
-## Dynamics 365 & OData API Guidelines
+## How to edit files (short checklist)
+- Use the project's edit APIs/workflow: prefer `apply_patch` / `insert_edit_into_file` for edits.
+- Make minimal, well-scoped changes that preserve coding style and public APIs.
+- For runnable code: include a tiny test or runner and update manifests (`package.json` etc.) when required.
+- Run the build (or the project's `Build Extension` task) and typecheck locally after substantive edits and report the results.
 
-### Required Reading
-Before working with Dynamics/Power Platform APIs, reference these official Microsoft docs:
-- [OData CLI Getting Started](https://learn.microsoft.com/en-us/odata/odatacli/getting-started)
-- [OData Get Data Concepts](https://learn.microsoft.com/en-us/odata/concepts/get-data)
-- [OData Query Options Overview](https://learn.microsoft.com/en-us/odata/concepts/queryoptions-overview)
-- [OData Query Options Usage](https://learn.microsoft.com/en-us/odata/concepts/queryoptions-usage)
+## Verification required before marking a change done
+1. Build or compile step completed (or you ran the `Build Extension` task).
+2. Type checks and unit tests (if present) pass.
+3. `CHANGELOG.md` updated in `[Unreleased]` (or a release section added when releasing).
 
-### API Best Practices
-- **Always use `$select`** to specify required fields only
-- **Use `$top` and `$skip`** for pagination (note: some entities like `importjobs` don't support `$skip`)
-- **Use `$orderby`** for consistent data ordering
-- **Use `$expand`** for related data when needed
-- **Include `$count=true`** when pagination info is needed
-- **Handle API errors gracefully** with user-friendly messages
+## Purpose of this file
+Short, actionable guidance for automated editing agents and contributors (APIs safe to call, which panels are scaffold-only, where mocks/stubs live). For full release history and user-facing notes, consult `CHANGELOG.md` and GitHub Releases.
 
-### Authentication & Token Management
-- **Use the existing `AuthenticationService`** - do not create new auth patterns
-- **Cache tokens appropriately** through the service
-- **Handle token expiration** and refresh automatically
-- **Test authentication flows** with different auth methods
+## Core development principles (concise)
+- Follow the modular architecture in `docs/ARCHITECTURE_GUIDE.md`.
+- Keep files small and single-purpose. Prefer composition over heavy inheritance.
+- Use `ServiceFactory` for dependency injection and shared services.
 
-## UI Development Guidelines
+## API & Dynamics guidelines (high level)
+- Use `$select`, `$top`, `$orderby`, and `$expand` appropriately for OData queries.
+- Prefer server-side pagination; be aware some entities (e.g., `importjobs`) have quirks.
+- Use `AuthenticationService` for token management; do not create alternate auth patterns.
 
-### Panel Development
-- **Extend `BasePanel`** for all new webview panels
-- **Use the established message passing pattern** between extension and webview
-- **Implement proper disposal** to prevent memory leaks
-- **Follow VS Code theming** using CSS variables (`var(--vscode-*)`)
-- **Make UIs responsive** and accessible
+## UI & panel guidelines
+- Extend `BasePanel` for webview panels and follow the established message-passing pattern.
+- Ensure proper disposal of panels and listeners to avoid memory leaks.
 
-### Environment Handling
-- **Always validate environment selection** before API calls
-- **Cache environment data** when appropriate
-- **Provide clear environment status feedback** to users
-- **Handle environment switching** gracefully
+## Security & privacy (reminder)
+- Never log tokens or secrets. Use VS Code `SecretStorage` for sensitive data.
 
-### Error Handling
-- **Show user-friendly error messages** in VS Code notifications
-- **Log detailed errors** to console for debugging
-- **Gracefully handle network failures** and timeouts
-- **Provide fallback behavior** when possible
+## Quick reference — Do / Don't
+- Do: reuse existing utilities (`TableUtils`, `PanelUtils`), add tests for new behavior, and update `CHANGELOG.md`.
+- Don't: invent new authentication patterns, hardcode URLs, or modify large unrelated files.
 
-## Performance Considerations
+## Communication & response style
+- Provide a one-line plan, a short checklist of steps, then perform edits. Keep messages concise.
+- When editing code, report build/typecheck status and list the files changed.
 
-### Data Loading
-- **Load data efficiently** - avoid unnecessary API calls
-- **Implement caching** for frequently accessed data
-- **Use pagination** when supported by the API
-- **Show loading states** to users during API calls
+## Change tracking
+- Always update `CHANGELOG.md` under `[Unreleased]` for development changes. Move entries to a versioned section when releasing.
 
-### Memory Management
-- **Dispose of panels properly** when closed
-- **Clean up event listeners** and subscriptions
-- **Avoid memory leaks** in long-running operations
-
-## Testing Guidelines
-
-### Manual Testing
-- **Test with multiple environments** (dev, prod, different auth methods)
-- **Test error scenarios** (network failures, auth failures, etc.)
-- **Test with large datasets** to ensure performance
-- **Test UI responsiveness** on different screen sizes
-
-### Code Quality
-- **Ensure TypeScript compilation** without errors or warnings
-- **Follow existing naming conventions**
-- **Maintain consistent code formatting**
-- **Keep functions focused** and testable
-
-## Security Considerations
-
-### Authentication
-- **Never log sensitive data** (tokens, passwords, secrets)
-- **Use secure storage** for credentials via VS Code's `SecretStorage`
-- **Validate user inputs** before processing
-- **Handle authentication state** properly
-
-### API Interactions
-- **Validate API responses** before processing
-- **Sanitize user inputs** in OData queries
-- **Use HTTPS endpoints** only
-- **Follow principle of least privilege** in API permissions
-
-## Common Patterns to Follow
-
-### Panel Creation
-```typescript
-export class NewPanel extends BasePanel {
-    public static readonly viewType = 'newPanel';
-    
-    public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
-        const panel = BasePanel.createWebviewPanel({
-            viewType: NewPanel.viewType,
-            title: 'Panel Title'
-        });
-        new NewPanel(panel, extensionUri, authService);
-    }
-    
-    protected async handleMessage(message: WebviewMessage): Promise<void> {
-        // Handle webview messages
-    }
-    
-    protected getHtmlContent(): string {
-        // Return HTML content
-    }
-}
-```
-
-### Command Registration
-```typescript
-export class DomainCommands {
-    constructor(private authService: AuthenticationService, private context: vscode.ExtensionContext) {}
-    
-    public registerCommands(): vscode.Disposable[] {
-        return [
-            vscode.commands.registerCommand('dynamics-devtools.commandName', () => {
-                // Command implementation
-            })
-        ];
-    }
-}
-```
-
-## Communication Guidelines
-
-### Response Style
-- **Keep responses concise and focused** on the specific task at hand
-- **Do NOT provide task summaries** unless explicitly requested by the user
-- **Confirm completion** with a brief statement like "Done" or "Updated successfully"
-- **Only elaborate** when the user asks for explanations or details
-
-### Testing & Validation
-- **Inform the user when to test builds** instead of running tests automatically
-- **Let the user validate functionality** and report results back
-- **Wait for user confirmation** before proceeding with dependent changes
-
-### Change Tracking
-- **Update CHANGELOG.md [Unreleased] section** for all notable changes during development
-- **Follow Keep a Changelog categories**: Added, Changed, Deprecated, Removed, Fixed, Security, Technical
-- **Use clear, human-readable descriptions** that explain impact and context
-- **Reference issue numbers and breaking changes** when applicable
-
-## What NOT to Do
-
-### Anti-Patterns
-- ❌ Don't create monolithic files (keep under 500 lines when possible)
-- ❌ Don't duplicate code across panels - use base classes or utilities
-- ❌ Don't hardcode URLs or configuration - use environment settings
-- ❌ Don't ignore errors silently - always provide user feedback
-- ❌ Don't create new authentication patterns - use existing service
-- ❌ Don't add features without considering existing users' workflows
-
-### Performance Anti-Patterns
-- ❌ Don't load all data without pagination
-- ❌ Don't make unnecessary API calls
-- ❌ Don't block the UI thread with long-running operations
-- ❌ Don't create memory leaks with uncleaned event listeners
-
-## Project-Specific Knowledge
-
-### Key Extension Points
-- **Environment Management**: All auth and environment switching
-- **Solution Operations**: Import, export, and solution management
-- **Data Browsing**: Entity/table exploration and querying
-- **Import Job Monitoring**: Solution import status and history
-
-### Important Files to Understand
-- `AuthenticationService.ts` - Handles all authentication flows
-- `BasePanel.ts` - Foundation for all UI panels
-- `extension.ts` - Main entry point and registration
-- `EnvironmentsProvider.ts` - Environment tree view logic
-
-### Common User Workflows
-1. **Setup**: Add environment → Test connection → Use tools
-2. **Solution Work**: Browse solutions → Open in Maker/Classic → Monitor imports
-3. **Data Exploration**: Browse entities → Query data → Export results
-4. **Troubleshooting**: View import jobs → Check status → Review errors
-
-Remember: This extension is used by developers working with Microsoft Dynamics 365 and Power Platform. Users expect professional, reliable tools that integrate well with their existing development workflows.
-
-## 📚 Essential Documentation
-
-For comprehensive information about this project:
-
-1. **[README.md](../README.md)** - Start here for:
-   - Project overview and features
-   - Installation and usage instructions
-   - Development setup and workflow
-   - Troubleshooting guide
-
-2. **[docs/ARCHITECTURE_GUIDE.md](../docs/ARCHITECTURE_GUIDE.md)** - Essential for development:
-   - Complete architecture patterns and principles
-   - Panel implementation guidelines
-   - Service layer patterns and best practices
-   - Shared utilities documentation
-   - Code examples and templates
+## Example patterns (unchanged)
+...existing code...
