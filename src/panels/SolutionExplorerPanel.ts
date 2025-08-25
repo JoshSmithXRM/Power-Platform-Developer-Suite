@@ -254,7 +254,7 @@ export class SolutionExplorerPanel extends BasePanel {
 
     protected getHtmlContent(): string {
         // Get common webview resources
-        const { tableUtilsScript, tableStylesSheet } = this.getCommonWebviewResources();
+        const { tableUtilsScript, tableStylesSheet, panelStylesSheet } = this.getCommonWebviewResources();
 
         const envSelectorUtilsScript = this._panel.webview.asWebviewUri(
             vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'EnvironmentSelectorUtils.js')
@@ -266,60 +266,10 @@ export class SolutionExplorerPanel extends BasePanel {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Solution Explorer</title>
+            <link rel="stylesheet" href="${panelStylesSheet}">
             <link rel="stylesheet" href="${tableStylesSheet}">
             <style>
-                body {
-                    margin: 0;
-                    padding: 20px;
-                    font-family: var(--vscode-font-family);
-                    background: var(--vscode-editor-background);
-                    color: var(--vscode-editor-foreground);
-                }
-                
-                .header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 20px;
-                    padding-bottom: 10px;
-                    border-bottom: 1px solid var(--vscode-editorWidget-border);
-                }
-                
-                .title {
-                    font-size: 1.5em;
-                    margin: 0;
-                    color: var(--vscode-textLink-foreground);
-                }
-                
-                .loading {
-                    text-align: center;
-                    padding: 40px;
-                    color: var(--vscode-descriptionForeground);
-                }
-                
-                .error {
-                    background: var(--vscode-inputValidation-errorBackground);
-                    border: 1px solid var(--vscode-inputValidation-errorBorder);
-                    color: var(--vscode-inputValidation-errorForeground);
-                    padding: 16px;
-                    border-radius: 6px;
-                    margin: 20px 0;
-                }
-                
-                .btn {
-                    background: var(--vscode-button-background);
-                    color: var(--vscode-button-foreground);
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 14px;
-                }
-                
-                .btn:hover {
-                    background: var(--vscode-button-hoverBackground);
-                }
-                
+                /* Solution-specific styles */
                 .solution-name-link {
                     color: var(--vscode-textLink-foreground);
                     text-decoration: none;
@@ -329,53 +279,6 @@ export class SolutionExplorerPanel extends BasePanel {
                 
                 .solution-name-link:hover {
                     text-decoration: underline;
-                }
-                
-                .solutions-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-top: 10px;
-                }
-                
-                .solutions-table th,
-                .solutions-table td {
-                    padding: 8px 12px;
-                    text-align: center;
-                    border-bottom: 1px solid var(--vscode-editorWidget-border);
-                }
-                
-                .solutions-table th {
-                    background: var(--vscode-editorGroupHeader-tabsBackground);
-                    font-weight: 600;
-                    cursor: pointer;
-                }
-                
-                .solutions-table th:hover {
-                    background: var(--vscode-list-hoverBackground);
-                }
-                
-                .solutions-table td:first-child {
-                    text-align: left;
-                }
-                
-                .solution-actions {
-                    display: flex;
-                    justify-content: center;
-                    gap: 5px;
-                }
-                
-                .action-btn {
-                    background: var(--vscode-button-secondaryBackground);
-                    border: 1px solid var(--vscode-button-border);
-                    color: var(--vscode-button-secondaryForeground);
-                    padding: 4px 8px;
-                    border-radius: 3px;
-                    cursor: pointer;
-                    font-size: 12px;
-                }
-                
-                .action-btn:hover {
-                    background: var(--vscode-button-secondaryHoverBackground);
                 }
             </style>
         </head>
