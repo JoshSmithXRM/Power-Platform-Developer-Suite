@@ -385,6 +385,9 @@ export class SolutionExplorerPanel extends BasePanel {
                     loadEnvironments();
                 });
                 
+                // Load environments on startup (fallback)
+                loadEnvironments();
+                
                 // Load environments
                 function loadEnvironments() {
                     EnvironmentSelectorUtils.setLoadingState('environmentSelect', true);
@@ -451,7 +454,7 @@ export class SolutionExplorerPanel extends BasePanel {
                 
                 // Custom renderer for solution names
                 function renderSolutionName(value, row) {
-                    return \`<a class="solution-name-link" onclick="openSolutionInMaker('\${row.id}'); return false;">\${value}</a>\`;
+                    return \`<a class="solution-name-link" onclick="openSolutionInMaker('\\\${row.id}'); return false;">\\\${value}</a>\`;
                 }
                 
                 // Custom renderer for solution type  
@@ -464,179 +467,120 @@ export class SolutionExplorerPanel extends BasePanel {
                     return value ? new Date(value).toLocaleDateString() : 'Unknown';
                 }
                 
-                // Populate solutions table with enhanced ComponentFactory
+                // Populate solutions table
                 function populateSolutions(solutionsData) {
                     solutions = solutionsData;
                     
                     if (solutions.length === 0) {
-                        document.getElementById('content').innerHTML = '<div class="loading"><p>No solutions found in this environment.</p></div>';
+                        document.getElementById('content').innerHTML = '<div class="no-solutions"><p>No solutions found in this environment.</p></div>';
                         return;
                     }
                     
-                    const tableHtml = \`\${${ComponentFactory.createDataTable({
-            id: 'solutionsTable',
-            columns: [
-                { key: 'displayName', label: 'Solution Name', sortable: true, renderer: 'renderSolutionName' },
-                { key: 'version', label: 'Version', sortable: true },
-                { key: 'isManaged', label: 'Type', sortable: true, renderer: 'renderSolutionType' },
-                { key: 'publisherName', label: 'Publisher', sortable: true },
-                { key: 'installedOn', label: 'Installed', sortable: true, renderer: 'renderInstalledDate' },
-                { key: 'description', label: 'Description', sortable: false }
-            ],
-            defaultSort: { column: 'displayName', direction: 'asc' },
-            filterable: true,
-            selectable: true,
-            rowActions: [
-                { id: 'openMaker', action: 'openInMaker', label: 'Open in Maker', icon: '🎨' },
-                { id: 'openClassic', action: 'openInClassic', label: 'Open in Classic', icon: '📋' },
-                { id: 'export', action: 'exportSolution', label: 'Export', icon: '📦' }
-            ],
-            contextMenu: [
-                { id: 'openMaker', action: 'openInMaker', label: 'Open in Maker Portal' },
-                { id: 'openClassic', action: 'openInClassic', label: 'Open in Classic UI' },
-                { id: 'sep1', action: '', label: '', separator: true },
-                { id: 'export', action: 'exportSolution', label: 'Export Solution' },
-                { id: 'details', action: 'viewDetails', label: 'View Details' },
-                { id: 'sep2', action: '', label: '', separator: true },
-                { id: 'security', action: 'manageSecurity', label: 'Manage Security Roles' }
-            ],
-            bulkActions: [
-                { id: 'exportSelected', action: 'bulkExport', label: 'Export Selected', icon: '📦', requiresSelection: true },
-                { id: 'updateSelected', action: 'bulkUpdate', label: 'Update Selected', icon: '🔄', requiresSelection: true }
-            ]
-        })}\`;
+                    // Create simple table HTML
+                    let tableHtml = \`
+                        <div class="table-controls">
+                            <input type="text" id="filterInput" class="filter-input" placeholder="Filter solutions...">
+                            <button onclick="clearFilter()" class="clear-filter-btn">Clear</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="solutions-table">
+                                <thead>
+                                    <tr>
+                                        <th onclick="sortTable(0)">Solution Name</th>
+                                        <th onclick="sortTable(1)">Version</th>
+                                        <th onclick="sortTable(2)">Type</th>
+                                        <th onclick="sortTable(3)">Publisher</th>
+                                        <th onclick="sortTable(4)">Installed</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    \`;
+                    
+                    solutions.forEach(solution => {
+                        const installedDate = solution.installedOn ? new Date(solution.installedOn).toLocaleDateString() : 'N/A';
+                        const type = solution.isManaged ? 'Managed' : 'Unmanaged';
+                        
+                        tableHtml += \`
+                            <tr>
+                                <td><a href="#" onclick="openSolutionInMaker('\\\${solution.id}'); return false;" class="solution-name-link">\\\${solution.displayName}</a></td>
+                                <td>\\\${solution.version}</td>
+                                <td>\\\${type}</td>
+                                <td>\\\${solution.publisherName || 'N/A'}</td>
+                                <td>\\\${installedDate}</td>
+                                <td class="solution-actions">
+                                    <button onclick="openSolutionInMaker('\\\${solution.id}')" class="action-btn maker-btn" title="Open in Maker">🎨</button>
+                                    <button onclick="openSolutionInClassic('\\\${solution.id}')" class="action-btn classic-btn" title="Open in Classic">📋</button>
+                                </td>
+                            </tr>
+                        \`;
+                    });
+                    
+                    tableHtml += \`
+                                </tbody>
+                            </table>
+                        </div>
+                    \`;
                     
                     document.getElementById('content').innerHTML = tableHtml;
                     
-                    // Initialize the enhanced table
-                    TableUtils.initializeTable('solutionsTable', {
-                        onRowAction: handleRowAction,
-                        onContextMenuAction: handleContextMenuAction,
-                        onBulkAction: handleBulkAction,
-                        onSelectionChange: handleSelectionChange
+                    // Setup filter functionality
+                    const filterInput = document.getElementById('filterInput');
+                    filterInput.addEventListener('input', filterSolutions);
+                }
+                
+                // Clear table content
+                function clearContent() {
+                    document.getElementById('content').innerHTML = '<div class="no-solutions"><p>Select an environment to load solutions.</p></div>';
+                }
+                
+                // Filter solutions function
+                function filterSolutions() {
+                    const filterValue = document.getElementById('filterInput').value.toLowerCase();
+                    const table = document.querySelector('.solutions-table tbody');
+                    const rows = table.querySelectorAll('tr');
+                    
+                    rows.forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = text.includes(filterValue) ? '' : 'none';
+                    });
+                }
+                
+                // Clear filter function
+                function clearFilter() {
+                    document.getElementById('filterInput').value = '';
+                    filterSolutions();
+                }
+                
+                // Sort table function
+                function sortTable(columnIndex) {
+                    const table = document.querySelector('.solutions-table tbody');
+                    const rows = Array.from(table.querySelectorAll('tr'));
+                    
+                    rows.sort((a, b) => {
+                        const aText = a.cells[columnIndex].textContent.trim();
+                        const bText = b.cells[columnIndex].textContent.trim();
+                        return aText.localeCompare(bText);
                     });
                     
-                    // Transform and load data
-                    const tableData = solutions.map(solution => ({
-                        id: solution.solutionId,
-                        displayName: solution.friendlyName || solution.displayName,
-                        version: solution.version,
-                        isManaged: solution.isManaged,
-                        publisherName: solution.publisherName || 'Unknown',
-                        installedOn: solution.installedOn,
-                        description: solution.description || ''
-                    }));
-                    
-                    TableUtils.loadTableData('solutionsTable', tableData);
+                    rows.forEach(row => table.appendChild(row));
                 }
                 
-                // Handle table row actions
-                function handleRowAction(actionId, rowData) {
-                    switch (actionId) {
-                        case 'openInMaker':
-                            openSolutionInMaker(rowData.id);
-                            break;
-                        case 'openInClassic':
-                            openSolutionInClassic(rowData.id);
-                            break;
-                        case 'exportSolution':
-                            exportSolution(rowData.id);
-                            break;
-                    }
-                }
-                
-                // Handle context menu actions
-                function handleContextMenuAction(actionId, rowData) {
-                    switch (actionId) {
-                        case 'openInMaker':
-                            openSolutionInMaker(rowData.id);
-                            break;
-                        case 'openInClassic':
-                            openSolutionInClassic(rowData.id);
-                            break;
-                        case 'exportSolution':
-                            exportSolution(rowData.id);
-                            break;
-                        case 'viewDetails':
-                            viewSolutionDetails(rowData.id);
-                            break;
-                        case 'manageSecurity':
-                            manageSolutionSecurity(rowData.id);
-                            break;
-                    }
-                }
-                
-                // Handle bulk actions
-                function handleBulkAction(actionId, selectedRows) {
-                    switch (actionId) {
-                        case 'bulkExport':
-                            bulkExportSolutions(selectedRows.map(row => row.id));
-                            break;
-                        case 'bulkUpdate':
-                            bulkUpdateSolutions(selectedRows.map(row => row.id));
-                            break;
-                    }
-                }
-                
-                // Handle selection changes
-                function handleSelectionChange(selectedRows) {
-                    console.log('Selected solutions:', selectedRows.length);
-                }
-                
-                // Solution action functions
+                // Open solution in maker portal
                 function openSolutionInMaker(solutionId) {
-                    vscode.postMessage({ 
-                        action: 'openSolutionInMaker', 
-                        solutionId: solutionId,
-                        environmentId: currentEnvironmentId 
+                    vscode.postMessage({
+                        action: 'openSolutionInMaker',
+                        environmentId: currentEnvironmentId,
+                        solutionId: solutionId
                     });
                 }
                 
+                // Open solution in classic UI
                 function openSolutionInClassic(solutionId) {
-                    vscode.postMessage({ 
-                        action: 'openSolutionInClassic', 
-                        solutionId: solutionId,
-                        environmentId: currentEnvironmentId 
-                    });
-                }
-                
-                function exportSolution(solutionId) {
-                    vscode.postMessage({ 
-                        action: 'exportSolution', 
-                        solutionId: solutionId,
-                        environmentId: currentEnvironmentId 
-                    });
-                }
-                
-                function viewSolutionDetails(solutionId) {
-                    vscode.postMessage({ 
-                        action: 'viewSolutionDetails', 
-                        solutionId: solutionId,
-                        environmentId: currentEnvironmentId 
-                    });
-                }
-                
-                function manageSolutionSecurity(solutionId) {
-                    vscode.postMessage({ 
-                        action: 'manageSolutionSecurity', 
-                        solutionId: solutionId,
-                        environmentId: currentEnvironmentId 
-                    });
-                }
-                
-                function bulkExportSolutions(solutionIds) {
-                    vscode.postMessage({ 
-                        action: 'bulkExportSolutions', 
-                        solutionIds: solutionIds,
-                        environmentId: currentEnvironmentId 
-                    });
-                }
-                
-                function bulkUpdateSolutions(solutionIds) {
-                    vscode.postMessage({ 
-                        action: 'bulkUpdateSolutions', 
-                        solutionIds: solutionIds,
-                        environmentId: currentEnvironmentId 
+                    vscode.postMessage({
+                        action: 'openSolutionInClassic',
+                        environmentId: currentEnvironmentId,
+                        solutionId: solutionId
                     });
                 }
                 
