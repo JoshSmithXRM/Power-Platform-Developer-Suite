@@ -22,7 +22,7 @@ Extension Root
 │   ├── MetadataBrowserPanel.ts
 │   ├── QueryDataPanel.ts
 │   ├── ImportJobViewerPanel.ts
-│   └── RecordCloningPanel.ts     # (future)
+│   └── RecordCloningPanel.ts     # (future - stubbed)
 │
 ├── 📁 components/       # Reusable UI components
 │   ├── 📁 base/         # Base component classes
@@ -173,8 +173,16 @@ Components are reusable UI elements that can be embedded in multiple panels.
 
 #### **1. EnvironmentSelector Component**
 ```typescript
+interface EnvironmentSelectorConfig {
+    id?: string;                    // Unique ID for multiple selectors
+    label?: string;                 // "Source Environment:", "Target Environment:"
+    showStatus?: boolean;           // Show connection status indicator
+    onSelectionChange?: string;     // JS function name for selection events
+    className?: string;            // Additional CSS classes
+}
+
 class EnvironmentSelector {
-    static getHtml(): string
+    static create(config: EnvironmentSelectorConfig): string
     static getCss(): string  
     static getJs(): string
     static handleMessage(message: WebviewMessage): void
@@ -183,20 +191,21 @@ class EnvironmentSelector {
 
 #### **2. DataTable Component**
 ```typescript
-class DataTable {
-    static getHtml(config: TableConfig): string
-    static getCss(): string
-    static getJs(): string
-    static generateTable(data: any[], columns: TableColumn[]): string
-}
-
 interface TableConfig {
     id: string;
     columns: TableColumn[];
-    sortable: boolean;
-    filterable: boolean;
-    selectable: boolean;
-    stickyHeader: boolean;
+    defaultSort?: {
+        column: string;
+        direction: 'asc' | 'desc';
+        type?: 'string' | 'number' | 'date' | 'version';  // Optional override
+    };
+    rowActions?: TableAction[];
+    contextMenu?: ContextMenuItem[];
+    bulkActions?: BulkAction[];
+    filterable?: boolean;
+    selectable?: boolean;
+    stickyHeader?: boolean;
+    className?: string;
 }
 
 interface TableColumn {
@@ -204,7 +213,40 @@ interface TableColumn {
     label: string;
     sortable?: boolean;
     width?: string;
-    renderer?: (value: any, row: any) => string;
+    className?: string;
+    renderer?: string;              // Function name for custom rendering
+}
+
+interface TableAction {
+    id: string;
+    label: string;
+    icon?: string;
+    action: string;                 // Message action to send
+    condition?: string;             // JS function name for show/hide logic
+    className?: string;
+}
+
+interface ContextMenuItem {
+    id: string;
+    label: string;
+    action: string;                 // Message action to send
+    separator?: boolean;
+    condition?: string;             // JS function name for show/hide logic
+}
+
+interface BulkAction {
+    id: string;
+    label: string;
+    action: string;                 // Message action to send
+    icon?: string;
+    requiresSelection?: boolean;
+}
+
+class DataTable {
+    static create(config: TableConfig): string
+    static getCss(): string
+    static getJs(): string
+    static generateTable(data: any[], columns: TableColumn[]): string
 }
 ```
 
@@ -232,14 +274,25 @@ export class ComponentFactory {
     static createDataTable(config: TableConfig): string
     static createStatusBadge(status: string, type: BadgeType): string
     static createFilterControls(config: FilterConfig): string
+    static createProgressIndicator(config: ProgressConfig): string
     
     // Aggregate CSS/JS methods
     static getBaseCss(): string
     static getDataTableCss(): string
+    static getEnvironmentSelectorCss(): string
+    static getStatusBadgeCss(): string
+    
     static getEnvironmentSelectorJs(): string
     static getDataTableJs(): string
+    static getFilterControlsJs(): string
 }
 ```
+
+#### **Component Configuration Principles**
+- **Sensible Defaults**: All configuration is optional with reasonable defaults
+- **Non-Breaking**: Invalid config shows warnings, doesn't throw errors
+- **Runtime Detection**: Data types auto-detected, manual override available
+- **Multi-Instance**: Components support multiple instances with unique IDs
 
 ---
 
@@ -311,14 +364,14 @@ export class SolutionListView extends BaseView<Solution, SolutionViewConfig> {
 export class StateService {
     private static instance: StateService;
     
-    // Save panel state
-    async savePanelState(panelType: string, state: PanelState): Promise<void>
+    // Save panel state (scoped per panel instance and environment)
+    async savePanelState(panelType: string, instanceId: string, environmentId: string, state: PanelState): Promise<void>
     
     // Restore panel state
-    async getPanelState(panelType: string): Promise<PanelState | null>
+    async getPanelState(panelType: string, instanceId: string, environmentId: string): Promise<PanelState | null>
     
     // Clear panel state
-    async clearPanelState(panelType: string): Promise<void>
+    async clearPanelState(panelType: string, instanceId?: string): Promise<void>
     
     // State change events
     onStateChanged: vscode.Event<StateChangedEvent>
@@ -326,13 +379,20 @@ export class StateService {
 
 interface PanelState {
     selectedEnvironmentId?: string;
-    filters?: Record<string, any>;
     sortColumn?: string;
     sortDirection?: 'asc' | 'desc';
+    filters?: Record<string, any>;
     selectedItems?: string[];
     viewConfig?: any;
+    // Note: No data caching - only UI state
 }
 ```
+
+### **State Persistence Strategy**
+- **Per-Panel-Instance**: Each panel window maintains independent state
+- **Environment-Scoped**: Different state for different environments  
+- **UI State Only**: No data persistence, just user interface state
+- **Automatic Cleanup**: State cleaned when environments are removed
 
 ### **Panel State Integration**
 ```typescript
@@ -417,21 +477,34 @@ export class ServiceFactory {
 protected async handleMessage(message: WebviewMessage): Promise<void> {
     try {
         switch (message.action) {
-            // Standard component messages
+            // Standard environment selector messages
             case 'loadEnvironments':
                 await this.environmentManager.loadEnvironments();
                 break;
                 
             case 'environmentChanged':
-                await this.handleEnvironmentChange(message.environmentId);
+                await this.handleEnvironmentChange(message.environmentId, message.selectorId);
                 break;
                 
+            // Standard table messages
             case 'tableSort':
-                await this.handleTableSort(message.column, message.direction);
+                await this.handleTableSort(message.tableId, message.column, message.direction);
                 break;
                 
             case 'tableFilter':
-                await this.handleTableFilter(message.filters);
+                await this.handleTableFilter(message.tableId, message.filters);
+                break;
+                
+            case 'tableRowAction':
+                await this.handleTableRowAction(message.tableId, message.actionId, message.rowData);
+                break;
+                
+            case 'tableContextMenu':
+                await this.handleTableContextMenu(message.tableId, message.actionId, message.rowData);
+                break;
+                
+            case 'tableBulkAction':
+                await this.handleTableBulkAction(message.tableId, message.actionId, message.selectedRows);
                 break;
                 
             // Panel-specific messages
@@ -439,8 +512,12 @@ protected async handleMessage(message: WebviewMessage): Promise<void> {
                 await this.loadSolutions();
                 break;
                 
-            case 'openSolution':
-                await this.openSolution(message.solutionId, message.mode);
+            case 'openSolutionInMaker':
+                await this.openSolutionInMaker(message.solutionId, message.solutionName);
+                break;
+                
+            case 'openSolutionInClassic':
+                await this.openSolutionInClassic(message.solutionId, message.solutionName);
                 break;
                 
             default:
@@ -497,11 +574,72 @@ private handleError(error: any, action: string): void {
 
 ---
 
-## 📚 NEXT STEPS
+## 📚 IMPLEMENTATION STATUS
 
-1. **Implement StateService for panel persistence**
-2. **Create ComponentFactory with standardized components**
-3. **Refactor existing panels to use new patterns**
-4. **Create BaseView abstract class**
-5. **Implement dependency injection throughout**
-6. **Add error handling standards**
+### ✅ Phase 1 - Foundation (COMPLETED)
+- **ServiceFactory**: Dependency injection pattern implemented
+- **StateService**: Panel state persistence with environment scoping  
+- **BasePanel**: Enhanced with state management and common resources
+- **Interface Updates**: All panels updated with new constructor signatures
+- **Compilation**: All TypeScript errors resolved
+
+### ✅ Phase 2A - Enhanced ComponentFactory (COMPLETED)
+
+#### **TableConfig Interface** ✅
+```typescript
+interface TableConfig {
+    id: string;
+    columns: TableColumn[];
+    defaultSort?: { column: string; direction: 'asc' | 'desc' };
+    rowActions?: TableAction[];
+    contextMenu?: ContextMenuItem[];
+    bulkActions?: BulkAction[];
+    filterable?: boolean;
+    selectable?: boolean;
+    stickyHeader?: boolean;
+    stickyFirstColumn?: boolean;
+    className?: string;
+}
+```
+
+#### **EnvironmentSelectorConfig Interface** ✅
+```typescript
+interface EnvironmentSelectorConfig {
+    id?: string;                    // Unique ID for multiple selectors
+    statusId?: string;              // Status indicator element ID
+    label?: string;                 // "Source Environment:", "Target Environment:"
+    placeholder?: string;           // Dropdown placeholder text
+    showStatus?: boolean;           // Show connection status indicator
+    onSelectionChange?: string;     // JS function name for selection events
+    className?: string;            // Additional CSS classes
+}
+```
+
+#### **JavaScript Implementation** ✅
+- **File**: `src/webview/components/TableUtils.js`
+- **Features**: Multi-table support, advanced sorting, real-time filtering, row selection, action handling, state persistence
+- **Runtime Data Type Detection**: Automatic sorting for numbers, dates, strings
+- **Message Passing**: Extension communication via vscode.postMessage
+
+#### **CSS Styling** ✅
+- **File**: `src/webview/components/TableStyles.css`  
+- **Features**: VS Code theme integration, responsive design, sticky positioning, interactive elements
+- **Components**: Enhanced tables, sortable headers, filter controls, bulk actions, context menus, environment selectors
+
+#### **BasePanel Integration** ✅
+- **getCommonWebviewResources()**: Provides URIs for TableUtils.js and TableStyles.css
+- **Consistent resource inclusion**: All panels can access common components
+
+### 🔄 Phase 2B - Remaining Tasks
+1. **Environment Selector JavaScript**: Implement multi-instance environment management
+2. **Panel Updates**: Update existing panels to use enhanced ComponentFactory
+3. **Solution Explorer Refactor**: Apply new component patterns
+4. **Documentation**: Update panel-specific documentation
+
+### 📋 NEXT STEPS
+
+1. **Complete environment selector JavaScript functionality**
+2. **Update existing panels to use new ComponentFactory methods**
+3. **Refactor Solution Explorer with enhanced table capabilities**
+4. **Add error handling standards**
+5. **Performance optimization and testing**

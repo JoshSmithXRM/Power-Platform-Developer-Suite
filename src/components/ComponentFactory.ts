@@ -1,8 +1,14 @@
 export interface TableConfig {
     id: string;
     columns: TableColumn[];
-    data?: any[];
-    sortable?: boolean;
+    defaultSort?: {
+        column: string;
+        direction: 'asc' | 'desc';
+        type?: 'string' | 'number' | 'date' | 'version';  // Optional override for complex sorting
+    };
+    rowActions?: TableAction[];
+    contextMenu?: ContextMenuItem[];
+    bulkActions?: BulkAction[];
     filterable?: boolean;
     selectable?: boolean;
     stickyHeader?: boolean;
@@ -19,11 +25,40 @@ export interface TableColumn {
     renderer?: string; // Function name for custom rendering
 }
 
-export interface EnvironmentSelectorConfig {
-    id?: string;
+export interface TableAction {
+    id: string;
+    label: string;
+    icon?: string;
+    action: string;                 // Message action to send
+    condition?: string;             // JS function name for show/hide logic
     className?: string;
-    showStatus?: boolean;
-    autoLoad?: boolean;
+}
+
+export interface ContextMenuItem {
+    id: string;
+    label: string;
+    action: string;                 // Message action to send
+    separator?: boolean;
+    condition?: string;             // JS function name for show/hide logic
+}
+
+export interface BulkAction {
+    id: string;
+    label: string;
+    action: string;                 // Message action to send
+    icon?: string;
+    requiresSelection?: boolean;
+    className?: string;
+}
+
+export interface EnvironmentSelectorConfig {
+    id?: string;                    // Unique ID for multiple selectors
+    statusId?: string;              // ID for status indicator element
+    label?: string;                 // "Source Environment:", "Target Environment:"
+    placeholder?: string;           // Placeholder text for dropdown
+    showStatus?: boolean;           // Show connection status indicator
+    onSelectionChange?: string;     // JS function name for selection events
+    className?: string;            // Additional CSS classes
 }
 
 export enum BadgeType {
@@ -43,16 +78,19 @@ export class ComponentFactory {
      */
     static createEnvironmentSelector(config: EnvironmentSelectorConfig = {}): string {
         const id = config.id || 'environmentSelect';
+        const statusId = config.statusId || (id === 'environmentSelect' ? 'environmentStatus' : `${id}Status`);
         const className = config.className || 'environment-selector';
+        const label = config.label || 'Environment:';
         const showStatus = config.showStatus !== false;
+        const placeholder = config.placeholder || 'Loading environments...';
         
         return `
             <div class="${className}">
-                <span class="environment-label">Environment:</span>
+                <span class="environment-label">${label}</span>
                 <select id="${id}" class="environment-dropdown">
-                    <option value="">Loading environments...</option>
+                    <option value="">${placeholder}</option>
                 </select>
-                ${showStatus ? '<span id="environmentStatus" class="environment-status environment-disconnected">Disconnected</span>' : ''}
+                ${showStatus ? `<span id="${statusId}" class="environment-status environment-disconnected">Disconnected</span>` : ''}
             </div>
         `;
     }
@@ -64,18 +102,50 @@ export class ComponentFactory {
         const {
             id,
             columns,
-            sortable = true,
+            defaultSort,
+            rowActions = [],
+            contextMenu = [],
+            bulkActions = [],
+            filterable = false,
+            selectable = false,
             stickyHeader = true,
             stickyFirstColumn = true,
             className = 'data-table'
         } = config;
         
+        // Auto-enable sorting if any column is sortable or default sort is specified
+        const sortable = columns.some(col => col.sortable !== false) || !!defaultSort;
+        
         const tableClass = [
             className,
             sortable ? 'sortable-table' : '',
             stickyHeader ? 'sticky-header' : '',
-            stickyFirstColumn ? 'sticky-first-column' : ''
+            stickyFirstColumn ? 'sticky-first-column' : '',
+            selectable ? 'selectable-table' : '',
+            filterable ? 'filterable-table' : ''
         ].filter(Boolean).join(' ');
+        
+        // Add filter controls if enabled
+        const filterControls = filterable ? `
+            <div class="table-controls">
+                <input type="text" id="${id}_filter" placeholder="Filter table..." class="filter-input">
+                <button onclick="clearTableFilter('${id}')" class="clear-filter-btn">Clear</button>
+            </div>
+        ` : '';
+        
+        // Add bulk actions if enabled and actions exist
+        const bulkActionsHtml = (selectable && bulkActions.length > 0) ? `
+            <div class="bulk-actions" id="${id}_bulkActions" style="display: none;">
+                ${bulkActions.map(action => `
+                    <button onclick="handleBulkAction('${id}', '${action.action}', '${action.id}')" 
+                            class="bulk-action-btn ${action.className || ''}"
+                            ${action.requiresSelection ? 'disabled' : ''}>
+                        ${action.icon ? `<span class="icon">${action.icon}</span>` : ''}
+                        ${action.label}
+                    </button>
+                `).join('')}
+            </div>
+        ` : '';
         
         const headers = columns.map(col => {
             const sortableClass = (sortable && col.sortable !== false) ? 'sortable' : '';
@@ -91,11 +161,32 @@ export class ComponentFactory {
             `;
         }).join('');
         
+        // Add action column header if row actions exist
+        const actionHeader = rowActions.length > 0 ? `
+            <th class="actions-column" style="width: ${rowActions.length * 40 + 20}px;">Actions</th>
+        ` : '';
+        
+        // Add selection column header if selectable
+        const selectionHeader = selectable ? `
+            <th class="selection-column" style="width: 40px;">
+                <input type="checkbox" id="${id}_selectAll" onchange="handleSelectAll('${id}', this.checked)">
+            </th>
+        ` : '';
+        
         return `
             <div class="table-container" id="${id}Container">
-                <table id="${id}" class="${tableClass}">
+                ${filterControls}
+                ${bulkActionsHtml}
+                <table id="${id}" class="${tableClass}" 
+                       data-default-sort='${JSON.stringify(defaultSort || {})}'
+                       data-row-actions='${JSON.stringify(rowActions)}'
+                       data-context-menu='${JSON.stringify(contextMenu)}'>
                     <thead>
-                        <tr>${headers}</tr>
+                        <tr>
+                            ${selectionHeader}
+                            ${headers}
+                            ${actionHeader}
+                        </tr>
                     </thead>
                     <tbody id="${id}Body">
                         <!-- Data will be populated by JavaScript -->
