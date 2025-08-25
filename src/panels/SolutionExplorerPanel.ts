@@ -60,63 +60,74 @@ export class SolutionExplorerPanel extends BasePanel {
     protected async handleMessage(message: WebviewMessage): Promise<void> {
         switch (message.action) {
             case 'loadEnvironments':
-                await this.loadEnvironments();
+                await this.handleLoadEnvironments();
                 break;
+
             case 'loadSolutions':
-                // Clear cache if environment changed or force refresh requested
-                if (this._selectedEnvironmentId !== message.environmentId || message.forceRefresh) {
-                    this._cachedSolutions = undefined;
-                }
-                // Store the selected environment
-                this._selectedEnvironmentId = message.environmentId;
-                await this.loadSolutions(message.environmentId);
+                await this.handleLoadSolutions(message.environmentId, message.forceRefresh);
                 break;
+
             case 'openSolutionInMaker':
-                await this.openSolutionInMaker(message.solutionId, message.solutionName);
+                await this.handleOpenSolutionInMaker(message.environmentId, message.solutionId);
                 break;
+
             case 'openSolutionInClassic':
-                await this.openSolutionInClassic(message.solutionId, message.solutionName);
+                await this.handleOpenSolutionInClassic(message.environmentId, message.solutionId);
                 break;
+
+            case 'exportSolution':
+                await this.handleExportSolution(message.environmentId, message.solutionId);
+                break;
+
+            case 'viewSolutionDetails':
+                await this.handleViewSolutionDetails(message.environmentId, message.solutionId);
+                break;
+
+            case 'manageSolutionSecurity':
+                await this.handleManageSolutionSecurity(message.environmentId, message.solutionId);
+                break;
+
+            case 'bulkExportSolutions':
+                await this.handleBulkExportSolutions(message.environmentId, message.solutionIds);
+                break;
+
+            case 'bulkUpdateSolutions':
+                await this.handleBulkUpdateSolutions(message.environmentId, message.solutionIds);
+                break;
+
+            default:
+                console.log('Unknown action:', message.action);
         }
     }
 
-    private async loadEnvironments() {
+    private async handleLoadEnvironments(): Promise<void> {
         try {
-            // Use cached environments if available
-            if (this._cachedEnvironments) {
-                this.postMessage({
-                    action: 'environmentsLoaded',
-                    data: this._cachedEnvironments,
-                    selectedEnvironmentId: this._selectedEnvironmentId
-                });
-                return;
-            }
-
             const environments = await this._authService.getEnvironments();
+            const selectedEnvironmentId = this._selectedEnvironmentId || environments[0]?.id;
 
-            // Cache the environments
-            this._cachedEnvironments = environments;
-
-            this.postMessage({
+            this._panel.webview.postMessage({
                 action: 'environmentsLoaded',
                 data: environments,
-                selectedEnvironmentId: this._selectedEnvironmentId
+                selectedEnvironmentId: selectedEnvironmentId
             });
-
         } catch (error: any) {
             console.error('Error loading environments:', error);
-            this.postMessage({
-                action: 'solutionsError',
-                error: `Failed to load environments: ${error.message}`
+            this._panel.webview.postMessage({
+                action: 'error',
+                message: `Failed to load environments: ${error.message}`
             });
         }
     }
 
-    private async loadSolutions(environmentId?: string) {
+    private async handleLoadSolutions(environmentId: string, forceRefresh: boolean = false): Promise<void> {
+        if (!environmentId) return;
+
         try {
-            // Check if we have cached solutions for this environment
-            if (this._cachedSolutions && this._selectedEnvironmentId === environmentId) {
-                this.postMessage({
+            this._selectedEnvironmentId = environmentId;
+
+            // Use cached data if available and not forcing refresh
+            if (!forceRefresh && this._cachedSolutions && this._cachedSolutions.length > 0) {
+                this._panel.webview.postMessage({
                     action: 'solutionsLoaded',
                     data: this._cachedSolutions
                 });
@@ -125,35 +136,17 @@ export class SolutionExplorerPanel extends BasePanel {
 
             // Get available environments
             const environments = await this._authService.getEnvironments();
+            const environment = environments.find(env => env.id === environmentId);
 
-            if (environments.length === 0) {
-                this.postMessage({
-                    action: 'solutionsError',
-                    error: 'No environments configured. Please add an environment first.'
-                });
-                return;
-            }
-
-            // Use specified environment or fall back to first one
-            let environment = environments[0];
-            if (environmentId) {
-                const foundEnv = environments.find(env => env.id === environmentId);
-                if (foundEnv) {
-                    environment = foundEnv;
-                } else {
-                    this.postMessage({
-                        action: 'solutionsError',
-                        error: 'Selected environment not found.'
-                    });
-                    return;
-                }
+            if (!environment) {
+                throw new Error('Selected environment not found');
             }
 
             // Get access token for the environment
             const token = await this._authService.getAccessToken(environment.id);
 
-            // Fetch solutions from Dataverse
-            const solutionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/solutions?$select=solutionid,uniquename,friendlyname,version,ismanaged,createdon,description&$expand=publisherid($select=uniquename,friendlyname)&$orderby=createdon desc`;
+            // Load solutions
+            const solutionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/solutions?$select=solutionid,uniquename,friendlyname,displayname,version,ismanaged,_publisherid_value,installedon,description&$expand=publisherid($select=friendlyname)&$orderby=friendlyname&$filter=(isvisible eq true)`;
 
             const response = await fetch(solutionsUrl, {
                 headers: {
@@ -168,118 +161,133 @@ export class SolutionExplorerPanel extends BasePanel {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            const data = await response.json() as any;
+            const data = await response.json();
+            const solutions = data.value || [];
 
-            // Transform the data to include publisher name
-            const solutions = data.value.map((solution: any) => ({
-                solutionid: solution.solutionid,
-                uniquename: solution.uniquename,
-                friendlyname: solution.friendlyname,
+            // Transform the data
+            const transformedSolutions = solutions.map((solution: any) => ({
+                solutionId: solution.solutionid,
+                uniqueName: solution.uniquename,
+                friendlyName: solution.friendlyname || solution.displayname,
+                displayName: solution.displayname,
                 version: solution.version,
-                ismanaged: solution.ismanaged,
-                createdon: solution.createdon,
-                description: solution.description,
-                publishername: solution.publisherid?.friendlyname || solution.publisherid?.uniquename || 'Unknown'
+                isManaged: solution.ismanaged,
+                publisherName: solution.publisherid?.friendlyname || 'Unknown',
+                installedOn: solution.installedon,
+                description: solution.description
             }));
 
-            // Cache the solutions data
-            this._cachedSolutions = solutions;
+            this._cachedSolutions = transformedSolutions;
 
-            this.postMessage({
+            this._panel.webview.postMessage({
                 action: 'solutionsLoaded',
-                data: solutions
+                data: transformedSolutions
             });
 
         } catch (error: any) {
             console.error('Error loading solutions:', error);
-            this.postMessage({
-                action: 'solutionsError',
-                error: error.message
+            this._panel.webview.postMessage({
+                action: 'error',
+                message: `Failed to load solutions: ${error.message}`
             });
         }
     }
 
-    private async openSolutionInMaker(solutionId: string, solutionName: string) {
+    private async handleOpenSolutionInMaker(environmentId: string, solutionId: string): Promise<void> {
         try {
-            // Get the current environment to extract the environment ID
             const environments = await this._authService.getEnvironments();
-            const currentEnv = environments.find(env => env.id === this._selectedEnvironmentId);
+            const environment = environments.find(env => env.id === environmentId);
 
-            if (!currentEnv || !currentEnv.environmentId) {
-                vscode.window.showErrorMessage(
-                    'Environment ID is not configured for this environment. Please edit the environment and add the Environment ID.'
-                );
-                return;
+            if (!environment || !environment.environmentId) {
+                throw new Error('Environment or environment ID not found');
             }
 
-            // Build the Maker URL (ensure clean URL construction)
-            const cleanEnvironmentId = currentEnv.environmentId.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes
-            const cleanSolutionId = solutionId.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes
-            const makerUrl = `https://make.powerapps.com/environments/${cleanEnvironmentId}/solutions/${cleanSolutionId}`;
-
-            // Open in browser
-            vscode.env.openExternal(vscode.Uri.parse(makerUrl));
-
-            vscode.window.showInformationMessage(`Opening solution "${solutionName}" in Maker...`);
-
+            const makerUrl = `https://make.powerapps.com/environments/${environment.environmentId}/solutions/${solutionId}`;
+            await vscode.env.openExternal(vscode.Uri.parse(makerUrl));
         } catch (error: any) {
+            console.error('Error opening solution in Maker:', error);
             vscode.window.showErrorMessage(`Failed to open solution in Maker: ${error.message}`);
         }
     }
 
-    private async openSolutionInClassic(solutionId: string, solutionName: string) {
+    private async handleOpenSolutionInClassic(environmentId: string, solutionId: string): Promise<void> {
         try {
-            // Get the current environment to extract the Dataverse URL
             const environments = await this._authService.getEnvironments();
-            const currentEnv = environments.find(env => env.id === this._selectedEnvironmentId);
+            const environment = environments.find(env => env.id === environmentId);
 
-            if (!currentEnv) {
-                vscode.window.showErrorMessage('Could not find current environment.');
-                return;
+            if (!environment) {
+                throw new Error('Environment not found');
             }
 
-            // Format the solution ID for classic URL (needs to be URL encoded and wrapped in braces)
-            const formattedSolutionId = encodeURIComponent(`{${solutionId.toUpperCase()}}`);
-
-            // Build the Classic URL using the Dataverse URL (ensure no double slashes)
-            const baseUrl = currentEnv.settings.dataverseUrl.endsWith('/')
-                ? currentEnv.settings.dataverseUrl.slice(0, -1)
-                : currentEnv.settings.dataverseUrl;
-            const classicUrl = `${baseUrl}/tools/solution/edit.aspx?id=${formattedSolutionId}`;
-
-            // Open in browser
-            vscode.env.openExternal(vscode.Uri.parse(classicUrl));
-
-            vscode.window.showInformationMessage(`Opening solution "${solutionName}" in Classic...`);
-
+            const classicUrl = `${environment.settings.dataverseUrl}/tools/solution/edit.aspx?id=${solutionId}`;
+            await vscode.env.openExternal(vscode.Uri.parse(classicUrl));
         } catch (error: any) {
+            console.error('Error opening solution in Classic:', error);
             vscode.window.showErrorMessage(`Failed to open solution in Classic: ${error.message}`);
         }
     }
 
-    protected getHtmlContent(): string {
-        // Due to the large HTML content, let's keep it in a separate method for maintainability
-        return this.getSolutionExplorerHtml();
+    private async handleExportSolution(environmentId: string, solutionId: string): Promise<void> {
+        try {
+            vscode.window.showInformationMessage('Solution export functionality coming soon!');
+        } catch (error: any) {
+            console.error('Error exporting solution:', error);
+            vscode.window.showErrorMessage(`Failed to export solution: ${error.message}`);
+        }
     }
 
-    private getSolutionExplorerHtml(): string {
+    private async handleViewSolutionDetails(environmentId: string, solutionId: string): Promise<void> {
+        try {
+            vscode.window.showInformationMessage('Solution details view coming soon!');
+        } catch (error: any) {
+            console.error('Error viewing solution details:', error);
+            vscode.window.showErrorMessage(`Failed to view solution details: ${error.message}`);
+        }
+    }
+
+    private async handleManageSolutionSecurity(environmentId: string, solutionId: string): Promise<void> {
+        try {
+            vscode.window.showInformationMessage('Solution security management coming soon!');
+        } catch (error: any) {
+            console.error('Error managing solution security:', error);
+            vscode.window.showErrorMessage(`Failed to manage solution security: ${error.message}`);
+        }
+    }
+
+    private async handleBulkExportSolutions(environmentId: string, solutionIds: string[]): Promise<void> {
+        try {
+            vscode.window.showInformationMessage(`Bulk export of ${solutionIds.length} solutions coming soon!`);
+        } catch (error: any) {
+            console.error('Error bulk exporting solutions:', error);
+            vscode.window.showErrorMessage(`Failed to bulk export solutions: ${error.message}`);
+        }
+    }
+
+    private async handleBulkUpdateSolutions(environmentId: string, solutionIds: string[]): Promise<void> {
+        try {
+            vscode.window.showInformationMessage(`Bulk update of ${solutionIds.length} solutions coming soon!`);
+        } catch (error: any) {
+            console.error('Error bulk updating solutions:', error);
+            vscode.window.showErrorMessage(`Failed to bulk update solutions: ${error.message}`);
+        }
+    }
+
+    protected getHtmlContent(): string {
+        // Get common webview resources
+        const { tableUtilsScript, tableStylesSheet } = this.getCommonWebviewResources();
+
+        const envSelectorUtilsScript = this._panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'EnvironmentSelectorUtils.js')
+        );
+
         return `<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Solution Explorer</title>
-            ${this.getSolutionExplorerStyles()}
-        </head>
-        <body>
-            ${this.getSolutionExplorerBody()}
-            ${this.getSolutionExplorerScript()}
-        </body>
-        </html>`;
-    }
-
-    private getSolutionExplorerStyles(): string {
-        return `<style>
+            <link rel="stylesheet" href="${tableStylesSheet}">
+            <style>
                 body {
                     margin: 0;
                     padding: 20px;
@@ -287,51 +295,7 @@ export class SolutionExplorerPanel extends BasePanel {
                     background: var(--vscode-editor-background);
                     color: var(--vscode-editor-foreground);
                 }
-                .environment-selector {
-                    background: var(--vscode-editorWidget-background);
-                    border: 1px solid var(--vscode-editorWidget-border);
-                    border-radius: 6px;
-                    padding: 16px;
-                    margin-bottom: 20px;
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                }
-                .environment-label {
-                    font-weight: 600;
-                    color: var(--vscode-textLink-foreground);
-                    min-width: 80px;
-                }
-                .environment-dropdown {
-                    flex: 1;
-                    max-width: 400px;
-                    padding: 8px 12px;
-                    border: 1px solid var(--vscode-input-border);
-                    border-radius: 4px;
-                    background: var(--vscode-input-background);
-                    color: var(--vscode-input-foreground);
-                    font-family: inherit;
-                    font-size: 14px;
-                }
-                .environment-dropdown:focus {
-                    outline: none;
-                    border-color: var(--vscode-focusBorder);
-                    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
-                }
-                .environment-status {
-                    padding: 4px 8px;
-                    border-radius: 12px;
-                    font-size: 0.85em;
-                    font-weight: 500;
-                }
-                .environment-connected {
-                    background: var(--vscode-testing-iconPassed);
-                    color: white;
-                }
-                .environment-disconnected {
-                    background: var(--vscode-testing-iconFailed);
-                    color: white;
-                }
+                
                 .header {
                     display: flex;
                     justify-content: space-between;
@@ -340,480 +304,352 @@ export class SolutionExplorerPanel extends BasePanel {
                     padding-bottom: 10px;
                     border-bottom: 1px solid var(--vscode-editorWidget-border);
                 }
+                
                 .title {
                     font-size: 1.5em;
                     margin: 0;
                     color: var(--vscode-textLink-foreground);
                 }
-                .refresh-btn {
+                
+                .loading {
+                    text-align: center;
+                    padding: 40px;
+                    color: var(--vscode-descriptionForeground);
+                }
+                
+                .error {
+                    background: var(--vscode-inputValidation-errorBackground);
+                    border: 1px solid var(--vscode-inputValidation-errorBorder);
+                    color: var(--vscode-inputValidation-errorForeground);
+                    padding: 16px;
+                    border-radius: 6px;
+                    margin: 20px 0;
+                }
+                
+                .btn {
                     background: var(--vscode-button-background);
                     color: var(--vscode-button-foreground);
                     border: none;
                     padding: 8px 16px;
                     border-radius: 4px;
                     cursor: pointer;
-                }
-                .refresh-btn:hover {
-                    background: var(--vscode-button-hoverBackground);
-                }
-                .loading {
-                    text-align: center;
-                    padding: 40px;
-                    color: var(--vscode-descriptionForeground);
-                }
-                .error {
-                    background: var(--vscode-inputValidation-errorBackground);
-                    border: 1px solid var(--vscode-inputValidation-errorBorder);
-                    color: var(--vscode-inputValidation-errorForeground);
-                    padding: 12px;
-                    border-radius: 4px;
-                    margin: 10px 0;
+                    font-size: 14px;
                 }
                 
-                ${EnvironmentManager.getStandardizedTableCss()}
+                .btn:hover {
+                    background: var(--vscode-button-hoverBackground);
+                }
+                
+                .solution-name-link {
+                    color: var(--vscode-textLink-foreground);
+                    text-decoration: none;
                     cursor: pointer;
                     font-weight: 500;
                 }
+                
                 .solution-name-link:hover {
                     text-decoration: underline;
                 }
-                .no-solutions {
-                    text-align: center;
-                    padding: 40px;
-                    color: var(--vscode-descriptionForeground);
-                }
-                .table-controls {
-                    margin-bottom: 15px;
-                    display: flex;
-                    gap: 10px;
-                    align-items: center;
-                }
-                .filter-input {
-                    flex: 1;
-                    padding: 8px 12px;
-                    border: 1px solid var(--vscode-input-border);
-                    border-radius: 4px;
-                    background: var(--vscode-input-background);
-                    color: var(--vscode-input-foreground);
-                    font-family: inherit;
-                    font-size: 14px;
-                }
-                .filter-input:focus {
-                    outline: none;
-                    border-color: var(--vscode-focusBorder);
-                    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
-                }
-                .clear-filter-btn {
-                    padding: 8px 12px;
-                    background: var(--vscode-button-secondaryBackground);
-                    color: var(--vscode-button-secondaryForeground);
-                    border: 1px solid var(--vscode-button-border);
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-family: inherit;
-                    font-size: 14px;
-                }
-                .clear-filter-btn:hover {
-                    background: var(--vscode-button-secondaryHoverBackground);
-                }
-                }
-                .filtered-row {
-                    display: none;
-                }
-                
-                /* Solution Actions */
-                .solution-actions {
-                    display: flex;
-                    gap: 4px;
-                    justify-content: center;
-                }
-                .action-btn {
-                    background: none;
-                    border: 1px solid var(--vscode-button-border);
-                    padding: 4px 6px;
-                    border-radius: 3px;
-                    cursor: pointer;
-                    font-size: 12px;
-                    line-height: 1;
-                    min-width: 24px;
-                    height: 24px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .maker-btn {
-                    background: var(--vscode-button-background);
-                    color: var(--vscode-button-foreground);
-                }
-                .maker-btn:hover {
-                    background: var(--vscode-button-hoverBackground);
-                }
-                .classic-btn {
-                    background: var(--vscode-button-secondaryBackground);
-                    color: var(--vscode-button-secondaryForeground);
-                    border: 1px solid var(--vscode-button-border);
-                }
-                .classic-btn:hover {
-                    background: var(--vscode-button-secondaryHoverBackground);
-                }
-                
-                /* Context Menu */
-                .context-menu {
-                    position: fixed;
-                    background: var(--vscode-menu-background);
-                    border: 1px solid var(--vscode-menu-border);
-                    border-radius: 4px;
-                    padding: 4px 0;
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-                    z-index: 1000;
-                    min-width: 180px;
-                }
-                .context-menu-item {
-                    padding: 8px 16px;
-                    cursor: pointer;
-                    font-size: 13px;
-                    color: var(--vscode-menu-foreground);
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-                .context-menu-item:hover {
-                    background: var(--vscode-menu-selectionBackground);
-                    color: var(--vscode-menu-selectionForeground);
-                }
-                .context-menu-separator {
-                    height: 1px;
-                    background: var(--vscode-menu-separatorBackground);
-                    margin: 4px 0;
-                }
-            </style>`;
-    }
-
-    private getSolutionExplorerBody(): string {
-        return `
-            <!-- Environment Selector -->
-            <div class="environment-selector">
-                <span class="environment-label">Environment:</span>
-                <select id="environmentSelect" class="environment-dropdown">
-                    <option value="">Loading environments...</option>
-                </select>
-                <span id="environmentStatus" class="environment-status environment-disconnected">Disconnected</span>
-            </div>
+            </style>
+        </head>
+        <body>
+            ${ComponentFactory.createEnvironmentSelector({
+            id: 'environmentSelect',
+            label: 'Environment:',
+            placeholder: 'Loading environments...'
+        })}
 
             <div class="header">
                 <h1 class="title">Solution Explorer</h1>
-                <button class="refresh-btn" onclick="refreshSolutions()">Refresh</button>
+                <button class="btn" onclick="refreshSolutions()">Refresh</button>
             </div>
             
             <div id="content">
                 <div class="loading">
                     <p>Select an environment to load solutions...</p>
                 </div>
-            </div>`;
-    }
+            </div>
 
-    private getSolutionExplorerScript(): string {
-        return `<script>
+            <script src="${envSelectorUtilsScript}"></script>
+            <script src="${tableUtilsScript}"></script>
+            <script>
                 const vscode = acquireVsCodeApi();
                 let currentEnvironmentId = '';
+                let solutions = [];
                 
-                // Load environments on startup
+                // Initialize environment selector
+                document.addEventListener('DOMContentLoaded', () => {
+                    EnvironmentSelectorUtils.initializeSelector('environmentSelect', {
+                        onSelectionChange: 'onEnvironmentChange'
+                    });
+                    loadEnvironments();
+                });
+                
+                // Load environments
                 function loadEnvironments() {
+                    EnvironmentSelectorUtils.setLoadingState('environmentSelect', true);
                     vscode.postMessage({ action: 'loadEnvironments' });
                 }
                 
-                function populateEnvironments(environments, selectedEnvironmentId) {
-                    const select = document.getElementById('environmentSelect');
-                    select.innerHTML = '<option value="">Select an environment...</option>';
-                    
-                    environments.forEach(env => {
-                        const option = document.createElement('option');
-                        option.value = env.id;
-                        option.textContent = \`\${env.name} (\${env.settings.dataverseUrl})\`;
-                        select.appendChild(option);
-                    });
-                    
-                    // Restore selected environment or auto-select first environment if available
-                    if (selectedEnvironmentId && environments.find(env => env.id === selectedEnvironmentId)) {
-                        select.value = selectedEnvironmentId;
-                        currentEnvironmentId = selectedEnvironmentId;
-                        updateEnvironmentStatus('Connected', true);
-                        loadSolutions();
-                    } else if (environments.length > 0) {
-                        select.value = environments[0].id;
-                        currentEnvironmentId = environments[0].id;
-                        updateEnvironmentStatus('Connected', true);
-                        loadSolutions();
-                    }
-                }
-                
-                function updateEnvironmentStatus(status, isConnected) {
-                    const statusElement = document.getElementById('environmentStatus');
-                    statusElement.textContent = status;
-                    statusElement.className = 'environment-status ' + 
-                        (isConnected ? 'environment-connected' : 'environment-disconnected');
-                }
-                
-                function onEnvironmentChange() {
-                    const select = document.getElementById('environmentSelect');
-                    currentEnvironmentId = select.value;
-                    
-                    if (currentEnvironmentId) {
-                        updateEnvironmentStatus('Connected', true);
+                // Handle environment selection change
+                function onEnvironmentChange(selectorId, environmentId, previousEnvironmentId) {
+                    currentEnvironmentId = environmentId;
+                    if (environmentId) {
                         loadSolutions();
                     } else {
-                        updateEnvironmentStatus('Disconnected', false);
-                        document.getElementById('content').innerHTML = 
-                            '<div class="loading"><p>Select an environment to load solutions...</p></div>';
+                        clearContent();
                     }
                 }
                 
+                // Load solutions for current environment
                 function loadSolutions() {
-                    if (!currentEnvironmentId) {
-                        document.getElementById('content').innerHTML = 
-                            '<div class="error">Please select an environment first.</div>';
-                        return;
-                    }
+                    if (!currentEnvironmentId) return;
                     
                     document.getElementById('content').innerHTML = '<div class="loading"><p>Loading solutions...</p></div>';
+                    
                     vscode.postMessage({ 
                         action: 'loadSolutions', 
                         environmentId: currentEnvironmentId 
                     });
                 }
                 
+                // Refresh solutions
                 function refreshSolutions() {
-                    if (!currentEnvironmentId) {
-                        document.getElementById('content').innerHTML = 
-                            '<div class="error">Please select an environment first.</div>';
-                        return;
-                    }
-                    
-                    document.getElementById('content').innerHTML = '<div class="loading"><p>Loading solutions...</p></div>';
-                    vscode.postMessage({ 
-                        action: 'loadSolutions', 
-                        environmentId: currentEnvironmentId,
-                        forceRefresh: true
-                    });
-                }
-                
-                function displaySolutions(solutions) {
-                    const content = document.getElementById('content');
-                    
-                    if (!solutions || solutions.length === 0) {
-                        content.innerHTML = '<div class="no-solutions"><p>No solutions found in this environment.</p></div>';
-                        return;
-                    }
-                    
-                    let tableHtml = \`
-                        <div class="table-container">
-                            <div class="table-controls">
-                                <input type="text" id="solutionFilter" placeholder="Filter solutions..." class="filter-input">
-                                <button onclick="clearFilter()" class="clear-filter-btn">Clear</button>
-                            </div>
-                            <table class="data-table" id="solutionsTable">
-                                <thead>
-                                    <tr>
-                                        <th class="sortable" data-column="displayName">
-                                            Display Name <span class="sort-indicator"></span>
-                                        </th>
-                                        <th class="sortable" data-column="uniqueName">
-                                            Name <span class="sort-indicator"></span>
-                                        </th>
-                                        <th class="sortable" data-column="type">
-                                            Type <span class="sort-indicator"></span>
-                                        </th>
-                                        <th class="sortable" data-column="version">
-                                            Version <span class="sort-indicator"></span>
-                                        </th>
-                                        <th class="sortable" data-column="publisher">
-                                            Publisher <span class="sort-indicator"></span>
-                                        </th>
-                                        <th class="sortable" data-column="created">
-                                            Created <span class="sort-indicator"></span>
-                                        </th>
-                                        <th style="width: 120px;">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="solutionsTableBody">
-                    \`;
-                    
-                    solutions.forEach(solution => {
-                        const managedBadge = solution.ismanaged 
-                            ? '<span class="managed-badge">Managed</span>'
-                            : '<span class="unmanaged-badge">Unmanaged</span>';
-                            
-                        const createdDate = new Date(solution.createdon).toLocaleDateString();
-                        
-                        tableHtml += \`
-                            <tr data-solution-id="\${solution.solutionid}" oncontextmenu="showSolutionContextMenu(event, '\${solution.solutionid}', '\${solution.friendlyname || solution.uniquename}')">
-                                <td data-column="displayName">\${solution.friendlyname || solution.uniquename}</td>
-                                <td data-column="uniqueName">\${solution.uniquename}</td>
-                                <td data-column="type">\${managedBadge}</td>
-                                <td data-column="version">\${solution.version}</td>
-                                <td data-column="publisher">\${solution.publishername || 'Unknown'}</td>
-                                <td data-column="created">\${createdDate}</td>
-                                <td>
-                                    <div class="solution-actions">
-                                        <button onclick="openSolutionInMaker('\${solution.solutionid}', '\${solution.friendlyname || solution.uniquename}')" 
-                                                class="action-btn maker-btn" title="Open in Maker">
-                                            🔧
-                                        </button>
-                                        <button onclick="openSolutionInClassic('\${solution.solutionid}', '\${solution.friendlyname || solution.uniquename}')" 
-                                                class="action-btn classic-btn" title="Open in Classic">
-                                            🏛️
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        \`;
-                    });
-                    
-                    tableHtml += '</tbody></table></div>';
-                    content.innerHTML = tableHtml;
-                    
-                    // Store solutions data globally for sorting/filtering
-                    window.solutionsData = solutions;
-                    
-                    // Set up filter and sort functionality
-                    setupTableFiltering();
-                    
-                    // Setup table sorting after table is created
-                    setupTableSorting('solutionsTable', 'uniqueName', 'asc');
-                }
-                
-                function displayError(error) {
-                    document.getElementById('content').innerHTML = 
-                        \`<div class="error">Error loading solutions: \${error}</div>\`;
-                    updateEnvironmentStatus('Error', false);
-                }
-                
-                // Use shared table sorting functions
-                ${ComponentFactory.getDataTableJs()}
-                
-                function setupTableFiltering() {
-                    const filterInput = document.getElementById('solutionFilter');
-                    if (filterInput) {
-                        filterInput.addEventListener('input', filterTable);
+                    if (currentEnvironmentId) {
+                        loadSolutions();
                     }
                 }
                 
-                function filterTable() {
-                    const filterValue = document.getElementById('solutionFilter').value.toLowerCase();
-                    const tbody = document.getElementById('solutionsTableBody');
-                    const rows = tbody.querySelectorAll('tr');
-                    
-                    rows.forEach(row => {
-                        const text = row.textContent.toLowerCase();
-                        if (text.includes(filterValue)) {
-                            row.style.display = '';
-                            row.classList.remove('filtered-row');
-                        } else {
-                            row.style.display = 'none';
-                            row.classList.add('filtered-row');
-                        }
-                    });
+                // Clear content when no environment selected
+                function clearContent() {
+                    document.getElementById('content').innerHTML = '<div class="loading"><p>Select an environment to load solutions...</p></div>';
                 }
                 
-                function clearFilter() {
-                    document.getElementById('solutionFilter').value = '';
-                    filterTable();
-                }
-                
-                // Listen for messages from the extension
+                // Handle messages from extension
                 window.addEventListener('message', event => {
                     const message = event.data;
                     
                     switch (message.action) {
                         case 'environmentsLoaded':
-                            populateEnvironments(message.data, message.selectedEnvironmentId);
+                            EnvironmentSelectorUtils.loadEnvironments('environmentSelect', message.data);
+                            if (message.selectedEnvironmentId) {
+                                EnvironmentSelectorUtils.setSelectedEnvironment('environmentSelect', message.selectedEnvironmentId);
+                                currentEnvironmentId = message.selectedEnvironmentId;
+                                loadSolutions();
+                            }
                             break;
+                            
                         case 'solutionsLoaded':
-                            displaySolutions(message.data);
+                            populateSolutions(message.data);
                             break;
-                        case 'solutionsError':
-                            displayError(message.error);
+                            
+                        case 'error':
+                            showError(message.message);
                             break;
                     }
                 });
                 
-                // Solution Actions
-                function openSolutionInMaker(solutionId, solutionName) {
+                // Custom renderer for solution names
+                function renderSolutionName(value, row) {
+                    return \`<a class="solution-name-link" onclick="openSolutionInMaker('\${row.id}'); return false;">\${value}</a>\`;
+                }
+                
+                // Custom renderer for solution type  
+                function renderSolutionType(value, row) {
+                    return value ? 'Managed' : 'Unmanaged';
+                }
+                
+                // Custom renderer for installed date
+                function renderInstalledDate(value, row) {
+                    return value ? new Date(value).toLocaleDateString() : 'Unknown';
+                }
+                
+                // Populate solutions table with enhanced ComponentFactory
+                function populateSolutions(solutionsData) {
+                    solutions = solutionsData;
+                    
+                    if (solutions.length === 0) {
+                        document.getElementById('content').innerHTML = '<div class="loading"><p>No solutions found in this environment.</p></div>';
+                        return;
+                    }
+                    
+                    const tableHtml = \`\${${ComponentFactory.createDataTable({
+            id: 'solutionsTable',
+            columns: [
+                { key: 'displayName', label: 'Solution Name', sortable: true, renderer: 'renderSolutionName' },
+                { key: 'version', label: 'Version', sortable: true },
+                { key: 'isManaged', label: 'Type', sortable: true, renderer: 'renderSolutionType' },
+                { key: 'publisherName', label: 'Publisher', sortable: true },
+                { key: 'installedOn', label: 'Installed', sortable: true, renderer: 'renderInstalledDate' },
+                { key: 'description', label: 'Description', sortable: false }
+            ],
+            defaultSort: { column: 'displayName', direction: 'asc' },
+            filterable: true,
+            selectable: true,
+            rowActions: [
+                { id: 'openMaker', action: 'openInMaker', label: 'Open in Maker', icon: '🎨' },
+                { id: 'openClassic', action: 'openInClassic', label: 'Open in Classic', icon: '📋' },
+                { id: 'export', action: 'exportSolution', label: 'Export', icon: '📦' }
+            ],
+            contextMenu: [
+                { id: 'openMaker', action: 'openInMaker', label: 'Open in Maker Portal' },
+                { id: 'openClassic', action: 'openInClassic', label: 'Open in Classic UI' },
+                { id: 'sep1', action: '', label: '', separator: true },
+                { id: 'export', action: 'exportSolution', label: 'Export Solution' },
+                { id: 'details', action: 'viewDetails', label: 'View Details' },
+                { id: 'sep2', action: '', label: '', separator: true },
+                { id: 'security', action: 'manageSecurity', label: 'Manage Security Roles' }
+            ],
+            bulkActions: [
+                { id: 'exportSelected', action: 'bulkExport', label: 'Export Selected', icon: '📦', requiresSelection: true },
+                { id: 'updateSelected', action: 'bulkUpdate', label: 'Update Selected', icon: '🔄', requiresSelection: true }
+            ]
+        })}\`;
+                    
+                    document.getElementById('content').innerHTML = tableHtml;
+                    
+                    // Initialize the enhanced table
+                    TableUtils.initializeTable('solutionsTable', {
+                        onRowAction: handleRowAction,
+                        onContextMenuAction: handleContextMenuAction,
+                        onBulkAction: handleBulkAction,
+                        onSelectionChange: handleSelectionChange
+                    });
+                    
+                    // Transform and load data
+                    const tableData = solutions.map(solution => ({
+                        id: solution.solutionId,
+                        displayName: solution.friendlyName || solution.displayName,
+                        version: solution.version,
+                        isManaged: solution.isManaged,
+                        publisherName: solution.publisherName || 'Unknown',
+                        installedOn: solution.installedOn,
+                        description: solution.description || ''
+                    }));
+                    
+                    TableUtils.loadTableData('solutionsTable', tableData);
+                }
+                
+                // Handle table row actions
+                function handleRowAction(actionId, rowData) {
+                    switch (actionId) {
+                        case 'openInMaker':
+                            openSolutionInMaker(rowData.id);
+                            break;
+                        case 'openInClassic':
+                            openSolutionInClassic(rowData.id);
+                            break;
+                        case 'exportSolution':
+                            exportSolution(rowData.id);
+                            break;
+                    }
+                }
+                
+                // Handle context menu actions
+                function handleContextMenuAction(actionId, rowData) {
+                    switch (actionId) {
+                        case 'openInMaker':
+                            openSolutionInMaker(rowData.id);
+                            break;
+                        case 'openInClassic':
+                            openSolutionInClassic(rowData.id);
+                            break;
+                        case 'exportSolution':
+                            exportSolution(rowData.id);
+                            break;
+                        case 'viewDetails':
+                            viewSolutionDetails(rowData.id);
+                            break;
+                        case 'manageSecurity':
+                            manageSolutionSecurity(rowData.id);
+                            break;
+                    }
+                }
+                
+                // Handle bulk actions
+                function handleBulkAction(actionId, selectedRows) {
+                    switch (actionId) {
+                        case 'bulkExport':
+                            bulkExportSolutions(selectedRows.map(row => row.id));
+                            break;
+                        case 'bulkUpdate':
+                            bulkUpdateSolutions(selectedRows.map(row => row.id));
+                            break;
+                    }
+                }
+                
+                // Handle selection changes
+                function handleSelectionChange(selectedRows) {
+                    console.log('Selected solutions:', selectedRows.length);
+                }
+                
+                // Solution action functions
+                function openSolutionInMaker(solutionId) {
                     vscode.postMessage({ 
                         action: 'openSolutionInMaker', 
                         solutionId: solutionId,
-                        solutionName: solutionName
+                        environmentId: currentEnvironmentId 
                     });
                 }
                 
-                function openSolutionInClassic(solutionId, solutionName) {
+                function openSolutionInClassic(solutionId) {
                     vscode.postMessage({ 
                         action: 'openSolutionInClassic', 
                         solutionId: solutionId,
-                        solutionName: solutionName
+                        environmentId: currentEnvironmentId 
                     });
                 }
                 
-                // Context Menu Functions
-                let currentContextMenu = null;
+                function exportSolution(solutionId) {
+                    vscode.postMessage({ 
+                        action: 'exportSolution', 
+                        solutionId: solutionId,
+                        environmentId: currentEnvironmentId 
+                    });
+                }
                 
-                function showSolutionContextMenu(event, solutionId, solutionName) {
-                    event.preventDefault();
-                    hideContextMenu(); // Hide any existing menu
-                    
-                    const menu = document.createElement('div');
-                    menu.className = 'context-menu';
-                    menu.innerHTML = \`
-                        <div class="context-menu-item" onclick="openSolutionInMaker('\${solutionId}', '\${solutionName}'); hideContextMenu();">
-                            🔧 Open in Maker
-                        </div>
-                        <div class="context-menu-item" onclick="openSolutionInClassic('\${solutionId}', '\${solutionName}'); hideContextMenu();">
-                            🏛️ Open in Classic
+                function viewSolutionDetails(solutionId) {
+                    vscode.postMessage({ 
+                        action: 'viewSolutionDetails', 
+                        solutionId: solutionId,
+                        environmentId: currentEnvironmentId 
+                    });
+                }
+                
+                function manageSolutionSecurity(solutionId) {
+                    vscode.postMessage({ 
+                        action: 'manageSolutionSecurity', 
+                        solutionId: solutionId,
+                        environmentId: currentEnvironmentId 
+                    });
+                }
+                
+                function bulkExportSolutions(solutionIds) {
+                    vscode.postMessage({ 
+                        action: 'bulkExportSolutions', 
+                        solutionIds: solutionIds,
+                        environmentId: currentEnvironmentId 
+                    });
+                }
+                
+                function bulkUpdateSolutions(solutionIds) {
+                    vscode.postMessage({ 
+                        action: 'bulkUpdateSolutions', 
+                        solutionIds: solutionIds,
+                        environmentId: currentEnvironmentId 
+                    });
+                }
+                
+                // Show error message
+                function showError(message) {
+                    document.getElementById('content').innerHTML = \`
+                        <div class="error">
+                            <strong>Error:</strong> \${message}
                         </div>
                     \`;
-                    
-                    // Position the menu
-                    menu.style.left = event.pageX + 'px';
-                    menu.style.top = event.pageY + 'px';
-                    
-                    document.body.appendChild(menu);
-                    currentContextMenu = menu;
-                    
-                    // Adjust position if menu goes off screen
-                    const rect = menu.getBoundingClientRect();
-                    if (rect.right > window.innerWidth) {
-                        menu.style.left = (event.pageX - rect.width) + 'px';
-                    }
-                    if (rect.bottom > window.innerHeight) {
-                        menu.style.top = (event.pageY - rect.height) + 'px';
-                    }
-                    
-                    return false;
                 }
-                
-                function hideContextMenu() {
-                    if (currentContextMenu) {
-                        currentContextMenu.remove();
-                        currentContextMenu = null;
-                    }
-                }
-                
-                // Hide context menu when clicking elsewhere
-                document.addEventListener('click', hideContextMenu);
-                document.addEventListener('contextmenu', (e) => {
-                    if (!e.target.closest('tr[data-solution-id]')) {
-                        hideContextMenu();
-                    }
-                });
-                
-                // Set up event listeners
-                document.addEventListener('DOMContentLoaded', () => {
-                    document.getElementById('environmentSelect').addEventListener('change', onEnvironmentChange);
-                    loadEnvironments();
-                });
-                
-                // Load environments on startup (fallback)
-                loadEnvironments();
-            </script>`;
+            </script>
+        </body>
+        </html>`;
     }
 }
