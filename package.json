@@ -14,7 +14,19 @@
     "categories": [
         "Other"
     ],
-    "activationEvents": [],
+    "activationEvents": [
+        "onView:dynamics-devtools-tools",
+        "onView:dynamics-devtools-environments",
+        "onCommand:dynamics-devtools.addEnvironment",
+        "onCommand:dynamics-devtools.removeEnvironment",
+        "onCommand:dynamics-devtools.solutionExplorer",
+        "onCommand:dynamics-devtools.importJobViewer",
+        "onCommand:dynamics-devtools.queryData",
+        "onCommand:dynamics-devtools.openMetadataBrowser",
+        "onCommand:dynamics-devtools.connectionReferences",
+        "onCommand:dynamics-devtools.environmentVariables",
+        "onCommand:dynamics-devtools.pluginTraceViewer"
+    ],
     "main": "./out/extension.js",
     "contributes": {
         "commands": [

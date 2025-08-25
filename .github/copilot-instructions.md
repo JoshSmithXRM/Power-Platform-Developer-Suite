@@ -28,7 +28,13 @@ This is a comprehensive VS Code extension for Microsoft Dynamics 365 / Power Pla
 - **Dependency Injection**: Use ServiceFactory for all service dependencies
 
 ### 2. Code Style Guidelines
-- **NO comments in code** - code should be self-documenting through clear naming
+- **Prefer self-documenting code** - use clear, descriptive naming over excessive commenting
+- **Strategic comments are welcome** for:
+  - Complex algorithms or business logic that isn't immediately obvious
+  - Workarounds for known issues or API limitations
+  - "Why" explanations when the "what" is clear but the reasoning isn't
+  - External dependencies or integration quirks
+  - Performance optimizations that trade readability for speed
 - **Use descriptive variable and function names**
 - **Prefer composition over inheritance** (except for UI panels)
 - **Keep functions small and focused**

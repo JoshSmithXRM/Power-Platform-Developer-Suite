@@ -107,7 +107,7 @@ export class SolutionExplorerPanel extends BasePanel {
     private async handleLoadEnvironments(): Promise<void> {
         try {
             const environments = await this._authService.getEnvironments();
-            
+
             // Get previously selected environment from state
             const cachedState = await this._stateService.getPanelState(SolutionExplorerPanel.viewType);
             const selectedEnvironmentId = this._selectedEnvironmentId || cachedState?.selectedEnvironmentId || environments[0]?.id;
@@ -138,7 +138,7 @@ export class SolutionExplorerPanel extends BasePanel {
                 if (cachedState?.selectedEnvironmentId === environmentId && cachedState.lastUpdated) {
                     const cacheAge = Date.now() - new Date(cachedState.lastUpdated).getTime();
                     const maxCacheAge = 5 * 60 * 1000; // 5 minutes
-                    
+
                     if (cacheAge < maxCacheAge) {
                         // Use cached data
                         this._panel.webview.postMessage({
@@ -303,160 +303,40 @@ export class SolutionExplorerPanel extends BasePanel {
             <!-- Pre-generated table template (hidden initially) -->
             <div id="solutionsTableTemplate" style="display: none;">
                 ${ComponentFactory.createDataTable({
-                    id: 'solutionsTable',
-                    columns: [
-                        { key: 'friendlyName', label: 'Solution Name', sortable: true },
-                        { key: 'uniqueName', label: 'Unique Name', sortable: true },
-                        { key: 'version', label: 'Version', sortable: true },
-                        { key: 'type', label: 'Type', sortable: true },
-                        { key: 'publisherName', label: 'Publisher', sortable: true },
-                        { key: 'installedDate', label: 'Installed', sortable: true }
-                    ],
-                    defaultSort: { column: 'friendlyName', direction: 'asc' },
-                    filterable: true,
-                    stickyFirstColumn: false,
-                    rowActions: [
-                        { id: 'openMaker', action: 'openInMaker', label: 'Maker', icon: '🎨' },
-                        { id: 'openClassic', action: 'openInClassic', label: 'Classic', icon: '📋' }
-                    ],
-                    contextMenu: [
-                        { id: 'openMaker', action: 'openInMaker', label: 'Open in Maker' },
-                        { id: 'openClassic', action: 'openInClassic', label: 'Open in Classic' }
-                    ]
-                })}
+            id: 'solutionsTable',
+            columns: [
+                { key: 'friendlyName', label: 'Solution Name', sortable: true },
+                { key: 'uniqueName', label: 'Unique Name', sortable: true },
+                { key: 'version', label: 'Version', sortable: true },
+                { key: 'type', label: 'Type', sortable: true },
+                { key: 'publisherName', label: 'Publisher', sortable: true },
+                { key: 'installedDate', label: 'Installed', sortable: true }
+            ],
+            defaultSort: { column: 'friendlyName', direction: 'asc' },
+            filterable: true,
+            stickyFirstColumn: false,
+            rowActions: [
+                { id: 'openMaker', action: 'openInMaker', label: 'Maker', icon: '🎨' },
+                { id: 'openClassic', action: 'openInClassic', label: 'Classic', icon: '📋' }
+            ],
+            contextMenu: [
+                { id: 'openMaker', action: 'openInMaker', label: 'Open in Maker' },
+                { id: 'openClassic', action: 'openInClassic', label: 'Open in Classic' }
+            ]
+        })}
             </div>
 
             <script src="${envSelectorUtilsScript}"></script>
             <script src="${panelUtilsScript}"></script>
             <script src="${tableUtilsScript}"></script>
-            <script>
-                const vscode = acquireVsCodeApi();
-                let currentEnvironmentId = '';
-                let solutions = [];
-                
-                // Initialize panel with PanelUtils
-                const panelUtils = PanelUtils.initializePanel({
-                    environmentSelectorId: 'environmentSelect',
-                    onEnvironmentChange: 'onEnvironmentChange',
-                    clearMessage: 'Select an environment to load solutions...'
-                });
-                
-                // Initialize environment selector and load environments
-                document.addEventListener('DOMContentLoaded', () => {
-                    panelUtils.loadEnvironments();
-                });
-                
-                // Load environments on startup (fallback)
-                panelUtils.loadEnvironments();
-                
-                // Handle environment selection change
-                function onEnvironmentChange(selectorId, environmentId, previousEnvironmentId) {
-                    currentEnvironmentId = environmentId;
-                    if (environmentId) {
-                        loadSolutions();
-                    } else {
-                        panelUtils.clearContent('Select an environment to load solutions...');
-                    }
-                }
-                
-                // Load solutions for current environment
-                function loadSolutions() {
-                    if (!currentEnvironmentId) return;
-                    
-                    panelUtils.showLoading('Loading solutions...');
-                    PanelUtils.sendMessage('loadSolutions', { 
-                        environmentId: currentEnvironmentId 
-                    });
-                }
-                
-                // Refresh solutions
-                function refreshSolutions() {
-                    if (currentEnvironmentId) {
-                        loadSolutions();
-                    }
-                }
-                
-                // Setup message handlers
-                PanelUtils.setupMessageHandler({
-                    'environmentsLoaded': (message) => {
-                        EnvironmentSelectorUtils.loadEnvironments('environmentSelect', message.data);
-                        if (message.selectedEnvironmentId) {
-                            EnvironmentSelectorUtils.setSelectedEnvironment('environmentSelect', message.selectedEnvironmentId);
-                            currentEnvironmentId = message.selectedEnvironmentId;
-                            loadSolutions();
-                        }
-                    },
-                    
-                    'solutionsLoaded': (message) => {
-                        populateSolutions(message.data);
-                    }
-                });
-                
-                // Populate solutions table using ComponentFactory
-                function populateSolutions(solutionsData) {
-                    solutions = solutionsData;
-                    
-                    if (solutions.length === 0) {
-                        panelUtils.showNoData('No solutions found in this environment.');
-                        return;
-                    }
-                    
-                    // Use pre-generated table template
-                    const template = document.getElementById('solutionsTableTemplate');
-                    document.getElementById('content').innerHTML = template.innerHTML;
-                    
-                    // Transform solutions data for the table
-                    const tableData = solutions.map(solution => ({
-                        id: solution.solutionId,
-                        friendlyName: solution.friendlyName,
-                        uniqueName: solution.uniqueName,
-                        version: solution.version,
-                        type: solution.isManaged ? 'Managed' : 'Unmanaged',
-                        publisherName: solution.publisherName,
-                        installedDate: PanelUtils.formatDate(solution.installedOn)
-                    }));
-                    
-                    // Initialize table with TableUtils
-                    TableUtils.initializeTable('solutionsTable', {
-                        onRowAction: handleRowAction
-                    });
-                    
-                    // Load data into table
-                    TableUtils.loadTableData('solutionsTable', tableData);
-                    
-                    // Apply default sort to show indicator
-                    TableUtils.sortTable('solutionsTable', 'friendlyName', 'asc');
-                }
-                
-                // Handle table row actions
-                function handleRowAction(actionId, rowData) {
-                    switch (actionId) {
-                        case 'openInMaker':
-                            openSolutionInMaker(rowData.id);
-                            break;
-                        case 'openInClassic':
-                            openSolutionInClassic(rowData.id);
-                            break;
-                    }
-                }
-                
-                // Open solution in maker portal
-                function openSolutionInMaker(solutionId) {
-                    PanelUtils.sendMessage('openSolutionInMaker', {
-                        environmentId: currentEnvironmentId,
-                        solutionId: solutionId
-                    });
-                }
-                
-                // Open solution in classic UI
-                function openSolutionInClassic(solutionId) {
-                    PanelUtils.sendMessage('openSolutionInClassic', {
-                        environmentId: currentEnvironmentId,
-                        solutionId: solutionId
-                    });
-                }
-            </script>
+            <script src="${this.getSolutionExplorerScript()}"></script>
         </body>
         </html>`;
+    }
+
+    private getSolutionExplorerScript(): vscode.Uri {
+        return this._panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'scripts', 'SolutionExplorer.js')
+        );
     }
 }

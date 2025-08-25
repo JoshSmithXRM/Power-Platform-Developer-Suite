@@ -415,37 +415,61 @@ class EnvironmentSetup extends HTMLElement {
     }
     
     validateForm(data) {
-        const errors = [];
-        
-        if (!data.name) errors.push('Environment name is required');
-        if (!data.dataverseUrl) errors.push('Dataverse URL is required');
-        if (!data.tenantId) errors.push('Tenant ID is required');
-        if (!data.authenticationMethod) errors.push('Authentication method is required');
-        
-        // Validate specific auth method requirements
+        // Define validation rules
+        const validationRules = {
+            name: {
+                required: true,
+                label: 'Environment name'
+            },
+            dataverseUrl: {
+                required: true,
+                dataverseUrl: true,
+                label: 'Dataverse URL'
+            },
+            tenantId: {
+                required: true,
+                guid: true,
+                label: 'Tenant ID'
+            },
+            environmentId: {
+                required: false,
+                guid: true,
+                label: 'Environment ID'
+            },
+            authenticationMethod: {
+                required: true,
+                label: 'Authentication method'
+            }
+        };
+
+        // Add conditional validation rules based on auth method
         switch(data.authenticationMethod) {
             case 'ServicePrincipal':
-                if (!data.clientId) errors.push('Client ID is required for Service Principal');
-                if (!data.clientSecret) errors.push('Client Secret is required for Service Principal');
+                validationRules.clientId = {
+                    required: true,
+                    guid: true,
+                    label: 'Client ID'
+                };
+                validationRules.clientSecret = {
+                    required: true,
+                    label: 'Client Secret'
+                };
                 break;
             case 'UsernamePassword':
-                if (!data.username) errors.push('Username is required for Username/Password');
-                if (!data.password) errors.push('Password is required for Username/Password');
+                validationRules.username = {
+                    required: true,
+                    email: true,
+                    label: 'Username'
+                };
+                validationRules.password = {
+                    required: true,
+                    label: 'Password'
+                };
                 break;
         }
-        
-        // Validate URL format
-        try {
-            new URL(data.dataverseUrl);
-        } catch {
-            errors.push('Invalid Dataverse URL format');
-        }
-        
-        // Validate GUID format for tenant ID
-        const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (data.tenantId && !guidRegex.test(data.tenantId)) {
-            errors.push('Tenant ID must be a valid GUID');
-        }
+
+        // Validate using shared utility
+        const errors = ValidationUtils.validateFields(data, validationRules);
         
         if (errors.length > 0) {
             this.showMessage(errors.join('<br>'), 'error');

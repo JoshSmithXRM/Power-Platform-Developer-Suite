@@ -60,7 +60,6 @@ A comprehensive VSCode extension for Microsoft Dynamics 365 / Power Platform dev
 - **Plugin Traces** - View plugin execution logs and performance (coming soon)
 
 ## Development Setup
-## Development Setup
 
 ### **Building from Source**
 1. **Clone the repository**

@@ -550,7 +550,6 @@ TableUtils.initializeTable('myTable', {
     onRowAction: handleRowAction     // Required for actions: (actionId, rowData) => void
 });
 ```
-```
 
 ### **Component Generation**
 ```typescript

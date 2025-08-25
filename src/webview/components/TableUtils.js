@@ -101,14 +101,6 @@ class TableUtils {
                 this.handleRowSelection(tableId, checkbox);
             }
         });
-        
-        // Handle context menu
-        table.addEventListener('contextmenu', (e) => {
-            const row = e.target.closest('tr');
-            if (row && row.dataset.rowId) {
-                this.showContextMenu(tableId, e, row);
-            }
-        });
     }
     
     /**
@@ -343,7 +335,7 @@ class TableUtils {
         const config = this.tables.get(tableId);
         if (!config) return;
         
-        const rowData = config.originalData.find(row => String(row.id) === String(rowId));
+        const rowData = config.originalData?.find(row => String(row.id) === String(rowId)) || null;
         
         // Call custom callback if provided
         if (config.onRowAction && typeof config.onRowAction === 'function') {
@@ -371,9 +363,9 @@ class TableUtils {
         if (!config) return;
         
         const selectedRowIds = Array.from(config.selectedRows);
-        const selectedData = config.originalData.filter(row => 
+        const selectedData = config.originalData?.filter(row => 
             selectedRowIds.includes(String(row.id))
-        );
+        ) || [];
         
         // Send message to extension
         if (typeof vscode !== 'undefined') {

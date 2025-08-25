@@ -185,6 +185,7 @@ export class EnvironmentCommands {
         if (confirm === 'Yes, Remove') {
             try {
                 await this.authService.removeEnvironment(selected.env.id);
+                vscode.commands.executeCommand('dynamics-devtools.refreshEnvironments');
                 vscode.window.showInformationMessage(`Environment "${selected.env.name}" removed successfully!`);
             } catch (error: any) {
                 vscode.window.showErrorMessage(`Failed to remove environment: ${error.message}`);
