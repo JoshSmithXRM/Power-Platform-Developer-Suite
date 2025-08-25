@@ -174,8 +174,8 @@ export class EnvironmentSetupPanel extends BasePanel {
     }
 
     protected getHtmlContent(): string {
-        const scriptUri = this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'EnvironmentSetup.js'));
-        const validationUtilsUri = this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'ValidationUtils.js'));
+        const scriptUri = this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'environment-setup.js'));
+        const validationUtilsUri = this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'validation-utils.js'));
 
         return `<!DOCTYPE html>
             <html lang="en">

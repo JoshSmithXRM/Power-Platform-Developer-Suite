@@ -157,16 +157,16 @@ export abstract class BasePanel implements IPanelBase {
     } {
         return {
             tableUtilsScript: this._panel.webview.asWebviewUri(
-                vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'TableUtils.js')
+                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'table-utils.js')
             ),
             tableStylesSheet: this._panel.webview.asWebviewUri(
-                vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'TableStyles.css')
+                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'css', 'table.css')
             ),
             panelStylesSheet: this._panel.webview.asWebviewUri(
-                vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'PanelStyles.css')
+                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'css', 'panel-base.css')
             ),
             panelUtilsScript: this._panel.webview.asWebviewUri(
-                vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'PanelUtils.js')
+                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'panel-utils.js')
             )
         };
     }

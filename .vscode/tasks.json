@@ -4,11 +4,10 @@
 		{
 			"label": "Build Extension",
 			"type": "shell",
-			"command": "npx",
+			"command": "npm",
 			"args": [
-				"tsc",
-				"-p",
-				"."
+				"run",
+				"compile"
 			],
 			"group": {
 				"kind": "build",
@@ -25,12 +24,10 @@
 		{
 			"label": "Watch",
 			"type": "shell",
-			"command": "npx",
+			"command": "npm",
 			"args": [
-				"tsc",
-				"-watch",
-				"-p",
-				"."
+				"run",
+				"watch"
 			],
 			"group": "build",
 			"isBackground": true,
@@ -41,6 +38,61 @@
 				"panel": "shared"
 			},
 			"problemMatcher": "$tsc-watch"
+		},
+		{
+			"label": "Package Extension",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"vsce-package"
+			],
+			"group": "build",
+			"dependsOn": "Build Extension",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Test Release",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-File",
+				"scripts/test-release.ps1",
+				"-Clean",
+				"-NewWindow",
+				"-Verbose"
+			],
+			"group": "test",
+			"dependsOn": "Package Extension",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": true,
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "Analyze Package",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-File",
+				"scripts/analyze-package.ps1",
+				"-Detailed"
+			],
+			"group": "test",
+			"dependsOn": "Package Extension",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": true,
+				"panel": "dedicated"
+			}
 		}
 	]
 }

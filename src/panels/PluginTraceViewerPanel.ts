@@ -95,7 +95,7 @@ export class PluginTraceViewerPanel extends BasePanel {
         const { tableUtilsScript, tableStylesSheet, panelStylesSheet, panelUtilsScript } = this.getCommonWebviewResources();
 
         const envSelectorUtilsScript = this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'components', 'EnvironmentSelectorUtils.js')
+            vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'environment-selector-utils.js')
         );
 
         return `<!DOCTYPE html>

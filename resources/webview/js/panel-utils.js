@@ -106,7 +106,7 @@ class PanelUtils {
             showLoading: (message) => PanelUtils.showLoading('content', message),
             showError: (message) => PanelUtils.showError(message),
             showNoData: (message) => PanelUtils.showNoData(message),
-            clearContent: (message) => PanelUtils.clearContent('content', message)
+            clearContent: (message) => PanelUtils.clearContent('content', clearMessage)
         };
     }
 
