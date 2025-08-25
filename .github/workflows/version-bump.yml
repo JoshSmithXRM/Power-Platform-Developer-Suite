@@ -52,11 +52,13 @@ jobs:
           
       - name: Push changes
         run: |
-          git push origin main --follow-tags
+          git push origin main
+          git push origin --tags
         
       - name: Create Release
         run: |
           gh release create ${{ steps.version.outputs.version }} \
+            --target main \
             --title "Release ${{ steps.version.outputs.version }}" \
             --notes "Changes in this Release
             - Auto-generated release from version bump"
