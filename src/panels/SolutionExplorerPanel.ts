@@ -625,12 +625,12 @@ export class SolutionExplorerPanel extends BasePanel {
                         
                         tableHtml += \`
                             <tr data-solution-id="\${solution.solutionid}" oncontextmenu="showSolutionContextMenu(event, '\${solution.solutionid}', '\${solution.friendlyname || solution.uniquename}')">
-                                <td>\${solution.friendlyname || solution.uniquename}</td>
-                                <td>\${solution.uniquename}</td>
-                                <td>\${managedBadge}</td>
-                                <td>\${solution.version}</td>
-                                <td>\${solution.publishername || 'Unknown'}</td>
-                                <td>\${createdDate}</td>
+                                <td data-column="displayName">\${solution.friendlyname || solution.uniquename}</td>
+                                <td data-column="uniqueName">\${solution.uniquename}</td>
+                                <td data-column="type">\${managedBadge}</td>
+                                <td data-column="version">\${solution.version}</td>
+                                <td data-column="publisher">\${solution.publishername || 'Unknown'}</td>
+                                <td data-column="created">\${createdDate}</td>
                                 <td>
                                     <div class="solution-actions">
                                         <button onclick="openSolutionInMaker('\${solution.solutionid}', '\${solution.friendlyname || solution.uniquename}')" 
@@ -672,8 +672,19 @@ export class SolutionExplorerPanel extends BasePanel {
                         filterInput.addEventListener('input', filterTable);
                     }
                     
-                    // Setup standardized table sorting with default sort by "displayName" ascending
-                    setupTableSorting('solutionsTable', 'displayName', 'asc');
+                    // Setup standardized table sorting with default sort by "uniqueName" ascending
+                    setupTableSorting('solutionsTable', 'uniqueName', 'asc');
+                    
+                    // Immediately apply the default sort to the table data
+                    setTimeout(() => {
+                        const table = document.getElementById('solutionsTable');
+                        if (table) {
+                            const header = table.querySelector('th[data-column="uniqueName"]');
+                            if (header) {
+                                header.click(); // Trigger the sort
+                            }
+                        }
+                    }, 10);
                 }
                 
                 function filterTable() {
