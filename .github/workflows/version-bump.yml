@@ -16,11 +16,15 @@ on:
 jobs:
   bump-version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Setup Node.js
@@ -47,17 +51,14 @@ jobs:
           git tag ${NEW_VERSION}
           
       - name: Push changes
-        run: git push --follow-tags
+        run: |
+          git push origin main --follow-tags
         
       - name: Create Release
-        uses: actions/create-release@v1
+        run: |
+          gh release create ${{ steps.version.outputs.version }} \
+            --title "Release ${{ steps.version.outputs.version }}" \
+            --notes "Changes in this Release
+            - Auto-generated release from version bump"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.version.outputs.version }}
-          release_name: Release ${{ steps.version.outputs.version }}
-          body: |
-            Changes in this Release
-            - Auto-generated release from version bump
-          draft: false
-          prerelease: false
