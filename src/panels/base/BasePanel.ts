@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { AuthenticationService } from '../../services/AuthenticationService';
+import { StateService, PanelState } from '../../services/StateService';
 import { PanelConfig, IPanelBase, WebviewMessage } from '../../types';
 
 /**
@@ -9,7 +10,9 @@ export abstract class BasePanel implements IPanelBase {
     protected readonly _panel: vscode.WebviewPanel;
     protected readonly _extensionUri: vscode.Uri;
     protected readonly _authService: AuthenticationService;
+    protected readonly _stateService: StateService;
     protected _disposables: vscode.Disposable[] = [];
+    protected currentState: PanelState = {};
 
     public readonly viewType: string;
     protected static _activePanels: Map<string, BasePanel> = new Map();
@@ -18,11 +21,13 @@ export abstract class BasePanel implements IPanelBase {
         panel: vscode.WebviewPanel,
         extensionUri: vscode.Uri,
         authService: AuthenticationService,
+        stateService: StateService,
         config: PanelConfig
     ) {
         this._panel = panel;
         this._extensionUri = extensionUri;
         this._authService = authService;
+        this._stateService = stateService;
         this.viewType = config.viewType;
 
         this._panel.title = config.title;
@@ -46,8 +51,56 @@ export abstract class BasePanel implements IPanelBase {
     /**
      * Initialize the panel - called after construction
      */
-    protected initialize(): void {
+    protected async initialize(): Promise<void> {
+        // Restore state first
+        await this.restoreState();
+        
+        // Then initialize UI
         this.updateWebview();
+    }
+
+    /**
+     * Restore panel state from storage
+     */
+    protected async restoreState(): Promise<void> {
+        try {
+            const savedState = await this._stateService.getPanelState(this.viewType);
+            if (savedState) {
+                this.currentState = savedState;
+                await this.applyRestoredState(savedState);
+            }
+        } catch (error) {
+            console.error(`Error restoring state for ${this.viewType}:`, error);
+        }
+    }
+
+    /**
+     * Apply restored state - override in child classes
+     */
+    protected async applyRestoredState(state: PanelState): Promise<void> {
+        // Base implementation - child classes should override
+        if (state.selectedEnvironmentId) {
+            // Set environment if available
+        }
+    }
+
+    /**
+     * Save current panel state
+     */
+    protected async saveState(): Promise<void> {
+        try {
+            await this._stateService.savePanelState(this.viewType, this.currentState);
+        } catch (error) {
+            console.error(`Error saving state for ${this.viewType}:`, error);
+        }
+    }
+
+    /**
+     * Update state and save
+     */
+    protected async updateState(partialState: Partial<PanelState>): Promise<void> {
+        this.currentState = { ...this.currentState, ...partialState };
+        await this.saveState();
     }
 
     /**

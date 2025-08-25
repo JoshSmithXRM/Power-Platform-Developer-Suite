@@ -5,12 +5,13 @@ import { BasePanel } from './base/BasePanel';
 import { AuthenticationService } from '../services/AuthenticationService';
 import { WebviewMessage, PanelConfig } from '../types';
 import { EnvironmentManager } from './base/EnvironmentManager';
+import { ServiceFactory } from '../services/ServiceFactory';
 
 export class QueryDataPanel extends BasePanel {
     public static readonly viewType = 'queryData';
     private environmentManager: EnvironmentManager;
 
-    public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
+    public static createOrShow(extensionUri: vscode.Uri) {
         // Try to focus existing panel first
         const existing = BasePanel.focusExisting(QueryDataPanel.viewType);
         if (existing) {
@@ -27,10 +28,10 @@ export class QueryDataPanel extends BasePanel {
             enableFindWidget: true
         }, column);
 
-        new QueryDataPanel(panel, extensionUri, authService);
+        new QueryDataPanel(panel, extensionUri);
     }
 
-    public static createNew(extensionUri: vscode.Uri, authService: AuthenticationService) {
+    public static createNew(extensionUri: vscode.Uri) {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         const panel = BasePanel.createWebviewPanel({
@@ -41,16 +42,16 @@ export class QueryDataPanel extends BasePanel {
             enableFindWidget: true
         }, column);
 
-        new QueryDataPanel(panel, extensionUri, authService);
+        new QueryDataPanel(panel, extensionUri);
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService) {
-        super(panel, extensionUri, authService, {
+    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: QueryDataPanel.viewType,
             title: 'Query Data'
         });
         
-        this.environmentManager = new EnvironmentManager(authService, (message) => this.postMessage(message));
+        this.environmentManager = new EnvironmentManager(ServiceFactory.getAuthService(), (message) => this.postMessage(message));
         
         // Initialize after construction
         this.initialize();

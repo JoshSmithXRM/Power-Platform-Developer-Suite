@@ -10,10 +10,10 @@ import { ImportJobViewerPanel } from '../panels/ImportJobViewerPanel';
  */
 export class PanelCommands {
     constructor(
-        private authService: AuthenticationService, 
+        private authService: AuthenticationService,
         private context: vscode.ExtensionContext,
         private environmentsProvider: EnvironmentsProvider
-    ) {}
+    ) { }
 
     /**
      * Register all panel commands
@@ -21,27 +21,27 @@ export class PanelCommands {
     public registerCommands(): vscode.Disposable[] {
         return [
             vscode.commands.registerCommand('dynamics-devtools.queryData', () => {
-                QueryDataPanel.createOrShow(this.context.extensionUri, this.authService);
+                QueryDataPanel.createOrShow(this.context.extensionUri);
             }),
 
             vscode.commands.registerCommand('dynamics-devtools.solutionExplorer', () => {
-                SolutionExplorerPanel.createOrShow(this.context.extensionUri, this.authService);
+                SolutionExplorerPanel.createOrShow(this.context.extensionUri);
             }),
 
             vscode.commands.registerCommand('dynamics-devtools.importJobViewer', () => {
-                ImportJobViewerPanel.createOrShow(this.context.extensionUri, this.authService);
+                ImportJobViewerPanel.createOrShow(this.context.extensionUri);
             }),
 
             vscode.commands.registerCommand('dynamics-devtools.queryDataNew', () => {
-                QueryDataPanel.createNew(this.context.extensionUri, this.authService);
+                QueryDataPanel.createNew(this.context.extensionUri);
             }),
 
             vscode.commands.registerCommand('dynamics-devtools.solutionExplorerNew', () => {
-                SolutionExplorerPanel.createNew(this.context.extensionUri, this.authService);
+                SolutionExplorerPanel.createNew(this.context.extensionUri);
             }),
 
             vscode.commands.registerCommand('dynamics-devtools.importJobViewerNew', () => {
-                ImportJobViewerPanel.createNew(this.context.extensionUri, this.authService);
+                ImportJobViewerPanel.createNew(this.context.extensionUri);
             }),
 
             vscode.commands.registerCommand('dynamics-devtools.refreshEnvironments', () => {

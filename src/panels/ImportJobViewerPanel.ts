@@ -1,24 +1,30 @@
 import * as vscode from 'vscode';
 import { BasePanel } from './base/BasePanel';
-import { AuthenticationService } from '../services/AuthenticationService';
+import { ServiceFactory } from '../services/ServiceFactory';
 import { EnvironmentManager } from './base/EnvironmentManager';
+import { ComponentFactory, TableConfig } from '../components/ComponentFactory';
 import { WebviewMessage, EnvironmentConnection } from '../types';
 
 export class ImportJobViewerPanel extends BasePanel {
     public static readonly viewType = 'importJobViewer';
 
+    private environmentManager: EnvironmentManager;
     private _cachedEnvironments: EnvironmentConnection[] | undefined;
     private _selectedEnvironmentId: string | undefined;
     private _cachedImportJobs: any[] | null = null;
     private readonly _pageSize = 5000; // Large page size to get all records
 
-    public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
+    public static createOrShow(extensionUri: vscode.Uri) {
         // Try to focus existing panel first
         const existing = BasePanel.focusExisting(ImportJobViewerPanel.viewType);
         if (existing) {
             return;
         }
 
+        ImportJobViewerPanel.createNew(extensionUri);
+    }
+
+    public static createNew(extensionUri: vscode.Uri) {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         const panel = BasePanel.createWebviewPanel({
@@ -29,28 +35,16 @@ export class ImportJobViewerPanel extends BasePanel {
             enableFindWidget: true
         }, column);
 
-        new ImportJobViewerPanel(panel, extensionUri, authService);
+        new ImportJobViewerPanel(panel, extensionUri);
     }
 
-    public static createNew(extensionUri: vscode.Uri, authService: AuthenticationService) {
-        const column = vscode.window.activeTextEditor?.viewColumn;
-
-        const panel = BasePanel.createWebviewPanel({
-            viewType: ImportJobViewerPanel.viewType,
-            title: 'Import Job Viewer',
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            enableFindWidget: true
-        }, column);
-
-        new ImportJobViewerPanel(panel, extensionUri, authService);
-    }
-
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService) {
-        super(panel, extensionUri, authService, {
+    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: ImportJobViewerPanel.viewType,
             title: 'Import Job Viewer'
         });
+
+        this.environmentManager = new EnvironmentManager(ServiceFactory.getAuthService(), (message) => this.postMessage(message));
 
         // Initialize after construction
         this.initialize();
@@ -1034,7 +1028,7 @@ export class ImportJobViewerPanel extends BasePanel {
                 // Load environments on startup (fallback)
                 loadEnvironments();
 
-                ${EnvironmentManager.getStandardizedTableSortingJs()}
+                ${ComponentFactory.getDataTableJs()}
             </script>`;
     }
 }

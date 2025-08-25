@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 // Services
-import { AuthenticationService } from './services/AuthenticationService';
+import { ServiceFactory } from './services/ServiceFactory';
 
 // Providers
 import { EnvironmentsProvider } from './providers/EnvironmentsProvider';
@@ -18,8 +18,11 @@ import { MetadataBrowserCommands } from './commands/MetadataBrowserCommands';
 export function activate(context: vscode.ExtensionContext) {
     console.log('Dynamics DevTools extension is now active!');
 
-    // Initialize services
-    const authService = AuthenticationService.getInstance(context);
+    // Initialize services first
+    ServiceFactory.initialize(context);
+    
+    // Get services from factory
+    const authService = ServiceFactory.getAuthService();
 
     // Initialize providers
     const environmentsProvider = new EnvironmentsProvider(authService);

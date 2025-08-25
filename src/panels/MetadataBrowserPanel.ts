@@ -4,6 +4,7 @@ import { AuthenticationService } from '../services/AuthenticationService';
 import { ODataService } from '../services/ODataService';
 import { WebviewMessage } from '../types';
 import { EnvironmentManager } from './base/EnvironmentManager';
+import { ServiceFactory } from '../services/ServiceFactory';
 
 interface EntityMetadata {
     LogicalName: string;
@@ -35,7 +36,7 @@ export class MetadataBrowserPanel extends BasePanel {
     private odataService: ODataService;
     private environmentManager: EnvironmentManager;
 
-    public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
+    public static createOrShow(extensionUri: vscode.Uri) {
         // Try to focus existing panel first
         const existing = BasePanel.focusExisting(MetadataBrowserPanel.viewType);
         if (existing) {
@@ -52,10 +53,10 @@ export class MetadataBrowserPanel extends BasePanel {
             enableFindWidget: true
         }, column);
 
-        new MetadataBrowserPanel(panel, extensionUri, authService);
+        new MetadataBrowserPanel(panel, extensionUri);
     }
 
-    public static createNew(extensionUri: vscode.Uri, authService: AuthenticationService) {
+    public static createNew(extensionUri: vscode.Uri) {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         const panel = BasePanel.createWebviewPanel({
@@ -66,22 +67,22 @@ export class MetadataBrowserPanel extends BasePanel {
             enableFindWidget: true
         }, column);
 
-        new MetadataBrowserPanel(panel, extensionUri, authService);
+        new MetadataBrowserPanel(panel, extensionUri);
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService) {
-        super(panel, extensionUri, authService, {
+    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: MetadataBrowserPanel.viewType,
             title: 'Metadata Browser'
         });
-        this.odataService = new ODataService();
-        this.environmentManager = new EnvironmentManager(authService, (message) => this.postMessage(message));
+        this.odataService = ServiceFactory.getODataService();
+        this.environmentManager = new EnvironmentManager(ServiceFactory.getAuthService(), (message) => this.postMessage(message));
 
         // Initialize after everything is set up
         this.initialize();
     }
 
-    protected initialize(): void {
+    protected async initialize(): Promise<void> {
         // Override to ensure environment manager is initialized before updating webview
         this.updateWebview();
     }

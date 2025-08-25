@@ -3,6 +3,7 @@ import { BasePanel } from './base/BasePanel';
 import { AuthenticationService } from '../services/AuthenticationService';
 import { WebviewMessage, EnvironmentConnection } from '../types';
 import { AuthenticationMethod } from '../models/AuthenticationMethod';
+import { ServiceFactory } from '../services/ServiceFactory';
 
 export class EnvironmentSetupPanel extends BasePanel {
     public static currentPanel: EnvironmentSetupPanel | undefined;
@@ -10,7 +11,7 @@ export class EnvironmentSetupPanel extends BasePanel {
 
     private readonly _editingEnvironment: EnvironmentConnection | undefined;
 
-    public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService, editingEnvironment?: EnvironmentConnection) {
+    public static createOrShow(extensionUri: vscode.Uri, editingEnvironment?: EnvironmentConnection) {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
@@ -32,11 +33,11 @@ export class EnvironmentSetupPanel extends BasePanel {
             }
         );
 
-        EnvironmentSetupPanel.currentPanel = new EnvironmentSetupPanel(panel, extensionUri, authService, editingEnvironment);
+        EnvironmentSetupPanel.currentPanel = new EnvironmentSetupPanel(panel, extensionUri, editingEnvironment);
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService, editingEnvironment?: EnvironmentConnection) {
-        super(panel, extensionUri, authService, {
+    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, editingEnvironment?: EnvironmentConnection) {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: EnvironmentSetupPanel.viewType,
             title: editingEnvironment ? 'Edit Dynamics 365 Environment' : 'Add Dynamics 365 Environment'
         });

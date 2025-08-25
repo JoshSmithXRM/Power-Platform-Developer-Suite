@@ -2,7 +2,9 @@ import * as vscode from 'vscode';
 import { BasePanel } from './base/BasePanel';
 import { AuthenticationService } from '../services/AuthenticationService';
 import { EnvironmentManager } from './base/EnvironmentManager';
+import { ComponentFactory } from '../components/ComponentFactory';
 import { WebviewMessage, EnvironmentConnection } from '../types';
+import { ServiceFactory } from '../services/ServiceFactory';
 
 export class SolutionExplorerPanel extends BasePanel {
     public static readonly viewType = 'solutionExplorer';
@@ -11,7 +13,7 @@ export class SolutionExplorerPanel extends BasePanel {
     private _cachedSolutions: any[] | undefined;
     private _cachedEnvironments: any[] | undefined;
 
-    public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
+    public static createOrShow(extensionUri: vscode.Uri) {
         // Try to focus existing panel first
         const existing = BasePanel.focusExisting(SolutionExplorerPanel.viewType);
         if (existing) {
@@ -28,10 +30,10 @@ export class SolutionExplorerPanel extends BasePanel {
             enableFindWidget: true
         }, column);
 
-        new SolutionExplorerPanel(panel, extensionUri, authService);
+        new SolutionExplorerPanel(panel, extensionUri);
     }
 
-    public static createNew(extensionUri: vscode.Uri, authService: AuthenticationService) {
+    public static createNew(extensionUri: vscode.Uri) {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         const panel = BasePanel.createWebviewPanel({
@@ -42,11 +44,11 @@ export class SolutionExplorerPanel extends BasePanel {
             enableFindWidget: true
         }, column);
 
-        new SolutionExplorerPanel(panel, extensionUri, authService);
+        new SolutionExplorerPanel(panel, extensionUri);
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, authService: AuthenticationService) {
-        super(panel, extensionUri, authService, {
+    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: SolutionExplorerPanel.viewType,
             title: 'Solution Explorer'
         });
@@ -687,7 +689,7 @@ export class SolutionExplorerPanel extends BasePanel {
                 }
                 
                 // Use shared table sorting functions
-                ${EnvironmentManager.getStandardizedTableSortingJs()}
+                ${ComponentFactory.getDataTableJs()}
                 
                 function setupTableFiltering() {
                     const filterInput = document.getElementById('solutionFilter');

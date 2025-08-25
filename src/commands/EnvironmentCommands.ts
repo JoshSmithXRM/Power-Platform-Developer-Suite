@@ -15,7 +15,7 @@ export class EnvironmentCommands {
     public registerCommands(): vscode.Disposable[] {
         return [
             vscode.commands.registerCommand('dynamics-devtools.addEnvironment', () => {
-                EnvironmentSetupPanel.createOrShow(this.context.extensionUri, this.authService);
+                EnvironmentSetupPanel.createOrShow(this.context.extensionUri);
             }),
 
             vscode.commands.registerCommand('dynamics-devtools.testConnection', async () => {
@@ -112,7 +112,7 @@ export class EnvironmentCommands {
         if (environmentItem) {
             const environment = await this.authService.getEnvironment(environmentItem.envId);
             if (environment) {
-                EnvironmentSetupPanel.createOrShow(this.context.extensionUri, this.authService, environment);
+                EnvironmentSetupPanel.createOrShow(this.context.extensionUri, environment);
             } else {
                 vscode.window.showErrorMessage('Environment not found');
             }

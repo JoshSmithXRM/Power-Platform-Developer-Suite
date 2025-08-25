@@ -17,7 +17,7 @@ export class MetadataBrowserCommands {
                     return;
                 }
 
-                MetadataBrowserPanel.createOrShow(this.context.extensionUri, this.authService);
+                MetadataBrowserPanel.createOrShow(this.context.extensionUri);
             }),
 
             vscode.commands.registerCommand('dynamics-devtools.openMetadataBrowserNew', async () => {
@@ -27,7 +27,7 @@ export class MetadataBrowserCommands {
                     return;
                 }
 
-                MetadataBrowserPanel.createNew(this.context.extensionUri, this.authService);
+                MetadataBrowserPanel.createNew(this.context.extensionUri);
             })
         ];
     }
