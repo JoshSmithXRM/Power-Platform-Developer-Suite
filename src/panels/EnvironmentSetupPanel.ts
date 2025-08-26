@@ -28,7 +28,7 @@ export class EnvironmentSetupPanel extends BasePanel {
             {
                 enableScripts: true,
                 localResourceRoots: [
-                    vscode.Uri.joinPath(extensionUri, 'src')
+                    vscode.Uri.joinPath(extensionUri, 'resources')
                 ]
             }
         );

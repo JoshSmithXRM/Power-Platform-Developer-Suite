@@ -43,11 +43,17 @@ export class ConnectionReferencesPanel extends BasePanel {
                 case 'loadEnvironments':
                     await this.handleLoadEnvironments();
                     break;
+                case 'loadSolutions':
+                    await this.handleLoadSolutions(message.environmentId);
+                    break;
                 case 'loadConnectionReferences':
-                    await this.handleLoadConnectionReferences(message.environmentId);
+                    await this.handleLoadConnectionReferences(message.environmentId, message.solutionId);
                     break;
                 case 'exportDeploymentSkeleton':
                     await this.handleExportDeploymentSkeleton(message.relationships);
+                    break;
+                case 'openInMaker':
+                    await this.handleOpenInMaker(message.environmentId, message.solutionId, message.entityType);
                     break;
                 default:
                     console.warn('Unhandled message action:', message.action);
@@ -69,7 +75,27 @@ export class ConnectionReferencesPanel extends BasePanel {
         }
     }
 
-    private async handleLoadConnectionReferences(environmentId: string): Promise<void> {
+    private async handleLoadSolutions(environmentId: string): Promise<void> {
+        if (!environmentId) {
+            this._panel.webview.postMessage({ action: 'error', message: 'Environment id required' });
+            return;
+        }
+
+        try {
+            const solutionService = ServiceFactory.getSolutionService();
+            const solutions = await solutionService.getSolutions(environmentId);
+
+            this._panel.webview.postMessage({ 
+                action: 'solutionsLoaded', 
+                data: solutions,
+                selectedSolutionId: solutions.find(s => s.uniqueName === 'Default')?.solutionId
+            });
+        } catch (err: any) {
+            this._panel.webview.postMessage({ action: 'error', message: err?.message || 'Failed to load solutions' });
+        }
+    }
+
+    private async handleLoadConnectionReferences(environmentId: string, solutionId?: string): Promise<void> {
         if (!environmentId) {
             this._panel.webview.postMessage({ action: 'error', message: 'Environment id required' });
             return;
@@ -77,10 +103,11 @@ export class ConnectionReferencesPanel extends BasePanel {
 
         this._selectedEnvironmentId = environmentId;
         const crService = ServiceFactory.getConnectionReferencesService();
-        const rels: RelationshipResult = await crService.aggregateRelationships(environmentId);
+        const rels: RelationshipResult = await crService.aggregateRelationships(environmentId, solutionId);
         console.debug('ConnectionReferencesPanel: loaded relationships', {
             flows: rels?.flows?.length || 0,
-            connectionReferences: rels?.connectionReferences?.length || 0
+            connectionReferences: rels?.connectionReferences?.length || 0,
+            solutionId: solutionId || 'all'
         });
 
         this._panel.webview.postMessage({ action: 'connectionReferencesLoaded', data: rels });
@@ -96,9 +123,39 @@ export class ConnectionReferencesPanel extends BasePanel {
         }
     }
 
+    private async handleOpenInMaker(environmentId: string, solutionId: string, entityType: string): Promise<void> {
+        if (!environmentId || !solutionId) {
+            this._panel.webview.postMessage({ action: 'error', message: 'Environment and solution are required' });
+            return;
+        }
+
+        try {
+            const environments = await this._authService.getEnvironments();
+            const environment = environments.find(env => env.id === environmentId);
+            
+            if (!environment) {
+                this._panel.webview.postMessage({ action: 'error', message: 'Environment not found' });
+                return;
+            }
+
+            // Use the actual environment GUID from the environment connection
+            const envGuid = environment.environmentId || environmentId;
+            const makerUrl = `https://make.powerapps.com/environments/${envGuid}/solutions/${solutionId}/objects/${entityType}`;
+            
+            console.log('Opening Maker URL:', makerUrl);
+            
+            // Open in external browser
+            vscode.env.openExternal(vscode.Uri.parse(makerUrl));
+            
+        } catch (err: any) {
+            this._panel.webview.postMessage({ action: 'error', message: err?.message || 'Failed to open in Maker' });
+        }
+    }
+
     protected getHtmlContent(): string {
         const { tableUtilsScript, tableStylesSheet, panelStylesSheet, panelUtilsScript } = this.getCommonWebviewResources();
         const envSelectorUtilsScript = this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'environment-selector-utils.js'));
+        const solutionSelectorUtilsScript = this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'solution-selector-utils.js'));
 
         // Use the standard ComponentFactory environment selector and external client script to mirror other panels
         return `<!DOCTYPE html>
@@ -122,11 +179,18 @@ export class ConnectionReferencesPanel extends BasePanel {
                 <span id="environmentStatus" class="environment-status environment-disconnected">Disconnected</span>
             </div>
 
+            ${ComponentFactory.createSolutionSelector({
+                id: 'solutionSelect',
+                label: 'Solution:',
+                placeholder: 'Loading solutions...'
+            })}
+
             <div class="header">
                 <h1 class="title">Connection References Manager</h1>
                 <div class="header-actions">
                     <button class="btn" id="exportBtn">Export Skeleton</button>
                     <button class="btn btn-secondary" id="visualizeBtn" disabled>Visualize (coming soon)</button>
+                    <button class="btn btn-primary" onclick="openInMaker()">Open in Maker</button>
                     <button class="btn" onclick="refreshData()">Refresh</button>
                 </div>
             </div>
@@ -141,12 +205,12 @@ export class ConnectionReferencesPanel extends BasePanel {
                     id: 'connectionReferencesTable',
                     columns: [
                         { key: 'flowName', label: 'Flow Name', sortable: true },
-                        { key: 'crLogicalName', label: 'Connection Reference Logical Name', sortable: true },
-                        { key: 'connectionName', label: 'Connection', sortable: true },
+                        { key: 'connectionReference', label: 'Connection Reference', sortable: true },
                         { key: 'provider', label: 'Provider', sortable: true },
+                        { key: 'connection', label: 'Connection', sortable: true },
                         { key: 'ismanaged', label: 'Managed', sortable: true },
-                        { key: 'modifiedon', label: 'Modified On', sortable: true },
-                        { key: 'modifiedby', label: 'Modified By', sortable: true }
+                        { key: 'modifiedOn', label: 'Modified On', sortable: true },
+                        { key: 'modifiedBy', label: 'Modified By', sortable: true }
                     ],
                     defaultSort: { column: 'flowName', direction: 'asc' },
                     filterable: true,
@@ -156,6 +220,7 @@ export class ConnectionReferencesPanel extends BasePanel {
             </div>
 
             <script src="${envSelectorUtilsScript}"></script>
+            <script src="${solutionSelectorUtilsScript}"></script>
             <script src="${panelUtilsScript}"></script>
             <script src="${tableUtilsScript}"></script>
             <script src="${this.getClientScript()}" ></script>

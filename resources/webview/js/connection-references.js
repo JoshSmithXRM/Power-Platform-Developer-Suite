@@ -1,6 +1,7 @@
 // Client-side script for Connection References Panel
 const vscode = acquireVsCodeApi();
 let currentEnvironmentId = '';
+let currentSolutionId = '';
 
 // Helper function to clean up provider names
 function cleanProviderName(providerName) {
@@ -25,26 +26,63 @@ const panelUtils = PanelUtils.initializePanel({
 // Wire DOMContentLoaded to load environments
 document.addEventListener('DOMContentLoaded', () => {
     panelUtils.loadEnvironments();
+    
+    // Initialize solution selector
+    SolutionSelectorUtils.initializeSelector('solutionSelect', {
+        onSelectionChange: 'onSolutionChange'
+    });
 });
 
 function onEnvironmentChange(selectorId, environmentId, previousEnvironmentId) {
     currentEnvironmentId = environmentId;
     if (environmentId) {
-        loadConnectionReferences(environmentId);
+        // Load solutions for the new environment
+        loadSolutions(environmentId);
     } else {
+        // Clear solution selector and content
+        SolutionSelectorUtils.clearSelector('solutionSelect', 'Select an environment first...');
+        currentSolutionId = '';
         panelUtils.clearContent('Select an environment to manage connection references...');
     }
 }
 
-function loadConnectionReferences(environmentId) {
+function onSolutionChange(selectorId, solutionId, previousSolutionId) {
+    currentSolutionId = solutionId;
+    if (solutionId && currentEnvironmentId) {
+        loadConnectionReferences(currentEnvironmentId, solutionId);
+    } else {
+        panelUtils.clearContent('Select a solution to view connection references...');
+    }
+}
+
+function loadSolutions(environmentId) {
+    if (!environmentId) return;
+    SolutionSelectorUtils.setLoadingState('solutionSelect', true);
+    PanelUtils.sendMessage('loadSolutions', { environmentId });
+}
+
+function loadConnectionReferences(environmentId, solutionId) {
     if (!environmentId) return;
     panelUtils.showLoading('Loading connection references...');
-    PanelUtils.sendMessage('loadConnectionReferences', { environmentId });
+    PanelUtils.sendMessage('loadConnectionReferences', { environmentId, solutionId });
 }
 
 function refreshData() {
-    if (!currentEnvironmentId) return;
-    loadConnectionReferences(currentEnvironmentId);
+    if (!currentEnvironmentId || !currentSolutionId) return;
+    loadConnectionReferences(currentEnvironmentId, currentSolutionId);
+}
+
+function openInMaker() {
+    if (!currentEnvironmentId || !currentSolutionId) {
+        PanelUtils.sendMessage('error', { message: 'Please select an environment and solution first' });
+        return;
+    }
+    
+    PanelUtils.sendMessage('openInMaker', { 
+        environmentId: currentEnvironmentId, 
+        solutionId: currentSolutionId,
+        entityType: 'connectionreferences'
+    });
 }
 
 // Message handlers
@@ -54,69 +92,78 @@ PanelUtils.setupMessageHandler({
         if (message.selectedEnvironmentId) {
             EnvironmentSelectorUtils.setSelectedEnvironment('environmentSelect', message.selectedEnvironmentId);
             currentEnvironmentId = message.selectedEnvironmentId;
-            loadConnectionReferences(message.selectedEnvironmentId);
+            loadSolutions(message.selectedEnvironmentId);
+        }
+    },
+
+    'solutionsLoaded': (message) => {
+        SolutionSelectorUtils.setLoadingState('solutionSelect', false);
+        SolutionSelectorUtils.loadSolutions('solutionSelect', message.data, message.selectedSolutionId);
+        if (message.selectedSolutionId) {
+            currentSolutionId = message.selectedSolutionId;
+            loadConnectionReferences(currentEnvironmentId, message.selectedSolutionId);
         }
     },
 
     'connectionReferencesLoaded': (message) => {
-        const content = document.getElementById('content');
         const data = message.data || {};
+        const relationships = data.relationships || [];
 
-        const rows = [];
-
-        (data.flows || []).forEach(f => {
-            (data.connectionReferences || []).forEach(cr => {
-                if (cr.flowIds && cr.flowIds.includes(f.id)) {
-                    rows.push({
-                        id: `${f.id}-${cr.id}`, // Unique ID for table row actions
-                        flowName: f.name,
-                        crLogicalName: cr.name,
-                        provider: cleanProviderName(cr.connectorLogicalName),
-                        connectionName: cr.referencedConnectionId || '',
-                        ismanaged: cr.ismanaged ? 'Yes' : 'No',
-                        modifiedon: formatDate(cr.modifiedon),
-                        modifiedby: cr.modifiedby || ''
-                    });
-                }
-            });
-        });
-
-        (data.connectionReferences || []).forEach(cr => {
-            if (!cr.flowIds || cr.flowIds.length === 0) {
-                rows.push({
-                    id: `no-flow-${cr.id}`,
-                    flowName: '',
-                    crLogicalName: cr.name,
-                    provider: cleanProviderName(cr.connectorLogicalName),
-                    connectionName: cr.referencedConnectionId || '',
-                    ismanaged: cr.ismanaged ? 'Yes' : 'No',
-                    modifiedon: formatDate(cr.modifiedon),
-                    modifiedby: cr.modifiedby || ''
-                });
-            }
-        });
-
-        if ((data.connectionReferences || []).length === 0 && (data.flows || []).length > 0) {
-            (data.flows || []).forEach(f => {
-                rows.push({
-                    id: f.id,
-                    flowName: f.name,
-                    crLogicalName: '<em>none found</em>',
-                    provider: '<em>direct connections</em>',
-                    connectionName: '<em>n/a</em>',
-                    ismanaged: f.ismanaged ? 'Yes' : 'No',
-                    modifiedon: formatDate(f.modifiedon),
-                    modifiedby: f.modifiedby || ''
-                });
-            });
-        }
-
-        if (rows.length === 0) {
+        if (relationships.length === 0) {
             panelUtils.showNoData('No flows or connection references found for the selected environment.');
             return;
         }
 
+        // Transform relationships to table data
+        const tableData = relationships.map(rel => {
+            // Determine the most recent modification date and author
+            let modifiedOn = '';
+            let modifiedBy = '';
+            
+            if (rel.flowModifiedOn && rel.crModifiedOn) {
+                // Both exist, use the more recent one
+                const flowDate = new Date(rel.flowModifiedOn);
+                const crDate = new Date(rel.crModifiedOn);
+                if (flowDate > crDate) {
+                    modifiedOn = formatDate(rel.flowModifiedOn);
+                    modifiedBy = rel.flowModifiedBy || '';
+                } else {
+                    modifiedOn = formatDate(rel.crModifiedOn);
+                    modifiedBy = rel.crModifiedBy || '';
+                }
+            } else if (rel.flowModifiedOn) {
+                modifiedOn = formatDate(rel.flowModifiedOn);
+                modifiedBy = rel.flowModifiedBy || '';
+            } else if (rel.crModifiedOn) {
+                modifiedOn = formatDate(rel.crModifiedOn);
+                modifiedBy = rel.crModifiedBy || '';
+            }
+
+            // Determine managed status - prioritize flow managed status if flow exists, otherwise CR
+            let isManaged = '';
+            if (rel.flowIsManaged !== undefined || rel.crIsManaged !== undefined) {
+                if (rel.flowIsManaged !== undefined) {
+                    isManaged = rel.flowIsManaged ? 'Yes' : 'No';
+                } else if (rel.crIsManaged !== undefined) {
+                    isManaged = rel.crIsManaged ? 'Yes' : 'No';
+                }
+            }
+
+            return {
+                id: rel.id,
+                flowName: rel.flowName || '<span class="orphaned-item">No flows</span>',
+                connectionReference: rel.connectionReferenceLogicalName || '<span class="orphaned-item">No connection references</span>',
+                provider: cleanProviderName(rel.connectorType) || '',
+                connection: rel.connectionName || '',
+                ismanaged: isManaged,
+                modifiedOn: modifiedOn,
+                modifiedBy: modifiedBy,
+                relationshipType: rel.relationshipType // For future styling
+            };
+        });
+
         // Use pre-generated table template
+        const content = document.getElementById('content');
         const template = document.getElementById('connectionReferencesTableTemplate');
         content.innerHTML = template.innerHTML;
 
@@ -127,7 +174,7 @@ PanelUtils.setupMessageHandler({
         });
 
         // Load data and apply default sorting by flow name
-        TableUtils.loadTableData('connectionReferencesTable', rows);
+        TableUtils.loadTableData('connectionReferencesTable', tableData);
         TableUtils.sortTable('connectionReferencesTable', 'flowName', 'asc');
 
         const exportBtn = document.getElementById('exportBtn');

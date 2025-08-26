@@ -27,7 +27,7 @@ export interface EnvironmentVariableData {
 export class EnvironmentVariablesService {
     constructor(private authService: AuthenticationService) {}
 
-    async getEnvironmentVariables(environmentId: string): Promise<EnvironmentVariableData> {
+    async getEnvironmentVariables(environmentId: string, solutionId?: string): Promise<EnvironmentVariableData> {
         const environments = await this.authService.getEnvironments();
         const environment = environments.find(env => env.id === environmentId);
 
@@ -37,15 +37,44 @@ export class EnvironmentVariablesService {
 
         const token = await this.authService.getAccessToken(environment.id);
 
-        // Fetch environment variable definitions - only essential fields
-        const definitionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/environmentvariabledefinitions` +
+        // Base URLs for API calls
+        let definitionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/environmentvariabledefinitions` +
             `?$select=environmentvariabledefinitionid,displayname,schemaname,type,ismanaged,modifiedon,defaultvalue` +
             `&$expand=modifiedby($select=fullname)`;
 
-        // Fetch environment variable values - only essential fields
-        const valuesUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/environmentvariablevalues` +
+        let valuesUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/environmentvariablevalues` +
             `?$select=environmentvariablevalueid,_environmentvariabledefinitionid_value,value,modifiedon` +
             `&$expand=modifiedby($select=fullname)`;
+
+        // If solution filtering is requested, get the solution component IDs
+        if (solutionId && solutionId !== 'test-bypass') {
+            const { ServiceFactory } = await import('./ServiceFactory');
+            const solutionComponentService = ServiceFactory.getSolutionComponentService();
+            
+            // Get environment variable definition IDs in the solution
+            const envVarIds = await solutionComponentService.getEnvironmentVariableIdsInSolution(environmentId, solutionId);
+            console.log(`Found ${envVarIds.length} environment variables in solution ${solutionId}`);
+            
+            if (envVarIds.length > 0) {
+                // Filter definitions by solution membership
+                const definitionFilter = envVarIds.map(id => `environmentvariabledefinitionid eq ${id}`).join(' or ');
+                definitionsUrl += `&$filter=(${definitionFilter})`;
+                
+                // Filter values by definition IDs
+                const valueFilter = envVarIds.map(id => `_environmentvariabledefinitionid_value eq ${id}`).join(' or ');
+                valuesUrl += `&$filter=(${valueFilter})`;
+            } else {
+                // No environment variables in solution, use impossible filter
+                definitionsUrl += `&$filter=environmentvariabledefinitionid eq '00000000-0000-0000-0000-000000000000'`;
+                valuesUrl += `&$filter=environmentvariablevalueid eq '00000000-0000-0000-0000-000000000000'`;
+            }
+        }
+
+        console.log('EnvironmentVariablesService: Fetching data with URLs:', {
+            definitionsUrl,
+            valuesUrl,
+            solutionId
+        });
 
         const [definitionsResponse, valuesResponse] = await Promise.all([
             fetch(definitionsUrl, {

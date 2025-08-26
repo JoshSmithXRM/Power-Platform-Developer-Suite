@@ -43,7 +43,7 @@ export class SolutionService {
         const data = await response.json();
         const solutions = data.value || [];
 
-        return solutions.map((solution: any) => ({
+        const mappedSolutions = solutions.map((solution: any) => ({
             solutionId: solution.solutionid,
             uniqueName: solution.uniquename,
             friendlyName: solution.friendlyname || solution.displayname,
@@ -54,5 +54,11 @@ export class SolutionService {
             installedOn: solution.installedon,
             description: solution.description
         }));
+
+        // Ensure Default solution is first
+        const defaultSolution = mappedSolutions.find((s: Solution) => s.uniqueName === 'Default');
+        const otherSolutions = mappedSolutions.filter((s: Solution) => s.uniqueName !== 'Default');
+        
+        return defaultSolution ? [defaultSolution, ...otherSolutions] : mappedSolutions;
     }
 }

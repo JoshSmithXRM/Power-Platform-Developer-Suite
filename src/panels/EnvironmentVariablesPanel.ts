@@ -44,8 +44,16 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 await this.handleLoadEnvironments();
                 break;
 
+            case 'loadSolutions':
+                await this.handleLoadSolutions(message.environmentId);
+                break;
+
             case 'loadEnvironmentVariables':
-                await this.handleLoadEnvironmentVariables(message.environmentId);
+                await this.handleLoadEnvironmentVariables(message.environmentId, message.solutionId);
+                break;
+
+            case 'openInMaker':
+                await this.handleOpenInMaker(message.environmentId, message.solutionId, message.entityType);
                 break;
 
             default:
@@ -74,8 +82,28 @@ export class EnvironmentVariablesPanel extends BasePanel {
         }
     }
 
-    private async handleLoadEnvironmentVariables(environmentId: string): Promise<void> {
-        console.log('handleLoadEnvironmentVariables called with environmentId:', environmentId);
+    private async handleLoadSolutions(environmentId: string): Promise<void> {
+        if (!environmentId) {
+            this._panel.webview.postMessage({ action: 'error', message: 'Environment id required' });
+            return;
+        }
+
+        try {
+            const solutionService = ServiceFactory.getSolutionService();
+            const solutions = await solutionService.getSolutions(environmentId);
+
+            this._panel.webview.postMessage({ 
+                action: 'solutionsLoaded', 
+                data: solutions,
+                selectedSolutionId: solutions.find(s => s.uniqueName === 'Default')?.solutionId
+            });
+        } catch (err: any) {
+            this._panel.webview.postMessage({ action: 'error', message: err?.message || 'Failed to load solutions' });
+        }
+    }
+
+    private async handleLoadEnvironmentVariables(environmentId: string, solutionId?: string): Promise<void> {
+        console.log('handleLoadEnvironmentVariables called with environmentId:', environmentId, 'solutionId:', solutionId);
 
         if (!environmentId) {
             this._panel.webview.postMessage({
@@ -94,8 +122,8 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 selectedEnvironmentId: environmentId
             });
 
-            // Fetch environment variables data
-            const environmentVariablesData = await this._environmentVariablesService.getEnvironmentVariables(environmentId);
+            // Fetch environment variables data with optional solution filtering
+            const environmentVariablesData = await this._environmentVariablesService.getEnvironmentVariables(environmentId, solutionId);
 
             this._panel.webview.postMessage({
                 action: 'environmentVariablesLoaded',
@@ -110,11 +138,43 @@ export class EnvironmentVariablesPanel extends BasePanel {
         }
     }
 
+    private async handleOpenInMaker(environmentId: string, solutionId: string, entityType: string): Promise<void> {
+        if (!environmentId || !solutionId) {
+            this._panel.webview.postMessage({ action: 'error', message: 'Environment and solution are required' });
+            return;
+        }
+
+        try {
+            const environments = await this._authService.getEnvironments();
+            const environment = environments.find(env => env.id === environmentId);
+            
+            if (!environment) {
+                this._panel.webview.postMessage({ action: 'error', message: 'Environment not found' });
+                return;
+            }
+
+            // Use the actual environment GUID from the environment connection
+            const envGuid = environment.environmentId || environmentId;
+            const makerUrl = `https://make.powerapps.com/environments/${envGuid}/solutions/${solutionId}/objects/${entityType}`;
+            
+            console.log('Opening Maker URL:', makerUrl);
+            
+            // Open in external browser
+            vscode.env.openExternal(vscode.Uri.parse(makerUrl));
+            
+        } catch (err: any) {
+            this._panel.webview.postMessage({ action: 'error', message: err?.message || 'Failed to open in Maker' });
+        }
+    }
+
     protected getHtmlContent(): string {
         const { tableUtilsScript, tableStylesSheet, panelStylesSheet, panelUtilsScript } = this.getCommonWebviewResources();
 
         const envSelectorUtilsScript = this._panel.webview.asWebviewUri(
             vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'environment-selector-utils.js')
+        );
+        const solutionSelectorUtilsScript = this._panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'solution-selector-utils.js')
         );
 
         return `<!DOCTYPE html>
@@ -135,10 +195,19 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 </select>
                 <span id="environmentStatus" class="environment-status environment-disconnected">Disconnected</span>
             </div>
+
+            ${ComponentFactory.createSolutionSelector({
+                id: 'solutionSelect',
+                label: 'Solution:',
+                placeholder: 'Loading solutions...'
+            })}
             
             <div class="header">
                 <h1 class="title">Environment Variables Manager</h1>
-                <button class="btn" onclick="refreshEnvironmentVariables()">Refresh</button>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="openInMaker()">Open in Maker</button>
+                    <button class="btn" onclick="refreshEnvironmentVariables()">Refresh</button>
+                </div>
             </div>
             
             <div id="content">
@@ -170,11 +239,13 @@ export class EnvironmentVariablesPanel extends BasePanel {
             </script>
 
             <script src="${envSelectorUtilsScript}"></script>
+            <script src="${solutionSelectorUtilsScript}"></script>
             <script src="${panelUtilsScript}"></script>
             <script src="${tableUtilsScript}"></script>
             <script>
                 const vscode = acquireVsCodeApi();
                 let currentEnvironmentId = '';
+                let currentSolutionId = '';
                 
                 const panelUtils = PanelUtils.initializePanel({
                     environmentSelectorId: 'environmentSelect',
@@ -184,31 +255,68 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 
                 document.addEventListener('DOMContentLoaded', () => {
                     panelUtils.loadEnvironments();
+                    
+                    // Initialize solution selector
+                    SolutionSelectorUtils.initializeSelector('solutionSelect', {
+                        onSelectionChange: 'onSolutionChange'
+                    });
                 });
                 
                 function onEnvironmentChange(selectorId, environmentId, previousEnvironmentId) {
                     currentEnvironmentId = environmentId;
-                    
                     if (environmentId) {
-                        loadEnvironmentVariablesForEnvironment(environmentId);
+                        // Load solutions for the new environment
+                        loadSolutions(environmentId);
                     } else {
+                        // Clear solution selector and content
+                        SolutionSelectorUtils.clearSelector('solutionSelect', 'Select an environment first...');
+                        currentSolutionId = '';
                         panelUtils.clearContent('Select an environment to manage environment variables...');
                     }
                 }
+
+                function onSolutionChange(selectorId, solutionId, previousSolutionId) {
+                    currentSolutionId = solutionId;
+                    if (solutionId && currentEnvironmentId) {
+                        loadEnvironmentVariables(currentEnvironmentId, solutionId);
+                    } else {
+                        panelUtils.clearContent('Select a solution to view environment variables...');
+                    }
+                }
+
+                function loadSolutions(environmentId) {
+                    if (!environmentId) return;
+                    SolutionSelectorUtils.setLoadingState('solutionSelect', true);
+                    PanelUtils.sendMessage('loadSolutions', { environmentId });
+                }
                 
-                function loadEnvironmentVariablesForEnvironment(environmentId) {
+                function loadEnvironmentVariables(environmentId, solutionId) {
                     if (environmentId) {
                         panelUtils.showLoading('Loading environment variables...');
                         PanelUtils.sendMessage('loadEnvironmentVariables', { 
-                            environmentId: environmentId 
+                            environmentId: environmentId,
+                            solutionId: solutionId
                         });
                     }
                 }
 
                 function refreshEnvironmentVariables() {
-                    if (currentEnvironmentId) {
-                        loadEnvironmentVariablesForEnvironment(currentEnvironmentId);
+                    if (currentEnvironmentId && currentSolutionId) {
+                        loadEnvironmentVariables(currentEnvironmentId, currentSolutionId);
                     }
+                }
+
+                function openInMaker() {
+                    if (!currentEnvironmentId || !currentSolutionId) {
+                        PanelUtils.sendMessage('error', { message: 'Please select an environment and solution first' });
+                        return;
+                    }
+                    
+                    PanelUtils.sendMessage('openInMaker', { 
+                        environmentId: currentEnvironmentId, 
+                        solutionId: currentSolutionId,
+                        entityType: 'environment%20variables'
+                    });
                 }
 
                 // Setup message handlers
@@ -218,7 +326,16 @@ export class EnvironmentVariablesPanel extends BasePanel {
                         if (message.selectedEnvironmentId) {
                             EnvironmentSelectorUtils.setSelectedEnvironment('environmentSelect', message.selectedEnvironmentId);
                             currentEnvironmentId = message.selectedEnvironmentId;
-                            loadEnvironmentVariablesForEnvironment(message.selectedEnvironmentId);
+                            loadSolutions(message.selectedEnvironmentId);
+                        }
+                    },
+
+                    'solutionsLoaded': (message) => {
+                        SolutionSelectorUtils.setLoadingState('solutionSelect', false);
+                        SolutionSelectorUtils.loadSolutions('solutionSelect', message.data, message.selectedSolutionId);
+                        if (message.selectedSolutionId) {
+                            currentSolutionId = message.selectedSolutionId;
+                            loadEnvironmentVariables(currentEnvironmentId, message.selectedSolutionId);
                         }
                     },
 

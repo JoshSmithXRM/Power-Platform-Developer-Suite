@@ -13,14 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Connection References panel extracts relationships from flow `clientdata` field for accurate flow-to-connection-reference mapping
 - Connection References panel displays all flows, including those with direct connections (no connection references)
 - Connection References panel now includes table sorting, filtering, and row actions using TableUtils and ComponentFactory
+- SolutionComponentService for proper Dynamics solution membership queries via EntityDefinitions and solutioncomponents tables
+- Solution selector functionality on Connection References and Environment Variables panels with Default solution auto-selection
+- "Open in Maker" button functionality for connection references and environment variables with correct Power Platform URLs
 - Table footer with record count display - shows filtered count and total when applicable (always visible at bottom)
 - ComponentFactory now supports table footers with customizable text and record count placeholders
 - Text selection enabled in table cells - users can now highlight and copy text from any table cell
 - Normalized footer messages across all panels with consistent format: "Showing X of Y items"
+- Generic SolutionComponentService.getEntityIdsInSolution method for flexible entity type filtering
+- Environment Variables panel with full API integration and solution filtering support
 
 ### Fixed
 - Table UX improvements: enabled text selection (`user-select: text`) and text cursor (`cursor: text`) for all table cells
 - Footer message consistency: all panels now use standardized "Showing {filteredCount} of {totalCount} items" format
+- Connection References panel solution filtering now uses proper Dynamics solution component queries instead of incorrect solutionid field filtering
+- Solution filtering properly scopes data by querying EntityDefinitions for ObjectTypeCode and solutioncomponents for actual solution membership
+- Environment Setup Panel webview resource loading - fixed localResourceRoots configuration to allow loading JavaScript and CSS files from resources directory
+- Connection References service optimization - removed unnecessary /connections API call and simplified connection name resolution to use data already available in connection references
 
 ### Changed
 - Nothing yet

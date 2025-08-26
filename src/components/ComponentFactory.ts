@@ -63,6 +63,14 @@ export interface EnvironmentSelectorConfig {
     className?: string;
 }
 
+export interface SolutionSelectorConfig {
+    id?: string;
+    className?: string;
+    label?: string;
+    placeholder?: string;
+    onSelectionChange?: string;
+}
+
 export enum BadgeType {
     Success = 'success',
     Error = 'error',
@@ -93,6 +101,25 @@ export class ComponentFactory {
                     <option value="">${placeholder}</option>
                 </select>
                 ${showStatus ? `<span id="${statusId}" class="environment-status environment-disconnected">Disconnected</span>` : ''}
+            </div>
+        `;
+    }
+
+    /**
+     * Create solution selector component
+     */
+    static createSolutionSelector(config: SolutionSelectorConfig = {}): string {
+        const id = config.id || 'solutionSelect';
+        const className = config.className || 'solution-selector';
+        const label = config.label || 'Solution:';
+        const placeholder = config.placeholder || 'Loading solutions...';
+
+        return `
+            <div class="${className}">
+                <span class="solution-label">${label}</span>
+                <select id="${id}" class="solution-dropdown">
+                    <option value="">${placeholder}</option>
+                </select>
             </div>
         `;
     }
