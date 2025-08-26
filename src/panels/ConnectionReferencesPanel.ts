@@ -127,6 +127,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                 <div class="header-actions">
                     <button class="btn" id="exportBtn">Export Skeleton</button>
                     <button class="btn btn-secondary" id="visualizeBtn" disabled>Visualize (coming soon)</button>
+                    <button class="btn" onclick="refreshData()">Refresh</button>
                 </div>
             </div>
 

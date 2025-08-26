@@ -42,6 +42,11 @@ function loadConnectionReferences(environmentId) {
     PanelUtils.sendMessage('loadConnectionReferences', { environmentId });
 }
 
+function refreshData() {
+    if (!currentEnvironmentId) return;
+    loadConnectionReferences(currentEnvironmentId);
+}
+
 // Message handlers
 PanelUtils.setupMessageHandler({
     'environmentsLoaded': (message) => {
