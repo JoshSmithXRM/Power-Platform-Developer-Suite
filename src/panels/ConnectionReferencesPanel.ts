@@ -88,7 +88,8 @@ export class ConnectionReferencesPanel extends BasePanel {
             data: {
                 flowsCount: rels?.flows?.length || 0,
                 connectionReferencesCount: rels?.connectionReferences?.length || 0,
-                connectionsCount: rels?.connections?.length || 0
+                connectionsCount: rels?.connections?.length || 0,
+                _debug: (rels as any)?._debug || {}
             }
         });
 

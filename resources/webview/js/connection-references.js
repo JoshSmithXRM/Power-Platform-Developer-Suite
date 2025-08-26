@@ -49,6 +49,7 @@ PanelUtils.setupMessageHandler({
             (data.connectionReferences || []).forEach(cr => {
                 if (cr.flowIds && cr.flowIds.includes(f.id)) {
                     rows.push({
+                        id: `${f.id}-${cr.id}`, // Unique ID for table row actions
                         flowName: f.name,
                         crLogicalName: cr.name,
                         provider: cr.connectorLogicalName || '',
@@ -58,8 +59,32 @@ PanelUtils.setupMessageHandler({
             });
         });
 
+        (data.connectionReferences || []).forEach(cr => {
+            if (!cr.flowIds || cr.flowIds.length === 0) {
+                rows.push({
+                    id: `no-flow-${cr.id}`, // Unique ID for table row actions
+                    flowName: '',
+                    crLogicalName: cr.name,
+                    provider: cr.connectorLogicalName || '',
+                    connectionName: cr.referencedConnectionName || ''
+                });
+            }
+        });
+
+        if ((data.connectionReferences || []).length === 0 && (data.flows || []).length > 0) {
+            (data.flows || []).forEach(f => {
+                rows.push({
+                    id: f.id, // Unique ID for table row actions
+                    flowName: f.name,
+                    crLogicalName: '<em>none found</em>',
+                    provider: '<em>direct connections</em>',
+                    connectionName: '<em>n/a</em>'
+                });
+            });
+        }
+
         if (rows.length === 0) {
-            panelUtils.showNoData('No connection references found for the selected environment.');
+            panelUtils.showNoData('No flows or connection references found for the selected environment.');
             return;
         }
 
@@ -89,8 +114,10 @@ PanelUtils.setupMessageHandler({
         console.log('connectionReferencesDebug:', message.data);
         const content = document.getElementById('content');
         if (content) {
-            const debugHtml = `<div style="padding:8px;color:var(--vscode-editor-foreground);font-size:12px;opacity:0.85;">Relationships: flows=${message.data.flowsCount}, connectionReferences=${message.data.connectionReferencesCount}, connections=${message.data.connectionsCount}</div>`;
-            content.insertAdjacentHTML('afterbegin', debugHtml);
+            const debugDetails = message.data._debug ? `<pre style="color:var(--vscode-editor-foreground);font-size:11px;opacity:0.85;">${JSON.stringify(message.data._debug, null, 2)}</pre>` : '';
+            const debugHtml = `<div style="padding:8px;color:var(--vscode-editor-foreground);font-size:12px;opacity:0.85;">Relationships: flows=${message.data.flowsCount}, connectionReferences=${message.data.connectionReferencesCount}, connections=${message.data.connectionsCount}</div>` + debugDetails;
+            +
+                content.insertAdjacentHTML('afterbegin', debugHtml);
         }
     },
 

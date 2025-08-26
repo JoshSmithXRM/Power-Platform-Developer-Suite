@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Connection References panel with full API integration - browse flows and their connection references relationships
+- Connection References panel fetches data using proper Dataverse field names (`connectionreferencelogicalname`, `connectionreferencedisplayname`, `connectionid`)
+- Connection References panel extracts relationships from flow `clientdata` field for accurate flow-to-connection-reference mapping
+- Connection References panel displays all flows, including those with direct connections (no connection references)
+
+### Fixed
 - Nothing yet
 
 ### Changed

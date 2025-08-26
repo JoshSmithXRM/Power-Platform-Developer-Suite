@@ -71,10 +71,8 @@ export class PanelCommands {
                 PluginTraceViewerPanel.createNew(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.refreshEnvironments', () => {
-                this.environmentsProvider.refresh();
-                vscode.window.showInformationMessage('Environments refreshed');
-            })
+            // Note: 'dynamics-devtools.refreshEnvironments' is registered by EnvironmentCommands
+            // to avoid duplicate command registration remove it from PanelCommands.
         ];
     }
 }
