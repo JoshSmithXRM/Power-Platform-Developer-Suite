@@ -4,7 +4,7 @@ export interface TableConfig {
     defaultSort?: {
         column: string;
         direction: 'asc' | 'desc';
-        type?: 'string' | 'number' | 'date' | 'version';  // Optional override for complex sorting
+        type?: 'string' | 'number' | 'date' | 'version';
     };
     rowActions?: TableAction[];
     contextMenu?: ContextMenuItem[];
@@ -14,6 +14,8 @@ export interface TableConfig {
     stickyHeader?: boolean;
     stickyFirstColumn?: boolean;
     className?: string;
+    showFooter?: boolean;
+    footerText?: string;
 }
 
 export interface TableColumn {
@@ -22,43 +24,43 @@ export interface TableColumn {
     sortable?: boolean;
     width?: string;
     className?: string;
-    renderer?: string; // Function name for custom rendering
+    renderer?: string;
 }
 
 export interface TableAction {
     id: string;
     label: string;
     icon?: string;
-    action: string;                 // Message action to send
-    condition?: string;             // JS function name for show/hide logic
+    action: string;
+    condition?: string;
     className?: string;
 }
 
 export interface ContextMenuItem {
     id: string;
     label: string;
-    action: string;                 // Message action to send
+    action: string;
     separator?: boolean;
-    condition?: string;             // JS function name for show/hide logic
+    condition?: string;
 }
 
 export interface BulkAction {
     id: string;
     label: string;
-    action: string;                 // Message action to send
+    action: string;
     icon?: string;
     requiresSelection?: boolean;
     className?: string;
 }
 
 export interface EnvironmentSelectorConfig {
-    id?: string;                    // Unique ID for multiple selectors
-    statusId?: string;              // ID for status indicator element
-    label?: string;                 // "Source Environment:", "Target Environment:"
-    placeholder?: string;           // Placeholder text for dropdown
-    showStatus?: boolean;           // Show connection status indicator
-    onSelectionChange?: string;     // JS function name for selection events
-    className?: string;            // Additional CSS classes
+    id?: string;
+    statusId?: string;
+    label?: string;
+    placeholder?: string;
+    showStatus?: boolean;
+    onSelectionChange?: string;
+    className?: string;
 }
 
 export enum BadgeType {
@@ -83,7 +85,7 @@ export class ComponentFactory {
         const label = config.label || 'Environment:';
         const showStatus = config.showStatus !== false;
         const placeholder = config.placeholder || 'Loading environments...';
-        
+
         return `
             <div class="${className}">
                 <span class="environment-label">${label}</span>
@@ -94,7 +96,7 @@ export class ComponentFactory {
             </div>
         `;
     }
-    
+
     /**
      * Create data table component
      */
@@ -110,12 +112,13 @@ export class ComponentFactory {
             selectable = false,
             stickyHeader = true,
             stickyFirstColumn = true,
-            className = 'data-table'
+            className = 'data-table',
+            showFooter = false,
+            footerText = 'Showing {filteredCount} of {totalCount} items'
         } = config;
-        
-        // Auto-enable sorting if any column is sortable or default sort is specified
+
         const sortable = columns.some(col => col.sortable !== false) || !!defaultSort;
-        
+
         const tableClass = [
             className,
             sortable ? 'sortable-table' : '',
@@ -124,15 +127,14 @@ export class ComponentFactory {
             selectable ? 'selectable-table' : '',
             filterable ? 'filterable-table' : ''
         ].filter(Boolean).join(' ');
-        
-        // Add filter controls if enabled
+
         const filterControls = filterable ? `
             <div class="table-controls">
                 <input type="text" id="${id}_filter" placeholder="Filter table..." class="filter-input">
                 <button onclick="clearTableFilter('${id}')" class="clear-filter-btn">Clear</button>
             </div>
         ` : '';
-        
+
         // Add bulk actions if enabled and actions exist
         const bulkActionsHtml = (selectable && bulkActions.length > 0) ? `
             <div class="bulk-actions" id="${id}_bulkActions" style="display: none;">
@@ -146,11 +148,11 @@ export class ComponentFactory {
                 `).join('')}
             </div>
         ` : '';
-        
+
         const headers = columns.map(col => {
             const sortableClass = (sortable && col.sortable !== false) ? 'sortable' : '';
             const style = col.width ? `style="width: ${col.width}"` : '';
-            
+
             return `
                 <th class="${sortableClass} ${col.className || ''}" 
                     data-column="${col.key}" 
@@ -160,56 +162,64 @@ export class ComponentFactory {
                 </th>
             `;
         }).join('');
-        
-        // Add action column header if row actions exist
+
         const actionHeader = rowActions.length > 0 ? `
             <th class="actions-column" style="width: ${rowActions.length * 40 + 20}px;">Actions</th>
         ` : '';
-        
-        // Add selection column header if selectable
+
         const selectionHeader = selectable ? `
             <th class="selection-column" style="width: 40px;">
                 <input type="checkbox" id="${id}_selectAll" onchange="handleSelectAll('${id}', this.checked)">
             </th>
         ` : '';
-        
+
+        const footerHtml = showFooter ? `
+            <div class="table-footer" id="${id}Footer">
+                <span class="record-count" id="${id}RecordCount">${footerText.replace('{filteredCount}', '0').replace('{totalCount}', '0')}</span>
+            </div>
+        ` : '';
+
         return `
             <div class="table-container" id="${id}Container">
                 ${filterControls}
                 ${bulkActionsHtml}
-                <table id="${id}" class="${tableClass}" 
-                       data-default-sort='${JSON.stringify(defaultSort || {})}'
-                       data-row-actions='${JSON.stringify(rowActions)}'
-                       data-context-menu='${JSON.stringify(contextMenu)}'>
-                    <thead>
-                        <tr>
-                            ${selectionHeader}
-                            ${headers}
-                            ${actionHeader}
-                        </tr>
-                    </thead>
-                    <tbody id="${id}Body">
-                        <!-- Data will be populated by JavaScript -->
-                    </tbody>
-                </table>
+                <div class="table-scroll-wrapper">
+                    <table id="${id}" class="${tableClass}" 
+                           data-default-sort='${JSON.stringify(defaultSort || {})}'
+                           data-row-actions='${JSON.stringify(rowActions)}'
+                           data-context-menu='${JSON.stringify(contextMenu)}'
+                           data-footer-text='${footerText}'>
+                        <thead>
+                            <tr>
+                                ${selectionHeader}
+                                ${headers}
+                                ${actionHeader}
+                            </tr>
+                        </thead>
+                        <tbody id="${id}Body">
+                            <!-- Data will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                ${footerHtml}
             </div>
         `;
     }
-    
+
     /**
      * Create status badge component
      */
     static createStatusBadge(text: string, type: BadgeType): string {
         return `<span class="status-badge status-${type}">${text}</span>`;
     }
-    
+
     /**
      * Create filter controls component
      */
     static createFilterControls(options: { placeholder?: string, className?: string } = {}): string {
         const placeholder = options.placeholder || 'Filter...';
         const className = options.className || 'filter-controls';
-        
+
         return `
             <div class="${className}">
                 <input type="text" 
@@ -219,7 +229,7 @@ export class ComponentFactory {
             </div>
         `;
     }
-    
+
     /**
      * Get base CSS for all components
      */
@@ -311,7 +321,7 @@ export class ComponentFactory {
             }
         `;
     }
-    
+
     /**
      * Get environment selector CSS
      */
@@ -369,7 +379,7 @@ export class ComponentFactory {
             }
         `;
     }
-    
+
     /**
      * Get data table CSS
      */
@@ -593,7 +603,7 @@ export class ComponentFactory {
             }
         `;
     }
-    
+
     /**
      * Get environment selector JavaScript
      */
@@ -672,7 +682,7 @@ export class ComponentFactory {
             });
         `;
     }
-    
+
     /**
      * Get data table JavaScript - Fixed table sorting functionality
      */

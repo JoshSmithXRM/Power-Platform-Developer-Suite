@@ -4,9 +4,14 @@
 body {
     margin: 0;
     padding: 20px;
+    padding-bottom: 60px; /* Account for fixed footer */
     font-family: var(--vscode-font-family);
     background: var(--vscode-editor-background);
     color: var(--vscode-editor-foreground);
+    height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Header Layout */

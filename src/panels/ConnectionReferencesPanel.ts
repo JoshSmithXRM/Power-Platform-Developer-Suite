@@ -157,7 +157,8 @@ export class ConnectionReferencesPanel extends BasePanel {
                     ],
                     defaultSort: { column: 'flowName', direction: 'asc' },
                     filterable: true,
-                    stickyFirstColumn: false
+                    stickyFirstColumn: false,
+                    showFooter: true
                 })}
             </div>
 

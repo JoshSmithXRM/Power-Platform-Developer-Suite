@@ -13,9 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Connection References panel extracts relationships from flow `clientdata` field for accurate flow-to-connection-reference mapping
 - Connection References panel displays all flows, including those with direct connections (no connection references)
 - Connection References panel now includes table sorting, filtering, and row actions using TableUtils and ComponentFactory
+- Table footer with record count display - shows filtered count and total when applicable (always visible at bottom)
+- ComponentFactory now supports table footers with customizable text and record count placeholders
+- Text selection enabled in table cells - users can now highlight and copy text from any table cell
+- Normalized footer messages across all panels with consistent format: "Showing X of Y items"
 
 ### Fixed
-- Nothing yet
+- Table UX improvements: enabled text selection (`user-select: text`) and text cursor (`cursor: text`) for all table cells
+- Footer message consistency: all panels now use standardized "Showing {filteredCount} of {totalCount} items" format
 
 ### Changed
 - Nothing yet

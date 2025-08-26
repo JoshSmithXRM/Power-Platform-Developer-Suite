@@ -2,6 +2,13 @@
 const vscode = acquireVsCodeApi();
 let currentEnvironmentId = '';
 
+// Helper function to clean up provider names
+function cleanProviderName(providerName) {
+    if (!providerName) return '';
+    // Remove the redundant Microsoft PowerApps prefix
+    return providerName.replace(/^\/providers\/Microsoft\.PowerApps\/apis\//, '');
+}
+
 // Initialize panel utilities similar to other panels
 const panelUtils = PanelUtils.initializePanel({
     environmentSelectorId: 'environmentSelect',
@@ -53,7 +60,7 @@ PanelUtils.setupMessageHandler({
                         id: `${f.id}-${cr.id}`, // Unique ID for table row actions
                         flowName: f.name,
                         crLogicalName: cr.name,
-                        provider: cr.connectorLogicalName || '',
+                        provider: cleanProviderName(cr.connectorLogicalName),
                         connectionName: cr.referencedConnectionId || ''
                     });
                 }
@@ -66,7 +73,7 @@ PanelUtils.setupMessageHandler({
                     id: `no-flow-${cr.id}`,
                     flowName: '',
                     crLogicalName: cr.name,
-                    provider: cr.connectorLogicalName || '',
+                    provider: cleanProviderName(cr.connectorLogicalName),
                     connectionName: cr.referencedConnectionId || ''
                 });
             }

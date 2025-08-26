@@ -448,6 +448,7 @@ class TableUtils {
         
         this.updateBulkActions(tableId);
         this.updateSelectAllCheckbox(tableId);
+        this.updateTableFooter(tableId);
     }
     
     /**
@@ -527,6 +528,38 @@ class TableUtils {
         
         // Compare as strings
         return String(a).localeCompare(String(b));
+    }
+    
+    /**
+     * Update table footer with record count
+     */
+    static updateTableFooter(tableId) {
+        const config = this.tables.get(tableId);
+        if (!config) return;
+        
+        const footerElement = document.getElementById(`${tableId}Footer`);
+        const recordCountElement = document.getElementById(`${tableId}RecordCount`);
+        
+        if (footerElement && recordCountElement) {
+            const count = config.filteredData.length;
+            const totalCount = config.originalData.length;
+            
+            let footerText = 'Showing {filteredCount} of {totalCount} items';
+            
+            // Get custom footer text from table data attribute or use default
+            const table = document.getElementById(tableId);
+            if (table && table.dataset.footerText) {
+                footerText = table.dataset.footerText;
+            }
+            
+            // Replace placeholders with actual values
+            let displayText = footerText
+                .replace('{filteredCount}', count)
+                .replace('{totalCount}', totalCount)
+                .replace('{count}', count); // Keep backward compatibility
+            
+            recordCountElement.textContent = displayText;
+        }
     }
 }
 
