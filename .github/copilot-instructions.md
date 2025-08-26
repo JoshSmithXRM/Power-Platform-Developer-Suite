@@ -62,50 +62,105 @@ Use semantic categories in CHANGELOG.md entries:
 - **Prefer self-documenting code** - use clear, descriptive naming over excessive commenting
 - **Strategic comments are welcome** for:
   - Complex algorithms or business logic that isn't immediately obvious
-# GitHub Copilot Instructions for Dynamics DevTools
+  - Public API contracts and integration points
+  - Workarounds for known platform limitations
+- **Maintain consistent naming** following existing patterns in the codebase
+- **Use TypeScript strictly** with proper type definitions
 
-## Quick start (authority and hard rules)
-- Authoritative changelog: see `CHANGELOG.md` for the canonical, versioned implementation status and release history.
-- Hard rules (non-negotiable):
-    - Never exfiltrate secrets, credentials, or sensitive data.
-    - Do not perform external network calls except when explicitly requested and permitted by the user/repo owner.
-    - Never paste raw patch diffs or terminal commands into chat output; use the repository edit and terminal workflows instead.
-    - Ask a clarifying question when requirements are ambiguous.
+### 3. Security & Privacy Requirements
+- **Never log tokens, credentials, or sensitive data**
+- **Use VS Code SecretStorage** for all sensitive information
+- **All API calls through AuthenticationService** - no alternate auth patterns
+- **Validate user inputs** before API interactions
+- **External calls only through proper authentication channels**
 
-## How to edit files (short checklist)
-- Use the project's edit APIs/workflow: prefer `apply_patch` / `insert_edit_into_file` for edits.
-- Make minimal, well-scoped changes that preserve coding style and public APIs.
-- For runnable code: include a tiny test or runner and update manifests (`package.json` etc.) when required.
-- Run the build (or the project's `Build Extension` task) and typecheck locally after substantive edits and report the results.
+## Development Commands
 
-## Verification required before marking a change done
-1. Build or compile step completed (or you ran the `Build Extension` task).
-2. Type checks and unit tests (if present) pass.
-3. `CHANGELOG.md` updated in `[Unreleased]` (or a release section added when releasing).
+```bash
+npm install              # Install dependencies
+npm run compile          # Development build
+npm run watch            # Watch mode for development
+npm run package          # Production build with webpack
+npm run lint             # ESLint type checking
+npm run vsce-package     # Create .vsix package
+npm run test-release     # Build, package, and install locally
+```
 
-## Purpose of this file
-Short, actionable guidance for automated editing agents and contributors (APIs safe to call, which panels are scaffold-only, where mocks/stubs live). For full release history and user-facing notes, consult `CHANGELOG.md` and GitHub Releases.
+**Development Workflow:**
+- Use `npm run watch` for continuous compilation
+- Press F5 to launch Extension Development Host
+- Use VS Code "Build Extension" task for webpack compilation
 
-## Core development principles (concise)
-- Follow the modular architecture in `docs/ARCHITECTURE_GUIDE.md`.
-- Keep files small and single-purpose. Prefer composition over heavy inheritance.
-- Use `ServiceFactory` for dependency injection and shared services.
+## Core Development Principles (Concise)
 
-## API & Dynamics guidelines (high level)
-- Use `$select`, `$top`, `$orderby`, and `$expand` appropriately for OData queries.
-- Prefer server-side pagination; be aware some entities (e.g., `importjobs`) have quirks.
-- Use `AuthenticationService` for token management; do not create alternate auth patterns.
+- **Follow modular architecture** documented in `docs/ARCHITECTURE_GUIDE.md`
+- **Keep files small and single-purpose** - prefer composition over inheritance
+- **Use ServiceFactory** for dependency injection and shared services
+- **All panels extend BasePanel** with consistent structure and message handling
+- **Use shared utilities**: TableUtils, PanelUtils, EnvironmentSelectorUtils
 
-## UI & panel guidelines
-- Extend `BasePanel` for webview panels and follow the established message-passing pattern.
-- Ensure proper disposal of panels and listeners to avoid memory leaks.
+## Critical Technical Requirements
 
-## Security & privacy (reminder)
-- Never log tokens or secrets. Use VS Code `SecretStorage` for sensitive data.
+**Table Implementation (REQUIRED):**
+```javascript
+// Data MUST have 'id' property for row actions to work
+const tableData = items.map(item => ({
+    id: item.primaryKey,     // Required for TableUtils
+    status: calculateStatus(item),  // Can contain HTML badges
+    ...item
+}));
 
-## Quick reference — Do / Don't
-- Do: reuse existing utilities (`TableUtils`, `PanelUtils`), add tests for new behavior, and update `CHANGELOG.md`.
-- Don't: invent new authentication patterns, hardcode URLs, or modify large unrelated files.
+// Initialize with action handlers
+TableUtils.initializeTable('tableId', {
+    onRowAction: handleRowAction  // (actionId, rowData) => void
+});
+```
+
+**Panel Development Pattern:**
+- Extend `BasePanel` class with dependency injection via ServiceFactory
+- Include common webview resources via `getCommonWebviewResources()`
+- Follow standard message handling with try/catch error handling
+- Use StateService for UI state persistence (not data caching)
+
+## API & Dynamics Guidelines
+
+- **OData queries**: Use `$select`, `$top`, `$orderby`, `$expand` appropriately
+- **Server-side pagination preferred** - be aware some entities have quirks
+- **AuthenticationService only** for token management - no alternate patterns
+- **Fresh API calls always** - only cache UI preferences, not data
+
+## UI & Panel Guidelines
+
+- **Extend BasePanel** for all webview panels with established message-passing pattern
+- **Use ComponentFactory** for environment selectors and data tables
+- **Include shared utilities**: TableUtils, PanelUtils, EnvironmentSelectorUtils
+- **Ensure proper disposal** of panels and listeners to avoid memory leaks
+- **Table data requirements**: MUST have 'id' property for row actions
+- **Support HTML content** in table cells for badges and formatting
+
+## Hard Rules (Non-Negotiable)
+
+- **Never exfiltrate secrets, credentials, or sensitive data**
+- **No external network calls** except when explicitly requested and permitted
+- **Never paste raw patch diffs or terminal commands** - use repository workflows
+- **Ask clarifying questions** when requirements are ambiguous
+- **Use VS Code SecretStorage** for all sensitive data storage
+
+## Quick Reference — Do / Don't
+
+**DO:**
+- Reuse existing utilities (`TableUtils`, `PanelUtils`, `EnvironmentSelectorUtils`)
+- Follow established architectural patterns in existing panels
+- Update `CHANGELOG.md` under `[Unreleased]` for all changes
+- Run build verification before completion (`npm run package`, `npm run lint`)
+- Test in Extension Development Host (F5) before marking complete
+
+**DON'T:**
+- Invent new authentication patterns - use AuthenticationService only
+- Hardcode URLs or connection strings
+- Modify large unrelated files - keep changes focused
+- Create direct service instances - use ServiceFactory dependency injection
+- Cache API data - only persist UI state preferences
 
 ## Communication & response style
 - Provide a one-line plan, a short checklist of steps, then perform edits. Keep messages concise.
@@ -114,5 +169,10 @@ Short, actionable guidance for automated editing agents and contributors (APIs s
 ## Change tracking
 - Always update `CHANGELOG.md` under `[Unreleased]` for development changes. Move entries to a versioned section when releasing.
 
-## Example patterns (unchanged)
-...existing code...
+## Webpack Bundling
+
+Extension uses webpack for production optimization:
+- Single bundled output: `dist/extension.js`
+- 92% size reduction (127KB vs 1.64MB)
+- All dependencies bundled except VS Code API
+- Source maps for debugging support
