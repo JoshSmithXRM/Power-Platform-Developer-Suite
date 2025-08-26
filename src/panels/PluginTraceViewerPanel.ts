@@ -62,6 +62,10 @@ export class PluginTraceViewerPanel extends BasePanel {
                     await this.handleRefreshTraces(message.environmentId, message.filterOptions);
                     break;
 
+                case 'openTraceInDynamics':
+                    await this.handleOpenTraceInDynamics(message.environmentId, message.traceId);
+                    break;
+
                 default:
                     console.log('Unknown action:', message.action);
             }
@@ -189,6 +193,38 @@ export class PluginTraceViewerPanel extends BasePanel {
 
     private async handleRefreshTraces(environmentId: string, filterOptions?: PluginTraceFilterOptions): Promise<void> {
         await this.handleLoadPluginTraces(environmentId, filterOptions);
+    }
+
+    private async handleOpenTraceInDynamics(environmentId: string, traceId: string): Promise<void> {
+        if (!environmentId || !traceId) {
+            this.postMessage({
+                action: 'error',
+                message: 'Environment ID and Trace ID are required'
+            });
+            return;
+        }
+
+        try {
+            const environments = await this._authService.getEnvironments();
+            const environment = environments.find(env => env.id === environmentId);
+
+            if (!environment) {
+                throw new Error('Environment not found');
+            }
+
+            // Extract the base URL from the dataverseUrl (remove /api/data/v9.2 part)
+            const baseUrl = environment.settings.dataverseUrl.replace('/api/data/v9.2', '').replace(/\/$/, '');
+            const dynamicsUrl = `${baseUrl}/main.aspx?pagetype=entityrecord&etn=plugintracelog&id=${traceId}`;
+
+            await vscode.env.openExternal(vscode.Uri.parse(dynamicsUrl));
+
+        } catch (error: any) {
+            console.error('Error opening trace in Dynamics:', error);
+            this.postMessage({
+                action: 'error',
+                message: `Failed to open trace in Dynamics: ${error.message}`
+            });
+        }
     }
 
     protected getHtmlContent(): string {
@@ -386,7 +422,8 @@ export class PluginTraceViewerPanel extends BasePanel {
                     filterable: true,
                     showFooter: true,
                     rowActions: [
-                        { id: 'viewDetails', label: 'View Details', icon: '👁️', action: 'viewTraceDetails' }
+                        { id: 'viewDetails', label: 'View Details', icon: '👁️', action: 'viewTraceDetails' },
+                        { id: 'openInDynamics', label: 'View in Dynamics', icon: '🔗', action: 'openTraceInDynamics' }
                     ]
                 })}
             </script>
@@ -538,7 +575,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                     
                     // Transform data for table display
                     const tableData = data.map(trace => ({
-                        id: trace.plugintraceid,
+                        id: trace.plugintracelogid,
                         createdon: formatDate(trace.createdon),
                         duration: formatDuration(trace.duration),
                         pluginname: trace.pluginname || '',
@@ -620,11 +657,16 @@ export class PluginTraceViewerPanel extends BasePanel {
                 function handleRowAction(actionId, rowData) {
                     if (actionId === 'viewTraceDetails') {
                         viewTraceDetails(rowData.id);
+                    } else if (actionId === 'openTraceInDynamics') {
+                        PanelUtils.sendMessage('openTraceInDynamics', {
+                            environmentId: currentEnvironmentId,
+                            traceId: rowData.id
+                        });
                     }
                 }
                 
                 function viewTraceDetails(traceId) {
-                    const trace = currentTraceData.find(t => t.plugintraceid === traceId);
+                    const trace = currentTraceData.find(t => t.plugintracelogid === traceId);
                     if (trace) {
                         // Show detailed information in a dialog-like format
                         const details = \`

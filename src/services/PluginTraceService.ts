@@ -1,7 +1,7 @@
 import { AuthenticationService } from './AuthenticationService';
 
 export interface PluginTraceLog {
-    plugintraceid: string;
+    plugintracelogid: string;
     createdon: string;
     operationtype: string;
     pluginname: string;
@@ -46,7 +46,7 @@ export interface OrganizationSettings {
 }
 
 export class PluginTraceService {
-    constructor(private authService: AuthenticationService) {}
+    constructor(private authService: AuthenticationService) { }
 
     async getPluginTraceLogs(environmentId: string, filterOptions: PluginTraceFilterOptions = {}): Promise<PluginTraceLog[]> {
         const environments = await this.authService.getEnvironments();
@@ -60,7 +60,7 @@ export class PluginTraceService {
 
         // Build OData query - using plugintracelogs entity
         let url = `${environment.settings.dataverseUrl}/api/data/v9.2/plugintracelogs`;
-        
+
         // Select specific fields for performance - using correct Dataverse field names
         const selectFields = [
             'plugintracelogid',
@@ -70,39 +70,49 @@ export class PluginTraceService {
             'primaryentity',
             'messagename',
             'mode',
-            'stage',
             'depth',
-            'duration',
+            'performanceexecutionduration',
+            'performanceconstructorduration',
             'exceptiondetails',
             'messageblock',
             'configuration',
-            'performancedetails',
-            'correlationid'
+            'correlationid',
+            'organizationid',
+            'pluginstepid',
+            'requestid',
+            'performanceexecutionstarttime',
+            'performanceconstructorstarttime',
+            'profile',
+            'persistencekey',
+            'issystemcreated',
+            '_createdby_value',
+            '_createdonbehalfby_value',
+            'secureconfiguration'
         ];
-        
+
         url += `?$select=${selectFields.join(',')}`;
 
         // Add filters
         const filters: string[] = [];
-        
+
         if (filterOptions.fromDate) {
             filters.push(`createdon ge ${filterOptions.fromDate}`);
         }
-        
+
         if (filterOptions.toDate) {
             filters.push(`createdon le ${filterOptions.toDate}`);
         }
-        
+
         if (filterOptions.pluginName) {
-            filters.push(`contains(pluginname,'${filterOptions.pluginName}')`);
+            filters.push(`contains(typename,'${filterOptions.pluginName}')`);
         }
-        
+
         if (filterOptions.entityName) {
-            filters.push(`entityname eq '${filterOptions.entityName}'`);
+            filters.push(`contains(primaryentity,'${filterOptions.entityName}')`);
         }
-        
+
         if (filterOptions.exceptionOnly) {
-            filters.push(`exceptiondetails ne null`);
+            filters.push(`exceptiondetails ne ''`);
         }
 
         if (filters.length > 0) {
@@ -143,21 +153,21 @@ export class PluginTraceService {
 
         // Transform data
         const traceLogs: PluginTraceLog[] = (data.value || []).map((log: any) => ({
-            plugintraceid: log.plugintraceid,
+            plugintracelogid: log.plugintracelogid,
             createdon: log.createdon,
-            operationtype: log.operationtype || '',
-            pluginname: log.pluginname || '',
-            entityname: log.entityname || '',
+            operationtype: log.operationtype?.toString() || '',
+            pluginname: log.typename || '',
+            entityname: log.primaryentity || '',
             messagename: log.messagename || '',
             mode: log.mode || 0,
-            stage: log.stage || 0,
+            stage: 0, // Stage is not available in the API response, defaulting to 0
             depth: log.depth || 0,
-            duration: log.duration || 0,
+            duration: log.performanceexecutionduration || 0,
             exceptiondetails: log.exceptiondetails || null,
             messageblock: log.messageblock || '',
             typename: log.typename || '',
             configuration: log.configuration || '',
-            performancedetails: log.performancedetails || '',
+            performancedetails: `Execution: ${log.performanceexecutionduration || 0}ms, Constructor: ${log.performanceconstructorduration || 0}ms`,
             correlationid: log.correlationid || ''
         }));
 
@@ -191,7 +201,7 @@ export class PluginTraceService {
 
         const data = await response.json();
         const organization = data.value?.[0];
-        
+
         if (!organization) {
             throw new Error('Organization settings not found');
         }
@@ -232,7 +242,7 @@ export class PluginTraceService {
 
         // Update the plugin trace log setting
         const updateUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/organizations(${organizationId})`;
-        
+
         const updateResponse = await fetch(updateUrl, {
             method: 'PATCH',
             headers: {
