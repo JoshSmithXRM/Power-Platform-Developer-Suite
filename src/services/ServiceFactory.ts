@@ -2,12 +2,16 @@ import * as vscode from 'vscode';
 import { AuthenticationService } from './AuthenticationService';
 import { StateService } from './StateService';
 import { SolutionService } from './SolutionService';
+import { ConnectionReferencesService } from './ConnectionReferencesService';
+import { DeploymentSettingsService } from './DeploymentSettingsService';
 import { UrlBuilderService } from './UrlBuilderService';
 
 export class ServiceFactory {
     private static authService: AuthenticationService;
     private static stateService: StateService;
     private static solutionService: SolutionService;
+    private static connectionReferencesService: ConnectionReferencesService;
+    private static deploymentSettingsService: DeploymentSettingsService;
     private static initialized = false;
     
     static initialize(context: vscode.ExtensionContext): void {
@@ -17,7 +21,9 @@ export class ServiceFactory {
         
         ServiceFactory.authService = AuthenticationService.getInstance(context);
         ServiceFactory.stateService = StateService.getInstance(context);
-        ServiceFactory.solutionService = new SolutionService(ServiceFactory.authService);
+    ServiceFactory.solutionService = new SolutionService(ServiceFactory.authService);
+    ServiceFactory.connectionReferencesService = new ConnectionReferencesService(ServiceFactory.authService);
+    ServiceFactory.deploymentSettingsService = new DeploymentSettingsService();
         ServiceFactory.initialized = true;
         
         console.log('ServiceFactory initialized successfully');
@@ -42,6 +48,20 @@ export class ServiceFactory {
             throw new Error('ServiceFactory not initialized. Call initialize() first.');
         }
         return ServiceFactory.solutionService;
+    }
+
+    static getConnectionReferencesService(): ConnectionReferencesService {
+        if (!ServiceFactory.initialized) {
+            throw new Error('ServiceFactory not initialized. Call initialize() first.');
+        }
+        return ServiceFactory.connectionReferencesService;
+    }
+
+    static getDeploymentSettingsService(): DeploymentSettingsService {
+        if (!ServiceFactory.initialized) {
+            throw new Error('ServiceFactory not initialized. Call initialize() first.');
+        }
+        return ServiceFactory.deploymentSettingsService;
     }
     
     static getUrlBuilderService(): typeof UrlBuilderService {

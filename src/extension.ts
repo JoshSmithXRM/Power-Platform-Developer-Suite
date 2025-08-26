@@ -37,12 +37,25 @@ export function activate(context: vscode.ExtensionContext) {
     const panelCommands = new PanelCommands(authService, context, environmentsProvider);
     const metadataBrowserCommands = new MetadataBrowserCommands(authService, context);
 
-    // Register all commands
-    const commandDisposables = [
-        ...environmentCommands.registerCommands(),
-        ...panelCommands.registerCommands(),
-        ...metadataBrowserCommands.registerCommands()
-    ];
+    // Register all commands with defensive error handling. If registration fails
+    // we register a small fallback command so the user doesn't see "command not found".
+    let commandDisposables: vscode.Disposable[] = [];
+    try {
+        commandDisposables = [
+            ...environmentCommands.registerCommands(),
+            ...panelCommands.registerCommands(),
+            ...metadataBrowserCommands.registerCommands()
+        ];
+    } catch (err: any) {
+        console.error('Failed to register commands during activation:', err);
+
+        // Fallback for the metadata browser command to avoid 'command not found'
+        const fallback = vscode.commands.registerCommand('dynamics-devtools.openMetadataBrowser', () => {
+            vscode.window.showErrorMessage('Dynamics DevTools failed to initialize completely. Check the Extension Host logs for details.');
+        });
+
+        commandDisposables.push(fallback);
+    }
 
     // Add all disposables to context
     context.subscriptions.push(...commandDisposables);
