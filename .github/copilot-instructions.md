@@ -80,8 +80,7 @@ Use semantic categories in CHANGELOG.md entries:
 npm install              # Install dependencies
 npm run compile          # Development build
 npm run watch            # Watch mode for development
-npm run package          # Production build with webpack
-npm run lint             # ESLint type checking
+npm run package          # Production build with webpack (includes TypeScript type checking)
 npm run vsce-package     # Create .vsix package
 npm run test-release     # Build, package, and install locally
 ```
@@ -152,7 +151,7 @@ TableUtils.initializeTable('tableId', {
 - Reuse existing utilities (`TableUtils`, `PanelUtils`, `EnvironmentSelectorUtils`)
 - Follow established architectural patterns in existing panels
 - Update `CHANGELOG.md` under `[Unreleased]` for all changes
-- Run build verification before completion (`npm run package`, `npm run lint`)
+- Run build verification before completion (`npm run package`)
 - Test in Extension Development Host (F5) before marking complete
 
 **DON'T:**

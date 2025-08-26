@@ -7,6 +7,7 @@ import { DeploymentSettingsService } from './DeploymentSettingsService';
 import { EnvironmentVariablesService } from './EnvironmentVariablesService';
 import { UrlBuilderService } from './UrlBuilderService';
 import { SolutionComponentService } from './SolutionComponentService';
+import { PluginTraceService } from './PluginTraceService';
 
 export class ServiceFactory {
     private static authService: AuthenticationService;
@@ -16,6 +17,7 @@ export class ServiceFactory {
     private static deploymentSettingsService: DeploymentSettingsService;
     private static environmentVariablesService: EnvironmentVariablesService;
     private static solutionComponentService: SolutionComponentService;
+    private static pluginTraceService: PluginTraceService;
     private static initialized = false;
     
     static initialize(context: vscode.ExtensionContext): void {
@@ -30,6 +32,7 @@ export class ServiceFactory {
         ServiceFactory.deploymentSettingsService = new DeploymentSettingsService();
         ServiceFactory.environmentVariablesService = new EnvironmentVariablesService(ServiceFactory.authService);
         ServiceFactory.solutionComponentService = new SolutionComponentService(ServiceFactory.authService);
+        ServiceFactory.pluginTraceService = new PluginTraceService(ServiceFactory.authService);
         ServiceFactory.initialized = true;        console.log('ServiceFactory initialized successfully');
     }
     
@@ -80,6 +83,13 @@ export class ServiceFactory {
             throw new Error('ServiceFactory not initialized. Call initialize() first.');
         }
         return ServiceFactory.solutionComponentService;
+    }
+
+    static getPluginTraceService(): PluginTraceService {
+        if (!ServiceFactory.initialized) {
+            throw new Error('ServiceFactory not initialized. Call initialize() first.');
+        }
+        return ServiceFactory.pluginTraceService;
     }
     
     static getUrlBuilderService(): typeof UrlBuilderService {

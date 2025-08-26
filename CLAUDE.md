@@ -18,8 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm install              # Install dependencies
 npm run compile          # Development build
 npm run watch            # Watch mode for development 
-npm run package          # Production build with webpack
-npm run lint             # ESLint type checking
+npm run package          # Production build with webpack (includes TypeScript type checking)
 ```
 
 **Extension Testing:**
@@ -145,12 +144,12 @@ Extension uses webpack for production optimization:
 **Always Required for Changes:**
 1. Update `CHANGELOG.md` under `[Unreleased]` section using Keep a Changelog format
 2. Use semantic categories: Added, Changed, Fixed, Deprecated, Removed, Security, Technical
-3. Run build verification: `npm run package` and `npm run lint`
+3. Run build verification: `npm run package`
 4. Test extension functionality in Extension Development Host (F5)
 
 **Verification Checklist Before Completion:**
 - [ ] Build completes successfully (`npm run package`)
-- [ ] Type checks pass (`npm run lint`)
+- [ ] TypeScript compilation passes (verified by webpack build)
 - [ ] Extension loads without errors in Development Host
 - [ ] CHANGELOG.md updated with changes
 - [ ] All modified functionality tested

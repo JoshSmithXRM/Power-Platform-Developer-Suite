@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Plugin Trace Viewer with comprehensive trace log analysis and environment trace level management
+- Plugin trace setting selector (Off/Exception/All) that synchronizes with environment configuration
+- Advanced filtering system for plugin traces: date ranges, plugin names, entity names, exception-only mode
+- Real-time trace data table with sortable columns: Start Time, Duration, Plugin, Step, Depth, Mode, Stage, Entity, Message, Exception
+- Plugin trace export functionality to CSV format with all trace details
+- PluginTraceService for efficient API queries with OData filtering and optimization
+- Trace detail viewer with expandable message blocks and exception information
 - Connection References panel with full API integration - browse flows and their connection references relationships
 - Connection References panel fetches data using proper Dataverse field names (`connectionreferencelogicalname`, `connectionreferencedisplayname`, `connectionid`)
 - Connection References panel extracts relationships from flow `clientdata` field for accurate flow-to-connection-reference mapping
