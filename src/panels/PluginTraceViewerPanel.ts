@@ -234,6 +234,14 @@ export class PluginTraceViewerPanel extends BasePanel {
             vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'environment-selector-utils.js')
         );
 
+        const modalUtilsScript = this._panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'modal-utils.js')
+        );
+
+        const modalStylesSheet = this._panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'css', 'modal-styles.css')
+        );
+
         return `<!DOCTYPE html>
         <html lang="en">
         <head>
@@ -242,6 +250,7 @@ export class PluginTraceViewerPanel extends BasePanel {
             <title>Plugin Trace Viewer</title>
             <link rel="stylesheet" href="${panelStylesSheet}">
             <link rel="stylesheet" href="${tableStylesSheet}">
+            <link rel="stylesheet" href="${modalStylesSheet}">
             <style>
                 .controls-section {
                     background: var(--vscode-editorWidget-background);
@@ -303,30 +312,12 @@ export class PluginTraceViewerPanel extends BasePanel {
                     margin-left: auto;
                 }
                 
-                .exception-indicator {
-                    background: var(--vscode-testing-iconFailed);
-                    color: white;
-                    padding: 2px 6px;
-                    border-radius: 3px;
-                    font-size: 0.8em;
-                    font-weight: 500;
-                }
                 
                 .duration-cell {
                     font-family: var(--vscode-editor-font-family);
                     text-align: right;
                 }
                 
-                .plugin-name-cell {
-                    font-weight: 500;
-                }
-                
-                .message-cell {
-                    max-width: 300px;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
                 
                 .depth-indicator {
                     display: inline-block;
@@ -379,6 +370,10 @@ export class PluginTraceViewerPanel extends BasePanel {
                         <input type="checkbox" id="exceptionOnlyFilter">
                         <label for="exceptionOnlyFilter">Exception Only</label>
                     </div>
+                    <div class="control-group">
+                        <label for="topFilter">Max Results:</label>
+                        <input type="number" id="topFilter" min="1" max="5000" value="1000" style="width: 80px;">
+                    </div>
                     <div class="filter-actions">
                         <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
                         <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
@@ -407,16 +402,15 @@ export class PluginTraceViewerPanel extends BasePanel {
                     columns: [
                         { key: 'createdon', label: 'Start Time', sortable: true, width: '140px' },
                         { key: 'duration', label: 'Duration', sortable: true, width: '80px', className: 'duration-cell' },
-                        { key: 'pluginname', label: 'Plugin', sortable: true, className: 'plugin-name-cell' },
+                        { key: 'pluginname', label: 'Plugin', sortable: true },
                         { key: 'messagename', label: 'Step', sortable: true, width: '120px' },
                         { key: 'depth', label: 'Depth', sortable: true, width: '60px' },
                         { key: 'mode', label: 'Mode', sortable: true, width: '100px' },
-                        { key: 'stage', label: 'Stage', sortable: true, width: '120px' },
                         { key: 'entityname', label: 'Entity', sortable: true, width: '100px' },
-                        { key: 'messageblock', label: 'Message', sortable: false, className: 'message-cell' },
-                        { key: 'exceptiondetails', label: 'Exception', sortable: false, className: 'message-cell' }
+                        { key: 'messageblock', label: 'Message', sortable: true, width: '80px' },
+                        { key: 'exceptiondetails', label: 'Exception', sortable: true, width: '80px' }
                     ],
-                    defaultSort: { column: 'createdon', direction: 'desc' },
+                    defaultSort: undefined,
                     stickyHeader: true,
                     stickyFirstColumn: false,
                     filterable: true,
@@ -429,6 +423,7 @@ export class PluginTraceViewerPanel extends BasePanel {
             </script>
 
             <script src="${envSelectorUtilsScript}"></script>
+            <script src="${modalUtilsScript}"></script>
             <script src="${panelUtilsScript}"></script>
             <script src="${tableUtilsScript}"></script>
             <script>
@@ -490,6 +485,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                     const pluginName = document.getElementById('pluginFilter').value.trim();
                     const entityName = document.getElementById('entityFilter').value.trim();
                     const exceptionOnly = document.getElementById('exceptionOnlyFilter').checked;
+                    const topLimit = document.getElementById('topFilter').value;
                     
                     const options = {};
                     
@@ -498,6 +494,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                     if (pluginName) options.pluginName = pluginName;
                     if (entityName) options.entityName = entityName;
                     if (exceptionOnly) options.exceptionOnly = true;
+                    if (topLimit && topLimit !== '1000') options.top = parseInt(topLimit);
                     
                     return options;
                 }
@@ -525,6 +522,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                     document.getElementById('exceptionOnlyFilter').checked = false;
                     document.getElementById('fromDate').value = '';
                     document.getElementById('toDate').value = '';
+                    document.getElementById('topFilter').value = '1000';
                     
                     if (currentEnvironmentId) {
                         loadPluginTracesForEnvironment(currentEnvironmentId);
@@ -543,21 +541,36 @@ export class PluginTraceViewerPanel extends BasePanel {
                         return;
                     }
                     
-                    // Simple CSV export
-                    const headers = ['Start Time', 'Duration', 'Plugin', 'Step', 'Depth', 'Mode', 'Stage', 'Entity', 'Message', 'Exception'];
+                    // Export all raw data without transformation
+                    const headers = [
+                        'plugintracelogid', 'createdon', 'operationtype', 'pluginname', 'entityname', 
+                        'messagename', 'mode', 'stage', 'depth', 'duration', 'exceptiondetails', 'messageblock', 
+                        'configuration', 'performancedetails', 'correlationid', 'userid', 'initiatinguserid', 
+                        'ownerid', 'businessunitid', 'organizationid'
+                    ];
                     const csvContent = [
                         headers.join(','),
                         ...currentTraceData.map(row => [
-                            formatDate(row.createdon),
-                            row.duration + 'ms',
+                            '"' + (row.plugintracelogid || '') + '"',
+                            '"' + (row.createdon || '') + '"',
+                            '"' + (row.operationtype || '') + '"',
                             '"' + (row.pluginname || '') + '"',
-                            '"' + (row.messagename || '') + '"',
-                            row.depth,
-                            getModeDisplayName(row.mode),
-                            getStageDisplayName(row.stage),
                             '"' + (row.entityname || '') + '"',
+                            '"' + (row.messagename || '') + '"',
+                            row.mode || 0,
+                            row.stage || 0,
+                            row.depth || 0,
+                            row.duration || 0,
+                            '"' + (row.exceptiondetails || '').replace(/"/g, '""') + '"',
                             '"' + (row.messageblock || '').replace(/"/g, '""') + '"',
-                            '"' + (row.exceptiondetails || '').replace(/"/g, '""') + '"'
+                            '"' + (row.configuration || '') + '"',
+                            '"' + (row.performancedetails || '') + '"',
+                            '"' + (row.correlationid || '') + '"',
+                            '"' + (row.userid || '') + '"',
+                            '"' + (row.initiatinguserid || '') + '"',
+                            '"' + (row.ownerid || '') + '"',
+                            '"' + (row.businessunitid || '') + '"',
+                            '"' + (row.organizationid || '') + '"'
                         ].join(','))
                     ].join('\\n');
                     
@@ -582,11 +595,9 @@ export class PluginTraceViewerPanel extends BasePanel {
                         messagename: trace.messagename || '',
                         depth: trace.depth || 0,
                         mode: getModeDisplayName(trace.mode),
-                        stage: getStageDisplayName(trace.stage),
                         entityname: trace.entityname || '',
-                        messageblock: truncateMessage(trace.messageblock),
-                        exceptiondetails: trace.exceptiondetails ? 
-                            '<span class="exception-indicator">Exception</span>' : '',
+                        messageblock: trace.messageblock && trace.messageblock.trim() ? 'Yes' : 'No',
+                        exceptiondetails: trace.exceptiondetails ? 'Yes' : 'No',
                         // Store raw data for sorting
                         'data-sort-createdon': new Date(trace.createdon).getTime(),
                         'data-sort-duration': trace.duration
@@ -628,27 +639,12 @@ export class PluginTraceViewerPanel extends BasePanel {
                 
                 function getModeDisplayName(mode) {
                     switch (mode) {
-                        case 0: return 'Sync';
-                        case 1: return 'Async';
+                        case 0: return 'Synchronous';
+                        case 1: return 'Asynchronous';
                         default: return 'Unknown';
                     }
                 }
                 
-                function getStageDisplayName(stage) {
-                    switch (stage) {
-                        case 10: return 'Pre-validation';
-                        case 20: return 'Pre-operation';
-                        case 40: return 'Post-operation';
-                        case 50: return 'Post-operation (Deprecated)';
-                        default: return 'Unknown';
-                    }
-                }
-                
-                function truncateMessage(message, maxLength = 100) {
-                    if (!message) return '';
-                    if (message.length <= maxLength) return message;
-                    return message.substring(0, maxLength) + '...';
-                }
                 
                 function handleRowClick(rowData, rowElement) {
                     console.log('Plugin trace clicked:', rowData);
@@ -667,30 +663,140 @@ export class PluginTraceViewerPanel extends BasePanel {
                 
                 function viewTraceDetails(traceId) {
                     const trace = currentTraceData.find(t => t.plugintracelogid === traceId);
-                    if (trace) {
-                        // Show detailed information in a dialog-like format
-                        const details = \`
-                            <div class="trace-details">
-                                <h3>Plugin Trace Details</h3>
-                                <p><strong>Plugin:</strong> \${trace.pluginname}</p>
-                                <p><strong>Entity:</strong> \${trace.entityname || 'N/A'}</p>
-                                <p><strong>Message:</strong> \${trace.messagename}</p>
-                                <p><strong>Duration:</strong> \${formatDuration(trace.duration)}</p>
-                                <p><strong>Depth:</strong> \${trace.depth}</p>
-                                <p><strong>Mode:</strong> \${getModeDisplayName(trace.mode)}</p>
-                                <p><strong>Stage:</strong> \${getStageDisplayName(trace.stage)}</p>
-                                <p><strong>Start Time:</strong> \${formatDate(trace.createdon)}</p>
-                                \${trace.messageblock ? \`<p><strong>Message Block:</strong><br><pre>\${trace.messageblock}</pre></p>\` : ''}
-                                \${trace.exceptiondetails ? \`<p><strong>Exception Details:</strong><br><pre style="color: var(--vscode-testing-iconFailed);">\${trace.exceptiondetails}</pre></p>\` : ''}
+                    if (!trace) return;
+                    
+                    // Create Configuration tab content
+                    const configurationContent = \`
+                        <div class="detail-section">
+                            <div class="detail-section-title">General</div>
+                            <div class="detail-grid">
+                                <div class="detail-label">Plugin Trace Log ID</div>
+                                <div class="detail-value" style="font-family: var(--vscode-editor-font-family); font-size: 13px;">\${trace.plugintracelogid}</div>
+                                
+                                <div class="detail-label">Type Name</div>
+                                <div class="detail-value">\${trace.pluginname || '<span class="empty">---</span>'}</div>
+                                
+                                <div class="detail-label">Message Name</div>
+                                <div class="detail-value">\${trace.messagename || '<span class="empty">none</span>'}</div>
+                                
+                                <div class="detail-label">Primary Entity</div>
+                                <div class="detail-value">\${trace.entityname || '<span class="empty">none</span>'}</div>
+                                
+                                <div class="detail-label">Operation Type</div>
+                                <div class="detail-value">\${trace.operationtype || '<span class="empty">---</span>'}</div>
+                                
+                                <div class="detail-label">Plugin Type</div>
+                                <div class="detail-value">\${getModeDisplayName(trace.mode)} Plugin</div>
                             </div>
-                        \`;
+                        </div>
                         
-                        vscode.postMessage({
-                            action: 'showInfo',
-                            message: 'Plugin Trace Details',
-                            details: details
-                        });
-                    }
+                        <div class="detail-section">
+                            <div class="detail-section-title">Configuration</div>
+                            <div class="detail-grid">
+                                <div class="detail-label">Configuration</div>
+                                <div class="detail-value"><span class="empty">---</span></div>
+                                
+                                <div class="detail-label">Secure Configuration</div>
+                                <div class="detail-value"><span class="empty">---</span></div>
+                                
+                                <div class="detail-label">Persistence Key</div>
+                                <div class="detail-value">\${trace.persistencekey || '<span class="empty">00000000-0000-0000-0000-000000000000</span>'}</div>
+                                
+                                <div class="detail-label">Plugin Step Id</div>
+                                <div class="detail-value">\${trace.pluginstepid || '<span class="empty">---</span>'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <div class="detail-section-title">Context</div>
+                            <div class="detail-grid">
+                                <div class="detail-label">Depth</div>
+                                <div class="detail-value">\${trace.depth || 1}</div>
+                                
+                                <div class="detail-label">Correlation Id</div>
+                                <div class="detail-value">\${trace.correlationid || '<span class="empty">---</span>'}</div>
+                                
+                                <div class="detail-label">Mode</div>
+                                <div class="detail-value">\${getModeDisplayName(trace.mode)}</div>
+                                
+                                <div class="detail-label">Request Id</div>
+                                <div class="detail-value">\${trace.requestid || '<span class="empty">---</span>'}</div>
+                            </div>
+                        </div>
+                    \`;
+                    
+                    // Create Execution tab content
+                    const executionContent = \`
+                        <div class="detail-section">
+                            <div class="detail-section-title">Performance</div>
+                            <div class="detail-grid">
+                                <div class="detail-label">Execution Start Time</div>
+                                <div class="detail-value">\${formatDate(trace.createdon)}</div>
+                                
+                                <div class="detail-label">Execution Duration</div>
+                                <div class="detail-value">\${formatDuration(trace.duration)}</div>
+                                
+                                <div class="detail-label">Performance Details</div>
+                                <div class="detail-value">\${trace.performancedetails || '<span class="empty">---</span>'}</div>
+                            </div>
+                        </div>
+                        
+                        \${trace.messageblock ? \`
+                        <div class="detail-section">
+                            <div class="detail-section-title">Message Block</div>
+                            <div class="detail-code">\${escapeHtml(trace.messageblock)}</div>
+                        </div>
+                        \` : ''}
+                        
+                        \${trace.exceptiondetails ? \`
+                        <div class="detail-section">
+                            <div class="detail-section-title">Exception Details</div>
+                            <div class="detail-code exception">\${formatStackTrace(trace.exceptiondetails)}</div>
+                        </div>
+                        \` : ''}
+                    \`;
+                    
+                    // Create tabbed content
+                    const tabs = [
+                        {
+                            id: 'configuration-tab',
+                            label: 'Configuration',
+                            content: configurationContent,
+                            active: true
+                        },
+                        {
+                            id: 'execution-tab',
+                            label: 'Execution',
+                            content: executionContent,
+                            active: false
+                        }
+                    ];
+                    
+                    const modalContent = ModalUtils.createTabbedContent(tabs);
+                    
+                    ModalUtils.showModal({
+                        id: 'trace-details-modal',
+                        title: \`Plugin Trace Log - \${trace.pluginname || 'Unknown Plugin'}\`,
+                        content: modalContent,
+                        size: 'large',
+                        closable: true
+                    });
+                }
+                
+                function escapeHtml(text) {
+                    const div = document.createElement('div');
+                    div.textContent = text;
+                    return div.innerHTML;
+                }
+                
+                function formatStackTrace(stackTrace) {
+                    if (!stackTrace) return '';
+                    
+                    // Simple syntax highlighting for stack traces
+                    return escapeHtml(stackTrace)
+                        .replace(/(\\w+Exception[^\\n]*)/g, '<span class="stack-trace-type">$1</span>')
+                        .replace(/(at\\s+[\\w\\.]+\\.[\\w<>]+)/g, '<span class="stack-trace-method">$1</span>')
+                        .replace(/(in\\s+[^\\n]*\\.cs:line\\s+\\d+)/g, '<span class="stack-trace-file">$1</span>');
                 }
                 
                 // Setup message handlers

@@ -14,7 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-time trace data table with sortable columns: Start Time, Duration, Plugin, Step, Depth, Mode, Stage, Entity, Message, Exception
 - Plugin trace export functionality to CSV format with all trace details
 - PluginTraceService for efficient API queries with OData filtering and optimization
-- Trace detail viewer with expandable message blocks and exception information
+- Enhanced plugin trace detail viewer with tabbed interface matching Dynamics 365 structure (Configuration and Execution tabs)
+- Plugin trace detail modal now displays Plugin Trace Log ID at the top and additional fields (Operation Type, Performance Details)
+- Reusable modal dialog system (ModalUtils) for displaying detailed information across all panels
+- Stack trace syntax highlighting in exception details for better readability
 - Connection References panel with full API integration - browse flows and their connection references relationships
 - Connection References panel fetches data using proper Dataverse field names (`connectionreferencelogicalname`, `connectionreferencedisplayname`, `connectionid`)
 - Connection References panel extracts relationships from flow `clientdata` field for accurate flow-to-connection-reference mapping
