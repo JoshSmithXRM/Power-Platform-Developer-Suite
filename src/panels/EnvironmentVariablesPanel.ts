@@ -1,12 +1,14 @@
 import * as vscode from 'vscode';
 import { BasePanel } from './base/BasePanel';
 import { ServiceFactory } from '../services/ServiceFactory';
+import { ComponentFactory } from '../components/ComponentFactory';
 import { WebviewMessage } from '../types';
 
 export class EnvironmentVariablesPanel extends BasePanel {
     public static readonly viewType = 'environmentVariables';
 
     private _selectedEnvironmentId: string | undefined;
+    private _environmentVariablesService: any;
 
     public static createOrShow(extensionUri: vscode.Uri) {
         const existing = BasePanel.focusExisting(EnvironmentVariablesPanel.viewType);
@@ -32,6 +34,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
             title: 'Environment Variables Manager'
         });
 
+        this._environmentVariablesService = ServiceFactory.getEnvironmentVariablesService();
         this.initialize();
     }
 
@@ -82,13 +85,29 @@ export class EnvironmentVariablesPanel extends BasePanel {
             return;
         }
 
-        this._selectedEnvironmentId = environmentId;
-        console.log('Selected environment ID set to:', this._selectedEnvironmentId);
+        try {
+            this._selectedEnvironmentId = environmentId;
+            console.log('Selected environment ID set to:', this._selectedEnvironmentId);
 
-        this._panel.webview.postMessage({
-            action: 'environmentVariablesLoaded',
-            data: []
-        });
+            // Save state
+            await this._stateService.savePanelState(EnvironmentVariablesPanel.viewType, {
+                selectedEnvironmentId: environmentId
+            });
+
+            // Fetch environment variables data
+            const environmentVariablesData = await this._environmentVariablesService.getEnvironmentVariables(environmentId);
+
+            this._panel.webview.postMessage({
+                action: 'environmentVariablesLoaded',
+                data: environmentVariablesData
+            });
+        } catch (error: any) {
+            console.error('Error loading environment variables:', error);
+            this._panel.webview.postMessage({
+                action: 'error',
+                message: `Failed to load environment variables: ${error.message}`
+            });
+        }
     }
 
     protected getHtmlContent(): string {
@@ -119,6 +138,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
             
             <div class="header">
                 <h1 class="title">Environment Variables Manager</h1>
+                <button class="btn" onclick="refreshEnvironmentVariables()">Refresh</button>
             </div>
             
             <div id="content">
@@ -126,6 +146,28 @@ export class EnvironmentVariablesPanel extends BasePanel {
                     <p>Select an environment to manage environment variables...</p>
                 </div>
             </div>
+
+            <!-- Hidden template for environment variables table -->
+            <script type="text/template" id="environmentVariablesTableTemplate">
+                ${ComponentFactory.createDataTable({
+                    id: 'environmentVariablesTable',
+                    columns: [
+                        { key: 'displayname', label: 'Display Name', sortable: true },
+                        { key: 'schemaname', label: 'Name', sortable: true },
+                        { key: 'typeDisplay', label: 'Type', sortable: true },
+                        { key: 'defaultValue', label: 'Default Value', sortable: false },
+                        { key: 'currentValue', label: 'Current Value', sortable: false },
+                        { key: 'ismanaged', label: 'Managed', sortable: true },
+                        { key: 'modifiedon', label: 'Modified On', sortable: true },
+                        { key: 'modifiedby', label: 'Modified By', sortable: true }
+                    ],
+                    defaultSort: { column: 'displayname', direction: 'asc' },
+                    stickyHeader: true,
+                    stickyFirstColumn: false,
+                    filterable: true,
+                    showFooter: true
+                })}
+            </script>
 
             <script src="${envSelectorUtilsScript}"></script>
             <script src="${panelUtilsScript}"></script>
@@ -143,8 +185,6 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 document.addEventListener('DOMContentLoaded', () => {
                     panelUtils.loadEnvironments();
                 });
-                
-                panelUtils.loadEnvironments();
                 
                 function onEnvironmentChange(selectorId, environmentId, previousEnvironmentId) {
                     currentEnvironmentId = environmentId;
@@ -164,7 +204,14 @@ export class EnvironmentVariablesPanel extends BasePanel {
                         });
                     }
                 }
-                
+
+                function refreshEnvironmentVariables() {
+                    if (currentEnvironmentId) {
+                        loadEnvironmentVariablesForEnvironment(currentEnvironmentId);
+                    }
+                }
+
+                // Setup message handlers
                 PanelUtils.setupMessageHandler({
                     'environmentsLoaded': (message) => {
                         EnvironmentSelectorUtils.loadEnvironments('environmentSelect', message.data);
@@ -174,12 +221,77 @@ export class EnvironmentVariablesPanel extends BasePanel {
                             loadEnvironmentVariablesForEnvironment(message.selectedEnvironmentId);
                         }
                     },
-                    
+
                     'environmentVariablesLoaded': (message) => {
-                        const content = document.getElementById('content');
-                        content.innerHTML = '<div class="loading"><p>🚧 Environment Variables Manager functionality coming soon! Environment connected successfully.</p></div>';
+                        populateEnvironmentVariables(message.data);
                     }
                 });
+
+                function populateEnvironmentVariables(data) {
+                    const definitions = data.definitions || [];
+                    const values = data.values || [];
+
+                    // Create a map of environment variable values by definition ID
+                    const valuesMap = new Map();
+                    values.forEach(value => {
+                        valuesMap.set(value.environmentvariabledefinitionid, value);
+                    });
+
+                    // Transform definitions to include values and formatting
+                    const tableData = definitions.map(def => {
+                        const value = valuesMap.get(def.environmentvariabledefinitionid);
+                        return {
+                            id: def.environmentvariabledefinitionid,
+                            displayname: def.displayname || '',
+                            schemaname: def.schemaname || '',
+                            typeDisplay: getTypeDisplayName(def.type),
+                            defaultValue: def.defaultvalue || '<em>No default</em>',
+                            currentValue: value ? value.value : '<em>No value set</em>',
+                            ismanaged: def.ismanaged ? 'Yes' : 'No',
+                            modifiedon: formatDate(value ? value.modifiedon : def.modifiedon),
+                            modifiedby: value ? value.modifiedby : def.modifiedby || ''
+                        };
+                    });
+
+                    // Use ComponentFactory template and TableUtils for display
+                    const content = document.getElementById('content');
+                    const template = document.getElementById('environmentVariablesTableTemplate');
+                    content.innerHTML = template.innerHTML;
+
+                    // Initialize table
+                    TableUtils.initializeTable('environmentVariablesTable', {
+                        onRowClick: handleRowClick,
+                        onRowAction: handleRowAction
+                    });
+
+                    // Load data and apply default sorting
+                    TableUtils.loadTableData('environmentVariablesTable', tableData);
+                    TableUtils.sortTable('environmentVariablesTable', 'displayname', 'asc');
+                }
+
+                function getTypeDisplayName(type) {
+                    switch (type) {
+                        case 100000000: return 'String';
+                        case 100000001: return 'Number';
+                        case 100000002: return 'Boolean';
+                        case 100000003: return 'JSON';
+                        case 100000004: return 'Data Source';
+                        default: return 'Unknown';
+                    }
+                }
+
+                function formatDate(dateString) {
+                    if (!dateString) return '';
+                    return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
+                }
+
+                function handleRowClick(rowData, rowElement) {
+                    console.log('Environment variable clicked:', rowData);
+                }
+
+                function handleRowAction(actionId, rowData) {
+                    console.log('Environment variable action:', actionId, rowData);
+                }
             </script>
         </body>
         </html>`;

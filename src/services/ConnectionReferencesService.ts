@@ -5,6 +5,9 @@ export interface FlowItem {
     name: string;
     solutionId?: string;
     solutionName?: string;
+    modifiedon?: string;
+    modifiedby?: string;
+    ismanaged?: boolean;
 }
 
 export interface ConnectionReferenceItem {
@@ -14,6 +17,9 @@ export interface ConnectionReferenceItem {
     referencedConnectionId?: string;
     referencedConnectionName?: string;
     flowIds?: string[];
+    modifiedon?: string;
+    modifiedby?: string;
+    ismanaged?: boolean;
 }
 
 export interface ConnectionItem {
@@ -48,7 +54,7 @@ export class ConnectionReferencesService {
             const debug: Record<string, any> = {};
 
             // Get flows (workflows with category 5 for Microsoft Flow)
-            const flowsUrl = `${baseUrl}/workflows?$select=workflowid,name,primaryentity,solutionid,clientdata&$filter=category eq 5`;
+            const flowsUrl = `${baseUrl}/workflows?$select=workflowid,name,primaryentity,solutionid,clientdata,modifiedon,ismanaged&$expand=modifiedby($select=fullname)&$filter=category eq 5`;
             const flowsResp = await fetch(flowsUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
             debug.flowsRespOk = !!flowsResp && flowsResp.ok;
             debug.flowsStatus = flowsResp && (flowsResp as any).status;
@@ -63,11 +69,14 @@ export class ConnectionReferencesService {
                 id: f.workflowid, 
                 name: f.name, 
                 solutionId: f._solutionid_value,
-                clientData: f.clientdata || null
+                clientData: f.clientdata || null,
+                modifiedon: f.modifiedon || '',
+                modifiedby: f.modifiedby?.fullname || '',
+                ismanaged: f.ismanaged || false
             } as any));
 
         // Get connectionreferences
-            const crUrl = `${baseUrl}/connectionreferences?$select=connectionreferenceid,connectionreferencelogicalname,connectionreferencedisplayname,connectorid,connectionid`;
+            const crUrl = `${baseUrl}/connectionreferences?$select=connectionreferenceid,connectionreferencelogicalname,connectionreferencedisplayname,connectorid,connectionid,modifiedon,ismanaged&$expand=modifiedby($select=fullname)`;
             const crResp = await fetch(crUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
             const connectionReferences = [] as ConnectionReferenceItem[];
             debug.crRespOk = !!crResp && crResp.ok;
@@ -81,7 +90,10 @@ export class ConnectionReferencesService {
                         name: c.connectionreferencelogicalname || c.connectionreferencedisplayname,
                         connectorLogicalName: c.connectorid,
                         referencedConnectionId: c.connectionid,
-                        flowIds: []
+                        flowIds: [],
+                        modifiedon: c.modifiedon || '',
+                        modifiedby: c.modifiedby?.fullname || '',
+                        ismanaged: c.ismanaged || false
                     });
                 });
             } else {

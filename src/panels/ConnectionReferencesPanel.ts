@@ -83,17 +83,6 @@ export class ConnectionReferencesPanel extends BasePanel {
             connectionReferences: rels?.connectionReferences?.length || 0
         });
 
-        // Post a debug message to the webview so the client can surface counts quickly
-        this._panel.webview.postMessage({
-            action: 'connectionReferencesDebug',
-            data: {
-                flowsCount: rels?.flows?.length || 0,
-                connectionReferencesCount: rels?.connectionReferences?.length || 0,
-                connectionsCount: rels?.connections?.length || 0,
-                _debug: (rels as any)?._debug || {}
-            }
-        });
-
         this._panel.webview.postMessage({ action: 'connectionReferencesLoaded', data: rels });
     }
 
@@ -153,7 +142,10 @@ export class ConnectionReferencesPanel extends BasePanel {
                         { key: 'flowName', label: 'Flow Name', sortable: true },
                         { key: 'crLogicalName', label: 'Connection Reference Logical Name', sortable: true },
                         { key: 'connectionName', label: 'Connection', sortable: true },
-                        { key: 'provider', label: 'Provider', sortable: true }
+                        { key: 'provider', label: 'Provider', sortable: true },
+                        { key: 'ismanaged', label: 'Managed', sortable: true },
+                        { key: 'modifiedon', label: 'Modified On', sortable: true },
+                        { key: 'modifiedby', label: 'Modified By', sortable: true }
                     ],
                     defaultSort: { column: 'flowName', direction: 'asc' },
                     filterable: true,

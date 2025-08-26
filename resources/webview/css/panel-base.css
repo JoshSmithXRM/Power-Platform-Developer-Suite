@@ -4,7 +4,7 @@
 body {
     margin: 0;
     padding: 20px;
-    padding-bottom: 60px; /* Account for fixed footer */
+    padding-bottom: 20px; /* Reset padding */
     font-family: var(--vscode-font-family);
     background: var(--vscode-editor-background);
     color: var(--vscode-editor-foreground);
@@ -163,4 +163,12 @@ body {
         align-items: stretch;
         gap: 8px;
     }
+}
+
+/* Content Container */
+#content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Allow flexbox to shrink */
 }

@@ -4,6 +4,7 @@ import { StateService } from './StateService';
 import { SolutionService } from './SolutionService';
 import { ConnectionReferencesService } from './ConnectionReferencesService';
 import { DeploymentSettingsService } from './DeploymentSettingsService';
+import { EnvironmentVariablesService } from './EnvironmentVariablesService';
 import { UrlBuilderService } from './UrlBuilderService';
 
 export class ServiceFactory {
@@ -12,6 +13,7 @@ export class ServiceFactory {
     private static solutionService: SolutionService;
     private static connectionReferencesService: ConnectionReferencesService;
     private static deploymentSettingsService: DeploymentSettingsService;
+    private static environmentVariablesService: EnvironmentVariablesService;
     private static initialized = false;
     
     static initialize(context: vscode.ExtensionContext): void {
@@ -24,6 +26,7 @@ export class ServiceFactory {
     ServiceFactory.solutionService = new SolutionService(ServiceFactory.authService);
     ServiceFactory.connectionReferencesService = new ConnectionReferencesService(ServiceFactory.authService);
     ServiceFactory.deploymentSettingsService = new DeploymentSettingsService();
+        ServiceFactory.environmentVariablesService = new EnvironmentVariablesService(ServiceFactory.authService);
         ServiceFactory.initialized = true;
         
         console.log('ServiceFactory initialized successfully');
@@ -62,6 +65,13 @@ export class ServiceFactory {
             throw new Error('ServiceFactory not initialized. Call initialize() first.');
         }
         return ServiceFactory.deploymentSettingsService;
+    }
+
+    static getEnvironmentVariablesService(): EnvironmentVariablesService {
+        if (!ServiceFactory.initialized) {
+            throw new Error('ServiceFactory not initialized. Call initialize() first.');
+        }
+        return ServiceFactory.environmentVariablesService;
     }
     
     static getUrlBuilderService(): typeof UrlBuilderService {

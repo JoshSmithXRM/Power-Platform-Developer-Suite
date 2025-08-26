@@ -9,6 +9,12 @@ function cleanProviderName(providerName) {
     return providerName.replace(/^\/providers\/Microsoft\.PowerApps\/apis\//, '');
 }
 
+// Helper function to format dates
+function formatDate(dateString) {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
+}
+
 // Initialize panel utilities similar to other panels
 const panelUtils = PanelUtils.initializePanel({
     environmentSelectorId: 'environmentSelect',
@@ -61,7 +67,10 @@ PanelUtils.setupMessageHandler({
                         flowName: f.name,
                         crLogicalName: cr.name,
                         provider: cleanProviderName(cr.connectorLogicalName),
-                        connectionName: cr.referencedConnectionId || ''
+                        connectionName: cr.referencedConnectionId || '',
+                        ismanaged: cr.ismanaged ? 'Yes' : 'No',
+                        modifiedon: formatDate(cr.modifiedon),
+                        modifiedby: cr.modifiedby || ''
                     });
                 }
             });
@@ -74,7 +83,10 @@ PanelUtils.setupMessageHandler({
                     flowName: '',
                     crLogicalName: cr.name,
                     provider: cleanProviderName(cr.connectorLogicalName),
-                    connectionName: cr.referencedConnectionId || ''
+                    connectionName: cr.referencedConnectionId || '',
+                    ismanaged: cr.ismanaged ? 'Yes' : 'No',
+                    modifiedon: formatDate(cr.modifiedon),
+                    modifiedby: cr.modifiedby || ''
                 });
             }
         });
@@ -86,7 +98,10 @@ PanelUtils.setupMessageHandler({
                     flowName: f.name,
                     crLogicalName: '<em>none found</em>',
                     provider: '<em>direct connections</em>',
-                    connectionName: '<em>n/a</em>'
+                    connectionName: '<em>n/a</em>',
+                    ismanaged: f.ismanaged ? 'Yes' : 'No',
+                    modifiedon: formatDate(f.modifiedon),
+                    modifiedby: f.modifiedby || ''
                 });
             });
         }
@@ -113,17 +128,6 @@ PanelUtils.setupMessageHandler({
         const exportBtn = document.getElementById('exportBtn');
         if (exportBtn) {
             exportBtn.onclick = () => PanelUtils.sendMessage('exportDeploymentSkeleton', { relationships: data });
-        }
-    },
-
-    'connectionReferencesDebug': (message) => {
-        console.log('connectionReferencesDebug:', message.data);
-        const content = document.getElementById('content');
-        if (content) {
-            const debugDetails = message.data._debug ? `<pre style="color:var(--vscode-editor-foreground);font-size:11px;opacity:0.85;">${JSON.stringify(message.data._debug, null, 2)}</pre>` : '';
-            const debugHtml = `<div style="padding:8px;color:var(--vscode-editor-foreground);font-size:12px;opacity:0.85;">Relationships: flows=${message.data.flowsCount}, connectionReferences=${message.data.connectionReferencesCount}, connections=${message.data.connectionsCount}</div>` + debugDetails;
-            +
-                content.insertAdjacentHTML('afterbegin', debugHtml);
         }
     },
 
