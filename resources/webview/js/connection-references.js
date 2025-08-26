@@ -45,6 +45,7 @@ PanelUtils.setupMessageHandler({
         const data = message.data || {};
 
         const rows = [];
+
         (data.flows || []).forEach(f => {
             (data.connectionReferences || []).forEach(cr => {
                 if (cr.flowIds && cr.flowIds.includes(f.id)) {
@@ -62,7 +63,7 @@ PanelUtils.setupMessageHandler({
         (data.connectionReferences || []).forEach(cr => {
             if (!cr.flowIds || cr.flowIds.length === 0) {
                 rows.push({
-                    id: `no-flow-${cr.id}`, // Unique ID for table row actions
+                    id: `no-flow-${cr.id}`,
                     flowName: '',
                     crLogicalName: cr.name,
                     provider: cr.connectorLogicalName || '',
@@ -74,7 +75,7 @@ PanelUtils.setupMessageHandler({
         if ((data.connectionReferences || []).length === 0 && (data.flows || []).length > 0) {
             (data.flows || []).forEach(f => {
                 rows.push({
-                    id: f.id, // Unique ID for table row actions
+                    id: f.id,
                     flowName: f.name,
                     crLogicalName: '<em>none found</em>',
                     provider: '<em>direct connections</em>',
@@ -88,21 +89,19 @@ PanelUtils.setupMessageHandler({
             return;
         }
 
-        let html = '<div class="table-container"><table class="data-table"><thead><tr>' +
-            '<th>Flow Name</th><th>Connection Reference Logical Name</th><th>Provider</th><th>Connection</th>' +
-            '</tr></thead><tbody>';
+        // Use pre-generated table template
+        const template = document.getElementById('connectionReferencesTableTemplate');
+        content.innerHTML = template.innerHTML;
 
-        rows.forEach(r => {
-            html += '<tr>' +
-                '<td>' + (r.flowName || '') + '</td>' +
-                '<td>' + (r.crLogicalName || '') + '</td>' +
-                '<td>' + (r.provider || '') + '</td>' +
-                '<td>' + (r.connectionName || '<em>unbound</em>') + '</td>' +
-                '</tr>';
+        // Initialize table with TableUtils for sorting and filtering
+        TableUtils.initializeTable('connectionReferencesTable', {
+            onRowClick: handleRowClick,
+            onRowAction: handleRowAction
         });
 
-        html += '</tbody></table></div>';
-        content.innerHTML = html;
+        // Load data and apply default sorting by flow name
+        TableUtils.loadTableData('connectionReferencesTable', rows);
+        TableUtils.sortTable('connectionReferencesTable', 'flowName', 'asc');
 
         const exportBtn = document.getElementById('exportBtn');
         if (exportBtn) {
@@ -130,3 +129,20 @@ PanelUtils.setupMessageHandler({
         panelUtils.showError(message.message || 'An error occurred');
     }
 });
+
+function handleRowClick(rowData, rowElement) {
+    console.log('Connection reference row clicked:', rowData);
+}
+
+function handleRowAction(actionId, rowData) {
+    switch (actionId) {
+        case 'viewDetails':
+            console.log('View details for:', rowData);
+            break;
+        case 'openInMaker':
+            console.log('Open in Maker:', rowData);
+            break;
+        default:
+            console.log('Unknown action:', actionId, rowData);
+    }
+}

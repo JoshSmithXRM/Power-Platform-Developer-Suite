@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { BasePanel } from './base/BasePanel';
 import { ServiceFactory } from '../services/ServiceFactory';
+import { ComponentFactory } from '../components/ComponentFactory';
 import { WebviewMessage } from '../types';
 import { RelationshipResult } from '../services/ConnectionReferencesService';
 
@@ -142,6 +143,28 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             <div id="content">
                 <div class="loading"><p>Select an environment to manage connection references...</p></div>
+            </div>
+
+            <!-- Pre-generated table template (hidden initially) -->
+            <div id="connectionReferencesTableTemplate" style="display: none;">
+                ${ComponentFactory.createDataTable({
+                    id: 'connectionReferencesTable',
+                    columns: [
+                        { key: 'flowName', label: 'Flow Name', sortable: true },
+                        { key: 'crLogicalName', label: 'Connection Reference Logical Name', sortable: true },
+                        { key: 'connectionName', label: 'Connection', sortable: true },
+                        { key: 'provider', label: 'Provider', sortable: true }
+                    ],
+                    defaultSort: { column: 'flowName', direction: 'asc' },
+                    filterable: true,
+                    stickyFirstColumn: false,
+                    rowActions: [
+                        { id: 'viewDetails', action: 'viewDetails', label: 'View', icon: '👁️' }
+                    ],
+                    contextMenu: [
+                        { id: 'viewDetails', action: 'viewDetails', label: 'View Details' }
+                    ]
+                })}
             </div>
 
             <script src="${envSelectorUtilsScript}"></script>
