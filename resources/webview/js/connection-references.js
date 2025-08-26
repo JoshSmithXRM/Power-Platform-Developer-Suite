@@ -2,6 +2,9 @@
 const vscode = acquireVsCodeApi();
 let currentEnvironmentId = '';
 let currentSolutionId = '';
+let currentRelationshipData = null;
+let currentSolutionUniqueName = '';
+let currentSolutionsData = [];
 
 // Helper function to clean up provider names
 function cleanProviderName(providerName) {
@@ -48,6 +51,10 @@ function onEnvironmentChange(selectorId, environmentId, previousEnvironmentId) {
 
 function onSolutionChange(selectorId, solutionId, previousSolutionId) {
     currentSolutionId = solutionId;
+    // Update the solution unique name when solution changes
+    const selectedSolution = currentSolutionsData.find(s => s.solutionId === solutionId);
+    currentSolutionUniqueName = selectedSolution?.uniqueName || '';
+    
     if (solutionId && currentEnvironmentId) {
         loadConnectionReferences(currentEnvironmentId, solutionId);
     } else {
@@ -85,6 +92,18 @@ function openInMaker() {
     });
 }
 
+function syncDeploymentSettings() {
+    if (!currentRelationshipData || !currentSolutionUniqueName) {
+        PanelUtils.sendMessage('error', { message: 'No connection reference data available to sync' });
+        return;
+    }
+    
+    PanelUtils.sendMessage('syncDeploymentSettings', {
+        relationships: currentRelationshipData,
+        solutionUniqueName: currentSolutionUniqueName
+    });
+}
+
 // Message handlers
 PanelUtils.setupMessageHandler({
     'environmentsLoaded': (message) => {
@@ -99,8 +118,13 @@ PanelUtils.setupMessageHandler({
     'solutionsLoaded': (message) => {
         SolutionSelectorUtils.setLoadingState('solutionSelect', false);
         SolutionSelectorUtils.loadSolutions('solutionSelect', message.data, message.selectedSolutionId);
+        // Store solutions data for later reference
+        currentSolutionsData = message.data;
         if (message.selectedSolutionId) {
             currentSolutionId = message.selectedSolutionId;
+            // Store solution unique name for deployment settings
+            const selectedSolution = message.data.find(s => s.solutionId === message.selectedSolutionId);
+            currentSolutionUniqueName = selectedSolution?.uniqueName || '';
             loadConnectionReferences(currentEnvironmentId, message.selectedSolutionId);
         }
     },
@@ -108,9 +132,15 @@ PanelUtils.setupMessageHandler({
     'connectionReferencesLoaded': (message) => {
         const data = message.data || {};
         const relationships = data.relationships || [];
+        currentRelationshipData = data; // Store for deployment settings sync
 
         if (relationships.length === 0) {
             panelUtils.showNoData('No flows or connection references found for the selected environment.');
+            // Disable sync button when no data
+            const syncBtn = document.getElementById('syncDeploymentBtn');
+            if (syncBtn) {
+                syncBtn.disabled = true;
+            }
             return;
         }
 
@@ -177,15 +207,21 @@ PanelUtils.setupMessageHandler({
         TableUtils.loadTableData('connectionReferencesTable', tableData);
         TableUtils.sortTable('connectionReferencesTable', 'flowName', 'asc');
 
-        const exportBtn = document.getElementById('exportBtn');
-        if (exportBtn) {
-            exportBtn.onclick = () => PanelUtils.sendMessage('exportDeploymentSkeleton', { relationships: data });
+        // Enable and wire sync deployment settings button
+        const syncBtn = document.getElementById('syncDeploymentBtn');
+        if (syncBtn) {
+            syncBtn.disabled = false;
+            syncBtn.onclick = () => syncDeploymentSettings();
         }
     },
 
-    'exportedSkeleton': (message) => {
-        const content = document.getElementById('content');
-        content.innerHTML = '<div style="padding:16px;"><h2>Exported Skeleton</h2><pre style="white-space:pre-wrap;">' + JSON.stringify(message.data, null, 2) + '</pre></div>';
+    'deploymentSettingsSynced': (message) => {
+        const result = message.data;
+        const actionText = result.isNewFile ? 'created' : 'updated';
+        const summary = `Deployment settings file ${actionText}: ${result.added} added, ${result.removed} removed`;
+        
+        // Show success message with file path
+        panelUtils.showSuccess(`${summary}\nFile: ${result.filePath}`);
     },
 
     'error': (message) => {

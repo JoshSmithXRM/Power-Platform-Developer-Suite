@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Open in Maker" button functionality for connection references and environment variables with correct Power Platform URLs
 - Table footer with record count display - shows filtered count and total when applicable (always visible at bottom)
 - ComponentFactory now supports table footers with customizable text and record count placeholders
+- Deployment Settings sync functionality - create or update deployment settings JSON files from solution data
+- "Sync Deployment Settings" button in Connection References and Environment Variables panels
+- Enhanced DeploymentSettingsService with file operations, user file selection, and smart sync logic
+- Automatic deployment settings file naming pattern: `{SolutionUniqueName}.deploymentsettings.json`
+- Intelligent sync behavior: adds new items, removes orphaned items, preserves existing values
+- Consistent deployment settings file sorting: Connection References by LogicalName, Environment Variables by SchemaName (prevents source control noise)
 - Text selection enabled in table cells - users can now highlight and copy text from any table cell
 - Normalized footer messages across all panels with consistent format: "Showing X of Y items"
 - Generic SolutionComponentService.getEntityIdsInSolution method for flexible entity type filtering
@@ -26,10 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Table UX improvements: enabled text selection (`user-select: text`) and text cursor (`cursor: text`) for all table cells
 - Footer message consistency: all panels now use standardized "Showing {filteredCount} of {totalCount} items" format
-- Connection References panel solution filtering now uses proper Dynamics solution component queries instead of incorrect solutionid field filtering
-- Solution filtering properly scopes data by querying EntityDefinitions for ObjectTypeCode and solutioncomponents for actual solution membership
-- Environment Setup Panel webview resource loading - fixed localResourceRoots configuration to allow loading JavaScript and CSS files from resources directory
-- Connection References service optimization - removed unnecessary /connections API call and simplified connection name resolution to use data already available in connection references
 
 ### Changed
 - Nothing yet
@@ -45,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - Nothing yet
+
+### Known Issues
+- Deployment settings sync includes secret environment variable values in plain text - requires research into secret detection/masking
 
 ## [0.1.4] - 2025-08-25
 

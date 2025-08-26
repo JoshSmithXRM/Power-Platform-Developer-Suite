@@ -49,8 +49,8 @@ export class ConnectionReferencesPanel extends BasePanel {
                 case 'loadConnectionReferences':
                     await this.handleLoadConnectionReferences(message.environmentId, message.solutionId);
                     break;
-                case 'exportDeploymentSkeleton':
-                    await this.handleExportDeploymentSkeleton(message.relationships);
+                case 'syncDeploymentSettings':
+                    await this.handleSyncDeploymentSettings(message.relationships, message.solutionUniqueName);
                     break;
                 case 'openInMaker':
                     await this.handleOpenInMaker(message.environmentId, message.solutionId, message.entityType);
@@ -113,13 +113,34 @@ export class ConnectionReferencesPanel extends BasePanel {
         this._panel.webview.postMessage({ action: 'connectionReferencesLoaded', data: rels });
     }
 
-    private async handleExportDeploymentSkeleton(relationships: RelationshipResult): Promise<void> {
+    private async handleSyncDeploymentSettings(relationships: RelationshipResult, solutionUniqueName?: string): Promise<void> {
         try {
-            const ds = ServiceFactory.getDeploymentSettingsService();
-            const skeleton = ds.createSkeletonFromRelationships(relationships);
-            this._panel.webview.postMessage({ action: 'exportedSkeleton', data: skeleton });
+            const deploymentSettingsService = ServiceFactory.getDeploymentSettingsService();
+            
+            // Prompt user to select or create deployment settings file
+            const filePath = await deploymentSettingsService.selectDeploymentSettingsFile(solutionUniqueName);
+            if (!filePath) {
+                return; // User cancelled
+            }
+
+            const isNewFile = !require('fs').existsSync(filePath);
+            
+            // Sync connection references with the file
+            const result = await deploymentSettingsService.syncConnectionReferences(filePath, relationships, isNewFile);
+            
+            // Send success message back to UI
+            this._panel.webview.postMessage({ 
+                action: 'deploymentSettingsSynced', 
+                data: {
+                    filePath: result.filePath,
+                    added: result.added,
+                    removed: result.removed,
+                    updated: result.updated,
+                    isNewFile
+                }
+            });
         } catch (err: any) {
-            this._panel.webview.postMessage({ action: 'error', message: err?.message || 'Failed to generate skeleton' });
+            this._panel.webview.postMessage({ action: 'error', message: err?.message || 'Failed to sync deployment settings' });
         }
     }
 
@@ -188,8 +209,7 @@ export class ConnectionReferencesPanel extends BasePanel {
             <div class="header">
                 <h1 class="title">Connection References Manager</h1>
                 <div class="header-actions">
-                    <button class="btn" id="exportBtn">Export Skeleton</button>
-                    <button class="btn btn-secondary" id="visualizeBtn" disabled>Visualize (coming soon)</button>
+                    <button class="btn btn-secondary" id="syncDeploymentBtn" disabled>Sync Deployment Settings</button>
                     <button class="btn btn-primary" onclick="openInMaker()">Open in Maker</button>
                     <button class="btn" onclick="refreshData()">Refresh</button>
                 </div>

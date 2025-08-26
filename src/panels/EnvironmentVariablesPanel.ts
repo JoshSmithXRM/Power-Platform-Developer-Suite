@@ -52,6 +52,10 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 await this.handleLoadEnvironmentVariables(message.environmentId, message.solutionId);
                 break;
 
+            case 'syncDeploymentSettings':
+                await this.handleSyncDeploymentSettings(message.environmentVariablesData, message.solutionUniqueName);
+                break;
+
             case 'openInMaker':
                 await this.handleOpenInMaker(message.environmentId, message.solutionId, message.entityType);
                 break;
@@ -138,6 +142,37 @@ export class EnvironmentVariablesPanel extends BasePanel {
         }
     }
 
+    private async handleSyncDeploymentSettings(environmentVariablesData: any, solutionUniqueName?: string): Promise<void> {
+        try {
+            const deploymentSettingsService = ServiceFactory.getDeploymentSettingsService();
+            
+            // Prompt user to select or create deployment settings file
+            const filePath = await deploymentSettingsService.selectDeploymentSettingsFile(solutionUniqueName);
+            if (!filePath) {
+                return; // User cancelled
+            }
+
+            const isNewFile = !require('fs').existsSync(filePath);
+            
+            // Sync environment variables with the file
+            const result = await deploymentSettingsService.syncEnvironmentVariables(filePath, environmentVariablesData, isNewFile);
+            
+            // Send success message back to UI
+            this._panel.webview.postMessage({ 
+                action: 'deploymentSettingsSynced', 
+                data: {
+                    filePath: result.filePath,
+                    added: result.added,
+                    removed: result.removed,
+                    updated: result.updated,
+                    isNewFile
+                }
+            });
+        } catch (err: any) {
+            this._panel.webview.postMessage({ action: 'error', message: err?.message || 'Failed to sync deployment settings' });
+        }
+    }
+
     private async handleOpenInMaker(environmentId: string, solutionId: string, entityType: string): Promise<void> {
         if (!environmentId || !solutionId) {
             this._panel.webview.postMessage({ action: 'error', message: 'Environment and solution are required' });
@@ -205,6 +240,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
             <div class="header">
                 <h1 class="title">Environment Variables Manager</h1>
                 <div class="header-actions">
+                    <button class="btn btn-secondary" id="syncDeploymentBtn" disabled>Sync Deployment Settings</button>
                     <button class="btn btn-primary" onclick="openInMaker()">Open in Maker</button>
                     <button class="btn" onclick="refreshEnvironmentVariables()">Refresh</button>
                 </div>
@@ -246,6 +282,9 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 const vscode = acquireVsCodeApi();
                 let currentEnvironmentId = '';
                 let currentSolutionId = '';
+                let currentEnvironmentVariablesData = null;
+                let currentSolutionUniqueName = '';
+                let currentSolutionsData = [];
                 
                 const panelUtils = PanelUtils.initializePanel({
                     environmentSelectorId: 'environmentSelect',
@@ -277,6 +316,10 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
                 function onSolutionChange(selectorId, solutionId, previousSolutionId) {
                     currentSolutionId = solutionId;
+                    // Update the solution unique name when solution changes
+                    const selectedSolution = currentSolutionsData.find(s => s.solutionId === solutionId);
+                    currentSolutionUniqueName = selectedSolution?.uniqueName || '';
+                    
                     if (solutionId && currentEnvironmentId) {
                         loadEnvironmentVariables(currentEnvironmentId, solutionId);
                     } else {
@@ -333,20 +376,46 @@ export class EnvironmentVariablesPanel extends BasePanel {
                     'solutionsLoaded': (message) => {
                         SolutionSelectorUtils.setLoadingState('solutionSelect', false);
                         SolutionSelectorUtils.loadSolutions('solutionSelect', message.data, message.selectedSolutionId);
+                        // Store solutions data for later reference
+                        currentSolutionsData = message.data;
                         if (message.selectedSolutionId) {
                             currentSolutionId = message.selectedSolutionId;
+                            // Store solution unique name for deployment settings
+                            const selectedSolution = message.data.find(s => s.solutionId === message.selectedSolutionId);
+                            currentSolutionUniqueName = selectedSolution?.uniqueName || '';
                             loadEnvironmentVariables(currentEnvironmentId, message.selectedSolutionId);
                         }
                     },
 
                     'environmentVariablesLoaded': (message) => {
+                        currentEnvironmentVariablesData = message.data; // Store for deployment settings sync
                         populateEnvironmentVariables(message.data);
+                    },
+
+                    'deploymentSettingsSynced': (message) => {
+                        const result = message.data;
+                        const actionText = result.isNewFile ? 'created' : 'updated';
+                        const summary = 'Deployment settings file ' + actionText + ': ' + result.added + ' added, ' + result.removed + ' removed';
+                        
+                        // Show success message with file path
+                        panelUtils.showSuccess(summary + '\\nFile: ' + result.filePath);
                     }
                 });
 
                 function populateEnvironmentVariables(data) {
                     const definitions = data.definitions || [];
                     const values = data.values || [];
+
+                    // Enable sync button if we have data
+                    const syncBtn = document.getElementById('syncDeploymentBtn');
+                    if (syncBtn) {
+                        if (definitions.length > 0) {
+                            syncBtn.disabled = false;
+                            syncBtn.onclick = () => syncDeploymentSettings();
+                        } else {
+                            syncBtn.disabled = true;
+                        }
+                    }
 
                     // Create a map of environment variable values by definition ID
                     const valuesMap = new Map();
@@ -408,6 +477,18 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
                 function handleRowAction(actionId, rowData) {
                     console.log('Environment variable action:', actionId, rowData);
+                }
+
+                function syncDeploymentSettings() {
+                    if (!currentEnvironmentVariablesData || !currentSolutionUniqueName) {
+                        PanelUtils.sendMessage('error', { message: 'No environment variable data available to sync' });
+                        return;
+                    }
+                    
+                    PanelUtils.sendMessage('syncDeploymentSettings', {
+                        environmentVariablesData: currentEnvironmentVariablesData,
+                        solutionUniqueName: currentSolutionUniqueName
+                    });
                 }
             </script>
         </body>
