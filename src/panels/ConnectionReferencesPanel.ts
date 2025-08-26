@@ -157,13 +157,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                     ],
                     defaultSort: { column: 'flowName', direction: 'asc' },
                     filterable: true,
-                    stickyFirstColumn: false,
-                    rowActions: [
-                        { id: 'viewDetails', action: 'viewDetails', label: 'View', icon: '👁️' }
-                    ],
-                    contextMenu: [
-                        { id: 'viewDetails', action: 'viewDetails', label: 'View Details' }
-                    ]
+                    stickyFirstColumn: false
                 })}
             </div>
 

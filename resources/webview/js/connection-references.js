@@ -54,7 +54,7 @@ PanelUtils.setupMessageHandler({
                         flowName: f.name,
                         crLogicalName: cr.name,
                         provider: cr.connectorLogicalName || '',
-                        connectionName: cr.referencedConnectionName || ''
+                        connectionName: cr.referencedConnectionId || ''
                     });
                 }
             });
@@ -67,7 +67,7 @@ PanelUtils.setupMessageHandler({
                     flowName: '',
                     crLogicalName: cr.name,
                     provider: cr.connectorLogicalName || '',
-                    connectionName: cr.referencedConnectionName || ''
+                    connectionName: cr.referencedConnectionId || ''
                 });
             }
         });
@@ -136,9 +136,6 @@ function handleRowClick(rowData, rowElement) {
 
 function handleRowAction(actionId, rowData) {
     switch (actionId) {
-        case 'viewDetails':
-            console.log('View details for:', rowData);
-            break;
         case 'openInMaker':
             console.log('Open in Maker:', rowData);
             break;
