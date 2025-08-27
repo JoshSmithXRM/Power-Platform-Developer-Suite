@@ -1319,7 +1319,19 @@ export class MetadataBrowserPanel extends BasePanel {
                             document.getElementById('tabContentArea').innerHTML = \`
                                 <div class="main-content">
                                     <div class="property-section">
-                                        <div class="property-section-title">Basic Information</div>
+                                        <div class="property-section-title">General Information</div>
+                                        <div class="property-row">
+                                            <div class="property-label">Metadata ID</div>
+                                            <div class="property-value">\${entity.MetadataId || 'Not specified'}</div>
+                                        </div>
+                                        <div class="property-row">
+                                            <div class="property-label">Has Changed</div>
+                                            <div class="property-value \${entity.HasChanged ? 'boolean-true' : 'boolean-false'}">\${entity.HasChanged ? 'True' : 'False'}</div>
+                                        </div>
+                                        <div class="property-row">
+                                            <div class="property-label">Activity Type Mask</div>
+                                            <div class="property-value">\${entity.ActivityTypeMask || 'Not specified'}</div>
+                                        </div>
                                         <div class="property-row">
                                             <div class="property-label">Logical Name</div>
                                             <div class="property-value">\${entity.LogicalName}</div>
@@ -1352,10 +1364,6 @@ export class MetadataBrowserPanel extends BasePanel {
                                             <div class="property-label">Entity Color</div>
                                             <div class="property-value">\${entity.EntityColor || 'Not specified'}</div>
                                         </div>
-                                    </div>
-
-                                    <div class="property-section">
-                                        <div class="property-section-title">Entity Collections</div>
                                         <div class="property-row">
                                             <div class="property-label">Entity Set Name</div>
                                             <div class="property-value">\${entity.EntitySetName}</div>
@@ -1372,10 +1380,6 @@ export class MetadataBrowserPanel extends BasePanel {
                                             <div class="property-label">Report View Name</div>
                                             <div class="property-value">\${entity.ReportViewName || 'Not specified'}</div>
                                         </div>
-                                    </div>
-
-                                    <div class="property-section">
-                                        <div class="property-section-title">Primary Attributes</div>
                                         <div class="property-row">
                                             <div class="property-label">Primary ID Attribute</div>
                                             <div class="property-value">\${entity.PrimaryIdAttribute}</div>
@@ -1388,7 +1392,24 @@ export class MetadataBrowserPanel extends BasePanel {
                                             <div class="property-label">Primary Image Attribute</div>
                                             <div class="property-value">\${entity.PrimaryImageAttribute || 'None'}</div>
                                         </div>
+                                        <div class="property-row">
+                                            <div class="property-label">Introduced Version</div>
+                                            <div class="property-value">\${entity.IntroducedVersion}</div>
+                                        </div>
+                                        <div class="property-row">
+                                            <div class="property-label">Created On</div>
+                                            <div class="property-value">\${entity.CreatedOn ? new Date(entity.CreatedOn).toLocaleString() : 'Not specified'}</div>
+                                        </div>
+                                        <div class="property-row">
+                                            <div class="property-label">Modified On</div>
+                                            <div class="property-value">\${entity.ModifiedOn ? new Date(entity.ModifiedOn).toLocaleString() : 'Not specified'}</div>
+                                        </div>
+                                        <div class="property-row">
+                                            <div class="property-label">Is AIR Updated</div>
+                                            <div class="property-value \${entity.IsAIRUpdated ? 'boolean-true' : 'boolean-false'}">\${entity.IsAIRUpdated ? 'True' : 'False'}</div>
+                                        </div>
                                     </div>
+
 
                                     <div class="property-section">
                                         <div class="property-section-title">Entity Classification</div>
@@ -1458,11 +1479,37 @@ export class MetadataBrowserPanel extends BasePanel {
                                         <div class="property-section-title">Entity Capabilities</div>
                                         <div class="property-row">
                                             <div class="property-label">Is Customizable</div>
-                                            <div class="property-value \${getBooleanValue(entity.IsCustomizable) ? 'boolean-true' : 'boolean-false'}">\${getBooleanValue(entity.IsCustomizable) ? 'True' : 'False'}</div>
+                                            <div class="property-container-details">
+                                                \${entity.IsCustomizable && typeof entity.IsCustomizable === 'object' ? \`
+                                                    <div class="property-sub-details">
+                                                        <div class="property-detail-row">
+                                                            <span class="property-detail-label">Value:</span>
+                                                            <span class="property-detail-value \${entity.IsCustomizable.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsCustomizable.Value ? 'True' : 'False'}</span>
+                                                        </div>
+                                                        <div class="property-detail-row">
+                                                            <span class="property-detail-label">Can Be Changed:</span>
+                                                            <span class="property-detail-value \${entity.IsCustomizable.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsCustomizable.CanBeChanged ? 'True' : 'False'}</span>
+                                                        </div>
+                                                    </div>
+                                                \` : \`<span class="property-value \${getBooleanValue(entity.IsCustomizable) ? 'boolean-true' : 'boolean-false'}">\${getBooleanValue(entity.IsCustomizable) ? 'True' : 'False'}</span>\`}
+                                            </div>
                                         </div>
                                         <div class="property-row">
                                             <div class="property-label">Is Renameable</div>
-                                            <div class="property-value \${getBooleanValue(entity.IsRenameable) ? 'boolean-true' : 'boolean-false'}">\${getBooleanValue(entity.IsRenameable) ? 'True' : 'False'}</div>
+                                            <div class="property-container-details">
+                                                \${entity.IsRenameable && typeof entity.IsRenameable === 'object' ? \`
+                                                    <div class="property-sub-details">
+                                                        <div class="property-detail-row">
+                                                            <span class="property-detail-label">Value:</span>
+                                                            <span class="property-detail-value \${entity.IsRenameable.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsRenameable.Value ? 'True' : 'False'}</span>
+                                                        </div>
+                                                        <div class="property-detail-row">
+                                                            <span class="property-detail-label">Can Be Changed:</span>
+                                                            <span class="property-detail-value \${entity.IsRenameable.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsRenameable.CanBeChanged ? 'True' : 'False'}</span>
+                                                        </div>
+                                                    </div>
+                                                \` : \`<span class="property-value \${getBooleanValue(entity.IsRenameable) ? 'boolean-true' : 'boolean-false'}">\${getBooleanValue(entity.IsRenameable) ? 'True' : 'False'}</span>\`}
+                                            </div>
                                         </div>
                                         <div class="property-row">
                                             <div class="property-label">Is Mappable</div>
@@ -1551,7 +1598,13 @@ export class MetadataBrowserPanel extends BasePanel {
                                     </div>
 
                                     <div class="property-section">
-                                        <div class="property-section-title">Mobile & Offline</div>
+                                        <div class="property-section-title">Mobile Configuration</div>
+                                        <div class="property-row">
+                                            <div class="property-label">Mobile Offline Filters</div>
+                                            <div class="property-value" style="word-break: break-all; font-family: monospace; font-size: 0.9em;">
+                                                \${entity.MobileOfflineFilters || 'Not specified'}
+                                            </div>
+                                        </div>
                                         <div class="property-row">
                                             <div class="property-label">Is Available Offline</div>
                                             <div class="property-value \${entity.IsAvailableOffline ? 'boolean-true' : 'boolean-false'}">\${entity.IsAvailableOffline ? 'True' : 'False'}</div>
@@ -1632,10 +1685,6 @@ export class MetadataBrowserPanel extends BasePanel {
                                             <div class="property-label">Days Since Record Last Modified</div>
                                             <div class="property-value">\${entity.DaysSinceRecordLastModified || 'Not specified'}</div>
                                         </div>
-                                    </div>
-
-                                    <div class="property-section">
-                                        <div class="property-section-title">External Integration</div>
                                         <div class="property-row">
                                             <div class="property-label">Is Enabled for External Channels</div>
                                             <div class="property-value \${entity.IsEnabledForExternalChannels ? 'boolean-true' : 'boolean-false'}">\${entity.IsEnabledForExternalChannels ? 'True' : 'False'}</div>
@@ -1650,25 +1699,27 @@ export class MetadataBrowserPanel extends BasePanel {
                                         </div>
                                     </div>
 
+
                                     <div class="property-section">
-                                        <div class="property-section-title">Metadata Information</div>
+                                        <div class="property-section-title">Icon & Appearance</div>
                                         <div class="property-row">
-                                            <div class="property-label">Introduced Version</div>
-                                            <div class="property-value">\${entity.IntroducedVersion}</div>
+                                            <div class="property-label">Icon Large Name</div>
+                                            <div class="property-value">\${entity.IconLargeName || 'Not specified'}</div>
                                         </div>
                                         <div class="property-row">
-                                            <div class="property-label">Created On</div>
-                                            <div class="property-value">\${entity.CreatedOn ? new Date(entity.CreatedOn).toLocaleString() : 'Not specified'}</div>
+                                            <div class="property-label">Icon Medium Name</div>
+                                            <div class="property-value">\${entity.IconMediumName || 'Not specified'}</div>
                                         </div>
                                         <div class="property-row">
-                                            <div class="property-label">Modified On</div>
-                                            <div class="property-value">\${entity.ModifiedOn ? new Date(entity.ModifiedOn).toLocaleString() : 'Not specified'}</div>
+                                            <div class="property-label">Icon Small Name</div>
+                                            <div class="property-value">\${entity.IconSmallName || 'Not specified'}</div>
                                         </div>
                                         <div class="property-row">
-                                            <div class="property-label">Is AIR Updated</div>
-                                            <div class="property-value \${entity.IsAIRUpdated ? 'boolean-true' : 'boolean-false'}">\${entity.IsAIRUpdated ? 'True' : 'False'}</div>
+                                            <div class="property-label">Icon Vector Name</div>
+                                            <div class="property-value">\${entity.IconVectorName || 'Not specified'}</div>
                                         </div>
                                     </div>
+
                                 </div>
                             \`;
                         }
@@ -1749,7 +1800,7 @@ export class MetadataBrowserPanel extends BasePanel {
                 function generateEntityProperties(entity) {
                     return \`
                         <div class="property-section">
-                            <div class="property-section-title">General</div>
+                            <div class="property-section-title">General Information</div>
                             <div class="property-row">
                                 <div class="property-label">Metadata ID</div>
                                 <div class="property-value guid">\${entity.MetadataId}</div>
@@ -1764,11 +1815,11 @@ export class MetadataBrowserPanel extends BasePanel {
                             </div>
                             <div class="property-row">
                                 <div class="property-label">Entity Set Name</div>
-                                <div class="property-value">\${entity.EntitySetName}</div>
+                                <div class="property-value">\${entity.EntitySetName || 'Not specified'}</div>
                             </div>
                             <div class="property-row">
                                 <div class="property-label">Object Type Code</div>
-                                <div class="property-value">\${entity.ObjectTypeCode}</div>
+                                <div class="property-value">\${entity.ObjectTypeCode !== undefined ? entity.ObjectTypeCode : 'Not specified'}</div>
                             </div>
                             <div class="property-row">
                                 <div class="property-label">Table Type</div>
@@ -1778,28 +1829,130 @@ export class MetadataBrowserPanel extends BasePanel {
                                 <div class="property-label">Entity Color</div>
                                 <div class="property-value">\${entity.EntityColor || 'Not specified'}</div>
                             </div>
+                            <div class="property-row">
+                                <div class="property-label">Has Changed</div>
+                                <div class="property-value">\${entity.HasChanged !== null && entity.HasChanged !== undefined ? (entity.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">External Name</div>
+                                <div class="property-value">\${entity.ExternalName || 'Not specified'}</div>
+                            </div>
+                            \${entity.DisplayName ? \`
+                            <div class="property-row">
+                                <div class="property-label">Display Name</div>
+                                <div class="property-value"></div>
+                            </div>
+                            \${entity.DisplayName.UserLocalizedLabel ? \`
+                            <div class="property-row property-container-details">
+                                <div class="property-label">User Localized Label</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Label</div>
+                                <div class="property-value">\${entity.DisplayName.UserLocalizedLabel.Label}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Language Code</div>
+                                <div class="property-value">\${entity.DisplayName.UserLocalizedLabel.LanguageCode}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Is Managed</div>
+                                <div class="property-value \${entity.DisplayName.UserLocalizedLabel.IsManaged ? 'boolean-true' : 'boolean-false'}">\${entity.DisplayName.UserLocalizedLabel.IsManaged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.DisplayName.LocalizedLabels && entity.DisplayName.LocalizedLabels.length > 0 ? entity.DisplayName.LocalizedLabels.map((label, index) => \`
+                            <div class="property-row property-container-details">
+                                <div class="property-label">Localized Label \${index + 1}</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Label</div>
+                                <div class="property-value">\${label.Label}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Language Code</div>
+                                <div class="property-value">\${label.LanguageCode}</div>
+                            </div>
+                            \`).join('') : ''}
+                            \` : ''}
+                            \${entity.DisplayCollectionName ? \`
+                            <div class="property-row">
+                                <div class="property-label">Display Collection Name</div>
+                                <div class="property-value">\${entity.DisplayCollectionName.UserLocalizedLabel?.Label || ''}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.Description ? \`
+                            <div class="property-row">
+                                <div class="property-label">Description</div>
+                                <div class="property-value">\${entity.Description.UserLocalizedLabel?.Label || 'No description'}</div>
+                            </div>
+                            \` : ''}
                         </div>
                         
                         <div class="property-section">
-                            <div class="property-section-title">Primary Attributes</div>
+                            <div class="property-section-title">Primary Attributes & Collections</div>
                             <div class="property-row">
-                                <div class="property-label">Primary ID</div>
-                                <div class="property-value">\${entity.PrimaryIdAttribute}</div>
+                                <div class="property-label">Primary ID Attribute</div>
+                                <div class="property-value">\${entity.PrimaryIdAttribute || 'Not specified'}</div>
                             </div>
                             <div class="property-row">
-                                <div class="property-label">Primary Name</div>
+                                <div class="property-label">Primary Name Attribute</div>
                                 <div class="property-value">\${entity.PrimaryNameAttribute || 'None'}</div>
                             </div>
                             <div class="property-row">
-                                <div class="property-label">Primary Image</div>
+                                <div class="property-label">Primary Image Attribute</div>
                                 <div class="property-value">\${entity.PrimaryImageAttribute || 'None'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Logical Collection Name</div>
+                                <div class="property-value">\${entity.LogicalCollectionName || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Collection Schema Name</div>
+                                <div class="property-value">\${entity.CollectionSchemaName || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">External Collection Name</div>
+                                <div class="property-value">\${entity.ExternalCollectionName || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Report View Name</div>
+                                <div class="property-value">\${entity.ReportViewName || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Primary Key</div>
+                                <div class="property-value">\${entity.PrimaryKey && entity.PrimaryKey.length > 0 ? entity.PrimaryKey.join(', ') : 'Not specified'}</div>
                             </div>
                         </div>
                         
                         <div class="property-section">
+                            <div class="property-section-title">Ownership & Security</div>
+                            <div class="property-row">
+                                <div class="property-label">Ownership Type</div>
+                                <div class="property-value">\${entity.OwnershipType || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Owner ID</div>
+                                <div class="property-value">\${entity.OwnerId || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Owner ID Type</div>
+                                <div class="property-value">\${entity.OwnerIdType !== undefined ? entity.OwnerIdType : 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Owning Business Unit</div>
+                                <div class="property-value">\${entity.OwningBusinessUnit || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Privileges</div>
+                                <div class="property-value">\${entity.Privileges && entity.Privileges.length > 0 ? entity.Privileges.length + ' privileges defined' : 'None'}</div>
+                            </div>
+                        </div>
+
+                        <div class="property-section">
                             <div class="property-section-title">Entity Classification</div>
                             <div class="property-row">
-                                <div class="property-label">Is Custom</div>
+                                <div class="property-label">Is Custom Entity</div>
                                 <div class="property-value \${entity.IsCustomEntity ? 'boolean-true' : 'boolean-false'}">\${entity.IsCustomEntity ? 'True' : 'False'}</div>
                             </div>
                             <div class="property-row">
@@ -1815,6 +1968,10 @@ export class MetadataBrowserPanel extends BasePanel {
                                 <div class="property-value \${entity.IsActivityParty ? 'boolean-true' : 'boolean-false'}">\${entity.IsActivityParty ? 'True' : 'False'}</div>
                             </div>
                             <div class="property-row">
+                                <div class="property-label">Activity Type Mask</div>
+                                <div class="property-value">\${entity.ActivityTypeMask !== undefined ? entity.ActivityTypeMask : 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
                                 <div class="property-label">Is Intersect</div>
                                 <div class="property-value \${entity.IsIntersect ? 'boolean-true' : 'boolean-false'}">\${entity.IsIntersect ? 'True' : 'False'}</div>
                             </div>
@@ -1822,38 +1979,284 @@ export class MetadataBrowserPanel extends BasePanel {
                                 <div class="property-label">Is Private</div>
                                 <div class="property-value \${entity.IsPrivate ? 'boolean-true' : 'boolean-false'}">\${entity.IsPrivate ? 'True' : 'False'}</div>
                             </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Logical Entity</div>
+                                <div class="property-value \${entity.IsLogicalEntity ? 'boolean-true' : 'boolean-false'}">\${entity.IsLogicalEntity ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Child Entity</div>
+                                <div class="property-value \${entity.IsChildEntity ? 'boolean-true' : 'boolean-false'}">\${entity.IsChildEntity ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is BPF Entity</div>
+                                <div class="property-value \${entity.IsBPFEntity ? 'boolean-true' : 'boolean-false'}">\${entity.IsBPFEntity ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Solution Aware</div>
+                                <div class="property-value \${entity.IsSolutionAware ? 'boolean-true' : 'boolean-false'}">\${entity.IsSolutionAware ? 'True' : 'False'}</div>
+                            </div>
                         </div>
                         
                         <div class="property-section">
                             <div class="property-section-title">Entity Capabilities</div>
+                            \${entity.IsCustomizable ? \`
                             <div class="property-row">
                                 <div class="property-label">Is Customizable</div>
-                                <div class="property-value \${getBooleanValue(entity.IsCustomizable) ? 'boolean-true' : 'boolean-false'}">\${getBooleanValue(entity.IsCustomizable) ? 'True' : 'False'}</div>
+                                <div class="property-value"></div>
                             </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsCustomizable.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsCustomizable.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsCustomizable.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsCustomizable.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${entity.IsCustomizable.ManagedPropertyLogicalName || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.IsRenameable ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Renameable</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsRenameable.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsRenameable.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsRenameable.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsRenameable.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.IsMappable ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Mappable</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsMappable.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsMappable.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsMappable.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsMappable.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.CanCreateAttributes ? \`
                             <div class="property-row">
                                 <div class="property-label">Can Create Attributes</div>
-                                <div class="property-value \${getBooleanValue(entity.CanCreateAttributes) ? 'boolean-true' : 'boolean-false'}">\${getBooleanValue(entity.CanCreateAttributes) ? 'True' : 'False'}</div>
+                                <div class="property-value"></div>
                             </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanCreateAttributes.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanCreateAttributes.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanCreateAttributes.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanCreateAttributes.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.CanCreateForms ? \`
                             <div class="property-row">
                                 <div class="property-label">Can Create Forms</div>
-                                <div class="property-value \${getBooleanValue(entity.CanCreateForms) ? 'boolean-true' : 'boolean-false'}">\${getBooleanValue(entity.CanCreateForms) ? 'True' : 'False'}</div>
+                                <div class="property-value"></div>
                             </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanCreateForms.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanCreateForms.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanCreateForms.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanCreateForms.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.CanCreateViews ? \`
                             <div class="property-row">
                                 <div class="property-label">Can Create Views</div>
-                                <div class="property-value \${getBooleanValue(entity.CanCreateViews) ? 'boolean-true' : 'boolean-false'}">\${getBooleanValue(entity.CanCreateViews) ? 'True' : 'False'}</div>
+                                <div class="property-value"></div>
                             </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanCreateViews.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanCreateViews.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanCreateViews.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanCreateViews.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.CanCreateCharts ? \`
                             <div class="property-row">
                                 <div class="property-label">Can Create Charts</div>
-                                <div class="property-value \${getBooleanValue(entity.CanCreateCharts) ? 'boolean-true' : 'boolean-false'}">\${getBooleanValue(entity.CanCreateCharts) ? 'True' : 'False'}</div>
+                                <div class="property-value"></div>
                             </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanCreateCharts.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanCreateCharts.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanCreateCharts.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanCreateCharts.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                        </div>
+                        
+                        <div class="property-section">
+                            <div class="property-section-title">Relationship Capabilities</div>
+                            \${entity.CanBeRelatedEntityInRelationship ? \`
+                            <div class="property-row">
+                                <div class="property-label">Can Be Related Entity In Relationship</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanBeRelatedEntityInRelationship.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanBeRelatedEntityInRelationship.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanBeRelatedEntityInRelationship.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanBeRelatedEntityInRelationship.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.CanBePrimaryEntityInRelationship ? \`
+                            <div class="property-row">
+                                <div class="property-label">Can Be Primary Entity In Relationship</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanBePrimaryEntityInRelationship.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanBePrimaryEntityInRelationship.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanBePrimaryEntityInRelationship.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanBePrimaryEntityInRelationship.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.CanBeInManyToMany ? \`
+                            <div class="property-row">
+                                <div class="property-label">Can Be In Many To Many</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanBeInManyToMany.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanBeInManyToMany.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanBeInManyToMany.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanBeInManyToMany.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.CanBeInCustomEntityAssociation ? \`
+                            <div class="property-row">
+                                <div class="property-label">Can Be In Custom Entity Association</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanBeInCustomEntityAssociation.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanBeInCustomEntityAssociation.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanBeInCustomEntityAssociation.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanBeInCustomEntityAssociation.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.CanChangeHierarchicalRelationship ? \`
+                            <div class="property-row">
+                                <div class="property-label">Can Change Hierarchical Relationship</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanChangeHierarchicalRelationship.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanChangeHierarchicalRelationship.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanChangeHierarchicalRelationship.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanChangeHierarchicalRelationship.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
                         </div>
                         
                         <div class="property-section">
                             <div class="property-section-title">Feature Integration</div>
+                            \${entity.IsAuditEnabled ? \`
                             <div class="property-row">
                                 <div class="property-label">Is Audit Enabled</div>
-                                <div class="property-value \${getBooleanValue(entity.IsAuditEnabled) ? 'boolean-true' : 'boolean-false'}">\${getBooleanValue(entity.IsAuditEnabled) ? 'True' : 'False'}</div>
+                                <div class="property-value"></div>
                             </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsAuditEnabled.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsAuditEnabled.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsAuditEnabled.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsAuditEnabled.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            <div class="property-row">
+                                <div class="property-label">Is Retrieve Audit Enabled</div>
+                                <div class="property-value \${entity.IsRetrieveAuditEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsRetrieveAuditEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Retrieve Multiple Audit Enabled</div>
+                                <div class="property-value \${entity.IsRetrieveMultipleAuditEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsRetrieveMultipleAuditEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            \${entity.IsValidForQueue ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Valid For Queue</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsValidForQueue.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsValidForQueue.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsValidForQueue.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsValidForQueue.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.IsConnectionsEnabled ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Connections Enabled</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsConnectionsEnabled.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsConnectionsEnabled.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsConnectionsEnabled.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsConnectionsEnabled.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.IsDuplicateDetectionEnabled ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Duplicate Detection Enabled</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsDuplicateDetectionEnabled.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsDuplicateDetectionEnabled.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsDuplicateDetectionEnabled.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsDuplicateDetectionEnabled.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.IsMailMergeEnabled ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Mail Merge Enabled</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsMailMergeEnabled.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsMailMergeEnabled.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsMailMergeEnabled.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsMailMergeEnabled.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
                             <div class="property-row">
                                 <div class="property-label">Has Activities</div>
                                 <div class="property-value \${entity.HasActivities ? 'boolean-true' : 'boolean-false'}">\${entity.HasActivities ? 'True' : 'False'}</div>
@@ -1863,54 +2266,340 @@ export class MetadataBrowserPanel extends BasePanel {
                                 <div class="property-value \${entity.HasNotes ? 'boolean-true' : 'boolean-false'}">\${entity.HasNotes ? 'True' : 'False'}</div>
                             </div>
                             <div class="property-row">
+                                <div class="property-label">Has Feedback</div>
+                                <div class="property-value \${entity.HasFeedback ? 'boolean-true' : 'boolean-false'}">\${entity.HasFeedback ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
                                 <div class="property-label">Has Email Addresses</div>
                                 <div class="property-value \${entity.HasEmailAddresses ? 'boolean-true' : 'boolean-false'}">\${entity.HasEmailAddresses ? 'True' : 'False'}</div>
+                            </div>
+                        </div>
+
+                        <div class="property-section">
+                            <div class="property-section-title">Workflow & Business Process</div>
+                            <div class="property-row">
+                                <div class="property-label">Can Trigger Workflow</div>
+                                <div class="property-value \${entity.CanTriggerWorkflow ? 'boolean-true' : 'boolean-false'}">\${entity.CanTriggerWorkflow ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Business Process Enabled</div>
+                                <div class="property-value \${entity.IsBusinessProcessEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsBusinessProcessEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is State Model Aware</div>
+                                <div class="property-value \${entity.IsStateModelAware ? 'boolean-true' : 'boolean-false'}">\${entity.IsStateModelAware ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Enforce State Transitions</div>
+                                <div class="property-value \${entity.EnforceStateTransitions ? 'boolean-true' : 'boolean-false'}">\${entity.EnforceStateTransitions ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Auto Route To Owner Queue</div>
+                                <div class="property-value \${entity.AutoRouteToOwnerQueue ? 'boolean-true' : 'boolean-false'}">\${entity.AutoRouteToOwnerQueue ? 'True' : 'False'}</div>
+                            </div>
+                        </div>
+
+                        <div class="property-section">
+                            <div class="property-section-title">Data Management</div>
+                            <div class="property-row">
+                                <div class="property-label">Is Importable</div>
+                                <div class="property-value \${entity.IsImportable ? 'boolean-true' : 'boolean-false'}">\${entity.IsImportable ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Change Tracking Enabled</div>
+                                <div class="property-value \${entity.ChangeTrackingEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.ChangeTrackingEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            \${entity.CanChangeTrackingBeEnabled ? \`
+                            <div class="property-row">
+                                <div class="property-label">Can Change Tracking Be Enabled</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanChangeTrackingBeEnabled.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanChangeTrackingBeEnabled.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanChangeTrackingBeEnabled.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanChangeTrackingBeEnabled.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            <div class="property-row">
+                                <div class="property-label">Is Optimistic Concurrency Enabled</div>
+                                <div class="property-value \${entity.IsOptimisticConcurrencyEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsOptimisticConcurrencyEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Sync To External Search Index</div>
+                                <div class="property-value \${entity.SyncToExternalSearchIndex ? 'boolean-true' : 'boolean-false'}">\${entity.SyncToExternalSearchIndex ? 'True' : 'False'}</div>
+                            </div>
+                            \${entity.CanEnableSyncToExternalSearchIndex ? \`
+                            <div class="property-row">
+                                <div class="property-label">Can Enable Sync To External Search Index</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanEnableSyncToExternalSearchIndex.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanEnableSyncToExternalSearchIndex.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanEnableSyncToExternalSearchIndex.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanEnableSyncToExternalSearchIndex.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            <div class="property-row">
+                                <div class="property-label">Days Since Record Last Modified</div>
+                                <div class="property-value">\${entity.DaysSinceRecordLastModified !== undefined ? entity.DaysSinceRecordLastModified : 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Data Provider ID</div>
+                                <div class="property-value">\${entity.DataProviderId || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Data Source ID</div>
+                                <div class="property-value">\${entity.DataSourceId || 'Not specified'}</div>
+                            </div>
+                        </div>
+
+                        <div class="property-section">
+                            <div class="property-section-title">Search & Advanced Find</div>
+                            <div class="property-row">
+                                <div class="property-label">Is Valid for Advanced Find</div>
+                                <div class="property-value \${entity.IsValidForAdvancedFind ? 'boolean-true' : 'boolean-false'}">\${entity.IsValidForAdvancedFind ? 'True' : 'False'}</div>
                             </div>
                             <div class="property-row">
                                 <div class="property-label">Is Enabled for Charts</div>
                                 <div class="property-value \${entity.IsEnabledForCharts ? 'boolean-true' : 'boolean-false'}">\${entity.IsEnabledForCharts ? 'True' : 'False'}</div>
                             </div>
                             <div class="property-row">
-                                <div class="property-label">Is Valid for Advanced Find</div>
-                                <div class="property-value \${entity.IsValidForAdvancedFind ? 'boolean-true' : 'boolean-false'}">\${entity.IsValidForAdvancedFind ? 'True' : 'False'}</div>
+                                <div class="property-label">Is Enabled for Trace</div>
+                                <div class="property-value \${entity.IsEnabledForTrace ? 'boolean-true' : 'boolean-false'}">\${entity.IsEnabledForTrace ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Enabled for External Channels</div>
+                                <div class="property-value \${entity.IsEnabledForExternalChannels ? 'boolean-true' : 'boolean-false'}">\${entity.IsEnabledForExternalChannels ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is AIR Updated</div>
+                                <div class="property-value \${entity.IsAIRUpdated ? 'boolean-true' : 'boolean-false'}">\${entity.IsAIRUpdated ? 'True' : 'False'}</div>
+                            </div>
+                        </div>
+
+                        <div class="property-section">
+                            <div class="property-section-title">Integration Settings</div>
+                            <div class="property-row">
+                                <div class="property-label">Is Document Management Enabled</div>
+                                <div class="property-value \${entity.IsDocumentManagementEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsDocumentManagementEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is OneNote Integration Enabled</div>
+                                <div class="property-value \${entity.IsOneNoteIntegrationEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsOneNoteIntegrationEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is MS Teams Integration Enabled</div>
+                                <div class="property-value \${entity.IsMSTeamsIntegrationEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsMSTeamsIntegrationEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Knowledge Management Enabled</div>
+                                <div class="property-value \${entity.IsKnowledgeManagementEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsKnowledgeManagementEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Interaction Centric Enabled</div>
+                                <div class="property-value \${entity.IsInteractionCentricEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsInteractionCentricEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Document Recommendations Enabled</div>
+                                <div class="property-value \${entity.IsDocumentRecommendationsEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsDocumentRecommendationsEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is SLA Enabled</div>
+                                <div class="property-value \${entity.IsSLAEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsSLAEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Entity Help URL Enabled</div>
+                                <div class="property-value \${entity.EntityHelpUrlEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.EntityHelpUrlEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Entity Help URL</div>
+                                <div class="property-value">\${entity.EntityHelpUrl || 'Not specified'}</div>
                             </div>
                         </div>
                         
                         <div class="property-section">
-                            <div class="property-section-title">Mobile & Integration</div>
+                            <div class="property-section-title">Mobile Configuration</div>
                             <div class="property-row">
                                 <div class="property-label">Is Available Offline</div>
                                 <div class="property-value \${entity.IsAvailableOffline ? 'boolean-true' : 'boolean-false'}">\${entity.IsAvailableOffline ? 'True' : 'False'}</div>
                             </div>
+                            \${entity.IsVisibleInMobile ? \`
                             <div class="property-row">
-                                <div class="property-label">Is Visible in Mobile</div>
-                                <div class="property-value \${getBooleanValue(entity.IsVisibleInMobile) ? 'boolean-true' : 'boolean-false'}">\${getBooleanValue(entity.IsVisibleInMobile) ? 'True' : 'False'}</div>
+                                <div class="property-label">Is Visible In Mobile</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsVisibleInMobile.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsVisibleInMobile.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsVisibleInMobile.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsVisibleInMobile.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.IsVisibleInMobileClient ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Visible In Mobile Client</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsVisibleInMobileClient.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsVisibleInMobileClient.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsVisibleInMobileClient.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsVisibleInMobileClient.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.IsReadOnlyInMobileClient ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Read Only In Mobile Client</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsReadOnlyInMobileClient.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsReadOnlyInMobileClient.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsReadOnlyInMobileClient.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsReadOnlyInMobileClient.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            \${entity.IsOfflineInMobileClient ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Offline In Mobile Client</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.IsOfflineInMobileClient.Value ? 'boolean-true' : 'boolean-false'}">\${entity.IsOfflineInMobileClient.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.IsOfflineInMobileClient.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.IsOfflineInMobileClient.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            <div class="property-row">
+                                <div class="property-label">Is Reading Pane Enabled</div>
+                                <div class="property-value \${entity.IsReadingPaneEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsReadingPaneEnabled ? 'True' : 'False'}</div>
                             </div>
                             <div class="property-row">
-                                <div class="property-label">MS Teams Integration</div>
-                                <div class="property-value \${entity.IsMSTeamsIntegrationEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsMSTeamsIntegrationEnabled ? 'True' : 'False'}</div>
+                                <div class="property-label">Is Quick Create Enabled</div>
+                                <div class="property-value \${entity.IsQuickCreateEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsQuickCreateEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            \${entity.MobileOfflineFilters ? \`
+                            <div class="property-row">
+                                <div class="property-label">Mobile Offline Filters</div>
+                                <div class="property-value"><span style="font-style: italic">XML filter definition present</span></div>
+                            </div>
+                            \` : ''}
+                        </div>
+
+                        <div class="property-section">
+                            <div class="property-section-title">Advanced Settings</div>
+                            <div class="property-row">
+                                <div class="property-label">Auto Create Access Teams</div>
+                                <div class="property-value \${entity.AutoCreateAccessTeams ? 'boolean-true' : 'boolean-false'}">\${entity.AutoCreateAccessTeams ? 'True' : 'False'}</div>
+                            </div>
+                            \${entity.CanModifyAdditionalSettings ? \`
+                            <div class="property-row">
+                                <div class="property-label">Can Modify Additional Settings</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${entity.CanModifyAdditionalSettings.Value ? 'boolean-true' : 'boolean-false'}">\${entity.CanModifyAdditionalSettings.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${entity.CanModifyAdditionalSettings.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${entity.CanModifyAdditionalSettings.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            \` : ''}
+                            <div class="property-row">
+                                <div class="property-label">Is Archival Enabled</div>
+                                <div class="property-value \${entity.IsArchivalEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsArchivalEnabled ? 'True' : 'False'}</div>
                             </div>
                             <div class="property-row">
-                                <div class="property-label">OneNote Integration</div>
-                                <div class="property-value \${entity.IsOneNoteIntegrationEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsOneNoteIntegrationEnabled ? 'True' : 'False'}</div>
+                                <div class="property-label">Is Retention Enabled</div>
+                                <div class="property-value \${entity.IsRetentionEnabled ? 'boolean-true' : 'boolean-false'}">\${entity.IsRetentionEnabled ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Cluster Mode</div>
+                                <div class="property-value">\${entity.ClusterMode || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Can Change Cluster Mode</div>
+                                <div class="property-value \${entity.CanChangeClusterMode ? 'boolean-true' : 'boolean-false'}">\${entity.CanChangeClusterMode ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Auto Replicate Cluster Records</div>
+                                <div class="property-value \${entity.AutoReplicateClusterRecords ? 'boolean-true' : 'boolean-false'}">\${entity.AutoReplicateClusterRecords ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Uses Business Data Label Table</div>
+                                <div class="property-value \${entity.UsesBusinessDataLabelTable ? 'boolean-true' : 'boolean-false'}">\${entity.UsesBusinessDataLabelTable ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Setting Of</div>
+                                <div class="property-value">\${entity.SettingOf || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Recurrence Base Entity Logical Name</div>
+                                <div class="property-value">\${entity.RecurrenceBaseEntityLogicalName || 'Not specified'}</div>
                             </div>
                         </div>
                         
                         <div class="property-section">
-                            <div class="property-section-title">Metadata Info</div>
+                            <div class="property-section-title">Icons</div>
+                            <div class="property-row">
+                                <div class="property-label">Icon Large Name</div>
+                                <div class="property-value">\${entity.IconLargeName || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Icon Medium Name</div>
+                                <div class="property-value">\${entity.IconMediumName || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Icon Small Name</div>
+                                <div class="property-value">\${entity.IconSmallName || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Icon Vector Name</div>
+                                <div class="property-value">\${entity.IconVectorName || 'Not specified'}</div>
+                            </div>
+                        </div>
+
+                        <div class="property-section">
+                            <div class="property-section-title">Timestamps</div>
                             <div class="property-row">
                                 <div class="property-label">Introduced Version</div>
-                                <div class="property-value">\${entity.IntroducedVersion}</div>
+                                <div class="property-value">\${entity.IntroducedVersion || 'Not specified'}</div>
                             </div>
                             <div class="property-row">
                                 <div class="property-label">Created On</div>
-                                <div class="property-value">\${entity.CreatedOn ? new Date(entity.CreatedOn).toLocaleDateString() : 'Not specified'}</div>
+                                <div class="property-value">\${entity.CreatedOn ? new Date(entity.CreatedOn).toLocaleDateString() + ' ' + new Date(entity.CreatedOn).toLocaleTimeString() : 'Not specified'}</div>
                             </div>
                             <div class="property-row">
                                 <div class="property-label">Modified On</div>
-                                <div class="property-value">\${entity.ModifiedOn ? new Date(entity.ModifiedOn).toLocaleDateString() : 'Not specified'}</div>
+                                <div class="property-value">\${entity.ModifiedOn ? new Date(entity.ModifiedOn).toLocaleDateString() + ' ' + new Date(entity.ModifiedOn).toLocaleTimeString() : 'Not specified'}</div>
                             </div>
                         </div>
+                        
+                        \${entity.Settings && entity.Settings.length > 0 ? \`
+                        <div class="property-section">
+                            <div class="property-section-title">Settings</div>
+                            <div class="property-row">
+                                <div class="property-label">Settings Count</div>
+                                <div class="property-value">\${entity.Settings.length} settings defined</div>
+                            </div>
+                        </div>
+                        \` : ''}
                     \`;
                 }
                 
