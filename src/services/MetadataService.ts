@@ -182,6 +182,17 @@ export interface SolutionComponent {
     RootComponentBehavior: number;
 }
 
+// Interface for complete entity metadata
+export interface CompleteEntityMetadata {
+    entity: EntityDefinition;
+    attributes: AttributeMetadata[];
+    keys: EntityKeyMetadata[];
+    oneToManyRelationships: OneToManyRelationshipMetadata[];
+    manyToOneRelationships: OneToManyRelationshipMetadata[];
+    manyToManyRelationships: ManyToManyRelationshipMetadata[];
+    privileges: EntityPrivilegeMetadata[];
+}
+
 export class MetadataService {
     private cache = new Map<string, any>();
     private cacheTimeout = 5 * 60 * 1000; // 5 minutes
@@ -561,6 +572,44 @@ export class MetadataService {
         const optionSet = await response.json();
         this.setCache(cacheKey, optionSet);
         return optionSet;
+    }
+
+    async getCompleteEntityMetadata(environmentId: string, entityLogicalName: string): Promise<CompleteEntityMetadata> {
+        const cacheKey = this.getCacheKey(environmentId, 'completeEntityMetadata', entityLogicalName);
+        const cached = this.getFromCache<CompleteEntityMetadata>(cacheKey);
+        if (cached) return cached;
+
+        // Load all metadata in parallel for better performance
+        const [
+            entity,
+            attributes,
+            keys,
+            oneToManyRelationships,
+            manyToOneRelationships,
+            manyToManyRelationships,
+            privileges
+        ] = await Promise.all([
+            this.getEntityMetadata(environmentId, entityLogicalName),
+            this.getEntityAttributes(environmentId, entityLogicalName),
+            this.getEntityKeys(environmentId, entityLogicalName),
+            this.getOneToManyRelationships(environmentId, entityLogicalName),
+            this.getManyToOneRelationships(environmentId, entityLogicalName),
+            this.getManyToManyRelationships(environmentId, entityLogicalName),
+            this.getEntityPrivileges(environmentId, entityLogicalName)
+        ]);
+
+        const completeMetadata: CompleteEntityMetadata = {
+            entity,
+            attributes,
+            keys,
+            oneToManyRelationships,
+            manyToOneRelationships,
+            manyToManyRelationships,
+            privileges
+        };
+
+        this.setCache(cacheKey, completeMetadata);
+        return completeMetadata;
     }
 
     // Utility methods for display

@@ -1,6 +1,6 @@
 # Power Platform Developer Suite
 
-![version](https://img.shields.io/badge/version-0.0.11-blue)
+![version](https://img.shields.io/badge/version-0.0.1-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 [![changelog](https://img.shields.io/badge/changelog-CHANGELOG-blue)](./CHANGELOG.md)
 [![version](https://img.shields.io/badge/version-0.0.1-blue)](./CHANGELOG.md)

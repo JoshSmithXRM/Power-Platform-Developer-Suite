@@ -124,7 +124,14 @@ export abstract class BasePanel implements IPanelBase {
      * Send a message to the webview
      */
     protected postMessage(message: WebviewMessage): void {
-        this._panel.webview.postMessage(message);
+        if (this._panel.webview) {
+            try {
+                this._panel.webview.postMessage(message);
+            } catch (error) {
+                // Webview is disposed, ignore the error
+                console.warn('Attempted to post message to disposed webview:', error);
+            }
+        }
     }
 
     /**

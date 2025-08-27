@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added explicit `bugs` and `homepage` fields to package.json for proper VS Code Marketplace integration
 - Added extension icon for professional marketplace appearance
 - Created custom Power Platform-themed SVG icon for VS Code activity bar (replaces generic wrench icon)
+- **PERFORMANCE**: Metadata Browser now loads all entity metadata (columns, keys, relationships, privileges) when a table is selected instead of lazy loading each tab - provides instant tab switching with better user experience
+- Metadata Browser uses intelligent caching system with parallel API calls for optimal performance when loading complete entity metadata
+- **UI/UX**: Improved Metadata Browser layout and space utilization with larger fonts (13-14px), better grid proportions, and enhanced property display sections
+- **UI/UX**: Enhanced main panel property display with organized sections (Basic Information, Entity Attributes, Capabilities) and improved spacing
+- **UI/UX**: Expanded right panel property grid with wider label columns (180px) and better readability
+- **UI/UX**: Improved responsive design with better breakpoints for different screen sizes
+- **UI/UX**: Enhanced tab switching in Metadata Browser - maintains per-tab selected row context and properties panel state, allowing users to return to previously selected items in each tab
+- **UI/UX**: Fixed left panel overflow scrollbar issue in Metadata Browser - adjusted main container height calculation and added proper overflow constraints
+- **UI/UX**: Fixed table footer overlap by adopting shared component structure (table-scroll-wrapper) while maintaining client-side compatibility
+- **UI/UX**: Enabled column sorting on all metadata browser tables - users can click column headers to sort data ascending/descending with visual indicators
+- **UI/UX**: Enhanced left panel display format to show 'Display Name (logical name)' for easier browsing and identification
+- **UI/UX**: Fixed choices not loading - added complete choice selection functionality with options display and properties panel
+- **UI/UX**: Added close button (×) to properties panel header and click-to-deselect functionality - users can close properties panel by clicking the close button or clicking an already selected row
 
 ### Added
 - **NEW FEATURE**: Comprehensive Metadata Browser with modern three-panel layout for browsing Dataverse entity metadata
@@ -62,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Table UX improvements: enabled text selection (`user-select: text`) and text cursor (`cursor: text`) for all table cells
 - Footer message consistency: all panels now use standardized "Showing {filteredCount} of {totalCount} items" format
 - Activity bar icon theming: replaced complex graphics with simple "PP" text-based 24x24 SVG using `currentColor` to ensure proper VS Code theme integration, hover states, and selection highlighting
+- Metadata Browser webview disposal error when clicking choice option rows - created separate choice display logic to avoid entity-specific message handling conflicts
 
 ### Changed
 - Nothing yet
@@ -98,6 +112,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plugin Trace Viewer panel framework with environment selector (API integration pending)
 
 ### Technical
+- Added `CompleteEntityMetadata` interface and `getCompleteEntityMetadata()` method to MetadataService for bulk metadata loading
+- Enhanced MetadataBrowserPanel with client-side metadata caching for instant tab switching
+- Improved MetadataService with parallel Promise.all() API calls for better performance when loading complete entity metadata
+- Updated metadata browser UI to show loading state during initial metadata fetch while maintaining instant tab switching afterward
 - Modular architecture with BasePanel foundation and dependency injection via ServiceFactory
 - Shared UI utilities (TableUtils, PanelUtils, EnvironmentSelectorUtils, ValidationUtils)
 - Complete solution management API integration via SolutionService
