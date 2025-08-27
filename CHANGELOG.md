@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **MAJOR**: Rebranded from "Dynamics DevTools" to "Power Platform Developer Suite" to better reflect the comprehensive Power Platform development toolkit vision and avoid naming conflicts in the marketplace
 - Updated all development scripts and package references to use new branding
+- Added explicit `bugs` and `homepage` fields to package.json for proper VS Code Marketplace integration
+- Added extension icon for professional marketplace appearance
+- Created custom Power Platform-themed SVG icon for VS Code activity bar (replaces generic wrench icon)
 
 ### Added
 - Plugin Trace Viewer with comprehensive trace log analysis and environment trace level management
