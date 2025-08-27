@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Footer message consistency: all panels now use standardized "Showing {filteredCount} of {totalCount} items" format
 - Activity bar icon theming: replaced complex graphics with simple "PP" text-based 24x24 SVG using `currentColor` to ensure proper VS Code theme integration, hover states, and selection highlighting
 - Metadata Browser webview disposal error when clicking choice option rows - created separate choice display logic to avoid entity-specific message handling conflicts
+- Metadata Browser footer record counts not displaying - replaced custom ClientComponentFactory with shared ComponentFactory pattern for consistent table functionality and automatic footer updates
 
 ### Changed
 - Nothing yet

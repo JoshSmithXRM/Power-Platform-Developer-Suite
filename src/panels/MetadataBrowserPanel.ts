@@ -851,6 +851,44 @@ export class MetadataBrowserPanel extends BasePanel {
                 </div>
             </div>
 
+            <!-- Hidden template for metadata table -->
+            <script type="text/template" id="metadataTableTemplate">
+                ${ComponentFactory.createDataTable({
+                    id: 'metadataTable',
+                    columns: [
+                        { key: 'LogicalName', label: 'Logical Name', sortable: true, width: '200px' },
+                        { key: 'DisplayName', label: 'Display Name', sortable: true, width: '200px' },
+                        { key: 'Type', label: 'Type', sortable: true, width: '150px' },
+                        { key: 'IsCustomizable', label: 'Customizable', sortable: true, width: '120px' },
+                        { key: 'IsManaged', label: 'Managed', sortable: true, width: '100px' }
+                    ],
+                    defaultSort: { column: 'DisplayName', direction: 'asc' },
+                    stickyHeader: true,
+                    stickyFirstColumn: false,
+                    filterable: true,
+                    showFooter: true,
+                    footerText: 'Showing {filteredCount} of {totalCount} items'
+                })}
+            </script>
+
+            <!-- Hidden template for choice options table -->
+            <script type="text/template" id="choiceOptionsTableTemplate">
+                ${ComponentFactory.createDataTable({
+                    id: 'choiceOptionsTable',
+                    columns: [
+                        { key: 'Value', label: 'Value', sortable: true, width: '100px' },
+                        { key: 'Label', label: 'Label', sortable: true, width: '200px' },
+                        { key: 'Description', label: 'Description', sortable: true, width: '300px' }
+                    ],
+                    defaultSort: { column: 'Value', direction: 'asc' },
+                    stickyHeader: true,
+                    stickyFirstColumn: false,
+                    filterable: true,
+                    showFooter: true,
+                    footerText: 'Showing {filteredCount} of {totalCount} options'
+                })}
+            </script>
+
             <script src="${envSelectorUtilsScript}"></script>
             <script src="${panelUtilsScript}"></script>
             <script src="${tableUtilsScript}"></script>
@@ -1758,49 +1796,12 @@ export class MetadataBrowserPanel extends BasePanel {
                     ], privileges);
                 }
                 
-                // Create a simple ComponentFactory for client-side use with proper structure
-                const ClientComponentFactory = {
-                    createDataTable: (config) => {
-                        const columnsHtml = config.columns.map(col => 
-                            \`<th class="sortable" data-column="\${col.key}" style="width: \${col.width || 'auto'}">
-                                \${col.label}
-                                <span class="sort-indicator"></span>
-                            </th>\`
-                        ).join('');
-                        
-                        const tableClasses = [
-                            'data-table',
-                            config.stickyHeader ? 'sticky-header' : '',
-                            'sortable-table'  // Enable sorting
-                        ].filter(Boolean).join(' ');
-                        
-                        return \`
-                            <div class="table-container">
-                                <div class="table-scroll-wrapper">
-                                    <table id="\${config.id}" class="\${tableClasses}">
-                                        <thead>
-                                            <tr>\${columnsHtml}</tr>
-                                        </thead>
-                                        <tbody id="\${config.id}Body"></tbody>
-                                    </table>
-                                </div>
-                                \${config.showFooter ? '<div class="table-footer"><span class="record-count">Loading...</span></div>' : ''}
-                            </div>
-                        \`;
-                    }
-                };
-                
                 function displayTable(tableData, columns, originalData) {
                     const tabContentArea = document.getElementById('tabContentArea');
-                    const tableHtml = ClientComponentFactory.createDataTable({
-                        id: 'metadataTable',
-                        columns: columns,
-                        stickyHeader: true,
-                        filterable: true,
-                        showFooter: true
-                    });
                     
-                    tabContentArea.innerHTML = tableHtml;
+                    // Use pre-generated table template (like other panels)
+                    const template = document.getElementById('metadataTableTemplate');
+                    tabContentArea.innerHTML = template.innerHTML;
                     
                     // Initialize table with TableUtils for sorting functionality
                     TableUtils.initializeTable('metadataTable');
@@ -1858,28 +1859,9 @@ export class MetadataBrowserPanel extends BasePanel {
                         return;
                     }
                     
-                    // Create simple table HTML for choice options (no complex entity logic)
-                    const columnsHtml = \`
-                        <th class="sortable" data-column="Value">Value <span class="sort-indicator"></span></th>
-                        <th class="sortable" data-column="Label">Label <span class="sort-indicator"></span></th>
-                        <th class="sortable" data-column="Description">Description <span class="sort-indicator"></span></th>
-                    \`;
-                    
-                    const tableHtml = \`
-                        <div class="table-container">
-                            <div class="table-scroll-wrapper">
-                                <table id="choiceOptionsTable" class="data-table sticky-header sortable-table">
-                                    <thead>
-                                        <tr>\${columnsHtml}</tr>
-                                    </thead>
-                                    <tbody id="choiceOptionsTableBody"></tbody>
-                                </table>
-                            </div>
-                            <div class="table-footer"><span class="record-count">Loading...</span></div>
-                        </div>
-                    \`;
-                    
-                    tabContentArea.innerHTML = tableHtml;
+                    // Use pre-generated choice options table template
+                    const template = document.getElementById('choiceOptionsTableTemplate');
+                    tabContentArea.innerHTML = template.innerHTML;
                     
                     // Prepare table data
                     const tableData = choice.Options.map(option => ({
@@ -1889,7 +1871,7 @@ export class MetadataBrowserPanel extends BasePanel {
                         Description: getDisplayName(option.Description) || ''
                     }));
                     
-                    // Initialize and populate table with simple choice option logic
+                    // Initialize and populate table with shared ComponentFactory logic
                     TableUtils.initializeTable('choiceOptionsTable');
                     TableUtils.loadTableData('choiceOptionsTable', tableData);
                     
