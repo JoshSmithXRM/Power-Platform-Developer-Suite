@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UI/UX**: Enhanced left panel display format to show 'Display Name (logical name)' for easier browsing and identification
 - **UI/UX**: Fixed choices not loading - added complete choice selection functionality with options display and properties panel
 - **UI/UX**: Added close button (×) to properties panel header and click-to-deselect functionality - users can close properties panel by clicking the close button or clicking an already selected row
+- **Technical**: Enhanced Keys properties panel in Metadata Browser to display all available fields including EntityLogicalName, HasChanged, EntityKeyIndexStatus, AsyncJob, IsSynchronous, IsExportKey, IsSecondaryKey, and IsCustomizable properties with proper organization in logical sections
 
 ### Added
 - **NEW FEATURE**: Comprehensive Metadata Browser with modern three-panel layout for browsing Dataverse entity metadata

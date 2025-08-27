@@ -579,11 +579,15 @@ export class MetadataBrowserPanel extends BasePanel {
 
                 .main-content .property-section-title {
                     font-size: 16px;
-                    font-weight: 600;
-                    color: var(--vscode-textLink-foreground);
-                    padding: 8px 0;
+                    font-weight: 700;
+                    color: var(--vscode-textLink-activeForeground);
+                    background: var(--vscode-editorWidget-background);
+                    padding: 10px 16px;
+                    margin: 0 -16px 16px -16px;
+                    border-left: 4px solid var(--vscode-textLink-foreground);
                     border-bottom: 2px solid var(--vscode-editorWidget-border);
-                    margin-bottom: 16px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
                 }
 
                 .main-content .property-row {
@@ -652,12 +656,32 @@ export class MetadataBrowserPanel extends BasePanel {
                 }
 
                 .property-section-title {
-                    font-weight: 600;
-                    color: var(--vscode-textLink-foreground);
-                    padding: 6px 0;
+                    font-weight: 700;
+                    color: var(--vscode-textLink-activeForeground);
+                    background: var(--vscode-editorWidget-background);
+                    padding: 8px 12px;
+                    margin: 0 -12px 12px -12px;
+                    border-left: 3px solid var(--vscode-textLink-foreground);
                     border-bottom: 1px solid var(--vscode-editorWidget-border);
-                    margin-bottom: 12px;
                     font-size: 14px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                
+                .property-subsection {
+                    margin: 16px 0 12px 12px;
+                    border-left: 2px solid var(--vscode-editorWidget-border);
+                    padding-left: 12px;
+                }
+                
+                .property-subsection-title {
+                    font-weight: 600;
+                    color: var(--vscode-foreground);
+                    padding: 4px 0 8px 0;
+                    font-size: 12px;
+                    opacity: 0.8;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
                 }
 
                 .property-row {
@@ -856,11 +880,11 @@ export class MetadataBrowserPanel extends BasePanel {
                 ${ComponentFactory.createDataTable({
                     id: 'metadataTable',
                     columns: [
-                        { key: 'LogicalName', label: 'Logical Name', sortable: true, width: '200px' },
                         { key: 'DisplayName', label: 'Display Name', sortable: true, width: '200px' },
-                        { key: 'Type', label: 'Type', sortable: true, width: '150px' },
-                        { key: 'IsCustomizable', label: 'Customizable', sortable: true, width: '120px' },
-                        { key: 'IsManaged', label: 'Managed', sortable: true, width: '100px' }
+                        { key: 'LogicalName', label: 'Logical Name', sortable: true, width: '200px' },
+                        { key: 'SchemaName', label: 'Schema Name', sortable: true, width: '200px' },
+                        { key: 'IsManaged', label: 'Managed', sortable: true, width: '100px' },
+                        { key: 'IsCustomizable', label: 'Customizable', sortable: true, width: '120px' }
                     ],
                     defaultSort: { column: 'DisplayName', direction: 'asc' },
                     stickyHeader: true,
@@ -1794,9 +1818,73 @@ export class MetadataBrowserPanel extends BasePanel {
                                 <div class="property-value">\${key.SchemaName}</div>
                             </div>
                             <div class="property-row">
-                                <div class="property-label">Display Name</div>
-                                <div class="property-value">\${getDisplayName(key.DisplayName)}</div>
+                                <div class="property-label">Entity Logical Name</div>
+                                <div class="property-value">\${key.EntityLogicalName || 'Not specified'}</div>
                             </div>
+                            <div class="property-row">
+                                <div class="property-label">Has Changed</div>
+                                <div class="property-value">\${key.HasChanged !== null ? (key.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="property-section">
+                            <div class="property-section-title">Display Name</div>
+                            \${key.DisplayName?.UserLocalizedLabel ? \`
+                            <div class="property-subsection">
+                                <div class="property-subsection-title">User Localized Label</div>
+                                <div class="property-row">
+                                    <div class="property-label">Label</div>
+                                    <div class="property-value">\${key.DisplayName.UserLocalizedLabel.Label}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Language Code</div>
+                                    <div class="property-value">\${key.DisplayName.UserLocalizedLabel.LanguageCode}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Is Managed</div>
+                                    <div class="property-value \${key.DisplayName.UserLocalizedLabel.IsManaged ? 'boolean-true' : 'boolean-false'}">\${key.DisplayName.UserLocalizedLabel.IsManaged ? 'True' : 'False'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Metadata ID</div>
+                                    <div class="property-value guid">\${key.DisplayName.UserLocalizedLabel.MetadataId}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Has Changed</div>
+                                    <div class="property-value">\${key.DisplayName.UserLocalizedLabel.HasChanged !== null ? (key.DisplayName.UserLocalizedLabel.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
+                                </div>
+                            </div>
+                            \` : ''}
+                            \${key.DisplayName?.LocalizedLabels && key.DisplayName.LocalizedLabels.length > 0 ? \`
+                            <div class="property-row">
+                                <div class="property-label">Localized Labels Count</div>
+                                <div class="property-value">\${key.DisplayName.LocalizedLabels.length}</div>
+                            </div>
+                            \${key.DisplayName.LocalizedLabels.map((label, index) => \`
+                                <div class="property-subsection">
+                                    <div class="property-subsection-title">Localized Label \${index + 1}</div>
+                                    <div class="property-row">
+                                        <div class="property-label">Label</div>
+                                        <div class="property-value">\${label.Label}</div>
+                                    </div>
+                                    <div class="property-row">
+                                        <div class="property-label">Language Code</div>
+                                        <div class="property-value">\${label.LanguageCode}</div>
+                                    </div>
+                                    <div class="property-row">
+                                        <div class="property-label">Is Managed</div>
+                                        <div class="property-value \${label.IsManaged ? 'boolean-true' : 'boolean-false'}">\${label.IsManaged ? 'True' : 'False'}</div>
+                                    </div>
+                                    <div class="property-row">
+                                        <div class="property-label">Metadata ID</div>
+                                        <div class="property-value guid">\${label.MetadataId}</div>
+                                    </div>
+                                    <div class="property-row">
+                                        <div class="property-label">Has Changed</div>
+                                        <div class="property-value">\${label.HasChanged !== null ? (label.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
+                                    </div>
+                                </div>
+                            \`).join('')}
+                            \` : ''}
                         </div>
                         
                         <div class="property-section">
@@ -1808,7 +1896,35 @@ export class MetadataBrowserPanel extends BasePanel {
                         </div>
                         
                         <div class="property-section">
-                            <div class="property-section-title">Properties</div>
+                            <div class="property-section-title">Key Status</div>
+                            <div class="property-row">
+                                <div class="property-label">Entity Key Index Status</div>
+                                <div class="property-value">\${key.EntityKeyIndexStatus || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Async Job</div>
+                                <div class="property-value guid">\${key.AsyncJob || 'Not specified'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="property-section">
+                            <div class="property-section-title">Key Types</div>
+                            <div class="property-row">
+                                <div class="property-label">Is Synchronous</div>
+                                <div class="property-value \${key.IsSynchronous ? 'boolean-true' : 'boolean-false'}">\${key.IsSynchronous ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Export Key</div>
+                                <div class="property-value \${key.IsExportKey ? 'boolean-true' : 'boolean-false'}">\${key.IsExportKey ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Secondary Key</div>
+                                <div class="property-value \${key.IsSecondaryKey ? 'boolean-true' : 'boolean-false'}">\${key.IsSecondaryKey ? 'True' : 'False'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="property-section">
+                            <div class="property-section-title">Management Properties</div>
                             <div class="property-row">
                                 <div class="property-label">Is Managed</div>
                                 <div class="property-value \${key.IsManaged ? 'boolean-true' : 'boolean-false'}">\${key.IsManaged ? 'True' : 'False'}</div>
@@ -1816,6 +1932,22 @@ export class MetadataBrowserPanel extends BasePanel {
                             <div class="property-row">
                                 <div class="property-label">Introduced Version</div>
                                 <div class="property-value">\${key.IntroducedVersion}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="property-section">
+                            <div class="property-section-title">Customization</div>
+                            <div class="property-row">
+                                <div class="property-label">Is Customizable</div>
+                                <div class="property-value \${key.IsCustomizable?.Value ? 'boolean-true' : 'boolean-false'}">\${key.IsCustomizable?.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${key.IsCustomizable?.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${key.IsCustomizable?.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${key.IsCustomizable?.ManagedPropertyLogicalName || 'Not specified'}</div>
                             </div>
                         </div>
                     \`;
@@ -2131,21 +2263,19 @@ export class MetadataBrowserPanel extends BasePanel {
                 function displayKeysTable(keys) {
                     const tableData = keys.map(key => ({
                         id: key.MetadataId || key.LogicalName,
+                        DisplayName: getDisplayName(key.DisplayName),
                         LogicalName: key.LogicalName,
                         SchemaName: key.SchemaName,
-                        DisplayName: getDisplayName(key.DisplayName),
-                        KeyAttributes: Array.isArray(key.KeyAttributes) ? key.KeyAttributes.join(', ') : key.KeyAttributes,
                         IsManaged: key.IsManaged ? 'Yes' : 'No',
-                        IntroducedVersion: key.IntroducedVersion
+                        IsCustomizable: key.IsCustomizable?.Value ? 'Yes' : 'No'
                     }));
                     
                     displayTable(tableData, [
+                        { key: 'DisplayName', label: 'Display Name', sortable: true },
                         { key: 'LogicalName', label: 'Logical Name', sortable: true },
                         { key: 'SchemaName', label: 'Schema Name', sortable: true },
-                        { key: 'DisplayName', label: 'Display Name', sortable: true },
-                        { key: 'KeyAttributes', label: 'Attributes', sortable: true },
                         { key: 'IsManaged', label: 'Managed', sortable: true },
-                        { key: 'IntroducedVersion', label: 'Version', sortable: true }
+                        { key: 'IsCustomizable', label: 'Customizable', sortable: true }
                     ], keys);
                 }
                 
