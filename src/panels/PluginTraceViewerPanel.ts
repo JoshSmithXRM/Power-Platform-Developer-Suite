@@ -115,7 +115,7 @@ export class PluginTraceViewerPanel extends BasePanel {
 
         try {
             this._selectedEnvironmentId = environmentId;
-            
+
             // Save environment selection
             await this.updateState({ selectedEnvironmentId: environmentId });
 
@@ -145,7 +145,7 @@ export class PluginTraceViewerPanel extends BasePanel {
 
         try {
             const traceLevel = await this._pluginTraceService.getPluginTraceLevel(environmentId);
-            
+
             this.postMessage({
                 action: 'traceLevelLoaded',
                 data: {
@@ -173,7 +173,7 @@ export class PluginTraceViewerPanel extends BasePanel {
 
         try {
             await this._pluginTraceService.setPluginTraceLevel(environmentId, traceLevel);
-            
+
             this.postMessage({
                 action: 'traceLevelSet',
                 data: {
@@ -331,10 +331,10 @@ export class PluginTraceViewerPanel extends BasePanel {
         </head>
         <body>
             ${ComponentFactory.createEnvironmentSelector({
-                id: 'environmentSelect',
-                label: 'Environment:',
-                placeholder: 'Loading environments...'
-            })}
+            id: 'environmentSelect',
+            label: 'Environment:',
+            placeholder: 'Loading environments...'
+        })}
 
             <!-- Trace Level Control -->
             <div class="controls-section">
@@ -372,7 +372,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                     </div>
                     <div class="control-group">
                         <label for="topFilter">Max Results:</label>
-                        <input type="number" id="topFilter" min="1" max="5000" value="1000" style="width: 80px;">
+                        <input type="number" id="topFilter" min="1" max="5000" value="100" style="width: 80px;">
                     </div>
                     <div class="filter-actions">
                         <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
@@ -398,28 +398,28 @@ export class PluginTraceViewerPanel extends BasePanel {
             <!-- Hidden template for plugin trace table -->
             <script type="text/template" id="pluginTraceTableTemplate">
                 ${ComponentFactory.createDataTable({
-                    id: 'pluginTraceTable',
-                    columns: [
-                        { key: 'createdon', label: 'Start Time', sortable: true, width: '140px' },
-                        { key: 'duration', label: 'Duration', sortable: true, width: '80px', className: 'duration-cell' },
-                        { key: 'pluginname', label: 'Plugin', sortable: true },
-                        { key: 'messagename', label: 'Step', sortable: true, width: '120px' },
-                        { key: 'depth', label: 'Depth', sortable: true, width: '60px' },
-                        { key: 'mode', label: 'Mode', sortable: true, width: '100px' },
-                        { key: 'entityname', label: 'Entity', sortable: true, width: '100px' },
-                        { key: 'messageblock', label: 'Message', sortable: true, width: '80px' },
-                        { key: 'exceptiondetails', label: 'Exception', sortable: true, width: '80px' }
-                    ],
-                    defaultSort: undefined,
-                    stickyHeader: true,
-                    stickyFirstColumn: false,
-                    filterable: true,
-                    showFooter: true,
-                    rowActions: [
-                        { id: 'viewDetails', label: 'View Details', icon: '👁️', action: 'viewTraceDetails' },
-                        { id: 'openInDynamics', label: 'View in Dynamics', icon: '🔗', action: 'openTraceInDynamics' }
-                    ]
-                })}
+            id: 'pluginTraceTable',
+            columns: [
+                { key: 'createdon', label: 'Start Time', sortable: true, width: '140px' },
+                { key: 'duration', label: 'Duration', sortable: true, width: '80px', className: 'duration-cell' },
+                { key: 'pluginname', label: 'Plugin', sortable: true },
+                { key: 'messagename', label: 'Step', sortable: true, width: '120px' },
+                { key: 'depth', label: 'Depth', sortable: true, width: '60px' },
+                { key: 'mode', label: 'Mode', sortable: true, width: '100px' },
+                { key: 'entityname', label: 'Entity', sortable: true, width: '100px' },
+                { key: 'messageblock', label: 'Message', sortable: true, width: '80px' },
+                { key: 'exceptiondetails', label: 'Exception', sortable: true, width: '80px' }
+            ],
+            defaultSort: undefined,
+            stickyHeader: true,
+            stickyFirstColumn: false,
+            filterable: true,
+            showFooter: true,
+            rowActions: [
+                { id: 'viewDetails', label: 'View Details', icon: '👁️', action: 'viewTraceDetails' },
+                { id: 'openInDynamics', label: 'View in Dynamics', icon: '🔗', action: 'openTraceInDynamics' }
+            ]
+        })}
             </script>
 
             <script src="${envSelectorUtilsScript}"></script>
@@ -494,7 +494,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                     if (pluginName) options.pluginName = pluginName;
                     if (entityName) options.entityName = entityName;
                     if (exceptionOnly) options.exceptionOnly = true;
-                    if (topLimit && topLimit !== '1000') options.top = parseInt(topLimit);
+                    if (topLimit && topLimit !== '100') options.top = parseInt(topLimit);
                     
                     return options;
                 }
@@ -522,7 +522,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                     document.getElementById('exceptionOnlyFilter').checked = false;
                     document.getElementById('fromDate').value = '';
                     document.getElementById('toDate').value = '';
-                    document.getElementById('topFilter').value = '1000';
+                    document.getElementById('topFilter').value = '100';
                     
                     if (currentEnvironmentId) {
                         loadPluginTracesForEnvironment(currentEnvironmentId);

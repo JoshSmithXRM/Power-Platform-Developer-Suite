@@ -123,8 +123,8 @@ export class PluginTraceService {
         const orderBy = filterOptions.orderBy || 'createdon desc';
         url += `&$orderby=${orderBy}`;
 
-        // Add top limit (default 1000 to prevent overwhelming results)
-        const top = filterOptions.top || 1000;
+        // Add top limit (default 100 to prevent overwhelming results)
+        const top = filterOptions.top || 100;
         url += `&$top=${top}`;
 
         console.log('PluginTraceService: Fetching plugin traces with URL:', url);
