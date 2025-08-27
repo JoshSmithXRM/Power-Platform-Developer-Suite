@@ -26,7 +26,7 @@ npm run package          # Production build with webpack (includes TypeScript ty
 npm run vsce-package     # Create .vsix package
 npm run test-release     # Build, package, and install locally
 npm run clean-install    # Uninstall and reinstall fresh
-code --install-extension power-platform-developer-suite-0.1.4.vsix  # Manual install
+code --install-extension power-platform-developer-suite-0.0.1.vsix  # Manual install
 ```
 
 **Development Workflow:**

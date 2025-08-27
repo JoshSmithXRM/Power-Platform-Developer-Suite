@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Created custom Power Platform-themed SVG icon for VS Code activity bar (replaces generic wrench icon)
 
 ### Added
+- **NEW FEATURE**: Comprehensive Metadata Browser with modern three-panel layout for browsing Dataverse entity metadata
+- Metadata Browser features complete entity exploration: Tables and Global Choices with hierarchical navigation
+- Interactive metadata browsing: entity selection → tabbed details (Table, Columns, Keys, Relationships, Privileges) → detailed properties
+- Smart metadata caching system with 5-minute TTL for optimal performance across large environments
+- Advanced metadata search and filtering capabilities within the browser interface
+- Complete entity attribute metadata display with proper type handling, required levels, and capability flags
+- Entity relationship browsing (1:N, N:1, N:N) with full cascade configuration and navigation property details
+- Entity key metadata viewing including alternate keys and index status information
+- Entity privilege analysis showing security permissions and access levels
+- Export functionality for metadata objects to JSON format
+- MetadataService with full Dataverse metadata API integration and intelligent caching
+- Three-panel responsive layout: Entity tree (left) → Metadata details (center) → Properties (right)
 - Plugin Trace Viewer with comprehensive trace log analysis and environment trace level management
 - Plugin trace setting selector (Off/Exception/All) that synchronizes with environment configuration
 - Advanced filtering system for plugin traces: date ranges, plugin names, entity names, exception-only mode
@@ -49,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Table UX improvements: enabled text selection (`user-select: text`) and text cursor (`cursor: text`) for all table cells
 - Footer message consistency: all panels now use standardized "Showing {filteredCount} of {totalCount} items" format
+- Activity bar icon theming: replaced complex graphics with simple "PP" text-based 24x24 SVG using `currentColor` to ensure proper VS Code theme integration, hover states, and selection highlighting
 
 ### Changed
 - Nothing yet
@@ -68,7 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Known Issues
 - Deployment settings sync includes secret environment variable values in plain text - requires research into secret detection/masking
 
-## [0.1.4] - 2025-08-25
+## [0.0.1] - 2025-08-25
 
 ### Added
 - Initial release of Dynamics DevTools extension
