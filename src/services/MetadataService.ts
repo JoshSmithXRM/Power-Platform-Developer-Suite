@@ -203,32 +203,69 @@ export interface AttributeMetadata {
 // Relationship Interfaces
 export interface OneToManyRelationshipMetadata {
     MetadataId: string;
+    HasChanged?: any;
     SchemaName: string;
-    ReferencingEntity: string;
-    ReferencingAttribute: string;
-    ReferencedEntity: string;
-    ReferencedAttribute: string;
-    RelationshipType: string;
+    SecurityTypes: string;
     IsCustomRelationship: boolean;
-    IsManaged: boolean;
     IsValidForAdvancedFind: boolean;
+    IsManaged: boolean;
+    RelationshipType: string;
     IntroducedVersion: string;
-    CascadeConfiguration: {
-        Assign: string;
-        Delete: string;
-        Merge: string;
-        Reparent: string;
-        Share: string;
-        Unshare: string;
+    ReferencedAttribute: string;
+    ReferencedEntity: string;
+    ReferencingAttribute: string;
+    ReferencingEntity: string;
+    IsHierarchical: boolean;
+    EntityKey?: any;
+    IsRelationshipAttributeDenormalized: boolean;
+    ReferencedEntityNavigationPropertyName: string;
+    ReferencingEntityNavigationPropertyName: string;
+    RelationshipBehavior: number;
+    IsDenormalizedLookup?: any;
+    DenormalizedAttributeName?: any;
+    IsCustomizable: {
+        Value: boolean;
+        CanBeChanged: boolean;
+        ManagedPropertyLogicalName: string;
     };
     AssociatedMenuConfiguration: {
         Behavior: string;
         Group: string;
-        Label: { UserLocalizedLabel: { Label: string } };
-        Order: number;
+        Order?: number;
+        IsCustomizable: boolean;
+        Icon?: string;
+        ViewId: string;
+        AvailableOffline: boolean;
+        MenuId?: string;
+        QueryApi?: string;
+        Label: {
+            LocalizedLabels: Array<{
+                Label: string;
+                LanguageCode: number;
+                IsManaged: boolean;
+                MetadataId: string;
+                HasChanged?: any;
+            }>;
+            UserLocalizedLabel?: {
+                Label: string;
+                LanguageCode: number;
+                IsManaged: boolean;
+                MetadataId: string;
+                HasChanged?: any;
+            } | null;
+        };
     };
-    ReferencedEntityNavigationPropertyName: string;
-    ReferencingEntityNavigationPropertyName: string;
+    CascadeConfiguration: {
+        Assign: string;
+        Delete: string;
+        Archive: string;
+        Merge: string;
+        Reparent: string;
+        Share: string;
+        Unshare: string;
+        RollupView: string;
+    };
+    RelationshipAttributes: any[];
 }
 
 export interface ManyToManyRelationshipMetadata {
@@ -774,6 +811,48 @@ export class MetadataService {
 
     canBeChanged(property: { Value: any; CanBeChanged: boolean } | null): boolean {
         return property?.CanBeChanged || false;
+    }
+
+    // OneToMany Relationship helper methods
+    getRelationshipBehaviorName(behavior: number): string {
+        switch (behavior) {
+            case 0: return 'Parental';
+            case 1: return 'Referential';
+            case 2: return 'Configurable Cascading';
+            default: return `Unknown (${behavior})`;
+        }
+    }
+
+    getCascadeValue(cascade: string): string {
+        switch (cascade) {
+            case 'NoCascade': return 'None';
+            case 'Cascade': return 'Cascade All';
+            case 'Active': return 'Cascade Active';
+            case 'UserOwned': return 'Cascade User-Owned';
+            case 'RemoveLink': return 'Remove Link';
+            case 'Restrict': return 'Restrict';
+            default: return cascade || 'None';
+        }
+    }
+
+    getMenuBehaviorName(behavior: string): string {
+        switch (behavior) {
+            case 'UseCollectionName': return 'Use Collection Name';
+            case 'UseLabel': return 'Use Label';
+            case 'DoNotDisplay': return 'Do Not Display';
+            default: return behavior || 'Unknown';
+        }
+    }
+
+    getSecurityTypesName(securityTypes: string): string {
+        switch (securityTypes) {
+            case 'None': return 'None';
+            case 'Append': return 'Append';
+            case 'ParentChild': return 'Parent Child';
+            case 'Pointer': return 'Pointer';
+            case 'Inheritance': return 'Inheritance';
+            default: return securityTypes || 'Unknown';
+        }
     }
 
     clearCache(): void {

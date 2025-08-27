@@ -694,6 +694,61 @@ export class MetadataBrowserPanel extends BasePanel {
                     min-height: 24px;
                 }
 
+                .property-row.property-sub-details {
+                    margin-left: 20px;
+                    border-bottom: none;
+                    padding: 3px 0;
+                    opacity: 0.9;
+                    font-size: 12px;
+                }
+
+                .property-row.property-sub-details .property-label {
+                    font-size: 12px;
+                    color: var(--vscode-descriptionForeground);
+                    font-weight: normal;
+                }
+
+                .property-row.property-sub-details .property-value {
+                    font-size: 12px;
+                }
+
+                .property-row.property-container-details {
+                    margin-left: 20px;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                    padding: 4px 0;
+                    opacity: 0.95;
+                    font-size: 12px;
+                }
+
+                .property-row.property-container-details .property-label {
+                    font-size: 12px;
+                    color: var(--vscode-textLink-foreground);
+                    font-weight: 500;
+                    opacity: 0.8;
+                }
+
+                .property-row.property-container-details .property-value {
+                    font-size: 12px;
+                }
+
+                .property-row.property-deep-details {
+                    margin-left: 40px;
+                    border-bottom: none;
+                    padding: 2px 0;
+                    opacity: 0.85;
+                    font-size: 11px;
+                }
+
+                .property-row.property-deep-details .property-label {
+                    font-size: 11px;
+                    color: var(--vscode-descriptionForeground);
+                    font-weight: normal;
+                }
+
+                .property-row.property-deep-details .property-value {
+                    font-size: 11px;
+                }
+
                 .property-label {
                     font-weight: 500;
                     color: var(--vscode-textLink-foreground);
@@ -875,8 +930,30 @@ export class MetadataBrowserPanel extends BasePanel {
                 </div>
             </div>
 
-            <!-- Hidden template for metadata table -->
-            <script type="text/template" id="metadataTableTemplate">
+            <!-- Hidden templates for different table types -->
+            <script type="text/template" id="attributesTableTemplate">
+                ${ComponentFactory.createDataTable({
+                    id: 'metadataTable',
+                    columns: [
+                        { key: 'LogicalName', label: 'Logical Name', sortable: true, width: '200px' },
+                        { key: 'SchemaName', label: 'Schema Name', sortable: true, width: '200px' },
+                        { key: 'DisplayName', label: 'Display Name', sortable: true, width: '200px' },
+                        { key: 'AttributeType', label: 'Type', sortable: true, width: '120px' },
+                        { key: 'RequiredLevel', label: 'Required', sortable: true, width: '120px' },
+                        { key: 'IsCustom', label: 'Custom', sortable: true, width: '100px' },
+                        { key: 'IsPrimaryId', label: 'Primary ID', sortable: true, width: '100px' },
+                        { key: 'IsPrimaryName', label: 'Primary Name', sortable: true, width: '120px' }
+                    ],
+                    defaultSort: { column: 'LogicalName', direction: 'asc' },
+                    stickyHeader: true,
+                    stickyFirstColumn: false,
+                    filterable: true,
+                    showFooter: true,
+                    footerText: 'Showing {filteredCount} of {totalCount} items'
+                })}
+            </script>
+
+            <script type="text/template" id="keysTableTemplate">
                 ${ComponentFactory.createDataTable({
                     id: 'metadataTable',
                     columns: [
@@ -887,6 +964,93 @@ export class MetadataBrowserPanel extends BasePanel {
                         { key: 'IsCustomizable', label: 'Customizable', sortable: true, width: '120px' }
                     ],
                     defaultSort: { column: 'DisplayName', direction: 'asc' },
+                    stickyHeader: true,
+                    stickyFirstColumn: false,
+                    filterable: true,
+                    showFooter: true,
+                    footerText: 'Showing {filteredCount} of {totalCount} items'
+                })}
+            </script>
+
+            <script type="text/template" id="oneToManyTableTemplate">
+                ${ComponentFactory.createDataTable({
+                    id: 'metadataTable',
+                    columns: [
+                        { key: 'SchemaName', label: 'Schema Name', sortable: true, width: '200px' },
+                        { key: 'ReferencedEntity', label: 'Referenced Entity', sortable: true, width: '150px' },
+                        { key: 'ReferencedAttribute', label: 'Referenced Attribute', sortable: true, width: '150px' },
+                        { key: 'ReferencingEntity', label: 'Referencing Entity', sortable: true, width: '150px' },
+                        { key: 'ReferencingAttribute', label: 'Referencing Attribute', sortable: true, width: '150px' },
+                        { key: 'HasChanged', label: 'Has Changed', sortable: true, width: '120px' },
+                        { key: 'IsManaged', label: 'Is Managed', sortable: true, width: '100px' },
+                        { key: 'IsCustomizable', label: 'Is Customizable', sortable: true, width: '120px' },
+                        { key: 'IsCustomRelationship', label: 'Is Custom Relationship', sortable: true, width: '150px' }
+                    ],
+                    defaultSort: { column: 'SchemaName', direction: 'asc' },
+                    stickyHeader: true,
+                    stickyFirstColumn: false,
+                    filterable: true,
+                    showFooter: true,
+                    footerText: 'Showing {filteredCount} of {totalCount} items'
+                })}
+            </script>
+
+            <script type="text/template" id="manyToOneTableTemplate">
+                ${ComponentFactory.createDataTable({
+                    id: 'metadataTable',
+                    columns: [
+                        { key: 'SchemaName', label: 'Schema Name', sortable: true, width: '200px' },
+                        { key: 'ReferencedEntity', label: 'Referenced Entity', sortable: true, width: '150px' },
+                        { key: 'ReferencedAttribute', label: 'Referenced Attribute', sortable: true, width: '150px' },
+                        { key: 'ReferencingEntity', label: 'Referencing Entity', sortable: true, width: '150px' },
+                        { key: 'ReferencingAttribute', label: 'Referencing Attribute', sortable: true, width: '150px' },
+                        { key: 'HasChanged', label: 'Has Changed', sortable: true, width: '120px' },
+                        { key: 'IsManaged', label: 'Is Managed', sortable: true, width: '100px' },
+                        { key: 'IsCustomizable', label: 'Is Customizable', sortable: true, width: '120px' },
+                        { key: 'IsCustomRelationship', label: 'Is Custom Relationship', sortable: true, width: '150px' }
+                    ],
+                    defaultSort: { column: 'SchemaName', direction: 'asc' },
+                    stickyHeader: true,
+                    stickyFirstColumn: false,
+                    filterable: true,
+                    showFooter: true,
+                    footerText: 'Showing {filteredCount} of {totalCount} items'
+                })}
+            </script>
+
+            <script type="text/template" id="manyToManyTableTemplate">
+                ${ComponentFactory.createDataTable({
+                    id: 'metadataTable',
+                    columns: [
+                        { key: 'SchemaName', label: 'Schema Name', sortable: true, width: '200px' },
+                        { key: 'ReferencingEntity', label: 'From Entity', sortable: true, width: '150px' },
+                        { key: 'ReferencedEntity', label: 'To Entity', sortable: true, width: '150px' },
+                        { key: 'ReferencingAttribute', label: 'From Field', sortable: true, width: '150px' },
+                        { key: 'ReferencedAttribute', label: 'To Field', sortable: true, width: '150px' },
+                        { key: 'IsCustomRelationship', label: 'Custom', sortable: true, width: '100px' },
+                        { key: 'IsManaged', label: 'Managed', sortable: true, width: '100px' }
+                    ],
+                    defaultSort: { column: 'SchemaName', direction: 'asc' },
+                    stickyHeader: true,
+                    stickyFirstColumn: false,
+                    filterable: true,
+                    showFooter: true,
+                    footerText: 'Showing {filteredCount} of {totalCount} items'
+                })}
+            </script>
+
+            <script type="text/template" id="privilegesTableTemplate">
+                ${ComponentFactory.createDataTable({
+                    id: 'metadataTable',
+                    columns: [
+                        { key: 'Name', label: 'Name', sortable: true, width: '200px' },
+                        { key: 'PrivilegeType', label: 'Type', sortable: true, width: '150px' },
+                        { key: 'CanBeBasic', label: 'Basic', sortable: true, width: '100px' },
+                        { key: 'CanBeLocal', label: 'Local', sortable: true, width: '100px' },
+                        { key: 'CanBeDeep', label: 'Deep', sortable: true, width: '100px' },
+                        { key: 'CanBeGlobal', label: 'Global', sortable: true, width: '100px' }
+                    ],
+                    defaultSort: { column: 'Name', direction: 'asc' },
                     stickyHeader: true,
                     stickyFirstColumn: false,
                     filterable: true,
@@ -1565,6 +1729,8 @@ export class MetadataBrowserPanel extends BasePanel {
                         html += generateAttributeProperties(item);
                     } else if (itemType === 'Relationship') {
                         html += generateRelationshipProperties(item);
+                    } else if (itemType === 'ManyToManyRelationship') {
+                        html += generateManyToManyProperties(item);
                     } else if (itemType === 'Key') {
                         html += generateKeyProperties(item);
                     } else if (itemType === 'Privilege') {
@@ -1825,78 +1991,98 @@ export class MetadataBrowserPanel extends BasePanel {
                                 <div class="property-label">Has Changed</div>
                                 <div class="property-value">\${key.HasChanged !== null ? (key.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
                             </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Managed</div>
+                                <div class="property-value \${key.IsManaged ? 'boolean-true' : 'boolean-false'}">\${key.IsManaged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Introduced Version</div>
+                                <div class="property-value">\${key.IntroducedVersion}</div>
+                            </div>
+                            \${key.IsCustomizable ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Customizable</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${key.IsCustomizable.Value ? 'boolean-true' : 'boolean-false'}">\${key.IsCustomizable.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${key.IsCustomizable.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${key.IsCustomizable.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${key.IsCustomizable.ManagedPropertyLogicalName || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                            \${key.DisplayName ? \`
+                            <div class="property-row">
+                                <div class="property-label">Display Name</div>
+                                <div class="property-value"></div>
+                            </div>
+                            \${key.DisplayName.UserLocalizedLabel ? \`
+                            <div class="property-row property-container-details">
+                                <div class="property-label">User Localized Label</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Label</div>
+                                <div class="property-value">\${key.DisplayName.UserLocalizedLabel.Label}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Language Code</div>
+                                <div class="property-value">\${key.DisplayName.UserLocalizedLabel.LanguageCode}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Is Managed</div>
+                                <div class="property-value \${key.DisplayName.UserLocalizedLabel.IsManaged ? 'boolean-true' : 'boolean-false'}">\${key.DisplayName.UserLocalizedLabel.IsManaged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Metadata ID</div>
+                                <div class="property-value guid">\${key.DisplayName.UserLocalizedLabel.MetadataId}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Has Changed</div>
+                                <div class="property-value">\${key.DisplayName.UserLocalizedLabel.HasChanged !== null ? (key.DisplayName.UserLocalizedLabel.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                            \${key.DisplayName.LocalizedLabels && key.DisplayName.LocalizedLabels.length > 0 ? key.DisplayName.LocalizedLabels.map((label, index) => \`
+                            <div class="property-row property-container-details">
+                                <div class="property-label">Localized Label \${index + 1}</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Label</div>
+                                <div class="property-value">\${label.Label}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Language Code</div>
+                                <div class="property-value">\${label.LanguageCode}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Is Managed</div>
+                                <div class="property-value \${label.IsManaged ? 'boolean-true' : 'boolean-false'}">\${label.IsManaged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Metadata ID</div>
+                                <div class="property-value guid">\${label.MetadataId}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Has Changed</div>
+                                <div class="property-value">\${label.HasChanged !== null ? (label.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
+                            </div>
+                            \`).join('') : ''}
+                            \` : ''}
                         </div>
                         
                         <div class="property-section">
-                            <div class="property-section-title">Display Name</div>
-                            \${key.DisplayName?.UserLocalizedLabel ? \`
-                            <div class="property-subsection">
-                                <div class="property-subsection-title">User Localized Label</div>
-                                <div class="property-row">
-                                    <div class="property-label">Label</div>
-                                    <div class="property-value">\${key.DisplayName.UserLocalizedLabel.Label}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Language Code</div>
-                                    <div class="property-value">\${key.DisplayName.UserLocalizedLabel.LanguageCode}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Is Managed</div>
-                                    <div class="property-value \${key.DisplayName.UserLocalizedLabel.IsManaged ? 'boolean-true' : 'boolean-false'}">\${key.DisplayName.UserLocalizedLabel.IsManaged ? 'True' : 'False'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Metadata ID</div>
-                                    <div class="property-value guid">\${key.DisplayName.UserLocalizedLabel.MetadataId}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Has Changed</div>
-                                    <div class="property-value">\${key.DisplayName.UserLocalizedLabel.HasChanged !== null ? (key.DisplayName.UserLocalizedLabel.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
-                                </div>
-                            </div>
-                            \` : ''}
-                            \${key.DisplayName?.LocalizedLabels && key.DisplayName.LocalizedLabels.length > 0 ? \`
+                            <div class="property-section-title">Key Configuration</div>
                             <div class="property-row">
-                                <div class="property-label">Localized Labels Count</div>
-                                <div class="property-value">\${key.DisplayName.LocalizedLabels.length}</div>
-                            </div>
-                            \${key.DisplayName.LocalizedLabels.map((label, index) => \`
-                                <div class="property-subsection">
-                                    <div class="property-subsection-title">Localized Label \${index + 1}</div>
-                                    <div class="property-row">
-                                        <div class="property-label">Label</div>
-                                        <div class="property-value">\${label.Label}</div>
-                                    </div>
-                                    <div class="property-row">
-                                        <div class="property-label">Language Code</div>
-                                        <div class="property-value">\${label.LanguageCode}</div>
-                                    </div>
-                                    <div class="property-row">
-                                        <div class="property-label">Is Managed</div>
-                                        <div class="property-value \${label.IsManaged ? 'boolean-true' : 'boolean-false'}">\${label.IsManaged ? 'True' : 'False'}</div>
-                                    </div>
-                                    <div class="property-row">
-                                        <div class="property-label">Metadata ID</div>
-                                        <div class="property-value guid">\${label.MetadataId}</div>
-                                    </div>
-                                    <div class="property-row">
-                                        <div class="property-label">Has Changed</div>
-                                        <div class="property-value">\${label.HasChanged !== null ? (label.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
-                                    </div>
-                                </div>
-                            \`).join('')}
-                            \` : ''}
-                        </div>
-                        
-                        <div class="property-section">
-                            <div class="property-section-title">Key Attributes</div>
-                            <div class="property-row">
-                                <div class="property-label">Attributes</div>
+                                <div class="property-label">Key Attributes</div>
                                 <div class="property-value">\${Array.isArray(key.KeyAttributes) ? key.KeyAttributes.join(', ') : key.KeyAttributes}</div>
                             </div>
-                        </div>
-                        
-                        <div class="property-section">
-                            <div class="property-section-title">Key Status</div>
                             <div class="property-row">
                                 <div class="property-label">Entity Key Index Status</div>
                                 <div class="property-value">\${key.EntityKeyIndexStatus || 'Not specified'}</div>
@@ -1905,10 +2091,6 @@ export class MetadataBrowserPanel extends BasePanel {
                                 <div class="property-label">Async Job</div>
                                 <div class="property-value guid">\${key.AsyncJob || 'Not specified'}</div>
                             </div>
-                        </div>
-                        
-                        <div class="property-section">
-                            <div class="property-section-title">Key Types</div>
                             <div class="property-row">
                                 <div class="property-label">Is Synchronous</div>
                                 <div class="property-value \${key.IsSynchronous ? 'boolean-true' : 'boolean-false'}">\${key.IsSynchronous ? 'True' : 'False'}</div>
@@ -1920,34 +2102,6 @@ export class MetadataBrowserPanel extends BasePanel {
                             <div class="property-row">
                                 <div class="property-label">Is Secondary Key</div>
                                 <div class="property-value \${key.IsSecondaryKey ? 'boolean-true' : 'boolean-false'}">\${key.IsSecondaryKey ? 'True' : 'False'}</div>
-                            </div>
-                        </div>
-                        
-                        <div class="property-section">
-                            <div class="property-section-title">Management Properties</div>
-                            <div class="property-row">
-                                <div class="property-label">Is Managed</div>
-                                <div class="property-value \${key.IsManaged ? 'boolean-true' : 'boolean-false'}">\${key.IsManaged ? 'True' : 'False'}</div>
-                            </div>
-                            <div class="property-row">
-                                <div class="property-label">Introduced Version</div>
-                                <div class="property-value">\${key.IntroducedVersion}</div>
-                            </div>
-                        </div>
-                        
-                        <div class="property-section">
-                            <div class="property-section-title">Customization</div>
-                            <div class="property-row">
-                                <div class="property-label">Is Customizable</div>
-                                <div class="property-value \${key.IsCustomizable?.Value ? 'boolean-true' : 'boolean-false'}">\${key.IsCustomizable?.Value ? 'True' : 'False'}</div>
-                            </div>
-                            <div class="property-row">
-                                <div class="property-label">Can Be Changed</div>
-                                <div class="property-value \${key.IsCustomizable?.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${key.IsCustomizable?.CanBeChanged ? 'True' : 'False'}</div>
-                            </div>
-                            <div class="property-row">
-                                <div class="property-label">Managed Property Logical Name</div>
-                                <div class="property-value">\${key.IsCustomizable?.ManagedPropertyLogicalName || 'Not specified'}</div>
                             </div>
                         </div>
                     \`;
@@ -1969,38 +2123,273 @@ export class MetadataBrowserPanel extends BasePanel {
                                 <div class="property-label">Relationship Type</div>
                                 <div class="property-value">\${relationship.RelationshipType}</div>
                             </div>
+                            <div class="property-row">
+                                <div class="property-label">Has Changed</div>
+                                <div class="property-value">\${relationship.HasChanged !== null ? (relationship.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Introduced Version</div>
+                                <div class="property-value">\${relationship.IntroducedVersion}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Managed</div>
+                                <div class="property-value \${relationship.IsManaged ? 'boolean-true' : 'boolean-false'}">\${relationship.IsManaged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Custom Relationship</div>
+                                <div class="property-value \${relationship.IsCustomRelationship ? 'boolean-true' : 'boolean-false'}">\${relationship.IsCustomRelationship ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Valid for Advanced Find</div>
+                                <div class="property-value \${relationship.IsValidForAdvancedFind ? 'boolean-true' : 'boolean-false'}">\${relationship.IsValidForAdvancedFind ? 'True' : 'False'}</div>
+                            </div>
+                            \${relationship.IsCustomizable ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Customizable</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${relationship.IsCustomizable.Value ? 'boolean-true' : 'boolean-false'}">\${relationship.IsCustomizable.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${relationship.IsCustomizable.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${relationship.IsCustomizable.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${relationship.IsCustomizable.ManagedPropertyLogicalName || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
                         </div>
                         
                         <div class="property-section">
-                            <div class="property-section-title">Entities</div>
-                            <div class="property-row">
-                                <div class="property-label">Referencing Entity</div>
-                                <div class="property-value">\${relationship.ReferencingEntity}</div>
-                            </div>
+                            <div class="property-section-title">Entity Mapping</div>
                             <div class="property-row">
                                 <div class="property-label">Referenced Entity</div>
                                 <div class="property-value">\${relationship.ReferencedEntity}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Referenced Attribute</div>
+                                <div class="property-value">\${relationship.ReferencedAttribute}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Referenced Entity Navigation Property</div>
+                                <div class="property-value">\${relationship.ReferencedEntityNavigationPropertyName}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Referencing Entity</div>
+                                <div class="property-value">\${relationship.ReferencingEntity}</div>
                             </div>
                             <div class="property-row">
                                 <div class="property-label">Referencing Attribute</div>
                                 <div class="property-value">\${relationship.ReferencingAttribute}</div>
                             </div>
                             <div class="property-row">
-                                <div class="property-label">Referenced Attribute</div>
-                                <div class="property-value">\${relationship.ReferencedAttribute}</div>
+                                <div class="property-label">Referencing Entity Navigation Property</div>
+                                <div class="property-value">\${relationship.ReferencingEntityNavigationPropertyName}</div>
                             </div>
                         </div>
                         
                         <div class="property-section">
-                            <div class="property-section-title">Properties</div>
+                            <div class="property-section-title">Relationship Behavior</div>
                             <div class="property-row">
-                                <div class="property-label">Is Custom</div>
-                                <div class="property-value \${relationship.IsCustomRelationship ? 'boolean-true' : 'boolean-false'}">\${relationship.IsCustomRelationship ? 'True' : 'False'}</div>
+                                <div class="property-label">Behavior</div>
+                                <div class="property-value">\${relationship.RelationshipBehavior !== undefined ? relationship.RelationshipBehavior + ' (' + (relationship.RelationshipBehavior === 0 ? 'Parental' : relationship.RelationshipBehavior === 1 ? 'Referential' : relationship.RelationshipBehavior === 2 ? 'Configurable Cascading' : 'Unknown') + ')' : 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Security Types</div>
+                                <div class="property-value">\${relationship.SecurityTypes || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Hierarchical</div>
+                                <div class="property-value \${relationship.IsHierarchical ? 'boolean-true' : 'boolean-false'}">\${relationship.IsHierarchical ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Relationship Attribute Denormalized</div>
+                                <div class="property-value \${relationship.IsRelationshipAttributeDenormalized ? 'boolean-true' : 'boolean-false'}">\${relationship.IsRelationshipAttributeDenormalized ? 'True' : 'False'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="property-section">
+                            <div class="property-section-title">Relationship Configuration</div>
+                            \${relationship.CascadeConfiguration ? \`
+                            <div class="property-subsection">
+                                <div class="property-subsection-title">Cascade Configuration</div>
+                                <div class="property-row">
+                                    <div class="property-label">Assign</div>
+                                    <div class="property-value">\${relationship.CascadeConfiguration.Assign || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Delete</div>
+                                    <div class="property-value">\${relationship.CascadeConfiguration.Delete || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Archive</div>
+                                    <div class="property-value">\${relationship.CascadeConfiguration.Archive || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Merge</div>
+                                    <div class="property-value">\${relationship.CascadeConfiguration.Merge || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Reparent</div>
+                                    <div class="property-value">\${relationship.CascadeConfiguration.Reparent || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Share</div>
+                                    <div class="property-value">\${relationship.CascadeConfiguration.Share || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Unshare</div>
+                                    <div class="property-value">\${relationship.CascadeConfiguration.Unshare || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Rollup View</div>
+                                    <div class="property-value">\${relationship.CascadeConfiguration.RollupView || 'Not specified'}</div>
+                                </div>
+                            </div>
+                            \` : ''}
+                            \${relationship.AssociatedMenuConfiguration ? \`
+                            <div class="property-subsection">
+                                <div class="property-subsection-title">Associated Menu Configuration</div>
+                                <div class="property-row">
+                                    <div class="property-label">Behavior</div>
+                                    <div class="property-value">\${relationship.AssociatedMenuConfiguration.Behavior || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Group</div>
+                                    <div class="property-value">\${relationship.AssociatedMenuConfiguration.Group || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Order</div>
+                                    <div class="property-value">\${relationship.AssociatedMenuConfiguration.Order !== undefined ? relationship.AssociatedMenuConfiguration.Order : 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Is Customizable</div>
+                                    <div class="property-value \${relationship.AssociatedMenuConfiguration.IsCustomizable ? 'boolean-true' : 'boolean-false'}">\${relationship.AssociatedMenuConfiguration.IsCustomizable ? 'True' : 'False'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">View ID</div>
+                                    <div class="property-value guid">\${relationship.AssociatedMenuConfiguration.ViewId || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Available Offline</div>
+                                    <div class="property-value \${relationship.AssociatedMenuConfiguration.AvailableOffline ? 'boolean-true' : 'boolean-false'}">\${relationship.AssociatedMenuConfiguration.AvailableOffline ? 'True' : 'False'}</div>
+                                </div>
+                            </div>
+                            \` : ''}
+                        </div>
+                        
+                    \`;
+                }
+                
+                function generateManyToManyProperties(relationship) {
+                    return \`
+                        <div class="property-section">
+                            <div class="property-section-title">General</div>
+                            <div class="property-row">
+                                <div class="property-label">Metadata ID</div>
+                                <div class="property-value guid">\${relationship.MetadataId}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Schema Name</div>
+                                <div class="property-value">\${relationship.SchemaName}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Intersect Entity Name</div>
+                                <div class="property-value">\${relationship.IntersectEntityName}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Introduced Version</div>
+                                <div class="property-value">\${relationship.IntroducedVersion}</div>
                             </div>
                             <div class="property-row">
                                 <div class="property-label">Is Managed</div>
                                 <div class="property-value \${relationship.IsManaged ? 'boolean-true' : 'boolean-false'}">\${relationship.IsManaged ? 'True' : 'False'}</div>
                             </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Custom Relationship</div>
+                                <div class="property-value \${relationship.IsCustomRelationship ? 'boolean-true' : 'boolean-false'}">\${relationship.IsCustomRelationship ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Valid for Advanced Find</div>
+                                <div class="property-value \${relationship.IsValidForAdvancedFind ? 'boolean-true' : 'boolean-false'}">\${relationship.IsValidForAdvancedFind ? 'True' : 'False'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="property-section">
+                            <div class="property-section-title">Entity Mapping</div>
+                            <div class="property-row">
+                                <div class="property-label">Entity 1 Logical Name</div>
+                                <div class="property-value">\${relationship.Entity1LogicalName}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Entity 1 Intersect Attribute</div>
+                                <div class="property-value">\${relationship.Entity1IntersectAttribute}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Entity 2 Logical Name</div>
+                                <div class="property-value">\${relationship.Entity2LogicalName}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Entity 2 Intersect Attribute</div>
+                                <div class="property-value">\${relationship.Entity2IntersectAttribute}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Entity 1 Navigation Property</div>
+                                <div class="property-value">\${relationship.Entity1NavigationPropertyName}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Entity 2 Navigation Property</div>
+                                <div class="property-value">\${relationship.Entity2NavigationPropertyName}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="property-section">
+                            <div class="property-section-title">Menu Configuration</div>
+                            \${relationship.Entity1AssociatedMenuConfiguration ? \`
+                            <div class="property-subsection">
+                                <div class="property-subsection-title">Entity 1 Associated Menu Configuration</div>
+                                <div class="property-row">
+                                    <div class="property-label">Behavior</div>
+                                    <div class="property-value">\${relationship.Entity1AssociatedMenuConfiguration.Behavior || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Group</div>
+                                    <div class="property-value">\${relationship.Entity1AssociatedMenuConfiguration.Group || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Order</div>
+                                    <div class="property-value">\${relationship.Entity1AssociatedMenuConfiguration.Order !== undefined ? relationship.Entity1AssociatedMenuConfiguration.Order : 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Label</div>
+                                    <div class="property-value">\${relationship.Entity1AssociatedMenuConfiguration.Label?.UserLocalizedLabel?.Label || 'Not specified'}</div>
+                                </div>
+                            </div>
+                            \` : ''}
+                            \${relationship.Entity2AssociatedMenuConfiguration ? \`
+                            <div class="property-subsection">
+                                <div class="property-subsection-title">Entity 2 Associated Menu Configuration</div>
+                                <div class="property-row">
+                                    <div class="property-label">Behavior</div>
+                                    <div class="property-value">\${relationship.Entity2AssociatedMenuConfiguration.Behavior || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Group</div>
+                                    <div class="property-value">\${relationship.Entity2AssociatedMenuConfiguration.Group || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Order</div>
+                                    <div class="property-value">\${relationship.Entity2AssociatedMenuConfiguration.Order !== undefined ? relationship.Entity2AssociatedMenuConfiguration.Order : 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Label</div>
+                                    <div class="property-value">\${relationship.Entity2AssociatedMenuConfiguration.Label?.UserLocalizedLabel?.Label || 'Not specified'}</div>
+                                </div>
+                            </div>
+                            \` : ''}
                         </div>
                     \`;
                 }
@@ -2248,16 +2637,7 @@ export class MetadataBrowserPanel extends BasePanel {
                         IsPrimaryName: attr.IsPrimaryName ? 'Yes' : 'No'
                     }));
                     
-                    displayTable(tableData, [
-                        { key: 'LogicalName', label: 'Logical Name', sortable: true },
-                        { key: 'SchemaName', label: 'Schema Name', sortable: true },
-                        { key: 'DisplayName', label: 'Display Name', sortable: true },
-                        { key: 'AttributeType', label: 'Type', sortable: true },
-                        { key: 'RequiredLevel', label: 'Required', sortable: true },
-                        { key: 'IsCustom', label: 'Custom', sortable: true },
-                        { key: 'IsPrimaryId', label: 'Primary ID', sortable: true },
-                        { key: 'IsPrimaryName', label: 'Primary Name', sortable: true }
-                    ], attributes);
+                    displayTable(tableData, 'attributesTableTemplate', attributes);
                 }
                 
                 function displayKeysTable(keys) {
@@ -2270,36 +2650,56 @@ export class MetadataBrowserPanel extends BasePanel {
                         IsCustomizable: key.IsCustomizable?.Value ? 'Yes' : 'No'
                     }));
                     
-                    displayTable(tableData, [
-                        { key: 'DisplayName', label: 'Display Name', sortable: true },
-                        { key: 'LogicalName', label: 'Logical Name', sortable: true },
-                        { key: 'SchemaName', label: 'Schema Name', sortable: true },
-                        { key: 'IsManaged', label: 'Managed', sortable: true },
-                        { key: 'IsCustomizable', label: 'Customizable', sortable: true }
-                    ], keys);
+                    displayTable(tableData, 'keysTableTemplate', keys);
                 }
                 
                 function displayRelationshipsTable(relationships, tabName) {
-                    const tableData = relationships.map(rel => ({
-                        id: rel.MetadataId || rel.SchemaName,
-                        SchemaName: rel.SchemaName,
-                        ReferencingEntity: rel.ReferencingEntity,
-                        ReferencedEntity: rel.ReferencedEntity,
-                        ReferencingAttribute: rel.ReferencingAttribute,
-                        ReferencedAttribute: rel.ReferencedAttribute,
-                        IsCustomRelationship: rel.IsCustomRelationship ? 'Yes' : 'No',
-                        IsManaged: rel.IsManaged ? 'Yes' : 'No'
-                    }));
-                    
-                    displayTable(tableData, [
-                        { key: 'SchemaName', label: 'Schema Name', sortable: true },
-                        { key: 'ReferencingEntity', label: 'From Entity', sortable: true },
-                        { key: 'ReferencedEntity', label: 'To Entity', sortable: true },
-                        { key: 'ReferencingAttribute', label: 'From Field', sortable: true },
-                        { key: 'ReferencedAttribute', label: 'To Field', sortable: true },
-                        { key: 'IsCustomRelationship', label: 'Custom', sortable: true },
-                        { key: 'IsManaged', label: 'Managed', sortable: true }
-                    ], relationships);
+                    if (tabName === 'oneToMany') {
+                        // OneToMany specific columns: SchemaName, Referenced Entity, ReferencedAttribute, Referencing Entity, HasChanged, IsManaged, IsCustomizable, IsCustomRelationship
+                        const tableData = relationships.map(rel => ({
+                            id: rel.MetadataId || rel.SchemaName,
+                            SchemaName: rel.SchemaName,
+                            ReferencedEntity: rel.ReferencedEntity,
+                            ReferencedAttribute: rel.ReferencedAttribute,
+                            ReferencingEntity: rel.ReferencingEntity,
+                            HasChanged: rel.HasChanged !== null && rel.HasChanged !== undefined ? 'Yes' : 'No',
+                            IsManaged: rel.IsManaged ? 'Yes' : 'No',
+                            IsCustomizable: rel.IsCustomizable?.Value ? 'Yes' : 'No',
+                            IsCustomRelationship: rel.IsCustomRelationship ? 'Yes' : 'No'
+                        }));
+                        
+                        displayTable(tableData, 'oneToManyTableTemplate', relationships);
+                    } else if (tabName === 'manyToOne') {
+                        // ManyToOne relationships - same columns as OneToMany
+                        const tableData = relationships.map(rel => ({
+                            id: rel.MetadataId || rel.SchemaName,
+                            SchemaName: rel.SchemaName,
+                            ReferencedEntity: rel.ReferencedEntity,
+                            ReferencedAttribute: rel.ReferencedAttribute,
+                            ReferencingEntity: rel.ReferencingEntity,
+                            ReferencingAttribute: rel.ReferencingAttribute,
+                            HasChanged: rel.HasChanged !== null && rel.HasChanged !== undefined ? 'Yes' : 'No',
+                            IsManaged: rel.IsManaged ? 'Yes' : 'No',
+                            IsCustomizable: rel.IsCustomizable?.Value ? 'Yes' : 'No',
+                            IsCustomRelationship: rel.IsCustomRelationship ? 'Yes' : 'No'
+                        }));
+                        
+                        displayTable(tableData, 'manyToOneTableTemplate', relationships);
+                    } else if (tabName === 'manyToMany') {
+                        // ManyToMany relationships
+                        const tableData = relationships.map(rel => ({
+                            id: rel.MetadataId || rel.SchemaName,
+                            SchemaName: rel.SchemaName,
+                            ReferencingEntity: rel.ReferencingEntity,
+                            ReferencedEntity: rel.ReferencedEntity,
+                            ReferencingAttribute: rel.ReferencingAttribute,
+                            ReferencedAttribute: rel.ReferencedAttribute,
+                            IsCustomRelationship: rel.IsCustomRelationship ? 'Yes' : 'No',
+                            IsManaged: rel.IsManaged ? 'Yes' : 'No'
+                        }));
+                        
+                        displayTable(tableData, 'manyToManyTableTemplate', relationships);
+                    }
                 }
                 
                 function displayPrivilegesTable(privileges) {
@@ -2313,21 +2713,19 @@ export class MetadataBrowserPanel extends BasePanel {
                         CanBeGlobal: priv.CanBeGlobal ? 'Yes' : 'No'
                     }));
                     
-                    displayTable(tableData, [
-                        { key: 'Name', label: 'Name', sortable: true },
-                        { key: 'PrivilegeType', label: 'Type', sortable: true },
-                        { key: 'CanBeBasic', label: 'Basic', sortable: true },
-                        { key: 'CanBeLocal', label: 'Local', sortable: true },
-                        { key: 'CanBeDeep', label: 'Deep', sortable: true },
-                        { key: 'CanBeGlobal', label: 'Global', sortable: true }
-                    ], privileges);
+                    displayTable(tableData, 'privilegesTableTemplate', privileges);
                 }
                 
-                function displayTable(tableData, columns, originalData) {
+                function displayTable(tableData, templateId, originalData) {
                     const tabContentArea = document.getElementById('tabContentArea');
                     
-                    // Use pre-generated table template (like other panels)
-                    const template = document.getElementById('metadataTableTemplate');
+                    // Use the specified template
+                    const template = document.getElementById(templateId);
+                    if (!template) {
+                        console.error('Template not found:', templateId);
+                        return;
+                    }
+                    
                     tabContentArea.innerHTML = template.innerHTML;
                     
                     // Initialize table with TableUtils for sorting functionality
@@ -2587,8 +2985,8 @@ export class MetadataBrowserPanel extends BasePanel {
                         case 'columns': return 'Attribute';
                         case 'keys': return 'Key';
                         case 'oneToMany':
-                        case 'manyToOne':
-                        case 'manyToMany': return 'Relationship';
+                        case 'manyToOne': return 'Relationship';
+                        case 'manyToMany': return 'ManyToManyRelationship';
                         case 'privileges': return 'Privilege';
                         default: return 'Generic';
                     }
