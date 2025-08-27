@@ -10,7 +10,7 @@ param(
 if (-not $VsixFile) {
     $PackageJson = Get-Content "package.json" | ConvertFrom-Json
     $Version = $PackageJson.version
-    $VsixFile = "dynamics-devtools-$Version.vsix"
+    $VsixFile = "power-platform-developer-suite-$Version.vsix"
 }
 
 if (-not (Test-Path $VsixFile)) {

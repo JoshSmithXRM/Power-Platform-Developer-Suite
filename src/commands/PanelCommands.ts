@@ -23,55 +23,55 @@ export class PanelCommands {
      */
     public registerCommands(): vscode.Disposable[] {
         return [
-            vscode.commands.registerCommand('dynamics-devtools.queryData', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.queryData', () => {
                 QueryDataPanel.createOrShow(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.solutionExplorer', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorer', () => {
                 SolutionExplorerPanel.createOrShow(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.importJobViewer', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.importJobViewer', () => {
                 ImportJobViewerPanel.createOrShow(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.connectionReferences', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.connectionReferences', () => {
                 ConnectionReferencesPanel.createOrShow(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.environmentVariables', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.environmentVariables', () => {
                 EnvironmentVariablesPanel.createOrShow(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.pluginTraceViewer', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.pluginTraceViewer', () => {
                 PluginTraceViewerPanel.createOrShow(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.queryDataNew', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.queryDataNew', () => {
                 QueryDataPanel.createNew(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.solutionExplorerNew', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorerNew', () => {
                 SolutionExplorerPanel.createNew(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.importJobViewerNew', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.importJobViewerNew', () => {
                 ImportJobViewerPanel.createNew(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.connectionReferencesNew', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.connectionReferencesNew', () => {
                 ConnectionReferencesPanel.createNew(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.environmentVariablesNew', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.environmentVariablesNew', () => {
                 EnvironmentVariablesPanel.createNew(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.pluginTraceViewerNew', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.pluginTraceViewerNew', () => {
                 PluginTraceViewerPanel.createNew(this.context.extensionUri);
             }),
 
-            // Note: 'dynamics-devtools.refreshEnvironments' is registered by EnvironmentCommands
+            // Note: 'power-platform-dev-suite.refreshEnvironments' is registered by EnvironmentCommands
             // to avoid duplicate command registration remove it from PanelCommands.
         ];
     }

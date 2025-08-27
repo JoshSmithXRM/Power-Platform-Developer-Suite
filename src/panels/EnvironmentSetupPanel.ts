@@ -95,7 +95,7 @@ export class EnvironmentSetupPanel extends BasePanel {
             await this._authService.saveEnvironmentSettings(environment);
 
             // Refresh the environments tree view
-            vscode.commands.executeCommand('dynamics-devtools.refreshEnvironments');
+            vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
 
             // Send success response
             this.postMessage({

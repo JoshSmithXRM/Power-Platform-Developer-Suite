@@ -1,4 +1,4 @@
-# Dynamics DevTools
+# Power Platform Developer Suite
 
 ![version](https://img.shields.io/badge/version-0.1.4-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -6,9 +6,9 @@
 [![version](https://img.shields.io/badge/version-0.1.4-blue)](./CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![changelog](https://img.shields.io/badge/changelog-CHANGELOG-blue)](./CHANGELOG.md)
-[![release](https://img.shields.io/github/v/release/JoshSmithXRM/Dynamics-DevTools)](https://github.com/JoshSmithXRM/Dynamics-DevTools/releases)
+[![release](https://img.shields.io/github/v/release/JoshSmithXRM/Power-Platform-Developer-Suite)](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/releases)
 
-Lightweight VS Code extension for Microsoft Dynamics 365 / Power Platform development and administration.
+Comprehensive VS Code extension for Power Platform development and administration - your complete toolkit for Dynamics 365, Dataverse, and Power Platform solutions.
 
 Keep this README short — it shows quick install and development steps. Full technical details live in `CHANGELOG.md` and `docs/`.
 
@@ -21,14 +21,14 @@ Quick install
 - Install from the built VSIX (recommended for testing):
 
 ```bash
-code --install-extension dynamics-devtools-0.1.4.vsix
+code --install-extension power-platform-developer-suite-0.1.4.vsix
 ```
 
 From source (dev)
 
 ```bash
-git clone https://github.com/JoshSmithXRM/Dynamics-DevTools.git
-cd Dynamics-DevTools
+git clone https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite.git
+cd Power-Platform-Developer-Suite
 npm install
 npm run compile
 ```

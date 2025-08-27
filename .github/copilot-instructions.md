@@ -1,7 +1,7 @@
-# GitHub Copilot Instructions for Dynamics DevTools
+# GitHub Copilot Instructions for Power Platform Developer Suite
 
 ## Project Overview
-This is a comprehensive VS Code extension for Microsoft Dynamics 365 / Power Platform development and administration. The extension provides a unified toolkit with modern UI components for managing environments, browsing metadata, monitoring solutions, and performing common development tasks.
+This is a comprehensive VS Code extension for Power Platform development and administration. The extension provides a unified toolkit with modern UI components for managing environments, browsing metadata, monitoring solutions, and performing common development tasks.
 
 **📚 For complete project information, see:**
 - **[README.md](../README.md)** - Installation, usage, and getting started guide

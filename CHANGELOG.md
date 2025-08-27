@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **MAJOR**: Rebranded from "Dynamics DevTools" to "Power Platform Developer Suite" to better reflect the comprehensive Power Platform development toolkit vision and avoid naming conflicts in the marketplace
+- Updated all development scripts and package references to use new branding
+
 ### Added
 - Plugin Trace Viewer with comprehensive trace log analysis and environment trace level management
 - Plugin trace setting selector (Off/Exception/All) that synchronizes with environment configuration

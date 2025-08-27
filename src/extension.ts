@@ -16,7 +16,7 @@ import { MetadataBrowserCommands } from './commands/MetadataBrowserCommands';
  * Extension activation function
  */
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Dynamics DevTools extension is now active!');
+    console.log('Power Platform Developer Suite extension is now active!');
 
     // Initialize services first
     ServiceFactory.initialize(context);
@@ -29,8 +29,8 @@ export function activate(context: vscode.ExtensionContext) {
     const toolsProvider = new ToolsProvider();
 
     // Register tree data providers
-    vscode.window.registerTreeDataProvider('dynamics-devtools-environments', environmentsProvider);
-    vscode.window.registerTreeDataProvider('dynamics-devtools-tools', toolsProvider);
+    vscode.window.registerTreeDataProvider('power-platform-dev-suite-environments', environmentsProvider);
+    vscode.window.registerTreeDataProvider('power-platform-dev-suite-tools', toolsProvider);
 
     // Initialize command handlers
     const environmentCommands = new EnvironmentCommands(authService, context, environmentsProvider);
@@ -50,8 +50,8 @@ export function activate(context: vscode.ExtensionContext) {
         console.error('Failed to register commands during activation:', err);
 
         // Fallback for the metadata browser command to avoid 'command not found'
-        const fallback = vscode.commands.registerCommand('dynamics-devtools.openMetadataBrowser', () => {
-            vscode.window.showErrorMessage('Dynamics DevTools failed to initialize completely. Check the Extension Host logs for details.');
+        const fallback = vscode.commands.registerCommand('power-platform-dev-suite.openMetadataBrowser', () => {
+            vscode.window.showErrorMessage('Power Platform Developer Suite failed to initialize completely. Check the Extension Host logs for details.');
         });
 
         commandDisposables.push(fallback);
@@ -60,12 +60,12 @@ export function activate(context: vscode.ExtensionContext) {
     // Add all disposables to context
     context.subscriptions.push(...commandDisposables);
 
-    console.log('Dynamics DevTools extension activated successfully!');
+    console.log('Power Platform Developer Suite extension activated successfully!');
 }
 
 /**
  * Extension deactivation function
  */
 export function deactivate() {
-    console.log('Dynamics DevTools extension deactivated');
+    console.log('Power Platform Developer Suite extension deactivated');
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 
-# Release Testing Script for Dynamics DevTools Extension
+# Release Testing Script for Power Platform Developer Suite Extension
 # This script simulates the exact user experience of installing and using the extension
 
 param(
@@ -9,14 +9,14 @@ param(
     [switch]$Verbose          # Enable verbose output
 )
 
-Write-Host "🔧 Dynamics DevTools - Release Testing Script" -ForegroundColor Cyan
+Write-Host "🔧 Power Platform Developer Suite - Release Testing Script" -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
 
 # Configuration
-$ExtensionId = "JoshSmithXRM.dynamics-devtools"
+$ExtensionId = "JoshSmithXRM.power-platform-dev-suite"
 $PackageJson = Get-Content "package.json" | ConvertFrom-Json
 $Version = $PackageJson.version
-$VsixFile = "dynamics-devtools-$Version.vsix"
+$VsixFile = "power-platform-developer-suite-$Version.vsix"
 
 if ($Verbose) {
     Write-Host "Extension ID: $ExtensionId" -ForegroundColor Yellow
