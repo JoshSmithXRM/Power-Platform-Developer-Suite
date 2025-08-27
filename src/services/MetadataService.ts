@@ -1,31 +1,162 @@
 import { AuthenticationService } from './AuthenticationService';
 
-// Entity Definition Interfaces
+// Entity Definition Interfaces - Made comprehensive to handle all fields from API
 export interface EntityDefinition {
+    // Core identification
     MetadataId: string;
     LogicalName: string;
     SchemaName: string;
     DisplayName: { UserLocalizedLabel: { Label: string } };
     Description: { UserLocalizedLabel: { Label: string } };
+    DisplayCollectionName?: { UserLocalizedLabel: { Label: string } };
     EntitySetName: string;
+    LogicalCollectionName?: string;
+    CollectionSchemaName?: string;
     ObjectTypeCode: number;
+
+    // Entity classification and type
     IsCustomEntity: boolean;
     IsManaged: boolean;
     IsActivity: boolean;
+    IsActivityParty?: boolean;
+    IsChildEntity?: boolean;
+    IsIntersect?: boolean;
+    IsLogicalEntity?: boolean;
+    IsPrivate?: boolean;
+    IsSolutionAware?: boolean;
+    TableType?: string;
+
+    // Primary attributes
+    PrimaryIdAttribute: string;
+    PrimaryNameAttribute?: string;
+    PrimaryImageAttribute?: string;
+
+    // Ownership
+    OwnershipType: number | string;
+    OwnerId?: string;
+    OwnerIdType?: number;
+    OwningBusinessUnit?: string;
+
+    // Capabilities - managed properties
     IsCustomizable: { Value: boolean; CanBeChanged: boolean };
+    IsRenameable?: { Value: boolean; CanBeChanged: boolean };
+    IsMappable?: { Value: boolean; CanBeChanged: boolean };
     CanCreateAttributes: { Value: boolean; CanBeChanged: boolean };
     CanCreateCharts: { Value: boolean; CanBeChanged: boolean };
     CanCreateForms: { Value: boolean; CanBeChanged: boolean };
     CanCreateViews: { Value: boolean; CanBeChanged: boolean };
-    IntroducedVersion: string;
-    PrimaryIdAttribute: string;
-    PrimaryNameAttribute: string;
-    OwnershipType: number;
-    IsValidForQueue: { Value: boolean; CanBeChanged: boolean };
-    IsConnectionsEnabled: { Value: boolean; CanBeChanged: boolean };
-    IsDocumentManagementEnabled: boolean;
-    IsMailMergeEnabled: { Value: boolean; CanBeChanged: boolean };
+    CanBeRelatedEntityInRelationship?: { Value: boolean; CanBeChanged: boolean };
+    CanBePrimaryEntityInRelationship?: { Value: boolean; CanBeChanged: boolean };
+    CanBeInManyToMany?: { Value: boolean; CanBeChanged: boolean };
+    CanBeInCustomEntityAssociation?: { Value: boolean; CanBeChanged: boolean };
+
+    // Feature flags
     IsAuditEnabled: { Value: boolean; CanBeChanged: boolean };
+    IsValidForQueue?: { Value: boolean; CanBeChanged: boolean };
+    IsConnectionsEnabled?: { Value: boolean; CanBeChanged: boolean };
+    IsDocumentManagementEnabled?: boolean;
+    IsOneNoteIntegrationEnabled?: boolean;
+    IsInteractionCentricEnabled?: boolean;
+    IsKnowledgeManagementEnabled?: boolean;
+    IsSLAEnabled?: boolean;
+    IsBPFEntity?: boolean;
+    IsDocumentRecommendationsEnabled?: boolean;
+    IsMSTeamsIntegrationEnabled?: boolean;
+    IsMailMergeEnabled?: { Value: boolean; CanBeChanged: boolean };
+    IsEnabledForCharts?: boolean;
+    IsEnabledForTrace?: boolean;
+    IsValidForAdvancedFind?: boolean;
+    IsBusinessProcessEnabled?: boolean;
+    IsOptimisticConcurrencyEnabled?: boolean;
+    ChangeTrackingEnabled?: boolean;
+    IsImportable?: boolean;
+    IsQuickCreateEnabled?: boolean;
+    IsReadingPaneEnabled?: boolean;
+    IsDuplicateDetectionEnabled?: { Value: boolean; CanBeChanged: boolean };
+
+    // Mobile and offline capabilities
+    IsVisibleInMobile?: { Value: boolean; CanBeChanged: boolean };
+    IsVisibleInMobileClient?: { Value: boolean; CanBeChanged: boolean };
+    IsReadOnlyInMobileClient?: { Value: boolean; CanBeChanged: boolean };
+    IsOfflineInMobileClient?: { Value: boolean; CanBeChanged: boolean };
+    IsAvailableOffline?: boolean;
+    MobileOfflineFilters?: string;
+
+    // External integration
+    IsEnabledForExternalChannels?: boolean;
+    SyncToExternalSearchIndex?: boolean;
+    CanEnableSyncToExternalSearchIndex?: { Value: boolean; CanBeChanged: boolean };
+    UsesBusinessDataLabelTable?: boolean;
+
+    // Audit and compliance
+    IsRetrieveAuditEnabled?: boolean;
+    IsRetrieveMultipleAuditEnabled?: boolean;
+    IsArchivalEnabled?: boolean;
+    IsRetentionEnabled?: boolean;
+
+    // Workflow and automation
+    CanTriggerWorkflow?: boolean;
+    IsStateModelAware?: boolean;
+    EnforceStateTransitions?: boolean;
+    AutoRouteToOwnerQueue?: boolean;
+
+    // Clustering and replication
+    ClusterMode?: string;
+    CanChangeClusterMode?: boolean;
+    AutoReplicateClusterRecords?: boolean;
+
+    // Metadata and versioning
+    IntroducedVersion: string;
+    HasChanged?: boolean;
+    CreatedOn?: string;
+    ModifiedOn?: string;
+    IsAIRUpdated?: boolean;
+
+    // Additional metadata
+    DaysSinceRecordLastModified?: number;
+    ReportViewName?: string;
+    EntityColor?: string;
+    HasNotes?: boolean;
+    HasActivities?: boolean;
+    HasFeedback?: boolean;
+    HasEmailAddresses?: boolean;
+    AutoCreateAccessTeams?: boolean;
+
+    // Icon properties
+    IconLargeName?: string;
+    IconMediumName?: string;
+    IconSmallName?: string;
+    IconVectorName?: string;
+
+    // Additional capabilities
+    CanModifyAdditionalSettings?: { Value: boolean; CanBeChanged: boolean };
+    CanChangeHierarchicalRelationship?: { Value: boolean; CanBeChanged: boolean };
+    CanChangeTrackingBeEnabled?: { Value: boolean; CanBeChanged: boolean };
+    RecurrenceBaseEntityLogicalName?: string;
+
+    // External system integration
+    DataProviderId?: string;
+    DataSourceId?: string;
+    ExternalName?: string;
+    ExternalCollectionName?: string;
+
+    // Activity specific
+    ActivityTypeMask?: number;
+
+    // Solution context
+    SettingOf?: string;
+
+    // Help and documentation
+    EntityHelpUrlEnabled?: boolean;
+    EntityHelpUrl?: string;
+
+    // Additional fields for any other properties that might come back
+    PrimaryKey?: any[];
+    Privileges?: EntityPrivilegeMetadata[];
+    Settings?: any[];
+
+    // Allow for additional dynamic properties
+    [key: string]: any;
 }
 
 // Attribute Metadata Interfaces
@@ -197,7 +328,7 @@ export class MetadataService {
     private cache = new Map<string, any>();
     private cacheTimeout = 5 * 60 * 1000; // 5 minutes
 
-    constructor(private authService: AuthenticationService) {}
+    constructor(private authService: AuthenticationService) { }
 
     private getCacheKey(environmentId: string, operation: string, params?: string): string {
         return `${environmentId}:${operation}:${params || ''}`;
@@ -266,12 +397,12 @@ export class MetadataService {
 
         const data = await response.json();
         const entities = data.value || [];
-        
+
         // Sort client-side by LogicalName since server-side sorting isn't supported
         entities.sort((a: any, b: any) => {
             return (a.LogicalName || '').localeCompare(b.LogicalName || '');
         });
-        
+
         this.setCache(cacheKey, entities);
         return entities;
     }
@@ -287,6 +418,7 @@ export class MetadataService {
 
         const token = await this.authService.getAccessToken(environment.id);
 
+        // Remove field filtering - get ALL metadata fields for complete entity metadata
         const url = `${environment.settings.dataverseUrl}/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')`;
 
         const response = await fetch(url, {
@@ -335,7 +467,7 @@ export class MetadataService {
 
         const data = await response.json();
         const attributes = data.value || [];
-        
+
         this.setCache(cacheKey, attributes);
         return attributes;
     }
@@ -368,7 +500,7 @@ export class MetadataService {
 
         const data = await response.json();
         const keys = data.value || [];
-        
+
         this.setCache(cacheKey, keys);
         return keys;
     }
@@ -401,7 +533,7 @@ export class MetadataService {
 
         const data = await response.json();
         const relationships = data.value || [];
-        
+
         this.setCache(cacheKey, relationships);
         return relationships;
     }
@@ -434,7 +566,7 @@ export class MetadataService {
 
         const data = await response.json();
         const relationships = data.value || [];
-        
+
         this.setCache(cacheKey, relationships);
         return relationships;
     }
@@ -467,7 +599,7 @@ export class MetadataService {
 
         const data = await response.json();
         const relationships = data.value || [];
-        
+
         this.setCache(cacheKey, relationships);
         return relationships;
     }
@@ -500,7 +632,7 @@ export class MetadataService {
 
         const data = await response.json();
         const privileges = data.value || [];
-        
+
         this.setCache(cacheKey, privileges);
         return privileges;
     }
@@ -533,12 +665,12 @@ export class MetadataService {
 
         const data = await response.json();
         const optionSets = data.value || [];
-        
+
         // Sort client-side by Name since server-side sorting isn't supported
         optionSets.sort((a: any, b: any) => {
             return (a.Name || '').localeCompare(b.Name || '');
         });
-        
+
         this.setCache(cacheKey, optionSets);
         return optionSets;
     }
