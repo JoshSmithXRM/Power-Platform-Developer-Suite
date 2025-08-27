@@ -2,7 +2,7 @@
     "name": "power-platform-developer-suite",
     "displayName": "Power Platform Developer Suite",
     "description": "A comprehensive VSCode extension for Power Platform development and administration - your complete toolkit for Dynamics 365, Dataverse, and Power Platform solutions",
-    "version": "0.1.4",
+    "version": "0.0.1",
     "icon": "images/icon.png",
     "publisher": "JoshSmithXRM",
     "repository": {
@@ -303,7 +303,7 @@
         "test": "node ./out/test/runTest.js",
         "vsce-package": "vsce package",
         "test-release": "npm run package && npm run vsce-package && npm run install-local",
-        "install-local": "code --install-extension power-platform-developer-suite-0.1.4.vsix --force",
+        "install-local": "code --install-extension power-platform-developer-suite-0.0.1.vsix --force",
         "uninstall-local": "code --uninstall-extension JoshSmithXRM.power-platform-dev-suite",
         "clean-install": "npm run uninstall-local && npm run test-release",
         "test-fresh": "npm run clean-install && code --new-window"
