@@ -960,10 +960,11 @@ export class MetadataBrowserPanel extends BasePanel {
                         { key: 'DisplayName', label: 'Display Name', sortable: true, width: '200px' },
                         { key: 'LogicalName', label: 'Logical Name', sortable: true, width: '200px' },
                         { key: 'SchemaName', label: 'Schema Name', sortable: true, width: '200px' },
-                        { key: 'IsManaged', label: 'Managed', sortable: true, width: '100px' },
-                        { key: 'IsCustomizable', label: 'Customizable', sortable: true, width: '120px' }
+                        { key: 'HasChanged', label: 'Has Changed', sortable: true, width: '120px' },
+                        { key: 'IsManaged', label: 'Is Managed', sortable: true, width: '100px' },
+                        { key: 'IsCustomizable', label: 'Is Customizable', sortable: true, width: '120px' }
                     ],
-                    defaultSort: { column: 'DisplayName', direction: 'asc' },
+                    defaultSort: { column: 'LogicalName', direction: 'asc' },
                     stickyHeader: true,
                     stickyFirstColumn: false,
                     filterable: true,
@@ -1044,11 +1045,13 @@ export class MetadataBrowserPanel extends BasePanel {
                     id: 'metadataTable',
                     columns: [
                         { key: 'Name', label: 'Name', sortable: true, width: '200px' },
-                        { key: 'PrivilegeType', label: 'Type', sortable: true, width: '150px' },
-                        { key: 'CanBeBasic', label: 'Basic', sortable: true, width: '100px' },
-                        { key: 'CanBeLocal', label: 'Local', sortable: true, width: '100px' },
-                        { key: 'CanBeDeep', label: 'Deep', sortable: true, width: '100px' },
-                        { key: 'CanBeGlobal', label: 'Global', sortable: true, width: '100px' }
+                        { key: 'PrivilegeType', label: 'Type', sortable: true, width: '120px' },
+                        { key: 'CanBeBasic', label: 'Can Be Basic', sortable: true, width: '120px' },
+                        { key: 'CanBeDeep', label: 'Can Be Deep', sortable: true, width: '120px' },
+                        { key: 'CanBeLocal', label: 'Can Be Local', sortable: true, width: '120px' },
+                        { key: 'CanBeEntityReference', label: 'Can Be Entity Reference', sortable: true, width: '180px' },
+                        { key: 'CanBeParentEntityReference', label: 'Can Be Parent Entity Reference', sortable: true, width: '220px' },
+                        { key: 'CanBeRecordFilter', label: 'Can Be Record Filter', sortable: true, width: '160px' }
                     ],
                     defaultSort: { column: 'Name', direction: 'asc' },
                     stickyHeader: true,
@@ -2192,7 +2195,7 @@ export class MetadataBrowserPanel extends BasePanel {
                         </div>
                         
                         <div class="property-section">
-                            <div class="property-section-title">Relationship Behavior</div>
+                            <div class="property-section-title">Relationship Configuration</div>
                             <div class="property-row">
                                 <div class="property-label">Behavior</div>
                                 <div class="property-value">\${relationship.RelationshipBehavior !== undefined ? relationship.RelationshipBehavior + ' (' + (relationship.RelationshipBehavior === 0 ? 'Parental' : relationship.RelationshipBehavior === 1 ? 'Referential' : relationship.RelationshipBehavior === 2 ? 'Configurable Cascading' : 'Unknown') + ')' : 'Not specified'}</div>
@@ -2209,74 +2212,72 @@ export class MetadataBrowserPanel extends BasePanel {
                                 <div class="property-label">Is Relationship Attribute Denormalized</div>
                                 <div class="property-value \${relationship.IsRelationshipAttributeDenormalized ? 'boolean-true' : 'boolean-false'}">\${relationship.IsRelationshipAttributeDenormalized ? 'True' : 'False'}</div>
                             </div>
-                        </div>
-                        
-                        <div class="property-section">
-                            <div class="property-section-title">Relationship Configuration</div>
                             \${relationship.CascadeConfiguration ? \`
-                            <div class="property-subsection">
-                                <div class="property-subsection-title">Cascade Configuration</div>
-                                <div class="property-row">
-                                    <div class="property-label">Assign</div>
-                                    <div class="property-value">\${relationship.CascadeConfiguration.Assign || 'Not specified'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Delete</div>
-                                    <div class="property-value">\${relationship.CascadeConfiguration.Delete || 'Not specified'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Archive</div>
-                                    <div class="property-value">\${relationship.CascadeConfiguration.Archive || 'Not specified'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Merge</div>
-                                    <div class="property-value">\${relationship.CascadeConfiguration.Merge || 'Not specified'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Reparent</div>
-                                    <div class="property-value">\${relationship.CascadeConfiguration.Reparent || 'Not specified'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Share</div>
-                                    <div class="property-value">\${relationship.CascadeConfiguration.Share || 'Not specified'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Unshare</div>
-                                    <div class="property-value">\${relationship.CascadeConfiguration.Unshare || 'Not specified'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Rollup View</div>
-                                    <div class="property-value">\${relationship.CascadeConfiguration.RollupView || 'Not specified'}</div>
-                                </div>
+                            <div class="property-row">
+                                <div class="property-label">Cascade Configuration</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Assign</div>
+                                <div class="property-value">\${relationship.CascadeConfiguration.Assign || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Delete</div>
+                                <div class="property-value">\${relationship.CascadeConfiguration.Delete || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Archive</div>
+                                <div class="property-value">\${relationship.CascadeConfiguration.Archive || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Merge</div>
+                                <div class="property-value">\${relationship.CascadeConfiguration.Merge || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Reparent</div>
+                                <div class="property-value">\${relationship.CascadeConfiguration.Reparent || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Share</div>
+                                <div class="property-value">\${relationship.CascadeConfiguration.Share || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Unshare</div>
+                                <div class="property-value">\${relationship.CascadeConfiguration.Unshare || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Rollup View</div>
+                                <div class="property-value">\${relationship.CascadeConfiguration.RollupView || 'Not specified'}</div>
                             </div>
                             \` : ''}
                             \${relationship.AssociatedMenuConfiguration ? \`
-                            <div class="property-subsection">
-                                <div class="property-subsection-title">Associated Menu Configuration</div>
-                                <div class="property-row">
-                                    <div class="property-label">Behavior</div>
-                                    <div class="property-value">\${relationship.AssociatedMenuConfiguration.Behavior || 'Not specified'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Group</div>
-                                    <div class="property-value">\${relationship.AssociatedMenuConfiguration.Group || 'Not specified'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Order</div>
-                                    <div class="property-value">\${relationship.AssociatedMenuConfiguration.Order !== undefined ? relationship.AssociatedMenuConfiguration.Order : 'Not specified'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Is Customizable</div>
-                                    <div class="property-value \${relationship.AssociatedMenuConfiguration.IsCustomizable ? 'boolean-true' : 'boolean-false'}">\${relationship.AssociatedMenuConfiguration.IsCustomizable ? 'True' : 'False'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">View ID</div>
-                                    <div class="property-value guid">\${relationship.AssociatedMenuConfiguration.ViewId || 'Not specified'}</div>
-                                </div>
-                                <div class="property-row">
-                                    <div class="property-label">Available Offline</div>
-                                    <div class="property-value \${relationship.AssociatedMenuConfiguration.AvailableOffline ? 'boolean-true' : 'boolean-false'}">\${relationship.AssociatedMenuConfiguration.AvailableOffline ? 'True' : 'False'}</div>
-                                </div>
+                            <div class="property-row">
+                                <div class="property-label">Associated Menu Configuration</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Behavior</div>
+                                <div class="property-value">\${relationship.AssociatedMenuConfiguration.Behavior || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Group</div>
+                                <div class="property-value">\${relationship.AssociatedMenuConfiguration.Group || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Order</div>
+                                <div class="property-value">\${relationship.AssociatedMenuConfiguration.Order !== undefined ? relationship.AssociatedMenuConfiguration.Order : 'Not specified'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Is Customizable</div>
+                                <div class="property-value \${relationship.AssociatedMenuConfiguration.IsCustomizable ? 'boolean-true' : 'boolean-false'}">\${relationship.AssociatedMenuConfiguration.IsCustomizable ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">View ID</div>
+                                <div class="property-value guid">\${relationship.AssociatedMenuConfiguration.ViewId || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Available Offline</div>
+                                <div class="property-value \${relationship.AssociatedMenuConfiguration.AvailableOffline ? 'boolean-true' : 'boolean-false'}">\${relationship.AssociatedMenuConfiguration.AvailableOffline ? 'True' : 'False'}</div>
                             </div>
                             \` : ''}
                         </div>
@@ -2407,28 +2408,36 @@ export class MetadataBrowserPanel extends BasePanel {
                                 <div class="property-value">\${privilege.Name}</div>
                             </div>
                             <div class="property-row">
-                                <div class="property-label">Privilege Type</div>
+                                <div class="property-label">Type</div>
                                 <div class="property-value">\${privilege.PrivilegeType}</div>
                             </div>
-                        </div>
-                        
-                        <div class="property-section">
-                            <div class="property-section-title">Access Levels</div>
                             <div class="property-row">
                                 <div class="property-label">Can Be Basic</div>
                                 <div class="property-value \${privilege.CanBeBasic ? 'boolean-true' : 'boolean-false'}">\${privilege.CanBeBasic ? 'True' : 'False'}</div>
-                            </div>
-                            <div class="property-row">
-                                <div class="property-label">Can Be Local</div>
-                                <div class="property-value \${privilege.CanBeLocal ? 'boolean-true' : 'boolean-false'}">\${privilege.CanBeLocal ? 'True' : 'False'}</div>
                             </div>
                             <div class="property-row">
                                 <div class="property-label">Can Be Deep</div>
                                 <div class="property-value \${privilege.CanBeDeep ? 'boolean-true' : 'boolean-false'}">\${privilege.CanBeDeep ? 'True' : 'False'}</div>
                             </div>
                             <div class="property-row">
+                                <div class="property-label">Can Be Local</div>
+                                <div class="property-value \${privilege.CanBeLocal ? 'boolean-true' : 'boolean-false'}">\${privilege.CanBeLocal ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
                                 <div class="property-label">Can Be Global</div>
                                 <div class="property-value \${privilege.CanBeGlobal ? 'boolean-true' : 'boolean-false'}">\${privilege.CanBeGlobal ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Can Be Entity Reference</div>
+                                <div class="property-value \${privilege.CanBeEntityReference ? 'boolean-true' : 'boolean-false'}">\${privilege.CanBeEntityReference ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Can Be Parent Entity Reference</div>
+                                <div class="property-value \${privilege.CanBeParentEntityReference ? 'boolean-true' : 'boolean-false'}">\${privilege.CanBeParentEntityReference ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Can Be Record Filter</div>
+                                <div class="property-value \${privilege.CanBeRecordFilter ? 'boolean-true' : 'boolean-false'}">\${privilege.CanBeRecordFilter ? 'True' : 'False'}</div>
                             </div>
                         </div>
                     \`;
@@ -2646,6 +2655,7 @@ export class MetadataBrowserPanel extends BasePanel {
                         DisplayName: getDisplayName(key.DisplayName),
                         LogicalName: key.LogicalName,
                         SchemaName: key.SchemaName,
+                        HasChanged: key.HasChanged !== null && key.HasChanged !== undefined ? (key.HasChanged ? 'Yes' : 'No') : 'Not specified',
                         IsManaged: key.IsManaged ? 'Yes' : 'No',
                         IsCustomizable: key.IsCustomizable?.Value ? 'Yes' : 'No'
                     }));
@@ -2708,9 +2718,11 @@ export class MetadataBrowserPanel extends BasePanel {
                         Name: priv.Name,
                         PrivilegeType: priv.PrivilegeType,
                         CanBeBasic: priv.CanBeBasic ? 'Yes' : 'No',
-                        CanBeLocal: priv.CanBeLocal ? 'Yes' : 'No',
                         CanBeDeep: priv.CanBeDeep ? 'Yes' : 'No',
-                        CanBeGlobal: priv.CanBeGlobal ? 'Yes' : 'No'
+                        CanBeLocal: priv.CanBeLocal ? 'Yes' : 'No',
+                        CanBeEntityReference: priv.CanBeEntityReference ? 'Yes' : 'No',
+                        CanBeParentEntityReference: priv.CanBeParentEntityReference ? 'Yes' : 'No',
+                        CanBeRecordFilter: priv.CanBeRecordFilter ? 'Yes' : 'No'
                     }));
                     
                     displayTable(tableData, 'privilegesTableTemplate', privileges);
