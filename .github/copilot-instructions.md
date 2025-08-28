@@ -19,7 +19,7 @@ Following industry best practices based on [Keep a Changelog](https://keepachang
 ### Documentation Hierarchy
 - **[CHANGELOG.md](../CHANGELOG.md)** - Authoritative technical record following Keep a Changelog format
 - **GitHub Releases** - User-focused release announcements generated from changelog
--- **README.md** - Current stable feature status and getting started guide
+- **README.md** - Current stable feature status and getting started guide
 
 ### Standard Release Process
 1. **During Development**: Track all changes in `[Unreleased]` section of CHANGELOG.md
