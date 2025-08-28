@@ -13,7 +13,7 @@ Write-Host "🔧 Power Platform Developer Suite - Release Testing Script" -Foreg
 Write-Host "=============================================" -ForegroundColor Cyan
 
 # Configuration
-$ExtensionId = "JoshSmithXRM.power-platform-dev-suite"
+$ExtensionId = "joshsmithxrm.power-platform-developer-suite"
 $PackageJson = Get-Content "package.json" | ConvertFrom-Json
 $Version = $PackageJson.version
 $VsixFile = "power-platform-developer-suite-$Version.vsix"
@@ -37,7 +37,7 @@ if ($Clean) {
 
 # Step 2: Build the extension
 Write-Host "🔨 Building extension..." -ForegroundColor Yellow
-& npm run compile
+& npm.cmd run compile
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Build failed!" -ForegroundColor Red
     exit 1
