@@ -362,8 +362,9 @@ export interface CompleteEntityMetadata {
 }
 
 export class MetadataService {
+    private static readonly DEFAULT_CACHE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
     private cache = new Map<string, any>();
-    private cacheTimeout = 5 * 60 * 1000; // 5 minutes
+    private cacheTimeout = MetadataService.DEFAULT_CACHE_TIMEOUT_MS;
 
     constructor(private authService: AuthenticationService) { }
 
