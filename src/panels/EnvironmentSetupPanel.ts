@@ -16,10 +16,11 @@ export class EnvironmentSetupPanel extends BasePanel {
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
 
-        if (EnvironmentSetupPanel.currentPanel) {
-            EnvironmentSetupPanel.currentPanel._panel.reveal(column);
-            return;
-        }
+        // Allow multiple panels - don't block creation if one exists
+        // if (EnvironmentSetupPanel.currentPanel) {
+        //     EnvironmentSetupPanel.currentPanel._panel.reveal(column);
+        //     return;
+        // }
 
         const panel = vscode.window.createWebviewPanel(
             EnvironmentSetupPanel.viewType,
@@ -33,7 +34,10 @@ export class EnvironmentSetupPanel extends BasePanel {
             }
         );
 
-        EnvironmentSetupPanel.currentPanel = new EnvironmentSetupPanel(panel, extensionUri, editingEnvironment);
+        const environmentPanel = new EnvironmentSetupPanel(panel, extensionUri, editingEnvironment);
+        
+        // Set as current panel (will be overridden by newer panels, but that's OK for multiple support)
+        EnvironmentSetupPanel.currentPanel = environmentPanel;
     }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, editingEnvironment?: EnvironmentConnection) {

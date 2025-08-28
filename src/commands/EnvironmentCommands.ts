@@ -125,8 +125,32 @@ export class EnvironmentCommands {
                 vscode.window.showErrorMessage('Environment not found');
             }
         } else {
-            vscode.window.showErrorMessage('No environment selected');
+            // No environment selected - show quick pick
+            await this.editEnvironmentFromQuickPick();
         }
+    }
+
+    private async editEnvironmentFromQuickPick() {
+        const environments = await this.authService.getEnvironments();
+
+        if (environments.length === 0) {
+            vscode.window.showWarningMessage('No environments configured to edit.');
+            return;
+        }
+
+        const selected = await vscode.window.showQuickPick(
+            environments.map(env => ({
+                label: env.name,
+                description: env.settings.dataverseUrl,
+                detail: `Auth: ${env.settings.authenticationMethod}`,
+                env: env
+            })),
+            { placeHolder: 'Select environment to edit' }
+        );
+
+        if (!selected) return;
+
+        EnvironmentSetupPanel.createOrShow(this.context.extensionUri, selected.env);
     }
 
     private async testEnvironmentConnection(environmentItem?: EnvironmentItem) {
