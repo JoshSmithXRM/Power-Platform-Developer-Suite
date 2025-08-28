@@ -165,4 +165,4 @@ Extension uses webpack for production optimization:
 **Communication Style:**
 - Provide brief plan, execute changes, report results
 - Keep responses concise and focused
-- Include build/test status in completion reports
+Include build/test status in completion reports
