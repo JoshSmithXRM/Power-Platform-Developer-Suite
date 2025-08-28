@@ -24,7 +24,7 @@ scripts/**
 .github/workflows/**
 
 # Old VSIX files (keep only the latest)
-dynamics-devtools-*.vsix
+power-platform-developer-suite-*.vsix
 
 # Test files
 **/test/**

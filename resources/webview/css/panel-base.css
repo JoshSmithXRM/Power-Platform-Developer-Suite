@@ -4,9 +4,14 @@
 body {
     margin: 0;
     padding: 20px;
+    padding-bottom: 20px; /* Reset padding */
     font-family: var(--vscode-font-family);
     background: var(--vscode-editor-background);
     color: var(--vscode-editor-foreground);
+    height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Header Layout */
@@ -136,6 +141,44 @@ body {
     text-shadow: none;
 }
 
+/* Solution Selector (common across panels) */
+.solution-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-widget-border);
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+
+.solution-label {
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    white-space: nowrap;
+}
+
+.solution-dropdown {
+    flex: 1;
+    padding: 6px 8px;
+    background: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 2px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.solution-dropdown:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.solution-dropdown:hover {
+    background: var(--vscode-dropdown-background);
+}
+
 /* Content Areas */
 #content {
     min-height: 200px;
@@ -158,4 +201,19 @@ body {
         align-items: stretch;
         gap: 8px;
     }
+}
+
+/* Content Container */
+#content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Allow flexbox to shrink */
+}
+
+/* Orphaned Item Styling for Connection References Panel */
+.orphaned-item {
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+    opacity: 0.7;
 }

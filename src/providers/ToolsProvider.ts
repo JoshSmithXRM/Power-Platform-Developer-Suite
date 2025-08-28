@@ -28,49 +28,49 @@ export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
                 'Query Data',
                 'Query and analyze data from Dynamics 365',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.queryData',
+                'power-platform-dev-suite.queryData',
                 'queryData'
             ),
             new ToolItem(
                 'Solution Explorer',
                 'Explore and manage Dynamics 365 solutions',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.solutionExplorer',
+                'power-platform-dev-suite.solutionExplorer',
                 'solutionExplorer'
             ),
             new ToolItem(
                 'Import Job Viewer',
                 'View and monitor data import jobs',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.importJobViewer',
+                'power-platform-dev-suite.importJobViewer',
                 'importJobViewer'
             ),
             new ToolItem(
                 'Metadata Browser',
                 'Browse and explore entity metadata',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.openMetadataBrowser',
+                'power-platform-dev-suite.openMetadataBrowser',
                 'metadataBrowser'
             ),
             new ToolItem(
                 'Connection References Manager',
                 'Manage connection references across environments',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.connectionReferences',
+                'power-platform-dev-suite.connectionReferences',
                 'connectionReferences'
             ),
             new ToolItem(
                 'Environment Variables Manager',
                 'Manage environment variables and their values',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.environmentVariables',
+                'power-platform-dev-suite.environmentVariables',
                 'environmentVariables'
             ),
             new ToolItem(
                 'Plugin Trace Viewer',
                 'View and analyze plugin execution traces',
                 vscode.TreeItemCollapsibleState.None,
-                'dynamics-devtools.pluginTraceViewer',
+                'power-platform-dev-suite.pluginTraceViewer',
                 'pluginTraceViewer'
             ),
         ];

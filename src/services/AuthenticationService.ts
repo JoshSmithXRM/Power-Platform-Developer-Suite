@@ -28,7 +28,7 @@ export class AuthenticationService {
 
     private async initializeStorage(): Promise<void> {
         try {
-            const cacheDir = path.join(os.homedir(), '.dynamics-devtools', 'cache');
+            const cacheDir = path.join(os.homedir(), '.power-platform-dev-suite', 'cache');
             this.tokenStorage = storage.create({
                 dir: cacheDir,
                 stringify: JSON.stringify,
@@ -102,7 +102,7 @@ export class AuthenticationService {
         }
 
         // Get client secret from secure storage
-        const clientSecret = await this.secretStorage.get(`dynamics-devtools-secret-${settings.clientId}`);
+        const clientSecret = await this.secretStorage.get(`power-platform-dev-suite-secret-${settings.clientId}`);
         if (!clientSecret) {
             throw new Error('Client secret not found in secure storage. Please re-add the environment.');
         }
@@ -246,7 +246,7 @@ export class AuthenticationService {
         }
 
         // Get password from secure storage
-        const password = await this.secretStorage.get(`dynamics-devtools-password-${settings.username}`);
+        const password = await this.secretStorage.get(`power-platform-dev-suite-password-${settings.username}`);
         if (!password) {
             throw new Error('Password not found in secure storage. Please re-add the environment.');
         }
@@ -388,7 +388,7 @@ export class AuthenticationService {
         // Store sensitive data in VS Code secret storage
         if (environment.settings.clientSecret) {
             await this.secretStorage.store(
-                `dynamics-devtools-secret-${environment.settings.clientId}`,
+                `power-platform-dev-suite-secret-${environment.settings.clientId}`,
                 environment.settings.clientSecret
             );
             // Remove secret from settings object before storing
@@ -399,7 +399,7 @@ export class AuthenticationService {
 
         if (environment.settings.password) {
             await this.secretStorage.store(
-                `dynamics-devtools-password-${environment.settings.username}`,
+                `power-platform-dev-suite-password-${environment.settings.username}`,
                 environment.settings.password
             );
             // Remove password from settings object before storing
@@ -408,11 +408,11 @@ export class AuthenticationService {
             environment.settings = settingsToStore;
         }
 
-        await this.context.globalState.update('dynamics-devtools-environments', environments);
+        await this.context.globalState.update('power-platform-dev-suite-environments', environments);
     }
 
     public async getEnvironments(): Promise<EnvironmentConnection[]> {
-        return this.context.globalState.get('dynamics-devtools-environments', []);
+        return this.context.globalState.get('power-platform-dev-suite-environments', []);
     }
 
     public async getEnvironment(environmentId: string): Promise<EnvironmentConnection | null> {
@@ -432,10 +432,10 @@ export class AuthenticationService {
         if (environment) {
             // Remove secrets from VS Code secret storage
             if (environment.settings.clientId) {
-                await this.secretStorage.delete(`dynamics-devtools-secret-${environment.settings.clientId}`);
+                await this.secretStorage.delete(`power-platform-dev-suite-secret-${environment.settings.clientId}`);
             }
             if (environment.settings.username) {
-                await this.secretStorage.delete(`dynamics-devtools-password-${environment.settings.username}`);
+                await this.secretStorage.delete(`power-platform-dev-suite-password-${environment.settings.username}`);
             }
             
             // Remove cached tokens
@@ -445,7 +445,7 @@ export class AuthenticationService {
         }
 
         const updatedEnvironments = environments.filter(env => env.id !== environmentId);
-        await this.context.globalState.update('dynamics-devtools-environments', updatedEnvironments);
+        await this.context.globalState.update('power-platform-dev-suite-environments', updatedEnvironments);
     }
 
     public async clearAllTokens(): Promise<void> {

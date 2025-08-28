@@ -315,6 +315,7 @@ export class SolutionExplorerPanel extends BasePanel {
             defaultSort: { column: 'friendlyName', direction: 'asc' },
             filterable: true,
             stickyFirstColumn: false,
+            showFooter: true,
             rowActions: [
                 { id: 'openMaker', action: 'openInMaker', label: 'Maker', icon: '🎨' },
                 { id: 'openClassic', action: 'openInClassic', label: 'Classic', icon: '📋' }

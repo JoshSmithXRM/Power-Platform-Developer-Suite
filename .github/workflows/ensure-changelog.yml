@@ -1,0 +1,38 @@
+name: Ensure changelog updated
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine changed files
+        id: changes
+        run: |
+          echo "::set-output name=files::$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})"
+      - name: Fail if code/docs changed without changelog update
+        run: |
+          files="${{ steps.changes.outputs.files }}"
+          echo "Changed files:\n$files"
+          # If only changelog was changed, pass
+          if [[ -z "$files" ]]; then
+            echo "No changes detected."
+            exit 0
+          fi
+
+          # Check if any changed file is in src/ or docs/ or README.md or package.json etc.
+          if echo "$files" | egrep -q "^(src/|docs/|README.md|package.json|package-lock.json|tsconfig.json|webpack.config.js)"; then
+            if echo "$files" | grep -q "CHANGELOG.md"; then
+              echo "CHANGELOG.md updated alongside code/docs changes."
+              exit 0
+            else
+              echo "ERROR: Code/docs changed but CHANGELOG.md not updated. Please add an entry to CHANGELOG.md under [Unreleased]."
+              exit 1
+            fi
+          fi
+
+          echo "No monitored files changed."
+          exit 0

@@ -1,16 +1,47 @@
-# GitHub Copilot Instructions for Dynamics DevTools
+# GitHub Copilot Instructions for Power Platform Developer Suite
 
 ## Project Overview
-This is a comprehensive VS Code extension for Microsoft Dynamics 365 / Power Platform development and administration. The extension provides a unified toolkit with modern UI components for managing environments, browsing metadata, monitoring solutions, and performing common development tasks.
+This is a comprehensive VS Code extension for Power Platform development and administration. The extension provides a unified toolkit with modern UI components for managing environments, browsing metadata, monitoring solutions, and performing common development tasks.
 
 **📚 For complete project information, see:**
 - **[README.md](../README.md)** - Installation, usage, and getting started guide
 - **[docs/ARCHITECTURE_GUIDE.md](../docs/ARCHITECTURE_GUIDE.md)** - Comprehensive architecture patterns and development guidelines
 
 ## Current Implementation Status
-✅ **All 7 panels implemented** following consistent architecture patterns:
-- **Production Ready**: Solution Explorer, Import Job Viewer, Query Data, Metadata Browser, Environment Setup
-- **Framework Ready**: Connection References Manager, Environment Variables Manager, Plugin Trace Viewer
+For the authoritative, versioned implementation status and release history see `CHANGELOG.md`.
+
+Use this file for short, actionable developer hints and Copilot-specific instructions (e.g., which APIs are safe to call, which panels are scaffold-only, and where to find mocks/stubs).
+
+## Release Notes & Change Management
+
+Following industry best practices based on [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/) standards.
+
+### Documentation Hierarchy
+- **[CHANGELOG.md](../CHANGELOG.md)** - Authoritative technical record following Keep a Changelog format
+- **GitHub Releases** - User-focused release announcements generated from changelog
+- **README.md** - Current stable feature status and getting started guide
+
+### Standard Release Process
+1. **During Development**: Track all changes in `[Unreleased]` section of CHANGELOG.md
+2. **Pre-Release**: Move unreleased changes to new versioned section with ISO date (YYYY-MM-DD)
+3. **Release**: Create GitHub Release referencing changelog with user-focused highlights
+4. **Post-Release**: Update README.md feature status if significant changes occurred
+
+### Keep a Changelog Categories
+Use semantic categories in CHANGELOG.md entries:
+- **Added** - New features and capabilities
+- **Changed** - Changes in existing functionality
+- **Deprecated** - Soon-to-be removed features
+- **Removed** - Features removed in this release
+- **Fixed** - Bug fixes and corrections
+- **Security** - Security vulnerability fixes
+- **Technical** - Internal changes, architecture improvements, build system updates
+
+### Content Strategy Guidelines
+- **CHANGELOG.md**: Technical accuracy, comprehensive change tracking, developer-focused
+- **GitHub Releases**: User impact, benefits, breaking changes, migration guidance
+- **README.md**: Honest feature status, clear capability descriptions
+- **Version Numbers**: Follow semantic versioning (MAJOR.MINOR.PATCH)
 
 ## Core Development Principles
 
@@ -31,211 +62,116 @@ This is a comprehensive VS Code extension for Microsoft Dynamics 365 / Power Pla
 - **Prefer self-documenting code** - use clear, descriptive naming over excessive commenting
 - **Strategic comments are welcome** for:
   - Complex algorithms or business logic that isn't immediately obvious
-  - Workarounds for known issues or API limitations
-  - "Why" explanations when the "what" is clear but the reasoning isn't
-  - External dependencies or integration quirks
-  - Performance optimizations that trade readability for speed
-- **Use descriptive variable and function names**
-- **Prefer composition over inheritance** (except for UI panels)
-- **Keep functions small and focused**
-- **Use TypeScript types extensively** for better developer experience
+  - Public API contracts and integration points
+  - Workarounds for known platform limitations
+- **Maintain consistent naming** following existing patterns in the codebase
+- **Use TypeScript strictly** with proper type definitions
 
-### 3. Decision Making Process
-- **Do NOT over-engineer solutions** - prefer simple, working implementations
-- **Always consult before making architectural decisions**
-- **Discuss breaking changes or new patterns before implementation**
-- **Follow existing patterns unless there's a compelling reason to change**
-- **Reference the [ARCHITECTURE_GUIDE.md](../docs/ARCHITECTURE_GUIDE.md)** for established patterns and best practices
+### 3. Security & Privacy Requirements
+- **Never log tokens, credentials, or sensitive data**
+- **Use VS Code SecretStorage** for all sensitive information
+- **All API calls through AuthenticationService** - no alternate auth patterns
+- **Validate user inputs** before API interactions
+- **External calls only through proper authentication channels**
 
-## Dynamics 365 & OData API Guidelines
+## Development Commands
 
-### Required Reading
-Before working with Dynamics/Power Platform APIs, reference these official Microsoft docs:
-- [OData CLI Getting Started](https://learn.microsoft.com/en-us/odata/odatacli/getting-started)
-- [OData Get Data Concepts](https://learn.microsoft.com/en-us/odata/concepts/get-data)
-- [OData Query Options Overview](https://learn.microsoft.com/en-us/odata/concepts/queryoptions-overview)
-- [OData Query Options Usage](https://learn.microsoft.com/en-us/odata/concepts/queryoptions-usage)
-
-### API Best Practices
-- **Always use `$select`** to specify required fields only
-- **Use `$top` and `$skip`** for pagination (note: some entities like `importjobs` don't support `$skip`)
-- **Use `$orderby`** for consistent data ordering
-- **Use `$expand`** for related data when needed
-- **Include `$count=true`** when pagination info is needed
-- **Handle API errors gracefully** with user-friendly messages
-
-### Authentication & Token Management
-- **Use the existing `AuthenticationService`** - do not create new auth patterns
-- **Cache tokens appropriately** through the service
-- **Handle token expiration** and refresh automatically
-- **Test authentication flows** with different auth methods
-
-## UI Development Guidelines
-
-### Panel Development
-- **Extend `BasePanel`** for all new webview panels
-- **Use the established message passing pattern** between extension and webview
-- **Implement proper disposal** to prevent memory leaks
-- **Follow VS Code theming** using CSS variables (`var(--vscode-*)`)
-- **Make UIs responsive** and accessible
-
-### Environment Handling
-- **Always validate environment selection** before API calls
-- **Cache environment data** when appropriate
-- **Provide clear environment status feedback** to users
-- **Handle environment switching** gracefully
-
-### Error Handling
-- **Show user-friendly error messages** in VS Code notifications
-- **Log detailed errors** to console for debugging
-- **Gracefully handle network failures** and timeouts
-- **Provide fallback behavior** when possible
-
-## Performance Considerations
-
-### Data Loading
-- **Load data efficiently** - avoid unnecessary API calls
-- **Implement caching** for frequently accessed data
-- **Use pagination** when supported by the API
-- **Show loading states** to users during API calls
-
-### Memory Management
-- **Dispose of panels properly** when closed
-- **Clean up event listeners** and subscriptions
-- **Avoid memory leaks** in long-running operations
-
-## Testing Guidelines
-
-### Manual Testing
-- **Test with multiple environments** (dev, prod, different auth methods)
-- **Test error scenarios** (network failures, auth failures, etc.)
-- **Test with large datasets** to ensure performance
-- **Test UI responsiveness** on different screen sizes
-
-### Code Quality
-- **Ensure TypeScript compilation** without errors or warnings
-- **Follow existing naming conventions**
-- **Maintain consistent code formatting**
-- **Keep functions focused** and testable
-
-## Security Considerations
-
-### Authentication
-- **Never log sensitive data** (tokens, passwords, secrets)
-- **Use secure storage** for credentials via VS Code's `SecretStorage`
-- **Validate user inputs** before processing
-- **Handle authentication state** properly
-
-### API Interactions
-- **Validate API responses** before processing
-- **Sanitize user inputs** in OData queries
-- **Use HTTPS endpoints** only
-- **Follow principle of least privilege** in API permissions
-
-## Common Patterns to Follow
-
-### Panel Creation
-```typescript
-export class NewPanel extends BasePanel {
-    public static readonly viewType = 'newPanel';
-    
-    public static createOrShow(extensionUri: vscode.Uri, authService: AuthenticationService) {
-        const panel = BasePanel.createWebviewPanel({
-            viewType: NewPanel.viewType,
-            title: 'Panel Title'
-        });
-        new NewPanel(panel, extensionUri, authService);
-    }
-    
-    protected async handleMessage(message: WebviewMessage): Promise<void> {
-        // Handle webview messages
-    }
-    
-    protected getHtmlContent(): string {
-        // Return HTML content
-    }
-}
+```bash
+npm install              # Install dependencies
+npm run compile          # Development build
+npm run watch            # Watch mode for development
+npm run package          # Production build with webpack (includes TypeScript type checking)
+npm run vsce-package     # Create .vsix package
+npm run test-release     # Build, package, and install locally
 ```
 
-### Command Registration
-```typescript
-export class DomainCommands {
-    constructor(private authService: AuthenticationService, private context: vscode.ExtensionContext) {}
-    
-    public registerCommands(): vscode.Disposable[] {
-        return [
-            vscode.commands.registerCommand('dynamics-devtools.commandName', () => {
-                // Command implementation
-            })
-        ];
-    }
-}
+**Development Workflow:**
+- Use `npm run watch` for continuous compilation
+- Press F5 to launch Extension Development Host
+- Use VS Code "Build Extension" task for webpack compilation
+
+## Core Development Principles (Concise)
+
+- **Follow modular architecture** documented in `docs/ARCHITECTURE_GUIDE.md`
+- **Keep files small and single-purpose** - prefer composition over inheritance
+- **Use ServiceFactory** for dependency injection and shared services
+- **All panels extend BasePanel** with consistent structure and message handling
+- **Use shared utilities**: TableUtils, PanelUtils, EnvironmentSelectorUtils
+
+## Critical Technical Requirements
+
+**Table Implementation (REQUIRED):**
+```javascript
+// Data MUST have 'id' property for row actions to work
+const tableData = items.map(item => ({
+    id: item.primaryKey,     // Required for TableUtils
+    status: calculateStatus(item),  // Can contain HTML badges
+    ...item
+}));
+
+// Initialize with action handlers
+TableUtils.initializeTable('tableId', {
+    onRowAction: handleRowAction  // (actionId, rowData) => void
+});
 ```
 
-## Communication Guidelines
+**Panel Development Pattern:**
+- Extend `BasePanel` class with dependency injection via ServiceFactory
+- Include common webview resources via `getCommonWebviewResources()`
+- Follow standard message handling with try/catch error handling
+- Use StateService for UI state persistence (not data caching)
 
-### Response Style
-- **Keep responses concise and focused** on the specific task at hand
-- **Do NOT provide task summaries** unless explicitly requested by the user
-- **Confirm completion** with a brief statement like "Done" or "Updated successfully"
-- **Only elaborate** when the user asks for explanations or details
+## API & Dynamics Guidelines
 
-### Testing & Validation
-- **Inform the user when to test the build** instead of running tests automatically
-- **Let the user validate functionality** and report results back
-- **Wait for user confirmation** before proceeding with dependent changes
+- **OData queries**: Use `$select`, `$top`, `$orderby`, `$expand` appropriately
+- **Server-side pagination preferred** - be aware some entities have quirks
+- **AuthenticationService only** for token management - no alternate patterns
+- **Fresh API calls always** - only cache UI preferences, not data
 
-## What NOT to Do
+## UI & Panel Guidelines
 
-### Anti-Patterns
-- ❌ Don't create monolithic files (keep under 500 lines when possible)
-- ❌ Don't duplicate code across panels - use base classes or utilities
-- ❌ Don't hardcode URLs or configuration - use environment settings
-- ❌ Don't ignore errors silently - always provide user feedback
-- ❌ Don't create new authentication patterns - use existing service
-- ❌ Don't add features without considering existing users' workflows
+- **Extend BasePanel** for all webview panels with established message-passing pattern
+- **Use ComponentFactory** for environment selectors and data tables
+- **Include shared utilities**: TableUtils, PanelUtils, EnvironmentSelectorUtils
+- **Ensure proper disposal** of panels and listeners to avoid memory leaks
+- **Table data requirements**: MUST have 'id' property for row actions
+- **Support HTML content** in table cells for badges and formatting
 
-### Performance Anti-Patterns
-- ❌ Don't load all data without pagination
-- ❌ Don't make unnecessary API calls
-- ❌ Don't block the UI thread with long-running operations
-- ❌ Don't create memory leaks with uncleaned event listeners
+## Hard Rules (Non-Negotiable)
 
-## Project-Specific Knowledge
+- **Never exfiltrate secrets, credentials, or sensitive data**
+- **No external network calls** except when explicitly requested and permitted
+- **Never paste raw patch diffs or terminal commands** - use repository workflows
+- **Ask clarifying questions** when requirements are ambiguous
+- **Use VS Code SecretStorage** for all sensitive data storage
 
-### Key Extension Points
-- **Environment Management**: All auth and environment switching
-- **Solution Operations**: Import, export, and solution management
-- **Data Browsing**: Entity/table exploration and querying
-- **Import Job Monitoring**: Solution import status and history
+## Quick Reference — Do / Don't
 
-### Important Files to Understand
-- `AuthenticationService.ts` - Handles all authentication flows
-- `BasePanel.ts` - Foundation for all UI panels
-- `extension.ts` - Main entry point and registration
-- `EnvironmentsProvider.ts` - Environment tree view logic
+**DO:**
+- Reuse existing utilities (`TableUtils`, `PanelUtils`, `EnvironmentSelectorUtils`)
+- Follow established architectural patterns in existing panels
+- Update `CHANGELOG.md` under `[Unreleased]` for all changes
+- Run build verification before completion (`npm run package`)
+- Test in Extension Development Host (F5) before marking complete
 
-### Common User Workflows
-1. **Setup**: Add environment → Test connection → Use tools
-2. **Solution Work**: Browse solutions → Open in Maker/Classic → Monitor imports
-3. **Data Exploration**: Browse entities → Query data → Export results
-4. **Troubleshooting**: View import jobs → Check status → Review errors
+**DON'T:**
+- Invent new authentication patterns - use AuthenticationService only
+- Hardcode URLs or connection strings
+- Modify large unrelated files - keep changes focused
+- Create direct service instances - use ServiceFactory dependency injection
+- Cache API data - only persist UI state preferences
 
-Remember: This extension is used by developers working with Microsoft Dynamics 365 and Power Platform. Users expect professional, reliable tools that integrate well with their existing development workflows.
+## Communication & response style
+- Provide a one-line plan, a short checklist of steps, then perform edits. Keep messages concise.
+- When editing code, report build/typecheck status and list the files changed.
 
-## 📚 Essential Documentation
+## Change tracking
+- Always update `CHANGELOG.md` under `[Unreleased]` for development changes. Move entries to a versioned section when releasing.
 
-For comprehensive information about this project:
+## Webpack Bundling
 
-1. **[README.md](../README.md)** - Start here for:
-   - Project overview and features
-   - Installation and usage instructions
-   - Development setup and workflow
-   - Troubleshooting guide
-
-2. **[docs/ARCHITECTURE_GUIDE.md](../docs/ARCHITECTURE_GUIDE.md)** - Essential for development:
-   - Complete architecture patterns and principles
-   - Panel implementation guidelines
-   - Service layer patterns and best practices
-   - Shared utilities documentation
-   - Code examples and templates
+Extension uses webpack for production optimization:
+- Single bundled output: `dist/extension.js`
+- 92% size reduction (127KB vs 1.64MB)
+- All dependencies bundled except VS Code API
+- Source maps for debugging support

@@ -16,10 +16,11 @@ export class EnvironmentSetupPanel extends BasePanel {
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
 
-        if (EnvironmentSetupPanel.currentPanel) {
-            EnvironmentSetupPanel.currentPanel._panel.reveal(column);
-            return;
-        }
+        // Allow multiple panels - don't block creation if one exists
+        // if (EnvironmentSetupPanel.currentPanel) {
+        //     EnvironmentSetupPanel.currentPanel._panel.reveal(column);
+        //     return;
+        // }
 
         const panel = vscode.window.createWebviewPanel(
             EnvironmentSetupPanel.viewType,
@@ -28,12 +29,15 @@ export class EnvironmentSetupPanel extends BasePanel {
             {
                 enableScripts: true,
                 localResourceRoots: [
-                    vscode.Uri.joinPath(extensionUri, 'src')
+                    vscode.Uri.joinPath(extensionUri, 'resources')
                 ]
             }
         );
 
-        EnvironmentSetupPanel.currentPanel = new EnvironmentSetupPanel(panel, extensionUri, editingEnvironment);
+        const environmentPanel = new EnvironmentSetupPanel(panel, extensionUri, editingEnvironment);
+        
+        // Set as current panel (will be overridden by newer panels, but that's OK for multiple support)
+        EnvironmentSetupPanel.currentPanel = environmentPanel;
     }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, editingEnvironment?: EnvironmentConnection) {
@@ -95,7 +99,7 @@ export class EnvironmentSetupPanel extends BasePanel {
             await this._authService.saveEnvironmentSettings(environment);
 
             // Refresh the environments tree view
-            vscode.commands.executeCommand('dynamics-devtools.refreshEnvironments');
+            vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
 
             // Send success response
             this.postMessage({

@@ -18,35 +18,35 @@ export class EnvironmentCommands {
      */
     public registerCommands(): vscode.Disposable[] {
         return [
-            vscode.commands.registerCommand('dynamics-devtools.addEnvironment', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.addEnvironment', () => {
                 EnvironmentSetupPanel.createOrShow(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.refreshEnvironments', () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.refreshEnvironments', () => {
                 this.environmentsProvider.refresh();
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.testConnection', async () => {
+            vscode.commands.registerCommand('power-platform-dev-suite.testConnection', async () => {
                 await this.testConnection();
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.openMaker', async (environmentItem?: EnvironmentItem) => {
+            vscode.commands.registerCommand('power-platform-dev-suite.openMaker', async (environmentItem?: EnvironmentItem) => {
                 await this.openMaker(environmentItem);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.openDynamics', async (environmentItem?: EnvironmentItem) => {
+            vscode.commands.registerCommand('power-platform-dev-suite.openDynamics', async (environmentItem?: EnvironmentItem) => {
                 await this.openDynamics(environmentItem);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.editEnvironment', async (environmentItem?: EnvironmentItem) => {
+            vscode.commands.registerCommand('power-platform-dev-suite.editEnvironment', async (environmentItem?: EnvironmentItem) => {
                 await this.editEnvironment(environmentItem);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.testEnvironmentConnection', async (environmentItem?: EnvironmentItem) => {
+            vscode.commands.registerCommand('power-platform-dev-suite.testEnvironmentConnection', async (environmentItem?: EnvironmentItem) => {
                 await this.testEnvironmentConnection(environmentItem);
             }),
 
-            vscode.commands.registerCommand('dynamics-devtools.removeEnvironment', async (environmentItem?: EnvironmentItem) => {
+            vscode.commands.registerCommand('power-platform-dev-suite.removeEnvironment', async (environmentItem?: EnvironmentItem) => {
                 await this.removeEnvironment(environmentItem);
             })
         ];
@@ -125,8 +125,32 @@ export class EnvironmentCommands {
                 vscode.window.showErrorMessage('Environment not found');
             }
         } else {
-            vscode.window.showErrorMessage('No environment selected');
+            // No environment selected - show quick pick
+            await this.editEnvironmentFromQuickPick();
         }
+    }
+
+    private async editEnvironmentFromQuickPick() {
+        const environments = await this.authService.getEnvironments();
+
+        if (environments.length === 0) {
+            vscode.window.showWarningMessage('No environments configured to edit.');
+            return;
+        }
+
+        const selected = await vscode.window.showQuickPick(
+            environments.map(env => ({
+                label: env.name,
+                description: env.settings.dataverseUrl,
+                detail: `Auth: ${env.settings.authenticationMethod}`,
+                env: env
+            })),
+            { placeHolder: 'Select environment to edit' }
+        );
+
+        if (!selected) return;
+
+        EnvironmentSetupPanel.createOrShow(this.context.extensionUri, selected.env);
     }
 
     private async testEnvironmentConnection(environmentItem?: EnvironmentItem) {
@@ -153,7 +177,7 @@ export class EnvironmentCommands {
             if (confirmResult === 'Remove') {
                 try {
                     await this.authService.removeEnvironment(environmentItem.envId);
-                    vscode.commands.executeCommand('dynamics-devtools.refreshEnvironments');
+                    vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
                     vscode.window.showInformationMessage(`Environment "${environmentItem.label}" removed successfully!`);
                 } catch (error: any) {
                     vscode.window.showErrorMessage(`Failed to remove environment: ${error.message}`);
@@ -193,7 +217,7 @@ export class EnvironmentCommands {
         if (confirm === 'Yes, Remove') {
             try {
                 await this.authService.removeEnvironment(selected.env.id);
-                vscode.commands.executeCommand('dynamics-devtools.refreshEnvironments');
+                vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
                 vscode.window.showInformationMessage(`Environment "${selected.env.name}" removed successfully!`);
             } catch (error: any) {
                 vscode.window.showErrorMessage(`Failed to remove environment: ${error.message}`);

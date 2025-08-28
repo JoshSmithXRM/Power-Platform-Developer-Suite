@@ -1,170 +1,213 @@
 {
-    "name": "dynamics-devtools",
-    "displayName": "Dynamics DevTools",
-    "description": "A comprehensive VSCode extension for Microsoft Dynamics 365 / Power Platform development and administration",
-    "version": "0.1.4",
+    "name": "power-platform-developer-suite",
+    "displayName": "Power Platform Developer Suite",
+    "description": "A comprehensive VSCode extension for Power Platform development and administration - your complete toolkit for Dynamics 365, Dataverse, and Power Platform solutions",
+    "version": "0.0.1",
+    "icon": "images/icon.png",
     "publisher": "JoshSmithXRM",
     "repository": {
         "type": "git",
-        "url": "https://github.com/JoshSmithXRM/Dynamics-DevTools.git"
+        "url": "https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite.git"
     },
+    "bugs": {
+        "url": "https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/issues"
+    },
+    "homepage": "https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite#readme",
     "engines": {
         "vscode": "^1.74.0"
     },
     "categories": [
+        "Extension Packs",
         "Other"
+    ],
+    "keywords": [
+        "power platform",
+        "power-platform",
+        "dynamics 365",
+        "d365",
+        "dynamics365",
+        "dataverse",
+        "powerapps",
+        "power apps",
+        "power automate",
+        "powerautomate",
+        "crm",
+        "dynamics crm",
+        "common data service",
+        "cds",
+        "microsoft",
+        "development",
+        "admin",
+        "administration",
+        "devtools",
+        "developer tools",
+        "plugin",
+        "plugins",
+        "solution",
+        "solutions",
+        "metadata",
+        "import",
+        "export",
+        "environment",
+        "environments",
+        "connection references",
+        "environment variables",
+        "trace",
+        "debugging",
+        "toolkit",
+        "suite"
     ],
     "activationEvents": [
         "onStartupFinished",
-        "onView:dynamics-devtools-tools",
-        "onView:dynamics-devtools-environments",
-        "onCommand:dynamics-devtools.addEnvironment",
-        "onCommand:dynamics-devtools.removeEnvironment",
-        "onCommand:dynamics-devtools.solutionExplorer",
-        "onCommand:dynamics-devtools.importJobViewer",
-        "onCommand:dynamics-devtools.queryData",
-        "onCommand:dynamics-devtools.openMetadataBrowser",
-        "onCommand:dynamics-devtools.connectionReferences",
-        "onCommand:dynamics-devtools.environmentVariables",
-        "onCommand:dynamics-devtools.pluginTraceViewer"
+        "onView:power-platform-dev-suite-tools",
+        "onView:power-platform-dev-suite-environments",
+        "onCommand:power-platform-dev-suite.addEnvironment",
+        "onCommand:power-platform-dev-suite.removeEnvironment",
+        "onCommand:power-platform-dev-suite.solutionExplorer",
+        "onCommand:power-platform-dev-suite.importJobViewer",
+        "onCommand:power-platform-dev-suite.queryData",
+        "onCommand:power-platform-dev-suite.openMetadataBrowser",
+        "onCommand:power-platform-dev-suite.connectionReferences",
+        "onCommand:power-platform-dev-suite.environmentVariables",
+        "onCommand:power-platform-dev-suite.pluginTraceViewer"
     ],
     "main": "./dist/extension.js",
     "contributes": {
         "commands": [
             {
-                "command": "dynamics-devtools.addEnvironment",
+                "command": "power-platform-dev-suite.addEnvironment",
                 "title": "Add Environment",
-                "category": "Dynamics DevTools",
+                "category": "Power Platform Developer Suite",
                 "icon": "$(add)"
             },
             {
-                "command": "dynamics-devtools.removeEnvironment",
+                "command": "power-platform-dev-suite.removeEnvironment",
                 "title": "Remove Environment",
-                "category": "Dynamics DevTools",
+                "category": "Power Platform Developer Suite",
                 "icon": "$(remove)"
             },
             {
-                "command": "dynamics-devtools.testConnection",
+                "command": "power-platform-dev-suite.testConnection",
                 "title": "Test Connection",
-                "category": "Dynamics DevTools",
+                "category": "Power Platform Developer Suite",
                 "icon": "$(beaker)"
             },
             {
-                "command": "dynamics-devtools.refreshEnvironments",
+                "command": "power-platform-dev-suite.refreshEnvironments",
                 "title": "Refresh Environments",
-                "category": "Dynamics DevTools",
+                "category": "Power Platform Developer Suite",
                 "icon": "$(refresh)"
             },
             {
-                "command": "dynamics-devtools.openMaker",
+                "command": "power-platform-dev-suite.openMaker",
                 "title": "Open Maker",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.editEnvironment",
+                "command": "power-platform-dev-suite.editEnvironment",
                 "title": "Edit Environment",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.testEnvironmentConnection",
+                "command": "power-platform-dev-suite.testEnvironmentConnection",
                 "title": "Test Environment Connection",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.openDynamics",
+                "command": "power-platform-dev-suite.openDynamics",
                 "title": "Open Dynamics",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.openMetadataBrowser",
+                "command": "power-platform-dev-suite.openMetadataBrowser",
                 "title": "Open Metadata Browser",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.solutionExplorer",
+                "command": "power-platform-dev-suite.solutionExplorer",
                 "title": "Solution Explorer",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.solutionExplorerNew",
+                "command": "power-platform-dev-suite.solutionExplorerNew",
                 "title": "Open New Solution Explorer",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.openMetadataBrowserNew",
+                "command": "power-platform-dev-suite.openMetadataBrowserNew",
                 "title": "Open New Metadata Browser",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.importJobViewer",
+                "command": "power-platform-dev-suite.importJobViewer",
                 "title": "Import Job Viewer",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.importJobViewerNew",
+                "command": "power-platform-dev-suite.importJobViewerNew",
                 "title": "Open New Import Job Viewer",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.queryData",
+                "command": "power-platform-dev-suite.queryData",
                 "title": "Query Data",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.queryDataNew",
+                "command": "power-platform-dev-suite.queryDataNew",
                 "title": "Open New Query Data",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.connectionReferences",
+                "command": "power-platform-dev-suite.connectionReferences",
                 "title": "Connection References Manager",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.connectionReferencesNew",
+                "command": "power-platform-dev-suite.connectionReferencesNew",
                 "title": "Open New Connection References Manager",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.environmentVariables",
+                "command": "power-platform-dev-suite.environmentVariables",
                 "title": "Environment Variables Manager",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.environmentVariablesNew",
+                "command": "power-platform-dev-suite.environmentVariablesNew",
                 "title": "Open New Environment Variables Manager",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.pluginTraceViewer",
+                "command": "power-platform-dev-suite.pluginTraceViewer",
                 "title": "Plugin Trace Viewer",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             },
             {
-                "command": "dynamics-devtools.pluginTraceViewerNew",
+                "command": "power-platform-dev-suite.pluginTraceViewerNew",
                 "title": "Open New Plugin Trace Viewer",
-                "category": "Dynamics DevTools"
+                "category": "Power Platform Developer Suite"
             }
         ],
         "viewsContainers": {
             "activitybar": [
                 {
-                    "id": "dynamics-devtools",
-                    "title": "Dynamics DevTools",
-                    "icon": "$(wrench)"
+                    "id": "power-platform-dev-suite",
+                    "title": "Power Platform Developer Suite",
+                    "icon": "images/activity-bar-icon.svg"
                 }
             ]
         },
         "views": {
-            "dynamics-devtools": [
+            "power-platform-dev-suite": [
                 {
-                    "id": "dynamics-devtools-tools",
+                    "id": "power-platform-dev-suite-tools",
                     "name": "Tools",
                     "when": "true",
                     "icon": "$(tools)"
                 },
                 {
-                    "id": "dynamics-devtools-environments",
+                    "id": "power-platform-dev-suite-environments",
                     "name": "Environments",
                     "when": "true",
                     "icon": "$(cloud)"
@@ -174,75 +217,75 @@
         "menus": {
             "view/title": [
                 {
-                    "command": "dynamics-devtools.addEnvironment",
-                    "when": "view == dynamics-devtools-environments",
+                    "command": "power-platform-dev-suite.addEnvironment",
+                    "when": "view == power-platform-dev-suite-environments",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "dynamics-devtools.refreshEnvironments",
-                    "when": "view == dynamics-devtools-environments",
+                    "command": "power-platform-dev-suite.refreshEnvironments",
+                    "when": "view == power-platform-dev-suite-environments",
                     "group": "navigation@2"
                 }
             ],
             "view/item/context": [
                 {
-                    "command": "dynamics-devtools.openMaker",
-                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "command": "power-platform-dev-suite.openMaker",
+                    "when": "view == power-platform-dev-suite-environments && viewItem == environment",
                     "group": "1_open@1"
                 },
                 {
-                    "command": "dynamics-devtools.openDynamics",
-                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "command": "power-platform-dev-suite.openDynamics",
+                    "when": "view == power-platform-dev-suite-environments && viewItem == environment",
                     "group": "1_open@2"
                 },
                 {
-                    "command": "dynamics-devtools.editEnvironment",
-                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "command": "power-platform-dev-suite.editEnvironment",
+                    "when": "view == power-platform-dev-suite-environments && viewItem == environment",
                     "group": "2_edit@1"
                 },
                 {
-                    "command": "dynamics-devtools.testEnvironmentConnection",
-                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "command": "power-platform-dev-suite.testEnvironmentConnection",
+                    "when": "view == power-platform-dev-suite-environments && viewItem == environment",
                     "group": "2_edit@2"
                 },
                 {
-                    "command": "dynamics-devtools.removeEnvironment",
-                    "when": "view == dynamics-devtools-environments && viewItem == environment",
+                    "command": "power-platform-dev-suite.removeEnvironment",
+                    "when": "view == power-platform-dev-suite-environments && viewItem == environment",
                     "group": "3_remove@1"
                 },
                 {
-                    "command": "dynamics-devtools.solutionExplorerNew",
-                    "when": "view == dynamics-devtools-tools && viewItem == solutionExplorer",
+                    "command": "power-platform-dev-suite.solutionExplorerNew",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == solutionExplorer",
                     "group": "1_open@1"
                 },
                 {
-                    "command": "dynamics-devtools.openMetadataBrowserNew",
-                    "when": "view == dynamics-devtools-tools && viewItem == metadataBrowser",
+                    "command": "power-platform-dev-suite.openMetadataBrowserNew",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == metadataBrowser",
                     "group": "1_open@1"
                 },
                 {
-                    "command": "dynamics-devtools.importJobViewerNew",
-                    "when": "view == dynamics-devtools-tools && viewItem == importJobViewer",
+                    "command": "power-platform-dev-suite.importJobViewerNew",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == importJobViewer",
                     "group": "1_open@1"
                 },
                 {
-                    "command": "dynamics-devtools.queryDataNew",
-                    "when": "view == dynamics-devtools-tools && viewItem == queryData",
+                    "command": "power-platform-dev-suite.queryDataNew",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == queryData",
                     "group": "1_open@1"
                 },
                 {
-                    "command": "dynamics-devtools.connectionReferencesNew",
-                    "when": "view == dynamics-devtools-tools && viewItem == connectionReferences",
+                    "command": "power-platform-dev-suite.connectionReferencesNew",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == connectionReferences",
                     "group": "1_open@1"
                 },
                 {
-                    "command": "dynamics-devtools.environmentVariablesNew",
-                    "when": "view == dynamics-devtools-tools && viewItem == environmentVariables",
+                    "command": "power-platform-dev-suite.environmentVariablesNew",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == environmentVariables",
                     "group": "1_open@1"
                 },
                 {
-                    "command": "dynamics-devtools.pluginTraceViewerNew",
-                    "when": "view == dynamics-devtools-tools && viewItem == pluginTraceViewer",
+                    "command": "power-platform-dev-suite.pluginTraceViewerNew",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == pluginTraceViewer",
                     "group": "1_open@1"
                 }
             ]
@@ -260,8 +303,8 @@
         "test": "node ./out/test/runTest.js",
         "vsce-package": "vsce package",
         "test-release": "npm run package && npm run vsce-package && npm run install-local",
-        "install-local": "code --install-extension dynamics-devtools-0.1.3.vsix --force",
-        "uninstall-local": "code --uninstall-extension JoshSmithXRM.dynamics-devtools",
+        "install-local": "code --install-extension power-platform-developer-suite-${npm_package_version}.vsix --force",
+        "uninstall-local": "code --uninstall-extension JoshSmithXRM.power-platform-developer-suite",
         "clean-install": "npm run uninstall-local && npm run test-release",
         "test-fresh": "npm run clean-install && code --new-window"
     },

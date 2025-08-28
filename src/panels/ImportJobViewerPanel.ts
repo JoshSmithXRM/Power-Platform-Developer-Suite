@@ -404,6 +404,7 @@ export class ImportJobViewerPanel extends BasePanel {
             stickyHeader: true,
             stickyFirstColumn: false,
             filterable: true,
+            showFooter: true,
             rowActions: [
                 { id: 'viewImportJobXml', action: 'viewImportJobXml', label: 'XML', icon: '📄' }
             ],

@@ -16,7 +16,7 @@ import { MetadataBrowserCommands } from './commands/MetadataBrowserCommands';
  * Extension activation function
  */
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Dynamics DevTools extension is now active!');
+    console.log('Power Platform Developer Suite extension is now active!');
 
     // Initialize services first
     ServiceFactory.initialize(context);
@@ -29,30 +29,43 @@ export function activate(context: vscode.ExtensionContext) {
     const toolsProvider = new ToolsProvider();
 
     // Register tree data providers
-    vscode.window.registerTreeDataProvider('dynamics-devtools-environments', environmentsProvider);
-    vscode.window.registerTreeDataProvider('dynamics-devtools-tools', toolsProvider);
+    vscode.window.registerTreeDataProvider('power-platform-dev-suite-environments', environmentsProvider);
+    vscode.window.registerTreeDataProvider('power-platform-dev-suite-tools', toolsProvider);
 
     // Initialize command handlers
     const environmentCommands = new EnvironmentCommands(authService, context, environmentsProvider);
     const panelCommands = new PanelCommands(authService, context, environmentsProvider);
     const metadataBrowserCommands = new MetadataBrowserCommands(authService, context);
 
-    // Register all commands
-    const commandDisposables = [
-        ...environmentCommands.registerCommands(),
-        ...panelCommands.registerCommands(),
-        ...metadataBrowserCommands.registerCommands()
-    ];
+    // Register all commands with defensive error handling. If registration fails
+    // we register a small fallback command so the user doesn't see "command not found".
+    let commandDisposables: vscode.Disposable[] = [];
+    try {
+        commandDisposables = [
+            ...environmentCommands.registerCommands(),
+            ...panelCommands.registerCommands(),
+            ...metadataBrowserCommands.registerCommands()
+        ];
+    } catch (err: any) {
+        console.error('Failed to register commands during activation:', err);
+
+        // Fallback for the metadata browser command to avoid 'command not found'
+        const fallback = vscode.commands.registerCommand('power-platform-dev-suite.openMetadataBrowser', () => {
+            vscode.window.showErrorMessage('Power Platform Developer Suite failed to initialize completely. Check the Extension Host logs for details.');
+        });
+
+        commandDisposables.push(fallback);
+    }
 
     // Add all disposables to context
     context.subscriptions.push(...commandDisposables);
 
-    console.log('Dynamics DevTools extension activated successfully!');
+    console.log('Power Platform Developer Suite extension activated successfully!');
 }
 
 /**
  * Extension deactivation function
  */
 export function deactivate() {
-    console.log('Dynamics DevTools extension deactivated');
+    console.log('Power Platform Developer Suite extension deactivated');
 }
