@@ -92,9 +92,7 @@ function openInMaker() {
     });
 }
 
-function syncDeploymentSettings() {
-    if (!currentRelationshipData || !currentSolutionUniqueName) {
-        PanelUtils.sendMessage('error', { message: 'No connection reference data available to sync' });
+        PanelUtils.sendMessage('error', { message: 'No connection reference data or solution selected for sync' });
         return;
     }
     
