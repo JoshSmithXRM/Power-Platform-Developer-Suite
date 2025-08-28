@@ -36,7 +36,8 @@ export class ServiceFactory {
         ServiceFactory.solutionComponentService = new SolutionComponentService(ServiceFactory.authService);
         ServiceFactory.pluginTraceService = new PluginTraceService(ServiceFactory.authService);
         ServiceFactory.metadataService = new MetadataService(ServiceFactory.authService);
-        ServiceFactory.initialized = true;        console.log('ServiceFactory initialized successfully');
+        ServiceFactory.initialized = true;
+        console.log('ServiceFactory initialized successfully');
     }
     
     static getAuthService(): AuthenticationService {
