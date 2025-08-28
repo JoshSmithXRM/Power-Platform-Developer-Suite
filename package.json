@@ -303,7 +303,7 @@
         "test": "node ./out/test/runTest.js",
         "vsce-package": "vsce package",
         "test-release": "npm run package && npm run vsce-package && npm run install-local",
-        "install-local": "code --install-extension power-platform-developer-suite-0.0.1.vsix --force",
+        "install-local": "code --install-extension power-platform-developer-suite-${npm_package_version}.vsix --force",
         "uninstall-local": "code --uninstall-extension joshsmithxrm.power-platform-developer-suite",
         "clean-install": "npm run uninstall-local && npm run test-release",
         "test-fresh": "npm run clean-install && code --new-window"
