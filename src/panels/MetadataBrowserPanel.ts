@@ -935,14 +935,15 @@ export class MetadataBrowserPanel extends BasePanel {
                 ${ComponentFactory.createDataTable({
                     id: 'metadataTable',
                     columns: [
+                        { key: 'DisplayName', label: 'Display Name', sortable: true, width: '200px' },
                         { key: 'LogicalName', label: 'Logical Name', sortable: true, width: '200px' },
                         { key: 'SchemaName', label: 'Schema Name', sortable: true, width: '200px' },
-                        { key: 'DisplayName', label: 'Display Name', sortable: true, width: '200px' },
-                        { key: 'AttributeType', label: 'Type', sortable: true, width: '120px' },
-                        { key: 'RequiredLevel', label: 'Required', sortable: true, width: '120px' },
-                        { key: 'IsCustom', label: 'Custom', sortable: true, width: '100px' },
-                        { key: 'IsPrimaryId', label: 'Primary ID', sortable: true, width: '100px' },
-                        { key: 'IsPrimaryName', label: 'Primary Name', sortable: true, width: '120px' }
+                        { key: 'Type', label: 'Type', sortable: true, width: '120px' },
+                        { key: 'RequiredLevel', label: 'Required Level', sortable: true, width: '120px' },
+                        { key: 'HasChanged', label: 'Has Changed', sortable: true, width: '100px' },
+                        { key: 'IsManaged', label: 'Is Managed', sortable: true, width: '100px' },
+                        { key: 'IsCustomizable', label: 'Is Customizable', sortable: true, width: '120px' },
+                        { key: 'IsCustomAttribute', label: 'Is Custom Attribute', sortable: true, width: '140px' }
                     ],
                     defaultSort: { column: 'LogicalName', direction: 'asc' },
                     stickyHeader: true,
@@ -2951,46 +2952,315 @@ export class MetadataBrowserPanel extends BasePanel {
                     \`;
                 }
                 
+                function generateAttributeDataTypeProperties(attribute) {
+                    const attributeType = attribute.AttributeType;
+                    let dataTypeSection = '';
+                    
+                    if (attributeType === 'String') {
+                        dataTypeSection = \`
+                            <div class="property-section">
+                                <div class="property-section-title">String Properties</div>
+                                <div class="property-row">
+                                    <div class="property-label">Format</div>
+                                    <div class="property-value">\${attribute.Format || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Format Name</div>
+                                    <div class="property-value">\${attribute.FormatName?.Value || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Max Length</div>
+                                    <div class="property-value">\${attribute.MaxLength !== null && attribute.MaxLength !== undefined ? attribute.MaxLength : 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Database Length</div>
+                                    <div class="property-value">\${attribute.DatabaseLength !== null && attribute.DatabaseLength !== undefined ? attribute.DatabaseLength : 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">IME Mode</div>
+                                    <div class="property-value">\${attribute.ImeMode || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Yomi Of</div>
+                                    <div class="property-value">\${attribute.YomiOf || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Is Localizable</div>
+                                    <div class="property-value \${attribute.IsLocalizable ? 'boolean-true' : 'boolean-false'}">\${attribute.IsLocalizable ? 'True' : 'False'}</div>
+                                </div>
+                            </div>
+                        \`;
+                    } else if (attributeType === 'Picklist' || attributeType === 'Status' || attributeType === 'State') {
+                        dataTypeSection = \`
+                            <div class="property-section">
+                                <div class="property-section-title">Choice Properties</div>
+                                <div class="property-row">
+                                    <div class="property-label">Default Form Value</div>
+                                    <div class="property-value">\${attribute.DefaultFormValue !== null && attribute.DefaultFormValue !== undefined ? attribute.DefaultFormValue : 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Parent Picklist Logical Name</div>
+                                    <div class="property-value">\${attribute.ParentPicklistLogicalName || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Child Picklist Logical Names</div>
+                                    <div class="property-value">\${attribute.ChildPicklistLogicalNames && attribute.ChildPicklistLogicalNames.length > 0 ? attribute.ChildPicklistLogicalNames.join(', ') : 'None'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Source Type Mask</div>
+                                    <div class="property-value">\${attribute.SourceTypeMask !== null && attribute.SourceTypeMask !== undefined ? attribute.SourceTypeMask : 'Not specified'}</div>
+                                </div>
+                            </div>
+                        \`;
+                    } else if (attributeType === 'Integer' || attributeType === 'BigInt' || attributeType === 'Decimal' || attributeType === 'Double' || attributeType === 'Money') {
+                        dataTypeSection = \`
+                            <div class="property-section">
+                                <div class="property-section-title">Numeric Properties</div>
+                                \${attribute.MinValue !== null && attribute.MinValue !== undefined ? \`
+                                <div class="property-row">
+                                    <div class="property-label">Min Value</div>
+                                    <div class="property-value">\${attribute.MinValue}</div>
+                                </div>
+                                \` : ''}
+                                \${attribute.MaxValue !== null && attribute.MaxValue !== undefined ? \`
+                                <div class="property-row">
+                                    <div class="property-label">Max Value</div>
+                                    <div class="property-value">\${attribute.MaxValue}</div>
+                                </div>
+                                \` : ''}
+                                \${attribute.Precision !== null && attribute.Precision !== undefined ? \`
+                                <div class="property-row">
+                                    <div class="property-label">Precision</div>
+                                    <div class="property-value">\${attribute.Precision}</div>
+                                </div>
+                                \` : ''}
+                                \${attribute.Format ? \`
+                                <div class="property-row">
+                                    <div class="property-label">Format</div>
+                                    <div class="property-value">\${attribute.Format}</div>
+                                </div>
+                                \` : ''}
+                            </div>
+                        \`;
+                    } else if (attributeType === 'DateTime') {
+                        dataTypeSection = \`
+                            <div class="property-section">
+                                <div class="property-section-title">DateTime Properties</div>
+                                <div class="property-row">
+                                    <div class="property-label">Format</div>
+                                    <div class="property-value">\${attribute.Format || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Date Behavior</div>
+                                    <div class="property-value">\${attribute.DateTimeBehavior?.Value || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Can Change Date Time Behavior</div>
+                                    <div class="property-value \${attribute.CanChangeDateTimeBehavior ? 'boolean-true' : 'boolean-false'}">\${attribute.CanChangeDateTimeBehavior ? 'True' : 'False'}</div>
+                                </div>
+                            </div>
+                        \`;
+                    } else if (attributeType === 'Memo') {
+                        dataTypeSection = \`
+                            <div class="property-section">
+                                <div class="property-section-title">Memo Properties</div>
+                                <div class="property-row">
+                                    <div class="property-label">Format</div>
+                                    <div class="property-value">\${attribute.Format || 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">Max Length</div>
+                                    <div class="property-value">\${attribute.MaxLength !== null && attribute.MaxLength !== undefined ? attribute.MaxLength : 'Not specified'}</div>
+                                </div>
+                                <div class="property-row">
+                                    <div class="property-label">IME Mode</div>
+                                    <div class="property-value">\${attribute.ImeMode || 'Not specified'}</div>
+                                </div>
+                            </div>
+                        \`;
+                    }
+                    
+                    return dataTypeSection;
+                }
+                
                 function generateAttributeProperties(attribute) {
                     return \`
                         <div class="property-section">
-                            <div class="property-section-title">General</div>
+                            <div class="property-section-title">General Information</div>
+                            <div class="property-row">
+                                <div class="property-label">Metadata ID</div>
+                                <div class="property-value">\${attribute.MetadataId || 'Not specified'}</div>
+                            </div>
                             <div class="property-row">
                                 <div class="property-label">Logical Name</div>
-                                <div class="property-value">\${attribute.LogicalName}</div>
+                                <div class="property-value">\${attribute.LogicalName || 'Not specified'}</div>
                             </div>
                             <div class="property-row">
                                 <div class="property-label">Schema Name</div>
-                                <div class="property-value">\${attribute.SchemaName}</div>
+                                <div class="property-value">\${attribute.SchemaName || 'Not specified'}</div>
                             </div>
+                            <div class="property-row">
+                                <div class="property-label">External Name</div>
+                                <div class="property-value">\${attribute.ExternalName || 'Not specified'}</div>
+                            </div>
+                            \${attribute.DisplayName ? \`
                             <div class="property-row">
                                 <div class="property-label">Display Name</div>
-                                <div class="property-value">\${getDisplayName(attribute.DisplayName)}</div>
+                                <div class="property-value"></div>
                             </div>
+                            \${attribute.DisplayName.UserLocalizedLabel ? \`
+                            <div class="property-row property-container-details">
+                                <div class="property-label">User Localized Label</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Label</div>
+                                <div class="property-value">\${attribute.DisplayName.UserLocalizedLabel.Label}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Language Code</div>
+                                <div class="property-value">\${attribute.DisplayName.UserLocalizedLabel.LanguageCode}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Is Managed</div>
+                                <div class="property-value \${attribute.DisplayName.UserLocalizedLabel.IsManaged ? 'boolean-true' : 'boolean-false'}">\${attribute.DisplayName.UserLocalizedLabel.IsManaged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Metadata ID</div>
+                                <div class="property-value">\${attribute.DisplayName.UserLocalizedLabel.MetadataId || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                            \${attribute.DisplayName.LocalizedLabels && attribute.DisplayName.LocalizedLabels.length > 0 ? attribute.DisplayName.LocalizedLabels.map((label, index) => \`
+                            <div class="property-row property-container-details">
+                                <div class="property-label">Localized Label \${index + 1}</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Label</div>
+                                <div class="property-value">\${label.Label}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Language Code</div>
+                                <div class="property-value">\${label.LanguageCode}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Is Managed</div>
+                                <div class="property-value \${label.IsManaged ? 'boolean-true' : 'boolean-false'}">\${label.IsManaged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Metadata ID</div>
+                                <div class="property-value guid">\${label.MetadataId}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Has Changed</div>
+                                <div class="property-value">\${label.HasChanged !== null ? (label.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
+                            </div>
+                            \`).join('') : ''}
+                            \` : \`
+                            <div class="property-row">
+                                <div class="property-label">Display Name</div>
+                                <div class="property-value">Not specified</div>
+                            </div>
+                            \`}
+                            \${attribute.Description ? \`
+                            <div class="property-row">
+                                <div class="property-label">Description</div>
+                                <div class="property-value"></div>
+                            </div>
+                            \${attribute.Description.UserLocalizedLabel ? \`
+                            <div class="property-row property-container-details">
+                                <div class="property-label">User Localized Label</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Label</div>
+                                <div class="property-value">\${attribute.Description.UserLocalizedLabel.Label}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Language Code</div>
+                                <div class="property-value">\${attribute.Description.UserLocalizedLabel.LanguageCode}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Is Managed</div>
+                                <div class="property-value \${attribute.Description.UserLocalizedLabel.IsManaged ? 'boolean-true' : 'boolean-false'}">\${attribute.Description.UserLocalizedLabel.IsManaged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Metadata ID</div>
+                                <div class="property-value">\${attribute.Description.UserLocalizedLabel.MetadataId || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                            \${attribute.Description.LocalizedLabels && attribute.Description.LocalizedLabels.length > 0 ? attribute.Description.LocalizedLabels.map((label, index) => \`
+                            <div class="property-row property-container-details">
+                                <div class="property-label">Localized Label \${index + 1}</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Label</div>
+                                <div class="property-value">\${label.Label}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Language Code</div>
+                                <div class="property-value">\${label.LanguageCode}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Is Managed</div>
+                                <div class="property-value \${label.IsManaged ? 'boolean-true' : 'boolean-false'}">\${label.IsManaged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Metadata ID</div>
+                                <div class="property-value guid">\${label.MetadataId}</div>
+                            </div>
+                            <div class="property-row property-deep-details">
+                                <div class="property-label">Has Changed</div>
+                                <div class="property-value">\${label.HasChanged !== null ? (label.HasChanged ? 'True' : 'False') : 'Not specified'}</div>
+                            </div>
+                            \`).join('') : ''}
+                            \` : \`
+                            <div class="property-row">
+                                <div class="property-label">Description</div>
+                                <div class="property-value">Not specified</div>
+                            </div>
+                            \`}
                             <div class="property-row">
                                 <div class="property-label">Attribute Type</div>
-                                <div class="property-value">\${attribute.AttributeType}</div>
+                                <div class="property-value">\${attribute.AttributeType || 'Not specified'}</div>
                             </div>
                             <div class="property-row">
-                                <div class="property-label">Required Level</div>
-                                <div class="property-value">\${getRequiredLevel(attribute.RequiredLevel)}</div>
+                                <div class="property-label">Attribute Type Name</div>
+                                <div class="property-value">\${attribute.AttributeTypeName?.Value || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Entity Logical Name</div>
+                                <div class="property-value">\${attribute.EntityLogicalName || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Column Number</div>
+                                <div class="property-value">\${attribute.ColumnNumber !== null && attribute.ColumnNumber !== undefined ? attribute.ColumnNumber : 'Not specified'}</div>
                             </div>
                         </div>
-                        
+
+                        \${generateAttributeDataTypeProperties(attribute)}
+
                         <div class="property-section">
-                            <div class="property-section-title">Properties</div>
+                            <div class="property-section-title">Validation & Requirements</div>
+                            \${attribute.RequiredLevel ? \`
                             <div class="property-row">
-                                <div class="property-label">Is Custom</div>
-                                <div class="property-value \${attribute.IsCustomAttribute ? 'boolean-true' : 'boolean-false'}">\${attribute.IsCustomAttribute ? 'True' : 'False'}</div>
+                                <div class="property-label">Required Level</div>
+                                <div class="property-value"></div>
                             </div>
-                            <div class="property-row">
-                                <div class="property-label">Is Primary ID</div>
-                                <div class="property-value \${attribute.IsPrimaryId ? 'boolean-true' : 'boolean-false'}">\${attribute.IsPrimaryId ? 'True' : 'False'}</div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value">\${getRequiredLevel(attribute.RequiredLevel)}</div>
                             </div>
-                            <div class="property-row">
-                                <div class="property-label">Is Primary Name</div>
-                                <div class="property-value \${attribute.IsPrimaryName ? 'boolean-true' : 'boolean-false'}">\${attribute.IsPrimaryName ? 'True' : 'False'}</div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${attribute.RequiredLevel.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${attribute.RequiredLevel.CanBeChanged ? 'True' : 'False'}</div>
                             </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${attribute.RequiredLevel.ManagedPropertyLogicalName || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
                             <div class="property-row">
                                 <div class="property-label">Valid for Create</div>
                                 <div class="property-value \${attribute.IsValidForCreate ? 'boolean-true' : 'boolean-false'}">\${attribute.IsValidForCreate ? 'True' : 'False'}</div>
@@ -3003,6 +3273,266 @@ export class MetadataBrowserPanel extends BasePanel {
                                 <div class="property-label">Valid for Update</div>
                                 <div class="property-value \${attribute.IsValidForUpdate ? 'boolean-true' : 'boolean-false'}">\${attribute.IsValidForUpdate ? 'True' : 'False'}</div>
                             </div>
+                            <div class="property-row">
+                                <div class="property-label">Valid for Form</div>
+                                <div class="property-value \${attribute.IsValidForForm ? 'boolean-true' : 'boolean-false'}">\${attribute.IsValidForForm ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Required for Form</div>
+                                <div class="property-value \${attribute.IsRequiredForForm ? 'boolean-true' : 'boolean-false'}">\${attribute.IsRequiredForForm ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Valid for Grid</div>
+                                <div class="property-value \${attribute.IsValidForGrid ? 'boolean-true' : 'boolean-false'}">\${attribute.IsValidForGrid ? 'True' : 'False'}</div>
+                            </div>
+                        </div>
+
+                        <div class="property-section">
+                            <div class="property-section-title">Security & Permissions</div>
+                            <div class="property-row">
+                                <div class="property-label">Can Be Secured for Create</div>
+                                <div class="property-value \${attribute.CanBeSecuredForCreate ? 'boolean-true' : 'boolean-false'}">\${attribute.CanBeSecuredForCreate ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Can Be Secured for Read</div>
+                                <div class="property-value \${attribute.CanBeSecuredForRead ? 'boolean-true' : 'boolean-false'}">\${attribute.CanBeSecuredForRead ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Can Be Secured for Update</div>
+                                <div class="property-value \${attribute.CanBeSecuredForUpdate ? 'boolean-true' : 'boolean-false'}">\${attribute.CanBeSecuredForUpdate ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Secured</div>
+                                <div class="property-value \${attribute.IsSecured ? 'boolean-true' : 'boolean-false'}">\${attribute.IsSecured ? 'True' : 'False'}</div>
+                            </div>
+                            \${attribute.IsCustomizable ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Customizable</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${attribute.IsCustomizable.Value ? 'boolean-true' : 'boolean-false'}">\${attribute.IsCustomizable.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${attribute.IsCustomizable.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${attribute.IsCustomizable.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${attribute.IsCustomizable.ManagedPropertyLogicalName || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                            \${attribute.IsRenameable ? \`
+                            <div class="property-row">
+                                <div class="property-label">Is Renameable</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${attribute.IsRenameable.Value ? 'boolean-true' : 'boolean-false'}">\${attribute.IsRenameable.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${attribute.IsRenameable.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${attribute.IsRenameable.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${attribute.IsRenameable.ManagedPropertyLogicalName || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                        </div>
+
+                        <div class="property-section">
+                            <div class="property-section-title">Search & Filtering</div>
+                            <div class="property-row">
+                                <div class="property-label">Is Searchable</div>
+                                <div class="property-value \${attribute.IsSearchable ? 'boolean-true' : 'boolean-false'}">\${attribute.IsSearchable ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Filterable</div>
+                                <div class="property-value \${attribute.IsFilterable ? 'boolean-true' : 'boolean-false'}">\${attribute.IsFilterable ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Retrievable</div>
+                                <div class="property-value \${attribute.IsRetrievable ? 'boolean-true' : 'boolean-false'}">\${attribute.IsRetrievable ? 'True' : 'False'}</div>
+                            </div>
+                            \${attribute.IsValidForAdvancedFind ? \`
+                            <div class="property-row">
+                                <div class="property-label">Valid for Advanced Find</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${attribute.IsValidForAdvancedFind.Value ? 'boolean-true' : 'boolean-false'}">\${attribute.IsValidForAdvancedFind.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${attribute.IsValidForAdvancedFind.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${attribute.IsValidForAdvancedFind.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${attribute.IsValidForAdvancedFind.ManagedPropertyLogicalName || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                            \${attribute.IsGlobalFilterEnabled ? \`
+                            <div class="property-row">
+                                <div class="property-label">Global Filter Enabled</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${attribute.IsGlobalFilterEnabled.Value ? 'boolean-true' : 'boolean-false'}">\${attribute.IsGlobalFilterEnabled.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${attribute.IsGlobalFilterEnabled.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${attribute.IsGlobalFilterEnabled.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${attribute.IsGlobalFilterEnabled.ManagedPropertyLogicalName || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                            \${attribute.IsSortableEnabled ? \`
+                            <div class="property-row">
+                                <div class="property-label">Sortable Enabled</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${attribute.IsSortableEnabled.Value ? 'boolean-true' : 'boolean-false'}">\${attribute.IsSortableEnabled.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${attribute.IsSortableEnabled.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${attribute.IsSortableEnabled.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${attribute.IsSortableEnabled.ManagedPropertyLogicalName || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                        </div>
+
+                        <div class="property-section">
+                            <div class="property-section-title">Auditing & Tracking</div>
+                            \${attribute.IsAuditEnabled ? \`
+                            <div class="property-row">
+                                <div class="property-label">Audit Enabled</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${attribute.IsAuditEnabled.Value ? 'boolean-true' : 'boolean-false'}">\${attribute.IsAuditEnabled.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${attribute.IsAuditEnabled.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${attribute.IsAuditEnabled.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${attribute.IsAuditEnabled.ManagedPropertyLogicalName || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                            <div class="property-row">
+                                <div class="property-label">Has Changed</div>
+                                <div class="property-value">\${attribute.HasChanged !== null && attribute.HasChanged !== undefined ? (attribute.HasChanged ? 'Yes' : 'No') : 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Created On</div>
+                                <div class="property-value">\${attribute.CreatedOn ? new Date(attribute.CreatedOn).toLocaleDateString() + ' ' + new Date(attribute.CreatedOn).toLocaleTimeString() : 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Modified On</div>
+                                <div class="property-value">\${attribute.ModifiedOn ? new Date(attribute.ModifiedOn).toLocaleDateString() + ' ' + new Date(attribute.ModifiedOn).toLocaleTimeString() : 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Introduced Version</div>
+                                <div class="property-value">\${attribute.IntroducedVersion || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Deprecated Version</div>
+                                <div class="property-value">\${attribute.DeprecatedVersion || 'Not specified'}</div>
+                            </div>
+                        </div>
+
+                        <div class="property-section">
+                            <div class="property-section-title">Advanced Properties</div>
+                            <div class="property-row">
+                                <div class="property-label">Is Managed</div>
+                                <div class="property-value \${attribute.IsManaged ? 'boolean-true' : 'boolean-false'}">\${attribute.IsManaged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Custom Attribute</div>
+                                <div class="property-value \${attribute.IsCustomAttribute ? 'boolean-true' : 'boolean-false'}">\${attribute.IsCustomAttribute ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Primary ID</div>
+                                <div class="property-value \${attribute.IsPrimaryId ? 'boolean-true' : 'boolean-false'}">\${attribute.IsPrimaryId ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Primary Name</div>
+                                <div class="property-value \${attribute.IsPrimaryName ? 'boolean-true' : 'boolean-false'}">\${attribute.IsPrimaryName ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Valid OData Attribute</div>
+                                <div class="property-value \${attribute.IsValidODataAttribute ? 'boolean-true' : 'boolean-false'}">\${attribute.IsValidODataAttribute ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Logical</div>
+                                <div class="property-value \${attribute.IsLogical ? 'boolean-true' : 'boolean-false'}">\${attribute.IsLogical ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Is Data Source Secret</div>
+                                <div class="property-value \${attribute.IsDataSourceSecret ? 'boolean-true' : 'boolean-false'}">\${attribute.IsDataSourceSecret ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Attribute Of</div>
+                                <div class="property-value">\${attribute.AttributeOf || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Linked Attribute ID</div>
+                                <div class="property-value">\${attribute.LinkedAttributeId || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Inherits From</div>
+                                <div class="property-value">\${attribute.InheritsFrom || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Source Type</div>
+                                <div class="property-value">\${attribute.SourceType !== null && attribute.SourceType !== undefined ? attribute.SourceType : 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Auto Number Format</div>
+                                <div class="property-value">\${attribute.AutoNumberFormat || 'Not specified'}</div>
+                            </div>
+                            <div class="property-row">
+                                <div class="property-label">Formula Definition</div>
+                                <div class="property-value">\${attribute.FormulaDefinition || 'Not specified'}</div>
+                            </div>
+                            \${attribute.CanModifyAdditionalSettings ? \`
+                            <div class="property-row">
+                                <div class="property-label">Can Modify Additional Settings</div>
+                                <div class="property-value"></div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Value</div>
+                                <div class="property-value \${attribute.CanModifyAdditionalSettings.Value ? 'boolean-true' : 'boolean-false'}">\${attribute.CanModifyAdditionalSettings.Value ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Can Be Changed</div>
+                                <div class="property-value \${attribute.CanModifyAdditionalSettings.CanBeChanged ? 'boolean-true' : 'boolean-false'}">\${attribute.CanModifyAdditionalSettings.CanBeChanged ? 'True' : 'False'}</div>
+                            </div>
+                            <div class="property-row property-sub-details">
+                                <div class="property-label">Managed Property Logical Name</div>
+                                <div class="property-value">\${attribute.CanModifyAdditionalSettings.ManagedPropertyLogicalName || 'Not specified'}</div>
+                            </div>
+                            \` : ''}
+                            \${attribute.Settings && attribute.Settings.length > 0 ? \`
+                            <div class="property-row">
+                                <div class="property-label">Settings</div>
+                                <div class="property-value">\${attribute.Settings.length} settings defined</div>
+                            </div>
+                            \` : ''}
                         </div>
                     \`;
                 }
@@ -3846,19 +4376,25 @@ export class MetadataBrowserPanel extends BasePanel {
                 });
                 
                 function displayAttributesTable(attributes) {
-                    const tableData = attributes.map(attr => ({
+                    // Sort attributes by logical name ascending
+                    const sortedAttributes = [...attributes].sort((a, b) => 
+                        (a.LogicalName || '').localeCompare(b.LogicalName || '')
+                    );
+                    
+                    const tableData = sortedAttributes.map(attr => ({
                         id: attr.MetadataId,
+                        DisplayName: getDisplayName(attr.DisplayName),
                         LogicalName: attr.LogicalName,
                         SchemaName: attr.SchemaName,
-                        DisplayName: getDisplayName(attr.DisplayName),
-                        AttributeType: attr.AttributeType,
+                        Type: attr.AttributeType,
                         RequiredLevel: getRequiredLevel(attr.RequiredLevel),
-                        IsCustom: attr.IsCustomAttribute ? 'Yes' : 'No',
-                        IsPrimaryId: attr.IsPrimaryId ? 'Yes' : 'No',
-                        IsPrimaryName: attr.IsPrimaryName ? 'Yes' : 'No'
+                        HasChanged: attr.HasChanged !== null && attr.HasChanged !== undefined ? (attr.HasChanged ? 'Yes' : 'No') : 'Not specified',
+                        IsManaged: attr.IsManaged ? 'Yes' : 'No',
+                        IsCustomizable: attr.IsCustomizable?.Value !== undefined ? (attr.IsCustomizable.Value ? 'Yes' : 'No') : 'Not specified',
+                        IsCustomAttribute: attr.IsCustomAttribute ? 'Yes' : 'No'
                     }));
                     
-                    displayTable(tableData, 'attributesTableTemplate', attributes);
+                    displayTable(tableData, 'attributesTableTemplate', sortedAttributes);
                 }
                 
                 function displayKeysTable(keys) {

@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UI/UX**: Fixed choices not loading - added complete choice selection functionality with options display and properties panel
 - **UI/UX**: Added close button (×) to properties panel header and click-to-deselect functionality - users can close properties panel by clicking the close button or clicking an already selected row
 - **Technical**: Enhanced Keys properties panel in Metadata Browser to display all available fields including EntityLogicalName, HasChanged, EntityKeyIndexStatus, AsyncJob, IsSynchronous, IsExportKey, IsSecondaryKey, and IsCustomizable properties with proper organization in logical sections
+- **Enhanced**: Metadata Browser Attributes tab now displays enhanced table columns (Display Name, Logical Name, Schema Name, Type, Required Level, Has Changed, Is Managed, Is Customizable, Is Custom Attribute) with attributes sorted by logical name ascending for better organization
+- **Enhanced**: Comprehensive attributes properties panel with extensive property groupings: General Information (with localized labels), Data Type Specific Properties (String, Choice, Numeric, DateTime, Memo), Validation & Requirements, Security & Permissions, Search & Filtering, Auditing & Tracking, and Advanced Properties - providing complete attribute metadata visibility
+- **Enhanced**: Proper handling of complex objects in attribute properties including LocalizedLabels with multi-language support, ManagedProperties with Value/CanBeChanged/ManagedPropertyLogicalName details, and data type-specific properties based on attribute type
+- **Fixed**: DisplayName and Description properties in attribute details now follow the same consistent pattern as other tabs (Keys, Relationships) - showing User Localized Label details and complete Localized Labels collection with proper hierarchical structure
 
 ### Added
 - **NEW FEATURE**: Comprehensive Metadata Browser with modern three-panel layout for browsing Dataverse entity metadata
