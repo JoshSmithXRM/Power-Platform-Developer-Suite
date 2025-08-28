@@ -7,131 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- **MAJOR**: Rebranded from "Dynamics DevTools" to "Power Platform Developer Suite" to better reflect the comprehensive Power Platform development toolkit vision and avoid naming conflicts in the marketplace
-- Updated all development scripts and package references to use new branding
-- Added explicit `bugs` and `homepage` fields to package.json for proper VS Code Marketplace integration
-- Added extension icon for professional marketplace appearance
-- Created custom Power Platform-themed SVG icon for VS Code activity bar (replaces generic wrench icon)
-- **PERFORMANCE**: Metadata Browser now loads all entity metadata (columns, keys, relationships, privileges) when a table is selected instead of lazy loading each tab - provides instant tab switching with better user experience
-- Metadata Browser uses intelligent caching system with parallel API calls for optimal performance when loading complete entity metadata
-- **UI/UX**: Improved Metadata Browser layout and space utilization with larger fonts (13-14px), better grid proportions, and enhanced property display sections
-- **UI/UX**: Enhanced main panel property display with organized sections (Basic Information, Entity Attributes, Capabilities) and improved spacing
-- **UI/UX**: Expanded right panel property grid with wider label columns (180px) and better readability
-- **UI/UX**: Improved responsive design with better breakpoints for different screen sizes
-- **UI/UX**: Enhanced tab switching in Metadata Browser - maintains per-tab selected row context and properties panel state, allowing users to return to previously selected items in each tab
-- **UI/UX**: Fixed left panel overflow scrollbar issue in Metadata Browser - adjusted main container height calculation and added proper overflow constraints
-- **UI/UX**: Fixed table footer overlap by adopting shared component structure (table-scroll-wrapper) while maintaining client-side compatibility
-- **UI/UX**: Enabled column sorting on all metadata browser tables - users can click column headers to sort data ascending/descending with visual indicators
-- **UI/UX**: Enhanced left panel display format to show 'Display Name (logical name)' for easier browsing and identification
-- **UI/UX**: Fixed choices not loading - added complete choice selection functionality with options display and properties panel
-- **UI/UX**: Added close button (×) to properties panel header and click-to-deselect functionality - users can close properties panel by clicking the close button or clicking an already selected row
-- **Technical**: Enhanced Keys properties panel in Metadata Browser to display all available fields including EntityLogicalName, HasChanged, EntityKeyIndexStatus, AsyncJob, IsSynchronous, IsExportKey, IsSecondaryKey, and IsCustomizable properties with proper organization in logical sections
-- **Enhanced**: Metadata Browser Attributes tab now displays enhanced table columns (Display Name, Logical Name, Schema Name, Type, Required Level, Has Changed, Is Managed, Is Customizable, Is Custom Attribute) with attributes sorted by logical name ascending for better organization
-- **Enhanced**: Comprehensive attributes properties panel with extensive property groupings: General Information (with localized labels), Data Type Specific Properties (String, Choice, Numeric, DateTime, Memo), Validation & Requirements, Security & Permissions, Search & Filtering, Auditing & Tracking, and Advanced Properties - providing complete attribute metadata visibility
-- **Enhanced**: Proper handling of complex objects in attribute properties including LocalizedLabels with multi-language support, ManagedProperties with Value/CanBeChanged/ManagedPropertyLogicalName details, and data type-specific properties based on attribute type
-- **Fixed**: DisplayName and Description properties in attribute details now follow the same consistent pattern as other tabs (Keys, Relationships) - showing User Localized Label details and complete Localized Labels collection with proper hierarchical structure
+## [0.0.1] - 2025-08-28
 
 ### Added
-- **NEW FEATURE**: Comprehensive Metadata Browser with modern three-panel layout for browsing Dataverse entity metadata
-- Metadata Browser features complete entity exploration: Tables and Global Choices with hierarchical navigation
-- Interactive metadata browsing: entity selection → tabbed details (Table, Columns, Keys, Relationships, Privileges) → detailed properties
-- Smart metadata caching system with 5-minute TTL for optimal performance across large environments
-- Advanced metadata search and filtering capabilities within the browser interface
-- Complete entity attribute metadata display with proper type handling, required levels, and capability flags
-- Entity relationship browsing (1:N, N:1, N:N) with full cascade configuration and navigation property details
-- Entity key metadata viewing including alternate keys and index status information
-- Entity privilege analysis showing security permissions and access levels
-- Export functionality for metadata objects to JSON format
-- MetadataService with full Dataverse metadata API integration and intelligent caching
-- Three-panel responsive layout: Entity tree (left) → Metadata details (center) → Properties (right)
-- Plugin Trace Viewer with comprehensive trace log analysis and environment trace level management
-- Plugin trace setting selector (Off/Exception/All) that synchronizes with environment configuration
-- Advanced filtering system for plugin traces: date ranges, plugin names, entity names, exception-only mode
-- Real-time trace data table with sortable columns: Start Time, Duration, Plugin, Step, Depth, Mode, Stage, Entity, Message, Exception
-- Plugin trace export functionality to CSV format with all trace details
-- PluginTraceService for efficient API queries with OData filtering and optimization
-- Enhanced plugin trace detail viewer with tabbed interface matching Dynamics 365 structure (Configuration and Execution tabs)
-- Plugin trace detail modal now displays Plugin Trace Log ID at the top and additional fields (Operation Type, Performance Details)
-- Reusable modal dialog system (ModalUtils) for displaying detailed information across all panels
-- Stack trace syntax highlighting in exception details for better readability
-- Connection References panel with full API integration - browse flows and their connection references relationships
-- Connection References panel fetches data using proper Dataverse field names (`connectionreferencelogicalname`, `connectionreferencedisplayname`, `connectionid`)
-- Connection References panel extracts relationships from flow `clientdata` field for accurate flow-to-connection-reference mapping
-- Connection References panel displays all flows, including those with direct connections (no connection references)
-- Connection References panel now includes table sorting, filtering, and row actions using TableUtils and ComponentFactory
-- SolutionComponentService for proper Dynamics solution membership queries via EntityDefinitions and solutioncomponents tables
-- Solution selector functionality on Connection References and Environment Variables panels with Default solution auto-selection
-- "Open in Maker" button functionality for connection references and environment variables with correct Power Platform URLs
-- Table footer with record count display - shows filtered count and total when applicable (always visible at bottom)
-- ComponentFactory now supports table footers with customizable text and record count placeholders
-- Deployment Settings sync functionality - create or update deployment settings JSON files from solution data
-- "Sync Deployment Settings" button in Connection References and Environment Variables panels
-- Enhanced DeploymentSettingsService with file operations, user file selection, and smart sync logic
-- Automatic deployment settings file naming pattern: `{SolutionUniqueName}.deploymentsettings.json`
-- Intelligent sync behavior: adds new items, removes orphaned items, preserves existing values
-- Consistent deployment settings file sorting: Connection References by LogicalName, Environment Variables by SchemaName (prevents source control noise)
-- Text selection enabled in table cells - users can now highlight and copy text from any table cell
-- Normalized footer messages across all panels with consistent format: "Showing X of Y items"
-- Generic SolutionComponentService.getEntityIdsInSolution method for flexible entity type filtering
-- Environment Variables panel with full API integration and solution filtering support
-
-### Fixed
-- Table UX improvements: enabled text selection (`user-select: text`) and text cursor (`cursor: text`) for all table cells
-- Footer message consistency: all panels now use standardized "Showing {filteredCount} of {totalCount} items" format
-- Activity bar icon theming: replaced complex graphics with simple "PP" text-based 24x24 SVG using `currentColor` to ensure proper VS Code theme integration, hover states, and selection highlighting
-- Metadata Browser webview disposal error when clicking choice option rows - created separate choice display logic to avoid entity-specific message handling conflicts
-- Metadata Browser footer record counts not displaying - replaced custom ClientComponentFactory with shared ComponentFactory pattern for consistent table functionality and automatic footer updates
-
-### Changed
-- Nothing yet
-
-### Deprecated
-- Nothing yet
-
-### Removed
-- Nothing yet
-
-### Fixed
-- Nothing yet
-
-### Security
-- Nothing yet
-
-### Known Issues
-- Deployment settings sync includes secret environment variable values in plain text - requires research into secret detection/masking
-
-## [0.0.1] - 2025-08-25
-
-### Added
-- Initial release of Dynamics DevTools extension
-- Environment Management with 4 authentication methods (Service Principal, Interactive, Username/Password, Device Code)
-- Solution Explorer with full API integration - browse, filter, export, and manage solutions
-- Import Job Viewer with real-time status monitoring and XML viewing capabilities
-- Environment Setup wizard with connection testing and validation
-- Left-click focus/reuse behavior for tools in sidebar
-- Right-click context menu with "Open New Window" option for tools
-- Query Data panel framework with environment selector (API integration pending)
-- Metadata Browser panel framework with environment selector (API integration pending)
-- Connection References Manager panel framework with environment selector (API integration pending)
-- Environment Variables Manager panel framework with environment selector (API integration pending)
-- Plugin Trace Viewer panel framework with environment selector (API integration pending)
+- **Power Platform Developer Suite** - comprehensive VS Code extension for Power Platform development
+- **Environment Management** - connect to multiple environments using 4 authentication methods:
+  - Service Principal (Client ID/Secret)
+  - Interactive Browser Authentication
+  - Username/Password
+  - Device Code Flow
+- **Solution Explorer** - browse, filter, export, and manage Dynamics 365/Dataverse solutions
+  - Real-time solution browsing with search and filtering
+  - Export solutions directly from VS Code
+  - Solution metadata and component analysis
+- **Metadata Browser** - comprehensive three-panel interface for exploring Dataverse entity metadata
+  - Browse tables and global choice sets with hierarchical navigation
+  - Interactive metadata exploration: Tables → Columns, Keys, Relationships, Privileges
+  - Detailed property panels showing complete entity, attribute, and relationship metadata
+  - Smart caching system for instant tab switching and optimal performance
+  - Export metadata objects to JSON format
+  - Advanced search and filtering within metadata
+- **Plugin Trace Viewer** - analyze and manage plugin execution traces
+  - View plugin traces with advanced filtering (date ranges, plugin names, entities, exceptions)
+  - Environment trace level management (Off/Exception/All) with live synchronization
+  - Detailed trace analysis with Configuration and Execution tabs
+  - Export trace data to CSV format
+  - Stack trace syntax highlighting for debugging
+- **Connection References Manager** - manage Power Automate flow connections
+  - Browse flows and their connection reference relationships
+  - View connection details and mapping to flows
+  - Solution-based filtering with automatic Default solution selection
+  - "Open in Maker" functionality to jump directly to Power Platform Maker portal
+  - Sync deployment settings to JSON files for ALM workflows
+- **Environment Variables Manager** - manage environment-specific configuration
+  - Browse environment variables with solution filtering
+  - View variable definitions, current values, and default values
+  - "Open in Maker" functionality for direct editing
+  - Sync deployment settings for automated deployment scenarios
+- **Import Job Viewer** - monitor solution import operations
+  - Real-time import status monitoring and progress tracking
+  - View detailed import logs and XML configurations
+  - Historical import job analysis
+- **Professional UI/UX Features**:
+  - VS Code theme integration with proper dark/light mode support
+  - Sortable columns with visual indicators across all data tables
+  - Text selection enabled in all table cells for easy copying
+  - Responsive three-panel layouts that adapt to different screen sizes
+  - Consistent "Open New Window" support via right-click context menus
+  - Smart panel management - left-click focuses existing panels, right-click opens new instances
 
 ### Technical
-- Added `CompleteEntityMetadata` interface and `getCompleteEntityMetadata()` method to MetadataService for bulk metadata loading
-- Enhanced MetadataBrowserPanel with client-side metadata caching for instant tab switching
-- Improved MetadataService with parallel Promise.all() API calls for better performance when loading complete entity metadata
-- Updated metadata browser UI to show loading state during initial metadata fetch while maintaining instant tab switching afterward
-- Modular architecture with BasePanel foundation and dependency injection via ServiceFactory
-- Shared UI utilities (TableUtils, PanelUtils, EnvironmentSelectorUtils, ValidationUtils)
-- Complete solution management API integration via SolutionService
-- Import job monitoring API integration with real-time status updates
-- VS Code theme integration with CSS variables for consistent theming
-- State persistence across VS Code sessions via StateService
-- Webpack bundling configuration for optimized production builds
+- Modern TypeScript architecture with dependency injection via ServiceFactory
+- Webpack bundling for optimized extension performance (92% size reduction)
 - Comprehensive error handling and user feedback systems
-- Static panel tracking system in BasePanel for efficient window management
-- createNew methods for all panels to support new window creation
-- Panel focus logic to bring existing panels to foreground
-- Enhanced ToolsProvider with contextValue support for menu targeting
+- State persistence across VS Code sessions
+- Smart caching systems with TTL for optimal API performance
 - Proper disposal patterns for memory leak prevention
