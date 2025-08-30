@@ -423,14 +423,6 @@ export class DataExplorerPanel extends BasePanel {
                     background: var(--vscode-list-hoverBackground);
                 }
 
-                .results-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 8px 12px;
-                    background: var(--vscode-sideBar-background);
-                    border-bottom: 1px solid var(--vscode-panel-border);
-                }
 
                 .pagination {
                     display: flex;
@@ -544,6 +536,27 @@ export class DataExplorerPanel extends BasePanel {
                     bottom: 0;
                     z-index: 10;
                 }
+                
+                .footer-load-more {
+                    background: var(--vscode-button-background);
+                    color: var(--vscode-button-foreground);
+                    border: 1px solid var(--vscode-button-border);
+                    padding: 10px 20px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: 500;
+                    transition: background-color 0.2s ease;
+                }
+                
+                .footer-load-more:hover:not(:disabled) {
+                    background: var(--vscode-button-hoverBackground);
+                }
+                
+                .footer-load-more:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
             </style>
         </head>
         <body>
@@ -588,9 +601,6 @@ export class DataExplorerPanel extends BasePanel {
             
             <!-- Results Container using content div for flex layout -->
             <div id="content">
-                <div class="results-header">
-                    <div id="resultCount">No results</div>
-                </div>
                 <div id="resultsContainer"></div>
             </div>
 
@@ -619,7 +629,8 @@ export class DataExplorerPanel extends BasePanel {
                 function restoreContentStructure() {
                     const contentDiv = document.getElementById('content');
                     if (contentDiv) {
-                        contentDiv.innerHTML = '<div class="results-header"><div id="resultCount">No results</div></div><div id="resultsContainer"><p style="padding: 20px; text-align: center;">Select an environment to explore data...</p></div>';
+                        // Remove results header, just keep the results container
+                        contentDiv.innerHTML = '<div id="resultsContainer"><p style="padding: 20px; text-align: center;">Select an environment to explore data...</p></div>';
                     }
                 }
                 
@@ -702,9 +713,7 @@ export class DataExplorerPanel extends BasePanel {
                 
                 function clearResults() {
                     const container = document.getElementById('resultsContainer');
-                    const count = document.getElementById('resultCount');
                     if (container) container.innerHTML = '';
-                    if (count) count.textContent = 'No results';
                 }
                 
                 function showLoadingIndicator(message) {
@@ -866,15 +875,9 @@ export class DataExplorerPanel extends BasePanel {
                         
                         const { data, count, hasMore, pageSize } = message;
                         
-                        // Reset table and update count
+                        // Reset table and update records
                         currentRecords = data || [];
                         console.log('Current records set to:', currentRecords.length, 'items');
-                        const viewSelectElement = document.getElementById('viewSelect');
-                        const resultCountElement = document.getElementById('resultCount');
-                        const viewName = viewSelectElement ? viewSelectElement.options[viewSelectElement.selectedIndex].text : 'Unknown';
-                        if (resultCountElement) {
-                            resultCountElement.textContent = 'Results: ' + (count || 0) + ' total (' + pageSize + ' per page) - View: ' + viewName;
-                        }
                         
                         // Update global state for footer
                         window.dataExplorerHasMore = hasMore;
