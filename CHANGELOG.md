@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Multi-instance Panel Support** - Environment panels now support multiple simultaneous tabs
+- **Automatic Form State Persistence** - Form data is automatically saved and restored when switching between tabs
+- **Secure Credential Preservation** - Editing environments preserves existing stored credentials when not explicitly changed
+- **WebView State Manager** - Reusable utility for form state persistence across all panels
+
+### Fixed
+- **Environment Setup Panels** - Multiple "Add Environment" tabs now maintain independent form state
+- **Credential Management** - Editing environment settings no longer overwrites stored secrets when unchanged
+- **Panel State Management** - Enhanced BasePanel class with proper multi-instance lifecycle management
+- **Environment Edit Validation** - Fixed validation error requiring credentials when editing environments with existing stored secrets
+
+### Technical
+- Enhanced BasePanel with multi-instance tracking and unique panel IDs
+- Added WebviewStateManager utility for automatic form state persistence
+- Improved AuthenticationService with credential preservation logic
+- Updated EnvironmentSetupPanel to support multiple concurrent instances
+
 ## [0.0.1] - 2025-08-28
 
 ### Added

@@ -375,11 +375,15 @@ export class AuthenticationService {
     }
 
     // Environment management methods
-    public async saveEnvironmentSettings(environment: EnvironmentConnection): Promise<void> {
+    public async saveEnvironmentSettings(environment: EnvironmentConnection, preserveCredentials: boolean = true): Promise<void> {
         const environments = await this.getEnvironments();
         const existingIndex = environments.findIndex(env => env.id === environment.id);
+        let existingEnvironment: EnvironmentConnection | null = null;
         
         if (existingIndex >= 0) {
+            existingEnvironment = environments[existingIndex];
+            // Merge with existing environment to preserve any missing fields
+            environment = this.mergeEnvironmentSettings(existingEnvironment, environment, preserveCredentials);
             environments[existingIndex] = environment;
         } else {
             environments.push(environment);
@@ -423,6 +427,56 @@ export class AuthenticationService {
     public async getEnvironmentSettings(environmentId: string): Promise<EnvironmentConnection | null> {
         const environments = await this.getEnvironments();
         return environments.find(env => env.id === environmentId) || null;
+    }
+
+    /**
+     * Merge environment settings, preserving existing credentials when requested
+     */
+    private mergeEnvironmentSettings(existing: EnvironmentConnection, updated: EnvironmentConnection, preserveCredentials: boolean): EnvironmentConnection {
+        const merged = { ...updated };
+        
+        if (preserveCredentials) {
+            // If new environment doesn't have credentials, preserve existing ones
+            if (!updated.settings.clientSecret && existing.settings.clientId === updated.settings.clientId) {
+                // Keep the existing clientId reference for secret lookup
+                merged.settings.clientId = existing.settings.clientId;
+            }
+            
+            if (!updated.settings.password && existing.settings.username === updated.settings.username) {
+                // Keep the existing username reference for password lookup
+                merged.settings.username = existing.settings.username;
+            }
+        }
+        
+        return merged;
+    }
+
+    /**
+     * Check if an environment has stored credentials
+     */
+    public async hasStoredCredentials(environment: EnvironmentConnection): Promise<{ hasSecret: boolean; hasPassword: boolean }> {
+        let hasSecret = false;
+        let hasPassword = false;
+        
+        if (environment.settings.clientId) {
+            try {
+                const secret = await this.secretStorage.get(`power-platform-dev-suite-secret-${environment.settings.clientId}`);
+                hasSecret = !!secret;
+            } catch {
+                hasSecret = false;
+            }
+        }
+        
+        if (environment.settings.username) {
+            try {
+                const password = await this.secretStorage.get(`power-platform-dev-suite-password-${environment.settings.username}`);
+                hasPassword = !!password;
+            } catch {
+                hasPassword = false;
+            }
+        }
+        
+        return { hasSecret, hasPassword };
     }
 
     public async removeEnvironment(environmentId: string): Promise<void> {

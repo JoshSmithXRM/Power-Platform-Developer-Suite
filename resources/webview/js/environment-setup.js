@@ -4,6 +4,18 @@ class EnvironmentSetup extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
+        
+        // Initialize VS Code API once for the entire webview
+        this.initializeVsCodeApi();
+        
+        // Initialize state manager with panel-specific ID and shared API
+        const panelId = this.getAttribute('data-panel-id') || null;
+        this.stateManager = new WebviewStateManager(panelId, this.vscode);
+        
+        // Track credential states
+        this.hasStoredCredentials = { hasSecret: false, hasPassword: false };
+        this.isEditing = false;
+        
         this.render();
     }
 
@@ -314,6 +326,29 @@ class EnvironmentSetup extends HTMLElement {
         `;
         
         this.setupEvents();
+        this.setupFormStatePersistence();
+    }
+    
+    /**
+     * Initialize VS Code API - only called once per webview
+     */
+    initializeVsCodeApi() {
+        try {
+            // Check if already initialized globally
+            if (window.vscodeApi) {
+                this.vscode = window.vscodeApi;
+            } else {
+                this.vscode = acquireVsCodeApi();
+                // Store globally to prevent multiple acquisitions
+                window.vscodeApi = this.vscode;
+            }
+        } catch (error) {
+            console.warn('Failed to acquire VS Code API:', error);
+            // Try to use existing global instance
+            if (window.vscodeApi) {
+                this.vscode = window.vscodeApi;
+            }
+        }
     }
     
     setupEvents() {
@@ -348,6 +383,28 @@ class EnvironmentSetup extends HTMLElement {
         this.setupMessageListener();
     }
     
+    setupFormStatePersistence() {
+        const form = this.shadowRoot.getElementById('environmentForm');
+        if (!form) return;
+        
+        // Bind form to state manager with specific options
+        this.stateManager.bindForm(form, {
+            includePasswords: false, // Never persist passwords
+            excludeFields: ['clientSecret'], // Never persist client secrets
+            onStateChange: (formData) => {
+                console.log('Form state saved:', Object.keys(formData));
+            }
+        });
+        
+        // Auto-save form data more frequently for better UX
+        form.addEventListener('input', () => {
+            this.stateManager.saveFormData(form, {
+                includePasswords: false,
+                excludeFields: ['clientSecret']
+            });
+        });
+    }
+    
     showAuthMethodFields(method) {
         // Hide all conditional fields
         const allFields = this.shadowRoot.querySelectorAll('.conditional-fields');
@@ -377,6 +434,12 @@ class EnvironmentSetup extends HTMLElement {
             return;
         }
         
+        // Save current form state before submitting
+        this.stateManager.saveFormData(this.shadowRoot.getElementById('environmentForm'), {
+            includePasswords: false,
+            excludeFields: ['clientSecret']
+        });
+        
         this.showMessage('Saving environment...', 'info');
         this.disableButtons(true);
         
@@ -398,9 +461,8 @@ class EnvironmentSetup extends HTMLElement {
     
     getFormData() {
         const form = this.shadowRoot.getElementById('environmentForm');
-        const formData = new FormData(form);
         
-        return {
+        const formData = {
             name: this.shadowRoot.getElementById('envName').value,
             dataverseUrl: this.shadowRoot.getElementById('dataverseUrl').value,
             tenantId: this.shadowRoot.getElementById('tenantId').value,
@@ -412,6 +474,19 @@ class EnvironmentSetup extends HTMLElement {
             password: this.shadowRoot.getElementById('password')?.value || '',
             publicClientId: '51f81489-12ee-4a9e-aaae-a2591f45987d' // Power Platform CLI client ID
         };
+        
+        // If editing and credential fields are empty, don't send them (preserve existing)
+        if (this.isEditing) {
+            if (!formData.clientSecret && this.hasStoredCredentials.hasSecret) {
+                delete formData.clientSecret; // Don't send empty credential - preserve existing
+            }
+            
+            if (!formData.password && this.hasStoredCredentials.hasPassword) {
+                delete formData.password; // Don't send empty password - preserve existing
+            }
+        }
+        
+        return formData;
     }
     
     validateForm(data) {
@@ -450,8 +525,9 @@ class EnvironmentSetup extends HTMLElement {
                     guid: true,
                     label: 'Client ID'
                 };
+                // Only require client secret if we're not editing or if we don't have stored credentials
                 validationRules.clientSecret = {
-                    required: true,
+                    required: !this.isEditing || !this.hasStoredCredentials.hasSecret,
                     label: 'Client Secret'
                 };
                 break;
@@ -461,8 +537,9 @@ class EnvironmentSetup extends HTMLElement {
                     email: true,
                     label: 'Username'
                 };
+                // Only require password if we're not editing or if we don't have stored credentials
                 validationRules.password = {
-                    required: true,
+                    required: !this.isEditing || !this.hasStoredCredentials.hasPassword,
                     label: 'Password'
                 };
                 break;
@@ -506,11 +583,13 @@ class EnvironmentSetup extends HTMLElement {
     
     sendMessage(action, data = null) {
         try {
-            // Get the VS Code API
-            const vscode = acquireVsCodeApi();
+            // Use the shared VS Code API instance
+            if (!this.vscode) {
+                throw new Error('VS Code API not available');
+            }
             
             // Send message to extension
-            vscode.postMessage({ action, data });
+            this.vscode.postMessage({ action, data });
             
             console.log('Sent message:', action, data);
             
@@ -528,12 +607,16 @@ class EnvironmentSetup extends HTMLElement {
             
             switch (message.action) {
                 case 'populateForm':
+                    this.isEditing = true;
+                    this.hasStoredCredentials = message.hasStoredCredentials || { hasSecret: false, hasPassword: false };
                     this.populateFormWithEnvironment(message.environment);
                     break;
                 case 'saveEnvironmentResponse':
                     this.disableButtons(false);
                     if (message.success) {
                         this.showMessage(message.data.message || 'Environment saved successfully!', 'success');
+                        // Clear form state on successful save
+                        this.stateManager.clearState();
                     } else {
                         this.showMessage('Error: ' + (message.error || 'Unknown error occurred'), 'error');
                     }
@@ -571,6 +654,9 @@ class EnvironmentSetup extends HTMLElement {
             saveBtn.textContent = 'Update Environment';
         }
         
+        // Clear any persisted state since we're populating from server data
+        this.stateManager.clearState();
+        
         // Populate basic fields
         this.shadowRoot.getElementById('envName').value = environment.name || '';
         this.shadowRoot.getElementById('dataverseUrl').value = environment.settings.dataverseUrl || '';
@@ -595,7 +681,26 @@ class EnvironmentSetup extends HTMLElement {
                 const usernameField = this.shadowRoot.getElementById('username');
                 if (usernameField) usernameField.value = environment.settings.username;
             }
+            
+            // Handle credential fields with placeholder text if credentials exist
+            this.updateCredentialFields();
         }, 50);
+    }
+    
+    updateCredentialFields() {
+        // Update client secret field
+        const clientSecretField = this.shadowRoot.getElementById('clientSecret');
+        if (clientSecretField && this.hasStoredCredentials.hasSecret) {
+            clientSecretField.placeholder = '••••••••••••••• (stored securely - leave blank to keep existing)';
+            clientSecretField.title = 'Current client secret is stored securely. Leave blank to keep the existing secret.';
+        }
+        
+        // Update password field
+        const passwordField = this.shadowRoot.getElementById('password');
+        if (passwordField && this.hasStoredCredentials.hasPassword) {
+            passwordField.placeholder = '••••••••••••••• (stored securely - leave blank to keep existing)';
+            passwordField.title = 'Current password is stored securely. Leave blank to keep the existing password.';
+        }
     }
 }
 
