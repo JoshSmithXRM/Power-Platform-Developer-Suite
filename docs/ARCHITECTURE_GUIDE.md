@@ -22,7 +22,7 @@ Extension Root
 │   │   └── BasePanel.ts
 │   ├── SolutionExplorerPanel.ts
 │   ├── ImportJobViewerPanel.ts
-│   ├── QueryDataPanel.ts
+│   ├── DataExplorerPanel.ts
 │   ├── MetadataBrowserPanel.ts
 │   ├── EnvironmentSetupPanel.ts
 │   ├── ConnectionReferencesPanel.ts

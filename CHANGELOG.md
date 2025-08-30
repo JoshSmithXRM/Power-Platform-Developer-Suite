@@ -12,8 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Automatic Form State Persistence** - Form data is automatically saved and restored when switching between tabs
 - **Secure Credential Preservation** - Editing environments preserves existing stored credentials when not explicitly changed
 - **WebView State Manager** - Reusable utility for form state persistence across all panels
+- **Data Explorer Design** - Comprehensive design documentation for new Data Explorer panel (formerly Query Data)
+- **Data Cloning Specification** - Cross-environment data cloning feature design (Phase 5)
+
+### Changed
+- **Activity Bar Icon** - Updated SVG icon for improved visual clarity
+- **Query Data to Data Explorer** - Renamed panel for better clarity and modern feel
+- **OData Pagination Implementation** - Fixed DataExplorerPanel and DataverseQueryService to use proper Microsoft OData pagination with Prefer header instead of $top/$skip parameters
 
 ### Fixed
+- **Data Explorer Table Footer** - Fixed table generation to use ComponentFactory with proper footer display instead of manual HTML building
+- **Data Explorer View Display** - Added view selection dropdown showing current view context (currently "All Records (No View)")
 - **Environment Setup Panels** - Multiple "Add Environment" tabs now maintain independent form state
 - **Credential Management** - Editing environment settings no longer overwrites stored secrets when unchanged
 - **Panel State Management** - Enhanced BasePanel class with proper multi-instance lifecycle management
@@ -24,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added WebviewStateManager utility for automatic form state persistence
 - Improved AuthenticationService with credential preservation logic
 - Updated EnvironmentSetupPanel to support multiple concurrent instances
+- **Data Explorer Implementation** - Created DataverseQueryService for entity queries
+- **Entity Selection** - Implemented entity metadata loading with type indicators
+- **Pagination System** - Added 200-record default pagination with navigation controls
 
 ## [0.0.1] - 2025-08-28
 

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { AuthenticationService } from '../services/AuthenticationService';
 import { EnvironmentsProvider } from '../providers/EnvironmentsProvider';
-import { QueryDataPanel } from '../panels/QueryDataPanel';
+import { DataExplorerPanel } from '../panels/DataExplorerPanel';
 import { SolutionExplorerPanel } from '../panels/SolutionExplorerPanel';
 import { ImportJobViewerPanel } from '../panels/ImportJobViewerPanel';
 import { ConnectionReferencesPanel } from '../panels/ConnectionReferencesPanel';
@@ -23,8 +23,8 @@ export class PanelCommands {
      */
     public registerCommands(): vscode.Disposable[] {
         return [
-            vscode.commands.registerCommand('power-platform-dev-suite.queryData', () => {
-                QueryDataPanel.createOrShow(this.context.extensionUri);
+            vscode.commands.registerCommand('power-platform-dev-suite.dataExplorer', () => {
+                DataExplorerPanel.createOrShow(this.context.extensionUri);
             }),
 
             vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorer', () => {
@@ -47,8 +47,8 @@ export class PanelCommands {
                 PluginTraceViewerPanel.createOrShow(this.context.extensionUri);
             }),
 
-            vscode.commands.registerCommand('power-platform-dev-suite.queryDataNew', () => {
-                QueryDataPanel.createNew(this.context.extensionUri);
+            vscode.commands.registerCommand('power-platform-dev-suite.dataExplorerNew', () => {
+                DataExplorerPanel.createNew(this.context.extensionUri);
             }),
 
             vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorerNew', () => {

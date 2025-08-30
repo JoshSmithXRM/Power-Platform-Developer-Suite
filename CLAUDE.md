@@ -1,6 +1,102 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+**IMPORTANT: Keep this file synchronized with `.github/copilot-instructions.md`. Any updates should be made to both files identically.**
+
+This file provides guidance to AI assistants (Claude, GitHub Copilot, Cursor, etc.) and developers when working with code in this repository.
+
+## CRITICAL: Understanding Execution Contexts
+
+### Extension Host Context (Node.js/TypeScript)
+- **What it is**: Runs in VS Code's Node.js process
+- **Has access to**: ComponentFactory, ServiceFactory, all TypeScript classes, Node.js APIs, file system, VS Code APIs
+- **Where it executes**: getHtmlContent() method, message handlers, all TypeScript code
+- **Can do**: Generate HTML using ComponentFactory, make API calls, access services
+
+### Webview Context (Browser/JavaScript)
+- **What it is**: Runs in isolated browser sandbox where users interact
+- **Has access to**: ONLY what's in the HTML string or loaded via `<script>` tags
+- **Available utilities**: TableUtils, PanelUtils, EnvironmentSelectorUtils (loaded as .js files)
+- **Cannot access**: ComponentFactory, ServiceFactory, or any TypeScript classes
+- **Communication**: Only via vscode.postMessage() to Extension Host
+
+### Common Mistakes to Avoid
+
+❌ **NEVER DO THIS** - Trying to use Extension Host classes in Webview:
+```javascript
+// In webview JavaScript - THIS WILL FAIL
+function displayResults(data) {
+    const tableHtml = ComponentFactory.generateDataTable(...); // ERROR: ComponentFactory is not defined
+    document.getElementById('results').innerHTML = tableHtml;
+}
+```
+
+✅ **ALWAYS DO THIS** - Generate HTML in Extension Host:
+```typescript
+// In getHtmlContent() method - Extension Host context
+protected getHtmlContent(): string {
+    const tableHtml = ComponentFactory.createDataTable({
+        id: 'resultsTable',
+        columns: [...]
+    });
+    
+    return `<!DOCTYPE html>
+        <html>
+        <body>
+            <div id="tableContainer">
+                ${tableHtml}  <!-- ComponentFactory runs in Extension Host -->
+            </div>
+            <script>
+                // Webview can only use loaded utilities
+                TableUtils.initializeTable('resultsTable', {...});
+            </script>
+        </body>
+        </html>`;
+}
+```
+
+## Component Development & Reuse Rules
+
+### ComponentFactory Usage (MANDATORY)
+
+ComponentFactory generates reusable HTML components in the Extension Host context. **Always check ComponentFactory first before writing custom HTML.**
+
+**Available Components:**
+- `createDataTable()` - Full-featured data tables with sorting, filtering
+- `createEmptyTable()` - Table structure without data  
+- `generateDataTable()` - Table with inline data
+- Environment selectors, buttons, forms, panels
+
+**Component Usage Rules:**
+1. **ALWAYS** use ComponentFactory for tables - never hand-code table HTML
+2. **CHECK FIRST** - does ComponentFactory have what you need?
+3. **ADD IF MISSING** - extend ComponentFactory rather than creating one-off HTML
+4. **REFERENCE** - Look at ImportJobViewerPanel.ts and PluginTraceViewerPanel.ts for patterns
+
+### Pattern Examples
+
+**Static Table (structure known at build time):**
+```typescript
+// In getHtmlContent() - see ImportJobViewerPanel.ts
+return `<script type="text/template" id="tableTemplate">
+    ${ComponentFactory.createDataTable({
+        id: 'myTable',
+        columns: [...],
+        defaultSort: { column: 'name', direction: 'asc' }
+    })}
+</script>`;
+```
+
+**Dynamic Table (data loaded via API):**
+```typescript
+// In getHtmlContent() - generate structure
+const tableStructure = ComponentFactory.createEmptyTable({
+    id: 'dynamicTable',
+    columns: [...]
+});
+
+// In webview JavaScript - populate with data
+TableUtils.loadTableData('dynamicTable', tableData);
+```
 
 ## Security Rules (Non-Negotiable)
 
@@ -44,7 +140,7 @@ This VS Code extension for Microsoft Dynamics 365/Power Platform follows a modul
 - **components/** - Reusable UI generation via ComponentFactory  
 - **providers/** - VS Code tree view providers (environments, tools)
 - **commands/** - Command handlers organized by domain
-- **resources/webview/** - Shared client-side utilities and CSS
+- **resources/webview/** - Shared webview utilities and CSS
 
 ### Key Architectural Patterns
 
@@ -61,12 +157,12 @@ This VS Code extension for Microsoft Dynamics 365/Power Platform follows a modul
 - Use AuthenticationService for all token management
 
 **UI Components:**
-- Use `ComponentFactory` for environment selectors and data tables
+- Use `ComponentFactory` for ALL HTML generation in Extension Host
 - Include shared utilities: TableUtils, PanelUtils, EnvironmentSelectorUtils
 - Table data MUST have 'id' property for row actions to work
 - Support HTML content in table cells for badges and formatting
 
-**Client-Side Utilities:**
+**Webview Utilities (loaded as .js files):**
 - **PanelUtils** - Common operations (loading states, messaging, error handling)
 - **TableUtils** - Complete table functionality (sorting, filtering, row actions, context menus)  
 - **EnvironmentSelectorUtils** - Multi-instance environment selector management
@@ -99,19 +195,12 @@ TableUtils.initializeTable('tableId', {
 - Use `$select` to limit fields and improve performance
 - Apply `$top` for pagination, `$orderby` for sorting
 - Use `$expand` judiciously for related entities
-- Server-side filtering preferred over client-side
+- Dataverse API filtering preferred over in-memory filtering
 
 **Authentication:**
 - All API calls go through AuthenticationService
 - Never create alternate authentication patterns
 - Use proper token management with environment-specific tokens
-
-## Security Requirements
-
-- Never log tokens, credentials, or sensitive data
-- Use VS Code SecretStorage for sensitive information
-- All external API calls must go through proper authentication
-- Validate all user inputs before API calls
 
 ## Development Guidelines
 
@@ -165,4 +254,20 @@ Extension uses webpack for production optimization:
 **Communication Style:**
 - Provide brief plan, execute changes, report results
 - Keep responses concise and focused
-Include build/test status in completion reports
+- Include build/test status in completion reports
+
+## Quick Reference - Do's and Don'ts
+
+**DO:**
+- ✅ Use ComponentFactory for ALL HTML generation in getHtmlContent()
+- ✅ Check existing panels for patterns before creating new ones
+- ✅ Extend ComponentFactory when you need new components
+- ✅ Use TableUtils, PanelUtils, EnvironmentSelectorUtils in webviews
+- ✅ Follow the Extension Host vs Webview separation strictly
+
+**DON'T:**
+- ❌ Try to use ComponentFactory in webview JavaScript
+- ❌ Build HTML strings manually when ComponentFactory can do it
+- ❌ Mix Extension Host and Webview contexts
+- ❌ Create new patterns when existing ones work
+- ❌ Access TypeScript classes from webview code
