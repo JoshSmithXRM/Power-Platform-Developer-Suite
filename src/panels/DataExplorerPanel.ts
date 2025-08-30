@@ -329,6 +329,12 @@ export class DataExplorerPanel extends BasePanel {
                     background: var(--vscode-button-hoverBackground);
                 }
 
+                .btn-primary:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                    background: var(--vscode-button-background);
+                }
+
                 .results-container {
                     flex: 1;
                     display: flex;
