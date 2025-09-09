@@ -39,9 +39,4 @@ export { AuthenticationMethod } from '../models/AuthenticationMethod';
 
 // Re-export new types from services and components
 export { PanelState, StateChangedEvent } from '../services/StateService';
-export { 
-    TableConfig, 
-    TableColumn, 
-    EnvironmentSelectorConfig, 
-    BadgeType 
-} from '../components/ComponentFactory';
+// Component types will be re-exported here once ComponentFactory is implemented

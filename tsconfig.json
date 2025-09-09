@@ -14,5 +14,8 @@
         "skipLibCheck": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true
-    }
+    },
+    "exclude": [
+        "src/old/**/*"
+    ]
 }
