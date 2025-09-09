@@ -54,48 +54,141 @@ protected getHtmlContent(): string {
 }
 ```
 
+## Component-Based Architecture
+
+### Component Composition Pattern
+
+Panels are now built by **composing reusable components** rather than custom implementations:
+
+```typescript
+export class EnvironmentVariablesPanel extends BasePanel {
+    private environmentSelector: EnvironmentSelectorComponent;
+    private solutionSelector: SolutionSelectorComponent;  
+    private dataTable: DataTableComponent;
+
+    constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+        super(panel, extensionUri, ...);
+        
+        // Compose panel from reusable components
+        this.environmentSelector = ComponentFactory.createEnvironmentSelector({
+            id: 'envSelector',
+            onChange: this.handleEnvironmentChange.bind(this)
+        });
+        
+        this.solutionSelector = ComponentFactory.createSolutionSelector({
+            id: 'solutionSelector', 
+            onChange: this.handleSolutionChange.bind(this)
+        });
+    }
+    
+    protected getHtmlContent(): string {
+        return PanelComposer.compose([
+            this.environmentSelector,
+            this.solutionSelector,
+            this.dataTable
+        ], this.getCommonWebviewResources());
+    }
+}
+```
+
+### Component Structure
+
+Each component follows this structure:
+- **Component Class** (TypeScript) - Business logic, state management, configuration
+- **View Class** (TypeScript) - HTML generation for Extension Host context  
+- **Behavior Script** (JavaScript) - Webview interactivity and event handling
+- **CSS File** - Component-specific styling
+- **Config Interface** - Type-safe configuration options
+
+### Multi-Instance Support
+
+Components support multiple instances per panel:
+
+```typescript
+// Multiple environment selectors in one panel
+const sourceEnvSelector = ComponentFactory.createEnvironmentSelector({
+    id: 'sourceEnv',
+    label: 'Source Environment:',
+    onChange: this.handleSourceEnvChange.bind(this)
+});
+
+const targetEnvSelector = ComponentFactory.createEnvironmentSelector({
+    id: 'targetEnv', 
+    label: 'Target Environment:',
+    onChange: this.handleTargetEnvChange.bind(this)
+});
+```
+
 ## Component Development & Reuse Rules
 
 ### ComponentFactory Usage (MANDATORY)
 
-ComponentFactory generates reusable HTML components in the Extension Host context. **Always check ComponentFactory first before writing custom HTML.**
+ComponentFactory creates configured component instances in the Extension Host context. **Always use ComponentFactory for component creation.**
 
-**Available Components:**
-- `createDataTable()` - Full-featured data tables with sorting, filtering
-- `createEmptyTable()` - Table structure without data  
-- `generateDataTable()` - Table with inline data
-- Environment selectors, buttons, forms, panels
+**Available Component Types:**
+- **Selectors**: `createEnvironmentSelector()`, `createSolutionSelector()`, `createEntitySelector()`
+- **Tables**: `createDataTable()`, `createEmptyTable()`, `createFilterableTable()`
+- **Forms**: `createActionBar()`, `createSearchForm()`, `createFilterForm()`
+- **Containers**: `createPanel()`, `createCollapsibleSection()`, `createTabs()`
 
 **Component Usage Rules:**
-1. **ALWAYS** use ComponentFactory for tables - never hand-code table HTML
-2. **CHECK FIRST** - does ComponentFactory have what you need?
-3. **ADD IF MISSING** - extend ComponentFactory rather than creating one-off HTML
-4. **REFERENCE** - Look at ImportJobViewerPanel.ts and PluginTraceViewerPanel.ts for patterns
+1. **ALWAYS** use ComponentFactory for component creation
+2. **CONFIGURE** components through typed configuration objects
+3. **COMPOSE** panels from multiple component instances
+4. **EXTEND** ComponentFactory when new component types are needed
+5. **REFERENCE** - Look at refactored panels for composition patterns
+
+### Component Configuration
+
+All components accept configuration objects:
+
+```typescript
+const dataTable = ComponentFactory.createDataTable({
+    id: 'resultsTable',
+    columns: [
+        { key: 'name', label: 'Name', sortable: true },
+        { key: 'status', label: 'Status', sortable: false }
+    ],
+    defaultSort: { column: 'name', direction: 'asc' },
+    filterable: true,
+    onRowAction: this.handleRowAction.bind(this)
+});
+```
 
 ### Pattern Examples
 
-**Static Table (structure known at build time):**
+**Component Composition (recommended):**
 ```typescript
-// In getHtmlContent() - see ImportJobViewerPanel.ts
+// In constructor - create and configure components
+this.components = {
+    environmentSelector: ComponentFactory.createEnvironmentSelector({
+        id: 'envSelect',
+        onChange: this.handleEnvironmentChange.bind(this)
+    }),
+    dataTable: ComponentFactory.createDataTable({
+        id: 'resultsTable',
+        columns: this.getColumnConfig()
+    })
+};
+
+// In getHtmlContent() - compose HTML
+protected getHtmlContent(): string {
+    return PanelComposer.compose([
+        this.components.environmentSelector,
+        this.components.dataTable
+    ], this.getCommonWebviewResources());
+}
+```
+
+**Legacy Pattern (being phased out):**
+```typescript
+// Old approach - avoid for new development
 return `<script type="text/template" id="tableTemplate">
     ${ComponentFactory.createDataTable({
         id: 'myTable',
-        columns: [...],
-        defaultSort: { column: 'name', direction: 'asc' }
+        columns: [...]
     })}
 </script>`;
-```
-
-**Dynamic Table (data loaded via API):**
-```typescript
-// In getHtmlContent() - generate structure
-const tableStructure = ComponentFactory.createEmptyTable({
-    id: 'dynamicTable',
-    columns: [...]
-});
-
-// In webview JavaScript - populate with data
-TableUtils.loadTableData('dynamicTable', tableData);
 ```
 
 ## Security Rules (Non-Negotiable)
@@ -135,18 +228,25 @@ code --install-extension power-platform-developer-suite-0.0.1.vsix  # Manual ins
 This VS Code extension for Microsoft Dynamics 365/Power Platform follows a modular architecture with clean separation of concerns:
 
 ### Core Structure
-- **panels/** - Webview panels extending BasePanel (7 panels implemented)
+- **panels/** - Webview panels extending BasePanel, composed from reusable components
 - **services/** - Business logic with dependency injection via ServiceFactory
-- **components/** - Reusable UI generation via ComponentFactory  
+- **components/** - Component-based UI system with composition pattern
+  - **base/** - Base component classes, interfaces, and shared functionality
+  - **selectors/** - Environment, solution, and entity selector components
+  - **tables/** - Data table components with various configurations
+  - **forms/** - Action bars, forms, and input components
+- **factories/** - Enhanced ComponentFactory and PanelComposer for component creation
 - **providers/** - VS Code tree view providers (environments, tools)
 - **commands/** - Command handlers organized by domain
-- **resources/webview/** - Shared webview utilities and CSS
+- **resources/webview/** - Component-specific CSS and JavaScript behaviors
 
 ### Key Architectural Patterns
 
 **Panel Development:**
 - All panels extend `BasePanel` class with consistent structure
+- **Compose panels** from reusable component instances, avoid custom HTML
 - Use `ServiceFactory` for dependency injection - never direct instantiation
+- Use `PanelComposer.compose()` to combine components into complete HTML
 - Include common webview resources via `getCommonWebviewResources()`
 - Follow standard message handling pattern with try/catch error handling
 
@@ -157,15 +257,21 @@ This VS Code extension for Microsoft Dynamics 365/Power Platform follows a modul
 - Use AuthenticationService for all token management
 
 **UI Components:**
-- Use `ComponentFactory` for ALL HTML generation in Extension Host
-- Include shared utilities: TableUtils, PanelUtils, EnvironmentSelectorUtils
+- Use `ComponentFactory` for ALL component creation in Extension Host
+- **Create component instances** with configuration objects for customization
+- **Support multiple instances** of the same component type per panel
+- Components handle their own state management and lifecycle
 - Table data MUST have 'id' property for row actions to work
 - Support HTML content in table cells for badges and formatting
 
-**Webview Utilities (loaded as .js files):**
-- **PanelUtils** - Common operations (loading states, messaging, error handling)
-- **TableUtils** - Complete table functionality (sorting, filtering, row actions, context menus)  
-- **EnvironmentSelectorUtils** - Multi-instance environment selector management
+**Component Behaviors (loaded as .js files):**
+- **ComponentUtils** - Base utilities shared by all components
+- **EnvironmentSelectorBehavior** - Environment selector webview interactions
+- **SolutionSelectorBehavior** - Solution selector webview interactions  
+- **DataTableBehavior** - Enhanced data table functionality
+- **ActionBarBehavior** - Action bar and button handling
+- **PanelUtils** - Panel-level operations (loading states, messaging, error handling)
+- **TableUtils** - Legacy table functionality (being phased out)
 
 ### Critical Requirements
 
@@ -220,6 +326,33 @@ TableUtils.initializeTable('tableId', {
 - Verify table functionality with row actions and context menus
 - Test error scenarios and edge cases
 
+## Component Development Guidelines
+
+**Creating New Components:**
+- Follow the four-file structure: Component.ts, View.ts, Behavior.js, styles.css
+- Implement BaseComponent interface for consistency
+- Use configuration objects for all customization
+- Support multiple instances per panel
+- Include comprehensive TypeScript types
+
+**Component Communication:**
+- Use observer pattern for component-to-component communication
+- Emit typed events for state changes
+- Handle parent panel message routing
+- Maintain component isolation
+
+**Component Testing:**
+- Unit test component classes independently
+- Test with various configuration combinations
+- Mock webview behavior interactions
+- Verify multi-instance scenarios
+
+**Component Styling:**
+- Use CSS custom properties for theming
+- Follow VS Code design system
+- Scope styles to component classes
+- Support component composition layouts
+
 ## Webpack Bundling
 
 Extension uses webpack for production optimization:
@@ -259,15 +392,20 @@ Extension uses webpack for production optimization:
 ## Quick Reference - Do's and Don'ts
 
 **DO:**
-- ✅ Use ComponentFactory for ALL HTML generation in getHtmlContent()
-- ✅ Check existing panels for patterns before creating new ones
-- ✅ Extend ComponentFactory when you need new components
-- ✅ Use TableUtils, PanelUtils, EnvironmentSelectorUtils in webviews
+- ✅ Use ComponentFactory for ALL component creation in Extension Host
+- ✅ Compose panels from reusable component instances
+- ✅ Configure components through typed configuration objects
+- ✅ Use PanelComposer.compose() to generate complete panel HTML
+- ✅ Create component instances in constructor, compose in getHtmlContent()
+- ✅ Use component-specific behavior scripts in webview
 - ✅ Follow the Extension Host vs Webview separation strictly
+- ✅ Support multiple instances of components per panel
 
 **DON'T:**
 - ❌ Try to use ComponentFactory in webview JavaScript
-- ❌ Build HTML strings manually when ComponentFactory can do it
+- ❌ Build HTML strings manually when components can do it
+- ❌ Create custom HTML when reusable components exist
 - ❌ Mix Extension Host and Webview contexts
-- ❌ Create new patterns when existing ones work
 - ❌ Access TypeScript classes from webview code
+- ❌ Create one-off implementations instead of reusable components
+- ❌ Skip component configuration - always use typed config objects
