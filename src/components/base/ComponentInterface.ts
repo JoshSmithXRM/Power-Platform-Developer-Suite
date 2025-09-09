@@ -1,5 +1,8 @@
 import { BaseComponentConfig } from './BaseComponent';
 
+// Re-export BaseComponentConfig for convenience
+export { BaseComponentConfig };
+
 /**
  * Core interfaces for the component-based architecture
  */

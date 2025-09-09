@@ -7,7 +7,6 @@ import {
     SolutionSelectorConfig,
     EntitySelectorConfig,
     DataTableConfig,
-    ActionBarConfig,
     SearchFormConfig,
     FilterFormConfig 
 } from './ComponentInterface';
@@ -29,8 +28,7 @@ export const DEFAULT_ENVIRONMENT_SELECTOR_CONFIG: Partial<EnvironmentSelectorCon
     placeholder: 'Loading environments...',
     showStatus: true,
     required: false,
-    disabled: false,
-    className: 'environment-selector'
+    disabled: false
 };
 
 export const DEFAULT_SOLUTION_SELECTOR_CONFIG: Partial<SolutionSelectorConfig> = {
@@ -40,8 +38,7 @@ export const DEFAULT_SOLUTION_SELECTOR_CONFIG: Partial<SolutionSelectorConfig> =
     showManagedStatus: true,
     filterManaged: false,
     required: false,
-    disabled: false,
-    className: 'solution-selector'
+    disabled: false
 };
 
 export const DEFAULT_ENTITY_SELECTOR_CONFIG: Partial<EntitySelectorConfig> = {
@@ -49,8 +46,7 @@ export const DEFAULT_ENTITY_SELECTOR_CONFIG: Partial<EntitySelectorConfig> = {
     placeholder: 'Select entity...',
     showPluralName: false,
     required: false,
-    disabled: false,
-    className: 'entity-selector'
+    disabled: false
 };
 
 // =============================================================================
@@ -63,8 +59,7 @@ export const DEFAULT_DATA_TABLE_CONFIG: Partial<DataTableConfig> = {
     stickyHeader: true,
     stickyFirstColumn: false,
     emptyMessage: 'No data available',
-    loadingMessage: 'Loading...',
-    className: 'data-table'
+    loadingMessage: 'Loading...'
 };
 
 export const DEFAULT_TABLE_COLUMN = {
@@ -78,10 +73,14 @@ export const DEFAULT_TABLE_COLUMN = {
 // Form Component Defaults  
 // =============================================================================
 
-export const DEFAULT_ACTION_BAR_CONFIG: Partial<ActionBarConfig> = {
-    align: 'left' as const,
+export const DEFAULT_ACTION_BAR_CONFIG = {
+    actions: [],
+    layout: 'horizontal' as const,
+    alignment: 'left' as const,
+    spacing: 'normal' as const,
+    variant: 'toolbar' as const,
     size: 'medium' as const,
-    className: 'action-bar'
+    theme: 'auto' as const
 };
 
 export const DEFAULT_ACTION_BUTTON = {
@@ -94,15 +93,13 @@ export const DEFAULT_ACTION_BUTTON = {
 export const DEFAULT_SEARCH_FORM_CONFIG: Partial<SearchFormConfig> = {
     placeholder: 'Search...',
     showClearButton: true,
-    debounceMs: 300,
-    className: 'search-form'
+    debounceMs: 300
 };
 
 export const DEFAULT_FILTER_FORM_CONFIG: Partial<FilterFormConfig> = {
     showResetButton: true,
     showApplyButton: true,
-    autoApply: false,
-    className: 'filter-form'
+    autoApply: false
 };
 
 export const DEFAULT_FORM_FIELD = {
@@ -123,6 +120,12 @@ export const CSS_CLASSES = {
     COMPONENT_ERROR: 'component-error',
     COMPONENT_LOADING: 'component-loading',
     COMPONENT_DISABLED: 'component-disabled',
+    COMPONENT_ROW: 'component-row',
+    COMPONENT_BUTTON: 'component-button',
+    COMPONENT_SELECT: 'component-select',
+    COMPONENT_STATUS: 'component-status',
+    COMPONENT_LOADING_CONTAINER: 'component-loading-container',
+    COMPONENT_ERROR_CONTAINER: 'component-error-container',
     
     // Selector classes
     SELECTOR: 'selector',
@@ -221,6 +224,8 @@ export const ICONS = {
     SEARCH: '🔍',
     FILTER: '🔻',
     CLEAR: '🧹',
+    RESET: '↩️',
+    MORE_HORIZONTAL: '⋯',
     
     // Status
     SUCCESS: '✅',
