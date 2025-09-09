@@ -216,16 +216,20 @@ export const ICONS = {
     
     // Actions
     ADD: '➕',
+    PLUS: '➕',
     EDIT: '✏️',
     DELETE: '🗑️',
+    TRASH: '🗑️',
     REFRESH: '🔄',
     SAVE: '💾',
     CANCEL: '❌',
+    CLOSE: '❌',
     SEARCH: '🔍',
     FILTER: '🔻',
     CLEAR: '🧹',
     RESET: '↩️',
     MORE_HORIZONTAL: '⋯',
+    SHARE: '🔗',
     
     // Status
     SUCCESS: '✅',
