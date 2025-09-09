@@ -5,15 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.2] - 2025-09-09
 
 ### Added
 - **Multi-instance Panel Support** - Environment panels now support multiple simultaneous tabs
 - **Automatic Form State Persistence** - Form data is automatically saved and restored when switching between tabs
 - **Secure Credential Preservation** - Editing environments preserves existing stored credentials when not explicitly changed
 - **WebView State Manager** - Reusable utility for form state persistence across all panels
-- **Data Explorer Design** - Comprehensive design documentation for new Data Explorer panel (formerly Query Data)
-- **Data Cloning Specification** - Cross-environment data cloning feature design (Phase 5)
+- **Data Explorer Panel** - Comprehensive data browsing and querying interface for Dataverse entities
+  - **Entity Browser** - Browse all entities with type indicators (System/Custom/Virtual)
+  - **View Selector** - Select from predefined system views with automatic default view detection
+  - **Direct FetchXML Execution** - Views execute FetchXML directly against Web API for full compatibility
+  - **Layout-aware Display** - Uses LayoutXML to determine column order and visibility
+  - **Developer-friendly Headers** - Shows exact logical names for copy-paste into code
+  - **Smart Pagination** - 200-record default with "Load More" functionality
 
 ### Changed
 - **Activity Bar Icon** - Updated SVG icon for improved visual clarity
@@ -21,8 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **OData Pagination Implementation** - Fixed DataExplorerPanel and DataverseQueryService to use proper Microsoft OData pagination with Prefer header instead of $top/$skip parameters
 
 ### Fixed
-- **Data Explorer Table Footer** - Fixed table generation to use ComponentFactory with proper footer display instead of manual HTML building
-- **Data Explorer View Display** - Added view selection dropdown showing current view context (currently "All Records (No View)")
 - **Environment Setup Panels** - Multiple "Add Environment" tabs now maintain independent form state
 - **Credential Management** - Editing environment settings no longer overwrites stored secrets when unchanged
 - **Panel State Management** - Enhanced BasePanel class with proper multi-instance lifecycle management
@@ -33,9 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added WebviewStateManager utility for automatic form state persistence
 - Improved AuthenticationService with credential preservation logic
 - Updated EnvironmentSetupPanel to support multiple concurrent instances
-- **Data Explorer Implementation** - Created DataverseQueryService for entity queries
-- **Entity Selection** - Implemented entity metadata loading with type indicators
-- **Pagination System** - Added 200-record default pagination with navigation controls
+- **Data Explorer Architecture** - Dual-engine query system with FetchXML and OData approaches
+- **FetchXmlParser Service** - Custom XML parser compatible with Node.js Extension Host environment
+- **DataverseMetadataService** - Comprehensive metadata caching and OData value formatting
+- **Direct FetchXML Execution** - `executeFetchXml()` method bypasses complex OData conversion
+- **Entity Metadata Loading** - Support for System/Custom/Virtual entity type detection
+- **Layout-aware Rendering** - LayoutXML parsing for view-specific column configuration
 
 ## [0.0.1] - 2025-08-28
 

@@ -4,6 +4,8 @@ import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
 import { DataverseQueryService, EntityMetadata, QueryOptions, FilterOperator } from '../services/DataverseQueryService';
 import { ComponentFactory } from '../components/ComponentFactory';
+import { FetchXmlParser } from '../services/FetchXmlParser';
+import { DataverseMetadataService } from '../services/DataverseMetadataService';
 
 export class DataExplorerPanel extends BasePanel {
     public static readonly viewType = 'dataExplorer';
@@ -11,6 +13,7 @@ export class DataExplorerPanel extends BasePanel {
     private _selectedEnvironmentId: string | undefined;
     private _selectedEntity: EntityMetadata | undefined;
     private _queryService: DataverseQueryService;
+    private _metadataService: DataverseMetadataService;
     private _currentFilters: QueryOptions = {};
     private _nextLink: string | undefined;
     private _hasMore: boolean = false;
@@ -40,6 +43,7 @@ export class DataExplorerPanel extends BasePanel {
         });
 
         this._queryService = ServiceFactory.getDataverseQueryService();
+        this._metadataService = ServiceFactory.getDataverseMetadataService();
         this.initialize();
     }
 
@@ -57,8 +61,12 @@ export class DataExplorerPanel extends BasePanel {
                 await this.handleLoadEntityFields(message.environmentId, message.entityLogicalName);
                 break;
 
+            case 'loadEntityViews':
+                await this.handleLoadEntityViews(message.environmentId, message.entityLogicalName);
+                break;
+
             case 'queryData':
-                await this.handleQueryData(message.environmentId, message.entitySetName, message.options);
+                await this.handleQueryData(message.environmentId, message.entitySetName, message.options, message.selectedView);
                 break;
 
             case 'loadNextPage':
@@ -139,7 +147,13 @@ export class DataExplorerPanel extends BasePanel {
         }
 
         try {
-            const fields = await this._queryService.getEntityFields(environmentId, entityLogicalName);
+            // Load both fields and metadata concurrently
+            const [fields, attributes] = await Promise.all([
+                this._queryService.getEntityFields(environmentId, entityLogicalName),
+                this._metadataService.getEntityAttributes(environmentId, entityLogicalName)
+            ]);
+            
+            console.log(`Loaded ${fields.length} fields and ${attributes.length} attributes for entity: ${entityLogicalName}`);
             
             this._panel.webview.postMessage({
                 action: 'fieldsLoaded',
@@ -147,6 +161,7 @@ export class DataExplorerPanel extends BasePanel {
             });
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to load entity fields';
+            console.error('Error in handleLoadEntityFields:', error);
             this._panel.webview.postMessage({
                 action: 'error',
                 message: errorMessage
@@ -154,8 +169,35 @@ export class DataExplorerPanel extends BasePanel {
         }
     }
 
-    private async handleQueryData(environmentId: string, entitySetName: string, options?: QueryOptions): Promise<void> {
-        console.log('handleQueryData called with:', { environmentId, entitySetName, options });
+    private async handleLoadEntityViews(environmentId: string, entityLogicalName: string): Promise<void> {
+        if (!environmentId || !entityLogicalName) {
+            this._panel.webview.postMessage({
+                action: 'error',
+                message: 'Environment ID and entity logical name are required'
+            });
+            return;
+        }
+
+        try {
+            const views = await this._queryService.getEntityViews(environmentId, entityLogicalName);
+            
+            this._panel.webview.postMessage({
+                action: 'viewsLoaded',
+                data: views
+            });
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to load entity views';
+            this._panel.webview.postMessage({
+                action: 'error',
+                message: errorMessage
+            });
+        }
+    }
+
+    private async handleQueryData(environmentId: string, entitySetName: string, options?: QueryOptions, selectedView?: any): Promise<void> {
+        console.log('handleQueryData called with:', { environmentId, entitySetName, options, selectedView });
+        console.log('selectedView.fetchXml:', selectedView?.fetchXml?.substring(0, 200) + '...');
+        console.log('selectedView.layoutXml:', selectedView?.layoutXml?.substring(0, 200) + '...');
         
         if (!environmentId || !entitySetName) {
             console.log('Missing required parameters');
@@ -167,34 +209,66 @@ export class DataExplorerPanel extends BasePanel {
         }
 
         try {
-            // Store current filters
-            this._currentFilters = options || {};
-            
-            // Apply proper OData pagination using Prefer header
-            const queryOptions: QueryOptions = {
-                ...this._currentFilters,
-                maxPageSize: 200
-            };
-            
-            console.log('Executing query with options:', queryOptions);
+            let result: any;
+            let layoutColumns: any[] = [];
 
-            const result = await this._queryService.queryRecords(environmentId, entitySetName, queryOptions);
+            // If a view is selected with FetchXML, use direct FetchXML execution (preferred approach)
+            if (selectedView?.fetchXml) {
+                console.log('Using direct FetchXML execution for view:', selectedView.name);
+                
+                // Parse LayoutXML if available
+                if (selectedView.layoutXml) {
+                    console.log('Parsing view LayoutXML:', selectedView.layoutXml);
+                    const parsedLayout = FetchXmlParser.parseLayoutXml(selectedView.layoutXml);
+                    if (parsedLayout) {
+                        layoutColumns = parsedLayout.columns;
+                        console.log('Parsed layout columns:', layoutColumns);
+                    }
+                }
+                
+                // Execute FetchXML directly - this bypasses OData conversion entirely
+                result = await this._queryService.executeFetchXml(environmentId, selectedView.fetchXml);
+                
+                // For FetchXML queries, pagination is handled differently - we'll need to track the original FetchXML
+                this._currentFilters = { fetchXml: selectedView.fetchXml };
+                this._nextLink = undefined; // FetchXML pagination works differently
+                this._hasMore = false; // TODO: Implement FetchXML pagination if needed
+                
+            } else {
+                // Use OData approach for custom queries without views
+                console.log('Using OData approach for custom query');
+                
+                let queryOptions: QueryOptions = options || {};
+                
+                // Apply proper OData pagination using Prefer header
+                queryOptions = {
+                    ...queryOptions,
+                    maxPageSize: 200
+                };
+                
+                // Store current filters for pagination
+                this._currentFilters = queryOptions;
+                
+                console.log('Executing OData query with options:', queryOptions);
+                result = await this._queryService.queryRecords(environmentId, entitySetName, queryOptions, this._metadataService);
+                
+                // Store pagination state for OData queries
+                this._nextLink = result.nextLink;
+                this._hasMore = result.hasMore;
+            }
             
             console.log('Query completed. Result count:', result.value?.length || 0);
             console.log('Total count:', result.count);
             console.log('Has more:', result.hasMore);
             console.log('Next link:', result.nextLink ? 'Present' : 'None');
             
-            // Store pagination state
-            this._nextLink = result.nextLink;
-            this._hasMore = result.hasMore;
-            
             const responseMessage = {
                 action: 'dataQueried',
                 data: result.value,
                 count: result.count,
                 hasMore: this._hasMore,
-                pageSize: 200
+                pageSize: 200,
+                layoutColumns: layoutColumns.length > 0 ? layoutColumns : undefined
             };
             
             console.log('Sending dataQueried response with', responseMessage.data?.length || 0, 'records');
@@ -271,7 +345,7 @@ export class DataExplorerPanel extends BasePanel {
                     display: flex;
                     gap: 16px;
                     flex-wrap: wrap;
-                    align-items: center;
+                    align-items: flex-start;  /* Changed from center to flex-start */
                     padding: 12px;
                     background: var(--vscode-editor-background);
                     border: 1px solid var(--vscode-panel-border);
@@ -281,6 +355,13 @@ export class DataExplorerPanel extends BasePanel {
                 .entity-selector {
                     flex: 1;
                     min-width: 200px;
+                }
+
+                .entity-selector label,
+                .view-selector label {
+                    display: block;
+                    margin-bottom: 4px;
+                    font-weight: 500;
                 }
 
                 .entity-selector select {
@@ -293,18 +374,13 @@ export class DataExplorerPanel extends BasePanel {
                 }
 
                 .view-selector {
-                    margin-top: 12px;
-                }
-
-                .view-selector label {
-                    display: block;
-                    margin-bottom: 4px;
-                    font-weight: 500;
+                    flex: 1;
+                    min-width: 200px;
                 }
 
                 .view-selector select {
-                    width: 200px;
-                    padding: 4px 8px;
+                    width: 100%;
+                    padding: 6px;
                     background: var(--vscode-input-background);
                     color: var(--vscode-input-foreground);
                     border: 1px solid var(--vscode-input-border);
@@ -314,6 +390,8 @@ export class DataExplorerPanel extends BasePanel {
                 .query-actions {
                     display: flex;
                     gap: 8px;
+                    align-items: flex-end;  /* Align buttons to bottom of their container */
+                    margin-top: 20px;  /* Add consistent spacing from labels/selects above */
                 }
 
                 .btn-primary {
@@ -451,9 +529,13 @@ export class DataExplorerPanel extends BasePanel {
                 }
 
                 .entity-info {
-                    font-size: 0.9em;
+                    font-size: 0.85em;
                     color: var(--vscode-descriptionForeground);
                     margin-top: 4px;
+                    height: 1.2em;  /* Fixed height to prevent layout shift */
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
                 }
 
                 #statusMessage {
@@ -523,6 +605,142 @@ export class DataExplorerPanel extends BasePanel {
                     border-width: 1px;
                 }
                 
+                /* FetchXML Builder Styles */
+                .fetchxml-builder {
+                    background: var(--vscode-editor-background);
+                    border: 1px solid var(--vscode-panel-border);
+                    border-radius: 4px;
+                    margin: 16px 0;
+                    padding: 16px;
+                }
+
+                .builder-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 16px;
+                    border-bottom: 1px solid var(--vscode-panel-border);
+                    padding-bottom: 12px;
+                }
+
+                .builder-header h3 {
+                    margin: 0;
+                    color: var(--vscode-foreground);
+                    font-size: 16px;
+                    font-weight: 600;
+                }
+
+                .builder-actions {
+                    display: flex;
+                    gap: 8px;
+                }
+
+                .builder-content {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                }
+
+                .builder-section {
+                    background: var(--vscode-list-hoverBackground);
+                    padding: 12px;
+                    border-radius: 4px;
+                    border: 1px solid var(--vscode-editorWidget-border);
+                }
+
+                .builder-section h4 {
+                    margin: 0 0 12px 0;
+                    color: var(--vscode-foreground);
+                    font-size: 14px;
+                    font-weight: 600;
+                }
+
+                .filter-row, .sort-row {
+                    display: flex;
+                    gap: 12px;
+                    align-items: center;
+                    margin-bottom: 8px;
+                    padding: 8px;
+                    background: var(--vscode-editor-background);
+                    border: 1px solid var(--vscode-editorWidget-border);
+                    border-radius: 3px;
+                }
+
+                .filter-row select, .sort-row select {
+                    padding: 4px 8px;
+                    background: var(--vscode-input-background);
+                    color: var(--vscode-input-foreground);
+                    border: 1px solid var(--vscode-input-border);
+                    border-radius: 3px;
+                    font-size: 13px;
+                    min-width: 120px;
+                }
+
+                .filter-row input[type="text"] {
+                    padding: 4px 8px;
+                    background: var(--vscode-input-background);
+                    color: var(--vscode-input-foreground);
+                    border: 1px solid var(--vscode-input-border);
+                    border-radius: 3px;
+                    font-size: 13px;
+                    flex: 1;
+                    min-width: 150px;
+                }
+
+                .remove-filter-btn, .remove-sort-btn {
+                    background: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                    border: none;
+                    padding: 4px 8px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    font-size: 12px;
+                }
+
+                .remove-filter-btn:hover, .remove-sort-btn:hover {
+                    background: var(--vscode-button-hoverBackground);
+                }
+
+                .columns-checkboxes {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 8px;
+                    margin-top: 8px;
+                    max-height: 200px;
+                    overflow-y: auto;
+                    padding: 8px;
+                    background: var(--vscode-editor-background);
+                    border: 1px solid var(--vscode-editorWidget-border);
+                    border-radius: 3px;
+                }
+
+                .columns-checkboxes label {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    font-size: 13px;
+                    cursor: pointer;
+                }
+
+                .columns-checkboxes input[type="checkbox"] {
+                    margin: 0;
+                }
+
+                .btn-secondary {
+                    background: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                    border: none;
+                    padding: 6px 12px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: 500;
+                }
+
+                .btn-secondary:hover {
+                    background: var(--vscode-button-hoverBackground);
+                }
+
                 /* Table wrapper and footer positioning */
                 .table-wrapper {
                     flex: 1;
@@ -595,13 +813,59 @@ export class DataExplorerPanel extends BasePanel {
                 <div class="view-selector">
                     <label for="viewSelect">View:</label>
                     <select id="viewSelect" disabled>
-                        <option value="allrecords">All Records (No View)</option>
+                        <option value="">All Records (No Filter)</option>
                     </select>
                 </div>
                 
                 <div class="query-actions">
                     <button id="queryButton" class="btn-primary" disabled>Query Data</button>
                     <button id="refreshButton" class="btn-primary">Refresh Entities</button>
+                </div>
+            </div>
+            
+            <!-- FetchXML Builder (hidden by default) -->
+            <div id="fetchXmlBuilder" class="fetchxml-builder" style="display: none;">
+                <div class="builder-header">
+                    <h3>FetchXML Query Builder</h3>
+                    <div class="builder-actions">
+                        <button id="resetBuilderButton" class="btn-secondary">Reset</button>
+                        <button id="previewFetchXmlButton" class="btn-secondary">Preview FetchXML</button>
+                    </div>
+                </div>
+                
+                <div class="builder-content">
+                    <!-- Filters Section -->
+                    <div class="builder-section">
+                        <h4>Filters</h4>
+                        <div id="filtersList" class="filters-list">
+                            <!-- Filters will be added dynamically -->
+                        </div>
+                        <button id="addFilterButton" class="btn-secondary">Add Filter</button>
+                    </div>
+                    
+                    <!-- Columns Section -->
+                    <div class="builder-section">
+                        <h4>Select Columns</h4>
+                        <div id="columnsList" class="columns-list">
+                            <div class="column-selection">
+                                <label>
+                                    <input type="checkbox" id="selectAllColumns" checked> Select All Columns
+                                </label>
+                            </div>
+                            <div id="columnsCheckboxes" class="columns-checkboxes">
+                                <!-- Column checkboxes will be populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sorting Section -->
+                    <div class="builder-section">
+                        <h4>Sort Order</h4>
+                        <div id="sortsList" class="sorts-list">
+                            <!-- Sort orders will be added dynamically -->
+                        </div>
+                        <button id="addSortButton" class="btn-secondary">Add Sort</button>
+                    </div>
                 </div>
             </div>
             
@@ -620,6 +884,9 @@ export class DataExplorerPanel extends BasePanel {
                 let currentEntities = [];
                 let currentEntity = null;
                 let currentRecords = [];
+                let currentViews = [];
+                let currentSelectedView = null;
+                let currentLayoutColumns = null;
                 
                 // Global state for table footer
                 window.dataExplorerHasMore = false;
@@ -768,7 +1035,10 @@ export class DataExplorerPanel extends BasePanel {
                         if (currentEntity) {
                             const queryBtn = document.getElementById('queryButton');
                             const entityInfoElement = document.getElementById('entityInfo');
+                            const viewSelect = document.getElementById('viewSelect');
+                            
                             if (queryBtn) queryBtn.disabled = false;
+                            
                             // Show entity info
                             let info = 'Type: ' + (currentEntity.isCustomEntity ? 'Custom' : 'System');
                             if (currentEntity.isVirtualEntity) {
@@ -778,15 +1048,68 @@ export class DataExplorerPanel extends BasePanel {
                                 info += ' - ' + currentEntity.description;
                             }
                             if (entityInfoElement) entityInfoElement.textContent = info;
+                            
+                            // Clear and disable view selector while loading
+                            if (viewSelect) {
+                                viewSelect.innerHTML = '<option value="">Loading views...</option>';
+                                viewSelect.disabled = true;
+                            }
+                            
+                            // Load views for this entity
+                            PanelUtils.sendMessage('loadEntityViews', {
+                                environmentId: currentEnvironmentId,
+                                entityLogicalName: currentEntity.logicalName
+                            });
                         }
                     } else {
                         const queryBtn = document.getElementById('queryButton');
                         const entityInfoElement = document.getElementById('entityInfo');
+                        const viewSelect = document.getElementById('viewSelect');
+                        
                         if (queryBtn) queryBtn.disabled = true;
                         currentEntity = null;
                         if (entityInfoElement) entityInfoElement.textContent = '';
+                        
+                        // Reset view selector
+                        if (viewSelect) {
+                            viewSelect.innerHTML = '<option value="">All Records (No Filter)</option>';
+                            viewSelect.disabled = true;
+                        }
+                        currentViews = [];
+                        currentSelectedView = null;
                     }
                 });
+                }
+                
+                // View selection
+                const viewSelect = document.getElementById('viewSelect');
+                if (viewSelect) {
+                    viewSelect.addEventListener('change', (e) => {
+                        const selectedViewId = e.target.value;
+                        if (selectedViewId === 'custom') {
+                            // Custom Query selected - show FetchXML builder
+                            currentSelectedView = {
+                                id: 'custom',
+                                name: 'Custom Query',
+                                isCustom: true
+                            };
+                            console.log('Custom Query selected - showing FetchXML builder');
+                            showFetchXmlBuilder();
+                        } else if (selectedViewId) {
+                            currentSelectedView = currentViews.find(v => v.id === selectedViewId);
+                            console.log('View selected:', currentSelectedView?.name);
+                            if (currentSelectedView) {
+                                console.log('Selected view details:');
+                                console.log('  - FetchXML:', currentSelectedView.fetchXml?.substring(0, 500));
+                                console.log('  - LayoutXML:', currentSelectedView.layoutXml?.substring(0, 500));
+                            }
+                            hideFetchXmlBuilder();
+                        } else {
+                            currentSelectedView = null;
+                            console.log('No view selected (All Records)');
+                            hideFetchXmlBuilder();
+                        }
+                    });
                 }
                 
                 // Query button
@@ -807,11 +1130,32 @@ export class DataExplorerPanel extends BasePanel {
                             environmentId: currentEnvironmentId,
                             entitySetName: currentEntity.entitySetName,
                             options: {
-                                // TODO: Add filters from UI
-                            }
+                                // Note: View filtering will be implemented in Phase 2
+                                // For now, we pass the view info but don't apply filters
+                            },
+                            selectedView: currentSelectedView  // Pass selected view for future use
                         };
                         
                         console.log('Sending queryData message:', queryMessage);
+                        console.log('queryMessage.selectedView:', queryMessage.selectedView);
+                        console.log('queryMessage.selectedView.fetchXml exists:', !!queryMessage.selectedView?.fetchXml);
+                        console.log('queryMessage.selectedView.layoutXml exists:', !!queryMessage.selectedView?.layoutXml);
+                        if (currentSelectedView) {
+                            console.log('Query will use view:', currentSelectedView.name);
+                            if (currentSelectedView.isCustom) {
+                                console.log('Executing custom query');
+                                executeCustomQuery();
+                                return;
+                            } else {
+                                console.log('View FetchXML:', currentSelectedView.fetchXml);
+                                console.log('View LayoutXML:', currentSelectedView.layoutXml);
+                            }
+                        } else {
+                            console.log('Query will use no view (All Records)');
+                        }
+                        
+                        // Additional logging to see what's actually being sent
+                        console.log('Final queryMessage structure:', JSON.stringify(queryMessage, null, 2));
                         PanelUtils.sendMessage('queryData', queryMessage);
                     }
                 });
@@ -869,6 +1213,58 @@ export class DataExplorerPanel extends BasePanel {
                         statusMessage.style.display = 'none';
                     },
                     
+                    'viewsLoaded': (message) => {
+                        currentViews = message.data || [];
+                        console.log('Views loaded in frontend:', currentViews);
+                        
+                        const viewSelect = document.getElementById('viewSelect');
+                        
+                        if (viewSelect) {
+                            // Clear the select
+                            viewSelect.innerHTML = '';
+                            
+                            // Add "All Records" option
+                            const allOption = document.createElement('option');
+                            allOption.value = '';
+                            allOption.textContent = 'All Records (No Filter)';
+                            viewSelect.appendChild(allOption);
+                            
+                            // Add "Custom Query" option
+                            const customOption = document.createElement('option');
+                            customOption.value = 'custom';
+                            customOption.textContent = 'Custom Query (FetchXML Builder)';
+                            viewSelect.appendChild(customOption);
+                            
+                            // Add each view
+                            if (currentViews.length > 0) {
+                                currentViews.forEach(view => {
+                                    console.log('Adding view to dropdown:', view.name);
+                                    console.log('  - FetchXML exists:', !!view.fetchXml);
+                                    console.log('  - LayoutXML exists:', !!view.layoutXml);
+                                    
+                                    const option = document.createElement('option');
+                                    option.value = view.id;
+                                    option.textContent = view.name;
+                                    if (view.isDefault) {
+                                        option.textContent += ' (Default)';
+                                    }
+                                    viewSelect.appendChild(option);
+                                });
+                                
+                                // Select the default view if there is one
+                                const defaultView = currentViews.find(v => v.isDefault);
+                                if (defaultView) {
+                                    viewSelect.value = defaultView.id;
+                                    currentSelectedView = defaultView;
+                                    console.log('Default view selected:', defaultView.name);
+                                }
+                            }
+                            
+                            // Enable the select
+                            viewSelect.disabled = false;
+                        }
+                    },
+                    
                     'dataQueried': (message) => {
                         console.log('Received dataQueried message:', message);
                         console.log('Data received:', message.data?.length || 0, 'records');
@@ -879,11 +1275,13 @@ export class DataExplorerPanel extends BasePanel {
                         if (queryBtn) queryBtn.disabled = false;
                         if (statusMsg) statusMsg.style.display = 'none';
                         
-                        const { data, count, hasMore, pageSize } = message;
+                        const { data, count, hasMore, pageSize, layoutColumns } = message;
                         
                         // Reset table and update records
                         currentRecords = data || [];
+                        currentLayoutColumns = layoutColumns;
                         console.log('Current records set to:', currentRecords.length, 'items');
+                        console.log('Layout columns received:', layoutColumns);
                         
                         // Update global state for footer
                         window.dataExplorerHasMore = hasMore;
@@ -892,7 +1290,7 @@ export class DataExplorerPanel extends BasePanel {
                         console.log('About to display results. Data length:', data?.length || 0);
                         if (data && data.length > 0) {
                             console.log('Calling displayResults with', data.length, 'records');
-                            displayResults(data);
+                            displayResults(data, layoutColumns);
                         } else {
                             console.log('No data to display, showing empty message');
                             const container = document.getElementById('resultsContainer');
@@ -920,9 +1318,17 @@ export class DataExplorerPanel extends BasePanel {
                         // Update global state for footer
                         window.dataExplorerHasMore = hasMore;
                         
-                        // Update the display with all records
+                        // Update the display with all records (preserve layout columns)
                         if (currentRecords.length > 0) {
-                            displayResults(currentRecords);
+                            displayResults(currentRecords, currentLayoutColumns);
+                        }
+                    },
+                    
+                    'fieldsLoaded': (message) => {
+                        console.log('Fields loaded for entity:', message.data?.length || 0);
+                        if (message.data && message.data.length > 0) {
+                            // Populate column checkboxes in FetchXML builder
+                            populateColumnCheckboxes(message.data);
                         }
                     },
                     
@@ -931,13 +1337,10 @@ export class DataExplorerPanel extends BasePanel {
                     }
                 });
                 
-                function displayResults(data) {
+                function displayResults(data, layoutColumns) {
                     console.log('displayResults called with:', data?.length || 0, 'records');
+                    console.log('Layout columns provided:', layoutColumns);
                     console.log('First record sample:', data?.[0]);
-                    console.log('Looking for resultsContainer...');
-                    console.log('Document:', document);
-                    console.log('All elements with id resultsContainer:', document.querySelectorAll('#resultsContainer'));
-                    console.log('Content div:', document.getElementById('content'));
                     
                     if (!data || data.length === 0) {
                         console.log('No data provided, showing empty message');
@@ -950,22 +1353,31 @@ export class DataExplorerPanel extends BasePanel {
                         return;
                     }
                     
-                    // Get all unique columns from the data (limit to first 10 most common)
-                    const columnCounts = {};
-                    data.forEach(record => {
-                        Object.keys(record).forEach(key => {
-                            // Skip OData metadata fields
-                            if (!key.startsWith('@') && !key.startsWith('_')) {
-                                columnCounts[key] = (columnCounts[key] || 0) + 1;
-                            }
-                        });
-                    });
+                    let columnArray = [];
                     
-                    // Sort by frequency and take top 10 columns
-                    const columnArray = Object.entries(columnCounts)
-                        .sort((a, b) => b[1] - a[1])
-                        .slice(0, 10)
-                        .map(([key]) => key);
+                    // Use layout columns if available, otherwise auto-detect
+                    if (layoutColumns && layoutColumns.length > 0) {
+                        console.log('Using layout columns from view definition');
+                        columnArray = layoutColumns.map(col => col.name);
+                    } else {
+                        console.log('Auto-detecting columns from data');
+                        // Get all unique columns from the data (limit to first 10 most common)
+                        const columnCounts = {};
+                        data.forEach(record => {
+                            Object.keys(record).forEach(key => {
+                                // Skip OData metadata fields
+                                if (!key.startsWith('@') && !key.startsWith('_')) {
+                                    columnCounts[key] = (columnCounts[key] || 0) + 1;
+                                }
+                            });
+                        });
+                        
+                        // Sort by frequency and take top 10 columns
+                        columnArray = Object.entries(columnCounts)
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 10)
+                            .map(([key]) => key);
+                    }
                     
                     // Always include primary name attribute if it exists
                     if (currentEntity?.primaryNameAttribute && !columnArray.includes(currentEntity.primaryNameAttribute)) {
@@ -1005,8 +1417,7 @@ export class DataExplorerPanel extends BasePanel {
                     // Add header
                     tableHtml += '<thead><tr>';
                     columnArray.forEach(col => {
-                        const headerText = col.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim();
-                        tableHtml += '<th data-column="' + col + '" class="sortable">' + headerText + '</th>';
+                        tableHtml += '<th data-column="' + col + '" class="sortable">' + col + '</th>';
                     });
                     tableHtml += '</tr></thead>';
                     
@@ -1052,6 +1463,320 @@ export class DataExplorerPanel extends BasePanel {
                         }
                     });
                     console.log('Table initialized successfully');
+                }
+
+                // FetchXML Builder Functions
+                let currentEntityFields = [];
+                let fetchXmlBuilderFilters = [];
+                let fetchXmlBuilderSorts = [];
+
+                function showFetchXmlBuilder() {
+                    const builder = document.getElementById('fetchXmlBuilder');
+                    if (builder) {
+                        builder.style.display = 'block';
+                        initializeFetchXmlBuilder();
+                    }
+                }
+
+                function hideFetchXmlBuilder() {
+                    const builder = document.getElementById('fetchXmlBuilder');
+                    if (builder) {
+                        builder.style.display = 'none';
+                    }
+                }
+
+                function initializeFetchXmlBuilder() {
+                    if (!currentEntity) return;
+
+                    // Clear existing state
+                    fetchXmlBuilderFilters = [];
+                    fetchXmlBuilderSorts = [];
+
+                    // Load entity fields for the builder
+                    loadEntityFieldsForBuilder();
+
+                    // Setup event listeners for builder controls
+                    setupBuilderEventListeners();
+                }
+
+                function loadEntityFieldsForBuilder() {
+                    if (!currentEnvironmentId || !currentEntity) return;
+
+                    vscode.postMessage({
+                        action: 'loadEntityFields',
+                        environmentId: currentEnvironmentId,
+                        entityLogicalName: currentEntity.logicalName
+                    });
+                }
+
+                function setupBuilderEventListeners() {
+                    // Add Filter button
+                    const addFilterBtn = document.getElementById('addFilterButton');
+                    if (addFilterBtn) {
+                        addFilterBtn.onclick = () => addFilter();
+                    }
+
+                    // Add Sort button
+                    const addSortBtn = document.getElementById('addSortButton');
+                    if (addSortBtn) {
+                        addSortBtn.onclick = () => addSort();
+                    }
+
+                    // Reset button
+                    const resetBtn = document.getElementById('resetBuilderButton');
+                    if (resetBtn) {
+                        resetBtn.onclick = () => resetBuilder();
+                    }
+
+                    // Preview FetchXML button
+                    const previewBtn = document.getElementById('previewFetchXmlButton');
+                    if (previewBtn) {
+                        previewBtn.onclick = () => previewFetchXml();
+                    }
+
+                    // Select all columns checkbox
+                    const selectAllBtn = document.getElementById('selectAllColumns');
+                    if (selectAllBtn) {
+                        selectAllBtn.onchange = (e) => toggleAllColumns(e.target.checked);
+                    }
+                }
+
+                function populateColumnCheckboxes(fields) {
+                    currentEntityFields = fields;
+                    const container = document.getElementById('columnsCheckboxes');
+                    if (!container) return;
+
+                    container.innerHTML = '';
+                    fields.forEach(field => {
+                        const label = document.createElement('label');
+                        label.innerHTML = \`
+                            <input type="checkbox" value="\${field.logicalName}" checked>
+                            \${field.displayName} (\${field.logicalName})
+                        \`;
+                        container.appendChild(label);
+                    });
+                }
+
+                function addFilter() {
+                    if (currentEntityFields.length === 0) return;
+
+                    const filterId = 'filter_' + Date.now();
+                    const filter = {
+                        id: filterId,
+                        field: '',
+                        operator: 'eq',
+                        value: ''
+                    };
+
+                    fetchXmlBuilderFilters.push(filter);
+                    renderFilters();
+                }
+
+                function renderFilters() {
+                    const container = document.getElementById('filtersList');
+                    if (!container) return;
+
+                    container.innerHTML = '';
+                    fetchXmlBuilderFilters.forEach(filter => {
+                        const filterDiv = document.createElement('div');
+                        filterDiv.className = 'filter-row';
+                        filterDiv.innerHTML = \`
+                            <select onchange="updateFilter('\${filter.id}', 'field', this.value)">
+                                <option value="">Select Field...</option>
+                                \${currentEntityFields.map(f => 
+                                    \`<option value="\${f.logicalName}" \${f.logicalName === filter.field ? 'selected' : ''}>\${f.displayName}</option>\`
+                                ).join('')}
+                            </select>
+                            <select onchange="updateFilter('\${filter.id}', 'operator', this.value)">
+                                <option value="eq" \${filter.operator === 'eq' ? 'selected' : ''}>Equals</option>
+                                <option value="ne" \${filter.operator === 'ne' ? 'selected' : ''}>Not Equal</option>
+                                <option value="like" \${filter.operator === 'like' ? 'selected' : ''}>Contains</option>
+                                <option value="gt" \${filter.operator === 'gt' ? 'selected' : ''}>Greater Than</option>
+                                <option value="ge" \${filter.operator === 'ge' ? 'selected' : ''}>Greater or Equal</option>
+                                <option value="lt" \${filter.operator === 'lt' ? 'selected' : ''}>Less Than</option>
+                                <option value="le" \${filter.operator === 'le' ? 'selected' : ''}>Less or Equal</option>
+                                <option value="null" \${filter.operator === 'null' ? 'selected' : ''}>Is Null</option>
+                                <option value="not-null" \${filter.operator === 'not-null' ? 'selected' : ''}>Is Not Null</option>
+                            </select>
+                            <input type="text" placeholder="Value" value="\${filter.value}" 
+                                   onchange="updateFilter('\${filter.id}', 'value', this.value)"
+                                   \${filter.operator === 'null' || filter.operator === 'not-null' ? 'disabled' : ''}>
+                            <button class="remove-filter-btn" onclick="removeFilter('\${filter.id}')">Remove</button>
+                        \`;
+                        container.appendChild(filterDiv);
+                    });
+                }
+
+                function addSort() {
+                    if (currentEntityFields.length === 0) return;
+
+                    const sortId = 'sort_' + Date.now();
+                    const sort = {
+                        id: sortId,
+                        field: '',
+                        direction: 'asc'
+                    };
+
+                    fetchXmlBuilderSorts.push(sort);
+                    renderSorts();
+                }
+
+                function renderSorts() {
+                    const container = document.getElementById('sortsList');
+                    if (!container) return;
+
+                    container.innerHTML = '';
+                    fetchXmlBuilderSorts.forEach(sort => {
+                        const sortDiv = document.createElement('div');
+                        sortDiv.className = 'sort-row';
+                        sortDiv.innerHTML = \`
+                            <select onchange="updateSort('\${sort.id}', 'field', this.value)">
+                                <option value="">Select Field...</option>
+                                \${currentEntityFields.map(f => 
+                                    \`<option value="\${f.logicalName}" \${f.logicalName === sort.field ? 'selected' : ''}>\${f.displayName}</option>\`
+                                ).join('')}
+                            </select>
+                            <select onchange="updateSort('\${sort.id}', 'direction', this.value)">
+                                <option value="asc" \${sort.direction === 'asc' ? 'selected' : ''}>Ascending</option>
+                                <option value="desc" \${sort.direction === 'desc' ? 'selected' : ''}>Descending</option>
+                            </select>
+                            <button class="remove-sort-btn" onclick="removeSort('\${sort.id}')">Remove</button>
+                        \`;
+                        container.appendChild(sortDiv);
+                    });
+                }
+
+                function updateFilter(filterId, property, value) {
+                    const filter = fetchXmlBuilderFilters.find(f => f.id === filterId);
+                    if (filter) {
+                        filter[property] = value;
+                        // Re-render if operator changed to update value field state
+                        if (property === 'operator') {
+                            renderFilters();
+                        }
+                    }
+                }
+
+                function updateSort(sortId, property, value) {
+                    const sort = fetchXmlBuilderSorts.find(s => s.id === sortId);
+                    if (sort) {
+                        sort[property] = value;
+                    }
+                }
+
+                function removeFilter(filterId) {
+                    fetchXmlBuilderFilters = fetchXmlBuilderFilters.filter(f => f.id !== filterId);
+                    renderFilters();
+                }
+
+                function removeSort(sortId) {
+                    fetchXmlBuilderSorts = fetchXmlBuilderSorts.filter(s => s.id !== sortId);
+                    renderSorts();
+                }
+
+                function toggleAllColumns(selectAll) {
+                    const checkboxes = document.querySelectorAll('#columnsCheckboxes input[type="checkbox"]');
+                    checkboxes.forEach(cb => cb.checked = selectAll);
+                }
+
+                function resetBuilder() {
+                    fetchXmlBuilderFilters = [];
+                    fetchXmlBuilderSorts = [];
+                    renderFilters();
+                    renderSorts();
+                    
+                    // Reset all columns to checked
+                    const selectAll = document.getElementById('selectAllColumns');
+                    if (selectAll) selectAll.checked = true;
+                    toggleAllColumns(true);
+                }
+
+                function previewFetchXml() {
+                    const selectedColumns = getSelectedColumns();
+                    const fetchXml = generateFetchXml(selectedColumns, fetchXmlBuilderFilters, fetchXmlBuilderSorts);
+                    
+                    // Show preview in a dialog or console
+                    console.log('Generated FetchXML:');
+                    console.log(fetchXml);
+                    
+                    // For now, just alert the FetchXML - could be enhanced with a modal
+                    alert('Generated FetchXML (check console for full XML):\\n\\n' + fetchXml.substring(0, 500) + '...');
+                }
+
+                function getSelectedColumns() {
+                    const checkboxes = document.querySelectorAll('#columnsCheckboxes input[type="checkbox"]:checked');
+                    return Array.from(checkboxes).map(cb => cb.value);
+                }
+
+                function generateFetchXml(columns, filters, sorts) {
+                    if (!currentEntity) return '';
+
+                    let xml = \`<fetch version="1.0" output-format="xml-platform" mapping="logical">\\n\`;
+                    xml += \`  <entity name="\${currentEntity.logicalName}">\\n\`;
+                    
+                    // Add columns
+                    if (columns && columns.length > 0) {
+                        columns.forEach(col => {
+                            xml += \`    <attribute name="\${col}" />\\n\`;
+                        });
+                    } else {
+                        xml += \`    <all-attributes />\\n\`;
+                    }
+                    
+                    // Add filters
+                    if (filters.length > 0) {
+                        xml += \`    <filter type="and">\\n\`;
+                        filters.forEach(filter => {
+                            if (filter.field && filter.operator) {
+                                if (filter.operator === 'null' || filter.operator === 'not-null') {
+                                    xml += \`      <condition attribute="\${filter.field}" operator="\${filter.operator}" />\\n\`;
+                                } else if (filter.value) {
+                                    xml += \`      <condition attribute="\${filter.field}" operator="\${filter.operator}" value="\${filter.value}" />\\n\`;
+                                }
+                            }
+                        });
+                        xml += \`    </filter>\\n\`;
+                    }
+                    
+                    // Add sorts
+                    if (sorts.length > 0) {
+                        sorts.forEach(sort => {
+                            if (sort.field) {
+                                const descending = sort.direction === 'desc' ? ' descending="true"' : '';
+                                xml += \`    <order attribute="\${sort.field}"\${descending} />\\n\`;
+                            }
+                        });
+                    }
+                    
+                    xml += \`  </entity>\\n\`;
+                    xml += \`</fetch>\`;
+                    
+                    return xml;
+                }
+
+                // Update the query functionality to handle custom FetchXML
+                function executeCustomQuery() {
+                    if (currentSelectedView && currentSelectedView.isCustom) {
+                        const selectedColumns = getSelectedColumns();
+                        const fetchXml = generateFetchXml(selectedColumns, fetchXmlBuilderFilters, fetchXmlBuilderSorts);
+                        
+                        // Create a synthetic view object with our generated FetchXML
+                        const customView = {
+                            id: 'custom',
+                            name: 'Custom Query',
+                            fetchXml: fetchXml,
+                            layoutXml: null // We'll generate layout from selected columns
+                        };
+                        
+                        console.log('Executing custom query with FetchXML:', fetchXml);
+                        
+                        vscode.postMessage({
+                            action: 'queryData',
+                            environmentId: currentEnvironmentId,
+                            entitySetName: currentEntity.entitySetName,
+                            selectedView: customView
+                        });
+                    }
                 }
             </script>
         </body>
