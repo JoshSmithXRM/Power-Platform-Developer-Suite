@@ -25,11 +25,11 @@ export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
     private getTools(): ToolItem[] {
         return [
             new ToolItem(
-                'Query Data',
-                'Query and analyze data from Dynamics 365',
+                'Data Explorer',
+                'Explore and analyze data from Dynamics 365',
                 vscode.TreeItemCollapsibleState.None,
-                'power-platform-dev-suite.queryData',
-                'queryData'
+                'power-platform-dev-suite.dataExplorer',
+                'dataExplorer'
             ),
             new ToolItem(
                 'Solution Explorer',

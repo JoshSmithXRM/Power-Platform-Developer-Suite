@@ -6,38 +6,33 @@ import { AuthenticationMethod } from '../models/AuthenticationMethod';
 import { ServiceFactory } from '../services/ServiceFactory';
 
 export class EnvironmentSetupPanel extends BasePanel {
-    public static currentPanel: EnvironmentSetupPanel | undefined;
     public static readonly viewType = 'environmentSetup';
 
     private readonly _editingEnvironment: EnvironmentConnection | undefined;
+    private _hasStoredCredentials: { hasSecret: boolean; hasPassword: boolean } = { hasSecret: false, hasPassword: false };
 
     public static createOrShow(extensionUri: vscode.Uri, editingEnvironment?: EnvironmentConnection) {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
 
-        // Allow multiple panels - don't block creation if one exists
-        // if (EnvironmentSetupPanel.currentPanel) {
-        //     EnvironmentSetupPanel.currentPanel._panel.reveal(column);
-        //     return;
-        // }
+        // Create new panel instead of reusing - allows multiple instances
+        const panelTitle = editingEnvironment 
+            ? `Edit Environment: ${editingEnvironment.name}`
+            : 'Add Dynamics 365 Environment';
 
-        const panel = vscode.window.createWebviewPanel(
-            EnvironmentSetupPanel.viewType,
-            editingEnvironment ? 'Edit Dynamics 365 Environment' : 'Add Dynamics 365 Environment',
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                localResourceRoots: [
-                    vscode.Uri.joinPath(extensionUri, 'resources')
-                ]
-            }
-        );
+        const panel = BasePanel.createWebviewPanel({
+            viewType: EnvironmentSetupPanel.viewType,
+            title: panelTitle,
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            enableFindWidget: true,
+            localResourceRoots: [
+                vscode.Uri.joinPath(extensionUri, 'resources')
+            ]
+        }, column);
 
-        const environmentPanel = new EnvironmentSetupPanel(panel, extensionUri, editingEnvironment);
-        
-        // Set as current panel (will be overridden by newer panels, but that's OK for multiple support)
-        EnvironmentSetupPanel.currentPanel = environmentPanel;
+        new EnvironmentSetupPanel(panel, extensionUri, editingEnvironment);
     }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, editingEnvironment?: EnvironmentConnection) {
@@ -51,14 +46,9 @@ export class EnvironmentSetupPanel extends BasePanel {
         // Initialize after construction
         this.initialize();
 
-        // If editing, send the environment data to the webview after a short delay to ensure it's loaded
+        // Check for stored credentials if editing
         if (this._editingEnvironment) {
-            setTimeout(() => {
-                this.postMessage({
-                    action: 'populateForm',
-                    environment: this._editingEnvironment
-                });
-            }, 100);
+            this.checkStoredCredentials();
         }
     }
 
@@ -96,7 +86,11 @@ export class EnvironmentSetupPanel extends BasePanel {
                 environmentId: data.environmentId || undefined
             };
 
-            await this._authService.saveEnvironmentSettings(environment);
+            // Only preserve credentials if we're editing and user didn't provide new ones
+            const preserveCredentials = !!this._editingEnvironment && 
+                (!data.clientSecret || !data.password);
+                
+            await this._authService.saveEnvironmentSettings(environment, preserveCredentials);
 
             // Refresh the environments tree view
             vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
@@ -172,14 +166,37 @@ export class EnvironmentSetupPanel extends BasePanel {
         }
     }
 
+    /**
+     * Check if the environment being edited has stored credentials
+     */
+    private async checkStoredCredentials() {
+        if (!this._editingEnvironment) return;
+        
+        try {
+            this._hasStoredCredentials = await this._authService.hasStoredCredentials(this._editingEnvironment);
+            
+            // Send environment data with credential status to webview after a short delay
+            setTimeout(() => {
+                this.postMessage({
+                    action: 'populateForm',
+                    environment: this._editingEnvironment,
+                    hasStoredCredentials: this._hasStoredCredentials,
+                    panelId: this.panelId
+                });
+            }, 100);
+        } catch (error) {
+            console.error('Error checking stored credentials:', error);
+        }
+    }
+
     public dispose() {
-        EnvironmentSetupPanel.currentPanel = undefined;
         super.dispose();
     }
 
     protected getHtmlContent(): string {
         const scriptUri = this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'environment-setup.js'));
         const validationUtilsUri = this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'validation-utils.js'));
+        const stateManagerUri = this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'webview-state-manager.js'));
 
         return `<!DOCTYPE html>
             <html lang="en">
@@ -197,8 +214,9 @@ export class EnvironmentSetupPanel extends BasePanel {
                 </style>
             </head>
             <body>
-                <environment-setup></environment-setup>
+                <environment-setup data-panel-id="${this.panelId}"></environment-setup>
                 <script src="${validationUtilsUri}"></script>
+                <script src="${stateManagerUri}"></script>
                 <script type="module" src="${scriptUri}"></script>
             </body>
             </html>`;

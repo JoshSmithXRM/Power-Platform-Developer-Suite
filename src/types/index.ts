@@ -8,6 +8,7 @@ export interface PanelConfig {
     enableScripts?: boolean;
     retainContextWhenHidden?: boolean;
     enableFindWidget?: boolean;
+    localResourceRoots?: vscode.Uri[];
 }
 
 // Base interface for all webview panels

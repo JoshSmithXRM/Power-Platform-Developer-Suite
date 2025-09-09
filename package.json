@@ -149,13 +149,13 @@
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.queryData",
-                "title": "Query Data",
+                "command": "power-platform-dev-suite.dataExplorer",
+                "title": "Data Explorer",
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.queryDataNew",
-                "title": "Open New Query Data",
+                "command": "power-platform-dev-suite.dataExplorerNew",
+                "title": "Open New Data Explorer",
                 "category": "Power Platform Developer Suite"
             },
             {
@@ -269,8 +269,8 @@
                     "group": "1_open@1"
                 },
                 {
-                    "command": "power-platform-dev-suite.queryDataNew",
-                    "when": "view == power-platform-dev-suite-tools && viewItem == queryData",
+                    "command": "power-platform-dev-suite.dataExplorerNew",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == dataExplorer",
                     "group": "1_open@1"
                 },
                 {

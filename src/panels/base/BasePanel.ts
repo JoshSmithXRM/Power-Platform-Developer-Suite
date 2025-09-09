@@ -13,9 +13,10 @@ export abstract class BasePanel implements IPanelBase {
     protected readonly _stateService: StateService;
     protected _disposables: vscode.Disposable[] = [];
     protected currentState: PanelState = {};
+    protected readonly _panelId: string;
 
     public readonly viewType: string;
-    protected static _activePanels: Map<string, BasePanel> = new Map();
+    protected static _activePanels: Map<string, BasePanel[]> = new Map();
 
     constructor(
         panel: vscode.WebviewPanel,
@@ -29,12 +30,13 @@ export abstract class BasePanel implements IPanelBase {
         this._authService = authService;
         this._stateService = stateService;
         this.viewType = config.viewType;
+        this._panelId = this.generatePanelId();
 
         this._panel.title = config.title;
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
         // Register this panel in the active panels map
-        BasePanel._activePanels.set(this.viewType, this);
+        this.registerPanel();
 
         // Set up message handling
         this._panel.webview.onDidReceiveMessage(
@@ -186,11 +188,35 @@ export abstract class BasePanel implements IPanelBase {
     }
 
     /**
+     * Generate a unique panel ID for this instance
+     */
+    protected generatePanelId(): string {
+        return `${this.viewType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    /**
+     * Register this panel instance
+     */
+    protected registerPanel(): void {
+        if (!BasePanel._activePanels.has(this.viewType)) {
+            BasePanel._activePanels.set(this.viewType, []);
+        }
+        BasePanel._activePanels.get(this.viewType)?.push(this);
+    }
+
+    /**
+     * Get panel ID for this instance
+     */
+    public get panelId(): string {
+        return this._panelId;
+    }
+
+    /**
      * Dispose of the panel and clean up resources
      */
     public dispose(): void {
         // Remove from active panels map
-        BasePanel._activePanels.delete(this.viewType);
+        this.unregisterPanel();
         
         this._panel.dispose();
         while (this._disposables.length) {
@@ -200,15 +226,48 @@ export abstract class BasePanel implements IPanelBase {
     }
 
     /**
+     * Unregister this panel instance
+     */
+    protected unregisterPanel(): void {
+        const panels = BasePanel._activePanels.get(this.viewType);
+        if (panels) {
+            const index = panels.indexOf(this);
+            if (index !== -1) {
+                panels.splice(index, 1);
+            }
+            if (panels.length === 0) {
+                BasePanel._activePanels.delete(this.viewType);
+            }
+        }
+    }
+
+    /**
      * Focus an existing panel or return null if none exists
+     * For multi-instance panels, focuses the first one found
      */
     protected static focusExisting(viewType: string): BasePanel | null {
-        const existingPanel = BasePanel._activePanels.get(viewType);
-        if (existingPanel) {
-            existingPanel._panel.reveal();
-            return existingPanel;
+        const existingPanels = BasePanel._activePanels.get(viewType);
+        if (existingPanels && existingPanels.length > 0) {
+            const panel = existingPanels[0];
+            panel._panel.reveal();
+            return panel;
         }
         return null;
+    }
+
+    /**
+     * Get all active panels of a specific type
+     */
+    protected static getActivePanels(viewType: string): BasePanel[] {
+        return BasePanel._activePanels.get(viewType) || [];
+    }
+
+    /**
+     * Get count of active panels of a specific type
+     */
+    protected static getActivePanelCount(viewType: string): number {
+        const panels = BasePanel._activePanels.get(viewType);
+        return panels ? panels.length : 0;
     }
 
     /**
@@ -225,7 +284,8 @@ export abstract class BasePanel implements IPanelBase {
             {
                 enableScripts: config.enableScripts ?? true,
                 retainContextWhenHidden: config.retainContextWhenHidden ?? true,
-                enableFindWidget: config.enableFindWidget ?? true
+                enableFindWidget: config.enableFindWidget ?? true,
+                localResourceRoots: config.localResourceRoots
             }
         );
     }
