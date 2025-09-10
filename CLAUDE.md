@@ -54,6 +54,48 @@ protected getHtmlContent(): string {
 }
 ```
 
+❌ **NEVER DO THIS** - Using `updateWebview()` for component data updates:
+```typescript
+// In panel method - THIS CAUSES FLASH AND POOR PERFORMANCE
+private async loadConnectionReferences(): Promise<void> {
+    const data = await this.service.getData();
+    const transformedData = this.transformData(data);
+    
+    this.dataTableComponent.setData(transformedData);
+    this.updateWebview(); // ❌ WRONG: Full HTML regeneration causes flash
+}
+```
+
+✅ **ALWAYS DO THIS** - Use component event bridge for data updates:
+```typescript
+// Panel constructor - Setup event bridge ONCE
+private initializeComponents(): void {
+    this.dataTableComponent = ComponentFactory.createDataTable({
+        id: 'myTable',
+        columns: this.getTableColumns()
+    });
+    
+    // ✅ CORRECT: Setup event bridge for efficient updates
+    this.dataTableComponent.on('update', (event) => {
+        this.postMessage({
+            command: 'component-update',
+            componentId: event.componentId,
+            action: 'setData',
+            data: this.dataTableComponent.getData()
+        });
+    });
+}
+
+// Data loading method - Component handles webview update automatically  
+private async loadConnectionReferences(): Promise<void> {
+    const data = await this.service.getData();
+    const transformedData = this.transformData(data);
+    
+    this.dataTableComponent.setData(transformedData); // ✅ CORRECT: Efficient DOM update via event bridge
+    // No updateWebview() call needed - component handles webview update
+}
+```
+
 ## Component-Based Architecture
 
 ### Component Composition Pattern
@@ -407,10 +449,124 @@ TableUtils.initializeTable('tableId', {
 });
 ```
 
+**For Component Data Updates (MANDATORY):**
+All panels MUST implement event bridge pattern for component updates to avoid unnecessary HTML regeneration:
+
+```typescript
+// In panel constructor - Set up event bridges for all components
+this.components.forEach(component => {
+    component.on('update', (event) => {
+        this.postMessage({
+            action: 'componentUpdate',
+            componentId: event.componentId,
+            data: component.getData()  // Get current component data
+        });
+    });
+    
+    component.on('stateChange', (event) => {
+        this.postMessage({
+            action: 'componentStateChange',
+            componentId: event.componentId,
+            state: event.state
+        });
+    });
+});
+
+// ❌ NEVER use updateWebview() for component data updates
+// This causes full HTML regeneration and flash effects
+```
+
 **State Management:**
 - Use StateService for UI state persistence (not data caching)
 - Always make fresh API calls, only cache UI preferences
 - Save panel state: selected environment, sort settings, view config
+
+## Component Update Communication
+
+### Extension Host ↔ Webview Bridge Pattern
+
+When components emit events in the Extension Host, they must be forwarded to the webview for UI updates. This avoids the performance penalty and visual flash of `updateWebview()`.
+
+**Required Implementation Pattern:**
+
+```typescript
+// 1. In Panel Constructor - Set up event bridge for each component
+constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, ...) {
+    super(panel, extensionUri, ...);
+    
+    // Create components
+    this.environmentSelector = ComponentFactory.createEnvironmentSelector({...});
+    this.dataTable = ComponentFactory.createDataTable({...});
+    
+    // Set up event bridges - MANDATORY for all components
+    this.setupComponentEventBridge(this.environmentSelector);
+    this.setupComponentEventBridge(this.dataTable);
+}
+
+private setupComponentEventBridge(component: BaseComponent): void {
+    component.on('update', (event) => {
+        this.postMessage({
+            action: 'componentUpdate',
+            componentId: event.componentId,
+            data: (component as any).getData?.() || null
+        });
+    });
+    
+    component.on('stateChange', (event) => {
+        this.postMessage({
+            action: 'componentStateChange',
+            componentId: event.componentId,
+            state: event.state
+        });
+    });
+}
+```
+
+**Webview Behavior Scripts:**
+
+```javascript
+// In component behavior scripts (e.g., DataTableBehavior.js)
+const DataTableBehavior = {
+    initialize(componentId, config, element) {
+        // Component-specific setup
+        return this;
+    },
+    
+    // Handle messages from Extension Host
+    handleMessage(message) {
+        if (message.action === 'componentUpdate' && message.componentId === this.componentId) {
+            // Update UI with new data without full page refresh
+            this.updateDisplayData(message.data);
+        } else if (message.action === 'componentStateChange' && message.componentId === this.componentId) {
+            // Handle state changes
+            this.updateState(message.state);
+        }
+    }
+};
+```
+
+**Benefits:**
+- Eliminates visual flash from full HTML regeneration
+- Improves performance by updating only changed components
+- Maintains clean separation between Extension Host and webview contexts
+- Enables granular component updates and state management
+
+**Anti-Pattern to Avoid:**
+```typescript
+// ❌ DON'T DO THIS - Causes flash and poor performance
+async handleLoadData() {
+    const data = await this.service.getData();
+    this.dataTable.setData(data);
+    this.updateWebview(); // Regenerates entire HTML
+}
+
+// ✅ DO THIS - Use event bridge pattern instead
+async handleLoadData() {
+    const data = await this.service.getData();
+    this.dataTable.setData(data); // Emits 'update' event, bridge forwards to webview
+    // No updateWebview() call needed
+}
+```
 
 ## API Guidelines
 

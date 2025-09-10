@@ -361,7 +361,8 @@ export class ConnectionReferencesPanel extends BasePanel {
                     // So we don't need to manually call it here to avoid duplicate execution
                 }
 
-                this.updateWebview();
+                // Note: setSolutions() already calls notifyStateChange() to update component in webview
+                // No need to call updateWebview() which would reload the entire HTML
             }
 
             this.postMessage({
@@ -402,12 +403,13 @@ export class ConnectionReferencesPanel extends BasePanel {
                 this.componentLogger.info('Updating DataTableComponent with API data', {
                     transformedRelationships: tableData.relationships?.length || 0
                 });
-                
+
                 this.componentLogger.debug('Sample connection reference data', {
                     sampleData: tableData.relationships?.slice(0, 2) || []
                 });
                 this.dataTableComponent.setData(tableData.relationships || []);
-                this.updateWebview();
+                // Note: setData() already calls notifyUpdate() to update the table in webview
+                // No need to call updateWebview() which would reload the entire HTML
             }
 
             this.postMessage({

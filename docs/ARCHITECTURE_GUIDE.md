@@ -736,6 +736,144 @@ this.dataTable = ComponentFactory.createDataTable({
 7. **Register in ComponentFactory** for easy creation
 8. **Write unit tests** for component logic
 
+### **Component Update Implementation Requirements**
+
+Every component MUST implement proper Extension Host ↔ Webview communication:
+
+#### **Extension Host Component (TypeScript)**
+```typescript
+export class MyComponent extends BaseComponent {
+    private data: any[] = [];
+    
+    public setData(data: any[]): void {
+        this.data = [...data];
+        this.processData();
+        this.notifyUpdate(); // ✅ REQUIRED - Triggers panel event bridge
+    }
+    
+    public setConfiguration(config: Partial<MyComponentConfig>): void {
+        this.config = { ...this.config, ...config };
+        this.notifyStateChange({ config: this.config }); // ✅ REQUIRED for config changes
+    }
+    
+    public getData(): any[] {
+        return [...this.data]; // ✅ REQUIRED - Panel needs access for event bridge
+    }
+}
+```
+
+#### **Panel Event Bridge Setup (TypeScript)**  
+```typescript
+export class MyPanel extends BasePanel {
+    private myComponent: MyComponent;
+    
+    private initializeComponents(): void {
+        this.myComponent = ComponentFactory.createMyComponent({
+            id: 'myComponent',
+            // ... configuration
+        });
+        
+        // ✅ REQUIRED - Setup event bridge for each component
+        this.setupComponentEventBridges();
+    }
+    
+    private setupComponentEventBridges(): void {
+        // Data update bridge
+        this.myComponent.on('update', (event) => {
+            this.postMessage({
+                command: 'component-update',
+                componentId: event.componentId,
+                action: 'dataUpdate',
+                data: this.myComponent.getData()
+            });
+        });
+        
+        // Configuration change bridge
+        this.myComponent.on('stateChange', (event) => {
+            this.postMessage({
+                command: 'component-update',
+                componentId: event.componentId,
+                action: 'configUpdate', 
+                data: event.state
+            });
+        });
+        
+        // Error bridge
+        this.myComponent.on('error', (event) => {
+            this.postMessage({
+                command: 'component-error',
+                componentId: event.componentId,
+                error: event.error
+            });
+        });
+    }
+}
+```
+
+#### **Webview Behavior Script (JavaScript)**
+```javascript
+class MyComponentBehavior {
+    constructor(componentId) {
+        this.componentId = componentId;
+        this.element = document.getElementById(componentId);
+        this.initialized = false;
+        this.init();
+        
+        // ✅ REQUIRED - Register for messages from Extension Host
+        ComponentUtils.registerMessageHandler(componentId, this.handleMessage.bind(this));
+    }
+    
+    // ✅ REQUIRED - Handle Extension Host messages
+    handleMessage(message) {
+        if (message.command === 'component-update' && 
+            message.componentId === this.componentId) {
+            this.handleUpdate(message.action, message.data);
+        } else if (message.command === 'component-error' &&
+                   message.componentId === this.componentId) {
+            this.handleError(message.error);
+        }
+    }
+    
+    handleUpdate(action, data) {
+        switch (action) {
+            case 'dataUpdate':
+                this.updateComponentData(data);
+                break;
+            case 'configUpdate':
+                this.updateComponentConfig(data);
+                break;
+            default:
+                console.warn(`Unknown update action: ${action}`);
+        }
+    }
+    
+    // ✅ REQUIRED - Efficient DOM updates without full page reload
+    updateComponentData(data) {
+        console.log(`Updating component ${this.componentId} with new data`);
+        
+        // Update DOM elements efficiently
+        this.clearContent();
+        this.renderContent(data);
+        this.updateInteractions();
+        
+        console.log(`Component ${this.componentId} updated successfully`);
+    }
+    
+    // Send user interactions back to Extension Host
+    notifyUserAction(action, data) {
+        ComponentUtils.sendMessage('component-action', {
+            componentId: this.componentId,
+            action: action,
+            data: data,
+            timestamp: Date.now()
+        });
+    }
+}
+
+// ✅ REQUIRED - Make behavior available globally
+window.MyComponentBehavior = MyComponentBehavior;
+```
+
 ### **Multi-Instance Component Support**
 
 ```typescript
@@ -911,6 +1049,306 @@ class MyPanel extends BasePanel {
 **For Development:**  
 - Output panel: "Power Platform Developer Suite" channel
 - Structured JSON format with timestamps and metadata
+
+---
+
+## 🔄 Component Update Communication Architecture
+
+### **The Component Update Challenge**
+
+Components in Extension Host context need to communicate state changes to their corresponding webview representations without causing full HTML regeneration (which creates UI flash and performance issues).
+
+### **Extension Host Component Events**
+
+Components emit events when their state changes using the BaseComponent event system:
+
+```typescript
+// BaseComponent automatically provides these methods
+export class DataTableComponent extends BaseComponent {
+    public setData(data: DataTableRow[]): void {
+        this.data = [...data];
+        this.processData();
+        this.notifyUpdate(); // ✅ Emits 'update' event
+    }
+    
+    public setColumns(columns: TableColumn[]): void {
+        this.config.columns = columns;
+        this.notifyStateChange({ columns }); // ✅ Emits 'stateChange' event
+    }
+}
+```
+
+**Available Component Events:**
+- **`update`** - Component data has changed (e.g., table rows, dropdown options)
+- **`stateChange`** - Component configuration has changed (e.g., columns, settings)
+- **`error`** - Component encountered an error
+- **`initialized`** - Component finished initialization
+- **`disposed`** - Component was cleaned up
+
+### **Event Bridge Pattern (Required)**
+
+Panels MUST implement event listeners to bridge Extension Host component events to webview updates:
+
+```typescript
+export class ConnectionReferencesPanel extends BasePanel {
+    private initializeComponents(): void {
+        // Create components
+        this.dataTableComponent = ComponentFactory.createDataTable({
+            id: 'connectionRefs-table',
+            columns: this.getTableColumns()
+        });
+        
+        this.environmentSelectorComponent = ComponentFactory.createEnvironmentSelector({
+            id: 'envSelector',
+            onChange: this.handleEnvironmentChange.bind(this)
+        });
+        
+        // ✅ CRITICAL: Setup event bridges for each component
+        this.setupComponentEventBridges();
+    }
+    
+    private setupComponentEventBridges(): void {
+        // Data table update bridge
+        this.dataTableComponent.on('update', (event) => {
+            this.postMessage({
+                command: 'component-update',
+                componentId: event.componentId,
+                action: 'setData',
+                data: this.dataTableComponent.getData()
+            });
+        });
+        
+        // Environment selector state change bridge  
+        this.environmentSelectorComponent.on('stateChange', (event) => {
+            this.postMessage({
+                command: 'component-update',
+                componentId: event.componentId, 
+                action: 'environmentsLoaded',
+                data: {
+                    environments: event.state.environments,
+                    selectedId: event.state.selectedId
+                }
+            });
+        });
+        
+        // Error handling bridge
+        [this.dataTableComponent, this.environmentSelectorComponent].forEach(component => {
+            component.on('error', (event) => {
+                this.postMessage({
+                    command: 'component-error',
+                    componentId: event.componentId,
+                    error: event.error
+                });
+            });
+        });
+    }
+}
+```
+
+### **Webview Component Message Handling**
+
+Component behavior scripts MUST implement `handleMessage()` to process Extension Host updates:
+
+```javascript
+// DataTableBehavior.js
+class DataTableBehavior {
+    constructor(tableId) {
+        this.tableId = tableId;
+        this.table = document.getElementById(tableId);
+        this.initialized = false;
+        this.init();
+        
+        // Register for component update messages
+        ComponentUtils.registerMessageHandler(this.tableId, this.handleMessage.bind(this));
+    }
+    
+    // ✅ REQUIRED: Handle messages from Extension Host
+    handleMessage(message) {
+        if (message.command === 'component-update' && 
+            message.componentId === this.tableId) {
+            
+            switch (message.action) {
+                case 'setData':
+                    this.updateTableData(message.data);
+                    break;
+                case 'setColumns':
+                    this.updateTableColumns(message.data);
+                    break;
+                case 'setLoading':
+                    this.toggleLoadingState(message.data);
+                    break;
+            }
+        } else if (message.command === 'component-error' &&
+                   message.componentId === this.tableId) {
+            this.showErrorState(message.error);
+        }
+    }
+    
+    // Efficient DOM updates without full page reload
+    updateTableData(data) {
+        console.log(`Updating table ${this.tableId} with ${data.length} rows`);
+        
+        // Clear existing rows
+        const tbody = this.table.querySelector('tbody');
+        tbody.innerHTML = '';
+        
+        // Add new rows
+        data.forEach(row => {
+            const tr = this.createTableRow(row);
+            tbody.appendChild(tr);
+        });
+        
+        // Update pagination, sorting, etc.
+        this.updateTableMeta(data);
+        
+        console.log(`Table ${this.tableId} updated successfully`);
+    }
+    
+    createTableRow(rowData) {
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-row-id', rowData.id);
+        
+        // Create cells based on current column configuration
+        this.currentColumns.forEach(column => {
+            const td = document.createElement('td');
+            td.textContent = rowData[column.key] || '';
+            td.className = `table-cell table-cell-${column.key}`;
+            tr.appendChild(td);
+        });
+        
+        return tr;
+    }
+}
+
+// Auto-initialize when script loads
+window.DataTableBehavior = DataTableBehavior;
+```
+
+### **ComponentUtils Message Routing**
+
+The ComponentUtils.js handles message routing to appropriate component behaviors:
+
+```javascript
+// ComponentUtils.js enhancements
+class ComponentUtils {
+    static messageHandlers = new Map();
+    
+    static registerMessageHandler(componentId, handler) {
+        this.messageHandlers.set(componentId, handler);
+    }
+    
+    static handleMessage(event) {
+        const message = event.data;
+        
+        if (!message || !message.command) {
+            return;
+        }
+        
+        // Route component-specific messages
+        if (message.componentId && this.messageHandlers.has(message.componentId)) {
+            const handler = this.messageHandlers.get(message.componentId);
+            handler(message);
+            return;
+        }
+        
+        // Handle global panel messages
+        this.handleGlobalMessage(message);
+    }
+}
+```
+
+### **Component Update Strategies**
+
+#### **✅ Use Component Messaging (Recommended)**
+For data updates that don't change component structure:
+
+```typescript
+// ✅ CORRECT: Component handles webview update automatically
+this.dataTableComponent.setData(newTableData);
+// Flow: setData() → notifyUpdate() → Panel event bridge → Webview DOM update
+
+this.environmentSelectorComponent.setEnvironments(environments);  
+// Flow: setEnvironments() → notifyStateChange() → Panel bridge → Webview update
+```
+
+#### **❌ Avoid `updateWebview()` for Data Updates**  
+Only use `updateWebview()` for structural changes requiring full HTML regeneration:
+
+```typescript
+// ❌ WRONG: Causes flash and regenerates entire HTML unnecessarily
+this.dataTableComponent.setData(newTableData);
+this.updateWebview(); // Regenerates ALL HTML including unchanged components
+
+// ✅ CORRECT: Only when adding/removing components or major layout changes
+if (needNewComponents) {
+    this.initializeNewComponents();
+    this.updateWebview(); // Full HTML regeneration needed for structure change
+}
+```
+
+#### **Update Decision Matrix**
+
+| Change Type | Method | Reason | Performance |
+|-------------|--------|---------|-------------|
+| Table data | Component messaging | No HTML structure change | Fast DOM update |
+| Dropdown options | Component messaging | Same component, different data | Fast option update |
+| Component configuration | Component messaging | Structure preserved | Fast attribute update |
+| Add/remove components | `updateWebview()` | HTML structure changes | Full regeneration needed |
+| Panel layout change | `updateWebview()` | Major DOM changes needed | Full regeneration needed |
+| Theme/CSS changes | Component messaging | Styling only | Fast class update |
+
+### **Message Protocol Standards**
+
+#### **Extension Host → Webview (Component Updates)**
+```typescript
+// Standard component update message format
+this.postMessage({
+    command: 'component-update',     // Standard command
+    componentId: 'myTable',          // Target component ID  
+    action: 'setData',               // Specific action to perform
+    data: transformedTableData,      // Action payload
+    timestamp: Date.now()            // For debugging/ordering
+});
+```
+
+#### **Webview → Extension Host (User Actions)**
+```javascript
+// Standard user action message format  
+ComponentUtils.sendMessage('component-action', {
+    componentId: 'myTable',          // Source component ID
+    action: 'row-selected',          // User action type
+    data: {                          // Action details
+        rowId: 'row-123',
+        rowData: selectedRow
+    },
+    timestamp: Date.now()
+});
+```
+
+#### **Error Handling Messages**
+```typescript
+// Extension Host error notification
+this.postMessage({
+    command: 'component-error',
+    componentId: 'myTable',
+    error: {
+        message: error.message,
+        type: 'data-load-failed',
+        recovery: 'retry-available'
+    }
+});
+```
+
+### **Implementation Checklist**
+
+For each new component, ensure:
+
+- [ ] **Extension Host Component**: Calls `notifyUpdate()` or `notifyStateChange()` appropriately
+- [ ] **Panel Event Bridge**: Listens to component events and forwards to webview  
+- [ ] **Webview Behavior**: Implements `handleMessage()` for update processing
+- [ ] **Message Registration**: Component registers with ComponentUtils message router
+- [ ] **Error Handling**: Both Extension Host errors and webview errors are handled
+- [ ] **Performance**: Uses component messaging instead of `updateWebview()` for data updates
 
 ---
 
