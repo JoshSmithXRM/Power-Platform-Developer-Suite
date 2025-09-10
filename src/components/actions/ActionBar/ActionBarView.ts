@@ -205,7 +205,9 @@ export class ActionBarView {
             action.badge ? 'action-bar-button--has-badge' : ''
         ].filter(Boolean).join(' ');
 
-        const icon = isLoading ? ICONS.LOADING : (action.icon || '');
+        // Get icon from ICONS mapping or use empty string if not found
+        const iconKey = action.icon ? action.icon.toUpperCase().replace('-', '_') as keyof typeof ICONS : null;
+        const iconValue = isLoading ? ICONS.LOADING : (iconKey && ICONS[iconKey] || '');
         const badge = action.badge ? `<span class="action-bar-badge">${String(action.badge)}</span>` : '';
 
         return `
@@ -218,7 +220,7 @@ export class ActionBarView {
                     title="${action.tooltip || action.label}"
                     ${isDisabled ? 'disabled' : ''}
                     ${action.keyboard ? `data-keyboard="${action.keyboard}"` : ''}>
-                ${icon ? `<span class="action-icon">${icon}</span>` : ''}
+                ${iconValue ? `<span class="action-icon">${iconValue}</span>` : ''}
                 <span class="action-label">${action.label}</span>
                 ${badge}
             </button>
@@ -251,7 +253,8 @@ export class ActionBarView {
             action.size ? `action-bar-button--${action.size}` : ''
         ].filter(Boolean).join(' ');
 
-        const icon = isLoading ? ICONS.LOADING : (action.icon || '');
+        const iconKey = action.icon ? action.icon.toUpperCase().replace('-', '_') as keyof typeof ICONS : null;
+        const iconValue = isLoading ? ICONS.LOADING : (iconKey && ICONS[iconKey] || '');
         const dropdownItems = this.renderDropdownItems(componentId, action.id, action.dropdownItems || []);
 
         return `
@@ -266,7 +269,7 @@ export class ActionBarView {
                         ${isDisabled ? 'disabled' : ''}
                         aria-haspopup="true"
                         aria-expanded="false">
-                    ${icon ? `<span class="action-icon">${icon}</span>` : ''}
+                    ${iconValue ? `<span class="action-icon">${iconValue}</span>` : ''}
                     <span class="action-label">${action.label}</span>
                     <span class="dropdown-arrow">${ICONS.CHEVRON_DOWN}</span>
                 </button>
@@ -391,27 +394,6 @@ export class ActionBarView {
         `;
     }
 
-    /**
-     * Helper method to escape HTML
-     */
-    private static escapeHtml(text: string): string {
-        return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-    }
-    
-    /**
-     * Helper method to escape HTML attributes
-     */
-    private static escapeAttribute(text: string): string {
-        return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#x27;');
-    }
 
     /**
      * Generate minimal action bar HTML (for inline use)

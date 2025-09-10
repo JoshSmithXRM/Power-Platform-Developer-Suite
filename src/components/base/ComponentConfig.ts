@@ -230,6 +230,7 @@ export const ICONS = {
     RESET: '↩️',
     MORE_HORIZONTAL: '⋯',
     SHARE: '🔗',
+    EXTERNAL_LINK: '🔗',
     
     // Status
     SUCCESS: '✅',
