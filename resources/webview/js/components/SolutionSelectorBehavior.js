@@ -218,8 +218,102 @@ class SolutionSelectorBehavior {
     }
 
     performSearch(componentId, query) {
+        console.log(`SolutionSelector: Performing search for "${query}"`);
+        
+        const instance = this.instances.get(componentId);
+        if (!instance) return;
+        
+        // Filter options based on search query
+        this.filterOptions(instance, query);
+        
         // Emit search event to Extension Host
         this.emitEvent(componentId, 'search', { query });
+    }
+    
+    filterOptions(instance, query) {
+        const options = instance.element.querySelectorAll('.solution-selector-option');
+        const lowerQuery = query.toLowerCase().trim();
+        let visibleCount = 0;
+        
+        options.forEach(option => {
+            const displayName = option.getAttribute('data-solution-display-name')?.toLowerCase() || '';
+            const uniqueName = option.getAttribute('data-solution-unique-name')?.toLowerCase() || '';
+            const friendlyName = option.getAttribute('data-solution-friendly-name')?.toLowerCase() || '';
+            const publisherName = option.getAttribute('data-solution-publisher-name')?.toLowerCase() || '';
+            
+            // Check if any of the solution attributes match the query
+            const matches = !lowerQuery || 
+                           displayName.includes(lowerQuery) ||
+                           uniqueName.includes(lowerQuery) ||
+                           friendlyName.includes(lowerQuery) ||
+                           publisherName.includes(lowerQuery);
+            
+            if (matches) {
+                option.style.display = 'block';
+                visibleCount++;
+            } else {
+                option.style.display = 'none';
+            }
+        });
+        
+        // Update groups visibility based on whether they have visible options
+        this.updateGroupVisibility(instance);
+        
+        // Show/hide no results message
+        this.updateNoResultsMessage(instance, visibleCount, query);
+        
+        console.log(`SolutionSelector: Filtered to ${visibleCount} visible options for query "${query}"`);
+    }
+    
+    updateGroupVisibility(instance) {
+        const groups = instance.element.querySelectorAll('.solution-selector-group');
+        
+        groups.forEach(group => {
+            const visibleOptions = group.querySelectorAll('.solution-selector-option[style*="display: block"], .solution-selector-option:not([style*="display: none"])');
+            
+            if (visibleOptions.length === 0) {
+                group.style.display = 'none';
+            } else {
+                group.style.display = 'block';
+            }
+        });
+    }
+    
+    updateNoResultsMessage(instance, visibleCount, query) {
+        let noResultsMessage = instance.element.querySelector('.solution-selector-no-results');
+        
+        if (visibleCount === 0 && query.trim()) {
+            // Create no results message if it doesn't exist
+            if (!noResultsMessage) {
+                noResultsMessage = document.createElement('div');
+                noResultsMessage.className = 'solution-selector-no-results';
+                noResultsMessage.innerHTML = `
+                    <div class="solution-selector-no-results-content">
+                        <span class="solution-selector-no-results-text">No solutions found matching "${query}"</span>
+                    </div>
+                `;
+                
+                // Insert after search container or at beginning of dropdown
+                const searchContainer = instance.element.querySelector('.solution-selector-search');
+                const dropdown = instance.element.querySelector('.solution-selector-dropdown');
+                
+                if (searchContainer && dropdown) {
+                    searchContainer.insertAdjacentElement('afterend', noResultsMessage);
+                } else if (dropdown) {
+                    dropdown.insertAdjacentElement('afterbegin', noResultsMessage);
+                }
+            } else {
+                // Update existing message
+                const textElement = noResultsMessage.querySelector('.solution-selector-no-results-text');
+                if (textElement) {
+                    textElement.textContent = `No solutions found matching "${query}"`;
+                }
+            }
+            
+            noResultsMessage.style.display = 'block';
+        } else if (noResultsMessage) {
+            noResultsMessage.style.display = 'none';
+        }
     }
 
     clearSearch(componentId) {
@@ -231,7 +325,27 @@ class SolutionSelectorBehavior {
             searchInput.value = '';
             instance.searchQuery = '';
             this.updateSearchClearButton(instance);
-            this.performSearch(componentId, '');
+            
+            // Reset all options to visible
+            const options = instance.element.querySelectorAll('.solution-selector-option');
+            options.forEach(option => {
+                option.style.display = 'block';
+            });
+            
+            // Reset all groups to visible
+            const groups = instance.element.querySelectorAll('.solution-selector-group');
+            groups.forEach(group => {
+                group.style.display = 'block';
+            });
+            
+            // Hide no results message
+            const noResultsMessage = instance.element.querySelector('.solution-selector-no-results');
+            if (noResultsMessage) {
+                noResultsMessage.style.display = 'none';
+            }
+            
+            // Also emit the search event for consistency
+            this.emitEvent(componentId, 'search', { query: '' });
             searchInput.focus();
         }
     }

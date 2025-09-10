@@ -885,6 +885,15 @@ const DataTableBehaviorStatic = {
      * Update table data efficiently without full page reload
      */
     updateDisplayData(componentId, data) {
+        console.log(`DEBUG: DataTableBehavior.updateDisplayData called for ${componentId}`, {
+            componentId,
+            dataType: typeof data,
+            isArray: Array.isArray(data),
+            dataLength: data?.length,
+            hasData: !!data,
+            sampleData: data?.slice(0, 2)
+        });
+        
         const instance = this.instances.get(componentId);
         if (!instance) {
             console.error(`DataTable instance not found for update: ${componentId}`);

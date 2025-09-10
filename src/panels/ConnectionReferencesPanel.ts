@@ -543,6 +543,16 @@ export class ConnectionReferencesPanel extends BasePanel {
                 });
                 
                 this.componentLogger.trace('About to call setData() which should trigger update event');
+                this.componentLogger.debug('DEBUG: Data being passed to setData()', {
+                    requestedSolutionId: solutionId,
+                    dataType: typeof tableData.relationships,
+                    isArray: Array.isArray(tableData.relationships),
+                    length: tableData.relationships?.length,
+                    hasIdProperty: tableData.relationships?.[0]?.id !== undefined,
+                    sampleRow: tableData.relationships?.[0],
+                    uniqueSolutionIds: [...new Set(tableData.relationships?.map((r: any) => r.solutionId).filter(Boolean))],
+                    relationshipTypes: [...new Set(tableData.relationships?.map((r: any) => r.relationshipType))]
+                });
                 this.dataTableComponent.setData(tableData.relationships || []);
                 this.componentLogger.trace('setData() call completed - event bridge should have forwarded to webview');
                 // Note: setData() already calls notifyUpdate() to update the table in webview

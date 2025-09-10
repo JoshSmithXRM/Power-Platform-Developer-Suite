@@ -315,6 +315,12 @@ export class SolutionSelectorView {
                  aria-selected="${isSelected}"
                  data-solution-id="${solution.id}"
                  data-solution-unique-name="${solution.uniqueName}"
+                 data-solution-display-name="${solution.displayName || solution.friendlyName || solution.uniqueName}"
+                 data-solution-friendly-name="${solution.friendlyName || solution.displayName || solution.uniqueName}"
+                 data-solution-version="${solution.version || ''}"
+                 data-solution-managed="${solution.isManaged}"
+                 data-solution-publisher-id="${solution.publisherId || ''}"
+                 data-solution-publisher-name="${solution.publisherName || ''}"
                  data-component-element="option"
                  data-option-index="${index}"
                  ${showTooltips && tooltipText ? `title="${this.escapeHtml(tooltipText)}"` : ''}>

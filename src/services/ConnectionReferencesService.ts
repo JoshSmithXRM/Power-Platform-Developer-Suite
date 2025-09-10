@@ -102,7 +102,11 @@ export class ConnectionReferencesService {
         const allFlowsUrl = `${baseUrl}/workflows?$select=workflowid,name,clientdata,modifiedon,ismanaged&$expand=modifiedby($select=fullname)&$filter=category eq 5`;
         
         debug.allFlowsUrl = allFlowsUrl;
-        this.logger.info('Loading flows from environment', { environmentId, solutionId });
+        this.logger.info('Loading flows from environment for filtering', { 
+            environmentId, 
+            solutionId: solutionId || 'all',
+            filteringApplied: !!solutionId && solutionId !== 'test-bypass'
+        });
 
         const allFlowsResp = await fetch(allFlowsUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
         debug.allFlowsRespOk = !!allFlowsResp && allFlowsResp.ok;
@@ -145,7 +149,11 @@ export class ConnectionReferencesService {
         const allCRUrl = `${baseUrl}/connectionreferences?$select=connectionreferenceid,connectionreferencelogicalname,connectionreferencedisplayname,connectorid,connectionid,modifiedon,ismanaged&$expand=modifiedby($select=fullname)`;
         
         debug.allCRUrl = allCRUrl;
-        this.logger.info('Loading ALL connection references from environment', { environmentId });
+        this.logger.info('Loading connection references from environment for filtering', { 
+            environmentId, 
+            solutionId: solutionId || 'all',
+            filteringApplied: !!solutionId && solutionId !== 'test-bypass'
+        });
 
         const allCRResp = await fetch(allCRUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
         debug.allCRRespOk = !!allCRResp && allCRResp.ok;
@@ -225,9 +233,18 @@ export class ConnectionReferencesService {
         let connectionReferences: ConnectionReferenceItem[] = [];
 
         if (solutionId && solutionId !== 'test-bypass') {
+            this.logger.info('Filtering data by solution membership', {
+                environmentId,
+                solutionId, 
+                totalFlowsCount: allFlows.length,
+                totalConnectionReferencesCount: allConnectionReferences.length,
+                solutionFlowIdsCount: solutionFlowIds.size,
+                solutionCRIdsCount: solutionCRIds.size
+            });
+            
             // Filter flows by solution membership
             flows = allFlows.filter((flow: any) => solutionFlowIds.has(flow.id));
-            this.logger.debug('Filtered flows by solution membership', { 
+            this.logger.info('Filtered flows by solution membership', { 
                 environmentId, 
                 solutionId, 
                 filteredFlowsCount: flows.length, 
@@ -236,19 +253,20 @@ export class ConnectionReferencesService {
 
             // Filter connection references by solution membership
             connectionReferences = allConnectionReferences.filter((cr: ConnectionReferenceItem) => solutionCRIds.has(cr.id));
-            this.logger.debug('Filtered connection references by solution membership', { 
+            this.logger.info('Filtered connection references by solution membership', { 
                 environmentId, 
                 solutionId, 
                 filteredConnectionReferencesCount: connectionReferences.length, 
-                totalConnectionReferencesCount: allConnectionReferences.length,
-                sampleConnectionReferences: connectionReferences.slice(0, 3).map(cr => ({
-                    id: cr.id,
-                    name: cr.name,
-                    referencedConnectionId: cr.referencedConnectionId,
-                    connectorLogicalName: cr.connectorLogicalName
-                }))
+                totalConnectionReferencesCount: allConnectionReferences.length
             });
         } else {
+            this.logger.info('No solution filtering applied - using all data', {
+                environmentId,
+                solutionId: solutionId || 'none',
+                totalFlowsCount: allFlows.length,
+                totalConnectionReferencesCount: allConnectionReferences.length
+            });
+            
             // No solution filtering - use all data
             flows = allFlows;
             connectionReferences = allConnectionReferences;

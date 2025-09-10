@@ -656,6 +656,26 @@
     }
 }
 
+/* No results message */
+.solution-selector-no-results {
+    padding: 16px 12px;
+    text-align: center;
+    color: var(--vscode-descriptionForeground);
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.solution-selector-no-results-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.solution-selector-no-results-text {
+    font-size: 13px;
+    font-style: italic;
+}
+
 /* Animation keyframes */
 @keyframes spin {
     0% { transform: rotate(0deg); }
