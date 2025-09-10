@@ -1,4 +1,5 @@
 import { QueryOptions, FilterOperator, QueryFilter } from './DataverseQueryService';
+import { ServiceFactory } from './ServiceFactory';
 
 export interface ParsedFetchXml {
     entity: string;
@@ -25,6 +26,14 @@ interface SimpleXmlElement {
 }
 
 export class FetchXmlParser {
+    private static _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private static get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('FetchXmlParser');
+        }
+        return this._logger;
+    }
     /**
      * Simple XML parser for Node.js environment
      */
@@ -50,7 +59,10 @@ export class FetchXmlParser {
                 content: rootContent
             };
         } catch (error) {
-            console.error('Error parsing XML:', error);
+            this.logger.error('Error parsing XML string', error as Error, {
+                xmlLength: xmlString?.length || 0,
+                operation: 'parseXmlString'
+            });
             return null;
         }
     }
@@ -126,7 +138,10 @@ export class FetchXmlParser {
         try {
             const doc = this.parseXmlString(fetchXml);
             if (!doc) {
-                console.error('Failed to parse FetchXML');
+                this.logger.error('Failed to parse FetchXML document', new Error('XML parsing failed'), {
+                    fetchXmlLength: fetchXml?.length || 0,
+                    operation: 'parseFetchXml'
+                });
                 return null;
             }
             
@@ -134,7 +149,11 @@ export class FetchXmlParser {
             const entityElement = this.findElement(doc, 'entity');
             
             if (!entityElement) {
-                console.error('No entity element found in FetchXML');
+                this.logger.error('No entity element found in FetchXML', new Error('Missing entity element'), {
+                    fetchXmlLength: fetchXml?.length || 0,
+                    hasDocument: !!doc,
+                    operation: 'parseFetchXml'
+                });
                 return null;
             }
 
@@ -232,9 +251,20 @@ export class FetchXmlParser {
                 });
             }
 
+            this.logger.info('FetchXML parsed successfully', {
+                entity: result.entity,
+                attributesCount: result.attributes.length,
+                filtersCount: result.filters.length,
+                hasOrderBy: !!result.orderBy,
+                hasTop: !!result.top
+            });
+            
             return result;
         } catch (error) {
-            console.error('Error parsing FetchXML:', error);
+            this.logger.error('Error parsing FetchXML', error as Error, {
+                fetchXmlLength: fetchXml?.length || 0,
+                operation: 'parseFetchXml'
+            });
             return null;
         }
     }
@@ -311,7 +341,12 @@ export class FetchXmlParser {
                 filterValue = 'USER_TEAMS'; // Placeholder
                 break;
             default:
-                console.warn(`Unsupported FetchXML operator: ${operator}`);
+                this.logger.warn('Unsupported FetchXML operator encountered', {
+                    operator,
+                    attribute,
+                    value,
+                    operation: 'convertConditionToFilter'
+                });
                 return null;
         }
 
@@ -329,7 +364,10 @@ export class FetchXmlParser {
         try {
             const doc = this.parseXmlString(layoutXml);
             if (!doc) {
-                console.error('Failed to parse LayoutXML');
+                this.logger.error('Failed to parse LayoutXML document', new Error('XML parsing failed'), {
+                    layoutXmlLength: layoutXml?.length || 0,
+                    operation: 'parseLayoutXml'
+                });
                 return null;
             }
             
@@ -347,9 +385,17 @@ export class FetchXmlParser {
                 }
             });
 
+            this.logger.info('LayoutXML parsed successfully', {
+                columnsCount: columns.length,
+                columnNames: columns.map(c => c.name)
+            });
+            
             return { columns };
         } catch (error) {
-            console.error('Error parsing LayoutXML:', error);
+            this.logger.error('Error parsing LayoutXML', error as Error, {
+                layoutXmlLength: layoutXml?.length || 0,
+                operation: 'parseLayoutXml'
+            });
             return null;
         }
     }

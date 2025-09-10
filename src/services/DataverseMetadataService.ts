@@ -1,4 +1,5 @@
 import { AuthenticationService } from './AuthenticationService';
+import { ServiceFactory } from './ServiceFactory';
 
 export interface AttributeMetadata {
     logicalName: string;
@@ -18,6 +19,14 @@ export interface EntityMetadataCache {
 export class DataverseMetadataService {
     private metadataCache: EntityMetadataCache = {};
     private readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('DataverseMetadataService');
+        }
+        return this._logger;
+    }
 
     constructor(private authService: AuthenticationService) {}
 
@@ -28,24 +37,40 @@ export class DataverseMetadataService {
         const cacheKey = entityLogicalName;
         const now = Date.now();
         
+        this.logger.debug('Requesting entity attributes', { environmentId, entityLogicalName });
+        
         // Check cache first
         if (this.metadataCache[cacheKey] && 
             (now - this.metadataCache[cacheKey].lastUpdated) < this.CACHE_DURATION) {
-            console.log(`Using cached metadata for entity: ${entityLogicalName}`);
+            this.logger.debug('Using cached metadata for entity', { 
+                entityLogicalName, 
+                cacheAge: now - this.metadataCache[cacheKey].lastUpdated,
+                attributesCount: Object.keys(this.metadataCache[cacheKey].attributes).length
+            });
             return Object.values(this.metadataCache[cacheKey].attributes);
         }
 
-        console.log(`Fetching metadata for entity: ${entityLogicalName}`);
+        this.logger.info('Fetching metadata for entity', { environmentId, entityLogicalName });
         
         try {
             const token = await this.authService.getAccessToken(environmentId);
             const environment = await this.authService.getEnvironment(environmentId);
             if (!environment) {
+                this.logger.error('Environment not found during metadata request', new Error('Environment not found'), { 
+                    environmentId, 
+                    entityLogicalName 
+                });
                 throw new Error('Environment not found');
             }
             
             const baseUrl = environment.settings.dataverseUrl;
             const url = `${baseUrl}/api/data/v9.2/EntityDefinitions?$filter=LogicalName eq '${entityLogicalName}'&$expand=Attributes&$select=LogicalName,DisplayName`;
+            
+            this.logger.debug('Making Dataverse metadata API call', { 
+                url, 
+                entityLogicalName, 
+                dataverseUrl: baseUrl 
+            });
             
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
@@ -63,11 +88,22 @@ export class DataverseMetadataService {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
+                this.logger.error('Failed to fetch entity metadata', new Error('API request failed'), { 
+                    entityLogicalName, 
+                    status: response.status, 
+                    statusText: response.statusText,
+                    environmentId
+                });
                 throw new Error(`Failed to fetch entity metadata: ${response.statusText}`);
             }
 
             const data = await response.json();
             if (!data.value || data.value.length === 0) {
+                this.logger.error('Entity not found in metadata response', new Error('Entity not found'), { 
+                    entityLogicalName, 
+                    environmentId,
+                    responseSize: data.value?.length || 0
+                });
                 throw new Error(`Entity ${entityLogicalName} not found`);
             }
 
@@ -95,11 +131,20 @@ export class DataverseMetadataService {
                 lastUpdated: now
             };
 
-            console.log(`Cached ${Object.keys(attributes).length} attributes for entity: ${entityLogicalName}`);
+            this.logger.info('Entity metadata cached successfully', { 
+                entityLogicalName,
+                attributesCount: Object.keys(attributes).length,
+                environmentId
+            });
+            
             return Object.values(attributes);
 
         } catch (error) {
-            console.error('Error fetching entity metadata:', error);
+            this.logger.error('Error fetching entity metadata', error as Error, { 
+                entityLogicalName, 
+                environmentId,
+                operation: 'getEntityAttributes'
+            });
             throw error;
         }
     }
@@ -109,10 +154,39 @@ export class DataverseMetadataService {
      */
     async getAttributeMetadata(environmentId: string, entityLogicalName: string, attributeName: string): Promise<AttributeMetadata | null> {
         try {
+            this.logger.debug('Requesting specific attribute metadata', { 
+                environmentId, 
+                entityLogicalName, 
+                attributeName 
+            });
+            
             const attributes = await this.getEntityAttributes(environmentId, entityLogicalName);
-            return attributes.find(attr => attr.logicalName === attributeName) || null;
+            const attribute = attributes.find(attr => attr.logicalName === attributeName) || null;
+            
+            if (attribute) {
+                this.logger.debug('Attribute metadata found', { 
+                    entityLogicalName, 
+                    attributeName,
+                    attributeType: attribute.attributeType,
+                    isLookup: attribute.isLookup
+                });
+            } else {
+                this.logger.warn('Attribute not found in entity metadata', {
+                    entityLogicalName,
+                    attributeName,
+                    availableAttributes: attributes.length
+                });
+            }
+            
+            return attribute;
         } catch (error) {
-            console.warn(`Failed to get metadata for attribute ${attributeName} on entity ${entityLogicalName}:`, error);
+            this.logger.warn('Failed to get metadata for attribute', {
+                attributeName,
+                entityLogicalName,
+                environmentId,
+                error: (error as Error).message,
+                operation: 'getAttributeMetadata'
+            });
             return null;
         }
     }

@@ -228,14 +228,12 @@ export class ConnectionReferencesPanel extends BasePanel {
      */
     private getComponentType(component: any): string {
         if (!component) {
-            console.log('DEBUG: getComponentType called with null/undefined component');
+            this.componentLogger.warn('getComponentType called with null/undefined component');
             return 'Unknown';
         }
         
         const constructor = component.constructor;
         const className = constructor.name;
-        
-        console.log('DEBUG: getComponentType - className:', className, 'component:', component);
         
         // Map class names to component types
         const typeMapping: { [key: string]: string } = {
@@ -248,7 +246,12 @@ export class ConnectionReferencesPanel extends BasePanel {
         };
         
         const mappedType = typeMapping[className] || className || 'Unknown';
-        console.log('DEBUG: getComponentType result:', mappedType);
+        
+        this.componentLogger.trace('Component type mapped', { 
+            className, 
+            mappedType, 
+            hasComponent: !!component 
+        });
         
         return mappedType;
     }
@@ -284,12 +287,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                         dataLength: componentData?.length || 0
                     });
                     
-                    console.log('DEBUG: Event bridge received update event, forwarding to webview:', {
-                        componentId: event.componentId,
-                        componentType: componentType,
-                        dataLength: componentData?.length || 0
-                    });
-                    
                     this.postMessage({
                         action: 'componentUpdate',
                         componentId: event.componentId,
@@ -298,7 +295,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                     });
                     
                     this.componentLogger.trace('Event bridge message posted to webview');
-                    console.log('DEBUG: Message posted to webview successfully');
                 });
                 
                 // Set up state change event bridge
@@ -322,7 +318,26 @@ export class ConnectionReferencesPanel extends BasePanel {
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
         try {
-            switch (message.command) {
+            // Validate message structure
+            if (!message || typeof message !== 'object') {
+                this.componentLogger.warn('Received malformed message - not an object', { message });
+                return;
+            }
+
+            const { command } = message;
+            
+            // Handle empty or undefined command
+            if (!command) {
+                this.componentLogger.trace('Received message with no command property', { 
+                    message,
+                    keys: Object.keys(message || {}),
+                    hasData: !!message.data,
+                    hasAction: !!message.action
+                });
+                return;
+            }
+            
+            switch (command) {
                 case 'environmentChanged':
                 case 'environment-selected':
                     await this.handleEnvironmentSelection(message.data?.environmentId);
@@ -509,10 +524,8 @@ export class ConnectionReferencesPanel extends BasePanel {
                 });
                 
                 this.componentLogger.trace('About to call setData() which should trigger update event');
-                console.log('DEBUG: About to call setData with data:', tableData.relationships?.length || 0);
                 this.dataTableComponent.setData(tableData.relationships || []);
                 this.componentLogger.trace('setData() call completed - event bridge should have forwarded to webview');
-                console.log('DEBUG: setData() completed, event should have been emitted');
                 // Note: setData() already calls notifyUpdate() to update the table in webview
                 // No need to call updateWebview() which would reload the entire HTML
             }

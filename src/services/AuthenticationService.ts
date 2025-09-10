@@ -6,17 +6,28 @@ import * as os from 'os';
 import { PowerPlatformSettings, EnvironmentConnection } from '../models/PowerPlatformSettings';
 import { AuthenticationMethod } from '../models/AuthenticationMethod';
 import { AuthenticationResult, TokenCacheEntry } from '../models/AuthenticationResult';
+import { ServiceFactory } from './ServiceFactory';
 
 export class AuthenticationService {
     private static instance: AuthenticationService;
     private tokenStorage: any;
     private secretStorage: vscode.SecretStorage;
     private context: vscode.ExtensionContext;
+    private storageInitialized: boolean = false;
+    private storageInitPromise: Promise<void> | null = null;
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('AuthenticationService');
+        }
+        return this._logger;
+    }
 
     private constructor(context: vscode.ExtensionContext) {
         this.context = context;
         this.secretStorage = context.secrets;
-        this.initializeStorage();
+        this.storageInitPromise = this.initializeStorage();
     }
 
     public static getInstance(context: vscode.ExtensionContext): AuthenticationService {
@@ -29,6 +40,8 @@ export class AuthenticationService {
     private async initializeStorage(): Promise<void> {
         try {
             const cacheDir = path.join(os.homedir(), '.power-platform-dev-suite', 'cache');
+            this.logger.debug('Initializing token storage', { cacheDir });
+            
             this.tokenStorage = storage.create({
                 dir: cacheDir,
                 stringify: JSON.stringify,
@@ -41,8 +54,23 @@ export class AuthenticationService {
             });
             
             await this.tokenStorage.init();
+            this.storageInitialized = true;
+            this.logger.info('Token storage initialized successfully', { cacheDir });
         } catch (error) {
-            console.error('Failed to initialize token storage:', error);
+            this.logger.error('Failed to initialize token storage', error as Error, { 
+                cacheDir: path.join(os.homedir(), '.power-platform-dev-suite', 'cache'),
+                operation: 'initializeStorage'
+            });
+            this.storageInitialized = false;
+        }
+    }
+
+    /**
+     * Ensure storage is initialized before using token operations
+     */
+    private async ensureStorageInitialized(): Promise<void> {
+        if (!this.storageInitialized && this.storageInitPromise) {
+            await this.storageInitPromise;
         }
     }
 
@@ -58,23 +86,39 @@ export class AuthenticationService {
     }
 
     public async getAccessToken(environmentId: string): Promise<string> {
+        this.logger.debug('Requesting access token', { environmentId });
+        
         // Try to get cached token first
         const cachedToken = await this.getCachedToken(environmentId);
         if (cachedToken && this.isTokenValid(cachedToken.authResult)) {
+            this.logger.debug('Using cached token for environment', { environmentId });
             return cachedToken.authResult.accessToken;
         }
 
         // Get environment settings
         const environment = await this.getEnvironmentSettings(environmentId);
         if (!environment) {
+            this.logger.error('Environment not found during token request', new Error('Environment not found'), { environmentId });
             throw new Error(`Environment ${environmentId} not found`);
         }
+
+        this.logger.info('Authenticating with environment', { 
+            environmentId, 
+            authMethod: environment.settings.authenticationMethod,
+            dataverseUrl: environment.settings.dataverseUrl 
+        });
 
         // Authenticate based on method
         const authResult = await this.authenticate(environment.settings);
         
         // Cache the new token
         await this.cacheToken(environmentId, authResult);
+        
+        this.logger.info('Access token obtained successfully', { 
+            environmentId,
+            username: authResult.account?.username || 'Unknown',
+            expiresOn: authResult.expiresOn
+        });
         
         return authResult.accessToken;
     }
@@ -163,7 +207,12 @@ export class AuthenticationService {
             };
         } catch (error: any) {
             // If VS Code auth fails, fall back to manual implementation
-            console.log('VS Code authentication failed, falling back to manual auth:', error.message);
+            this.logger.warn('VS Code authentication failed, falling back to manual auth', {
+                errorMessage: error.message,
+                scopes,
+                dataverseUrl: settings.dataverseUrl,
+                fallbackMethod: 'manual-interactive'
+            });
             
             // Manual interactive auth using authorization code flow
             return await this.authenticateInteractiveManual(settings, scopes);
@@ -335,19 +384,50 @@ export class AuthenticationService {
 
     private async getCachedToken(environmentId: string): Promise<TokenCacheEntry | null> {
         try {
-            if (!this.tokenStorage) return null;
+            await this.ensureStorageInitialized();
+            
+            if (!this.storageInitialized || !this.tokenStorage) {
+                this.logger.debug('Token storage not available, skipping cache lookup', { 
+                    environmentId,
+                    storageInitialized: this.storageInitialized,
+                    hasTokenStorage: !!this.tokenStorage
+                });
+                return null;
+            }
+            
             const cacheKey = `token-${environmentId}`;
             const cached = await this.tokenStorage.getItem(cacheKey);
+            
+            if (cached) {
+                this.logger.debug('Cached token found for environment', { environmentId });
+            } else {
+                this.logger.debug('No cached token found for environment', { environmentId });
+            }
+            
             return cached as TokenCacheEntry | null;
         } catch (error) {
-            console.log('Error getting cached token:', error);
+            this.logger.warn('Error retrieving cached token', {
+                environmentId,
+                error: (error as Error).message,
+                operation: 'getCachedToken'
+            });
             return null;
         }
     }
 
     private async cacheToken(environmentId: string, authResult: AuthenticationResult): Promise<void> {
         try {
-            if (!this.tokenStorage) return;
+            await this.ensureStorageInitialized();
+            
+            if (!this.storageInitialized || !this.tokenStorage) {
+                this.logger.debug('Token storage not available, skipping cache', { 
+                    environmentId,
+                    storageInitialized: this.storageInitialized,
+                    hasTokenStorage: !!this.tokenStorage
+                });
+                return;
+            }
+            
             const cacheEntry: TokenCacheEntry = {
                 environmentId,
                 authResult,
@@ -356,8 +436,18 @@ export class AuthenticationService {
             
             const cacheKey = `token-${environmentId}`;
             await this.tokenStorage.setItem(cacheKey, cacheEntry);
+            
+            this.logger.debug('Token cached successfully', { 
+                environmentId,
+                expiresOn: authResult.expiresOn,
+                username: authResult.account?.username || 'Unknown'
+            });
         } catch (error) {
-            console.log('Error caching token:', error);
+            this.logger.warn('Error caching token', {
+                environmentId,
+                error: (error as Error).message,
+                operation: 'cacheToken'
+            });
         }
     }
 

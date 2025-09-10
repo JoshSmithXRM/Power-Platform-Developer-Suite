@@ -33,10 +33,14 @@ export class ServiceFactory {
             return;
         }
         
+        // Initialize LoggerService FIRST to avoid circular dependency issues
+        ServiceFactory.loggerService = LoggerService.getInstance();
+        
+        // Now initialize all other services
         ServiceFactory.authService = AuthenticationService.getInstance(context);
         ServiceFactory.stateService = StateService.getInstance(context);
-    ServiceFactory.solutionService = new SolutionService(ServiceFactory.authService);
-    ServiceFactory.connectionReferencesService = new ConnectionReferencesService(ServiceFactory.authService);
+        ServiceFactory.solutionService = new SolutionService(ServiceFactory.authService);
+        ServiceFactory.connectionReferencesService = new ConnectionReferencesService(ServiceFactory.authService);
         ServiceFactory.deploymentSettingsService = new DeploymentSettingsService();
         ServiceFactory.environmentVariablesService = new EnvironmentVariablesService(ServiceFactory.authService);
         ServiceFactory.solutionComponentService = new SolutionComponentService(ServiceFactory.authService);
@@ -44,7 +48,7 @@ export class ServiceFactory {
         ServiceFactory.metadataService = new MetadataService(ServiceFactory.authService);
         ServiceFactory.dataverseQueryService = new DataverseQueryService(ServiceFactory.authService);
         ServiceFactory.dataverseMetadataService = new DataverseMetadataService(ServiceFactory.authService);
-        ServiceFactory.loggerService = LoggerService.getInstance();
+        
         ServiceFactory.initialized = true;
         
         // Use logger service instead of console.log
@@ -129,8 +133,9 @@ export class ServiceFactory {
     }
     
     static getLoggerService(): LoggerService {
-        if (!ServiceFactory.initialized) {
-            throw new Error('ServiceFactory not initialized. Call initialize() first.');
+        // For LoggerService, we allow access during initialization to prevent circular deps
+        if (!ServiceFactory.loggerService) {
+            ServiceFactory.loggerService = LoggerService.getInstance();
         }
         return ServiceFactory.loggerService;
     }
