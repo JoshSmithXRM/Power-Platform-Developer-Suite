@@ -2,6 +2,16 @@ import { BaseComponent } from '../components/base/BaseComponent';
 import * as vscode from 'vscode';
 
 /**
+ * WebviewResources interface for resource management
+ */
+export interface WebviewResources {
+    tableUtilsScript: vscode.Uri;
+    tableStylesSheet: vscode.Uri;
+    panelStylesSheet: vscode.Uri;
+    panelUtilsScript: vscode.Uri;
+}
+
+/**
  * PanelComposer.ts
  * 
  * Composes complete HTML templates from multiple components
@@ -51,6 +61,38 @@ export class PanelComposer {
             resourceUriScheme: 'vscode-resource',
             ...config
         };
+    }
+
+    /**
+     * Simple composition method as specified in architecture guide
+     * Composes components directly into HTML string
+     * 
+     * @param components Array of components to compose
+     * @param webviewResources Resource URIs for CSS and JS files
+     * @param panelTitle Optional panel title (also used for panel-specific CSS)
+     */
+    public static compose(
+        components: BaseComponent[], 
+        webviewResources: WebviewResources,
+        panelTitle?: string
+    ): string {
+        // Generate component HTML by concatenating component outputs
+        const componentHTML = components.map(component => component.generateHTML()).join('\n');
+        
+        // Collect required CSS files (including optional panel-specific CSS)
+        const cssFiles = PanelComposer.collectCSSFiles(components, panelTitle);
+        
+        // Collect required behavior scripts  
+        const behaviorScripts = PanelComposer.collectBehaviorScripts(components);
+        
+        // Generate complete HTML document
+        return PanelComposer.generateCompleteHTML({
+            title: panelTitle || 'Panel',
+            componentHTML,
+            cssFiles,
+            behaviorScripts,
+            webviewResources
+        });
     }
 
     /**
@@ -109,7 +151,7 @@ export class PanelComposer {
     ): ComposedPanel {
         const template: PanelTemplate = {
             title,
-            template: this.getLayoutTemplate(layout),
+            template: this.getLayoutTemplate(layout, components.length),
             components: components.map((component, index) => ({
                 component,
                 placeholder: `{{COMPONENT_${index}}}`,
@@ -296,13 +338,18 @@ export class PanelComposer {
     /**
      * Get layout template for multi-component panels
      */
-    private getLayoutTemplate(layout: 'vertical' | 'horizontal' | 'grid'): string {
+    private getLayoutTemplate(layout: 'vertical' | 'horizontal' | 'grid', componentCount: number = 0): string {
         const layoutClass = `panel-layout--${layout}`;
+        
+        // Generate component placeholders for the specified number of components
+        const componentPlaceholders = Array.from({ length: componentCount }, (_, index) => 
+            `{{COMPONENT_${index}}}`
+        ).join('\n                    ');
         
         return `
             <div class="panel-container ${layoutClass}">
                 <div class="panel-content">
-                    {{COMPONENTS}}
+                    ${componentPlaceholders}
                 </div>
             </div>
         `;
@@ -523,6 +570,141 @@ export class PanelComposer {
             isValid: errors.length === 0,
             errors
         };
+    }
+
+    /**
+     * Static helper methods for simple composition
+     * 
+     * Collects CSS files in order:
+     * 1. Base component styles (applied to all components)
+     * 2. Base panel styles (applied to all panels)
+     * 3. Component-specific styles (from each component)
+     * 4. Panel-specific styles (optional overrides for specific panels)
+     */
+    private static collectCSSFiles(components: BaseComponent[], panelTitle?: string): string[] {
+        const cssFiles = new Set<string>();
+        
+        // 1. Add base CSS files (foundation styles)
+        cssFiles.add('css/base/component-base.css');
+        cssFiles.add('css/base/panel-base.css');
+        
+        // 2. Collect component-specific CSS files
+        components.forEach(component => {
+            try {
+                const componentCSSFile = component.getCSSFile();
+                if (componentCSSFile) {
+                    cssFiles.add(componentCSSFile);
+                }
+            } catch (error) {
+                console.warn(`Warning collecting CSS for component ${component.getId()}:`, error);
+            }
+        });
+        
+        // 3. Add panel-specific CSS file if panel title is provided
+        // This allows panels to override component styles for their specific needs
+        if (panelTitle) {
+            // Convert panel title to CSS filename format
+            // e.g., "Environment Variables" -> "environment-variables-panel.css"
+            const panelCssName = panelTitle
+                .toLowerCase()
+                .replace(/\s+/g, '-')
+                .replace(/[^a-z0-9-]/g, '');
+            
+            const panelCssFile = `css/panels/${panelCssName}-panel.css`;
+            
+            // Note: This file is optional - if it doesn't exist, it will just not load
+            // This allows gradual adoption of panel-specific styles
+            cssFiles.add(panelCssFile);
+        }
+        
+        return Array.from(cssFiles);
+    }
+
+    private static collectBehaviorScripts(components: BaseComponent[]): string[] {
+        const scripts = new Set<string>();
+        
+        // Add base utility scripts
+        scripts.add('js/utils/ComponentUtils.js');
+        scripts.add('js/utils/PanelUtils.js');
+        
+        // Collect component-specific behavior scripts
+        components.forEach(component => {
+            try {
+                const componentScript = component.getBehaviorScript();
+                if (componentScript) {
+                    scripts.add(componentScript);
+                }
+            } catch (error) {
+                console.warn(`Warning collecting scripts for component ${component.getId()}:`, error);
+            }
+        });
+        
+        return Array.from(scripts);
+    }
+
+    private static generateCompleteHTML(params: {
+        title: string;
+        componentHTML: string;
+        cssFiles: string[];
+        behaviorScripts: string[];
+        webviewResources: WebviewResources;
+    }): string {
+        // Convert webviewResources to URI strings
+        const cssLinks = params.cssFiles.map(css => 
+            `<link rel="stylesheet" href="${params.webviewResources.panelStylesSheet.toString().replace('panel-base.css', css)}">`
+        ).join('\n    ');
+        
+        const jsScripts = params.behaviorScripts.map(script => 
+            `<script src="${params.webviewResources.panelUtilsScript.toString().replace('panel-utils.js', script)}"></script>`
+        ).join('\n    ');
+        
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${params.title}</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src vscode-resource: 'unsafe-inline'; script-src vscode-resource: 'unsafe-inline'; font-src vscode-resource:; img-src vscode-resource: data:;">
+    ${cssLinks}
+</head>
+<body>
+    <div class="panel-container">
+        <div class="panel-content">
+            ${params.componentHTML}
+        </div>
+    </div>
+    
+    <script>
+        // Make vscode API available globally
+        const vscode = acquireVsCodeApi();
+        
+        // Global error handler
+        window.addEventListener('error', function(event) {
+            console.error('Panel error:', event.error);
+            vscode.postMessage({
+                command: 'panel-error',
+                error: {
+                    message: event.error?.message || 'Unknown error',
+                    stack: event.error?.stack
+                }
+            });
+        });
+        
+        // Initialize components when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.ComponentUtils && window.ComponentUtils.initializeAllComponents) {
+                window.ComponentUtils.initializeAllComponents();
+            }
+            
+            vscode.postMessage({
+                command: 'panel-ready',
+                components: window.registeredComponents || []
+            });
+        });
+    </script>
+    ${jsScripts}
+</body>
+</html>`;
     }
 }
 

@@ -1,0 +1,31 @@
+/**
+ * Panel-specific styles for Environment Variables Panel
+ * 
+ * These styles override component defaults for this specific panel.
+ * This file is optional - if not present, only default component styles apply.
+ */
+
+/* Example: Make the environment variables table more compact */
+.environment-variables-table {
+    font-size: 12px;  /* Slightly smaller text for dense data */
+}
+
+.environment-variables-table .data-table-header {
+    padding: 6px 8px;  /* Tighter header padding */
+    background: var(--vscode-list-activeSelectionBackground);
+}
+
+.environment-variables-table .data-table-cell {
+    padding: 4px 8px;  /* Tighter cell padding */
+}
+
+/* Example: Style the solution selector specifically for this panel */
+.environment-variables-solution-selector {
+    margin-bottom: 8px;  /* Less margin for compact layout */
+}
+
+/* Example: Make action buttons smaller in this panel */
+.environment-variables-actions .action-button {
+    padding: 4px 12px;
+    font-size: 12px;
+}

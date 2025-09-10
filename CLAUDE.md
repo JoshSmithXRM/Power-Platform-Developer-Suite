@@ -200,6 +200,78 @@ return `<script type="text/template" id="tableTemplate">
 - **No external network calls** except through proper authentication channels
 - **Ask clarifying questions** when requirements are ambiguous
 
+## Logging Standards (Mandatory)
+
+**Use VS Code's Native Logging APIs - NO console.log statements**
+
+### LoggerService Usage
+
+All logging must use the centralized `LoggerService` accessed through `ServiceFactory`:
+
+```typescript
+// Get component-specific logger
+private logger = ServiceFactory.getLoggerService().createComponentLogger('YourComponent');
+
+// Use structured logging with metadata
+this.logger.info('Panel initialized successfully', { 
+    viewType: this.viewType,
+    componentCount: 3 
+});
+this.logger.error('Failed to load data', error, { environmentId, operation: 'fetchData' });
+```
+
+### Log Levels (Use Appropriately)
+
+- **trace**: Most detailed - component method calls, detailed flow
+- **debug**: Development info - initialization steps, state changes  
+- **info**: Production milestones - panel opened, data loaded, operations completed
+- **warn**: Concerning but recoverable - deprecated usage, fallbacks triggered
+- **error**: Actual failures - exceptions, failed operations, validation errors
+
+### Required Format
+
+```typescript
+// ✅ CORRECT - Structured with context
+this.logger.info('Environment selected', { 
+    environmentId: env.id, 
+    environmentName: env.name,
+    panelType: this.viewType 
+});
+
+// ❌ WRONG - Plain console.log
+console.log('Environment selected:', env.id);
+
+// ❌ WRONG - No context
+this.logger.info('Operation completed');
+```
+
+### Security-Safe Logging
+
+The LoggerService automatically sanitizes sensitive data:
+
+```typescript
+// Automatically redacts tokens, passwords, secrets
+this.logger.debug('API call completed', { 
+    token: 'Bearer abc123...',     // Becomes '[REDACTED]'
+    data: responseData,            // Safe data preserved
+    environmentUrl: env.url        // Safe data preserved
+});
+```
+
+### Accessing Logs
+
+**For Users:**
+- Use VS Code command: `Developer: Open Extensions Logs Folder`
+- Configurable log levels via VS Code: `Developer: Set Log Level...`
+
+**For Development:**
+- View in VS Code Output panel: Select "Power Platform Developer Suite" channel
+- All logs include timestamps and structured metadata
+
+### Migration Rule
+
+**Replace ALL `console.log/error/warn` statements with LoggerService calls.** Use component-specific loggers with appropriate log levels and structured metadata.
+
 ## Development Commands
 
 **Build and Development:**

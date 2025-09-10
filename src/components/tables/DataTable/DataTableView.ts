@@ -1,5 +1,6 @@
 import { DataTableConfig, DataTableColumn, DataTableRow, DataTableAction } from './DataTableConfig';
 import { CSS_CLASSES, ICONS } from '../../base/ComponentConfig';
+import { escapeHtml } from '../../base/HtmlUtils';
 
 /**
  * DataTableView - HTML generation for DataTable component
@@ -784,12 +785,10 @@ export class DataTableView {
     }
 
     /**
-     * Helper method to escape HTML
+     * Helper method to escape HTML - uses Node.js compatible utility
      */
     private static escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return escapeHtml(text);
     }
 
     /**

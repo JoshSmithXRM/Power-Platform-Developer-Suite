@@ -1,5 +1,6 @@
 import { SolutionSelectorConfig, Solution, SOLUTION_SELECTOR_CSS } from './SolutionSelectorConfig';
 import { CSS_CLASSES, ICONS } from '../../base/ComponentConfig';
+import { escapeHtml } from '../../base/HtmlUtils';
 
 /**
  * SolutionSelectorView - HTML generation for SolutionSelector component
@@ -547,11 +548,9 @@ export class SolutionSelectorView {
     }
 
     /**
-     * Escape HTML to prevent XSS
+     * Escape HTML to prevent XSS - uses Node.js compatible utility
      */
     private static escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return escapeHtml(text);
     }
 }

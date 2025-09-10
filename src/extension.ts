@@ -16,13 +16,15 @@ import { MetadataBrowserCommands } from './commands/MetadataBrowserCommands';
  * Extension activation function
  */
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Power Platform Developer Suite extension is now active!');
 
     // Initialize services first
     ServiceFactory.initialize(context);
     
     // Get services from factory
     const authService = ServiceFactory.getAuthService();
+    const logger = ServiceFactory.getLoggerService();
+    
+    logger.info('Extension', 'Power Platform Developer Suite extension is now active!');
 
     // Initialize providers
     const environmentsProvider = new EnvironmentsProvider(authService);
@@ -47,7 +49,7 @@ export function activate(context: vscode.ExtensionContext) {
             ...metadataBrowserCommands.registerCommands()
         ];
     } catch (err: any) {
-        console.error('Failed to register commands during activation:', err);
+        logger.error('Extension', 'Failed to register commands during activation', err);
 
         // Fallback for the metadata browser command to avoid 'command not found'
         const fallback = vscode.commands.registerCommand('power-platform-dev-suite.openMetadataBrowser', () => {
@@ -60,12 +62,14 @@ export function activate(context: vscode.ExtensionContext) {
     // Add all disposables to context
     context.subscriptions.push(...commandDisposables);
 
-    console.log('Power Platform Developer Suite extension activated successfully!');
+    logger.info('Extension', 'Power Platform Developer Suite extension activated successfully!');
 }
 
 /**
  * Extension deactivation function
  */
 export function deactivate() {
-    console.log('Power Platform Developer Suite extension deactivated');
+    const logger = ServiceFactory.getLoggerService();
+    logger.info('Extension', 'Power Platform Developer Suite extension deactivated');
+    logger.dispose();
 }

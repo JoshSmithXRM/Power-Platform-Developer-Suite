@@ -9,6 +9,7 @@ The Power Platform Developer Suite follows a **component-based architecture** wi
 ### **3. SERVICES** - Business logic and API interaction layers with dependency injection ✅
 ### **4. FACTORIES** - Component creation and panel composition utilities ✅
 ### **5. BEHAVIORS** - Component-specific webview JavaScript for interactivity ✅
+### **6. LOGGING** - Centralized structured logging with VS Code native APIs ✅
 
 **New Architecture Status**: Transitioning from legacy HTML generation to component composition pattern to eliminate duplication and enable multi-instance components.
 
@@ -618,10 +619,68 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
 ## 🎨 Component Styling Architecture
 
-### **CSS Organization**
-- **base/component-base.css**: Base component styling, CSS custom properties
-- **components/[component-name].css**: Component-specific styles
-- **base/panel-base.css**: Panel layout and composition styles
+### **CSS Organization & Cascade**
+
+The styling system follows a **progressive enhancement cascade** with four levels:
+
+1. **Base Component Styles** (`base/component-base.css`)
+   - Foundation styles for all components
+   - VS Code theme integration
+   - CSS custom properties
+
+2. **Base Panel Styles** (`base/panel-base.css`)
+   - Panel container and layout styles
+   - Common panel UI patterns
+
+3. **Component-Specific Styles** (`components/[component-name].css`)
+   - Default styles for each component type
+   - Applied to ALL instances of that component
+
+4. **Panel-Specific Overrides** (`panels/[panel-name]-panel.css`) 
+   - Optional overrides for specific panels
+   - Loaded automatically if file exists
+   - Use component className for targeting
+
+### **Panel-Specific Styling Example**
+
+```css
+/* resources/webview/css/panels/environment-variables-panel.css */
+
+/* Target components in this panel using their className */
+.environment-variables-table {
+    font-size: 12px;  /* Smaller text for dense data */
+}
+
+.environment-variables-table .data-table-cell {
+    padding: 4px 8px;  /* Tighter padding */
+}
+
+/* Override action bar for this panel only */
+.environment-variables-actions .action-button {
+    padding: 4px 12px;
+    font-size: 12px;
+}
+```
+
+### **How to Enable Panel-Specific Styles**
+
+1. **Use className when creating components:**
+```typescript
+this.dataTable = ComponentFactory.createDataTable({
+    id: 'myTable',
+    className: 'my-panel-table',  // Panel-specific class
+    columns: [...]
+});
+```
+
+2. **Create panel CSS file (optional):**
+   - Name: `[panel-title]-panel.css` in `css/panels/`
+   - Auto-loaded if exists, ignored if missing
+   - No code changes needed
+
+3. **CSS loads in order:**
+   - Base styles → Component defaults → Panel overrides
+   - Later styles override earlier ones
 
 ### **CSS Custom Properties for Theming**
 ```css
@@ -796,3 +855,59 @@ this.environmentSelector.on('update', (data) => {
 - 🎯 Component library reusable across multiple VS Code extensions
 - 🎯 Consistent user experience across all panels
 - 🎯 Easy addition of new features (themes, accessibility, etc.)
+
+---
+
+## 📊 Logging Architecture
+
+### **Centralized LoggerService**
+
+Professional logging system using VS Code's native APIs for structured, security-conscious logging:
+
+```typescript
+// Service integration
+export class ServiceFactory {
+    static getLoggerService(): LoggerService { ... }
+}
+
+// Component usage
+class MyPanel extends BasePanel {
+    private logger = ServiceFactory.getLoggerService().createComponentLogger('MyPanel');
+    
+    private async loadData() {
+        this.logger.info('Loading panel data', { environmentId: env.id });
+        try {
+            const data = await this.dataService.fetch();
+            this.logger.debug('Data loaded successfully', { recordCount: data.length });
+        } catch (error) {
+            this.logger.error('Failed to load data', error, { operation: 'fetchData' });
+        }
+    }
+}
+```
+
+### **Security Features**
+
+- **Automatic sanitization** of tokens, passwords, and sensitive data
+- **Structured metadata** for debugging without exposing credentials
+- **VS Code integration** for user-accessible logs via native commands
+
+### **Log Levels & Usage**
+
+| Level | Purpose | Example |
+|-------|---------|---------|
+| **trace** | Detailed flow | Method entry/exit, component lifecycle |
+| **debug** | Development info | State changes, initialization steps |
+| **info** | Milestones | Panel opened, data loaded, user actions |
+| **warn** | Concerning | Deprecation warnings, fallback usage |
+| **error** | Failures | Exceptions, failed operations, validation errors |
+
+### **Access Methods**
+
+**For Users:**
+- `Developer: Open Extensions Logs Folder` (VS Code command)
+- `Developer: Set Log Level...` (configure verbosity)
+
+**For Development:**  
+- Output panel: "Power Platform Developer Suite" channel
+- Structured JSON format with timestamps and metadata

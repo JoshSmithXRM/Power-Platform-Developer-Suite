@@ -11,6 +11,7 @@ import { PluginTraceService } from './PluginTraceService';
 import { MetadataService } from './MetadataService';
 import { DataverseQueryService } from './DataverseQueryService';
 import { DataverseMetadataService } from './DataverseMetadataService';
+import { LoggerService } from './LoggerService';
 
 export class ServiceFactory {
     private static authService: AuthenticationService;
@@ -24,6 +25,7 @@ export class ServiceFactory {
     private static metadataService: MetadataService;
     private static dataverseQueryService: DataverseQueryService;
     private static dataverseMetadataService: DataverseMetadataService;
+    private static loggerService: LoggerService;
     private static initialized = false;
     
     static initialize(context: vscode.ExtensionContext): void {
@@ -42,8 +44,11 @@ export class ServiceFactory {
         ServiceFactory.metadataService = new MetadataService(ServiceFactory.authService);
         ServiceFactory.dataverseQueryService = new DataverseQueryService(ServiceFactory.authService);
         ServiceFactory.dataverseMetadataService = new DataverseMetadataService(ServiceFactory.authService);
+        ServiceFactory.loggerService = LoggerService.getInstance();
         ServiceFactory.initialized = true;
-        console.log('ServiceFactory initialized successfully');
+        
+        // Use logger service instead of console.log
+        ServiceFactory.loggerService.info('ServiceFactory', 'All services initialized successfully');
     }
     
     static getAuthService(): AuthenticationService {
@@ -121,6 +126,13 @@ export class ServiceFactory {
             throw new Error('ServiceFactory not initialized. Call initialize() first.');
         }
         return ServiceFactory.dataverseMetadataService;
+    }
+    
+    static getLoggerService(): LoggerService {
+        if (!ServiceFactory.initialized) {
+            throw new Error('ServiceFactory not initialized. Call initialize() first.');
+        }
+        return ServiceFactory.loggerService;
     }
     
     static getUrlBuilderService(): typeof UrlBuilderService {

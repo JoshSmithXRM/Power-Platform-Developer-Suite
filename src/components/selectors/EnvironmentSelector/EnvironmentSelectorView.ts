@@ -1,5 +1,6 @@
 import { EnvironmentSelectorConfig, Environment } from '../../base/ComponentInterface';
 import { CSS_CLASSES, ICONS } from '../../base/ComponentConfig';
+import { escapeHtml } from '../../base/HtmlUtils';
 
 /**
  * EnvironmentSelectorView - HTML generation for EnvironmentSelector component
@@ -47,8 +48,8 @@ export class EnvironmentSelectorView {
             <div class="${containerClass}" 
                  data-component-id="${id}"
                  data-component-type="EnvironmentSelector"
-                 data-config-label="${this.escapeHtml(label)}"
-                 data-config-placeholder="${this.escapeHtml(placeholder)}"
+                 data-config-label="${escapeHtml(label)}"
+                 data-config-placeholder="${escapeHtml(placeholder)}"
                  data-config-show-status="${showStatus}"
                  data-config-required="${required}"
                  data-config-disabled="${disabled}">
@@ -79,7 +80,7 @@ export class EnvironmentSelectorView {
 
         return `
             <label for="${componentId}_select" class="${labelClass}">
-                ${this.escapeHtml(label)}${required ? ' *' : ''}
+                ${escapeHtml(label)}${required ? ' *' : ''}
             </label>
         `;
     }
@@ -103,11 +104,11 @@ export class EnvironmentSelectorView {
         const isDisabled = disabled || loading;
 
         const optionsHtml = [
-            `<option value="">${this.escapeHtml(placeholder)}</option>`,
+            `<option value="">${escapeHtml(placeholder)}</option>`,
             ...environments.map(env => 
-                `<option value="${this.escapeHtml(env.id)}" 
+                `<option value="${escapeHtml(env.id)}" 
                          ${env.id === selectedEnvironmentId ? 'selected' : ''}>
-                    ${this.escapeHtml(env.displayName || env.name)}
+                    ${escapeHtml(env.displayName || env.name)}
                 </option>`
             )
         ].join('');
@@ -213,8 +214,8 @@ export class EnvironmentSelectorView {
             const description = env.settings?.dataverseUrl ? 
                 ` - ${new URL(env.settings.dataverseUrl).hostname}` : '';
             
-            return `<option value="${this.escapeHtml(env.id)}" ${selected} title="${this.escapeHtml(env.settings?.dataverseUrl || '')}">
-                        ${this.escapeHtml(displayName)}${this.escapeHtml(description)}
+            return `<option value="${escapeHtml(env.id)}" ${selected} title="${escapeHtml(env.settings?.dataverseUrl || '')}">
+                        ${escapeHtml(displayName)}${escapeHtml(description)}
                     </option>`;
         }).join('');
     }
@@ -233,14 +234,6 @@ export class EnvironmentSelectorView {
         return info.join('\n');
     }
 
-    /**
-     * Helper method to escape HTML
-     */
-    private static escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     /**
      * Generate validation error HTML
@@ -248,7 +241,7 @@ export class EnvironmentSelectorView {
     static generateValidationError(error: string): string {
         return `
             <div class="${CSS_CLASSES.FORM_VALIDATION_ERROR}">
-                ${ICONS.ERROR} ${this.escapeHtml(error)}
+                ${ICONS.ERROR} ${escapeHtml(error)}
             </div>
         `;
     }
@@ -259,7 +252,7 @@ export class EnvironmentSelectorView {
     static generateEmptyState(message: string = 'No environments configured'): string {
         return `
             <div class="environment-selector-empty">
-                ${ICONS.INFO} ${this.escapeHtml(message)}
+                ${ICONS.INFO} ${escapeHtml(message)}
             </div>
         `;
     }
@@ -274,7 +267,7 @@ export class EnvironmentSelectorView {
         placeholder: string = 'Select environment...'
     ): string {
         const optionsHtml = [
-            `<option value="">${this.escapeHtml(placeholder)}</option>`,
+            `<option value="">${escapeHtml(placeholder)}</option>`,
             this.generateOptionsHTML(environments, selectedId)
         ].join('');
 

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { AuthenticationService } from '../../services/AuthenticationService';
 import { StateService, PanelState } from '../../services/StateService';
 import { PanelConfig, IPanelBase, WebviewMessage } from '../../types';
+import { ServiceFactory } from '../../services/ServiceFactory';
 
 /**
  * Base class for all webview panels providing common functionality
@@ -14,6 +15,14 @@ export abstract class BasePanel implements IPanelBase {
     protected _disposables: vscode.Disposable[] = [];
     protected currentState: PanelState = {};
     protected readonly _panelId: string;
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    protected get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('BasePanel');
+        }
+        return this._logger;
+    }
 
     public readonly viewType: string;
     protected static _activePanels: Map<string, BasePanel[]> = new Map();
@@ -47,6 +56,11 @@ export abstract class BasePanel implements IPanelBase {
             this._disposables
         );
 
+        this.logger.debug('Panel constructor completed', { 
+            viewType: config.viewType,
+            title: config.title,
+            panelId: this._panelId
+        });
         // Don't auto-initialize - let child classes control when to initialize
     }
 
@@ -54,11 +68,13 @@ export abstract class BasePanel implements IPanelBase {
      * Initialize the panel - called after construction
      */
     protected async initialize(): Promise<void> {
+        this.logger.debug('Panel initialization starting', { viewType: this.viewType });
         // Restore state first
         await this.restoreState();
         
         // Then initialize UI
         this.updateWebview();
+        this.logger.info('Panel initialization completed', { viewType: this.viewType });
     }
 
     /**
@@ -72,7 +88,7 @@ export abstract class BasePanel implements IPanelBase {
                 await this.applyRestoredState(savedState);
             }
         } catch (error) {
-            console.error(`Error restoring state for ${this.viewType}:`, error);
+            this.logger.error('Error restoring panel state', error as Error, { viewType: this.viewType });
         }
     }
 
@@ -93,7 +109,7 @@ export abstract class BasePanel implements IPanelBase {
         try {
             await this._stateService.savePanelState(this.viewType, this.currentState);
         } catch (error) {
-            console.error(`Error saving state for ${this.viewType}:`, error);
+            this.logger.error('Error saving panel state', error as Error, { viewType: this.viewType });
         }
     }
 
@@ -119,7 +135,14 @@ export abstract class BasePanel implements IPanelBase {
      * Update the webview content
      */
     protected updateWebview(): void {
-        this._panel.webview.html = this.getHtmlContent();
+        this.logger.trace('Updating webview content', { viewType: this.viewType });
+        const html = this.getHtmlContent();
+        this.logger.trace('Generated HTML content', { 
+            viewType: this.viewType, 
+            htmlLength: html.length 
+        });
+        this._panel.webview.html = html;
+        this.logger.trace('Webview HTML content updated', { viewType: this.viewType });
     }
 
     /**
@@ -131,7 +154,10 @@ export abstract class BasePanel implements IPanelBase {
                 this._panel.webview.postMessage(message);
             } catch (error) {
                 // Webview is disposed, ignore the error
-                console.warn('Attempted to post message to disposed webview:', error);
+                this.logger.warn('Attempted to post message to disposed webview', { 
+                    viewType: this.viewType,
+                    error: (error as Error).message 
+                });
             }
         }
     }
