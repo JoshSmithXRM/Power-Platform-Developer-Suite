@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { ServiceFactory } from '../../services/ServiceFactory';
 
 export interface BaseComponentConfig {
     id: string;
@@ -12,6 +13,16 @@ export interface BaseComponentConfig {
 export abstract class BaseComponent extends EventEmitter {
     protected config: BaseComponentConfig;
     protected isInitialized: boolean = false;
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    protected get componentLogger() {
+        if (!this._logger) {
+            // Use the actual component class name for component-specific logging
+            const componentName = this.constructor.name;
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger(componentName);
+        }
+        return this._logger;
+    }
 
     constructor(config: BaseComponentConfig) {
         super();

@@ -1223,7 +1223,7 @@ this.environmentSelector.on('update', (data) => {
 
 ### **Centralized LoggerService**
 
-Professional logging system using VS Code's native APIs for structured, security-conscious logging:
+Professional logging system using VS Code's native APIs for structured, security-conscious logging with context-specific patterns:
 
 ```typescript
 // Service integration
@@ -1231,17 +1231,51 @@ export class ServiceFactory {
     static getLoggerService(): LoggerService { ... }
 }
 
-// Component usage
+// Panel usage - BasePanel provides this.componentLogger automatically
 class MyPanel extends BasePanel {
-    private logger = ServiceFactory.getLoggerService().createComponentLogger('MyPanel');
-    
     private async loadData() {
-        this.logger.info('Loading panel data', { environmentId: env.id });
+        this.componentLogger.info('Loading panel data', { environmentId: env.id });
         try {
             const data = await this.dataService.fetch();
-            this.logger.debug('Data loaded successfully', { recordCount: data.length });
+            this.componentLogger.debug('Data loaded successfully', { recordCount: data.length });
         } catch (error) {
-            this.logger.error('Failed to load data', error, { operation: 'fetchData' });
+            this.componentLogger.error('Failed to load data', error, { operation: 'fetchData' });
+        }
+    }
+}
+
+// Component usage - BaseComponent provides this.componentLogger automatically
+class MyComponent extends BaseComponent {
+    public setData(data: any[]): void {
+        this.componentLogger.debug('Setting component data', { 
+            componentId: this.config.id,
+            itemCount: data.length 
+        });
+        this.data = [...data];
+        this.notifyUpdate();
+    }
+}
+
+// Service usage - Services use private logger getter with manual setup
+class MyService {
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('MyService');
+        }
+        return this._logger;
+    }
+    
+    public async fetchData(params: any): Promise<any> {
+        this.logger.info('Fetching service data', { params });
+        try {
+            const result = await this.apiCall(params);
+            this.logger.debug('Service data retrieved', { resultCount: result.length });
+            return result;
+        } catch (error) {
+            this.logger.error('Service data fetch failed', error, { operation: 'fetchData' });
+            throw error;
         }
     }
 }
@@ -1252,6 +1286,58 @@ class MyPanel extends BasePanel {
 - **Automatic sanitization** of tokens, passwords, and sensitive data
 - **Structured metadata** for debugging without exposing credentials
 - **VS Code integration** for user-accessible logs via native commands
+
+### **Logging Patterns by Architectural Layer**
+
+The extension uses different logging patterns depending on the architectural layer:
+
+| Layer | Property | Pattern | Reason |
+|-------|----------|---------|--------|
+| **Panels** | `this.componentLogger` | Auto-provided by BasePanel | Inherits from BasePanel, automatic setup |
+| **Components** | `this.componentLogger` | Auto-provided by BaseComponent | Inherits from BaseComponent, automatic setup |
+| **Services** | `this.logger` | Manual getter with lazy initialization | Independent classes, manual logger setup |
+| **Webview Behaviors** | `console.log` | Browser console only | LoggerService not available in webview context |
+
+**When to use each pattern:**
+
+```typescript
+// ✅ PANELS: Use this.componentLogger (BasePanel provides automatically)
+class MyPanel extends BasePanel {
+    async loadData() {
+        this.componentLogger.info('Loading panel data');
+    }
+}
+
+// ✅ COMPONENTS: Use this.componentLogger (BaseComponent provides automatically) 
+class MyComponent extends BaseComponent {
+    setData(data: any[]) {
+        this.componentLogger.debug('Setting component data');
+    }
+}
+
+// ✅ SERVICES: Use this.logger with private getter pattern
+class MyService {
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('MyService');
+        }
+        return this._logger;
+    }
+    
+    async fetchData() {
+        this.logger.info('Fetching data');
+    }
+}
+
+// ✅ WEBVIEW BEHAVIORS: Use console.log (LoggerService not available)
+class MyBehavior {
+    static handleMessage(message) {
+        console.log('Handling message in webview:', message);
+    }
+}
+```
 
 ### **Log Levels & Usage**
 

@@ -308,7 +308,10 @@ export class EnvironmentSelectorComponent extends BaseComponent {
             try {
                 this.config.onError(error);
             } catch (callbackError) {
-                console.error('Error in onError callback:', callbackError);
+                this.componentLogger.error('Error in onError callback', callbackError as Error, { 
+                    componentId: this.config.id,
+                    originalError: error.message 
+                });
             }
         }
     }

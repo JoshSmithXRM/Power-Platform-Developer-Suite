@@ -246,20 +246,61 @@ return `<script type="text/template" id="tableTemplate">
 
 **Use VS Code's Native Logging APIs - NO console.log statements**
 
-### LoggerService Usage
+### LoggerService Usage by Architectural Layer
 
-All logging must use the centralized `LoggerService` accessed through `ServiceFactory`:
+The extension uses different logging patterns depending on the architectural layer:
+
+| Layer | Property | Pattern | Reason |
+|-------|----------|---------|--------|
+| **Panels** | `this.componentLogger` | Auto-provided by BasePanel | Inherits from BasePanel, automatic setup |
+| **Components** | `this.componentLogger` | Auto-provided by BaseComponent | Inherits from BaseComponent, automatic setup |
+| **Services** | `this.logger` | Manual getter with lazy initialization | Independent classes, manual logger setup |
+| **Webview Behaviors** | `console.log` | Browser console only | LoggerService not available in webview context |
 
 ```typescript
-// Get component-specific logger
-private logger = ServiceFactory.getLoggerService().createComponentLogger('YourComponent');
+// ✅ PANELS: Use this.componentLogger (BasePanel provides automatically)
+class MyPanel extends BasePanel {
+    async loadData() {
+        this.componentLogger.info('Loading panel data', { 
+            viewType: this.viewType,
+            componentCount: 3 
+        });
+    }
+}
 
-// Use structured logging with metadata
-this.logger.info('Panel initialized successfully', { 
-    viewType: this.viewType,
-    componentCount: 3 
-});
-this.logger.error('Failed to load data', error, { environmentId, operation: 'fetchData' });
+// ✅ COMPONENTS: Use this.componentLogger (BaseComponent provides automatically) 
+class MyComponent extends BaseComponent {
+    setData(data: any[]) {
+        this.componentLogger.debug('Setting component data', { 
+            componentId: this.config.id,
+            itemCount: data.length 
+        });
+    }
+}
+
+// ✅ SERVICES: Use this.logger with private getter pattern
+class MyService {
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('MyService');
+        }
+        return this._logger;
+    }
+    
+    async fetchData() {
+        this.logger.info('Fetching service data');
+        this.logger.error('Service operation failed', error, { operation: 'fetchData' });
+    }
+}
+
+// ✅ WEBVIEW BEHAVIORS: Use console.log (LoggerService not available in webview context)
+class MyBehavior {
+    static handleMessage(message) {
+        console.log('Handling message in webview:', message);
+    }
+}
 ```
 
 ### Log Levels (Use Appropriately)
@@ -274,17 +315,17 @@ this.logger.error('Failed to load data', error, { environmentId, operation: 'fet
 
 ```typescript
 // ✅ CORRECT - Structured with context
-this.logger.info('Environment selected', { 
+this.componentLogger.info('Environment selected', { 
     environmentId: env.id, 
     environmentName: env.name,
     panelType: this.viewType 
 });
 
-// ❌ WRONG - Plain console.log
+// ❌ WRONG - Plain console.log (in Extension Host context)
 console.log('Environment selected:', env.id);
 
 // ❌ WRONG - No context
-this.logger.info('Operation completed');
+this.componentLogger.info('Operation completed');
 ```
 
 ### Security-Safe Logging
@@ -293,7 +334,7 @@ The LoggerService automatically sanitizes sensitive data:
 
 ```typescript
 // Automatically redacts tokens, passwords, secrets
-this.logger.debug('API call completed', { 
+this.componentLogger.debug('API call completed', { 
     token: 'Bearer abc123...',     // Becomes '[REDACTED]'
     data: responseData,            // Safe data preserved
     environmentUrl: env.url        // Safe data preserved
@@ -310,9 +351,21 @@ this.logger.debug('API call completed', {
 - View in VS Code Output panel: Select "Power Platform Developer Suite" channel
 - All logs include timestamps and structured metadata
 
+### Context-Specific Logging Rules
+
+**Extension Host Context (TypeScript):**
+- ✅ **ALWAYS use `this.componentLogger`** for all logging
+- ❌ **NEVER use `console.log`** in Extension Host code
+- Available in: `BasePanel`, `BaseComponent`, and service classes
+
+**Webview Context (JavaScript):**  
+- ✅ **MUST use `console.log`** - LoggerService is not available in webview
+- Located in: `resources/webview/js/components/*Behavior.js` files
+- Webview logs appear in browser DevTools, not VS Code logs
+
 ### Migration Rule
 
-**Replace ALL `console.log/error/warn` statements with LoggerService calls.** Use component-specific loggers with appropriate log levels and structured metadata.
+**Replace ALL `console.log/error/warn` statements in Extension Host TypeScript code with LoggerService calls.** Webview JavaScript behavior scripts should continue using `console.log` as LoggerService is not accessible in webview context.
 
 ## Development Commands
 
