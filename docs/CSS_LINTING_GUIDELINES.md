@@ -58,21 +58,30 @@ grep -r "!important" resources/webview/css/components/
 # Check for common inconsistency patterns
 cd "resources/webview/css/components"
 
-# 1. Find direct VS Code variable usage (should be minimal)
+# 1. Find direct VS Code variable usage (should be minimal, only font-family/font-size allowed)
 echo "=== Direct VS Code Variables (should be replaced) ===" 
 grep -c "var(--vscode-" *.css | grep -v ":0"
+echo "=== Detailed VS Code Variable Usage ==="
+grep -rn "var(--vscode-" *.css | grep -v "font-family\|font-size"
 
 # 2. Find missing semantic token usage
 echo "=== Files not using semantic tokens ===" 
 grep -L "var(--component-" *.css
 
-# 3. Check for hardcoded values
+# 3. Check for hardcoded values (CRITICAL VIOLATION - 74 found!)
 echo "=== Hardcoded colors (should be tokenized) ==="
-grep -rE "#[0-9a-fA-F]{3,6}" *.css || echo "None found ✅"
+echo "Current count: $(grep -rE "#[0-9a-fA-F]{3,6}|rgba?\(" *.css | wc -l) violations"
+echo "TARGET: 0 violations"
+echo "Top offenders:"
+grep -rE "#[0-9a-fA-F]{3,6}|rgba?\(" *.css | head -5
 
 # 4. Check for excessive !important usage
 echo "=== Excessive !important usage ==="
 grep -c "!important" *.css | grep -v ":0" || echo "None found ✅"
+
+# 5. Check for mixed border variable usage (NEW CHECK)
+echo "=== Mixed Border Variables (should be standardized) ==="
+grep -rn "border.*var(--vscode-" *.css || echo "None found ✅"
 ```
 
 ### **Theme Compatibility Test**

@@ -70,7 +70,7 @@
     text-align: left;
     font-weight: 600;
     font-size: 13px;
-    border-right: 1px solid rgba(128, 128, 128, 0.3);
+    border-right: 1px solid var(--component-border-subtle);
     position: relative;
     user-select: none;
     white-space: nowrap;
@@ -174,7 +174,7 @@
 /* Filter row */
 .data-table-filter-row {
     background: var(--vscode-input-background);
-    border-bottom: 1px solid var(--vscode-panel-border);
+    border-bottom: 1px solid var(--component-border-subtle);
 }
 
 .data-table-filter-cell {
@@ -274,7 +274,7 @@
 
 .data-table-body-cell {
     padding: 12px 16px;
-    border-right: 1px solid rgba(128, 128, 128, 0.3);
+    border-right: 1px solid var(--component-border-subtle);
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -595,7 +595,7 @@
 /* Search */
 .search-container {
     padding: 12px 16px;
-    border-bottom: 1px solid var(--vscode-panel-border);
+    border-bottom: 1px solid var(--component-border-subtle);
     background: var(--vscode-editor-background);
 }
 
