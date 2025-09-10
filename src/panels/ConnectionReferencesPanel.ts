@@ -61,15 +61,15 @@ export class ConnectionReferencesPanel extends BasePanel {
         });
 
         this.componentLogger.debug('Constructor starting');
-        
+
         this.initializeComponents();
-        
+
         // Initialize the panel (this calls updateWebview which calls getHtmlContent)
         this.initialize();
-        
+
         // Load environments after initialization
         this.loadEnvironments();
-        
+
         this.componentLogger.info('Panel initialized successfully');
     }
 
@@ -227,11 +227,11 @@ export class ConnectionReferencesPanel extends BasePanel {
                 case 'environment-selected':
                     await this.handleEnvironmentSelection(message.data?.environmentId);
                     break;
-                
+
                 case 'solution-selected':
                     await this.handleSolutionSelection(message.data?.solutionId);
                     break;
-                
+
                 case 'loadSolutions':
                     await this.handleLoadSolutions(message.data?.environmentId);
                     break;
@@ -247,7 +247,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                 case 'openInMaker':
                     await this.handleOpenInMaker(message.data?.environmentId, message.data?.solutionId, message.data?.entityType);
                     break;
-                
+
                 case 'refresh-data':
                     await this.refreshConnectionReferences();
                     break;
@@ -261,7 +261,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                     this.componentLogger.debug('Component event received', { data: message.data });
                     // Handle component-specific events if needed
                     break;
-                
+
                 default:
                     this.componentLogger.warn('Unknown message command', { command: message.command });
             }
@@ -283,12 +283,12 @@ export class ConnectionReferencesPanel extends BasePanel {
 
         try {
             this.componentLogger.info('Environment selected', { environmentId });
-            
+
             // Load solutions for this environment
             this.componentLogger.debug('About to call handleLoadSolutions', { environmentId });
             await this.handleLoadSolutions(environmentId);
             this.componentLogger.debug('handleLoadSolutions completed', { environmentId });
-            
+
         } catch (error) {
             this.componentLogger.error('Error handling environment selection', error as Error, { environmentId });
             vscode.window.showErrorMessage('Failed to load environment configuration');
@@ -303,13 +303,13 @@ export class ConnectionReferencesPanel extends BasePanel {
 
         try {
             this.componentLogger.info('Solution selected', { solutionId });
-            
+
             // Get current environment ID
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
             if (selectedEnvironment) {
                 await this.handleLoadConnectionReferences(selectedEnvironment.id, solutionId);
             }
-            
+
         } catch (error) {
             this.componentLogger.error('Error handling solution selection', error as Error, { solutionId });
             vscode.window.showErrorMessage('Failed to load solution configuration');
@@ -340,32 +340,32 @@ export class ConnectionReferencesPanel extends BasePanel {
                     isVisible: true,
                     version: sol.version || '',
                     description: sol.description || '',
-                    components: { 
+                    components: {
                         entities: 0,
-                        workflows: 0, 
+                        workflows: 0,
                         webResources: 0,
                         plugins: 0,
                         customControls: 0,
-                        total: 0 
+                        total: 0
                     }
                 }));
-                
+
                 this.solutionSelectorComponent.setSolutions(transformedSolutions);
-                
+
                 // Auto-select Default solution if available
                 const defaultSolution = transformedSolutions.find(s => s.uniqueName === 'Default');
                 if (defaultSolution) {
                     this.solutionSelectorComponent.setSelectedSolutions([defaultSolution]);
-                    
-                    // Trigger connection references loading for the auto-selected solution
-                    await this.handleLoadConnectionReferences(environmentId, defaultSolution.id);
+                    // Note: setSelectedSolutions will automatically trigger onSelectionChange handler
+                    // which calls handleSolutionSelection -> handleLoadConnectionReferences
+                    // So we don't need to manually call it here to avoid duplicate execution
                 }
-                
+
                 this.updateWebview();
             }
 
-            this.postMessage({ 
-                action: 'solutionsLoaded', 
+            this.postMessage({
+                action: 'solutionsLoaded',
                 data: solutions,
                 selectedSolutionId: solutions.find(s => s.uniqueName === 'Default')?.solutionId
             });
@@ -386,41 +386,62 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             const crService = ServiceFactory.getConnectionReferencesService();
             const relationships = await crService.aggregateRelationships(environmentId, solutionId);
-            
+
             this.componentLogger.debug('Connection references loaded', {
                 flows: relationships?.flows?.length || 0,
                 connectionReferences: relationships?.connectionReferences?.length || 0,
+                relationships: relationships?.relationships?.length || 0,
                 solutionId: solutionId || 'all'
             });
 
             // Transform data for table display
             const tableData = this.transformConnectionReferencesData(relationships);
 
+            // Update the data table component directly
+            if (this.dataTableComponent) {
+                this.componentLogger.info('Updating DataTableComponent with API data', {
+                    transformedRelationships: tableData.relationships?.length || 0
+                });
+                
+                this.componentLogger.debug('Sample connection reference data', {
+                    sampleData: tableData.relationships?.slice(0, 2) || []
+                });
+                this.dataTableComponent.setData(tableData.relationships || []);
+                this.updateWebview();
+            }
+
             this.postMessage({
                 action: 'connectionReferencesLoaded',
                 data: tableData
             });
+
+            this.componentLogger.info('Connection references loaded successfully', {
+                environmentId,
+                solutionId: solutionId || 'all',
+                relationshipsCount: tableData.relationships?.length || 0
+            });
+
         } catch (error) {
             this.componentLogger.error('Error loading connection references', error as Error, { environmentId, solutionId });
-            this.postMessage({ 
-                action: 'error', 
+            this.postMessage({
+                action: 'error',
                 message: `Failed to load connection references: ${(error as Error).message}`
             });
         }
     }
 
-    private transformConnectionReferencesData(relationships: any): any[] {
+    private transformConnectionReferencesData(relationships: any): any {
         if (!relationships || !relationships.relationships) {
             this.componentLogger.debug('No relationships data to transform', { relationships });
-            return [];
+            return { relationships: [] };
         }
 
         const relationshipItems = relationships.relationships || [];
-        this.componentLogger.debug('Transforming relationships for table display', { 
-            relationshipCount: relationshipItems.length 
+        this.componentLogger.debug('Transforming relationships for table display', {
+            relationshipCount: relationshipItems.length
         });
 
-        const tableData = relationshipItems.map((rel: any) => ({
+        const transformedRelationships = relationshipItems.map((rel: any) => ({
             id: rel.id, // Already has unique ID from service
             flowName: rel.flowName || 'No Flow Associated',
             connectionReference: rel.connectionReferenceLogicalName || 'No Connection Reference',
@@ -428,17 +449,17 @@ export class ConnectionReferencesPanel extends BasePanel {
             relationshipType: rel.relationshipType || 'unknown',
             connectionName: rel.connectionName || 'No Connection',
             isManaged: (rel.flowIsManaged || rel.crIsManaged) ? 'Yes' : 'No',
-            modifiedOn: this.formatDate(rel.flowModifiedOn || rel.crModifiedOn),
+            modifiedOn: rel.flowModifiedOn || rel.crModifiedOn || '',
             modifiedBy: rel.flowModifiedBy || rel.crModifiedBy || 'Unknown'
         }));
 
-        this.componentLogger.debug('Data transformation completed', { 
+        this.componentLogger.debug('Data transformation completed', {
             originalCount: relationshipItems.length,
-            transformedCount: tableData.length,
-            sampleData: tableData.slice(0, 2)
+            transformedCount: transformedRelationships.length,
+            sampleData: transformedRelationships.slice(0, 2)
         });
 
-        return tableData;
+        return { relationships: transformedRelationships };
     }
 
     private formatDate(dateString: string): string {
@@ -449,7 +470,7 @@ export class ConnectionReferencesPanel extends BasePanel {
     private async handleSyncDeploymentSettings(relationships: any, solutionUniqueName?: string): Promise<void> {
         try {
             const deploymentSettingsService = ServiceFactory.getDeploymentSettingsService();
-            
+
             // Prompt user to select or create deployment settings file
             const filePath = await deploymentSettingsService.selectDeploymentSettingsFile(solutionUniqueName);
             if (!filePath) {
@@ -457,13 +478,13 @@ export class ConnectionReferencesPanel extends BasePanel {
             }
 
             const isNewFile = !require('fs').existsSync(filePath);
-            
+
             // Sync connection references with the file
             const result = await deploymentSettingsService.syncConnectionReferences(filePath, relationships, isNewFile);
-            
+
             // Send success message back to UI
-            this.postMessage({ 
-                action: 'deploymentSettingsSynced', 
+            this.postMessage({
+                action: 'deploymentSettingsSynced',
                 data: {
                     filePath: result.filePath,
                     added: result.added,
@@ -487,7 +508,7 @@ export class ConnectionReferencesPanel extends BasePanel {
         try {
             const environments = await this._authService.getEnvironments();
             const environment = environments.find(env => env.id === environmentId);
-            
+
             if (!environment) {
                 this.postMessage({ action: 'error', message: 'Environment not found' });
                 return;
@@ -496,12 +517,12 @@ export class ConnectionReferencesPanel extends BasePanel {
             // Use the actual environment GUID from the environment connection
             const envGuid = environment.environmentId || environmentId;
             const makerUrl = `https://make.powerapps.com/environments/${envGuid}/solutions/${solutionId}/objects/${entityType}`;
-            
+
             this.componentLogger.info('Opening Maker URL', { url: makerUrl });
-            
+
             // Open in external browser
             vscode.env.openExternal(vscode.Uri.parse(makerUrl));
-            
+
         } catch (error) {
             this.componentLogger.error('Error opening in Maker', error as Error);
             this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to open in Maker' });
@@ -511,11 +532,11 @@ export class ConnectionReferencesPanel extends BasePanel {
     private async refreshConnectionReferences(): Promise<void> {
         try {
             this.componentLogger.debug('Refreshing connection references');
-            
+
             // Get current selections
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
             const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
-            
+
             if (selectedEnvironment) {
                 await this.handleLoadConnectionReferences(selectedEnvironment.id, selectedSolution?.id);
                 vscode.window.showInformationMessage('Connection References refreshed');
@@ -531,14 +552,14 @@ export class ConnectionReferencesPanel extends BasePanel {
     protected getHtmlContent(): string {
         this.componentLogger.trace('Generating HTML content');
         try {
-            if (!this.environmentSelectorComponent || !this.solutionSelectorComponent || 
+            if (!this.environmentSelectorComponent || !this.solutionSelectorComponent ||
                 !this.actionBarComponent || !this.dataTableComponent) {
                 this.componentLogger.warn('Components not initialized when generating HTML');
                 return this.getErrorHtml('Failed to initialize components');
             }
 
             this.componentLogger.trace('Using simple PanelComposer.compose() as specified in architecture');
-            
+
             // Use simple composition method as specified in architecture guide
             return PanelComposer.compose([
                 this.environmentSelectorComponent,
@@ -592,7 +613,7 @@ export class ConnectionReferencesPanel extends BasePanel {
 
     public dispose(): void {
         ConnectionReferencesPanel.currentPanel = undefined;
-        
+
         this.environmentSelectorComponent?.dispose();
         this.solutionSelectorComponent?.dispose();
         this.actionBarComponent?.dispose();

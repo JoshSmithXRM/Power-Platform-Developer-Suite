@@ -324,7 +324,11 @@ export class ConnectionReferencesService {
             solutionId,
             flowsCount: flows.length,
             connectionReferencesCount: connectionReferences.length,
-            relationshipsCount: relationships.length,
+            relationshipsCount: relationships.length
+        });
+
+        // Only log debug data at trace level for troubleshooting
+        this.logger.trace('Connection references aggregation debug details', {
             debug: debug
         });
 
