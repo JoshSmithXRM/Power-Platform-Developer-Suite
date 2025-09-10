@@ -8,18 +8,18 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    background: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
+    background: var(--component-elevated-surface);
+    border: 1px solid var(--component-border);
     border-radius: 4px;
     padding: 12px;
     font-family: var(--vscode-font-family);
     font-size: var(--vscode-font-size);
-    color: var(--vscode-foreground);
+    color: var(--component-text-primary);
 }
 
 .solution-selector-label {
     font-weight: 600;
-    color: var(--vscode-foreground);
+    color: var(--component-text-primary);
     margin-bottom: 4px;
     display: flex;
     align-items: center;
@@ -193,7 +193,7 @@
 
 .solution-selector-solution-name {
     font-weight: 500;
-    color: var(--vscode-foreground);
+    color: var(--component-text-primary);
 }
 
 .solution-selector-solution-version,
@@ -299,7 +299,7 @@
 
 .solution-details-title {
     font-weight: 600;
-    color: var(--vscode-foreground);
+    color: var(--component-text-primary);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -346,7 +346,7 @@
 
 .solution-detail-value {
     font-size: 13px;
-    color: var(--vscode-foreground);
+    color: var(--component-text-primary);
     word-break: break-all;
 }
 

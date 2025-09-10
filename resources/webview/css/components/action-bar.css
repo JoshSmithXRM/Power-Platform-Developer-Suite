@@ -11,8 +11,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: var(--vscode-input-background) !important;
-    border: 1px solid var(--vscode-input-border) !important;
+    background: var(--component-header-surface);
+    border: 1px solid var(--component-border);
     border-radius: 4px;
     padding: 8px 12px;
     margin-bottom: 8px;
@@ -89,8 +89,8 @@
    ============================================================================= */
 
 .action-bar.action-bar--toolbar {
-    background: var(--vscode-titleBar-activeBackground);
-    border-color: var(--vscode-titleBar-border);
+    background: var(--component-header-surface);
+    border-color: var(--component-border);
 }
 
 .action-bar.action-bar--buttonbar {
@@ -107,9 +107,9 @@
 }
 
 .action-bar.action-bar--panel {
-    background: var(--vscode-panel-background);
-    border-color: var(--vscode-panel-border);
-    border-top: 2px solid var(--vscode-focusBorder);
+    background: var(--component-header-surface);
+    border-color: var(--component-border);
+    border-top: 2px solid var(--component-border-focus);
 }
 
 /* =============================================================================
@@ -598,7 +598,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: var(--vscode-editor-background);
+    background: var(--component-header-surface);
     opacity: 0.8;
     z-index: 1;
     border-radius: inherit;
@@ -608,7 +608,7 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    background: var(--vscode-editor-background);
+    background: var(--component-header-surface);
 }
 
 .action-bar--collapsible {
