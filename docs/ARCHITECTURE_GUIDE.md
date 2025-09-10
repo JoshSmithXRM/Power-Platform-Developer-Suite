@@ -529,7 +529,7 @@ class EnvironmentSelectorBehavior {
         
         // Notify panel via message
         if (instance.config.onChange) {
-            ComponentUtils.sendMessage('environmentChanged', {
+            ComponentUtils.sendMessage('environment-changed', {
                 componentId: instance.id,
                 environmentId: environmentId
             });
@@ -635,12 +635,100 @@ if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
 
 All component behavior scripts MUST follow this exact registration pattern for ComponentUtils integration:
 
-#### **1. Required Static Methods**
+#### **The ComponentUtils Registration Problem & Solution**
+
+Initial implementation had behaviors that couldn't receive Extension Host messages, causing critical issues:
+- ❌ "ComponentUtils not available yet" errors during behavior registration
+- ❌ "DataTable warning: No data provided - table will be empty" despite data being sent
+- ❌ Extension Host sends data but webview shows empty components
+- ❌ Button clicks and user interactions not working
+
+**Root Cause**: Behaviors were loading before ComponentUtils, preventing proper registration and message routing.
+
+**Solution**: ComponentUtilsStub pattern provides immediate registration capability before ComponentUtils loads.
+
+#### **1. ComponentUtilsStub Pattern (Required)**
+
+Create `ComponentUtilsStub.js` file that loads before all behaviors:
+
+```javascript
+/**
+ * ComponentUtilsStub - Critical stub for behavior registration
+ * This allows behaviors to register themselves before ComponentUtils loads
+ * SOLVES: "ComponentUtils not available yet" registration failures
+ */
+
+// Create stub ComponentUtils that behaviors can register with immediately
+if (!window.ComponentUtils) {
+    window.ComponentUtils = {
+        pendingBehaviorRegistrations: [],
+        
+        // Stub registration method that queues registrations
+        registerBehavior: function(name, behaviorClass) {
+            console.log(`ComponentUtilsStub: Queuing registration for ${name}`);
+            this.pendingBehaviorRegistrations.push({ name, behaviorClass });
+        }
+    };
+    
+    console.log('ComponentUtilsStub: Stub created for behavior registration');
+}
+```
+
+#### **2. Enhanced ComponentUtils Pattern**
+
+ComponentUtils processes stub registrations when it loads:
+
+```javascript
+// ComponentUtils.js - Enhanced with stub processing
+class ComponentUtils {
+    static registeredBehaviors = new Map();
+    static componentInstances = new Map();
+    
+    static initialize() {
+        console.log('ComponentUtils: Starting initialization');
+        
+        // ✅ CRITICAL: Process pending registrations from stub
+        this.processPendingRegistrations();
+        
+        // Initialize components after processing registrations
+        this.initializeAllComponents();
+        
+        console.log('ComponentUtils: Initialization completed');
+    }
+    
+    // ✅ NEW: Process registrations queued by ComponentUtilsStub
+    static processPendingRegistrations() {
+        const existingPending = window.ComponentUtils?.pendingBehaviorRegistrations || [];
+        console.log(`ComponentUtils: Processing ${existingPending.length} pending registrations`);
+        
+        existingPending.forEach(({ name, behaviorClass }) => {
+            console.log(`ComponentUtils: Processing pending registration for ${name}`);
+            this.registerBehavior(name, behaviorClass);
+        });
+        
+        // Clear pending list after processing
+        if (window.ComponentUtils?.pendingBehaviorRegistrations) {
+            window.ComponentUtils.pendingBehaviorRegistrations = [];
+        }
+    }
+    
+    // Enhanced registration with debug logging
+    static registerBehavior(componentType, behaviorClass) {
+        console.log(`ComponentUtils: Registering behavior ${componentType}`);
+        this.registeredBehaviors.set(componentType, behaviorClass);
+        console.log(`ComponentUtils: Total registered behaviors: ${this.registeredBehaviors.size}`);
+    }
+}
+```
+
+#### **3. Required Static Methods for All Behaviors**
 
 Every behavior class MUST implement these two static methods:
 
 ```javascript
 class ComponentBehavior {
+    static instances = new Map(); // Track component instances
+    
     // ✅ REQUIRED: Initialize component instance  
     static initialize(componentId, config, element) {
         // Validation
@@ -658,6 +746,7 @@ class ComponentBehavior {
         // Create and store instance
         const instance = { id: componentId, config, element };
         this.instances.set(componentId, instance);
+        console.log(`ComponentBehavior: Initialized ${componentId}`);
         return instance;
     }
     
@@ -685,7 +774,7 @@ class ComponentBehavior {
 }
 ```
 
-#### **2. Global Registration Pattern**
+#### **4. Global Registration Pattern (Required)**
 
 At the end of every behavior script:
 
@@ -695,7 +784,7 @@ if (typeof window !== 'undefined') {
     // Make behavior available globally
     window.ComponentBehavior = ComponentBehavior;
     
-    // Register with ComponentUtils - CRITICAL for Extension Host communication
+    // ✅ CRITICAL: Register with ComponentUtils (stub or real)
     if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
         window.ComponentUtils.registerBehavior('ComponentType', ComponentBehavior);
         console.log('ComponentBehavior registered with ComponentUtils');
@@ -705,9 +794,9 @@ if (typeof window !== 'undefined') {
 }
 ```
 
-#### **3. Script Loading Order in PanelComposer**
+#### **5. Script Loading Order (Critical)**
 
-Component behaviors must load BEFORE ComponentUtils for proper registration:
+PanelComposer MUST load scripts in this exact order:
 
 ```typescript
 // PanelComposer.ts - collectBehaviorScripts() method
@@ -717,7 +806,10 @@ private static collectBehaviorScripts(components: BaseComponent[]): string[] {
     // 1. Load PanelUtils first
     scripts.push('js/utils/PanelUtils.js');
     
-    // 2. Load component behavior scripts
+    // 2. ✅ CRITICAL: Load ComponentUtilsStub BEFORE behaviors
+    scripts.push('js/utils/ComponentUtilsStub.js');
+    
+    // 3. Load component behavior scripts (can now register immediately)
     components.forEach(component => {
         const behaviorScript = component.getBehaviorScript();
         if (behaviorScript && !scripts.includes(behaviorScript)) {
@@ -725,10 +817,37 @@ private static collectBehaviorScripts(components: BaseComponent[]): string[] {
         }
     });
     
-    // 3. Load ComponentUtils LAST (after all behaviors are available)
+    // 4. Load ComponentUtils LAST (processes pending registrations)
     scripts.push('js/utils/ComponentUtils.js');
     
     return scripts;
+}
+```
+
+#### **6. Message Structure Fix**
+
+Extension Host message parsing was also corrected to handle ComponentUtils.sendMessage() wrapper:
+
+```typescript
+// ✅ FIXED: Extension Host message parsing
+protected async handleMessage(message: WebviewMessage): Promise<void> {
+    try {
+        // ✅ CRITICAL FIX: ComponentUtils wraps data in message.data property
+        const { componentId, eventType, data } = message.data || {};
+        
+        this.componentLogger.debug('Extension Host received message', { 
+            messageStructure: typeof message,
+            hasData: !!message.data,
+            componentId,
+            eventType 
+        });
+        
+        if (componentId && eventType) {
+            // Process component messages...
+        }
+    } catch (error) {
+        this.componentLogger.error('Message handling failed', error as Error);
+    }
 }
 ```
 
@@ -736,57 +855,146 @@ private static collectBehaviorScripts(components: BaseComponent[]): string[] {
 
 The proper initialization sequence prevents "ComponentUtils not available yet" errors:
 
-1. **HTML Loads**: Browser renders component HTML structure
-2. **Behavior Scripts Load**: Component behaviors register with `window.ComponentBehavior = ...`
-3. **ComponentUtils Loads**: Finds all registered behaviors and initializes components  
-4. **Component Instances Created**: Each behavior's `initialize()` method called
-5. **Message Routing Active**: `handleMessage()` methods ready to receive Extension Host updates
+1. **HTML Loads**: Browser renders component HTML structure with `data-component-type` and `data-component-id` attributes
+2. **ComponentUtilsStub Loads**: Creates stub registration system before behaviors load
+3. **Behavior Scripts Load**: Component behaviors register immediately with stub `window.ComponentUtils.registerBehavior()`
+4. **ComponentUtils Loads**: Processes all pending registrations from stub and replaces stub with full implementation
+5. **Component Instances Created**: Each behavior's `initialize()` method called with proper configuration
+6. **Message Routing Active**: `handleMessage()` methods ready to receive Extension Host updates
 
-### **ComponentUtils Integration**
-
-ComponentUtils provides the central registry and message routing system:
+**Debugging Lifecycle Issues:**
 
 ```javascript
-// ComponentUtils.js - Core registry functionality
+// Check registration status in browser console
+console.log('Registered behaviors:', window.ComponentUtils?.registeredBehaviors?.size || 0);
+console.log('Component instances:', window.ComponentUtils?.componentInstances?.size || 0);
+console.log('Pending registrations:', window.ComponentUtils?.pendingBehaviorRegistrations?.length || 0);
+```
+
+### **ComponentUtils Integration with Stub Processing**
+
+ComponentUtils provides the central registry and message routing system with stub integration:
+
+```javascript
+// ComponentUtils.js - Enhanced core registry functionality
 class ComponentUtils {
     static registeredBehaviors = new Map();
     static componentInstances = new Map();
     
-    // Register behavior classes  
+    // ✅ ENHANCED: Initialize with pending registration processing
+    static initialize() {
+        console.log('ComponentUtils: Starting initialization');
+        console.log(`ComponentUtils: Found ${document.querySelectorAll('[data-component-type]').length} components in DOM`);
+        
+        // Process any pending registrations from ComponentUtilsStub
+        this.processPendingRegistrations();
+        
+        // Initialize all components
+        this.initializeAllComponents();
+        
+        console.log(`ComponentUtils: Initialization complete. Registered behaviors: ${this.registeredBehaviors.size}`);
+    }
+    
+    // ✅ NEW: Process registrations queued by ComponentUtilsStub
+    static processPendingRegistrations() {
+        const existingPending = window.ComponentUtils?.pendingBehaviorRegistrations || [];
+        console.log(`ComponentUtils: Processing ${existingPending.length} pending registrations`);
+        
+        existingPending.forEach(({ name, behaviorClass }) => {
+            console.log(`ComponentUtils: Processing pending registration for ${name}`);
+            this.registeredBehaviors.set(name, behaviorClass);
+        });
+        
+        // Clear pending list after processing
+        if (window.ComponentUtils?.pendingBehaviorRegistrations) {
+            window.ComponentUtils.pendingBehaviorRegistrations = [];
+        }
+        
+        console.log(`ComponentUtils: Processed pending registrations. Total behaviors: ${this.registeredBehaviors.size}`);
+    }
+    
+    // ✅ ENHANCED: Register behavior classes with comprehensive logging
     static registerBehavior(componentType, behaviorClass) {
         console.log(`ComponentUtils: Registering behavior ${componentType}`);
         this.registeredBehaviors.set(componentType, behaviorClass);
-        this.checkReadyToInitialize();
+        console.log(`ComponentUtils: Total registered behaviors: ${this.registeredBehaviors.size}`);
     }
     
-    // Initialize all components when ready
+    // ✅ ENHANCED: Initialize all components with error handling
     static initializeAllComponents() {
-        document.querySelectorAll('[data-component-type]').forEach(element => {
+        const componentElements = document.querySelectorAll('[data-component-type]');
+        console.log(`ComponentUtils: Initializing ${componentElements.length} components`);
+        
+        componentElements.forEach(element => {
             const componentType = element.getAttribute('data-component-type');
             const componentId = element.getAttribute('data-component-id');
             
+            console.log(`ComponentUtils: Initializing ${componentType} with ID ${componentId}`);
+            
             if (this.registeredBehaviors.has(componentType)) {
                 const behaviorClass = this.registeredBehaviors.get(componentType);
-                const instance = behaviorClass.initialize(componentId, {}, element);
                 
-                if (instance) {
-                    this.componentInstances.set(componentId, instance);
+                try {
+                    const instance = behaviorClass.initialize(componentId, {}, element);
+                    
+                    if (instance) {
+                        this.componentInstances.set(componentId, instance);
+                        console.log(`ComponentUtils: Successfully initialized ${componentId}`);
+                    } else {
+                        console.warn(`ComponentUtils: Failed to initialize ${componentId}`);
+                    }
+                } catch (error) {
+                    console.error(`ComponentUtils: Error initializing ${componentId}:`, error);
                 }
+            } else {
+                console.warn(`ComponentUtils: No behavior registered for ${componentType}`);
             }
         });
+        
+        console.log(`ComponentUtils: Component initialization complete. Active instances: ${this.componentInstances.size}`);
     }
     
-    // Route messages from Extension Host to component behaviors
+    // ✅ ENHANCED: Route messages with better error handling
     static handleMessage(message) {
+        console.log('ComponentUtils: Received message', message);
+        
         const { componentId, componentType, action } = message;
         
         if (componentType && this.registeredBehaviors.has(componentType)) {
             const behaviorClass = this.registeredBehaviors.get(componentType);
             if (behaviorClass.handleMessage) {
-                behaviorClass.handleMessage(message);
+                try {
+                    behaviorClass.handleMessage(message);
+                } catch (error) {
+                    console.error(`ComponentUtils: Error handling message for ${componentType}:`, error);
+                }
+            } else {
+                console.warn(`ComponentUtils: Behavior ${componentType} has no handleMessage method`);
             }
+        } else {
+            console.warn(`ComponentUtils: No behavior registered for type ${componentType}`);
         }
     }
+}
+
+// ✅ CRITICAL: Replace stub with full ComponentUtils when script loads
+if (window.ComponentUtils?.pendingBehaviorRegistrations) {
+    console.log('ComponentUtils: Found existing stub, preserving pending registrations');
+    const pendingRegistrations = window.ComponentUtils.pendingBehaviorRegistrations;
+    
+    // Replace stub with full implementation
+    window.ComponentUtils = ComponentUtils;
+    window.ComponentUtils.pendingBehaviorRegistrations = pendingRegistrations;
+    
+    // Initialize immediately
+    document.addEventListener('DOMContentLoaded', () => {
+        ComponentUtils.initialize();
+    });
+} else {
+    window.ComponentUtils = ComponentUtils;
+    document.addEventListener('DOMContentLoaded', () => {
+        ComponentUtils.initialize();
+    });
 }
 ```
 
@@ -1602,11 +1810,11 @@ export class DataTableComponent extends BaseComponent {
 ```
 
 **Available Component Events:**
-- **`update`** - Component data has changed (e.g., table rows, dropdown options)
-- **`stateChange`** - Component configuration has changed (e.g., columns, settings)
-- **`error`** - Component encountered an error
-- **`initialized`** - Component finished initialization
-- **`disposed`** - Component was cleaned up
+- **`'update'`** - Component data has changed (e.g., table rows, dropdown options)
+- **`'stateChange'`** - Component configuration has changed (e.g., columns, settings)
+- **`'error'`** - Component encountered an error
+- **`'initialized'`** - Component finished initialization
+- **`'disposed'`** - Component was cleaned up
 
 ### **Event Bridge Pattern (Required)**
 
@@ -1634,8 +1842,9 @@ export class ConnectionReferencesPanel extends BasePanel {
         // Data table update bridge
         this.dataTableComponent.on('update', (event) => {
             this.postMessage({
-                command: 'component-update',
+                command: 'component-event',
                 componentId: event.componentId,
+                eventType: 'actionExecuted',
                 action: 'setData',
                 data: this.dataTableComponent.getData()
             });
@@ -1644,8 +1853,9 @@ export class ConnectionReferencesPanel extends BasePanel {
         // Environment selector state change bridge  
         this.environmentSelectorComponent.on('stateChange', (event) => {
             this.postMessage({
-                command: 'component-update',
-                componentId: event.componentId, 
+                command: 'component-event',
+                componentId: event.componentId,
+                eventType: 'environmentChanged', 
                 action: 'environmentsLoaded',
                 data: {
                     environments: event.state.environments,
@@ -1687,7 +1897,7 @@ class DataTableBehavior {
     
     // ✅ REQUIRED: Handle messages from Extension Host
     handleMessage(message) {
-        if (message.command === 'component-update' && 
+        if (message.command === 'component-event' && 
             message.componentId === this.tableId) {
             
             switch (message.action) {
@@ -1822,12 +2032,15 @@ if (needNewComponents) {
 
 ### **Message Protocol Standards**
 
+**IMPORTANT: All message commands MUST use kebab-case format (e.g., `'component-event'`, `'environment-changed'`, `'load-data'`). This ensures consistency across the entire codebase and eliminates configuration mismatches.**
+
 #### **Extension Host → Webview (Component Updates)**
 ```typescript
 // Standard component update message format
 this.postMessage({
-    command: 'component-update',     // Standard command
-    componentId: 'myTable',          // Target component ID  
+    command: 'component-event',      // Standard command
+    componentId: 'myTable',          // Target component ID
+    eventType: 'dataUpdated',        // Event type for this update  
     action: 'setData',               // Specific action to perform
     data: transformedTableData,      // Action payload
     timestamp: Date.now()            // For debugging/ordering
@@ -1837,14 +2050,14 @@ this.postMessage({
 #### **Webview → Extension Host (User Actions)**
 ```javascript
 // Standard user action message format  
-ComponentUtils.sendMessage('component-action', {
+ComponentUtils.sendMessage('component-event', {
     componentId: 'myTable',          // Source component ID
-    action: 'row-selected',          // User action type
+    eventType: 'actionExecuted',     // Event type 
+    action: 'rowSelected',           // User action type
     data: {                          // Action details
         rowId: 'row-123',
         rowData: selectedRow
-    },
-    timestamp: Date.now()
+    }
 });
 ```
 

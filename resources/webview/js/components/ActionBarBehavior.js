@@ -211,21 +211,23 @@ class ActionBarBehavior {
             }
         }
 
-        // Set loading state if configured
-        if (action.loading !== false) {
+        // Set loading state if explicitly configured
+        if (action.loading === true) {
             this.setActionLoading(instance, actionId, true);
         }
 
         // Send message to Extension Host
-        ComponentUtils.sendMessage('actionExecuted', {
+        ComponentUtils.sendMessage('component-event', {
             componentId: instance.id,
-            actionId: actionId,
-            action: action,
-            timestamp: Date.now()
+            eventType: 'actionClicked',
+            data: {
+                actionId: actionId,
+                action: action
+            }
         });
 
-        // Clear loading state after a short delay
-        if (action.loading !== false) {
+        // Clear loading state after a short delay if it was set
+        if (action.loading === true) {
             setTimeout(() => {
                 this.setActionLoading(instance, actionId, false);
             }, 500);
@@ -287,7 +289,7 @@ class ActionBarBehavior {
         instance.openDropdowns.add(actionId);
         
         // Send message to Extension Host
-        ComponentUtils.sendMessage('dropdownOpened', {
+        ComponentUtils.sendMessage('dropdown-opened', {
             componentId: instance.id,
             actionId: actionId,
             timestamp: Date.now()
@@ -317,7 +319,7 @@ class ActionBarBehavior {
         instance.openDropdowns.delete(actionId);
         
         // Send message to Extension Host
-        ComponentUtils.sendMessage('dropdownClosed', {
+        ComponentUtils.sendMessage('dropdown-closed', {
             componentId: instance.id,
             actionId: actionId,
             timestamp: Date.now()
@@ -349,7 +351,7 @@ class ActionBarBehavior {
         this.closeDropdown(instance, actionId);
         
         // Send message to Extension Host
-        ComponentUtils.sendMessage('dropdownItemClicked', {
+        ComponentUtils.sendMessage('dropdown-item-clicked', {
             componentId: instance.id,
             actionId: actionId,
             itemId: itemId,
@@ -435,7 +437,7 @@ class ActionBarBehavior {
         // Create context menu with all visible actions
         const visibleActions = instance.actions.filter(action => action.visible !== false);
         
-        ComponentUtils.sendMessage('contextMenuRequested', {
+        ComponentUtils.sendMessage('context-menu-requested', {
             componentId: instance.id,
             actions: visibleActions,
             position: { x: event.clientX, y: event.clientY },
@@ -493,7 +495,7 @@ class ActionBarBehavior {
         instance.collapsed = true;
         
         // Send message to Extension Host
-        ComponentUtils.sendMessage('overflowChanged', {
+        ComponentUtils.sendMessage('overflow-changed', {
             componentId: instance.id,
             overflowActions: overflowActions,
             visibleActions: visibleActions,
@@ -509,7 +511,7 @@ class ActionBarBehavior {
         instance.collapsed = false;
         
         // Send message to Extension Host
-        ComponentUtils.sendMessage('overflowChanged', {
+        ComponentUtils.sendMessage('overflow-changed', {
             componentId: instance.id,
             overflowActions: [],
             visibleActions: instance.actions,
@@ -530,20 +532,22 @@ class ActionBarBehavior {
             actionElement.classList.add('action-bar-button--loading');
             actionElement.disabled = true;
             
-            // Replace icon with spinner
+            // Store and replace icon with spinner
             const iconElement = actionElement.querySelector('.action-icon');
             if (iconElement) {
+                // Store original icon for restoration
+                actionElement.dataset.originalIcon = iconElement.innerHTML;
                 iconElement.innerHTML = '⏳';
             }
         } else {
             actionElement.classList.remove('action-bar-button--loading');
             actionElement.disabled = false;
             
-            // Restore original icon (would need to be stored)
+            // Restore original icon if it was stored
             const iconElement = actionElement.querySelector('.action-icon');
-            if (iconElement) {
-                // This would need the original icon to be stored
-                iconElement.innerHTML = '🔄'; // Default
+            if (iconElement && actionElement.dataset.originalIcon) {
+                iconElement.innerHTML = actionElement.dataset.originalIcon;
+                delete actionElement.dataset.originalIcon;
             }
         }
     }
@@ -825,6 +829,8 @@ ActionBarBehavior.handleMessage = function(message) {
         // Update action states if needed
     }
 };
+
+// Already made available globally above at line 805
 
 // Register with ComponentUtils if available
 if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {

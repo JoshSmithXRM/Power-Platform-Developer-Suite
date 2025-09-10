@@ -629,6 +629,9 @@ export class PanelComposer {
         // IMPORTANT: Load PanelUtils first (has no dependencies)
         scripts.push('js/utils/PanelUtils.js');
         
+        // Load ComponentUtils stub for behavior registration BEFORE behavior scripts
+        scripts.push('js/utils/ComponentUtilsStub.js');
+        
         // Then load component-specific behavior scripts BEFORE ComponentUtils
         components.forEach(component => {
             try {

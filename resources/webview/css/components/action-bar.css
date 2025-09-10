@@ -198,12 +198,15 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
-    border: 1px solid var(--vscode-button-border);
+    background: var(--vscode-button-secondaryBackground, #404040);
+    color: var(--vscode-button-secondaryForeground, white);
+    border: 1px solid var(--vscode-button-border, #6e6e6e);
     border-radius: 3px;
     padding: 4px 12px;
     height: 28px;
+    /* Debugging: Force visibility if VS Code variables fail */
+    min-width: 80px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     font-family: var(--vscode-font-family);
     font-size: 13px;
     font-weight: 400;
@@ -240,9 +243,9 @@
    ============================================================================= */
 
 .action-bar-button--primary {
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    border-color: var(--vscode-button-background);
+    background: var(--vscode-button-background, #0e639c);
+    color: var(--vscode-button-foreground, white);
+    border-color: var(--vscode-button-background, #0e639c);
 }
 
 .action-bar-button--primary:hover:not([disabled]) {
@@ -251,9 +254,9 @@
 }
 
 .action-bar-button--secondary {
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
-    border-color: var(--vscode-button-border);
+    background: var(--vscode-button-secondaryBackground, #3c3c3c);
+    color: var(--vscode-button-secondaryForeground, white);
+    border-color: var(--vscode-button-border, #6e6e6e);
 }
 
 .action-bar-button--danger {

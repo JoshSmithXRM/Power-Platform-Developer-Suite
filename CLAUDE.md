@@ -78,8 +78,9 @@ private initializeComponents(): void {
     // ✅ CORRECT: Setup event bridge for efficient updates
     this.dataTableComponent.on('update', (event) => {
         this.postMessage({
-            command: 'component-update',
+            command: 'component-event',
             componentId: event.componentId,
+            eventType: 'dataUpdated',
             action: 'setData',
             data: this.dataTableComponent.getData()
         });
@@ -622,16 +623,20 @@ All panels MUST implement event bridge pattern for component updates to avoid un
 this.components.forEach(component => {
     component.on('update', (event) => {
         this.postMessage({
-            action: 'componentUpdate',
+            command: 'component-event',
             componentId: event.componentId,
+            eventType: 'dataUpdated',
+            action: 'setData',
             data: component.getData()  // Get current component data
         });
     });
     
     component.on('stateChange', (event) => {
         this.postMessage({
-            action: 'componentStateChange',
+            command: 'component-event',
             componentId: event.componentId,
+            eventType: 'configChanged',
+            action: 'updateState',
             state: event.state
         });
     });
@@ -697,10 +702,10 @@ class ComponentBehavior {
         
         // Handle specific message actions
         switch (message.action) {
-            case 'componentUpdate':
+            case 'setData':
                 this.updateComponent(message.componentId, message.data);
                 break;
-            case 'stateChange':
+            case 'updateState':
                 this.updateState(message.componentId, message.state);
                 break;
             default:
@@ -727,16 +732,58 @@ if (typeof window !== 'undefined') {
 }
 ```
 
-#### **3. Script Loading Order (Essential)**
-PanelComposer MUST load behaviors BEFORE ComponentUtils:
+#### **3. Script Loading Order with ComponentUtils Stub (Essential)**
+PanelComposer MUST load ComponentUtils stub before behaviors, then ComponentUtils last:
 ```typescript
 // In PanelComposer.collectBehaviorScripts()
 const scripts = [
-    'js/utils/PanelUtils.js',                    // 1. Panel utilities first
-    'js/components/EnvironmentSelectorBehavior.js', // 2. Component behaviors
-    'js/components/DataTableBehavior.js',           // 3. More behaviors
-    'js/utils/ComponentUtils.js'                    // 4. ComponentUtils LAST
+    'js/utils/PanelUtils.js',                       // 1. Panel utilities first
+    'js/utils/ComponentUtilsStub.js',               // 2. ComponentUtils stub for behavior registration
+    'js/components/EnvironmentSelectorBehavior.js', // 3. Component behaviors (can register immediately)
+    'js/components/DataTableBehavior.js',           // 4. More behaviors
+    'js/utils/ComponentUtils.js'                    // 5. ComponentUtils LAST (processes registrations)
 ];
+```
+
+#### **4. ComponentUtils Stub Pattern (Required)**
+To solve behavior registration timing issues, a stub provides immediate registration capability:
+
+```javascript
+// ComponentUtilsStub.js - Loaded before behaviors
+if (!window.ComponentUtils) {
+    window.ComponentUtils = {
+        pendingBehaviorRegistrations: [],
+        
+        // Stub registration method that queues registrations
+        registerBehavior: function(name, behaviorClass) {
+            console.log(`ComponentUtilsStub: Queuing registration for ${name}`);
+            this.pendingBehaviorRegistrations.push({ name, behaviorClass });
+        }
+    };
+    
+    console.log('ComponentUtilsStub: Stub created for behavior registration');
+}
+```
+
+```typescript
+// PanelComposer.ts - Add stub to script loading
+private static collectBehaviorScripts(components: BaseComponent[]): string[] {
+    const scripts: string[] = [];
+    
+    scripts.push('js/utils/PanelUtils.js');
+    scripts.push('js/utils/ComponentUtilsStub.js');        // ← REQUIRED: Stub before behaviors
+    
+    components.forEach(component => {
+        const behaviorScript = component.getBehaviorScript();
+        if (behaviorScript && !scripts.includes(behaviorScript)) {
+            scripts.push(behaviorScript);
+        }
+    });
+    
+    scripts.push('js/utils/ComponentUtils.js');            // ← REQUIRED: ComponentUtils processes stub registrations
+    
+    return scripts;
+}
 ```
 
 ### **Initialization Lifecycle**
@@ -758,6 +805,8 @@ const scripts = [
 ### Extension Host ↔ Webview Bridge Pattern
 
 When components emit events in the Extension Host, they must be forwarded to the webview for UI updates. This avoids the performance penalty and visual flash of `updateWebview()`.
+
+**IMPORTANT: All message commands MUST use kebab-case format (e.g., `'component-event'`, `'environment-changed'`, `'load-data'`). This ensures consistency across the entire codebase and eliminates configuration mismatches.**
 
 **Required Implementation Pattern:**
 

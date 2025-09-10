@@ -104,7 +104,7 @@ class PanelUtils {
                 if (document.getElementById(environmentSelectorId) && window.EnvironmentSelectorUtils) {
                     EnvironmentSelectorUtils.setLoadingState(environmentSelectorId, true);
                 }
-                PanelUtils.sendMessage('loadEnvironments');
+                PanelUtils.sendMessage('load-environments');
             },
             
             showLoading: (message) => PanelUtils.showLoading('content', message),

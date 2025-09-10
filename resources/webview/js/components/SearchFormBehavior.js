@@ -247,7 +247,7 @@ class SearchFormBehavior {
         this.setLoading(instance, true);
         
         // Send search message to Extension Host
-        ComponentUtils.sendMessage('formSearched', {
+        ComponentUtils.sendMessage('form-searched', {
             componentId: instance.id,
             values: values,
             isValid: validation.isValid,
@@ -290,7 +290,7 @@ class SearchFormBehavior {
         }
         
         // Send field change message to Extension Host
-        ComponentUtils.sendMessage('fieldValueChanged', {
+        ComponentUtils.sendMessage('field-value-changed', {
             componentId: instance.id,
             fieldId: fieldId,
             value: value,
@@ -359,7 +359,7 @@ class SearchFormBehavior {
         this.clearValidationErrors(instance);
         
         // Send clear message to Extension Host
-        ComponentUtils.sendMessage('formCleared', {
+        ComponentUtils.sendMessage('form-cleared', {
             componentId: instance.id,
             clearedFields: clearedFields,
             timestamp: Date.now()
@@ -383,7 +383,7 @@ class SearchFormBehavior {
         this.clearValidationErrors(instance);
         
         // Send reset message to Extension Host
-        ComponentUtils.sendMessage('formReset', {
+        ComponentUtils.sendMessage('form-reset', {
             componentId: instance.id,
             values: defaultValues,
             timestamp: Date.now()
@@ -416,7 +416,7 @@ class SearchFormBehavior {
         console.log(`SearchFormBehavior: Form ${instance.collapsed ? 'collapsed' : 'expanded'} for ${instance.id}`);
         
         // Send collapse message to Extension Host
-        ComponentUtils.sendMessage('formCollapseToggled', {
+        ComponentUtils.sendMessage('form-collapse-toggled', {
             componentId: instance.id,
             collapsed: instance.collapsed,
             timestamp: Date.now()
@@ -821,7 +821,7 @@ class SearchFormBehavior {
         }
         
         // Send search message to Extension Host
-        ComponentUtils.sendMessage('formSearched', {
+        ComponentUtils.sendMessage('form-searched', {
             componentId: instance.id,
             values: values,
             isValid: true,
@@ -842,7 +842,7 @@ class SearchFormBehavior {
         
         const delay = instance.config.autoSaveDelay || 1000;
         instance.autoSaveTimeoutId = setTimeout(() => {
-            ComponentUtils.sendMessage('formAutoSave', {
+            ComponentUtils.sendMessage('form-auto-save', {
                 componentId: instance.id,
                 values: instance.values,
                 timestamp: Date.now()

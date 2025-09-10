@@ -195,7 +195,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
         try {
             switch (message.command) {
                 case 'environment-selected':
-                case 'environmentChanged':
+                case 'environment-changed':
                     await this.handleEnvironmentSelection(message.data?.environmentId);
                     break;
                 
@@ -203,19 +203,19 @@ export class EnvironmentVariablesPanel extends BasePanel {
                     await this.handleSolutionSelection(message.data?.solutionId);
                     break;
                 
-                case 'loadSolutions':
+                case 'load-solutions':
                     await this.handleLoadSolutions(message.data?.environmentId);
                     break;
 
-                case 'loadEnvironmentVariables':
+                case 'load-environment-variables':
                     await this.handleLoadEnvironmentVariables(message.data?.environmentId, message.data?.solutionId);
                     break;
 
-                case 'syncDeploymentSettings':
+                case 'sync-deployment-settings':
                     await this.handleSyncDeploymentSettings(message.data?.environmentVariablesData, message.data?.solutionUniqueName);
                     break;
 
-                case 'openInMaker':
+                case 'open-in-maker':
                     await this.handleOpenInMaker(message.data?.environmentId, message.data?.solutionId, message.data?.entityType);
                     break;
                 

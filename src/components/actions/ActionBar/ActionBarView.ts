@@ -114,7 +114,7 @@ export class ActionBarView {
         config: ActionBarConfig
     ): string {
         const groupsHtml = groups.map(group => {
-            if (!group.visible) return '';
+            if (group.visible === false) return '';
 
             const groupActions = actions.filter(action => group.actions.includes(action.id));
             const actionsHtml = groupActions.map(action => this.renderAction(componentId, action, state, config)).join('');
@@ -131,7 +131,7 @@ export class ActionBarView {
                      data-collapsible="${group.collapsible}"
                      data-collapsed="${group.collapsed}">
                     ${group.label && config.showGroupLabels ? 
-                        `<div class="action-bar-group-label">${this.escapeHtml(group.label)}</div>` : ''}
+                        `<div class="action-bar-group-label">${group.label}</div>` : ''}
                     <div class="action-bar-group-actions">
                         ${actionsHtml}
                     </div>
@@ -152,8 +152,8 @@ export class ActionBarView {
         state: ActionBarViewState,
         config: ActionBarConfig
     ): string {
-        const actionsHtml = actions
-            .filter(action => action.visible !== false)
+        const visibleActions = actions.filter(action => action.visible !== false);
+        const actionsHtml = visibleActions
             .map(action => this.renderAction(componentId, action, state, config))
             .join('');
 
@@ -169,7 +169,7 @@ export class ActionBarView {
         state: ActionBarViewState,
         config: ActionBarConfig
     ): string {
-        if (!action.visible) return '';
+        if (action.visible === false) return '';
 
         switch (action.type) {
             case 'separator':
@@ -206,7 +206,7 @@ export class ActionBarView {
         ].filter(Boolean).join(' ');
 
         const icon = isLoading ? ICONS.LOADING : (action.icon || '');
-        const badge = action.badge ? `<span class="action-bar-badge">${this.escapeHtml(String(action.badge))}</span>` : '';
+        const badge = action.badge ? `<span class="action-bar-badge">${String(action.badge)}</span>` : '';
 
         return `
             <button type="button" 
@@ -215,11 +215,11 @@ export class ActionBarView {
                     data-action-id="${action.id}"
                     data-action-type="${action.type || 'button'}"
                     data-component-element="action"
-                    title="${this.escapeHtml(action.tooltip || action.label)}"
+                    title="${action.tooltip || action.label}"
                     ${isDisabled ? 'disabled' : ''}
                     ${action.keyboard ? `data-keyboard="${action.keyboard}"` : ''}>
                 ${icon ? `<span class="action-icon">${icon}</span>` : ''}
-                <span class="action-label">${this.escapeHtml(action.label)}</span>
+                <span class="action-label">${action.label}</span>
                 ${badge}
             </button>
         `;
@@ -262,12 +262,12 @@ export class ActionBarView {
                         data-action-id="${action.id}"
                         data-action-type="dropdown"
                         data-component-element="dropdown-toggle"
-                        title="${this.escapeHtml(action.tooltip || action.label)}"
+                        title="${action.tooltip || action.label}"
                         ${isDisabled ? 'disabled' : ''}
                         aria-haspopup="true"
                         aria-expanded="false">
                     ${icon ? `<span class="action-icon">${icon}</span>` : ''}
-                    <span class="action-label">${this.escapeHtml(action.label)}</span>
+                    <span class="action-label">${action.label}</span>
                     <span class="dropdown-arrow">${ICONS.CHEVRON_DOWN}</span>
                 </button>
                 <div class="action-bar-dropdown-menu" 
@@ -289,7 +289,7 @@ export class ActionBarView {
                 return '<div class="action-bar-dropdown-separator" role="separator"></div>';
             }
 
-            if (!item.visible) return '';
+            if (item.visible === false) return '';
 
             const itemClass = [
                 'action-bar-dropdown-item',
@@ -304,9 +304,9 @@ export class ActionBarView {
                         data-component-element="dropdown-item"
                         role="menuitem"
                         ${item.disabled ? 'disabled' : ''}
-                        title="${this.escapeHtml(item.label)}">
+                        title="${item.label}">
                     ${item.icon ? `<span class="item-icon">${item.icon}</span>` : ''}
-                    <span class="item-label">${this.escapeHtml(item.label)}</span>
+                    <span class="item-label">${item.label}</span>
                 </button>
             `;
         }).join('');
@@ -395,9 +395,22 @@ export class ActionBarView {
      * Helper method to escape HTML
      */
     private static escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+    
+    /**
+     * Helper method to escape HTML attributes
+     */
+    private static escapeAttribute(text: string): string {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;');
     }
 
     /**
@@ -420,10 +433,10 @@ export class ActionBarView {
                 <button type="button" 
                         class="${buttonClass}"
                         data-action-id="${action.id}"
-                        title="${this.escapeHtml(action.tooltip || action.label)}"
+                        title="${action.tooltip || action.label}"
                         ${isDisabled ? 'disabled' : ''}>
                     ${action.icon ? `<span class="action-icon">${action.icon}</span>` : ''}
-                    <span class="action-label">${this.escapeHtml(action.label)}</span>
+                    <span class="action-label">${action.label}</span>
                 </button>
             `;
         }).join('');
@@ -458,10 +471,10 @@ export class ActionBarView {
                 return `
                     <div class="${itemClass}" 
                          data-action-id="${action.id}"
-                         title="${this.escapeHtml(action.tooltip || action.label)}">
+                         title="${action.tooltip || action.label}">
                         ${action.icon ? `<span class="menu-icon">${action.icon}</span>` : ''}
-                        <span class="menu-label">${this.escapeHtml(action.label)}</span>
-                        ${action.keyboard ? `<span class="menu-shortcut">${this.escapeHtml(action.keyboard)}</span>` : ''}
+                        <span class="menu-label">${action.label}</span>
+                        ${action.keyboard ? `<span class="menu-shortcut">${action.keyboard}</span>` : ''}
                     </div>
                 `;
             }).join('');

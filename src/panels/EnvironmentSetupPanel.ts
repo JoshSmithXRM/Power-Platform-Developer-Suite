@@ -134,7 +134,7 @@ export class EnvironmentSetupPanel extends BasePanel {
     protected async handleMessage(message: WebviewMessage): Promise<void> {
         try {
             switch (message.command) {
-                case 'environmentChanged':
+                case 'environment-changed':
                     await this.handleEnvironmentSelection(message.data?.environmentId);
                     break;
                 

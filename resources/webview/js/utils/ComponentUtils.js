@@ -12,6 +12,7 @@ class ComponentUtils {
     static messageQueue = [];
     static registeredBehaviors = new Map();
     static expectedBehaviors = new Set();
+    static pendingBehaviorRegistrations = [];
 
     /**
      * Register a behavior class when it loads
@@ -23,6 +24,58 @@ class ComponentUtils {
         
         // Check if we can initialize now
         this.checkReadyToInitialize();
+    }
+
+    /**
+     * Auto-register behaviors that are available in global scope
+     */
+    static registerAvailableBehaviors() {
+        const behaviorTypes = ['EnvironmentSelector', 'SolutionSelector', 'ActionBar', 'DataTable', 'SearchForm', 'EntitySelector'];
+        
+        console.log('ComponentUtils: registerAvailableBehaviors() called');
+        console.log('ComponentUtils: window object keys:', Object.keys(window).filter(k => k.includes('Behavior')));
+        
+        behaviorTypes.forEach(type => {
+            const behaviorName = `${type}Behavior`;
+            const behaviorExists = !!window[behaviorName];
+            const alreadyRegistered = this.registeredBehaviors.has(type);
+            
+            console.log(`ComponentUtils: Checking ${behaviorName} - exists: ${behaviorExists}, already registered: ${alreadyRegistered}`);
+            
+            if (window[behaviorName] && !this.registeredBehaviors.has(type)) {
+                console.log(`ComponentUtils: Auto-registering ${behaviorName}`);
+                this.registerBehavior(type, window[behaviorName]);
+            }
+        });
+        
+        console.log('ComponentUtils: Final registered behaviors:', Array.from(this.registeredBehaviors.keys()));
+    }
+
+    /**
+     * Process pending behavior registrations from stub or deferred registrations
+     */
+    static processPendingRegistrations() {
+        // Check if there's a pre-existing ComponentUtils with pending registrations (from stub)
+        const existingPending = window.ComponentUtils?.pendingBehaviorRegistrations || [];
+        
+        console.log(`ComponentUtils: Processing ${existingPending.length} pending registrations from stub`);
+        
+        existingPending.forEach(({ name, behaviorClass }) => {
+            console.log(`ComponentUtils: Registering pending behavior ${name}`);
+            this.registerBehavior(name, behaviorClass);
+        });
+        
+        // Also process our own pending registrations
+        if (this.pendingBehaviorRegistrations.length > 0) {
+            console.log(`ComponentUtils: Processing ${this.pendingBehaviorRegistrations.length} internal pending registrations`);
+            this.pendingBehaviorRegistrations.forEach(({ name, behaviorClass }) => {
+                console.log(`ComponentUtils: Registering internal pending behavior ${name}`);
+                this.registerBehavior(name, behaviorClass);
+            });
+        }
+        
+        // Clear all pending registrations
+        this.pendingBehaviorRegistrations = [];
     }
 
     /**
@@ -64,6 +117,8 @@ class ComponentUtils {
      * Call this after DOM is ready and all behaviors are loaded
      */
     static initialize() {
+        console.log('ComponentUtils: initialize() method called');
+        
         if (this.isInitialized) {
             console.warn('ComponentUtils already initialized');
             return;
@@ -78,6 +133,14 @@ class ComponentUtils {
             return;
         }
 
+        console.log('ComponentUtils: About to call registerAvailableBehaviors()');
+        // Auto-register any behaviors that loaded before ComponentUtils
+        this.registerAvailableBehaviors();
+        
+        // Process any pending registrations from the stub
+        this.processPendingRegistrations();
+        
+        console.log('ComponentUtils: About to call checkReadyToInitialize()');
         // Check if we're ready to initialize
         this.checkReadyToInitialize();
     }
@@ -258,9 +321,9 @@ class ComponentUtils {
     /**
      * Send message to Extension Host
      */
-    static sendMessage(action, data = {}) {
+    static sendMessage(command, data = {}) {
         const message = {
-            action,
+            command,
             data,
             timestamp: Date.now()
         };
@@ -524,7 +587,7 @@ class ComponentUtils {
         document.dispatchEvent(event);
 
         // Also send to Extension Host
-        this.sendMessage('componentEvent', {
+        this.sendMessage('component-event', {
             componentId,
             eventType,
             data
@@ -676,7 +739,7 @@ class ComponentUtils {
             this.showError(componentId, event.error.message, 'Global error handler');
         } else {
             // Send global error to Extension Host
-            this.sendMessage('globalError', {
+            this.sendMessage('global-error', {
                 message: event.error.message,
                 stack: event.error.stack,
                 filename: event.filename,
@@ -738,5 +801,5 @@ if (document.readyState === 'loading') {
     ComponentUtils.initialize();
 }
 
-// Make available globally
+// Make available globally (replacing any stub)
 window.ComponentUtils = ComponentUtils;

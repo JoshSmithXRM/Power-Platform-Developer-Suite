@@ -159,7 +159,7 @@ class EnvironmentSelectorBehavior {
         const selectedEnvironment = instance.environments.find(env => env.id === newEnvironmentId) || null;
         
         // Send message to Extension Host
-        ComponentUtils.sendMessage('environmentChanged', {
+        ComponentUtils.sendMessage('environment-changed', {
             componentId: instance.id,
             environmentId: newEnvironmentId || '',
             environment: selectedEnvironment,
@@ -188,7 +188,7 @@ class EnvironmentSelectorBehavior {
         this.setLoading(instance, true, 'Refreshing environments...');
         
         // Send refresh message to Extension Host
-        ComponentUtils.sendMessage('refreshEnvironments', {
+        ComponentUtils.sendMessage('refresh-environments', {
             componentId: instance.id,
             reason: 'user'
         });
@@ -201,7 +201,7 @@ class EnvironmentSelectorBehavior {
         if (instance.config.autoRefreshOnFocus && !instance.loading) {
             
             // Send refresh message to Extension Host
-            ComponentUtils.sendMessage('refreshEnvironments', {
+            ComponentUtils.sendMessage('refresh-environments', {
                 componentId: instance.id,
                 reason: 'focus'
             });

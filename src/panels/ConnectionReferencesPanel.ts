@@ -123,25 +123,25 @@ export class ConnectionReferencesPanel extends BasePanel {
                 id: 'connectionRefs-actions',
                 actions: [
                     {
-                        id: 'refresh',
-                        label: 'Refresh',
-                        icon: 'refresh',
+                        id: 'syncDeploymentBtn',
+                        label: 'Sync Deployment Settings',
+                        icon: 'sync',
+                        variant: 'secondary',
+                        disabled: true
+                    },
+                    {
+                        id: 'openInMakerBtn',
+                        label: 'Open in Maker',
+                        icon: 'external-link',
                         variant: 'primary',
                         disabled: false
                     },
                     {
-                        id: 'create',
-                        label: 'Create New Reference',
-                        icon: 'add',
-                        variant: 'secondary',
-                        disabled: true
-                    },
-                    {
-                        id: 'export',
-                        label: 'Export References',
-                        icon: 'export',
-                        variant: 'secondary',
-                        disabled: true
+                        id: 'refreshBtn',
+                        label: 'Refresh',
+                        icon: 'refresh',
+                        variant: 'info',
+                        disabled: false
                     }
                 ],
                 layout: 'horizontal',
@@ -348,6 +348,13 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             const { command } = message;
             
+            this.componentLogger.info('Message received in handleMessage', { 
+                command, 
+                hasData: !!message.data,
+                hasAction: !!message.action,
+                messageKeys: Object.keys(message)
+            });
+            
             // Handle empty or undefined command
             if (!command) {
                 this.componentLogger.trace('Received message with no command property', { 
@@ -361,6 +368,13 @@ export class ConnectionReferencesPanel extends BasePanel {
             
             switch (command) {
                 case 'component-event':
+                    // Debug: check message structure
+                    this.componentLogger.info('component-event structure', {
+                        hasData: !!message.data,
+                        dataComponentId: message.data?.componentId,
+                        dataEventType: message.data?.eventType,
+                        dataHasData: !!message.data?.data
+                    });
                     await this.handleComponentEvent(message);
                     break;
 
@@ -368,11 +382,11 @@ export class ConnectionReferencesPanel extends BasePanel {
                     await this.refreshConnectionReferences();
                     break;
 
-                case 'syncDeploymentSettings':
+                case 'sync-deployment-settings':
                     await this.handleSyncDeploymentSettings(message.data?.relationships, message.data?.solutionUniqueName);
                     break;
 
-                case 'openInMaker':
+                case 'open-in-maker':
                     await this.handleOpenInMaker(message.data?.environmentId, message.data?.solutionId, message.data?.entityType);
                     break;
 
@@ -394,7 +408,8 @@ export class ConnectionReferencesPanel extends BasePanel {
 
     private async handleComponentEvent(message: WebviewMessage): Promise<void> {
         try {
-            const { componentId, eventType, data } = message;
+            // ComponentUtils.sendMessage puts everything in message.data
+            const { componentId, eventType, data } = message.data || {};
             
             this.componentLogger.debug('Processing component event', { 
                 componentId, 
@@ -417,6 +432,42 @@ export class ConnectionReferencesPanel extends BasePanel {
                 } else {
                     this.componentLogger.debug('Solution selection cleared via component event');
                     await this.handleSolutionSelection('');
+                }
+                return;
+            }
+
+            // Handle action bar events
+            if (componentId === 'connectionRefs-actions' && eventType === 'actionClicked') {
+                const { actionId } = data;
+                
+                this.componentLogger.info('Action bar button clicked', { actionId });
+                
+                switch (actionId) {
+                    case 'refreshBtn':
+                        await this.refreshConnectionReferences();
+                        break;
+                    case 'syncDeploymentBtn':
+                        // Get current data for deployment settings sync
+                        const currentData = this.dataTableComponent?.getData() || [];
+                        const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
+                        const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
+                        
+                        await this.handleSyncDeploymentSettings({
+                            relationships: currentData
+                        }, selectedSolution?.uniqueName);
+                        break;
+                    case 'openInMakerBtn':
+                        const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
+                        const solId = this.solutionSelectorComponent?.getSelectedSolution()?.id;
+                        
+                        if (envId && solId) {
+                            await this.handleOpenInMaker(envId, solId, 'workflows');
+                        } else {
+                            vscode.window.showWarningMessage('Please select an environment and solution first');
+                        }
+                        break;
+                    default:
+                        this.componentLogger.warn('Unknown action ID', { actionId });
                 }
                 return;
             }
