@@ -10,7 +10,7 @@
     gap: 8px;
     background: var(--vscode-editor-background);
     border: 1px solid var(--vscode-panel-border);
-    border-radius: 6px;
+    border-radius: 4px;
     padding: 12px;
     font-family: var(--vscode-font-family);
     font-size: var(--vscode-font-size);
@@ -38,7 +38,7 @@
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    background: var(--vscode-dropdown-background);
+    background: var(--vscode-input-background) !important;
     border: 1px solid var(--vscode-dropdown-border);
     color: var(--vscode-dropdown-foreground);
     padding: 8px 12px;
@@ -99,7 +99,7 @@
     left: 0;
     right: 0;
     z-index: 1000;
-    background: var(--vscode-dropdown-listBackground);
+    background: var(--vscode-input-background) !important;
     border: 1px solid var(--vscode-dropdown-border);
     border-radius: 4px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
@@ -109,7 +109,7 @@
 
 /* Main dropdown - legacy compatibility */
 .solution-dropdown {
-    background: var(--vscode-dropdown-background);
+    background: var(--vscode-input-background) !important;
     border: 1px solid var(--vscode-dropdown-border);
     color: var(--vscode-dropdown-foreground);
     padding: 8px 12px;

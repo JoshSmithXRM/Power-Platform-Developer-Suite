@@ -11,8 +11,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-input-background) !important;
+    border: 1px solid var(--vscode-input-border) !important;
     border-radius: 4px;
     padding: 8px 12px;
     margin-bottom: 8px;
@@ -609,7 +609,6 @@
     top: 0;
     z-index: 100;
     background: var(--vscode-editor-background);
-    border-bottom: 1px solid var(--vscode-panel-border);
 }
 
 .action-bar--collapsible {

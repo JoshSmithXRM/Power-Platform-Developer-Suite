@@ -1281,51 +1281,28 @@ The styling system follows a **progressive enhancement cascade** with four level
    - Default styles for each component type
    - Applied to ALL instances of that component
 
-4. **Panel-Specific Overrides** (`panels/[panel-name]-panel.css`) 
-   - Optional overrides for specific panels
-   - Loaded automatically if file exists
-   - Use component className for targeting
+**Note**: Panel-specific CSS is not supported per component-based architecture. All styling should be done through component configuration and component-specific CSS files.
 
-### **Panel-Specific Styling Example**
+### **Component Styling Best Practices**
 
-```css
-/* resources/webview/css/panels/environment-variables-panel.css */
-
-/* Target components in this panel using their className */
-.environment-variables-table {
-    font-size: 12px;  /* Smaller text for dense data */
-}
-
-.environment-variables-table .data-table-cell {
-    padding: 4px 8px;  /* Tighter padding */
-}
-
-/* Override action bar for this panel only */
-.environment-variables-actions .action-button {
-    padding: 4px 12px;
-    font-size: 12px;
-}
-```
-
-### **How to Enable Panel-Specific Styles**
-
-1. **Use className when creating components:**
+1. **Use component configuration for customization:**
 ```typescript
 this.dataTable = ComponentFactory.createDataTable({
     id: 'myTable',
-    className: 'my-panel-table',  // Panel-specific class
+    className: 'data-table--compact',  // Component variant class
+    size: 'small',                     // Built-in size variants
     columns: [...]
 });
 ```
 
-2. **Create panel CSS file (optional):**
-   - Name: `[panel-title]-panel.css` in `css/panels/`
-   - Auto-loaded if exists, ignored if missing
-   - No code changes needed
+2. **Extend component CSS files for new variants:**
+   - Add variant classes to component CSS files
+   - Use BEM naming: `.component-name--variant`
+   - Example: `.data-table--compact`, `.action-bar--minimal`
 
 3. **CSS loads in order:**
-   - Base styles → Component defaults → Panel overrides
-   - Later styles override earlier ones
+   - Base styles → Component defaults → Component variants
+   - All styling contained within component boundaries
 
 ### **CSS Custom Properties for Theming**
 ```css

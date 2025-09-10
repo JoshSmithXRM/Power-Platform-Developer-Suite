@@ -9,7 +9,7 @@
     position: relative;
     background: var(--vscode-editor-background);
     border: 1px solid var(--vscode-panel-border);
-    border-radius: 6px;
+    border-radius: 4px;
     overflow: hidden;
     font-family: var(--vscode-font-family);
     font-size: var(--vscode-font-size);
@@ -17,8 +17,10 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    margin: 0; /* Remove any default margin */
+    margin: 0;
 }
+
+/* Hover effects removed for border consistency */
 
 .data-table-container {
     position: relative;
@@ -50,9 +52,9 @@
     table-layout: fixed;
 }
 
-/* Header styling */
+/* Header styling - Clean consistent appearance matching environment selector */
 .data-table-thead {
-    background: var(--vscode-sideBar-background);
+    background: var(--vscode-input-background) !important;
     border-bottom: 2px solid var(--vscode-panel-border);
     position: sticky;
     top: 0;
@@ -60,18 +62,21 @@
 }
 
 .data-table-header-row {
-    background: var(--vscode-sideBar-background);
+    background: transparent;
 }
 
 .data-table-header-cell {
-    padding: 8px 12px;
+    padding: 12px 16px;
     text-align: left;
     font-weight: 600;
-    border-right: 1px solid var(--vscode-panel-border);
+    font-size: 13px;
+    border-right: 1px solid rgba(128, 128, 128, 0.3);
     position: relative;
     user-select: none;
     white-space: nowrap;
     vertical-align: middle;
+    color: var(--vscode-foreground);
+    transition: background-color 0.15s ease;
 }
 
 .data-table-header-cell:last-child {
@@ -100,14 +105,17 @@
     text-overflow: ellipsis;
 }
 
-/* Sortable headers */
+/* Sortable headers - Enhanced interactivity */
 .data-table-header-cell.sortable {
     cursor: pointer;
-    transition: background-color 0.15s ease;
+    transition: all 0.15s ease;
+    border-radius: 4px 4px 0 0;
 }
 
 .data-table-header-cell.sortable:hover {
-    background: var(--vscode-list-hoverBackground);
+    background: rgba(128, 128, 128, 0.1);
+    color: var(--vscode-charts-blue);
+    transform: translateY(-1px);
 }
 
 .sort-button {
@@ -215,26 +223,44 @@
 }
 
 .data-table-body-row {
-    border-bottom: 1px solid var(--vscode-panel-border);
-    transition: background-color 0.15s ease;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+    transition: all 0.15s ease;
+    position: relative;
 }
 
 .data-table-body-row:last-child {
     border-bottom: none;
 }
 
-/* Striped rows for better readability - more visible approach */
+.data-table-body-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: transparent;
+    transition: background-color 0.2s ease;
+}
+
+/* Striped rows - Modern, subtle approach */
 .data-table-tbody .data-table-body-row:nth-child(even) {
     background: var(--vscode-editor-background) !important;
 }
 
 .data-table-tbody .data-table-body-row:nth-child(odd) {
-    background: var(--vscode-input-background) !important;
+    background: rgba(128, 128, 128, 0.05) !important;
 }
 
 .data-table-body-row:hover {
-    background: var(--vscode-list-activeSelectionBackground) !important;
+    background: rgba(var(--vscode-list-hoverBackground), 0.8) !important;
     color: var(--vscode-list-activeSelectionForeground);
+    transform: translateX(2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.data-table-body-row:hover::before {
+    background: var(--vscode-charts-blue);
 }
 
 .data-table-body-row.selected {
@@ -247,12 +273,15 @@
 }
 
 .data-table-body-cell {
-    padding: 8px 12px;
-    border-right: 1px solid var(--vscode-panel-border);
+    padding: 12px 16px;
+    border-right: 1px solid rgba(128, 128, 128, 0.3);
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    transition: all 0.15s ease;
+    font-size: 13px;
+    line-height: 1.4;
 }
 
 .data-table-body-cell:last-child {
@@ -305,18 +334,22 @@
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
     border: 1px solid var(--vscode-button-border, transparent);
-    padding: 4px 8px;
-    border-radius: 3px;
+    padding: 6px 12px;
+    border-radius: 4px;
     cursor: pointer;
     font-size: 12px;
+    font-weight: 500;
     transition: all 0.15s ease;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .action-button:hover {
     background: var(--vscode-button-hoverBackground);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .action-button:active {
@@ -464,20 +497,22 @@
     border-top: 1px solid var(--vscode-panel-border);
 }
 
-/* Pagination/Footer */
+/* Pagination/Footer - Clean consistent design matching environment selector */
 .data-table-pagination {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
+    padding: 16px 20px;
     border-top: 2px solid var(--vscode-panel-border);
-    background: var(--vscode-sideBar-background);
+    background: var(--vscode-editor-background);
     gap: 16px;
     flex-wrap: wrap;
     position: sticky;
     bottom: 0;
     z-index: 5;
-    min-height: 44px;
+    min-height: 52px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .page-info {
@@ -519,15 +554,19 @@
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
     border: 1px solid var(--vscode-button-border, transparent);
-    padding: 6px 12px;
-    border-radius: 3px;
+    padding: 8px 14px;
+    border-radius: 4px;
     cursor: pointer;
     font-size: 13px;
-    transition: background-color 0.15s ease;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .page-button:hover:not(:disabled) {
     background: var(--vscode-button-hoverBackground);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .page-button:disabled {
@@ -538,6 +577,8 @@
 .page-button.current {
     background: var(--vscode-charts-blue);
     color: white;
+    box-shadow: 0 2px 4px rgba(0, 114, 183, 0.3);
+    font-weight: 600;
 }
 
 .page-input {

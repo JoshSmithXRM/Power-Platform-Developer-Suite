@@ -69,7 +69,7 @@ export class PanelComposer {
      * 
      * @param components Array of components to compose
      * @param webviewResources Resource URIs for CSS and JS files
-     * @param panelTitle Optional panel title (also used for panel-specific CSS)
+     * @param panelTitle Optional panel title
      */
     public static compose(
         components: BaseComponent[], 
@@ -79,8 +79,8 @@ export class PanelComposer {
         // Generate component HTML by concatenating component outputs
         const componentHTML = components.map(component => component.generateHTML()).join('\n');
         
-        // Collect required CSS files (including optional panel-specific CSS)
-        const cssFiles = PanelComposer.collectCSSFiles(components, panelTitle);
+        // Collect required CSS files (component-based only)
+        const cssFiles = PanelComposer.collectCSSFiles(components);
         
         // Collect required behavior scripts  
         const behaviorScripts = PanelComposer.collectBehaviorScripts(components);
@@ -580,9 +580,10 @@ export class PanelComposer {
      * 1. Base component styles (applied to all components)
      * 2. Base panel styles (applied to all panels)
      * 3. Component-specific styles (from each component)
-     * 4. Panel-specific styles (optional overrides for specific panels)
+     * 
+     * Note: Panel-specific CSS is not supported per component-based architecture
      */
-    private static collectCSSFiles(components: BaseComponent[], panelTitle?: string): string[] {
+    private static collectCSSFiles(components: BaseComponent[]): string[] {
         const cssFiles = new Set<string>();
         
         // 1. Add base CSS files (foundation styles)
@@ -602,23 +603,6 @@ export class PanelComposer {
                 console.warn(`Warning collecting CSS for component ${component.getId()}:`, error);
             }
         });
-        
-        // 3. Add panel-specific CSS file if panel title is provided
-        // This allows panels to override component styles for their specific needs
-        if (panelTitle) {
-            // Convert panel title to CSS filename format
-            // e.g., "Environment Variables" -> "environment-variables-panel.css"
-            const panelCssName = panelTitle
-                .toLowerCase()
-                .replace(/\s+/g, '-')
-                .replace(/[^a-z0-9-]/g, '');
-            
-            const panelCssFile = `css/panels/${panelCssName}-panel.css`;
-            
-            // Note: This file is optional - if it doesn't exist, it will just not load
-            // This allows gradual adoption of panel-specific styles
-            cssFiles.add(panelCssFile);
-        }
         
         return Array.from(cssFiles);
     }
