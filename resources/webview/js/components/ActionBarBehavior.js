@@ -801,6 +801,32 @@ if (typeof ComponentUtils !== 'undefined') {
 // Make available globally
 window.ActionBarBehavior = ActionBarBehavior;
 
+// Static methods are already on the class, no need to reassign
+
+// Add static handleMessage method for ComponentUtils compatibility
+ActionBarBehavior.handleMessage = function(message) {
+    console.log('DEBUG: ActionBarBehavior.handleMessage called with:', message);
+    
+    if (!message || !message.componentId) {
+        console.warn('ActionBar handleMessage: Invalid message format', message);
+        return;
+    }
+    
+    // Find the instance for this componentId
+    const instance = ActionBarBehavior.instances.get(message.componentId);
+    if (!instance) {
+        console.warn(`ActionBar instance not found: ${message.componentId}`);
+        return;
+    }
+    
+    // Route message to instance method (find the actual instance method name)
+    // For now, just handle basic action updates
+    if (message.action === 'componentUpdate' && message.data) {
+        console.log(`ActionBar: Handling component update for ${message.componentId}`);
+        // Update action states if needed
+    }
+};
+
 // Register with ComponentUtils if available
 if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
     window.ComponentUtils.registerBehavior('ActionBar', ActionBarBehavior);

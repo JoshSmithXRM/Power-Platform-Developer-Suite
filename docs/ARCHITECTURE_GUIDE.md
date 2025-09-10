@@ -237,25 +237,76 @@ export const DEFAULT_ENVIRONMENT_SELECTOR_CONFIG: Partial<EnvironmentSelectorCon
 class EnvironmentSelectorBehavior {
     static instances = new Map();
     
-    static initialize(componentId, config) {
-        const selector = document.getElementById(componentId);
-        if (!selector) return;
+    // ✅ REQUIRED: Static initialize method for ComponentUtils compatibility
+    static initialize(componentId, config, element) {
+        if (!componentId || !element) {
+            console.error('EnvironmentSelectorBehavior: componentId and element are required');
+            return null;
+        }
+        
+        if (this.instances.has(componentId)) {
+            console.warn(`EnvironmentSelectorBehavior: ${componentId} already initialized`);
+            return this.instances.get(componentId);
+        }
         
         const instance = {
             id: componentId,
-            config: config,
-            element: selector,
-            statusElement: document.getElementById(componentId + '_status')
+            config: { ...config },
+            element: element,
+            statusElement: element.querySelector('[data-component-element="status"]')
         };
         
         // Setup event listeners
-        selector.addEventListener('change', (e) => {
+        element.addEventListener('change', (e) => {
             const environmentId = e.target.value;
             this.handleEnvironmentChange(instance, environmentId);
         });
         
         this.instances.set(componentId, instance);
+        console.log(`EnvironmentSelectorBehavior: Initialized ${componentId}`);
         return instance;
+    }
+    
+    // ✅ REQUIRED: Static handleMessage method for Extension Host communication
+    static handleMessage(message) {
+        console.log('DEBUG: EnvironmentSelectorBehavior.handleMessage called with:', message);
+        
+        if (!message || !message.componentId) {
+            console.warn('EnvironmentSelector handleMessage: Invalid message format', message);
+            return;
+        }
+        
+        // Handle different message actions
+        const { action, data, componentId } = message;
+        
+        switch (action) {
+            case 'componentUpdate':
+            case 'environmentsLoaded':
+                if (data && data.environments) {
+                    this.loadEnvironments(componentId, data.environments);
+                }
+                if (data && data.selectedEnvironmentId) {
+                    this.setSelectedEnvironment(componentId, data.selectedEnvironmentId);
+                }
+                break;
+                
+            case 'environmentSelected':
+                if (data && data.environmentId) {
+                    this.setSelectedEnvironment(componentId, data.environmentId);
+                }
+                break;
+                
+            case 'loadingStateChanged':
+                this.setLoading(componentId, data.loading, data.message);
+                break;
+                
+            case 'errorOccurred':
+                this.showError(componentId, data.error, data.context);
+                break;
+                
+            default:
+                console.warn(`EnvironmentSelectorBehavior: Unknown message action: ${action}`);
+        }
     }
     
     static handleEnvironmentChange(instance, environmentId) {
@@ -303,8 +354,17 @@ class EnvironmentSelectorBehavior {
     }
 }
 
-// Auto-register when script loads
+// ✅ REQUIRED: Component Registry Pattern for ComponentUtils integration
+// Make available globally
 window.EnvironmentSelectorBehavior = EnvironmentSelectorBehavior;
+
+// Register with ComponentUtils if available - CRITICAL for component communication
+if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
+    window.ComponentUtils.registerBehavior('EnvironmentSelector', EnvironmentSelectorBehavior);
+    console.log('EnvironmentSelectorBehavior registered with ComponentUtils');
+} else {
+    console.log('EnvironmentSelectorBehavior loaded, ComponentUtils not available yet');
+}
 ```
 
 ```css
@@ -350,6 +410,169 @@ window.EnvironmentSelectorBehavior = EnvironmentSelectorBehavior;
 .environment-disconnected {
     background: rgba(255, 0, 0, 0.1);
     color: #e74c3c;
+}
+```
+
+---
+
+## 🔄 Component Registry and Lifecycle Pattern
+
+### **Component Behavior Registration (MANDATORY)**
+
+All component behavior scripts MUST follow this exact registration pattern for ComponentUtils integration:
+
+#### **1. Required Static Methods**
+
+Every behavior class MUST implement these two static methods:
+
+```javascript
+class ComponentBehavior {
+    // ✅ REQUIRED: Initialize component instance  
+    static initialize(componentId, config, element) {
+        // Validation
+        if (!componentId || !element) {
+            console.error('ComponentBehavior: componentId and element are required');
+            return null;
+        }
+        
+        // Prevent double initialization
+        if (this.instances.has(componentId)) {
+            console.warn(`ComponentBehavior: ${componentId} already initialized`);
+            return this.instances.get(componentId);
+        }
+        
+        // Create and store instance
+        const instance = { id: componentId, config, element };
+        this.instances.set(componentId, instance);
+        return instance;
+    }
+    
+    // ✅ REQUIRED: Handle messages from Extension Host
+    static handleMessage(message) {
+        console.log('DEBUG: ComponentBehavior.handleMessage called with:', message);
+        
+        if (!message || !message.componentId) {
+            console.warn('ComponentBehavior handleMessage: Invalid message format', message);
+            return;
+        }
+        
+        // Route to appropriate handler based on message.action
+        switch (message.action) {
+            case 'componentUpdate':
+                this.handleComponentUpdate(message.componentId, message.data);
+                break;
+            case 'stateChange':
+                this.handleStateChange(message.componentId, message.data);
+                break;
+            default:
+                console.warn(`ComponentBehavior: Unknown action: ${message.action}`);
+        }
+    }
+}
+```
+
+#### **2. Global Registration Pattern**
+
+At the end of every behavior script:
+
+```javascript
+// ✅ REQUIRED: Component Registry Pattern
+if (typeof window !== 'undefined') {
+    // Make behavior available globally
+    window.ComponentBehavior = ComponentBehavior;
+    
+    // Register with ComponentUtils - CRITICAL for Extension Host communication
+    if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
+        window.ComponentUtils.registerBehavior('ComponentType', ComponentBehavior);
+        console.log('ComponentBehavior registered with ComponentUtils');
+    } else {
+        console.log('ComponentBehavior loaded, ComponentUtils not available yet');
+    }
+}
+```
+
+#### **3. Script Loading Order in PanelComposer**
+
+Component behaviors must load BEFORE ComponentUtils for proper registration:
+
+```typescript
+// PanelComposer.ts - collectBehaviorScripts() method
+private static collectBehaviorScripts(components: BaseComponent[]): string[] {
+    const scripts: string[] = [];
+    
+    // 1. Load PanelUtils first
+    scripts.push('js/utils/PanelUtils.js');
+    
+    // 2. Load component behavior scripts
+    components.forEach(component => {
+        const behaviorScript = component.getBehaviorScript();
+        if (behaviorScript && !scripts.includes(behaviorScript)) {
+            scripts.push(behaviorScript);
+        }
+    });
+    
+    // 3. Load ComponentUtils LAST (after all behaviors are available)
+    scripts.push('js/utils/ComponentUtils.js');
+    
+    return scripts;
+}
+```
+
+### **Component Initialization Lifecycle**
+
+The proper initialization sequence prevents "ComponentUtils not available yet" errors:
+
+1. **HTML Loads**: Browser renders component HTML structure
+2. **Behavior Scripts Load**: Component behaviors register with `window.ComponentBehavior = ...`
+3. **ComponentUtils Loads**: Finds all registered behaviors and initializes components  
+4. **Component Instances Created**: Each behavior's `initialize()` method called
+5. **Message Routing Active**: `handleMessage()` methods ready to receive Extension Host updates
+
+### **ComponentUtils Integration**
+
+ComponentUtils provides the central registry and message routing system:
+
+```javascript
+// ComponentUtils.js - Core registry functionality
+class ComponentUtils {
+    static registeredBehaviors = new Map();
+    static componentInstances = new Map();
+    
+    // Register behavior classes  
+    static registerBehavior(componentType, behaviorClass) {
+        console.log(`ComponentUtils: Registering behavior ${componentType}`);
+        this.registeredBehaviors.set(componentType, behaviorClass);
+        this.checkReadyToInitialize();
+    }
+    
+    // Initialize all components when ready
+    static initializeAllComponents() {
+        document.querySelectorAll('[data-component-type]').forEach(element => {
+            const componentType = element.getAttribute('data-component-type');
+            const componentId = element.getAttribute('data-component-id');
+            
+            if (this.registeredBehaviors.has(componentType)) {
+                const behaviorClass = this.registeredBehaviors.get(componentType);
+                const instance = behaviorClass.initialize(componentId, {}, element);
+                
+                if (instance) {
+                    this.componentInstances.set(componentId, instance);
+                }
+            }
+        });
+    }
+    
+    // Route messages from Extension Host to component behaviors
+    static handleMessage(message) {
+        const { componentId, componentType, action } = message;
+        
+        if (componentType && this.registeredBehaviors.has(componentType)) {
+            const behaviorClass = this.registeredBehaviors.get(componentType);
+            if (behaviorClass.handleMessage) {
+                behaviorClass.handleMessage(message);
+            }
+        }
+    }
 }
 ```
 

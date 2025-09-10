@@ -379,13 +379,27 @@ This VS Code extension for Microsoft Dynamics 365/Power Platform follows a modul
 - Support HTML content in table cells for badges and formatting
 
 **Component Behaviors (loaded as .js files):**
-- **ComponentUtils** - Base utilities shared by all components
+- **ComponentUtils** - Component registry, message routing, and initialization lifecycle management
 - **EnvironmentSelectorBehavior** - Environment selector webview interactions
 - **SolutionSelectorBehavior** - Solution selector webview interactions  
-- **DataTableBehavior** - Enhanced data table functionality
+- **DataTableBehavior** - Enhanced data table functionality with static message handling
 - **ActionBarBehavior** - Action bar and button handling
 - **PanelUtils** - Panel-level operations (loading states, messaging, error handling)
 - **TableUtils** - Legacy table functionality (being phased out)
+
+**Component Behavior Requirements (MANDATORY):**
+All behavior scripts MUST implement these static methods for ComponentUtils integration:
+```javascript
+class ComponentBehavior {
+    static initialize(componentId, config, element) { /* Component setup */ }
+    static handleMessage(message) { /* Extension Host communication */ }
+}
+
+// REQUIRED: Global registration at end of script
+if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
+    window.ComponentUtils.registerBehavior('ComponentType', ComponentBehavior);
+}
+```
 
 ### Data Flow and Transformation Patterns
 
@@ -434,6 +448,39 @@ This approach maintains separation of concerns while ensuring each layer handles
 
 ### Critical Requirements
 
+**For DataTable HTML Structure (MANDATORY):**
+DataTable components MUST always render required HTML elements for dynamic updates:
+
+```typescript
+// ✅ CORRECT: Always render tbody and include component ID
+private static renderTable(config: DataTableConfig, state: DataTableViewState): string {
+    return `
+        <table id="${config.id}" class="data-table-element">
+            ${this.renderTableHeader(config, visibleColumns, state)}
+            ${this.renderTableBody(config, visibleColumns, state)}
+        </table>
+    `;
+}
+
+private static renderTableBody(config: DataTableConfig, state: DataTableViewState): string {
+    const visibleData = this.getVisibleData(config, state);
+    
+    // ✅ CRITICAL: Always render tbody, even when empty (required for dynamic updates)
+    return `
+        <tbody class="data-table-tbody">
+            ${visibleData.map((row, index) => 
+                this.renderTableRow(row, index, columns, config, state)
+            ).join('')}
+        </tbody>
+    `;
+}
+
+// ❌ WRONG: Conditional tbody rendering breaks DataTableBehavior updates
+if (visibleData.length === 0) {
+    return ''; // DataTableBehavior can't find tbody element to update
+}
+```
+
 **For Table Implementation:**
 ```javascript
 // Data objects MUST have 'id' property for row actions
@@ -480,6 +527,113 @@ this.components.forEach(component => {
 - Use StateService for UI state persistence (not data caching)
 - Always make fresh API calls, only cache UI preferences
 - Save panel state: selected environment, sort settings, view config
+
+## Component Registry and Lifecycle Pattern (MANDATORY)
+
+### **The Component Behavior Problem We Solved**
+
+Initial implementation had behaviors that couldn't receive Extension Host messages, causing issues like:
+- ❌ "ComponentUtils not available yet" errors
+- ❌ "DataTable warning: No data provided - table will be empty" 
+- ❌ Extension Host sends 292 rows but webview shows no data
+- ❌ Component behaviors not receiving `componentUpdate` messages
+
+### **Component Registry Pattern Solution**
+
+All component behaviors MUST follow this exact pattern:
+
+#### **1. Required Static Methods (Non-Negotiable)**
+```javascript
+class ComponentBehavior {
+    static instances = new Map(); // Track component instances
+    
+    // ✅ REQUIRED: ComponentUtils calls this to initialize components
+    static initialize(componentId, config, element) {
+        if (!componentId || !element) {
+            console.error('ComponentBehavior: componentId and element are required');
+            return null;
+        }
+        
+        // Prevent double initialization
+        if (this.instances.has(componentId)) {
+            return this.instances.get(componentId);
+        }
+        
+        // Create and store instance
+        const instance = {
+            id: componentId,
+            config: { ...config },
+            element: element
+        };
+        
+        this.instances.set(componentId, instance);
+        return instance;
+    }
+    
+    // ✅ REQUIRED: ComponentUtils routes Extension Host messages here
+    static handleMessage(message) {
+        if (!message || !message.componentId) {
+            console.warn('Invalid message format', message);
+            return;
+        }
+        
+        // Handle specific message actions
+        switch (message.action) {
+            case 'componentUpdate':
+                this.updateComponent(message.componentId, message.data);
+                break;
+            case 'stateChange':
+                this.updateState(message.componentId, message.state);
+                break;
+            default:
+                console.warn(`Unknown action: ${message.action}`);
+        }
+    }
+}
+```
+
+#### **2. Global Registration Pattern (Critical)**
+At the END of every behavior script file:
+```javascript
+// ✅ REQUIRED: Make behavior available globally
+if (typeof window !== 'undefined') {
+    window.ComponentBehavior = ComponentBehavior;
+    
+    // ✅ CRITICAL: Register with ComponentUtils for message routing
+    if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
+        window.ComponentUtils.registerBehavior('ComponentType', ComponentBehavior);
+        console.log('ComponentBehavior registered with ComponentUtils');
+    } else {
+        console.log('ComponentBehavior loaded, ComponentUtils not available yet');
+    }
+}
+```
+
+#### **3. Script Loading Order (Essential)**
+PanelComposer MUST load behaviors BEFORE ComponentUtils:
+```typescript
+// In PanelComposer.collectBehaviorScripts()
+const scripts = [
+    'js/utils/PanelUtils.js',                    // 1. Panel utilities first
+    'js/components/EnvironmentSelectorBehavior.js', // 2. Component behaviors
+    'js/components/DataTableBehavior.js',           // 3. More behaviors
+    'js/utils/ComponentUtils.js'                    // 4. ComponentUtils LAST
+];
+```
+
+### **Initialization Lifecycle**
+1. **HTML renders** with `data-component-type` and `data-component-id` attributes
+2. **Behavior scripts load** and register with `window.ComponentUtils.registerBehavior()`  
+3. **ComponentUtils loads** and finds all registered behaviors
+4. **Component initialization** - ComponentUtils calls each behavior's `initialize()` method
+5. **Message routing active** - Extension Host messages routed to `handleMessage()` methods
+
+### **Why This Pattern Works**
+- ✅ **Eliminates "ComponentUtils not available yet" errors** - correct loading order
+- ✅ **Enables Extension Host → Webview communication** - message routing works
+- ✅ **Prevents double initialization** - instance tracking prevents conflicts  
+- ✅ **Provides debugging information** - comprehensive logging throughout lifecycle
+- ✅ **Supports multi-instance components** - each behavior manages multiple instances
 
 ## Component Update Communication
 

@@ -1133,6 +1133,9 @@ if (typeof window !== 'undefined') {
     // Add static initialize method to global DataTableBehavior for ComponentUtils
     DataTableBehavior.initialize = DataTableBehavior.initialize || DataTableBehaviorStatic.initialize;
     
+    // Add static handleMessage method to global DataTableBehavior for ComponentUtils  
+    DataTableBehavior.handleMessage = DataTableBehavior.handleMessage || DataTableBehaviorStatic.handleMessage;
+    
     // Register with ComponentUtils if available
     if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
         window.ComponentUtils.registerBehavior('DataTable', DataTableBehavior);
