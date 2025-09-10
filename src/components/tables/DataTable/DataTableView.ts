@@ -176,7 +176,7 @@ export class DataTableView {
         const visibleColumns = config.columns.filter((col: DataTableColumn) => state.columnVisibility[col.id] !== false);
 
         return `
-            <table class="data-table-element">
+            <table id="${config.id}" class="data-table-element">
                 ${config.showHeader !== false ? this.renderTableHeader(config, visibleColumns, state) : ''}
                 ${this.renderTableBody(config, visibleColumns, state)}
             </table>
@@ -397,10 +397,7 @@ export class DataTableView {
     ): string {
         const visibleData = this.getVisibleData(config, state);
 
-        if (visibleData.length === 0 && !state.loading) {
-            return ''; // Empty state will be shown instead
-        }
-
+        // Always render tbody element, even when empty (required for dynamic updates)
         return `
             <tbody class="data-table-tbody">
                 ${visibleData.map((row, index) => 

@@ -286,8 +286,9 @@ export class PanelComposer {
     ${html}
     
     <script>
-        // Make vscode API available globally
-        const vscode = acquireVsCodeApi();
+        // Make vscode API available globally - avoid duplicate acquisition
+        const vscode = window.vscode || acquireVsCodeApi();
+        window.vscode = vscode;
         
         // Component registration tracking
         window.registeredComponents = window.registeredComponents || [];
@@ -593,7 +594,9 @@ export class PanelComposer {
             try {
                 const componentCSSFile = component.getCSSFile();
                 if (componentCSSFile) {
-                    cssFiles.add(componentCSSFile);
+                    // Prepend css/ if not already present
+                    const cssPath = componentCSSFile.startsWith('css/') ? componentCSSFile : `css/${componentCSSFile}`;
+                    cssFiles.add(cssPath);
                 }
             } catch (error) {
                 console.warn(`Warning collecting CSS for component ${component.getId()}:`, error);
@@ -621,25 +624,37 @@ export class PanelComposer {
     }
 
     private static collectBehaviorScripts(components: BaseComponent[]): string[] {
-        const scripts = new Set<string>();
+        const scripts: string[] = [];
         
-        // Add base utility scripts
-        scripts.add('js/utils/ComponentUtils.js');
-        scripts.add('js/utils/PanelUtils.js');
+        // IMPORTANT: Load PanelUtils first (has no dependencies)
+        scripts.push('js/utils/PanelUtils.js');
         
-        // Collect component-specific behavior scripts
+        // Then load component-specific behavior scripts BEFORE ComponentUtils
         components.forEach(component => {
             try {
                 const componentScript = component.getBehaviorScript();
                 if (componentScript) {
-                    scripts.add(componentScript);
+                    // Ensure proper js/ prefix for component behavior scripts
+                    let scriptPath = componentScript;
+                    if (scriptPath.startsWith('components/')) {
+                        scriptPath = `js/${scriptPath}`;
+                    } else if (!scriptPath.startsWith('js/')) {
+                        scriptPath = `js/${scriptPath}`;
+                    }
+                    // Avoid duplicates
+                    if (!scripts.includes(scriptPath)) {
+                        scripts.push(scriptPath);
+                    }
                 }
             } catch (error) {
                 console.warn(`Warning collecting scripts for component ${component.getId()}:`, error);
             }
         });
         
-        return Array.from(scripts);
+        // Load ComponentUtils LAST so all behaviors are available when it initializes
+        scripts.push('js/utils/ComponentUtils.js');
+        
+        return scripts;
     }
 
     private static generateCompleteHTML(params: {
@@ -649,13 +664,16 @@ export class PanelComposer {
         behaviorScripts: string[];
         webviewResources: WebviewResources;
     }): string {
-        // Convert webviewResources to URI strings
+        // Create proper webview URIs for CSS and JS files
+        // Extract the base URI pattern from existing resources and construct proper paths
+        const baseUri = params.webviewResources.panelStylesSheet.toString().replace('/css/panel-base.css', '');
+        
         const cssLinks = params.cssFiles.map(css => 
-            `<link rel="stylesheet" href="${params.webviewResources.panelStylesSheet.toString().replace('panel-base.css', css)}">`
+            `<link rel="stylesheet" href="${baseUri}/${css}">`
         ).join('\n    ');
         
         const jsScripts = params.behaviorScripts.map(script => 
-            `<script src="${params.webviewResources.panelUtilsScript.toString().replace('panel-utils.js', script)}"></script>`
+            `<script src="${baseUri}/${script}"></script>`
         ).join('\n    ');
         
         return `<!DOCTYPE html>
@@ -675,8 +693,9 @@ export class PanelComposer {
     </div>
     
     <script>
-        // Make vscode API available globally
-        const vscode = acquireVsCodeApi();
+        // Make vscode API available globally - avoid duplicate acquisition
+        const vscode = window.vscode || acquireVsCodeApi();
+        window.vscode = vscode;
         
         // Global error handler
         window.addEventListener('error', function(event) {

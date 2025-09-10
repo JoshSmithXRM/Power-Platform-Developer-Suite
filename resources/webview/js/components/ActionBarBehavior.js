@@ -800,3 +800,11 @@ if (typeof ComponentUtils !== 'undefined') {
 
 // Make available globally
 window.ActionBarBehavior = ActionBarBehavior;
+
+// Register with ComponentUtils if available
+if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
+    window.ComponentUtils.registerBehavior('ActionBar', ActionBarBehavior);
+    console.log('ActionBarBehavior registered with ComponentUtils');
+} else {
+    console.log('ActionBarBehavior loaded, ComponentUtils not available yet');
+}

@@ -9,10 +9,59 @@ class ComponentUtils {
     static messageHandlers = new Map();
     static isInitialized = false;
     static vscode = null;
+    static messageQueue = [];
+    static registeredBehaviors = new Map();
+    static expectedBehaviors = new Set();
+
+    /**
+     * Register a behavior class when it loads
+     * Called by each behavior script when it loads
+     */
+    static registerBehavior(name, behaviorClass) {
+        console.log(`ComponentUtils: Registering behavior ${name}`);
+        this.registeredBehaviors.set(name, behaviorClass);
+        
+        // Check if we can initialize now
+        this.checkReadyToInitialize();
+    }
+
+    /**
+     * Check if all expected behaviors are registered and we're ready to initialize
+     */
+    static checkReadyToInitialize() {
+        // Get all components in DOM that need behaviors
+        const componentElements = document.querySelectorAll('[data-component-type]');
+        const neededBehaviors = new Set();
+        
+        componentElements.forEach(element => {
+            const componentType = element.getAttribute('data-component-type');
+            if (componentType) {
+                neededBehaviors.add(componentType);
+            }
+        });
+        
+        console.log('ComponentUtils: Needed behaviors:', Array.from(neededBehaviors));
+        console.log('ComponentUtils: Registered behaviors:', Array.from(this.registeredBehaviors.keys()));
+        
+        // Check if all needed behaviors are registered
+        let allReady = true;
+        neededBehaviors.forEach(behaviorType => {
+            const behaviorName = `${behaviorType}Behavior`;
+            if (!window[behaviorName]) {
+                console.log(`ComponentUtils: Still waiting for ${behaviorName}`);
+                allReady = false;
+            }
+        });
+        
+        if (allReady && !this.isInitialized && window.vscode) {
+            console.log('ComponentUtils: All behaviors ready, initializing components');
+            this.completeInitialization();
+        }
+    }
 
     /**
      * Initialize the component system
-     * Call this after DOM is ready
+     * Call this after DOM is ready and all behaviors are loaded
      */
     static initialize() {
         if (this.isInitialized) {
@@ -20,19 +69,31 @@ class ComponentUtils {
             return;
         }
 
-        // Get VS Code API
-        if (typeof acquireVsCodeApi !== 'undefined') {
-            this.vscode = acquireVsCodeApi();
+        // Store VS Code API reference
+        if (window.vscode) {
+            this.vscode = window.vscode;
+            console.log('ComponentUtils: VS Code API available');
         } else {
-            console.error('VS Code API not available');
+            console.error('ComponentUtils: VS Code API not available - should be set by PanelComposer');
             return;
         }
 
+        // Check if we're ready to initialize
+        this.checkReadyToInitialize();
+    }
+
+    /**
+     * Complete initialization after VS Code API is available
+     */
+    static completeInitialization() {
         // Setup global message handler
         window.addEventListener('message', this.handleMessage.bind(this));
 
         // Setup global error handler
         window.addEventListener('error', this.handleGlobalError.bind(this));
+
+        // Flush any queued messages
+        this.flushMessageQueue();
 
         // Mark as initialized
         this.isInitialized = true;
@@ -199,19 +260,39 @@ class ComponentUtils {
      * Send message to Extension Host
      */
     static sendMessage(action, data = {}) {
-        if (!this.vscode) {
-            console.error('VS Code API not available');
-            return;
-        }
-
         const message = {
             action,
             data,
             timestamp: Date.now()
         };
 
+        if (!this.vscode) {
+            // Queue the message until VS Code API is available
+            console.log('Queueing message (VS Code API not ready):', message);
+            this.messageQueue.push(message);
+            return;
+        }
+
         console.log('Sending message to Extension Host:', message);
         this.vscode.postMessage(message);
+    }
+
+    /**
+     * Flush queued messages when VS Code API becomes available
+     */
+    static flushMessageQueue() {
+        if (!this.vscode || this.messageQueue.length === 0) {
+            return;
+        }
+
+        console.log(`Flushing ${this.messageQueue.length} queued messages`);
+        const queuedMessages = [...this.messageQueue];
+        this.messageQueue = [];
+
+        queuedMessages.forEach(message => {
+            console.log('Sending queued message to Extension Host:', message);
+            this.vscode.postMessage(message);
+        });
     }
 
     /**
@@ -233,6 +314,30 @@ class ComponentUtils {
     }
 
     /**
+     * Register a component-specific message handler
+     */
+    static registerComponentHandler(componentId, handler) {
+        if (!componentId || typeof handler !== 'function') {
+            console.error('Invalid componentId or handler for component registration');
+            return;
+        }
+        
+        this.componentHandlers = this.componentHandlers || new Map();
+        this.componentHandlers.set(componentId, handler);
+        console.log(`Registered component handler for: ${componentId}`);
+    }
+
+    /**
+     * Unregister a component-specific message handler
+     */
+    static unregisterComponentHandler(componentId) {
+        if (this.componentHandlers) {
+            this.componentHandlers.delete(componentId);
+            console.log(`Unregistered component handler for: ${componentId}`);
+        }
+    }
+
+    /**
      * Handle incoming messages from Extension Host
      */
     static handleMessage(event) {
@@ -243,18 +348,38 @@ class ComponentUtils {
                 return;
             }
 
-            console.log('Received message from Extension Host:', message);
+            console.log('DEBUG: ComponentUtils received message from Extension Host:', message);
 
-            // Try component-specific handler first
+            // First priority: Try component-specific handlers (new system)
+            if (message.componentId && this.componentHandlers && this.componentHandlers.has(message.componentId)) {
+                console.log('DEBUG: Routing to component-specific handler');
+                const handler = this.componentHandlers.get(message.componentId);
+                handler(message);
+                return;
+            }
+
+            // Second priority: Try component-specific behavior handlers (existing system)
             if (message.componentId) {
                 const component = this.getComponent(message.componentId);
                 if (component && component.behaviorInstance && component.behaviorInstance.handleMessage) {
+                    console.log('DEBUG: Routing to behavior instance handler');
                     component.behaviorInstance.handleMessage(message);
                     return;
                 }
             }
 
-            // Try global handler
+            // Third priority: Route to specific behavior static handlers
+            if (message.action === 'componentUpdate' || message.action === 'componentStateChange') {
+                console.log('DEBUG: Routing to component behavior static handler', {
+                    action: message.action,
+                    componentId: message.componentId,
+                    componentType: message.componentType
+                });
+                this.routeToComponentBehavior(message);
+                return;
+            }
+
+            // Fourth priority: Try global action handlers
             const handler = this.messageHandlers.get(message.action);
             if (handler) {
                 handler(message);
@@ -264,6 +389,139 @@ class ComponentUtils {
         } catch (error) {
             console.error('Error handling message:', error);
         }
+    }
+
+    /**
+     * Route messages to appropriate component behavior static handlers
+     */
+    static routeToComponentBehavior(message) {
+        if (!message.componentId) {
+            console.warn('Component message missing componentId:', message);
+            return;
+        }
+
+        // Determine component type from element or message
+        const element = document.getElementById(message.componentId);
+        let componentType = message.componentType;
+        
+        if (!componentType && element) {
+            // Infer component type from element attributes or structure
+            componentType = element.getAttribute('data-component-type') || 
+                          this.inferComponentTypeFromElement(element);
+        }
+
+        console.log('DEBUG: Routing to component type:', componentType);
+        
+        // Route to appropriate behavior handler
+        switch (componentType) {
+            case 'DataTable':
+                console.log('DEBUG: Routing to DataTableBehaviorStatic', {
+                    componentId: message.componentId,
+                    action: message.action,
+                    hasStatic: !!window.DataTableBehaviorStatic
+                });
+                if (window.DataTableBehaviorStatic) {
+                    console.log('DEBUG: DataTableBehaviorStatic found, calling handleMessage');
+                    window.DataTableBehaviorStatic.handleMessage(message);
+                } else {
+                    console.warn('DataTableBehaviorStatic not available');
+                }
+                break;
+                
+            case 'EnvironmentSelector':
+                if (window.EnvironmentSelectorBehavior) {
+                    window.EnvironmentSelectorBehavior.handleMessage(message);
+                } else {
+                    console.warn('EnvironmentSelectorBehavior not available');
+                }
+                break;
+                
+            case 'SolutionSelector':
+                if (window.SolutionSelectorBehavior) {
+                    window.SolutionSelectorBehavior.handleMessage(message);
+                } else {
+                    console.warn('SolutionSelectorBehavior not available');
+                }
+                break;
+                
+            case 'ActionBar':
+                if (window.ActionBarBehavior) {
+                    window.ActionBarBehavior.handleMessage(message);
+                } else {
+                    console.warn('ActionBarBehavior not available');
+                }
+                break;
+                
+            default:
+                // Fallback: try to find behavior based on componentId pattern
+                this.routeByIdPattern(message);
+        }
+    }
+
+    /**
+     * Infer component type from DOM element structure
+     */
+    static inferComponentTypeFromElement(element) {
+        if (!element) return null;
+        
+        // Check for data table structure
+        if (element.tagName === 'TABLE' || element.closest('.data-table')) {
+            return 'DataTable';
+        }
+        
+        // Check for environment selector structure
+        if (element.classList.contains('environment-selector') || 
+            element.closest('.environment-selector')) {
+            return 'EnvironmentSelector';
+        }
+        
+        // Check for solution selector structure
+        if (element.classList.contains('solution-selector') || 
+            element.closest('.solution-selector')) {
+            return 'SolutionSelector';
+        }
+        
+        // Check for action bar structure
+        if (element.classList.contains('action-bar') || 
+            element.closest('.action-bar')) {
+            return 'ActionBar';
+        }
+        
+        return null;
+    }
+
+    /**
+     * Route messages based on component ID patterns (fallback)
+     */
+    static routeByIdPattern(message) {
+        const componentId = message.componentId;
+        
+        // DataTable patterns
+        if (componentId.includes('table') || componentId.includes('Table')) {
+            if (window.DataTableBehaviorStatic) {
+                window.DataTableBehaviorStatic.handleMessage(message);
+                return;
+            }
+        }
+        
+        // Environment selector patterns
+        if (componentId.includes('env') || componentId.includes('Env') || 
+            componentId.includes('environment') || componentId.includes('Environment')) {
+            if (window.EnvironmentSelectorBehavior) {
+                window.EnvironmentSelectorBehavior.handleMessage(message);
+                return;
+            }
+        }
+        
+        // Solution selector patterns
+        if (componentId.includes('solution') || componentId.includes('Solution')) {
+            if (window.SolutionSelectorBehavior) {
+                window.SolutionSelectorBehavior.handleMessage(message);
+                return;
+            }
+        }
+        
+        console.warn(`Could not route message to component behavior: ${componentId}`, message);
     }
 
     /**

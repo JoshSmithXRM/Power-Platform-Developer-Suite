@@ -481,33 +481,52 @@ class EnvironmentSelectorBehavior {
     }
 
     /**
-     * Handle messages from Extension Host
+     * Handle messages from Extension Host (for ComponentUtils routing)
      */
-    static handleMessage(instance, message) {
+    static handleMessage(message) {
+        console.log('DEBUG: EnvironmentSelectorBehavior.handleMessage called with:', message);
+        
+        if (!message || !message.componentId) {
+            console.warn('EnvironmentSelector handleMessage: Invalid message format', message);
+            return;
+        }
+        
+        // Find the instance for this componentId
+        const selector = document.getElementById(message.componentId);
+        if (!selector) {
+            console.warn(`EnvironmentSelector element not found: ${message.componentId}`);
+            return;
+        }
+        
         const { action, data } = message;
         
         switch (action) {
+            case 'componentUpdate':
             case 'environmentsLoaded':
-                this.loadEnvironments(instance.id, data.environments);
-                if (data.selectedEnvironmentId) {
-                    this.setSelectedEnvironment(instance.id, data.selectedEnvironmentId);
+                if (data && data.environments) {
+                    this.loadEnvironments(message.componentId, data.environments);
+                }
+                if (data && data.selectedEnvironmentId) {
+                    this.setSelectedEnvironment(message.componentId, data.selectedEnvironmentId);
                 }
                 break;
                 
             case 'environmentSelected':
-                this.setSelectedEnvironment(instance.id, data.environmentId);
+                if (data && data.environmentId) {
+                    this.setSelectedEnvironment(message.componentId, data.environmentId);
+                }
                 break;
                 
             case 'loadingStateChanged':
-                this.setLoading(instance.id, data.loading, data.message);
+                this.setLoading(message.componentId, data.loading, data.message);
                 break;
                 
             case 'errorOccurred':
-                this.showError(instance.id, data.error, data.context);
+                this.showError(message.componentId, data.error, data.context);
                 break;
                 
             case 'clearError':
-                this.clearError(instance);
+                this.clearError(message.componentId);
                 break;
                 
             default:
@@ -587,3 +606,11 @@ if (typeof ComponentUtils !== 'undefined') {
 
 // Make available globally
 window.EnvironmentSelectorBehavior = EnvironmentSelectorBehavior;
+
+// Register with ComponentUtils if available
+if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
+    window.ComponentUtils.registerBehavior('EnvironmentSelector', EnvironmentSelectorBehavior);
+    console.log('EnvironmentSelectorBehavior registered with ComponentUtils');
+} else {
+    console.log('EnvironmentSelectorBehavior loaded, ComponentUtils not available yet');
+}

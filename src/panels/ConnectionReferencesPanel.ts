@@ -63,6 +63,9 @@ export class ConnectionReferencesPanel extends BasePanel {
         this.componentLogger.debug('Constructor starting');
 
         this.initializeComponents();
+        
+        // Set up event bridges for component communication
+        this.setupComponentEventBridges();
 
         // Initialize the panel (this calls updateWebview which calls getHtmlContent)
         this.initialize();
@@ -218,6 +221,103 @@ export class ConnectionReferencesPanel extends BasePanel {
             this.componentLogger.error('Error initializing components', error as Error);
             vscode.window.showErrorMessage('Failed to initialize Connection References panel');
         }
+    }
+
+    /**
+     * Get component type from component instance
+     */
+    private getComponentType(component: any): string {
+        if (!component) {
+            console.log('DEBUG: getComponentType called with null/undefined component');
+            return 'Unknown';
+        }
+        
+        const constructor = component.constructor;
+        const className = constructor.name;
+        
+        console.log('DEBUG: getComponentType - className:', className, 'component:', component);
+        
+        // Map class names to component types
+        const typeMapping: { [key: string]: string } = {
+            'DataTableComponent': 'DataTable',
+            'EnvironmentSelectorComponent': 'EnvironmentSelector', 
+            'SolutionSelectorComponent': 'SolutionSelector',
+            'ActionBarComponent': 'ActionBar',
+            'SearchFormComponent': 'SearchForm',
+            'FilterFormComponent': 'FilterForm'
+        };
+        
+        const mappedType = typeMapping[className] || className || 'Unknown';
+        console.log('DEBUG: getComponentType result:', mappedType);
+        
+        return mappedType;
+    }
+
+    /**
+     * Set up event bridges to forward component events to webview
+     */
+    private setupComponentEventBridges(): void {
+        this.componentLogger.debug('Setting up component event bridges');
+        
+        const components = [
+            this.environmentSelectorComponent,
+            this.solutionSelectorComponent,
+            this.actionBarComponent,
+            this.dataTableComponent
+        ].filter(Boolean); // Filter out any undefined components
+        
+        components.forEach(component => {
+            if (component) {
+                // Set up update event bridge
+                component.on('update', (event) => {
+                    this.componentLogger.trace('Component update event received', { 
+                        componentId: event.componentId 
+                    });
+                    
+                    // Get component data for update
+                    const componentData = (component as any).getData?.() || null;
+                    const componentType = this.getComponentType(component);
+                    
+                    this.componentLogger.debug('Event bridge forwarding component update to webview', {
+                        componentId: event.componentId,
+                        componentType: componentType,
+                        dataLength: componentData?.length || 0
+                    });
+                    
+                    console.log('DEBUG: Event bridge received update event, forwarding to webview:', {
+                        componentId: event.componentId,
+                        componentType: componentType,
+                        dataLength: componentData?.length || 0
+                    });
+                    
+                    this.postMessage({
+                        action: 'componentUpdate',
+                        componentId: event.componentId,
+                        componentType: componentType,
+                        data: componentData
+                    });
+                    
+                    this.componentLogger.trace('Event bridge message posted to webview');
+                    console.log('DEBUG: Message posted to webview successfully');
+                });
+                
+                // Set up state change event bridge
+                component.on('stateChange', (event) => {
+                    this.componentLogger.trace('Component state change event received', { 
+                        componentId: event.componentId 
+                    });
+                    this.postMessage({
+                        action: 'componentStateChange',
+                        componentId: event.componentId,
+                        state: event.state
+                    });
+                });
+            }
+        });
+        
+        this.componentLogger.info('Component event bridges set up', { 
+            bridgeCount: components.length 
+        });
     }
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
@@ -407,7 +507,12 @@ export class ConnectionReferencesPanel extends BasePanel {
                 this.componentLogger.debug('Sample connection reference data', {
                     sampleData: tableData.relationships?.slice(0, 2) || []
                 });
+                
+                this.componentLogger.trace('About to call setData() which should trigger update event');
+                console.log('DEBUG: About to call setData with data:', tableData.relationships?.length || 0);
                 this.dataTableComponent.setData(tableData.relationships || []);
+                this.componentLogger.trace('setData() call completed - event bridge should have forwarded to webview');
+                console.log('DEBUG: setData() completed, event should have been emitted');
                 // Note: setData() already calls notifyUpdate() to update the table in webview
                 // No need to call updateWebview() which would reload the entire HTML
             }

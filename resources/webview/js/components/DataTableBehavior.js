@@ -797,18 +797,358 @@ class DataTableBehavior {
         this.actionHandlers.clear();
         this.initialized = false;
     }
+    
+    /**
+     * Static initialize method for ComponentUtils compatibility
+     */
+    static initialize(componentId, config, element) {
+        return DataTableBehaviorStatic.initialize(componentId, config, element);
+    }
 }
+
+// Static behavior object for ComponentUtils integration
+const DataTableBehaviorStatic = {
+    instances: new Map(),
+    
+    /**
+     * Initialize a data table behavior instance
+     */
+    initialize(componentId, config, element) {
+        if (this.instances.has(componentId)) {
+            console.warn(`DataTable behavior ${componentId} already initialized`);
+            return this.instances.get(componentId);
+        }
+        
+        const table = element || document.getElementById(componentId);
+        if (!table) {
+            console.error(`DataTable element with ID '${componentId}' not found`);
+            return null;
+        }
+        
+        // Create behavior instance using existing class
+        const behaviorInstance = new DataTableBehavior(componentId);
+        
+        const instance = {
+            id: componentId,
+            config: config || {},
+            element: table,
+            behaviorInstance: behaviorInstance
+        };
+        
+        this.instances.set(componentId, instance);
+        console.log(`DataTable behavior initialized: ${componentId}`);
+        
+        return instance;
+    },
+    
+    /**
+     * Handle messages from Extension Host
+     */
+    handleMessage(message) {
+        console.log('DEBUG: DataTableBehaviorStatic.handleMessage called with:', message);
+        
+        if (!message || !message.componentId) {
+            console.warn('DataTable handleMessage: Invalid message format', message);
+            return;
+        }
+        
+        const instance = this.instances.get(message.componentId);
+        if (!instance) {
+            console.warn(`DataTable instance not found: ${message.componentId}. Available instances:`, Array.from(this.instances.keys()));
+            return;
+        }
+        
+        console.log(`DEBUG: DataTable ${message.componentId} handling message:`, message);
+        
+        switch (message.action) {
+            case 'componentUpdate':
+                this.updateDisplayData(message.componentId, message.data);
+                break;
+            case 'componentStateChange':
+                this.updateState(message.componentId, message.data);
+                break;
+            case 'setData':
+                this.updateDisplayData(message.componentId, message.data);
+                break;
+            case 'setColumns':
+                this.updateColumns(message.componentId, message.data);
+                break;
+            case 'setLoading':
+                this.setLoadingState(message.componentId, message.data);
+                break;
+            default:
+                console.warn(`Unknown DataTable action: ${message.action}`);
+        }
+    },
+    
+    /**
+     * Update table data efficiently without full page reload
+     */
+    updateDisplayData(componentId, data) {
+        const instance = this.instances.get(componentId);
+        if (!instance) {
+            console.error(`DataTable instance not found for update: ${componentId}`);
+            return;
+        }
+        
+        console.log(`Updating DataTable ${componentId} with ${data?.length || 0} rows`);
+        
+        try {
+            const tbody = instance.element.querySelector('tbody');
+            if (!tbody) {
+                console.error(`Table body not found in ${componentId}`);
+                return;
+            }
+            
+            // Clear existing rows
+            tbody.innerHTML = '';
+            
+            if (!data || !Array.isArray(data)) {
+                console.log(`No data to display in ${componentId}`);
+                this.showEmptyState(instance);
+                return;
+            }
+            
+            // Add new rows
+            data.forEach((rowData, index) => {
+                const row = this.createTableRow(instance, rowData, index);
+                if (row) {
+                    tbody.appendChild(row);
+                }
+            });
+            
+            // Update table meta information
+            this.updateTableMeta(instance, data);
+            
+            console.log(`DataTable ${componentId} updated successfully with ${data.length} rows`);
+            
+        } catch (error) {
+            console.error(`Error updating DataTable ${componentId}:`, error);
+            this.showErrorState(instance, error.message);
+        }
+    },
+    
+    /**
+     * Create a table row from data
+     */
+    createTableRow(instance, rowData, index) {
+        if (!rowData || !rowData.id) {
+            console.warn('Row data missing required id field:', rowData);
+            return null;
+        }
+        
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-row-id', rowData.id);
+        tr.setAttribute('data-row-index', index.toString());
+        
+        // Get current column configuration
+        const table = instance.element;
+        const headers = table.querySelectorAll('thead th[data-column-id]');
+        
+        headers.forEach(header => {
+            const columnId = header.getAttribute('data-column-id');
+            const td = document.createElement('td');
+            
+            // Get cell value
+            const cellValue = rowData[columnId];
+            if (cellValue !== null && cellValue !== undefined) {
+                // Handle HTML content or plain text
+                if (typeof cellValue === 'string' && cellValue.includes('<')) {
+                    td.innerHTML = cellValue;
+                } else {
+                    td.textContent = cellValue.toString();
+                }
+            } else {
+                td.textContent = '';
+            }
+            
+            td.className = `table-cell table-cell-${columnId}`;
+            td.setAttribute('data-column-id', columnId);
+            
+            tr.appendChild(td);
+        });
+        
+        // Add row actions if configured
+        if (instance.config.onRowAction) {
+            tr.addEventListener('click', (e) => {
+                if (e.target.closest('.row-action')) {
+                    const action = e.target.closest('.row-action').getAttribute('data-action');
+                    this.handleRowAction(instance, action, rowData);
+                }
+            });
+        }
+        
+        return tr;
+    },
+    
+    /**
+     * Handle row actions
+     */
+    handleRowAction(instance, action, rowData) {
+        console.log(`Row action triggered: ${action} on row:`, rowData);
+        
+        // Send action back to Extension Host
+        if (typeof ComponentUtils !== 'undefined') {
+            ComponentUtils.sendMessage('component-action', {
+                componentId: instance.id,
+                action: 'rowAction',
+                data: {
+                    action: action,
+                    rowData: rowData
+                },
+                timestamp: Date.now()
+            });
+        }
+    },
+    
+    /**
+     * Update table metadata (row count, pagination, etc.)
+     */
+    updateTableMeta(instance, data) {
+        const table = instance.element.closest('.data-table');
+        if (!table) return;
+        
+        // Update row count
+        const rowCountElement = table.querySelector('.table-row-count');
+        if (rowCountElement) {
+            rowCountElement.textContent = `${data.length} rows`;
+        }
+        
+        // Update empty state visibility
+        const emptyState = table.querySelector('.table-empty-state');
+        if (emptyState) {
+            emptyState.style.display = data.length === 0 ? 'block' : 'none';
+        }
+        
+        // Re-enable sorting and filtering
+        if (instance.behaviorInstance && instance.behaviorInstance.setupSorting) {
+            instance.behaviorInstance.setupSorting();
+            instance.behaviorInstance.setupFiltering();
+        }
+    },
+    
+    /**
+     * Show empty state
+     */
+    showEmptyState(instance) {
+        const table = instance.element.closest('.data-table');
+        if (!table) return;
+        
+        const tbody = instance.element.querySelector('tbody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="100%" class="empty-state">No data available</td></tr>';
+        }
+    },
+    
+    /**
+     * Show error state
+     */
+    showErrorState(instance, error) {
+        const table = instance.element.closest('.data-table');
+        if (!table) return;
+        
+        const tbody = instance.element.querySelector('tbody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="100%" class="error-state">Error loading data: ${error}</td></tr>`;
+        }
+    },
+    
+    /**
+     * Update component state
+     */
+    updateState(componentId, state) {
+        const instance = this.instances.get(componentId);
+        if (!instance) return;
+        
+        console.log(`Updating state for ${componentId}:`, state);
+        
+        // Update configuration
+        instance.config = { ...instance.config, ...state.config };
+        
+        // Handle specific state changes
+        if (state.loading !== undefined) {
+            this.setLoadingState(componentId, state.loading);
+        }
+    },
+    
+    /**
+     * Set loading state
+     */
+    setLoadingState(componentId, isLoading) {
+        const instance = this.instances.get(componentId);
+        if (!instance) return;
+        
+        const table = instance.element.closest('.data-table');
+        if (!table) return;
+        
+        if (isLoading) {
+            table.classList.add('table-loading');
+            const tbody = instance.element.querySelector('tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="100%" class="loading-state">Loading...</td></tr>';
+            }
+        } else {
+            table.classList.remove('table-loading');
+        }
+    },
+    
+    /**
+     * Update table columns
+     */
+    updateColumns(componentId, columns) {
+        const instance = this.instances.get(componentId);
+        if (!instance) return;
+        
+        console.log(`Updating columns for ${componentId}:`, columns);
+        // This would require more complex table header reconstruction
+        // For now, log and potentially trigger full table rebuild
+        console.warn('Column updates require full table rebuild - consider using updateWebview()');
+    },
+    
+    /**
+     * Get instance by component ID
+     */
+    getInstance(componentId) {
+        return this.instances.get(componentId);
+    },
+    
+    /**
+     * Cleanup instance
+     */
+    dispose(componentId) {
+        const instance = this.instances.get(componentId);
+        if (instance && instance.behaviorInstance) {
+            instance.behaviorInstance.destroy();
+        }
+        this.instances.delete(componentId);
+        console.log(`DataTable behavior disposed: ${componentId}`);
+    }
+};
 
 // Auto-initialize tables when DOM is ready
 if (typeof window !== 'undefined') {
     window.DataTableBehavior = DataTableBehavior;
+    window.DataTableBehaviorStatic = DataTableBehaviorStatic;
+    
+    // Add static initialize method to global DataTableBehavior for ComponentUtils
+    DataTableBehavior.initialize = DataTableBehavior.initialize || DataTableBehaviorStatic.initialize;
+    
+    // Register with ComponentUtils if available
+    if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
+        window.ComponentUtils.registerBehavior('DataTable', DataTableBehavior);
+        console.log('DataTableBehavior registered with ComponentUtils');
+    } else {
+        console.log('DataTableBehavior loaded, ComponentUtils not available yet');
+    }
     
     // Initialize all data tables
     function initializeDataTables() {
         const tables = document.querySelectorAll('.data-table table[id]');
         tables.forEach(table => {
             if (!table.dataset.initialized) {
+                // Use both class-based and static initialization for compatibility
                 new DataTableBehavior(table.id);
+                DataTableBehaviorStatic.initialize(table.id, {}, table);
                 table.dataset.initialized = 'true';
             }
         });

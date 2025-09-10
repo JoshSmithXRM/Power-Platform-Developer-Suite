@@ -677,6 +677,22 @@ class SolutionSelectorBehavior {
         this.updateSearchClearButton(instance);
     }
 
+    // Load solutions into a specific selector
+    loadSolutions(componentId, solutions) {
+        console.log(`SolutionSelector: Loading ${solutions?.length || 0} solutions for ${componentId}`);
+        const instance = this.instances.get(componentId);
+        if (!instance) {
+            console.warn(`SolutionSelector: Cannot load solutions for ${componentId} - instance not found`);
+            return;
+        }
+        
+        // Update instance with new solutions
+        instance.solutions = solutions || [];
+        this.updateDisplay(instance);
+        
+        console.log(`SolutionSelector: Solutions loaded for ${componentId}`);
+    }
+
     // Observer for dynamically added selectors
     observeNewSelectors() {
         const observer = new MutationObserver((mutations) => {
@@ -711,4 +727,38 @@ const solutionSelectorBehavior = new SolutionSelectorBehavior();
 // Export for potential external access
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = SolutionSelectorBehavior;
+}
+
+// Make available globally and register with ComponentUtils
+if (typeof window !== 'undefined') {
+    window.SolutionSelectorBehavior = SolutionSelectorBehavior;
+    
+    // Add static initialize method for ComponentUtils compatibility
+    SolutionSelectorBehavior.initialize = function(componentId, config, element) {
+        // Use existing instance or create new one
+        return solutionSelectorBehavior.initializeSelector(element);
+    };
+    
+    // Add static handleMessage method for ComponentUtils compatibility
+    SolutionSelectorBehavior.handleMessage = function(message) {
+        console.log('DEBUG: SolutionSelectorBehavior.handleMessage called with:', message);
+        
+        if (!message || !message.componentId) {
+            console.warn('SolutionSelector handleMessage: Invalid message format', message);
+            return;
+        }
+        
+        // Handle solutions loaded
+        if (message.action === 'solutionsLoaded' && message.data) {
+            solutionSelectorBehavior.loadSolutions(message.componentId, message.data);
+        }
+    };
+    
+    // Register with ComponentUtils if available
+    if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
+        window.ComponentUtils.registerBehavior('SolutionSelector', SolutionSelectorBehavior);
+        console.log('SolutionSelectorBehavior registered with ComponentUtils');
+    } else {
+        console.log('SolutionSelectorBehavior loaded, ComponentUtils not available yet');
+    }
 }
