@@ -458,10 +458,8 @@ export class DataTableConfigValidator {
             }
         });
 
-        // Warnings
-        if (!config.data || config.data.length === 0) {
-            warnings.push('No data provided - table will be empty');
-        }
+        // Warnings (skip empty data warning during initialization as this is expected)
+        // Note: Empty data is normal during component initialization
 
         if (config.virtualScroll && config.stickyHeader) {
             warnings.push('Virtual scrolling with sticky header may have performance implications');

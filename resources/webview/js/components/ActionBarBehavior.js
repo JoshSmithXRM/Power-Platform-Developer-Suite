@@ -16,7 +16,6 @@ class ActionBarBehavior {
         }
 
         if (this.instances.has(componentId)) {
-            console.warn(`ActionBarBehavior: ${componentId} already initialized`);
             return this.instances.get(componentId);
         }
 

@@ -16,7 +16,6 @@ class EnvironmentSelectorBehavior {
         }
 
         if (this.instances.has(componentId)) {
-            console.warn(`EnvironmentSelectorBehavior: ${componentId} already initialized`);
             return this.instances.get(componentId);
         }
 
@@ -115,7 +114,6 @@ class EnvironmentSelectorBehavior {
         instance.boundHandlers.keyDown = (e) => this.handleKeyDown(instance, e);
         instance.element.addEventListener('keydown', instance.boundHandlers.keyDown);
         
-        console.log(`EnvironmentSelectorBehavior: Event listeners setup for ${instance.id}`);
     }
 
     /**
@@ -137,11 +135,6 @@ class EnvironmentSelectorBehavior {
             // Update status display
             this.updateStatusDisplay(instance);
         }
-        
-        console.log(`EnvironmentSelectorBehavior: State initialized for ${instance.id}`, {
-            selectedEnvironmentId: instance.selectedEnvironmentId,
-            environmentCount: instance.environments.length
-        });
     }
 
     /**
@@ -151,7 +144,6 @@ class EnvironmentSelectorBehavior {
         const newEnvironmentId = event.target.value;
         const oldEnvironmentId = instance.selectedEnvironmentId;
         
-        console.log(`EnvironmentSelectorBehavior: Environment changed from ${oldEnvironmentId} to ${newEnvironmentId}`);
         
         // Update instance state
         instance.selectedEnvironmentId = newEnvironmentId || null;
@@ -191,7 +183,6 @@ class EnvironmentSelectorBehavior {
      */
     static handleRefreshClick(instance, event) {
         event.preventDefault();
-        console.log(`EnvironmentSelectorBehavior: Refresh clicked for ${instance.id}`);
         
         // Set loading state
         this.setLoading(instance, true, 'Refreshing environments...');
@@ -208,7 +199,6 @@ class EnvironmentSelectorBehavior {
      */
     static handleSelectorFocus(instance, event) {
         if (instance.config.autoRefreshOnFocus && !instance.loading) {
-            console.log(`EnvironmentSelectorBehavior: Auto-refresh on focus for ${instance.id}`);
             
             // Send refresh message to Extension Host
             ComponentUtils.sendMessage('refreshEnvironments', {
@@ -249,7 +239,6 @@ class EnvironmentSelectorBehavior {
             return;
         }
 
-        console.log(`EnvironmentSelectorBehavior: Loading ${environments.length} environments for ${componentId}`);
         
         // Store environments in instance
         instance.environments = environments || [];
@@ -278,8 +267,6 @@ class EnvironmentSelectorBehavior {
         
         // Clear loading state
         this.setLoading(instance, false);
-        
-        console.log(`EnvironmentSelectorBehavior: Environments loaded for ${componentId}`);
     }
 
     /**
@@ -292,7 +279,6 @@ class EnvironmentSelectorBehavior {
             return;
         }
 
-        console.log(`EnvironmentSelectorBehavior: Setting selection to ${environmentId} for ${componentId}`);
         
         // Update selector value
         instance.selector.value = environmentId || '';
@@ -352,7 +338,6 @@ class EnvironmentSelectorBehavior {
             this.updateStatusDisplay(instance);
         }
         
-        console.log(`EnvironmentSelectorBehavior: Loading state ${loading} for ${componentId}`);
     }
 
     /**
@@ -484,17 +469,15 @@ class EnvironmentSelectorBehavior {
      * Handle messages from Extension Host (for ComponentUtils routing)
      */
     static handleMessage(message) {
-        console.log('DEBUG: EnvironmentSelectorBehavior.handleMessage called with:', message);
-        
         if (!message || !message.componentId) {
             console.warn('EnvironmentSelector handleMessage: Invalid message format', message);
             return;
         }
         
-        // Find the instance for this componentId
-        const selector = document.getElementById(message.componentId);
-        if (!selector) {
-            console.warn(`EnvironmentSelector element not found: ${message.componentId}`);
+        // Get the initialized instance instead of searching DOM
+        const instance = this.instances.get(message.componentId);
+        if (!instance) {
+            console.warn(`EnvironmentSelector instance not found: ${message.componentId}`);
             return;
         }
         
@@ -508,6 +491,15 @@ class EnvironmentSelectorBehavior {
                 }
                 if (data && data.selectedEnvironmentId) {
                     this.setSelectedEnvironment(message.componentId, data.selectedEnvironmentId);
+                }
+                break;
+                
+            case 'componentStateChange':
+                // Handle state change messages from Extension Host
+                if (data && typeof data === 'object') {
+                    // Update internal state without triggering events
+                    Object.assign(instance, data);
+                    this.updateStatusDisplay(instance);
                 }
                 break;
                 
@@ -526,7 +518,7 @@ class EnvironmentSelectorBehavior {
                 break;
                 
             case 'clearError':
-                this.clearError(message.componentId);
+                this.clearError(instance);
                 break;
                 
             default:
@@ -574,8 +566,6 @@ class EnvironmentSelectorBehavior {
 
         // Clear references
         this.instances.delete(componentId);
-        
-        console.log(`EnvironmentSelectorBehavior: Disposed ${componentId}`);
     }
 
     /**

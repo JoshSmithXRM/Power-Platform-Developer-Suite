@@ -815,7 +815,6 @@ const DataTableBehaviorStatic = {
      */
     initialize(componentId, config, element) {
         if (this.instances.has(componentId)) {
-            console.warn(`DataTable behavior ${componentId} already initialized`);
             return this.instances.get(componentId);
         }
         
@@ -836,7 +835,6 @@ const DataTableBehaviorStatic = {
         };
         
         this.instances.set(componentId, instance);
-        console.log(`DataTable behavior initialized: ${componentId}`);
         
         return instance;
     },
@@ -845,7 +843,6 @@ const DataTableBehaviorStatic = {
      * Handle messages from Extension Host
      */
     handleMessage(message) {
-        console.log('DEBUG: DataTableBehaviorStatic.handleMessage called with:', message);
         
         if (!message || !message.componentId) {
             console.warn('DataTable handleMessage: Invalid message format', message);
@@ -858,7 +855,6 @@ const DataTableBehaviorStatic = {
             return;
         }
         
-        console.log(`DEBUG: DataTable ${message.componentId} handling message:`, message);
         
         switch (message.action) {
             case 'componentUpdate':
@@ -885,14 +881,6 @@ const DataTableBehaviorStatic = {
      * Update table data efficiently without full page reload
      */
     updateDisplayData(componentId, data) {
-        console.log(`DEBUG: DataTableBehavior.updateDisplayData called for ${componentId}`, {
-            componentId,
-            dataType: typeof data,
-            isArray: Array.isArray(data),
-            dataLength: data?.length,
-            hasData: !!data,
-            sampleData: data?.slice(0, 2)
-        });
         
         const instance = this.instances.get(componentId);
         if (!instance) {
@@ -913,7 +901,6 @@ const DataTableBehaviorStatic = {
             tbody.innerHTML = '';
             
             if (!data || !Array.isArray(data)) {
-                console.log(`No data to display in ${componentId}`);
                 this.showEmptyState(instance);
                 return;
             }

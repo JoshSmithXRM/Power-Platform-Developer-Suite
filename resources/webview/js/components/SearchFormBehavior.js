@@ -16,7 +16,6 @@ class SearchFormBehavior {
         }
 
         if (this.instances.has(componentId)) {
-            console.warn(`SearchFormBehavior: ${componentId} already initialized`);
             return this.instances.get(componentId);
         }
 

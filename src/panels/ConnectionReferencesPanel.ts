@@ -294,16 +294,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                         dataLength: dataLength
                     });
                     
-                    // DEBUG: Special logging for SolutionSelector updates
-                    if (componentType === 'SolutionSelector') {
-                        console.log('DEBUG: SolutionSelector event bridge data:', {
-                            componentId: event.componentId,
-                            hasSolutions: !!componentData?.solutions,
-                            solutionsCount: componentData?.solutions?.length || 0,
-                            hasDefaultSolution: componentData?.solutions?.find((s: any) => s.uniqueName === 'Default'),
-                            sampleSolutions: componentData?.solutions?.slice(0, 3)?.map((s: any) => s.displayName) || []
-                        });
-                    }
                     
                     // For components that need HTML regeneration (like SolutionSelector with dynamic options)
                     let messageData = componentData;
@@ -368,21 +358,12 @@ export class ConnectionReferencesPanel extends BasePanel {
             }
             
             switch (command) {
-                case 'environmentChanged':
-                case 'environment-selected':
-                    await this.handleEnvironmentSelection(message.data?.environmentId);
+                case 'component-event':
+                    await this.handleComponentEvent(message);
                     break;
 
-                case 'solution-selected':
-                    await this.handleSolutionSelection(message.data?.solutionId);
-                    break;
-
-                case 'loadSolutions':
-                    await this.handleLoadSolutions(message.data?.environmentId);
-                    break;
-
-                case 'loadConnectionReferences':
-                    await this.handleLoadConnectionReferences(message.data?.environmentId, message.data?.solutionId);
+                case 'refresh-data':
+                    await this.refreshConnectionReferences();
                     break;
 
                 case 'syncDeploymentSettings':
@@ -393,18 +374,8 @@ export class ConnectionReferencesPanel extends BasePanel {
                     await this.handleOpenInMaker(message.data?.environmentId, message.data?.solutionId, message.data?.entityType);
                     break;
 
-                case 'refresh-data':
-                    await this.refreshConnectionReferences();
-                    break;
-
                 case 'panel-ready':
                     this.componentLogger.debug('Panel ready event received');
-                    // Panel is ready, no action needed
-                    break;
-
-                case 'component-event':
-                    this.componentLogger.debug('Component event received', { data: message.data });
-                    // Handle component-specific events if needed
                     break;
 
                 default:
@@ -413,9 +384,48 @@ export class ConnectionReferencesPanel extends BasePanel {
         } catch (error) {
             this.componentLogger.error('Error handling message', error as Error, { command: message.command });
             this.postMessage({
-                command: 'error',
                 action: 'error',
                 message: 'An error occurred while processing your request'
+            });
+        }
+    }
+
+    private async handleComponentEvent(message: WebviewMessage): Promise<void> {
+        try {
+            const { componentId, eventType, data } = message;
+            
+            this.componentLogger.debug('Processing component event', { 
+                componentId, 
+                eventType, 
+                hasData: !!data 
+            });
+
+            // Handle solution selector events
+            if (componentId === 'connectionRefs-solutionSelector' && eventType === 'selectionChanged') {
+                const { selectedSolutions } = data;
+                
+                if (selectedSolutions && selectedSolutions.length > 0) {
+                    const selectedSolution = selectedSolutions[0];
+                    this.componentLogger.info('Solution selection changed via component event', { 
+                        solutionId: selectedSolution.id,
+                        solutionName: selectedSolution.displayName 
+                    });
+                    
+                    await this.handleSolutionSelection(selectedSolution.id);
+                } else {
+                    this.componentLogger.debug('Solution selection cleared via component event');
+                    await this.handleSolutionSelection('');
+                }
+                return;
+            }
+
+            // Handle other component events as needed
+            this.componentLogger.trace('Component event not handled', { componentId, eventType });
+
+        } catch (error) {
+            this.componentLogger.error('Error handling component event', error as Error, { 
+                componentId: message.componentId, 
+                eventType: message.eventType 
             });
         }
     }
@@ -499,11 +509,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                 // No need to call updateWebview() which would reload the entire HTML
             }
 
-            this.postMessage({
-                action: 'solutionsLoaded',
-                data: solutions,
-                selectedSolutionId: solutions.find(s => s.uniqueName === 'Default')?.solutionId
-            });
         } catch (error) {
             this.componentLogger.error('Error loading solutions', error as Error, { environmentId });
             this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to load solutions' });
@@ -559,10 +564,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                 // No need to call updateWebview() which would reload the entire HTML
             }
 
-            this.postMessage({
-                action: 'connectionReferencesLoaded',
-                data: tableData
-            });
 
             this.componentLogger.info('Connection references loaded successfully', {
                 environmentId,

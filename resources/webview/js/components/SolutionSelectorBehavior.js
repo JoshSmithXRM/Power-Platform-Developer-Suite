@@ -868,7 +868,6 @@ if (typeof window !== 'undefined') {
     
     // Add static handleMessage method for ComponentUtils compatibility
     SolutionSelectorBehavior.handleMessage = function(message) {
-        console.log('DEBUG: SolutionSelectorBehavior.handleMessage called with:', message);
         
         if (!message || !message.componentId) {
             console.warn('SolutionSelector handleMessage: Invalid message format', message);

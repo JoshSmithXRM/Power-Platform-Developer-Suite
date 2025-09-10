@@ -113,7 +113,6 @@ class ComponentUtils {
         }
 
         if (this.components.has(componentId)) {
-            console.warn(`Component ${componentId} already registered`);
             return this.components.get(componentId);
         }
 
@@ -348,11 +347,9 @@ class ComponentUtils {
                 return;
             }
 
-            console.log('DEBUG: ComponentUtils received message from Extension Host:', message);
 
             // First priority: Try component-specific handlers (new system)
             if (message.componentId && this.componentHandlers && this.componentHandlers.has(message.componentId)) {
-                console.log('DEBUG: Routing to component-specific handler');
                 const handler = this.componentHandlers.get(message.componentId);
                 handler(message);
                 return;
@@ -362,7 +359,6 @@ class ComponentUtils {
             if (message.componentId) {
                 const component = this.getComponent(message.componentId);
                 if (component && component.behaviorInstance && component.behaviorInstance.handleMessage) {
-                    console.log('DEBUG: Routing to behavior instance handler');
                     component.behaviorInstance.handleMessage(message);
                     return;
                 }
@@ -370,11 +366,6 @@ class ComponentUtils {
 
             // Third priority: Route to specific behavior static handlers
             if (message.action === 'componentUpdate' || message.action === 'componentStateChange') {
-                console.log('DEBUG: Routing to component behavior static handler', {
-                    action: message.action,
-                    componentId: message.componentId,
-                    componentType: message.componentType
-                });
                 this.routeToComponentBehavior(message);
                 return;
             }
@@ -410,18 +401,11 @@ class ComponentUtils {
                           this.inferComponentTypeFromElement(element);
         }
 
-        console.log('DEBUG: Routing to component type:', componentType);
         
         // Route to appropriate behavior handler
         switch (componentType) {
             case 'DataTable':
-                console.log('DEBUG: Routing to DataTableBehaviorStatic', {
-                    componentId: message.componentId,
-                    action: message.action,
-                    hasStatic: !!window.DataTableBehaviorStatic
-                });
                 if (window.DataTableBehaviorStatic) {
-                    console.log('DEBUG: DataTableBehaviorStatic found, calling handleMessage');
                     window.DataTableBehaviorStatic.handleMessage(message);
                 } else {
                     console.warn('DataTableBehaviorStatic not available');
