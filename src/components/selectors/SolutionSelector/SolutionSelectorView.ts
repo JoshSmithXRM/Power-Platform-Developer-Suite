@@ -1,4 +1,5 @@
-import { SolutionSelectorConfig, Solution, SOLUTION_SELECTOR_CSS } from './SolutionSelectorConfig';
+import { SolutionSelectorConfig, SOLUTION_SELECTOR_CSS } from './SolutionSelectorConfig';
+import { Solution } from '../../../services/SolutionService'; // Use standardized Solution interface
 import { CSS_CLASSES, ICONS } from '../../base/ComponentConfig';
 import { escapeHtml } from '../../base/HtmlUtils';
 
@@ -96,7 +97,7 @@ export class SolutionSelectorView {
             <div class="${SOLUTION_SELECTOR_CSS.WRAPPER}">
                 <div class="${SOLUTION_SELECTOR_CSS.DROPDOWN} ${state.isOpen ? SOLUTION_SELECTOR_CSS.DROPDOWN_OPEN : ''}">
                     ${this.renderTrigger(config, state)}
-                    ${state.isOpen ? this.renderDropdownMenu(config, state) : ''}
+                    ${this.renderDropdownMenu(config, state)}
                 </div>
                 
                 ${allowMultiSelect && state.selectedSolutions.length > 0 ? 

@@ -1,38 +1,10 @@
 import { BaseComponentConfig } from '../../base/ComponentInterface';
+import { Solution } from '../../../services/SolutionService'; // Use standardized Solution interface
 
 /**
  * Configuration interface for SolutionSelectorComponent
  * Provides type-safe configuration for Power Platform solution selection
  */
-
-export interface Solution {
-    id: string;
-    uniqueName: string;
-    friendlyName: string;
-    displayName: string;
-    version: string;
-    isManaged: boolean;
-    isVisible: boolean;
-    publisherId: string;
-    publisherName: string;
-    description?: string;
-    installedOn?: Date;
-    modifiedOn?: Date;
-    createdBy?: string;
-    solutionType?: 'None' | 'Snapshot' | 'Internal' | 'Managed' | 'Unmanaged';
-    upgradeInfo?: {
-        isUpgrade: boolean;
-        baseVersion?: string;
-    };
-    components?: {
-        entities: number;
-        workflows: number;
-        webResources: number;
-        plugins: number;
-        customControls: number;
-        total: number;
-    };
-}
 
 export interface SolutionSelectorConfig extends BaseComponentConfig {
     // Basic configuration
@@ -362,7 +334,7 @@ export class SolutionSelectorConfigValidator {
         filtered = filtered.filter(solution => {
             if (solution.isManaged && !config.showManaged) return false;
             if (!solution.isManaged && !config.showUnmanaged) return false;
-            if (solution.solutionType === 'Internal' && !config.showInternal) return false;
+            // Note: Internal solution filtering removed - not available in standardized interface
             if (this.isSystemSolution(solution) && !config.showSystem) return false;
             return true;
         });

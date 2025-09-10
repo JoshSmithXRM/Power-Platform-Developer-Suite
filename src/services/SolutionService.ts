@@ -2,15 +2,26 @@ import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
 export interface Solution {
-    solutionId: string;
+    id: string;              // Using 'id' to match SolutionSelectorComponent expectations
+    solutionId: string;      // Keep for backward compatibility
     uniqueName: string;
     friendlyName: string;
-    displayName?: string;
+    displayName: string;
     version: string;
     isManaged: boolean;
+    isVisible: boolean;      // Required by SolutionSelectorComponent
+    publisherId: string;     // Required by SolutionSelectorComponent
     publisherName: string;
     installedOn?: string;
     description?: string;
+    components?: {           // Required by SolutionSelectorComponent
+        entities: number;
+        workflows: number;
+        webResources: number;
+        plugins: number;
+        customControls: number;
+        total: number;
+    };
 }
 
 export class SolutionService {
@@ -79,15 +90,26 @@ export class SolutionService {
         });
 
         const mappedSolutions = solutions.map((solution: any) => ({
-            solutionId: solution.solutionid,
+            id: solution.solutionid,                                    // Primary id field for components
+            solutionId: solution.solutionid,                           // Backward compatibility
             uniqueName: solution.uniquename,
-            friendlyName: solution.friendlyname || solution.displayname,
-            displayName: solution.displayname,
-            version: solution.version,
-            isManaged: solution.ismanaged,
-            publisherName: solution.publisherid?.friendlyname || 'Unknown',
+            friendlyName: solution.friendlyname || solution.displayname || solution.uniquename,
+            displayName: solution.friendlyname || solution.displayname || solution.uniquename,
+            version: solution.version || '1.0',
+            isManaged: solution.ismanaged || false,
+            isVisible: true,                                           // All solutions are visible by default
+            publisherId: solution._publisherid_value || '',            // Publisher GUID
+            publisherName: solution.publisherid?.friendlyname || 'Unknown Publisher',
             installedOn: solution.installedon,
-            description: solution.description
+            description: solution.description || '',
+            components: {                                              // Component stats (can be enhanced later)
+                entities: 0,
+                workflows: 0,
+                webResources: 0,
+                plugins: 0,
+                customControls: 0,
+                total: 0
+            }
         }));
 
         // Ensure Default solution is first

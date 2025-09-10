@@ -359,40 +359,17 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
             // Update solution selector component if available
             if (this.solutionSelectorComponent) {
-                // Transform solutions to match component interface
-                const transformedSolutions = solutions.map((sol: any) => ({
-                    id: sol.solutionId,
-                    uniqueName: sol.uniqueName,
-                    displayName: sol.friendlyName || sol.displayName,
-                    friendlyName: sol.friendlyName,
-                    publisherName: sol.publisherDisplayName || '',
-                    publisherId: sol.publisherId || '',
-                    isManaged: sol.isManaged || false,
-                    isVisible: true,
-                    version: sol.version || '',
-                    description: sol.description || '',
-                    components: { 
-                        entities: 0,
-                        workflows: 0, 
-                        webResources: 0,
-                        plugins: 0,
-                        customControls: 0,
-                        total: 0 
-                    }
-                }));
-                
-                this.solutionSelectorComponent.setSolutions(transformedSolutions);
+                // Use solutions directly from service - no transformation needed
+                this.solutionSelectorComponent.setSolutions(solutions);
                 
                 // Auto-select Default solution if available
-                const defaultSolution = transformedSolutions.find(s => s.uniqueName === 'Default');
+                const defaultSolution = solutions.find(s => s.uniqueName === 'Default');
                 if (defaultSolution) {
                     this.solutionSelectorComponent.setSelectedSolutions([defaultSolution]);
                     
                     // Trigger environment variables loading for the auto-selected solution
                     await this.handleLoadEnvironmentVariables(environmentId, defaultSolution.id);
                 }
-                
-                this.updateWebview();
             }
 
             this.postMessage({ 

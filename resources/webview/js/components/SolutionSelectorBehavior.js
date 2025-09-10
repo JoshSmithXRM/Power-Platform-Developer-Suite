@@ -735,8 +735,21 @@ if (typeof window !== 'undefined') {
     
     // Add static initialize method for ComponentUtils compatibility
     SolutionSelectorBehavior.initialize = function(componentId, config, element) {
-        // Use existing instance or create new one
-        return solutionSelectorBehavior.initializeSelector(element);
+        if (!componentId || !element) {
+            console.error('SolutionSelectorBehavior: componentId and element are required');
+            return null;
+        }
+        
+        // Use existing instance behavior to initialize
+        solutionSelectorBehavior.initializeSelector(element);
+        
+        // Return instance info for ComponentUtils compatibility
+        const instance = solutionSelectorBehavior.instances.get(componentId);
+        return instance || {
+            id: componentId,
+            config: { ...config },
+            element: element
+        };
     };
     
     // Add static handleMessage method for ComponentUtils compatibility
@@ -748,8 +761,53 @@ if (typeof window !== 'undefined') {
             return;
         }
         
-        // Handle solutions loaded
+        // Handle component updates from event bridge
+        if (message.action === 'componentUpdate' && message.data) {
+            console.log('SolutionSelector: Received componentUpdate with data:', {
+                componentId: message.componentId,
+                hasData: !!message.data,
+                hasSolutions: !!message.data.solutions,
+                solutionsCount: message.data.solutions?.length || 0,
+                hasDefaultSolution: message.data.solutions?.find(s => s.uniqueName === 'Default'),
+                sampleSolutions: message.data.solutions?.slice(0, 3)?.map(s => s.displayName) || [],
+                requiresHtmlUpdate: !!message.data.requiresHtmlUpdate,
+                hasHtml: !!message.data.html
+            });
+            
+            // Check if this update requires HTML replacement (for components with dynamic content)
+            if (message.data.requiresHtmlUpdate && message.data.html) {
+                console.log('SolutionSelector: Performing HTML replacement for component');
+                const instance = solutionSelectorBehavior.instances.get(message.componentId);
+                if (instance && instance.element) {
+                    // Replace the entire component HTML
+                    instance.element.outerHTML = message.data.html;
+                    
+                    // Re-find the element (since outerHTML replaced it)
+                    const newElement = document.querySelector(`[data-component-id="${message.componentId}"]`);
+                    if (newElement) {
+                        instance.element = newElement;
+                        // Re-bind events for the new element
+                        solutionSelectorBehavior.bindEvents(instance);
+                        console.log('SolutionSelector: Component HTML updated and events re-bound');
+                    } else {
+                        console.error('SolutionSelector: Could not find component element after HTML update');
+                    }
+                } else {
+                    console.warn('SolutionSelector: Instance not found for HTML update');
+                }
+            } 
+            // Handle standard data-only updates
+            else if (message.data.solutions && message.data.solutions.length > 0) {
+                console.log('SolutionSelector: Calling loadSolutions with', message.data.solutions.length, 'solutions');
+                solutionSelectorBehavior.loadSolutions(message.componentId, message.data.solutions);
+            } else {
+                console.warn('SolutionSelector: No solutions data to load', message.data);
+            }
+        }
+        
+        // Handle direct solutions loaded (legacy)
         if (message.action === 'solutionsLoaded' && message.data) {
+            console.log('SolutionSelector: Received legacy solutionsLoaded');
             solutionSelectorBehavior.loadSolutions(message.componentId, message.data);
         }
     };

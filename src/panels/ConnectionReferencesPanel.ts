@@ -105,6 +105,9 @@ export class ConnectionReferencesPanel extends BasePanel {
                 required: false,
                 allowMultiSelect: false,
                 solutions: [],
+                showSystem: true,
+                showManaged: true,
+                showUnmanaged: true,
                 className: 'connection-references-solution-selector',
                 onSelectionChange: (selectedSolutions: any[]) => {
                     const solutionId = selectedSolutions.length > 0 ? selectedSolutions[0].id : '';
@@ -281,17 +284,44 @@ export class ConnectionReferencesPanel extends BasePanel {
                     const componentData = (component as any).getData?.() || null;
                     const componentType = this.getComponentType(component);
                     
+                    const dataLength = Array.isArray(componentData) ? componentData.length : 
+                                      componentData?.solutions?.length || 
+                                      (componentData ? Object.keys(componentData).length : 0);
+                    
                     this.componentLogger.debug('Event bridge forwarding component update to webview', {
                         componentId: event.componentId,
                         componentType: componentType,
-                        dataLength: componentData?.length || 0
+                        dataLength: dataLength
                     });
+                    
+                    // DEBUG: Special logging for SolutionSelector updates
+                    if (componentType === 'SolutionSelector') {
+                        console.log('DEBUG: SolutionSelector event bridge data:', {
+                            componentId: event.componentId,
+                            hasSolutions: !!componentData?.solutions,
+                            solutionsCount: componentData?.solutions?.length || 0,
+                            hasDefaultSolution: componentData?.solutions?.find((s: any) => s.uniqueName === 'Default'),
+                            sampleSolutions: componentData?.solutions?.slice(0, 3)?.map((s: any) => s.displayName) || []
+                        });
+                    }
+                    
+                    // For components that need HTML regeneration (like SolutionSelector with dynamic options)
+                    let messageData = componentData;
+                    if (componentType === 'SolutionSelector' && componentData?.solutions) {
+                        // Include fresh HTML in the data for HTML-regenerating components
+                        const componentHtml = (component as any).generateHTML();
+                        messageData = {
+                            ...componentData,
+                            html: componentHtml,
+                            requiresHtmlUpdate: true
+                        };
+                    }
                     
                     this.postMessage({
                         action: 'componentUpdate',
                         componentId: event.componentId,
                         componentType: componentType,
-                        data: componentData
+                        data: messageData
                     });
                     
                     this.componentLogger.trace('Event bridge message posted to webview');
@@ -443,32 +473,21 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             // Update solution selector component if available
             if (this.solutionSelectorComponent) {
-                // Transform solutions to match component interface
-                const transformedSolutions = solutions.map((sol: any) => ({
-                    id: sol.solutionId,
-                    uniqueName: sol.uniqueName,
-                    displayName: sol.friendlyName || sol.displayName,
-                    friendlyName: sol.friendlyName,
-                    publisherName: sol.publisherDisplayName || '',
-                    publisherId: sol.publisherId || '',
-                    isManaged: sol.isManaged || false,
-                    isVisible: true,
-                    version: sol.version || '',
-                    description: sol.description || '',
-                    components: {
-                        entities: 0,
-                        workflows: 0,
-                        webResources: 0,
-                        plugins: 0,
-                        customControls: 0,
-                        total: 0
-                    }
-                }));
+                this.componentLogger.debug('Setting solutions directly from service (no transformation needed)', {
+                    solutionsCount: solutions.length,
+                    sampleSolution: solutions[0]
+                });
 
-                this.solutionSelectorComponent.setSolutions(transformedSolutions);
+                // Use solutions directly from service - no transformation needed
+                this.solutionSelectorComponent.setSolutions(solutions);
+                
+                this.componentLogger.debug('setSolutions() completed - checking component state', {
+                    componentSolutions: this.solutionSelectorComponent.getSolutions().length,
+                    componentFiltered: this.solutionSelectorComponent.getFilteredSolutions().length
+                });
 
-                // Auto-select Default solution if available
-                const defaultSolution = transformedSolutions.find(s => s.uniqueName === 'Default');
+                // Auto-select Default solution if available  
+                const defaultSolution = solutions.find(s => s.uniqueName === 'Default');
                 if (defaultSolution) {
                     this.solutionSelectorComponent.setSelectedSolutions([defaultSolution]);
                     // Note: setSelectedSolutions will automatically trigger onSelectionChange handler

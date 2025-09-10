@@ -1,6 +1,7 @@
 import { BaseComponent } from '../../base/BaseComponent';
-import { SolutionSelectorConfig, Solution, SolutionSelectorSelectionEvent, SolutionSelectorLoadEvent, DEFAULT_SOLUTION_SELECTOR_CONFIG, SolutionSelectorConfigValidator } from './SolutionSelectorConfig';
+import { SolutionSelectorConfig, SolutionSelectorSelectionEvent, SolutionSelectorLoadEvent, DEFAULT_SOLUTION_SELECTOR_CONFIG, SolutionSelectorConfigValidator } from './SolutionSelectorConfig';
 import { SolutionSelectorView, SolutionSelectorViewState } from './SolutionSelectorView';
+import { Solution } from '../../../services/SolutionService'; // Use standardized Solution interface
 
 /**
  * SolutionSelectorComponent - Power Platform solution selector with advanced filtering
@@ -75,6 +76,18 @@ export class SolutionSelectorComponent extends BaseComponent {
             focusedIndex: this.focusedIndex,
             quickFilters: this.quickFilters
         };
+        
+        // DEBUG: Log component state during HTML generation
+        console.log(`SolutionSelector[${this.config.id}] HTML Generation State:`, {
+            totalSolutions: this.solutions.length,
+            filteredSolutions: this.filteredSolutions.length,
+            selectedSolutions: this.selectedSolutions.length,
+            isOpen: this.isOpen,
+            loading: this.loading,
+            error: this.error,
+            hasDefaultSolution: this.solutions.find(s => s.uniqueName === 'Default'),
+            sampleFilteredSolutions: this.filteredSolutions.slice(0, 3).map(s => s.displayName)
+        });
         
         return SolutionSelectorView.render(this.config, viewState);
     }
@@ -438,6 +451,18 @@ export class SolutionSelectorComponent extends BaseComponent {
     }
 
     /**
+     * Get component data for event bridge updates (required for componentUpdate events)
+     */
+    public getData() {
+        return {
+            solutions: this.solutions,
+            filteredSolutions: this.filteredSolutions,
+            selectedSolutions: this.selectedSolutions,
+            hasData: this.solutions.length > 0
+        };
+    }
+
+    /**
      * Get component state
      */
     public getState() {
@@ -484,7 +509,28 @@ export class SolutionSelectorComponent extends BaseComponent {
      * Apply filters and sorting to solutions
      */
     private applyFiltersAndSort(): void {
+        console.log(`SolutionSelector[${this.config.id}] Filtering Debug:`, {
+            inputSolutions: this.solutions.length,
+            config: {
+                showManaged: this.config.showManaged,
+                showUnmanaged: this.config.showUnmanaged,
+                showSystem: this.config.showSystem
+            },
+            sampleInputSolutions: this.solutions.slice(0, 3).map(s => ({
+                name: s.displayName,
+                uniqueName: s.uniqueName, 
+                isManaged: s.isManaged
+            }))
+        });
+        
         let filtered = SolutionSelectorConfigValidator.filterSolutions(this.solutions, this.config);
+        
+        console.log(`SolutionSelector[${this.config.id}] After config filtering:`, {
+            filteredCount: filtered.length,
+            removedCount: this.solutions.length - filtered.length,
+            hasDefaultSolution: filtered.find(s => s.uniqueName === 'Default'),
+            sampleFiltered: filtered.slice(0, 3).map(s => s.displayName)
+        });
         
         // Apply quick filters
         if (!this.quickFilters.managed) {
@@ -513,6 +559,12 @@ export class SolutionSelectorComponent extends BaseComponent {
         
         // Apply sorting
         this.filteredSolutions = SolutionSelectorConfigValidator.sortSolutions(filtered, this.config);
+        
+        console.log(`SolutionSelector[${this.config.id}] Final filtering result:`, {
+            finalCount: this.filteredSolutions.length,
+            hasDefaultSolution: this.filteredSolutions.find(s => s.uniqueName === 'Default'),
+            firstFewSolutions: this.filteredSolutions.slice(0, 5).map(s => s.displayName)
+        });
     }
 
     /**
