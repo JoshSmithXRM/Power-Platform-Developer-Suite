@@ -1,4 +1,5 @@
 import { AuthenticationService } from './AuthenticationService';
+import { ServiceFactory } from './ServiceFactory';
 
 export interface FlowItem {
     id: string;
@@ -66,12 +67,32 @@ export interface RelationshipResult {
 }
 
 export class ConnectionReferencesService {
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('ConnectionReferencesService');
+        }
+        return this._logger;
+    }
+    
     constructor(private authService: AuthenticationService) { }
 
     async aggregateRelationships(environmentId: string, solutionId?: string): Promise<RelationshipResult> {
+        this.logger.info('Starting connection references aggregation', { environmentId, solutionId });
+        
         const environments = await this.authService.getEnvironments();
         const environment = environments.find(e => e.id === environmentId);
-        if (!environment) throw new Error('Environment not found');
+        if (!environment) {
+            this.logger.error('Environment not found', new Error('Environment not found'), { environmentId });
+            throw new Error('Environment not found');
+        }
+
+        this.logger.debug('Environment found', { 
+            environmentId, 
+            environmentName: environment.name,
+            dataverseUrl: environment.settings.dataverseUrl 
+        });
 
         const token = await this.authService.getAccessToken(environment.id);
         const baseUrl = `${environment.settings.dataverseUrl}/api/data/v9.2`;
@@ -81,7 +102,7 @@ export class ConnectionReferencesService {
         const allFlowsUrl = `${baseUrl}/workflows?$select=workflowid,name,clientdata,modifiedon,ismanaged&$expand=modifiedby($select=fullname)&$filter=category eq 5`;
         
         debug.allFlowsUrl = allFlowsUrl;
-        console.log('ConnectionReferencesService: Loading ALL flows from environment');
+        this.logger.info('Loading flows from environment', { environmentId, solutionId });
 
         const allFlowsResp = await fetch(allFlowsUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
         debug.allFlowsRespOk = !!allFlowsResp && allFlowsResp.ok;
@@ -90,15 +111,22 @@ export class ConnectionReferencesService {
         let allFlowsJson: any = { value: [] };
         if (allFlowsResp && allFlowsResp.ok) {
             allFlowsJson = await allFlowsResp.json();
-            console.log('ConnectionReferencesService: Loaded', allFlowsJson.value?.length || 0, 'total flows from environment');
+            this.logger.info('Flows loaded from environment', { 
+                environmentId, 
+                flowCount: allFlowsJson.value?.length || 0 
+            });
         } else {
-            console.error('ConnectionReferencesService: Failed to load all flows - Status:', allFlowsResp?.status, allFlowsResp?.statusText);
+            this.logger.error('Failed to load flows from environment', new Error('API request failed'), { 
+                environmentId, 
+                status: allFlowsResp?.status, 
+                statusText: allFlowsResp?.statusText 
+            });
             try { 
                 const errorJson = await allFlowsResp.json(); 
-                console.error('ConnectionReferencesService: All flows error details:', errorJson);
+                this.logger.debug('API error details', { errorJson });
                 debug.allFlowsError = errorJson;
             } catch { 
-                console.error('ConnectionReferencesService: Could not parse all flows error response');
+                this.logger.warn('Could not parse API error response');
             }
         }
 
@@ -117,7 +145,7 @@ export class ConnectionReferencesService {
         const allCRUrl = `${baseUrl}/connectionreferences?$select=connectionreferenceid,connectionreferencelogicalname,connectionreferencedisplayname,connectorid,connectionid,modifiedon,ismanaged&$expand=modifiedby($select=fullname)`;
         
         debug.allCRUrl = allCRUrl;
-        console.log('ConnectionReferencesService: Loading ALL connection references from environment');
+        this.logger.info('Loading ALL connection references from environment', { environmentId });
 
         const allCRResp = await fetch(allCRUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
         debug.allCRRespOk = !!allCRResp && allCRResp.ok;
@@ -126,15 +154,22 @@ export class ConnectionReferencesService {
         let allCRJson: any = { value: [] };
         if (allCRResp && allCRResp.ok) {
             allCRJson = await allCRResp.json();
-            console.log('ConnectionReferencesService: Loaded', allCRJson.value?.length || 0, 'total connection references from environment');
+            this.logger.info('Connection references loaded from environment', { 
+                environmentId, 
+                connectionReferencesCount: allCRJson.value?.length || 0 
+            });
         } else {
-            console.error('ConnectionReferencesService: Failed to load all CRs - Status:', allCRResp?.status, allCRResp?.statusText);
+            this.logger.error('Failed to load connection references from environment', new Error('API request failed'), { 
+                environmentId, 
+                status: allCRResp?.status, 
+                statusText: allCRResp?.statusText 
+            });
             try { 
                 const errorJson = await allCRResp.json(); 
-                console.error('ConnectionReferencesService: All CRs error details:', errorJson);
+                this.logger.debug('Connection references API error details', { errorJson });
                 debug.allCRError = errorJson;
             } catch { 
-                console.error('ConnectionReferencesService: Could not parse all CRs error response');
+                this.logger.warn('Could not parse connection references API error response');
             }
         }
 
@@ -167,14 +202,22 @@ export class ConnectionReferencesService {
             solutionFlowIds = new Set(flowIds);
             debug.solutionFlowIds = flowIds;
             debug.solutionFlowIdsCount = flowIds.length;
-            console.log('ConnectionReferencesService: Found', flowIds.length, 'flow IDs in solution');
+            this.logger.debug('Solution component flow IDs retrieved', { 
+                environmentId, 
+                solutionId, 
+                flowIdsCount: flowIds.length 
+            });
             
             // Get connection reference IDs from solution components
             const crIds = await solutionComponentService.getConnectionReferenceIdsInSolution(environmentId, solutionId);
             solutionCRIds = new Set(crIds);
             debug.solutionCRIds = crIds;
             debug.solutionCRIdsCount = crIds.length;
-            console.log('ConnectionReferencesService: Found', crIds.length, 'connection reference IDs in solution');
+            this.logger.debug('Solution component connection reference IDs retrieved', { 
+                environmentId, 
+                solutionId, 
+                connectionReferenceIdsCount: crIds.length 
+            });
         }
 
         // Step 4: Filter cached data based on solution membership (or use all if no solution filtering)
@@ -184,22 +227,36 @@ export class ConnectionReferencesService {
         if (solutionId && solutionId !== 'test-bypass') {
             // Filter flows by solution membership
             flows = allFlows.filter((flow: any) => solutionFlowIds.has(flow.id));
-            console.log('ConnectionReferencesService: Filtered to', flows.length, 'flows in solution');
+            this.logger.debug('Filtered flows by solution membership', { 
+                environmentId, 
+                solutionId, 
+                filteredFlowsCount: flows.length, 
+                totalFlowsCount: allFlows.length 
+            });
 
             // Filter connection references by solution membership
             connectionReferences = allConnectionReferences.filter((cr: ConnectionReferenceItem) => solutionCRIds.has(cr.id));
-            console.log('ConnectionReferencesService: Filtered to', connectionReferences.length, 'connection references in solution');
-            console.log('ConnectionReferencesService: Sample connection references:', connectionReferences.slice(0, 3).map(cr => ({
-                id: cr.id,
-                name: cr.name,
-                referencedConnectionId: cr.referencedConnectionId,
-                connectorLogicalName: cr.connectorLogicalName
-            })));
+            this.logger.debug('Filtered connection references by solution membership', { 
+                environmentId, 
+                solutionId, 
+                filteredConnectionReferencesCount: connectionReferences.length, 
+                totalConnectionReferencesCount: allConnectionReferences.length,
+                sampleConnectionReferences: connectionReferences.slice(0, 3).map(cr => ({
+                    id: cr.id,
+                    name: cr.name,
+                    referencedConnectionId: cr.referencedConnectionId,
+                    connectorLogicalName: cr.connectorLogicalName
+                }))
+            });
         } else {
             // No solution filtering - use all data
             flows = allFlows;
             connectionReferences = allConnectionReferences;
-            console.log('ConnectionReferencesService: Using all flows and connection references (no solution filter)');
+            this.logger.debug('Using all flows and connection references (no solution filter)', { 
+                environmentId, 
+                flowsCount: flows.length, 
+                connectionReferencesCount: connectionReferences.length 
+            });
         }
 
         debug.filteredFlowsCount = flows.length;
@@ -226,7 +283,7 @@ export class ConnectionReferencesService {
                     });
                 }
             } catch (error) {
-                console.debug('Failed to parse flow clientdata:', error);
+                this.logger.trace('Failed to parse flow clientdata', { error });
             }
 
             return Array.from(names);
@@ -262,7 +319,9 @@ export class ConnectionReferencesService {
             _debug: debug 
         };
 
-        console.log('ConnectionReferencesService: Final result:', {
+        this.logger.info('Connection references aggregation completed', {
+            environmentId,
+            solutionId,
             flowsCount: flows.length,
             connectionReferencesCount: connectionReferences.length,
             relationshipsCount: relationships.length,

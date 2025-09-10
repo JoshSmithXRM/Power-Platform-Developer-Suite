@@ -345,6 +345,51 @@ This VS Code extension for Microsoft Dynamics 365/Power Platform follows a modul
 - **PanelUtils** - Panel-level operations (loading states, messaging, error handling)
 - **TableUtils** - Legacy table functionality (being phased out)
 
+### Data Flow and Transformation Patterns
+
+The extension follows a clear separation of concerns for data handling across architectural layers:
+
+**Service Layer Responsibilities:**
+- Return business data in domain-appropriate structures
+- Focus on data accuracy, completeness, and business rules  
+- Remain UI-agnostic and reusable across different consumers
+- Handle API calls, authentication, and data aggregation
+
+**Panel Layer Responsibilities:**
+- Transform service data for specific UI display needs
+- Map business objects to component-expected formats
+- Handle UI-specific data enrichment (badges, formatting, computed fields)
+- Ensure table data includes required 'id' property for row actions
+- Coordinate between multiple services and components
+
+**Component Layer Responsibilities:**
+- Accept transformed data and render appropriately
+- Handle component-specific state and user interactions
+- Remain data-source agnostic and reusable
+
+**Data Transformation Pattern:**
+```typescript
+// Service returns business data
+const businessData = await serviceFactory.getService().getData(params);
+
+// Panel transforms for UI display in private method
+private transformDataForDisplay(businessData: BusinessDataType): UIDataType[] {
+    return businessData.items.map(item => ({
+        id: item.uniqueKey,                    // Required for row actions
+        displayName: item.title || 'Untitled',
+        status: this.calculateDisplayStatus(item),
+        formattedDate: this.formatDate(item.created),
+        // ... other UI-specific fields
+    }));
+}
+
+// Component receives UI-ready data
+const uiData = this.transformDataForDisplay(businessData);
+this.dataTableComponent.setData(uiData);
+```
+
+This approach maintains separation of concerns while ensuring each layer handles appropriate responsibilities and enables consistent data flow patterns across all panels.
+
 ### Critical Requirements
 
 **For Table Implementation:**

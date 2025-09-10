@@ -5,26 +5,22 @@ import { WebviewMessage } from '../types';
 import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
+import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
+import { Environment } from '../components/base/ComponentInterface';
+import { EnvironmentConnection } from '../models/PowerPlatformSettings';
 
 export class ConnectionReferencesPanel extends BasePanel {
     public static readonly viewType = 'connectionReferences';
     private static currentPanel: ConnectionReferencesPanel | undefined;
 
     private environmentSelectorComponent?: EnvironmentSelectorComponent;
+    private solutionSelectorComponent?: SolutionSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
     private dataTableComponent?: DataTableComponent;
     private composer: PanelComposer;
     private componentFactory: ComponentFactory;
-    private _componentLogger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
-    
-    private get componentLogger() {
-        if (!this._componentLogger) {
-            this._componentLogger = ServiceFactory.getLoggerService().createComponentLogger('ConnectionReferencesPanel');
-        }
-        return this._componentLogger;
-    }
 
     public static createOrShow(extensionUri: vscode.Uri) {
         const column = vscode.window.activeTextEditor?.viewColumn;
@@ -71,6 +67,9 @@ export class ConnectionReferencesPanel extends BasePanel {
         // Initialize the panel (this calls updateWebview which calls getHtmlContent)
         this.initialize();
         
+        // Load environments after initialization
+        this.loadEnvironments();
+        
         this.componentLogger.info('Panel initialized successfully');
     }
 
@@ -86,9 +85,31 @@ export class ConnectionReferencesPanel extends BasePanel {
                 required: true,
                 environments: [],
                 showRefreshButton: true,
-                className: 'connection-references-env-selector'
+                className: 'connection-references-env-selector',
+                onChange: (environmentId: string) => {
+                    this.componentLogger.debug('Environment onChange triggered', { environmentId });
+                    this.handleEnvironmentSelection(environmentId);
+                }
             });
             this.componentLogger.trace('EnvironmentSelectorComponent created successfully');
+
+            this.componentLogger.trace('Creating SolutionSelectorComponent');
+            // Solution Selector Component
+            this.solutionSelectorComponent = this.componentFactory.createSolutionSelector({
+                id: 'connectionRefs-solutionSelector',
+                label: 'Filter by Solution (Optional)',
+                placeholder: 'All Solutions',
+                required: false,
+                allowMultiSelect: false,
+                solutions: [],
+                className: 'connection-references-solution-selector',
+                onSelectionChange: (selectedSolutions: any[]) => {
+                    const solutionId = selectedSolutions.length > 0 ? selectedSolutions[0].id : '';
+                    this.componentLogger.debug('Solution onSelectionChange triggered', { solutionId, selectedSolutions });
+                    this.handleSolutionSelection(solutionId);
+                }
+            });
+            this.componentLogger.trace('SolutionSelectorComponent created successfully');
 
             this.componentLogger.trace('Creating ActionBarComponent');
             // Action Bar Component
@@ -128,38 +149,61 @@ export class ConnectionReferencesPanel extends BasePanel {
                 id: 'connectionRefs-table',
                 columns: [
                     {
-                        id: 'displayName',
-                        label: 'Display Name',
-                        field: 'displayName',
+                        id: 'flowName',
+                        label: 'Flow Name',
+                        field: 'flowName',
                         sortable: true,
                         filterable: true,
                         width: '250px'
                     },
                     {
-                        id: 'logicalName',
-                        label: 'Logical Name',
-                        field: 'logicalName',
+                        id: 'connectionReference',
+                        label: 'Connection Reference',
+                        field: 'connectionReference',
                         sortable: true,
                         filterable: true,
-                        width: '200px',
-                        align: 'left'
+                        width: '200px'
                     },
                     {
-                        id: 'connectionType',
-                        label: 'Connection Type',
-                        field: 'connectionType',
+                        id: 'connectorType',
+                        label: 'Connector Type',
+                        field: 'connectorType',
                         sortable: true,
                         filterable: true,
                         width: '150px'
                     },
                     {
-                        id: 'status',
-                        label: 'Status',
-                        field: 'status',
+                        id: 'connectionName',
+                        label: 'Connection',
+                        field: 'connectionName',
                         sortable: true,
                         filterable: true,
-                        width: '120px',
+                        width: '150px'
+                    },
+                    {
+                        id: 'isManaged',
+                        label: 'Managed',
+                        field: 'isManaged',
+                        sortable: true,
+                        filterable: true,
+                        width: '100px',
                         align: 'center'
+                    },
+                    {
+                        id: 'modifiedOn',
+                        label: 'Modified On',
+                        field: 'modifiedOn',
+                        sortable: true,
+                        filterable: true,
+                        width: '180px'
+                    },
+                    {
+                        id: 'modifiedBy',
+                        label: 'Modified By',
+                        field: 'modifiedBy',
+                        sortable: true,
+                        filterable: true,
+                        width: '150px'
                     }
                 ],
                 data: [],
@@ -179,19 +223,50 @@ export class ConnectionReferencesPanel extends BasePanel {
     protected async handleMessage(message: WebviewMessage): Promise<void> {
         try {
             switch (message.command) {
+                case 'environmentChanged':
                 case 'environment-selected':
-                    vscode.window.showInformationMessage(`Environment selected: ${message.data?.environmentId}`);
+                    await this.handleEnvironmentSelection(message.data?.environmentId);
+                    break;
+                
+                case 'solution-selected':
+                    await this.handleSolutionSelection(message.data?.solutionId);
+                    break;
+                
+                case 'loadSolutions':
+                    await this.handleLoadSolutions(message.data?.environmentId);
+                    break;
+
+                case 'loadConnectionReferences':
+                    await this.handleLoadConnectionReferences(message.data?.environmentId, message.data?.solutionId);
+                    break;
+
+                case 'syncDeploymentSettings':
+                    await this.handleSyncDeploymentSettings(message.data?.relationships, message.data?.solutionUniqueName);
+                    break;
+
+                case 'openInMaker':
+                    await this.handleOpenInMaker(message.data?.environmentId, message.data?.solutionId, message.data?.entityType);
                     break;
                 
                 case 'refresh-data':
-                    vscode.window.showInformationMessage('Connection References refreshed');
+                    await this.refreshConnectionReferences();
+                    break;
+
+                case 'panel-ready':
+                    this.componentLogger.debug('Panel ready event received');
+                    // Panel is ready, no action needed
+                    break;
+
+                case 'component-event':
+                    this.componentLogger.debug('Component event received', { data: message.data });
+                    // Handle component-specific events if needed
                     break;
                 
                 default:
-                    console.warn('Unknown message command:', message.command);
+                    this.componentLogger.warn('Unknown message command', { command: message.command });
             }
         } catch (error) {
-            console.error('Error handling message in ConnectionReferencesPanel:', error);
+            this.componentLogger.error('Error handling message', error as Error, { command: message.command });
             this.postMessage({
                 command: 'error',
                 action: 'error',
@@ -200,10 +275,264 @@ export class ConnectionReferencesPanel extends BasePanel {
         }
     }
 
+    private async handleEnvironmentSelection(environmentId: string): Promise<void> {
+        if (!environmentId) {
+            this.componentLogger.debug('Environment selection cleared');
+            return;
+        }
+
+        try {
+            this.componentLogger.info('Environment selected', { environmentId });
+            
+            // Load solutions for this environment
+            this.componentLogger.debug('About to call handleLoadSolutions', { environmentId });
+            await this.handleLoadSolutions(environmentId);
+            this.componentLogger.debug('handleLoadSolutions completed', { environmentId });
+            
+        } catch (error) {
+            this.componentLogger.error('Error handling environment selection', error as Error, { environmentId });
+            vscode.window.showErrorMessage('Failed to load environment configuration');
+        }
+    }
+
+    private async handleSolutionSelection(solutionId: string): Promise<void> {
+        if (!solutionId) {
+            this.componentLogger.debug('Solution selection cleared');
+            return;
+        }
+
+        try {
+            this.componentLogger.info('Solution selected', { solutionId });
+            
+            // Get current environment ID
+            const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
+            if (selectedEnvironment) {
+                await this.handleLoadConnectionReferences(selectedEnvironment.id, solutionId);
+            }
+            
+        } catch (error) {
+            this.componentLogger.error('Error handling solution selection', error as Error, { solutionId });
+            vscode.window.showErrorMessage('Failed to load solution configuration');
+        }
+    }
+
+    private async handleLoadSolutions(environmentId: string): Promise<void> {
+        if (!environmentId) {
+            this.postMessage({ action: 'error', message: 'Environment id required' });
+            return;
+        }
+
+        try {
+            const solutionService = ServiceFactory.getSolutionService();
+            const solutions = await solutionService.getSolutions(environmentId);
+
+            // Update solution selector component if available
+            if (this.solutionSelectorComponent) {
+                // Transform solutions to match component interface
+                const transformedSolutions = solutions.map((sol: any) => ({
+                    id: sol.solutionId,
+                    uniqueName: sol.uniqueName,
+                    displayName: sol.friendlyName || sol.displayName,
+                    friendlyName: sol.friendlyName,
+                    publisherName: sol.publisherDisplayName || '',
+                    publisherId: sol.publisherId || '',
+                    isManaged: sol.isManaged || false,
+                    isVisible: true,
+                    version: sol.version || '',
+                    description: sol.description || '',
+                    components: { 
+                        entities: 0,
+                        workflows: 0, 
+                        webResources: 0,
+                        plugins: 0,
+                        customControls: 0,
+                        total: 0 
+                    }
+                }));
+                
+                this.solutionSelectorComponent.setSolutions(transformedSolutions);
+                
+                // Auto-select Default solution if available
+                const defaultSolution = transformedSolutions.find(s => s.uniqueName === 'Default');
+                if (defaultSolution) {
+                    this.solutionSelectorComponent.setSelectedSolutions([defaultSolution]);
+                    
+                    // Trigger connection references loading for the auto-selected solution
+                    await this.handleLoadConnectionReferences(environmentId, defaultSolution.id);
+                }
+                
+                this.updateWebview();
+            }
+
+            this.postMessage({ 
+                action: 'solutionsLoaded', 
+                data: solutions,
+                selectedSolutionId: solutions.find(s => s.uniqueName === 'Default')?.solutionId
+            });
+        } catch (error) {
+            this.componentLogger.error('Error loading solutions', error as Error, { environmentId });
+            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to load solutions' });
+        }
+    }
+
+    private async handleLoadConnectionReferences(environmentId: string, solutionId?: string): Promise<void> {
+        if (!environmentId) {
+            this.postMessage({ action: 'error', message: 'Environment id required' });
+            return;
+        }
+
+        try {
+            this.componentLogger.info('Loading connection references', { environmentId, solutionId });
+
+            const crService = ServiceFactory.getConnectionReferencesService();
+            const relationships = await crService.aggregateRelationships(environmentId, solutionId);
+            
+            this.componentLogger.debug('Connection references loaded', {
+                flows: relationships?.flows?.length || 0,
+                connectionReferences: relationships?.connectionReferences?.length || 0,
+                solutionId: solutionId || 'all'
+            });
+
+            // Transform data for table display
+            const tableData = this.transformConnectionReferencesData(relationships);
+
+            this.postMessage({
+                action: 'connectionReferencesLoaded',
+                data: tableData
+            });
+        } catch (error) {
+            this.componentLogger.error('Error loading connection references', error as Error, { environmentId, solutionId });
+            this.postMessage({ 
+                action: 'error', 
+                message: `Failed to load connection references: ${(error as Error).message}`
+            });
+        }
+    }
+
+    private transformConnectionReferencesData(relationships: any): any[] {
+        if (!relationships || !relationships.relationships) {
+            this.componentLogger.debug('No relationships data to transform', { relationships });
+            return [];
+        }
+
+        const relationshipItems = relationships.relationships || [];
+        this.componentLogger.debug('Transforming relationships for table display', { 
+            relationshipCount: relationshipItems.length 
+        });
+
+        const tableData = relationshipItems.map((rel: any) => ({
+            id: rel.id, // Already has unique ID from service
+            flowName: rel.flowName || 'No Flow Associated',
+            connectionReference: rel.connectionReferenceLogicalName || 'No Connection Reference',
+            connectorType: rel.connectorType || 'Unknown Connector',
+            relationshipType: rel.relationshipType || 'unknown',
+            connectionName: rel.connectionName || 'No Connection',
+            isManaged: (rel.flowIsManaged || rel.crIsManaged) ? 'Yes' : 'No',
+            modifiedOn: this.formatDate(rel.flowModifiedOn || rel.crModifiedOn),
+            modifiedBy: rel.flowModifiedBy || rel.crModifiedBy || 'Unknown'
+        }));
+
+        this.componentLogger.debug('Data transformation completed', { 
+            originalCount: relationshipItems.length,
+            transformedCount: tableData.length,
+            sampleData: tableData.slice(0, 2)
+        });
+
+        return tableData;
+    }
+
+    private formatDate(dateString: string): string {
+        if (!dateString) return '';
+        return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
+    }
+
+    private async handleSyncDeploymentSettings(relationships: any, solutionUniqueName?: string): Promise<void> {
+        try {
+            const deploymentSettingsService = ServiceFactory.getDeploymentSettingsService();
+            
+            // Prompt user to select or create deployment settings file
+            const filePath = await deploymentSettingsService.selectDeploymentSettingsFile(solutionUniqueName);
+            if (!filePath) {
+                return; // User cancelled
+            }
+
+            const isNewFile = !require('fs').existsSync(filePath);
+            
+            // Sync connection references with the file
+            const result = await deploymentSettingsService.syncConnectionReferences(filePath, relationships, isNewFile);
+            
+            // Send success message back to UI
+            this.postMessage({ 
+                action: 'deploymentSettingsSynced', 
+                data: {
+                    filePath: result.filePath,
+                    added: result.added,
+                    removed: result.removed,
+                    updated: result.updated,
+                    isNewFile
+                }
+            });
+        } catch (error) {
+            this.componentLogger.error('Error syncing deployment settings', error as Error);
+            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to sync deployment settings' });
+        }
+    }
+
+    private async handleOpenInMaker(environmentId: string, solutionId: string, entityType: string): Promise<void> {
+        if (!environmentId || !solutionId) {
+            this.postMessage({ action: 'error', message: 'Environment and solution are required' });
+            return;
+        }
+
+        try {
+            const environments = await this._authService.getEnvironments();
+            const environment = environments.find(env => env.id === environmentId);
+            
+            if (!environment) {
+                this.postMessage({ action: 'error', message: 'Environment not found' });
+                return;
+            }
+
+            // Use the actual environment GUID from the environment connection
+            const envGuid = environment.environmentId || environmentId;
+            const makerUrl = `https://make.powerapps.com/environments/${envGuid}/solutions/${solutionId}/objects/${entityType}`;
+            
+            this.componentLogger.info('Opening Maker URL', { url: makerUrl });
+            
+            // Open in external browser
+            vscode.env.openExternal(vscode.Uri.parse(makerUrl));
+            
+        } catch (error) {
+            this.componentLogger.error('Error opening in Maker', error as Error);
+            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to open in Maker' });
+        }
+    }
+
+    private async refreshConnectionReferences(): Promise<void> {
+        try {
+            this.componentLogger.debug('Refreshing connection references');
+            
+            // Get current selections
+            const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
+            const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
+            
+            if (selectedEnvironment) {
+                await this.handleLoadConnectionReferences(selectedEnvironment.id, selectedSolution?.id);
+                vscode.window.showInformationMessage('Connection References refreshed');
+            } else {
+                vscode.window.showWarningMessage('Please select an environment first');
+            }
+        } catch (error) {
+            this.componentLogger.error('Error refreshing connection references', error as Error);
+            vscode.window.showErrorMessage('Failed to refresh connection references');
+        }
+    }
+
     protected getHtmlContent(): string {
         this.componentLogger.trace('Generating HTML content');
         try {
-            if (!this.environmentSelectorComponent || !this.actionBarComponent || !this.dataTableComponent) {
+            if (!this.environmentSelectorComponent || !this.solutionSelectorComponent || 
+                !this.actionBarComponent || !this.dataTableComponent) {
                 this.componentLogger.warn('Components not initialized when generating HTML');
                 return this.getErrorHtml('Failed to initialize components');
             }
@@ -213,6 +542,7 @@ export class ConnectionReferencesPanel extends BasePanel {
             // Use simple composition method as specified in architecture guide
             return PanelComposer.compose([
                 this.environmentSelectorComponent,
+                this.solutionSelectorComponent,
                 this.actionBarComponent,
                 this.dataTableComponent
             ], this.getCommonWebviewResources(), 'Connection References');
@@ -254,10 +584,17 @@ export class ConnectionReferencesPanel extends BasePanel {
         `;
     }
 
+    private async loadEnvironments(): Promise<void> {
+        if (this.environmentSelectorComponent) {
+            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger);
+        }
+    }
+
     public dispose(): void {
         ConnectionReferencesPanel.currentPanel = undefined;
         
         this.environmentSelectorComponent?.dispose();
+        this.solutionSelectorComponent?.dispose();
         this.actionBarComponent?.dispose();
         this.dataTableComponent?.dispose();
         this.componentFactory?.dispose();

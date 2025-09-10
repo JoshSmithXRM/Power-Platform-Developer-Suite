@@ -911,3 +911,272 @@ class MyPanel extends BasePanel {
 **For Development:**  
 - Output panel: "Power Platform Developer Suite" channel
 - Structured JSON format with timestamps and metadata
+
+---
+
+## 🔄 Data Flow and Transformation Architecture
+
+### **Data Layer Responsibilities**
+
+The extension enforces clear separation of concerns across three data processing layers:
+
+#### **1. Service Layer (Business Data)**
+**Purpose**: Return raw business data from APIs with complete accuracy and business logic
+- Raw OData entities, relationship objects, API responses
+- Business logic: filtering, aggregation, entity relationships
+- Data completeness and accuracy focus
+- **Example**: `ConnectionReferencesService` returns `FlowConnectionRelationship[]`
+
+```typescript
+// Service Layer - Business Data
+export interface FlowConnectionRelationship {
+    id: string;
+    flowId?: string;
+    flowName?: string;
+    flowModifiedOn?: string;
+    connectionReferenceId?: string;
+    connectionReferenceLogicalName?: string;
+    connectorType?: string;
+    relationshipType: 'flow-to-cr' | 'orphaned-flow' | 'orphaned-cr';
+    // ... business fields
+}
+```
+
+#### **2. Panel Layer (UI Data Transformation)**
+**Purpose**: Transform business data to UI-ready format for component consumption
+- Add required UI properties (especially `id` for table rows)
+- Apply UI-specific formatting (dates, status badges, display names)
+- Handle null/undefined values with fallback display text
+- **Ownership**: Data transformation is **Panel Layer responsibility**
+
+```typescript
+// Panel Layer - UI Transformation
+private transformConnectionReferencesData(relationships: any): any[] {
+    if (!relationships || !relationships.relationships) {
+        this.componentLogger.debug('No relationships data to transform');
+        return [];
+    }
+
+    const relationshipItems = relationships.relationships || [];
+    this.componentLogger.debug('Transforming business data for UI', { 
+        itemCount: relationshipItems.length 
+    });
+
+    const tableData = relationshipItems.map((rel: any) => ({
+        id: rel.id, // REQUIRED: Unique identifier for table rows
+        flowName: rel.flowName || 'No Flow Associated',
+        connectionReference: rel.connectionReferenceLogicalName || 'No Connection Reference',
+        connectorType: rel.connectorType || 'Unknown Connector',
+        relationshipType: rel.relationshipType || 'unknown',
+        isManaged: (rel.flowIsManaged || rel.crIsManaged) ? 'Yes' : 'No',
+        modifiedOn: this.formatDate(rel.flowModifiedOn || rel.crModifiedOn),
+        modifiedBy: rel.flowModifiedBy || rel.crModifiedBy || 'Unknown'
+    }));
+
+    this.componentLogger.debug('Data transformation completed', { 
+        originalCount: relationshipItems.length,
+        transformedCount: tableData.length 
+    });
+
+    return tableData;
+}
+```
+
+#### **3. Component Layer (Display)**
+**Purpose**: Accept transformed UI data and render consistently
+- Focus on interaction, sorting, filtering, styling
+- No business logic or data transformation
+- Consistent rendering and user experience
+
+```typescript
+// Component Layer - Display Only
+this.dataTable = ComponentFactory.createDataTable({
+    id: 'relationshipsTable',
+    columns: [
+        { key: 'flowName', label: 'Flow Name', sortable: true },
+        { key: 'connectionReference', label: 'Connection Reference', sortable: true },
+        { key: 'connectorType', label: 'Connector Type', sortable: true }
+    ],
+    data: transformedTableData  // ← UI-ready data from panel transformation
+});
+```
+
+### **Data Transformation Pattern**
+
+**Standard implementation pattern for all panels:**
+
+```typescript
+// 1. Load business data from service
+private async loadConnectionReferences(environmentId: string, solutionId?: string): Promise<void> {
+    try {
+        this.componentLogger.info('Loading connection references', { environmentId, solutionId });
+        
+        // Get business data from service layer
+        const relationships = await this.connectionReferencesService.aggregateRelationships(
+            environmentId, 
+            solutionId
+        );
+        
+        this.componentLogger.info('Business data loaded', { 
+            flowsCount: relationships.flows.length,
+            connectionReferencesCount: relationships.connectionReferences.length,
+            relationshipsCount: relationships.relationships.length 
+        });
+
+        // Transform business data for UI display
+        const tableData = this.transformConnectionReferencesData(relationships);
+        
+        // Send UI-ready data to components
+        this.postMessage({
+            action: 'connectionReferencesLoaded',
+            data: tableData
+        });
+        
+    } catch (error) {
+        this.componentLogger.error('Error loading connection references', error as Error);
+    }
+}
+
+// 2. Transform business data to UI format
+private transformConnectionReferencesData(businessData: any): any[] {
+    // Comprehensive logging for debugging data flow
+    this.componentLogger.debug('Starting data transformation', { businessData });
+    
+    if (!businessData?.relationships) {
+        this.componentLogger.warn('No relationship data available for transformation');
+        return [];
+    }
+    
+    const tableData = businessData.relationships.map((item: any) => ({
+        // CRITICAL: id property required for table row actions
+        id: item.id || `${item.flowId || 'orphan'}-${item.connectionReferenceId || 'none'}`,
+        
+        // UI-specific formatting with null safety
+        displayName: item.flowName || 'No Flow Associated',
+        status: this.formatStatus(item.relationshipType),
+        lastModified: this.formatDate(item.flowModifiedOn || item.crModifiedOn),
+        
+        // Fallback values for missing data
+        connectorType: item.connectorType || 'Unknown',
+        isManaged: (item.flowIsManaged || item.crIsManaged) ? 'Yes' : 'No'
+    }));
+    
+    this.componentLogger.info('Data transformation completed', {
+        originalCount: businessData.relationships.length,
+        transformedCount: tableData.length
+    });
+    
+    return tableData;
+}
+
+// 3. Helper methods for UI formatting
+private formatStatus(relationshipType: string): string {
+    const statusMap = {
+        'flow-to-cr': 'Connected',
+        'orphaned-flow': 'Orphaned Flow', 
+        'orphaned-cr': 'Orphaned Reference'
+    };
+    return statusMap[relationshipType] || 'Unknown';
+}
+
+private formatDate(dateString?: string): string {
+    if (!dateString) return 'Unknown';
+    try {
+        return new Date(dateString).toLocaleDateString();
+    } catch {
+        return 'Invalid Date';
+    }
+}
+```
+
+### **Critical Requirements**
+
+#### **1. Table Data `id` Property**
+All table data objects **must** have a unique `id` field for row actions to function:
+
+```typescript
+// ✅ CORRECT - Every row has unique id
+const tableData = items.map(item => ({
+    id: item.primaryKey || `generated-${index}`,  // Required!
+    name: item.displayName,
+    status: item.isActive ? 'Active' : 'Inactive'
+}));
+
+// ❌ INCORRECT - Missing id property
+const tableData = items.map(item => ({
+    name: item.displayName,     // Missing id!
+    status: item.isActive ? 'Active' : 'Inactive'
+}));
+```
+
+#### **2. Panel Layer Ownership**
+Data transformation **belongs in panels**, not services or components:
+
+- **Services**: Return complete business data for maximum flexibility
+- **Panels**: Transform business data to meet UI component requirements
+- **Components**: Accept UI-ready data, focus on display and interaction
+
+#### **3. Comprehensive Logging**
+Log all transformation steps for debugging data flow issues:
+
+```typescript
+this.componentLogger.debug('Transforming business data for UI', { 
+    inputType: typeof businessData,
+    itemCount: businessData?.length || 0
+});
+
+// ... transformation logic ...
+
+this.componentLogger.info('Transformation completed', {
+    originalCount: businessData.length,
+    transformedCount: tableData.length,
+    hasRequiredIds: tableData.every(item => !!item.id)
+});
+```
+
+#### **4. Null Safety**
+Handle null/undefined values with appropriate fallback display text:
+
+```typescript
+const tableData = businessData.map(item => ({
+    id: item.id || `fallback-${Date.now()}-${Math.random()}`,
+    displayName: item.name || item.title || 'Unnamed Item',
+    status: item.isActive ? 'Active' : 'Inactive',
+    lastModified: item.modifiedOn ? this.formatDate(item.modifiedOn) : 'Never',
+    owner: item.owner?.name || 'Unknown User'
+}));
+```
+
+#### **5. Type Consistency**
+Maintain consistent data types throughout the transformation pipeline:
+
+```typescript
+// Define transformation interface
+interface UITableRow {
+    id: string;           // Always string for consistency
+    displayName: string;  // Never null/undefined
+    status: string;       // Formatted display value
+    lastModified: string; // Formatted date string
+    isManaged: string;    // 'Yes'/'No' not boolean
+}
+
+// Use interface in transformation
+private transformDataForTable(businessData: any[]): UITableRow[] {
+    return businessData.map(item => ({
+        id: String(item.id || 'unknown'),
+        displayName: String(item.name || 'Unnamed'),
+        status: this.formatStatus(item.status),
+        lastModified: this.formatDate(item.modifiedOn),
+        isManaged: item.isManaged ? 'Yes' : 'No'
+    }));
+}
+```
+
+### **Benefits of This Architecture**
+
+- **Clear Separation**: Each layer has distinct, well-defined responsibilities
+- **Reusable Services**: Business logic can be reused across multiple panels
+- **Consistent UI**: All tables receive properly formatted, UI-ready data
+- **Debuggable**: Comprehensive logging reveals data flow issues quickly
+- **Type Safe**: TypeScript interfaces ensure data consistency
+- **Maintainable**: Changes to business logic don't affect UI formatting and vice versa

@@ -3,6 +3,9 @@ import { AuthenticationService } from '../../services/AuthenticationService';
 import { StateService, PanelState } from '../../services/StateService';
 import { PanelConfig, IPanelBase, WebviewMessage } from '../../types';
 import { ServiceFactory } from '../../services/ServiceFactory';
+import { Environment } from '../../components/base/ComponentInterface';
+import { EnvironmentConnection } from '../../models/PowerPlatformSettings';
+import { EnvironmentSelectorComponent } from '../../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 
 /**
  * Base class for all webview panels providing common functionality
@@ -17,9 +20,11 @@ export abstract class BasePanel implements IPanelBase {
     protected readonly _panelId: string;
     private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
     
-    protected get logger() {
+    protected get componentLogger() {
         if (!this._logger) {
-            this._logger = ServiceFactory.getLoggerService().createComponentLogger('BasePanel');
+            // Use the actual panel class name for component-specific logging
+            const componentName = this.constructor.name;
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger(componentName);
         }
         return this._logger;
     }
@@ -56,7 +61,7 @@ export abstract class BasePanel implements IPanelBase {
             this._disposables
         );
 
-        this.logger.debug('Panel constructor completed', { 
+        this.componentLogger.debug('Panel constructor completed', { 
             viewType: config.viewType,
             title: config.title,
             panelId: this._panelId
@@ -68,13 +73,13 @@ export abstract class BasePanel implements IPanelBase {
      * Initialize the panel - called after construction
      */
     protected async initialize(): Promise<void> {
-        this.logger.debug('Panel initialization starting', { viewType: this.viewType });
+        this.componentLogger.debug('Panel initialization starting', { viewType: this.viewType });
         // Restore state first
         await this.restoreState();
         
         // Then initialize UI
         this.updateWebview();
-        this.logger.info('Panel initialization completed', { viewType: this.viewType });
+        this.componentLogger.info('Panel initialization completed', { viewType: this.viewType });
     }
 
     /**
@@ -88,7 +93,7 @@ export abstract class BasePanel implements IPanelBase {
                 await this.applyRestoredState(savedState);
             }
         } catch (error) {
-            this.logger.error('Error restoring panel state', error as Error, { viewType: this.viewType });
+            this.componentLogger.error('Error restoring panel state', error as Error, { viewType: this.viewType });
         }
     }
 
@@ -109,7 +114,7 @@ export abstract class BasePanel implements IPanelBase {
         try {
             await this._stateService.savePanelState(this.viewType, this.currentState);
         } catch (error) {
-            this.logger.error('Error saving panel state', error as Error, { viewType: this.viewType });
+            this.componentLogger.error('Error saving panel state', error as Error, { viewType: this.viewType });
         }
     }
 
@@ -135,14 +140,14 @@ export abstract class BasePanel implements IPanelBase {
      * Update the webview content
      */
     protected updateWebview(): void {
-        this.logger.trace('Updating webview content', { viewType: this.viewType });
+        this.componentLogger.trace('Updating webview content', { viewType: this.viewType });
         const html = this.getHtmlContent();
-        this.logger.trace('Generated HTML content', { 
+        this.componentLogger.trace('Generated HTML content', { 
             viewType: this.viewType, 
             htmlLength: html.length 
         });
         this._panel.webview.html = html;
-        this.logger.trace('Webview HTML content updated', { viewType: this.viewType });
+        this.componentLogger.trace('Webview HTML content updated', { viewType: this.viewType });
     }
 
     /**
@@ -154,7 +159,7 @@ export abstract class BasePanel implements IPanelBase {
                 this._panel.webview.postMessage(message);
             } catch (error) {
                 // Webview is disposed, ignore the error
-                this.logger.warn('Attempted to post message to disposed webview', { 
+                this.componentLogger.warn('Attempted to post message to disposed webview', { 
                     viewType: this.viewType,
                     error: (error as Error).message 
                 });
@@ -314,5 +319,61 @@ export abstract class BasePanel implements IPanelBase {
                 localResourceRoots: config.localResourceRoots
             }
         );
+    }
+
+    /**
+     * Standardized environment loading with optional auto-selection
+     * Common pattern used by multiple panels
+     */
+    protected async loadEnvironmentsWithAutoSelect(
+        environmentSelectorComponent: EnvironmentSelectorComponent,
+        logger: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>,
+        autoSelect: boolean = true
+    ): Promise<void> {
+        logger.debug('Loading environments');
+        try {
+            const environmentConnections = await this._authService.getEnvironments();
+            logger.info('Environments loaded', { count: environmentConnections.length });
+            
+            // Convert EnvironmentConnection[] to Environment[]
+            const environments = this.convertEnvironmentConnections(environmentConnections);
+            
+            // Update the environment selector component with loaded environments
+            environmentSelectorComponent.setEnvironments(environments);
+            
+            // Auto-select first environment if requested and available
+            if (autoSelect && environments.length > 0) {
+                environmentSelectorComponent.setSelectedEnvironment(environments[0].id);
+                logger.info('Auto-selected first environment', { 
+                    environmentId: environments[0].id,
+                    name: environments[0].displayName 
+                });
+            }
+            
+            // Refresh the webview to display the updated component
+            this.updateWebview();
+            
+        } catch (error) {
+            logger.error('Failed to load environments', error as Error);
+            vscode.window.showErrorMessage('Failed to load environments: ' + (error as Error).message);
+        }
+    }
+
+    /**
+     * Convert EnvironmentConnection[] to Environment[]
+     * Common conversion used by multiple panels
+     */
+    protected convertEnvironmentConnections(connections: EnvironmentConnection[]): Environment[] {
+        return connections.map(conn => ({
+            id: conn.id,
+            name: conn.name,
+            displayName: conn.name,
+            environmentId: conn.environmentId,
+            settings: {
+                ...conn.settings,
+                dataverseUrl: conn.settings?.dataverseUrl || '',
+                authenticationMethod: conn.settings?.authenticationMethod || 'interactive'
+            }
+        }));
     }
 }

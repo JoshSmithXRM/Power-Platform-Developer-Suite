@@ -367,6 +367,90 @@ TableUtils.initializeTable('tableId', {
 - Always make fresh API calls, only cache UI preferences
 - Save panel state: selected environment, sort settings, view config
 
+## Data Flow and Transformation Patterns
+
+### Architectural Responsibilities
+
+The extension follows a clear data flow pattern with distinct transformation responsibilities:
+
+**Service Layer (Business Data):**
+- Return raw business data from APIs (OData entities, relationship objects)
+- Focus on data accuracy and completeness
+- Handle business logic like filtering, aggregation, relationships
+- Example: ConnectionReferencesService returns `FlowConnectionRelationship[]`
+
+**Panel Layer (UI Data Transformation):**
+- Transform business data to UI-ready format for table display
+- Add required properties for UI components (especially `id` for table rows)
+- Apply UI-specific formatting (dates, status badges, display names)
+- Handle null/undefined values with fallback display text
+
+**Component Layer (Display):**
+- Accept transformed UI data and render consistently
+- Focus on interaction, sorting, filtering, styling
+- No business logic or data transformation
+
+### Data Transformation Pattern
+
+All data transformations should happen in the **Panel Layer** using this pattern:
+
+```typescript
+// In Panel class - transform service data for UI display
+private transformDataForTable(businessData: any[]): any[] {
+    if (!businessData) {
+        this.componentLogger.debug('No business data to transform');
+        return [];
+    }
+
+    this.componentLogger.debug('Transforming business data for UI', { 
+        itemCount: businessData.length 
+    });
+
+    const tableData = businessData.map((item: any) => ({
+        id: item.id || item.primaryKey, // REQUIRED: Unique identifier for table rows
+        displayName: item.displayName || item.name || 'Unknown',
+        status: this.formatStatus(item.isManaged), // UI-specific formatting
+        modifiedOn: this.formatDate(item.modifiedOn),
+        modifiedBy: item.modifiedBy || 'Unknown',
+        // Add other UI-specific fields as needed
+    }));
+
+    this.componentLogger.debug('Data transformation completed', { 
+        originalCount: businessData.length,
+        transformedCount: tableData.length 
+    });
+
+    return tableData;
+}
+
+// Example usage in data loading
+private async loadData(): Promise<void> {
+    try {
+        // 1. Get business data from service
+        const businessData = await this.someService.getData(environmentId);
+        
+        // 2. Transform for UI display (Panel responsibility)
+        const tableData = this.transformDataForTable(businessData);
+        
+        // 3. Send to table component for display
+        this.postMessage({
+            action: 'dataLoaded',
+            data: tableData
+        });
+    } catch (error) {
+        this.componentLogger.error('Error loading data', error as Error);
+    }
+}
+```
+
+### Critical Requirements
+
+1. **Table Data Must Have `id` Property**: All table data objects require a unique `id` field for row actions to work
+2. **Panel Layer Ownership**: Data transformation belongs in panels, not services or components  
+3. **Comprehensive Logging**: Log transformation steps for debugging data flow issues
+4. **Null Safety**: Handle null/undefined values with appropriate fallback display text
+5. **Type Consistency**: Maintain consistent data types throughout transformation pipeline
+
 ## API Guidelines
 
 **OData Query Best Practices:**

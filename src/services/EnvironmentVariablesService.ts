@@ -1,4 +1,5 @@
 import { AuthenticationService } from './AuthenticationService';
+import { ServiceFactory } from './ServiceFactory';
 
 export interface EnvironmentVariableDefinition {
     environmentvariabledefinitionid: string;
@@ -25,15 +26,33 @@ export interface EnvironmentVariableData {
 }
 
 export class EnvironmentVariablesService {
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('EnvironmentVariablesService');
+        }
+        return this._logger;
+    }
+    
     constructor(private authService: AuthenticationService) {}
 
     async getEnvironmentVariables(environmentId: string, solutionId?: string): Promise<EnvironmentVariableData> {
+        this.logger.info('Starting environment variables retrieval', { environmentId, solutionId });
+        
         const environments = await this.authService.getEnvironments();
         const environment = environments.find(env => env.id === environmentId);
 
         if (!environment) {
+            this.logger.error('Environment not found', new Error('Environment not found'), { environmentId });
             throw new Error('Environment not found');
         }
+
+        this.logger.debug('Environment found', { 
+            environmentId, 
+            environmentName: environment.name,
+            dataverseUrl: environment.settings.dataverseUrl 
+        });
 
         const token = await this.authService.getAccessToken(environment.id);
 
@@ -53,7 +72,11 @@ export class EnvironmentVariablesService {
             
             // Get environment variable definition IDs in the solution
             const envVarIds = await solutionComponentService.getEnvironmentVariableIdsInSolution(environmentId, solutionId);
-            console.log(`Found ${envVarIds.length} environment variables in solution ${solutionId}`);
+            this.logger.debug('Solution component environment variable IDs retrieved', { 
+                environmentId, 
+                solutionId, 
+                environmentVariableIdsCount: envVarIds.length 
+            });
             
             if (envVarIds.length > 0) {
                 // Filter definitions by solution membership
@@ -70,10 +93,11 @@ export class EnvironmentVariablesService {
             }
         }
 
-        console.log('EnvironmentVariablesService: Fetching data with URLs:', {
+        this.logger.debug('Fetching environment variables data', {
+            environmentId,
+            solutionId,
             definitionsUrl,
-            valuesUrl,
-            solutionId
+            valuesUrl
         });
 
         const [definitionsResponse, valuesResponse] = await Promise.all([
@@ -96,15 +120,34 @@ export class EnvironmentVariablesService {
         ]);
 
         if (!definitionsResponse.ok) {
+            this.logger.error('Failed to fetch environment variable definitions', new Error('API request failed'), {
+                environmentId,
+                solutionId,
+                status: definitionsResponse.status,
+                statusText: definitionsResponse.statusText
+            });
             throw new Error(`Failed to fetch environment variable definitions: ${definitionsResponse.statusText}`);
         }
 
         if (!valuesResponse.ok) {
+            this.logger.error('Failed to fetch environment variable values', new Error('API request failed'), {
+                environmentId,
+                solutionId,
+                status: valuesResponse.status,
+                statusText: valuesResponse.statusText
+            });
             throw new Error(`Failed to fetch environment variable values: ${valuesResponse.statusText}`);
         }
 
         const definitionsData = await definitionsResponse.json();
         const valuesData = await valuesResponse.json();
+
+        this.logger.debug('Environment variables data retrieved', {
+            environmentId,
+            solutionId,
+            definitionsCount: definitionsData.value?.length || 0,
+            valuesCount: valuesData.value?.length || 0
+        });
 
         // Transform definitions data
         const definitions: EnvironmentVariableDefinition[] = (definitionsData.value || []).map((def: any) => ({
@@ -126,6 +169,13 @@ export class EnvironmentVariablesService {
             modifiedon: val.modifiedon || '',
             modifiedby: val.modifiedby?.fullname || ''
         }));
+
+        this.logger.info('Environment variables retrieval completed', {
+            environmentId,
+            solutionId,
+            definitionsCount: definitions.length,
+            valuesCount: values.length
+        });
 
         return {
             definitions,

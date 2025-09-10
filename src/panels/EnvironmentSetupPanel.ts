@@ -6,6 +6,8 @@ import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
+import { Environment } from '../components/base/ComponentInterface';
+import { EnvironmentConnection } from '../models/PowerPlatformSettings';
 
 export class EnvironmentSetupPanel extends BasePanel {
     public static readonly viewType = 'environmentSetup';
@@ -15,14 +17,6 @@ export class EnvironmentSetupPanel extends BasePanel {
     private actionBarComponent?: ActionBarComponent;
     private composer: PanelComposer;
     private componentFactory: ComponentFactory;
-    private _componentLogger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
-    
-    private get componentLogger() {
-        if (!this._componentLogger) {
-            this._componentLogger = ServiceFactory.getLoggerService().createComponentLogger('EnvironmentSetupPanel');
-        }
-        return this._componentLogger;
-    }
 
     public static createOrShow(extensionUri: vscode.Uri, environment?: any) {
         const column = vscode.window.activeTextEditor?.viewColumn;
@@ -70,6 +64,9 @@ export class EnvironmentSetupPanel extends BasePanel {
         
         // Initialize the panel (this calls updateWebview which calls getHtmlContent)
         this.initialize();
+        
+        // Load environments after initialization
+        this.loadEnvironments();
         
         this.componentLogger.info('Panel initialized successfully');
     }
@@ -137,6 +134,10 @@ export class EnvironmentSetupPanel extends BasePanel {
     protected async handleMessage(message: WebviewMessage): Promise<void> {
         try {
             switch (message.command) {
+                case 'environmentChanged':
+                    await this.handleEnvironmentSelection(message.data?.environmentId);
+                    break;
+                
                 case 'environment-selected':
                     await this.handleEnvironmentSelection(message.data?.environmentId);
                     break;
@@ -154,10 +155,10 @@ export class EnvironmentSetupPanel extends BasePanel {
                     break;
                 
                 default:
-                    console.warn('Unknown message command:', message.command);
+                    this.componentLogger.warn('Unknown message command', { command: message.command });
             }
         } catch (error) {
-            console.error('Error handling message in EnvironmentSetupPanel:', error);
+            this.componentLogger.error('Error handling message', error as Error, { command: message.command });
             this.postMessage({
                 command: 'error',
                 action: 'error',
@@ -168,14 +169,36 @@ export class EnvironmentSetupPanel extends BasePanel {
 
     private async handleEnvironmentSelection(environmentId: string): Promise<void> {
         if (!environmentId) {
+            this.componentLogger.debug('Environment selection cleared');
             return;
         }
 
         try {
-            vscode.window.showInformationMessage(`Environment selected: ${environmentId}`);
+            this.componentLogger.info('Environment selected', { environmentId });
+            
+            // Get environment details
+            const environmentConnections = await this._authService.getEnvironments();
+            const environments = this.convertEnvironmentConnections(environmentConnections);
+            const selectedEnvironment = environments.find(env => env.id === environmentId);
+            
+            if (selectedEnvironment) {
+                this.componentLogger.debug('Environment details loaded', { 
+                    name: selectedEnvironment.displayName,
+                    url: selectedEnvironment.settings.dataverseUrl 
+                });
+                vscode.window.showInformationMessage(`Environment selected: ${selectedEnvironment.displayName}`);
+                
+                // Enable the save button since an environment is now selected
+                if (this.actionBarComponent) {
+                    // Update action bar to enable save button
+                    this.updateWebview();
+                }
+            } else {
+                this.componentLogger.warn('Selected environment not found in available environments');
+            }
 
         } catch (error) {
-            console.error('Error loading environment:', error);
+            this.componentLogger.error('Error handling environment selection', error as Error, { environmentId });
             vscode.window.showErrorMessage('Failed to load environment configuration');
         }
     }
@@ -207,6 +230,12 @@ export class EnvironmentSetupPanel extends BasePanel {
         } catch (error) {
             console.error('Error resetting settings:', error);
             vscode.window.showErrorMessage('Failed to reset settings');
+        }
+    }
+
+    private async loadEnvironments(): Promise<void> {
+        if (this.environmentSelectorComponent) {
+            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger);
         }
     }
 
