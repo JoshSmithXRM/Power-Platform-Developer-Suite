@@ -128,6 +128,7 @@ export interface DataTableConfig extends BaseComponentConfig {
     pageSizeOptions?: number[];
     currentPage?: number;
     totalRows?: number;
+    showFooter?: boolean;
     onPageChange?: (page: number, pageSize: number) => void;
     
     // Actions

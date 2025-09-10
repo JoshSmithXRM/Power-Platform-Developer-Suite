@@ -657,6 +657,52 @@ export class PanelComposer {
         return scripts;
     }
 
+    /**
+     * Organize components into flexible layout structure
+     * Separates control components (selectors, action bars) from table components
+     * and arranges them in the proper flex layout for optimal space usage
+     */
+    private static organizeComponentsForFlexibleLayout(componentHTML: string): string {
+        // Reliable approach: Use string splitting by component markers to separate controls from tables
+        // This avoids complex regex parsing that could break nested HTML
+        
+        let controlsHTML = '';
+        let tablesHTML = '';
+        
+        // Split by main component types using simple string detection
+        const lines = componentHTML.split('\n');
+        let currentComponent = '';
+        let isInTableComponent = false;
+        
+        for (const line of lines) {
+            // Detect start of table components
+            if (line.includes('data-table') || line.includes('class="data-table') || 
+                line.includes('connection-references-table')) {
+                isInTableComponent = true;
+            }
+            
+            // Collect the HTML
+            if (isInTableComponent) {
+                tablesHTML += line + '\n';
+            } else {
+                // This includes selectors, action bars, and other controls
+                controlsHTML += line + '\n';
+            }
+        }
+        
+        // Build the flexible layout structure
+        return `<div class="panel-container">
+        <div class="panel-controls">
+            ${controlsHTML.trim()}
+        </div>
+        <div class="panel-content">
+            <div class="panel-table-section">
+                ${tablesHTML.trim()}
+            </div>
+        </div>
+    </div>`;
+    }
+
     private static generateCompleteHTML(params: {
         title: string;
         componentHTML: string;
@@ -676,6 +722,9 @@ export class PanelComposer {
             `<script src="${baseUri}/${script}"></script>`
         ).join('\n    ');
         
+        // Organize components for flexible layout
+        const organizedHTML = PanelComposer.organizeComponentsForFlexibleLayout(params.componentHTML);
+        
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -686,11 +735,7 @@ export class PanelComposer {
     ${cssLinks}
 </head>
 <body>
-    <div class="panel-container">
-        <div class="panel-content">
-            ${params.componentHTML}
-        </div>
-    </div>
+    ${organizedHTML}
     
     <script>
         // Make vscode API available globally - avoid duplicate acquisition

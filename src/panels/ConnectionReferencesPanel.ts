@@ -215,6 +215,8 @@ export class ConnectionReferencesPanel extends BasePanel {
                 data: [],
                 sortable: true,
                 filterable: true,
+                showFooter: true,
+                striped: true,
                 className: 'connection-references-table'
             });
             this.componentLogger.trace('DataTableComponent created successfully');

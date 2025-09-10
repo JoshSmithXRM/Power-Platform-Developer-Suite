@@ -1010,10 +1010,16 @@ const DataTableBehaviorStatic = {
             rowCountElement.textContent = `${data.length} rows`;
         }
         
-        // Update empty state visibility
-        const emptyState = table.querySelector('.table-empty-state');
+        // Update empty state visibility - use correct CSS class
+        const emptyState = table.querySelector('.data-table-empty-state');
         if (emptyState) {
-            emptyState.style.display = data.length === 0 ? 'block' : 'none';
+            if (data.length === 0) {
+                emptyState.classList.add('visible');
+                emptyState.style.display = 'block';
+            } else {
+                emptyState.classList.remove('visible');
+                emptyState.style.display = 'none';
+            }
         }
         
         // Re-enable sorting and filtering
@@ -1030,9 +1036,17 @@ const DataTableBehaviorStatic = {
         const table = instance.element.closest('.data-table');
         if (!table) return;
         
+        // Clear tbody content
         const tbody = instance.element.querySelector('tbody');
         if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="100%" class="empty-state">No data available</td></tr>';
+            tbody.innerHTML = '';
+        }
+        
+        // Show the dedicated empty state element
+        const emptyState = table.querySelector('.data-table-empty-state');
+        if (emptyState) {
+            emptyState.classList.add('visible');
+            emptyState.style.display = 'block';
         }
     },
     

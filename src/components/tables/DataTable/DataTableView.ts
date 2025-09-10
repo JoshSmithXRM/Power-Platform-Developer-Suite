@@ -650,8 +650,26 @@ export class DataTableView {
      * Render pagination controls
      */
     private static renderPagination(config: DataTableConfig, state: DataTableViewState): string {
-        if (!config.paginated) {
+        if (!config.paginated && !config.showFooter) {
             return '';
+        }
+        
+        if (!config.paginated) {
+            // Always show footer with item count, even without pagination
+            const totalItems = state.data.length;
+            const hasFilters = Object.keys(state.filters).some(key => state.filters[key]);
+            const searchActive = state.searchQuery && state.searchQuery.trim() !== '';
+            
+            return `
+                <div class="data-table-pagination">
+                    <div class="page-info">
+                        ${hasFilters || searchActive 
+                            ? `Showing ${totalItems} filtered items`
+                            : `Showing ${totalItems} items`
+                        }
+                    </div>
+                </div>
+            `;
         }
 
         const totalPages = Math.ceil(state.totalRows / state.pageSize);
@@ -725,12 +743,16 @@ export class DataTableView {
      * Render empty state
      */
     private static renderEmptyState(config: DataTableConfig, state: DataTableViewState): string {
-        if (state.data.length > 0 || state.loading) {
+        // Only show empty state if there's actually no data and not loading
+        const hasData = state.data && state.data.length > 0;
+        const isLoading = state.loading;
+        
+        if (hasData || isLoading) {
             return '';
         }
 
         return `
-            <div class="data-table-empty-state">
+            <div class="data-table-empty-state visible">
                 ${config.emptyIcon ? `<div class="data-table-empty-icon">${config.emptyIcon}</div>` : ''}
                 <div class="data-table-empty-message">
                     ${this.escapeHtml(config.emptyMessage || 'No data available')}

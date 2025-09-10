@@ -157,6 +157,220 @@ Components generate HTML in Extension Host context, handle interactions in webvi
 
 ---
 
+## 📐 Flexible Panel Layout System
+
+### **The Height Management Challenge**
+
+Traditional VS Code extensions often struggle with layout issues:
+- **Hardcoded pixel heights** break on different panel configurations
+- **Fixed calculations** like `calc(100vh - 120px)` fail when adding/removing controls
+- **Per-panel CSS tweaking** required for each unique layout
+
+### **Flexbox-Based Solution**
+
+The Power Platform Developer Suite implements a **scalable flexbox layout system** that automatically adapts to any panel configuration:
+
+```css
+/* Base Layout Structure */
+.panel-container {
+    height: 100vh;                    /* Full viewport height */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Top Controls Section - Natural Height */
+.panel-controls {
+    flex: 0 0 auto;                   /* Don't grow, natural height only */
+    padding: var(--component-padding);
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
+    display: flex;
+    flex-direction: column;
+    gap: var(--component-gap);
+}
+
+/* Main Content Area - Fills Remaining Space */
+.panel-content {
+    flex: 1 1 auto;                   /* Grow to fill available space */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;                    /* Critical: allows flex child to shrink */
+}
+
+/* Table Section - Uses All Content Space */
+.panel-table-section {
+    flex: 1 1 auto;                   /* Use all available content space */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+```
+
+### **Intelligent Component Organization**
+
+`PanelComposer.organizeComponentsForFlexibleLayout()` automatically categorizes and positions components:
+
+```typescript
+/**
+ * Organize components into flexible layout structure
+ * Separates control components from table components automatically
+ */
+private static organizeComponentsForFlexibleLayout(componentHTML: string): string {
+    // Parse component HTML and categorize by type
+    const controlComponents: string[] = [];    // Selectors, action bars, forms
+    const tableComponents: string[] = [];      // Data tables, lists
+    const otherComponents: string[] = [];      // Fallback category
+    
+    // Detect component types from HTML attributes and structure
+    for (const match of componentMatches) {
+        if (match.includes('data-component-type="DataTable"') || 
+            match.includes('data-table') || 
+            match.includes('class="data-table')) {
+            tableComponents.push(match);
+        } else if (match.includes('data-component-type="EnvironmentSelector"') ||
+                   match.includes('data-component-type="SolutionSelector"') ||
+                   match.includes('data-component-type="ActionBar"')) {
+            controlComponents.push(match);
+        } else {
+            otherComponents.push(match);
+        }
+    }
+    
+    // Build structured layout
+    return `
+        <div class="panel-controls">
+            ${controlComponents.concat(otherComponents).join('\n')}
+        </div>
+        <div class="panel-content">
+            <div class="panel-table-section">
+                ${tableComponents.join('\n')}
+            </div>
+        </div>
+    `;
+}
+```
+
+### **Layout Behavior Examples**
+
+#### **Simple Panel (Minimal Controls)**
+```typescript
+// Panel with just environment selector + table
+PanelComposer.compose([
+    environmentSelector,    // → Controls section (natural height)
+    dataTable              // → Table section (fills remaining space)
+]);
+```
+**Result**: Table gets maximum available height, minimal space for controls.
+
+#### **Complex Panel (Many Controls)**
+```typescript  
+// Panel with multiple controls + table
+PanelComposer.compose([
+    environmentSelector,    // → Controls section
+    solutionSelector,       // → Controls section  
+    actionBar,             // → Controls section
+    searchForm,            // → Controls section
+    dataTable              // → Table section (adapts to remaining space)
+]);
+```
+**Result**: All controls stack naturally in top section, table uses remaining space.
+
+#### **Multi-Table Panel**
+```typescript
+// Panel with controls + multiple tables
+PanelComposer.compose([
+    environmentSelector,    // → Controls section
+    primaryTable,          // → Table section
+    secondaryTable         // → Table section (shares space)
+]);
+```
+**Result**: Controls at top, tables share remaining space proportionally.
+
+### **Data Table Integration**
+
+Data tables now use flexible height instead of hardcoded pixels:
+
+```css
+/* OLD: Hardcoded heights (removed) */
+.data-table-container {
+    height: calc(100vh - 160px);  /* ❌ Breaks on different panels */
+    min-height: 400px;
+    max-height: calc(100vh - 120px);
+}
+
+/* NEW: Flexible height system */
+.data-table-container {
+    height: 100%;                  /* ✅ Use full height of parent */
+    display: flex;
+    flex-direction: column;
+    min-height: 0;                 /* Allow shrinking */
+}
+
+.data-table-wrapper {
+    flex: 1;                       /* ✅ Table content grows to fill */
+    overflow: auto;
+    min-height: 0;
+}
+```
+
+### **Benefits**
+
+#### **🚀 Scalability**
+- **Works with ANY panel configuration** - 1 control or 20 controls
+- **No per-panel CSS required** - One layout system works everywhere
+- **Future-proof** - New components automatically work
+
+#### **🎯 Developer Experience** 
+- **Zero hardcoded heights** - No pixel calculations needed
+- **Automatic organization** - Components go to correct sections
+- **Backward compatible** - Existing panels work immediately
+
+#### **⚡ Performance**
+- **No layout thrashing** - Flexbox handles resize efficiently  
+- **Consistent behavior** - Same layout logic across all panels
+- **Mobile responsive** - Flexbox adapts to different screen sizes
+
+### **Migration Impact**
+
+#### **No Code Changes Required**
+Existing panels automatically benefit from the new layout system:
+
+```typescript
+// This code works the same but now has flexible layout
+return PanelComposer.compose([
+    this.environmentSelector,
+    this.dataTable
+], this.getCommonWebviewResources());
+```
+
+#### **CSS Improvements**
+All data tables now:
+- ✅ Fill available height perfectly
+- ✅ Adapt to any number of top controls  
+- ✅ Handle window resizing gracefully
+- ✅ Support different panel configurations
+
+#### **Enhanced User Experience**
+- **No more empty space** at bottom of panels
+- **Consistent table sizing** across all panels
+- **Better space utilization** on different screen sizes
+- **Professional appearance** with proper proportions
+
+### **Implementation Details**
+
+The flexible layout system is implemented in three layers:
+
+1. **CSS Base Classes** (`component-base.css`) - Define flexbox structure
+2. **PanelComposer Logic** (`PanelComposer.ts`) - Intelligent component organization  
+3. **Component Integration** (`data-table.css`) - Tables adapt to flexible containers
+
+This creates a **comprehensive solution** that eliminates height management issues across the entire extension while maintaining backward compatibility and requiring no code changes for existing panels.
+
+---
+
 ## 🔧 Component-Based Architecture Pattern
 
 ### **Component Structure**

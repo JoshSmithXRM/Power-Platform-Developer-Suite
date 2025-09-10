@@ -161,6 +161,71 @@ const targetEnvSelector = ComponentFactory.createEnvironmentSelector({
 });
 ```
 
+## Flexible Panel Layout System (NEW)
+
+### **Scalable Height Management**
+
+The extension now uses a **flexbox-based layout system** that automatically adapts to any panel configuration without hardcoded pixel values:
+
+```css
+/* Flexible Layout Classes */
+.panel-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-controls {
+    flex: 0 0 auto;           /* Natural height, doesn't grow */
+    padding: var(--component-padding);
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.panel-content {
+    flex: 1 1 auto;           /* Grows to fill remaining space */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-table-section {
+    flex: 1 1 auto;           /* Tables use all available space */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+```
+
+### **Intelligent Component Organization**
+
+`PanelComposer.organizeComponentsForFlexibleLayout()` automatically separates components:
+
+- **Control Components** → Top section (selectors, action bars, forms)
+- **Table Components** → Content section (data tables, lists)  
+- **Automatic Detection** → Based on component types and HTML structure
+
+### **Benefits**
+
+✅ **Works with ANY panel configuration** - 1 control or 10 controls at the top
+✅ **Zero hardcoded pixel values** - Pure flexbox layout system  
+✅ **Self-adapting** - Tables automatically consume correct amount of space
+✅ **Future-proof** - New components work automatically
+✅ **Backward compatible** - Existing panels benefit immediately
+
+### **Usage**
+
+No code changes required - the system automatically organizes components:
+
+```typescript
+// ANY configuration works automatically
+return PanelComposer.compose([
+    this.environmentSelector,      // → Goes to controls section
+    this.solutionSelector,         // → Goes to controls section  
+    this.actionBar,               // → Goes to controls section
+    this.dataTable                // → Goes to table section (fills remaining space)
+], this.getCommonWebviewResources());
+```
+
 ## Component Development & Reuse Rules
 
 ### ComponentFactory Usage (MANDATORY)

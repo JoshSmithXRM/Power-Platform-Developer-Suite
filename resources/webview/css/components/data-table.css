@@ -17,15 +17,19 @@
     height: 100%;
     display: flex;
     flex-direction: column;
+    margin: 0; /* Remove any default margin */
 }
 
 .data-table-container {
     position: relative;
     width: 100%;
-    height: 100%;
-    max-height: calc(100vh - 200px); /* Leave space for panel header/controls */
+    height: 100%; /* Use full height of parent container */
     display: flex;
     flex-direction: column;
+    min-height: 0; /* Allow flex child to shrink */
+    padding: 0; /* Remove any padding */
+    margin: 0;  /* Remove any margin */
+    box-sizing: border-box; /* Include border in height calculation */
 }
 
 .data-table-wrapper {
@@ -48,7 +52,7 @@
 
 /* Header styling */
 .data-table-thead {
-    background: var(--vscode-editor-background);
+    background: var(--vscode-sideBar-background);
     border-bottom: 2px solid var(--vscode-panel-border);
     position: sticky;
     top: 0;
@@ -56,7 +60,7 @@
 }
 
 .data-table-header-row {
-    background: var(--vscode-list-hoverBackground);
+    background: var(--vscode-sideBar-background);
 }
 
 .data-table-header-cell {
@@ -219,8 +223,18 @@
     border-bottom: none;
 }
 
+/* Striped rows for better readability - more visible approach */
+.data-table-tbody .data-table-body-row:nth-child(even) {
+    background: var(--vscode-editor-background) !important;
+}
+
+.data-table-tbody .data-table-body-row:nth-child(odd) {
+    background: var(--vscode-input-background) !important;
+}
+
 .data-table-body-row:hover {
-    background: var(--vscode-list-hoverBackground);
+    background: var(--vscode-list-activeSelectionBackground) !important;
+    color: var(--vscode-list-activeSelectionForeground);
 }
 
 .data-table-body-row.selected {
@@ -450,21 +464,26 @@
     border-top: 1px solid var(--vscode-panel-border);
 }
 
-/* Pagination */
+/* Pagination/Footer */
 .data-table-pagination {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    border-top: 1px solid var(--vscode-panel-border);
-    background: var(--vscode-editor-background);
+    border-top: 2px solid var(--vscode-panel-border);
+    background: var(--vscode-sideBar-background);
     gap: 16px;
     flex-wrap: wrap;
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    min-height: 44px;
 }
 
 .page-info {
-    color: var(--vscode-descriptionForeground);
+    color: var(--vscode-foreground);
     font-size: 13px;
+    font-weight: 500;
     flex: 1;
     min-width: 150px;
 }
@@ -691,9 +710,32 @@
     font-size: 14px;
 }
 
-/* Table variants */
+/* Table variants - Clean alternating row colors */
 .data-table--striped .data-table-body-row:nth-child(even) {
-    background: var(--vscode-list-hoverBackground);
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.data-table--striped .data-table-body-row:nth-child(odd) {
+    background: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Fallback selectors for maximum compatibility */
+.data-table--striped tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.data-table--striped tr:nth-child(odd) {
+    background: rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Add borders for even more distinction */
+.data-table--striped .data-table-body-row {
+    border-bottom: 1px solid var(--vscode-panel-border) !important;
+}
+
+/* Ensure hover state is visible */
+.data-table--striped .data-table-body-row:hover {
+    background: var(--vscode-list-hoverBackground) !important;
 }
 
 .data-table--bordered {
@@ -786,4 +828,50 @@
     .data-table-body-row {
         break-inside: avoid;
     }
+}
+
+/* Empty state styling */
+.data-table-empty-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--vscode-descriptionForeground);
+    display: none !important; /* Force hide - only show via JavaScript when truly no data */
+    z-index: 10;
+}
+
+.data-table-empty-state.visible {
+    display: block !important;
+}
+
+/* Ensure empty state is hidden when table has data */
+.data-table:has(tbody tr) .data-table-empty-state {
+    display: none !important;
+}
+
+.data-table-empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.data-table-empty-message {
+    font-size: 16px;
+    margin-bottom: 16px;
+}
+
+.data-table-empty-action {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: 1px solid var(--vscode-button-border, transparent);
+    padding: 8px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.data-table-empty-action:hover {
+    background: var(--vscode-button-hoverBackground);
 }

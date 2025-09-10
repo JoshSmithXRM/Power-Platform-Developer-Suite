@@ -388,7 +388,7 @@
     flex-direction: row;
 }
 
-/* Panel container styles to prevent body scrollbars */
+/* Panel container styles - Flexible layout system for all panels */
 .panel-container {
     height: 100vh;
     overflow: hidden;
@@ -396,13 +396,35 @@
     flex-direction: column;
 }
 
-.panel-content {
-    flex: 1;
-    overflow: hidden;
+/* Top controls section - natural height, doesn't grow */
+.panel-controls {
+    flex: 0 0 auto;
+    padding: var(--component-padding);
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
     display: flex;
     flex-direction: column;
     gap: var(--component-gap);
-    padding: var(--component-padding);
+}
+
+/* Main content area - grows to fill remaining space */
+.panel-content {
+    flex: 1 1 auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Critical for flex child to shrink */
+    padding: 0; /* Remove any default padding */
+    margin: 0;  /* Remove any default margin */
+}
+
+/* Table section - grows to fill content area */
+.panel-table-section {
+    flex: 1 1 auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 .component-flex-center {
