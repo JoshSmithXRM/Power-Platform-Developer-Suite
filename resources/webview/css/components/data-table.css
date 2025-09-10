@@ -14,16 +14,24 @@
     font-family: var(--vscode-font-family);
     font-size: var(--vscode-font-size);
     color: var(--vscode-foreground);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .data-table-container {
     position: relative;
     width: 100%;
+    height: 100%;
+    max-height: calc(100vh - 200px); /* Leave space for panel header/controls */
+    display: flex;
+    flex-direction: column;
 }
 
 .data-table-wrapper {
     overflow: auto;
-    max-height: inherit;
+    flex: 1;
+    min-height: 0; /* Allow flex child to shrink below content size */
 }
 
 /* Table structure */
@@ -31,6 +39,7 @@
     width: 100%;
     border-collapse: collapse;
     table-layout: auto;
+    min-width: max-content; /* Ensure table can expand beyond container for horizontal scroll */
 }
 
 .data-table-element.fixed-layout {

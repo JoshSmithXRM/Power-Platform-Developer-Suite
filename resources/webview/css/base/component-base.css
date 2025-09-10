@@ -388,6 +388,23 @@
     flex-direction: row;
 }
 
+/* Panel container styles to prevent body scrollbars */
+.panel-container {
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: var(--component-gap);
+    padding: var(--component-padding);
+}
+
 .component-flex-center {
     justify-content: center;
     align-items: center;
