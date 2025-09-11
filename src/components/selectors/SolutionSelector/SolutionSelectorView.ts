@@ -69,7 +69,7 @@ export class SolutionSelectorView {
     /**
      * Render label
      */
-    private static renderLabel(config: SolutionSelectorConfig, state: SolutionSelectorViewState): string {
+    private static renderLabel(config: SolutionSelectorConfig, _state: SolutionSelectorViewState): string {
         const { id, label, required, ariaDescribedBy } = config;
         
         return `
@@ -87,11 +87,7 @@ export class SolutionSelectorView {
      */
     private static renderSelector(config: SolutionSelectorConfig, state: SolutionSelectorViewState): string {
         const {
-            id,
-            placeholder = 'Select solution...',
-            disabled = false,
-            allowMultiSelect = false,
-            ariaLabel
+            allowMultiSelect = false
         } = config;
 
         return `
@@ -155,7 +151,7 @@ export class SolutionSelectorView {
      * Render dropdown menu
      */
     private static renderDropdownMenu(config: SolutionSelectorConfig, state: SolutionSelectorViewState): string {
-        const { id, searchable, quickFilters } = config;
+        const { searchable, quickFilters } = config;
         
         return `
             <div class="${SOLUTION_SELECTOR_CSS.DROPDOWN_MENU}" 
@@ -489,7 +485,7 @@ export class SolutionSelectorView {
     /**
      * Get display name for solution
      */
-    private static getSolutionDisplayName(solution: Solution, config: SolutionSelectorConfig): string {
+    private static getSolutionDisplayName(solution: Solution, _config: SolutionSelectorConfig): string {
         // Prefer displayName, fallback to friendlyName, then uniqueName
         return solution.displayName || solution.friendlyName || solution.uniqueName;
     }
@@ -497,7 +493,7 @@ export class SolutionSelectorView {
     /**
      * Build tooltip text for solution
      */
-    private static buildTooltipText(solution: Solution, config: SolutionSelectorConfig): string {
+    private static buildTooltipText(solution: Solution, _config: SolutionSelectorConfig): string {
         const parts = [];
         
         parts.push(solution.displayName || solution.friendlyName);

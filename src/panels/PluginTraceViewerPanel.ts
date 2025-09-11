@@ -9,12 +9,12 @@ import { BasePanel } from './base/BasePanel';
 export class PluginTraceViewerPanel extends BasePanel {
     public static readonly viewType = 'pluginTraceViewer';
 
-    public static createOrShow(extensionUri: vscode.Uri): void {
+    public static createOrShow(_extensionUri: vscode.Uri): void {
         // Placeholder implementation
         vscode.window.showInformationMessage('PluginTraceViewerPanel - Coming soon with component architecture!');
     }
 
-    public static createNew(extensionUri: vscode.Uri): void {
+    public static createNew(_extensionUri: vscode.Uri): void {
         // Placeholder implementation
         vscode.window.showInformationMessage('PluginTraceViewerPanel (New) - Coming soon with component architecture!');
     }
@@ -26,7 +26,7 @@ export class PluginTraceViewerPanel extends BasePanel {
         });
     }
 
-    protected async handleMessage(message: WebviewMessage): Promise<void> {
+    protected async handleMessage(_message: WebviewMessage): Promise<void> {
         // Placeholder
     }
 

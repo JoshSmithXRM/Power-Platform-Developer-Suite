@@ -73,7 +73,6 @@ export class LoggerService {
      * Internal logging method with structured format
      */
     private log(level: 'trace' | 'debug' | 'info' | 'warn' | 'error', component: string, message: string, metadata?: Record<string, any>): void {
-        const timestamp = new Date().toISOString();
         const formattedComponent = `[${component}]`;
         
         // Create structured log message

@@ -9,12 +9,12 @@ import { BasePanel } from './base/BasePanel';
 export class SolutionExplorerPanel extends BasePanel {
     public static readonly viewType = 'solutionExplorer';
 
-    public static createOrShow(extensionUri: vscode.Uri): void {
+    public static createOrShow(_extensionUri: vscode.Uri): void {
         // Placeholder implementation
         vscode.window.showInformationMessage('SolutionExplorerPanel - Coming soon with component architecture!');
     }
 
-    public static createNew(extensionUri: vscode.Uri): void {
+    public static createNew(_extensionUri: vscode.Uri): void {
         // Placeholder implementation
         vscode.window.showInformationMessage('SolutionExplorerPanel (New) - Coming soon with component architecture!');
     }
@@ -26,7 +26,7 @@ export class SolutionExplorerPanel extends BasePanel {
         });
     }
 
-    protected async handleMessage(message: WebviewMessage): Promise<void> {
+    protected async handleMessage(_message: WebviewMessage): Promise<void> {
         // Placeholder
     }
 

@@ -9,12 +9,12 @@ import { BasePanel } from './base/BasePanel';
 export class DataExplorerPanel extends BasePanel {
     public static readonly viewType = 'dataExplorer';
 
-    public static createOrShow(extensionUri: vscode.Uri): void {
+    public static createOrShow(_extensionUri: vscode.Uri): void {
         // Placeholder implementation
         vscode.window.showInformationMessage('DataExplorerPanel - Coming soon with component architecture!');
     }
 
-    public static createNew(extensionUri: vscode.Uri): void {
+    public static createNew(_extensionUri: vscode.Uri): void {
         // Placeholder implementation
         vscode.window.showInformationMessage('DataExplorerPanel (New) - Coming soon with component architecture!');
     }
@@ -26,7 +26,7 @@ export class DataExplorerPanel extends BasePanel {
         });
     }
 
-    protected async handleMessage(message: WebviewMessage): Promise<void> {
+    protected async handleMessage(_message: WebviewMessage): Promise<void> {
         // Placeholder
     }
 

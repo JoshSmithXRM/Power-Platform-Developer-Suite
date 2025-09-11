@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 
-import { AuthenticationService } from '../services/AuthenticationService';
 
 // Shared types for the extension
 export interface PanelConfig {

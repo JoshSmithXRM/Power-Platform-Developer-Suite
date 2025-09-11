@@ -68,7 +68,14 @@ export default tseslint.config(
           'newlines-between': 'always'
         }
       ],
-      '@typescript-eslint/no-unused-vars': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_'
+        }
+      ],
 
       // 5. General Code Quality
       '@typescript-eslint/no-explicit-any': 'warn',

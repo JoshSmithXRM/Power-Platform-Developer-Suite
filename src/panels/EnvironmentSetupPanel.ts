@@ -6,8 +6,6 @@ import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
-import { Environment } from '../components/base/ComponentInterface';
-import { EnvironmentConnection } from '../models/PowerPlatformSettings';
 
 import { BasePanel } from './base/BasePanel';
 
@@ -199,7 +197,7 @@ export class EnvironmentSetupPanel extends BasePanel {
         }
     }
 
-    private async saveEnvironmentSettings(settings: any): Promise<void> {
+    private async saveEnvironmentSettings(_settings: any): Promise<void> {
         try {
             vscode.window.showInformationMessage('Environment settings saved successfully');
 

@@ -331,7 +331,7 @@ export class DataTableView {
         index: number,
         columns: DataTableColumn[],
         config: DataTableConfig,
-        state: DataTableViewState
+        _state: DataTableViewState
     ): string {
         const rowClass = [
             'data-table-body-row',
@@ -370,7 +370,7 @@ export class DataTableView {
     private static renderBodyCell(
         row: DataTableRow, 
         column: DataTableColumn, 
-        config: DataTableConfig
+        _config: DataTableConfig
     ): string {
         const value = row[column.field];
         const formattedValue = column.format ? column.format(value, row) : value;

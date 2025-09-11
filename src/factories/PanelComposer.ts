@@ -685,7 +685,6 @@ export class PanelComposer {
         
         // Split by main component types using simple string detection
         const lines = componentHTML.split('\n');
-        const currentComponent = '';
         let isInTableComponent = false;
         
         for (const line of lines) {

@@ -1,6 +1,6 @@
 import { BaseComponent } from '../../base/BaseComponent';
 
-import { DataTableConfig, DataTableRow, DataTableColumn, DataTableSortEvent, DataTableFilterEvent, DataTablePageEvent, DataTableSelectionEvent, DEFAULT_DATA_TABLE_CONFIG, DATA_TABLE_VALIDATION, DataTableConfigValidator } from './DataTableConfig';
+import { DataTableConfig, DataTableRow, DataTableSortEvent, DataTableFilterEvent, DataTablePageEvent, DEFAULT_DATA_TABLE_CONFIG, DATA_TABLE_VALIDATION, DataTableConfigValidator } from './DataTableConfig';
 import { DataTableView, DataTableViewState } from './DataTableView';
 
 /**
@@ -83,7 +83,7 @@ export class DataTableComponent extends BaseComponent {
         
         this.componentLogger.info('DataTable initialized successfully', {
             componentId: this.config.id,
-            visibleColumns: Array.from(this.columnVisibility.entries()).filter(([_, visible]) => visible).length,
+            visibleColumns: Array.from(this.columnVisibility.entries()).filter(([, visible]) => visible).length,
             totalColumns: this.config.columns.length
         });
     }

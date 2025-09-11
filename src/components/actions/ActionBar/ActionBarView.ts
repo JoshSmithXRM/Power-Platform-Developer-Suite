@@ -402,7 +402,7 @@ export class ActionBarView {
     static renderMinimal(
         id: string,
         actions: ActionBarAction[],
-        config?: Partial<ActionBarConfig>
+        _config?: Partial<ActionBarConfig>
     ): string {
         const actionsHtml = actions.map(action => {
             const isDisabled = action.disabled;

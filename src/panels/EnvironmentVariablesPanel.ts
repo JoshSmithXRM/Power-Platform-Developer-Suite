@@ -8,8 +8,6 @@ import { EnvironmentSelectorComponent } from '../components/selectors/Environmen
 import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
-import { Environment } from '../components/base/ComponentInterface';
-import { EnvironmentConnection } from '../models/PowerPlatformSettings';
 
 import { BasePanel } from './base/BasePanel';
 

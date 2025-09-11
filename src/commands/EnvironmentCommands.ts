@@ -71,7 +71,7 @@ export class EnvironmentCommands {
 
         try {
             vscode.window.showInformationMessage('Testing connection...');
-            const token = await this.authService.getAccessToken(selected.env.id);
+            await this.authService.getAccessToken(selected.env.id);
             vscode.window.showInformationMessage(`Connection successful to ${selected.env.name}!`);
         } catch (error: any) {
             vscode.window.showErrorMessage(`Connection failed: ${error.message}`);
