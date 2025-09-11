@@ -205,19 +205,6 @@ export interface SolutionSelectorConfig extends BaseComponentConfig {
     disabled?: boolean;
 }
 
-export interface EntitySelectorConfig extends BaseComponentConfig {
-    label?: string;
-    placeholder?: string;
-    entities?: Entity[];
-    selectedEntityId?: string;
-    environmentId?: string; // Required to load entities
-    onChange?: (entityId: string, entity?: Entity) => void;
-    onError?: (error: Error) => void;
-    filterByType?: string[]; // Filter by entity types
-    showPluralName?: boolean;
-    required?: boolean;
-    disabled?: boolean;
-}
 
 export interface DataTableConfig extends BaseComponentConfig {
     columns: TableColumn[];
@@ -248,24 +235,7 @@ export interface ActionBarConfig extends BaseComponentConfig {
     onActionClick?: (actionId: string, button: ActionButton) => void;
 }
 
-export interface SearchFormConfig extends BaseComponentConfig {
-    placeholder?: string;
-    searchTerm?: string;
-    showClearButton?: boolean;
-    debounceMs?: number;
-    onSearch?: (searchTerm: string) => void;
-    onClear?: () => void;
-}
 
-export interface FilterFormConfig extends BaseComponentConfig {
-    fields: FormField[];
-    values?: { [fieldId: string]: any };
-    showResetButton?: boolean;
-    showApplyButton?: boolean;
-    autoApply?: boolean; // Apply filters as user types
-    onFilter?: (filters: { [fieldId: string]: any }) => void;
-    onReset?: () => void;
-}
 
 // =============================================================================
 // Webview Resource Management
@@ -303,11 +273,8 @@ export interface PanelCompositionConfig {
 export interface ComponentFactoryMethods {
     createEnvironmentSelector(config: EnvironmentSelectorConfig): any;
     createSolutionSelector(config: SolutionSelectorConfig): any;
-    createEntitySelector(config: EntitySelectorConfig): any;
     createDataTable(config: DataTableConfig): any;
     createActionBar(config: ActionBarConfig): any;
-    createSearchForm(config: SearchFormConfig): any;
-    createFilterForm(config: FilterFormConfig): any;
 }
 
 // =============================================================================

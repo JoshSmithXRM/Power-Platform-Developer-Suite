@@ -5,10 +5,7 @@
 import { 
     EnvironmentSelectorConfig, 
     SolutionSelectorConfig,
-    EntitySelectorConfig,
-    DataTableConfig,
-    SearchFormConfig,
-    FilterFormConfig 
+    DataTableConfig
 } from './ComponentInterface';
 
 // =============================================================================
@@ -41,13 +38,6 @@ export const DEFAULT_SOLUTION_SELECTOR_CONFIG: Partial<SolutionSelectorConfig> =
     disabled: false
 };
 
-export const DEFAULT_ENTITY_SELECTOR_CONFIG: Partial<EntitySelectorConfig> = {
-    label: 'Entity:',
-    placeholder: 'Select entity...',
-    showPluralName: false,
-    required: false,
-    disabled: false
-};
 
 // =============================================================================
 // Table Component Defaults
@@ -90,17 +80,7 @@ export const DEFAULT_ACTION_BUTTON = {
     loading: false
 };
 
-export const DEFAULT_SEARCH_FORM_CONFIG: Partial<SearchFormConfig> = {
-    placeholder: 'Search...',
-    showClearButton: true,
-    debounceMs: 300
-};
 
-export const DEFAULT_FILTER_FORM_CONFIG: Partial<FilterFormConfig> = {
-    showResetButton: true,
-    showApplyButton: true,
-    autoApply: false
-};
 
 export const DEFAULT_FORM_FIELD = {
     type: 'text' as const,
@@ -146,9 +126,6 @@ export const CSS_CLASSES = {
     SOLUTION_MANAGED: 'solution-managed',
     SOLUTION_UNMANAGED: 'solution-unmanaged',
     
-    // Entity selector specific
-    ENTITY_SELECTOR: 'entity-selector',
-    ENTITY_TYPE: 'entity-type',
     
     // Table classes
     TABLE: 'table',
@@ -191,16 +168,6 @@ export const CSS_CLASSES = {
     FORM_VALIDATION_ERROR: 'form-validation-error',
     FORM_REQUIRED: 'form-required',
     
-    // Search form specific
-    SEARCH_FORM: 'search-form',
-    SEARCH_INPUT: 'search-input',
-    SEARCH_CLEAR: 'search-clear',
-    
-    // Filter form specific
-    FILTER_FORM: 'filter-form',
-    FILTER_BUTTONS: 'filter-buttons',
-    FILTER_RESET: 'filter-reset',
-    FILTER_APPLY: 'filter-apply'
 };
 
 // =============================================================================

@@ -2,16 +2,10 @@ import { EnvironmentSelectorComponent } from '../components/selectors/Environmen
 import { EnvironmentSelectorConfig } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorConfig';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { ActionBarConfig } from '../components/actions/ActionBar/ActionBarConfig';
-import { SearchFormComponent } from '../components/forms/SearchForm/SearchFormComponent';
-import { SearchFormConfig } from '../components/forms/SearchForm/SearchFormConfig';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
 import { DataTableConfig } from '../components/tables/DataTable/DataTableConfig';
 import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
 import { SolutionSelectorConfig } from '../components/selectors/SolutionSelector/SolutionSelectorConfig';
-import { EntitySelectorComponent } from '../components/selectors/EntitySelector/EntitySelectorComponent';
-import { EntitySelectorConfig } from '../components/selectors/EntitySelector/EntitySelectorConfig';
-import { FilterFormComponent } from '../components/forms/FilterForm/FilterFormComponent';
-import { FilterFormConfig } from '../components/forms/FilterForm/FilterFormConfig';
 import { BaseComponent } from '../components/base/BaseComponent';
 
 /**
@@ -83,17 +77,6 @@ export class ComponentFactory {
         return component;
     }
 
-    /**
-     * Create a SearchFormComponent
-     */
-    public createSearchForm(config: SearchFormConfig): SearchFormComponent {
-        this.validateComponentConfig(config, 'SearchForm');
-        
-        const component = new SearchFormComponent(config);
-        this.trackInstance(config.id, 'SearchForm', component);
-        
-        return component;
-    }
 
     // Phase 4: Data Components
 
@@ -124,29 +107,7 @@ export class ComponentFactory {
         return component;
     }
 
-    /**
-     * Create an EntitySelectorComponent
-     */
-    public createEntitySelector(config: EntitySelectorConfig): EntitySelectorComponent {
-        this.validateComponentConfig(config, 'EntitySelector');
-        
-        const component = new EntitySelectorComponent(config);
-        this.trackInstance(config.id, 'EntitySelector', component);
-        
-        return component;
-    }
 
-    /**
-     * Create a FilterFormComponent
-     */
-    public createFilterForm(config: FilterFormConfig): FilterFormComponent {
-        this.validateComponentConfig(config, 'FilterForm');
-        
-        const component = new FilterFormComponent(config);
-        this.trackInstance(config.id, 'FilterForm', component);
-        
-        return component;
-    }
 
     // Instance Management
 
