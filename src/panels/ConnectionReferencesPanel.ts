@@ -24,7 +24,7 @@ export class ConnectionReferencesPanel extends BasePanel {
     private composer: PanelComposer;
     private componentFactory: ComponentFactory;
 
-    public static createOrShow(extensionUri: vscode.Uri) {
+    public static createOrShow(extensionUri: vscode.Uri): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         if (ConnectionReferencesPanel.currentPanel) {
@@ -45,7 +45,7 @@ export class ConnectionReferencesPanel extends BasePanel {
         ConnectionReferencesPanel.currentPanel = new ConnectionReferencesPanel(panel, extensionUri);
     }
 
-    public static createNew(extensionUri: vscode.Uri) {
+    public static createNew(extensionUri: vscode.Uri): void {
         this.createOrShow(extensionUri);
     }
 

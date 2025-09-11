@@ -443,7 +443,7 @@ export class SolutionSelectorComponent extends BaseComponent {
     /**
      * Get component data for event bridge updates (required for componentUpdate events)
      */
-    public getData() {
+    public getData(): { solutions: Solution[]; filteredSolutions: Solution[]; selectedSolutions: Solution[]; hasData: boolean } {
         return {
             solutions: this.solutions,
             filteredSolutions: this.filteredSolutions,
@@ -455,7 +455,7 @@ export class SolutionSelectorComponent extends BaseComponent {
     /**
      * Get component state
      */
-    public getState() {
+    public getState(): { solutions: Solution[]; filteredSolutions: Solution[]; selectedSolutions: Solution[]; searchQuery: string; isOpen: boolean; loading: boolean; error: string | null; focusedIndex: number; quickFilters: { managed: boolean; unmanaged: boolean; hasComponents: boolean }; hasSelections: boolean; isValid: boolean } {
         return {
             solutions: this.solutions,
             filteredSolutions: this.filteredSolutions,

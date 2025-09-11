@@ -267,7 +267,7 @@ export class EnvironmentSelectorComponent extends BaseComponent {
     /**
      * Get current component state
      */
-    public getState() {
+    public getState(): { environments: Environment[]; selectedEnvironmentId: string | null; loading: boolean; connectionStatus: 'connected' | 'disconnected' | 'error'; disabled: boolean | undefined; required: boolean | undefined; isValid: boolean } {
         return {
             environments: this.environments,
             selectedEnvironmentId: this.selectedEnvironmentId,

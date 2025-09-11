@@ -21,7 +21,7 @@ export abstract class BasePanel implements IPanelBase {
     protected readonly _panelId: string;
     private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
     
-    protected get componentLogger() {
+    protected get componentLogger(): ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']> {
         if (!this._logger) {
             // Use the actual panel class name for component-specific logging
             const componentName = this.constructor.name;

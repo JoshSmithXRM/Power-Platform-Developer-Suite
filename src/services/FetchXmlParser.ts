@@ -28,7 +28,7 @@ interface SimpleXmlElement {
 export class FetchXmlParser {
     private static _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
     
-    private static get logger() {
+    private static get logger(): ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']> {
         if (!this._logger) {
             this._logger = ServiceFactory.getLoggerService().createComponentLogger('FetchXmlParser');
         }

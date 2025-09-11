@@ -21,7 +21,7 @@ export class DataverseMetadataService {
     private readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
     private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
     
-    private get logger() {
+    private get logger(): ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']> {
         if (!this._logger) {
             this._logger = ServiceFactory.getLoggerService().createComponentLogger('DataverseMetadataService');
         }

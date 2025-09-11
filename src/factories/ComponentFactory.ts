@@ -39,7 +39,7 @@ export class ComponentFactory {
     private cleanupTimer?: NodeJS.Timeout;
     private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
     
-    private get logger() {
+    private get logger(): ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']> {
         if (!this._logger) {
             this._logger = ServiceFactory.getLoggerService().createComponentLogger('ComponentFactory');
         }
@@ -386,7 +386,7 @@ export class ComponentFactory {
     /**
      * Export factory state for debugging
      */
-    public exportState() {
+    public exportState(): { config: ComponentFactoryConfig; instances: Array<{ id: string; type: string; created: string; lastUpdated: string; isActive: boolean }>; statistics: ReturnType<ComponentFactory['getStatistics']> } {
         return {
             config: this.config,
             instances: Array.from(this.instances.values()).map(instance => ({

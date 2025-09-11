@@ -9,12 +9,12 @@ import { BasePanel } from './base/BasePanel';
 export class MetadataBrowserPanel extends BasePanel {
     public static readonly viewType = 'metadataBrowser';
 
-    public static createOrShow(extensionUri: vscode.Uri) {
+    public static createOrShow(extensionUri: vscode.Uri): void {
         // Placeholder implementation
         vscode.window.showInformationMessage('MetadataBrowserPanel - Coming soon with component architecture!');
     }
 
-    public static createNew(extensionUri: vscode.Uri) {
+    public static createNew(extensionUri: vscode.Uri): void {
         // Placeholder implementation
         vscode.window.showInformationMessage('MetadataBrowserPanel (New) - Coming soon with component architecture!');
     }

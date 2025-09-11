@@ -9,12 +9,12 @@ import { BasePanel } from './base/BasePanel';
 export class ImportJobViewerPanel extends BasePanel {
     public static readonly viewType = 'importJobViewer';
 
-    public static createOrShow(extensionUri: vscode.Uri) {
+    public static createOrShow(extensionUri: vscode.Uri): void {
         // Placeholder implementation
         vscode.window.showInformationMessage('ImportJobViewerPanel - Coming soon with component architecture!');
     }
 
-    public static createNew(extensionUri: vscode.Uri) {
+    public static createNew(extensionUri: vscode.Uri): void {
         // Placeholder implementation
         vscode.window.showInformationMessage('ImportJobViewerPanel (New) - Coming soon with component architecture!');
     }

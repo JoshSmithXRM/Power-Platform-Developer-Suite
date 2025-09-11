@@ -15,7 +15,7 @@ import { MetadataBrowserCommands } from './commands/MetadataBrowserCommands';
 /**
  * Extension activation function
  */
-export function activate(context: vscode.ExtensionContext) {
+export function activate(context: vscode.ExtensionContext): void {
 
     // Initialize services first
     ServiceFactory.initialize(context);
@@ -68,7 +68,7 @@ export function activate(context: vscode.ExtensionContext) {
 /**
  * Extension deactivation function
  */
-export function deactivate() {
+export function deactivate(): void {
     const logger = ServiceFactory.getLoggerService();
     logger.info('Extension', 'Power Platform Developer Suite extension deactivated');
     logger.dispose();

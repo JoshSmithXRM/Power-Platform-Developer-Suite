@@ -53,7 +53,7 @@ export class EnvironmentCommands {
         ];
     }
 
-    private async testConnection() {
+    private async testConnection(): Promise<void> {
         const environments = await this.authService.getEnvironments();
 
         if (environments.length === 0) {
@@ -78,7 +78,7 @@ export class EnvironmentCommands {
         }
     }
 
-    private async openMaker(environmentItem?: EnvironmentItem) {
+    private async openMaker(environmentItem?: EnvironmentItem): Promise<void> {
         if (!environmentItem) {
             vscode.window.showErrorMessage('No environment selected');
             return;
@@ -99,7 +99,7 @@ export class EnvironmentCommands {
         vscode.env.openExternal(vscode.Uri.parse(makerUrl));
     }
 
-    private async openDynamics(environmentItem?: EnvironmentItem) {
+    private async openDynamics(environmentItem?: EnvironmentItem): Promise<void> {
         if (environmentItem) {
             // Open the Dataverse URL directly
             const environment = await this.authService.getEnvironment(environmentItem.envId);
@@ -113,7 +113,7 @@ export class EnvironmentCommands {
         }
     }
 
-    private async editEnvironment(environmentItem?: EnvironmentItem) {
+    private async editEnvironment(environmentItem?: EnvironmentItem): Promise<void> {
         if (environmentItem) {
             const environment = await this.authService.getEnvironment(environmentItem.envId);
             if (environment) {
@@ -127,7 +127,7 @@ export class EnvironmentCommands {
         }
     }
 
-    private async editEnvironmentFromQuickPick() {
+    private async editEnvironmentFromQuickPick(): Promise<void> {
         const environments = await this.authService.getEnvironments();
 
         if (environments.length === 0) {
@@ -146,7 +146,7 @@ export class EnvironmentCommands {
         EnvironmentSetupPanel.createOrShow(this.context.extensionUri, selected.env);
     }
 
-    private async testEnvironmentConnection(environmentItem?: EnvironmentItem) {
+    private async testEnvironmentConnection(environmentItem?: EnvironmentItem): Promise<void> {
         if (environmentItem) {
             try {
                 await this.authService.getAccessToken(environmentItem.envId);
@@ -159,7 +159,7 @@ export class EnvironmentCommands {
         }
     }
 
-    private async removeEnvironment(environmentItem?: EnvironmentItem) {
+    private async removeEnvironment(environmentItem?: EnvironmentItem): Promise<void> {
         if (environmentItem) {
             const confirmResult = await vscode.window.showWarningMessage(
                 `Are you sure you want to remove the environment "${environmentItem.label}"?`,
@@ -181,7 +181,7 @@ export class EnvironmentCommands {
         }
     }
 
-    private async removeEnvironmentFromQuickPick() {
+    private async removeEnvironmentFromQuickPick(): Promise<void> {
         const environments = await this.authService.getEnvironments();
 
         if (environments.length === 0) {

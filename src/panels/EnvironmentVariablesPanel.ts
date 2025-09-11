@@ -24,7 +24,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
     private composer: PanelComposer;
     private componentFactory: ComponentFactory;
 
-    public static createOrShow(extensionUri: vscode.Uri) {
+    public static createOrShow(extensionUri: vscode.Uri): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         if (EnvironmentVariablesPanel.currentPanel) {
@@ -45,7 +45,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
         EnvironmentVariablesPanel.currentPanel = new EnvironmentVariablesPanel(panel, extensionUri);
     }
 
-    public static createNew(extensionUri: vscode.Uri) {
+    public static createNew(extensionUri: vscode.Uri): void {
         this.createOrShow(extensionUri);
     }
 

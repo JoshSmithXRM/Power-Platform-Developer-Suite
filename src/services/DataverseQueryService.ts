@@ -83,7 +83,7 @@ export interface QueryResult {
 export class DataverseQueryService {
     private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
     
-    private get logger() {
+    private get logger(): ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']> {
         if (!this._logger) {
             this._logger = ServiceFactory.getLoggerService().createComponentLogger('DataverseQueryService');
         }

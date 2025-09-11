@@ -444,7 +444,7 @@ export class ActionBarComponent extends BaseComponent {
     /**
      * Get current component state
      */
-    public getState() {
+    public getState(): { actions: ActionBarAction[]; groups: ActionBarGroup[]; loading: boolean; disabled: boolean; collapsed: boolean; overflowActions: ActionBarAction[]; actionCount: number; groupCount: number; isValid: boolean } {
         return {
             actions: this.actions,
             groups: this.groups,

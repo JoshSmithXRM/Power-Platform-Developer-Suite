@@ -20,7 +20,7 @@ export class EnvironmentSetupPanel extends BasePanel {
     private composer: PanelComposer;
     private componentFactory: ComponentFactory;
 
-    public static createOrShow(extensionUri: vscode.Uri, environment?: any) {
+    public static createOrShow(extensionUri: vscode.Uri, environment?: any): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         if (EnvironmentSetupPanel.currentPanel) {

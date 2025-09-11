@@ -16,7 +16,7 @@ export abstract class BaseComponent extends EventEmitter {
     protected isInitialized: boolean = false;
     private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
     
-    protected get componentLogger() {
+    protected get componentLogger(): ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']> {
         if (!this._logger) {
             // Use the actual component class name for component-specific logging
             const componentName = this.constructor.name;
