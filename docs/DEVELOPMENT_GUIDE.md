@@ -99,14 +99,22 @@ docs/                   # Documentation
 
 **Logging**:
 ```typescript
-// Use component logger in Extension Host
-this.componentLogger.debug('Component state', { 
-    componentId: this.config.id,
-    data: this.getData()
-});
+// Use component logger in Extension Host with appropriate levels
+this.componentLogger.trace('Component lifecycle event', { componentId }); // UI lifecycle
+this.componentLogger.debug('Component state changed', { newState });      // Development info
+this.componentLogger.info('User action completed', { actionId });         // Business events
+this.componentLogger.warn('Recoverable issue detected', { issue });       // Non-critical issues
+this.componentLogger.error('Operation failed', error, { context });       // Failures
 
 // View logs in VS Code Output panel: "Power Platform Developer Suite"
 ```
+
+**Log Level Guidelines**:
+- **TRACE**: UI lifecycle events (dropdowns open/close, focus changes)
+- **DEBUG**: State changes, method entry/exit, user input processing
+- **INFO**: Business events, user actions with business impact, successful operations
+- **WARN**: Recoverable issues, missing optional data, fallback behaviors
+- **ERROR**: Failures requiring user attention, unrecoverable errors
 
 ### Webview Debugging
 
@@ -122,6 +130,27 @@ this.componentLogger.debug('Component state', {
 // In webview behavior scripts
 console.log('Component initialized:', componentId);
 console.log('Message received:', message);
+```
+
+**Component Event Logging Patterns**:
+```typescript
+// Panel message handlers - log based on business significance
+private async handleComponentEvent(message: WebviewMessage): Promise<void> {
+    const { componentId, eventType, data } = message.data || {};
+    
+    if (eventType === 'selectionChanged') {
+        // Business event - INFO level
+        this.componentLogger.info(`Selection: ${data.selectedItem?.name}`, { 
+            itemId: data.selectedItem?.id 
+        });
+    } else if (eventType === 'search') {
+        // User input - DEBUG level
+        this.componentLogger.debug(`Search: "${data.query}"`, { componentId });
+    } else {
+        // UI lifecycle - TRACE level  
+        this.componentLogger.trace(`Event: ${componentId}/${eventType}`);
+    }
+}
 ```
 
 ### Common Debug Scenarios

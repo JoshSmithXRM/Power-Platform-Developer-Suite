@@ -346,14 +346,10 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             const { command } = message;
             
-            this.componentLogger.info('Message received in handleMessage', { 
+            this.componentLogger.debug('Message received', { 
                 command, 
-                hasData: !!message.data,
-                hasAction: !!message.action,
                 componentId: message.data?.componentId,
-                eventType: message.data?.eventType,
-                actionId: message.data?.actionId,
-                fullMessage: message
+                eventType: message.data?.eventType
             });
             
             // Handle empty or undefined command
@@ -369,15 +365,6 @@ export class ConnectionReferencesPanel extends BasePanel {
             
             switch (command) {
                 case 'component-event':
-                    // Debug: check message structure
-                    this.componentLogger.info('component-event structure', {
-                        hasData: !!message.data,
-                        dataComponentId: message.data?.componentId,
-                        dataEventType: message.data?.eventType,
-                        dataHasData: !!message.data?.data,
-                        dataProperties: message.data ? Object.keys(message.data).join(', ') : 'none',
-                        innerDataProperties: message.data?.data ? Object.keys(message.data.data).join(', ') : 'none'
-                    });
                     await this.handleComponentEvent(message);
                     break;
 
@@ -414,11 +401,26 @@ export class ConnectionReferencesPanel extends BasePanel {
             // ComponentUtils.sendMessage puts everything in message.data
             const { componentId, eventType, data } = message.data || {};
             
-            this.componentLogger.debug('Processing component event', { 
-                componentId, 
-                eventType, 
-                hasData: !!data 
-            });
+            // Log based on event significance
+            if (eventType === 'selectionChanged') {
+                // Business event - INFO level
+                const solutionName = data?.selectedSolutions?.[0]?.displayName;
+                const solutionId = data?.selectedSolutions?.[0]?.id;
+                if (solutionName) {
+                    this.componentLogger.info(`Solution selected: ${solutionName}`, { solutionId });
+                } else {
+                    this.componentLogger.info('Solution selection cleared');
+                }
+            } else if (eventType === 'search') {
+                // User input - DEBUG level
+                this.componentLogger.debug(`Search query: "${data?.query || ''}"`, { componentId });
+            } else if (eventType === 'actionClicked') {
+                // User action - INFO level
+                this.componentLogger.info(`Action clicked: ${data?.actionId}`, { componentId });
+            } else {
+                // UI lifecycle events - TRACE level
+                this.componentLogger.trace(`Component event: ${componentId}/${eventType}`);
+            }
 
             // Handle solution selector events
             if (componentId === 'connectionRefs-solutionSelector' && eventType === 'selectionChanged') {
@@ -426,14 +428,8 @@ export class ConnectionReferencesPanel extends BasePanel {
                 
                 if (selectedSolutions && selectedSolutions.length > 0) {
                     const selectedSolution = selectedSolutions[0];
-                    this.componentLogger.info('Solution selection changed via component event', { 
-                        solutionId: selectedSolution.id,
-                        solutionName: selectedSolution.displayName 
-                    });
-                    
                     await this.handleSolutionSelection(selectedSolution.id);
                 } else {
-                    this.componentLogger.debug('Solution selection cleared via component event');
                     await this.handleSolutionSelection('');
                 }
                 return;
@@ -442,8 +438,6 @@ export class ConnectionReferencesPanel extends BasePanel {
             // Handle action bar events
             if (componentId === 'connectionRefs-actions' && eventType === 'actionClicked') {
                 const { actionId } = data;
-                
-                this.componentLogger.info('Action bar button clicked', { actionId });
                 
                 switch (actionId) {
                     case 'refreshBtn':
