@@ -508,8 +508,6 @@ export class ConnectionReferencesPanel extends BasePanel {
         }
 
         try {
-            this.componentLogger.info('Solution selected', { solutionId });
-
             // Get current environment ID
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
             if (selectedEnvironment) {
