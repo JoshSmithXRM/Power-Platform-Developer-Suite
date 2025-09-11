@@ -6,10 +6,6 @@ import { SearchFormComponent } from '../components/forms/SearchForm/SearchFormCo
 import { SearchFormConfig } from '../components/forms/SearchForm/SearchFormConfig';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
 import { DataTableConfig } from '../components/tables/DataTable/DataTableConfig';
-import { EmptyTableComponent } from '../components/tables/EmptyTable/EmptyTableComponent';
-import { EmptyTableConfig } from '../components/tables/EmptyTable/EmptyTableConfig';
-import { FilterableTableComponent } from '../components/tables/FilterableTable/FilterableTableComponent';
-import { FilterableTableConfig } from '../components/tables/FilterableTable/FilterableTableConfig';
 import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
 import { SolutionSelectorConfig } from '../components/selectors/SolutionSelector/SolutionSelectorConfig';
 import { EntitySelectorComponent } from '../components/selectors/EntitySelector/EntitySelectorComponent';
@@ -113,29 +109,6 @@ export class ComponentFactory {
         return component;
     }
 
-    /**
-     * Create an EmptyTableComponent
-     */
-    public createEmptyTable(config: EmptyTableConfig): EmptyTableComponent {
-        this.validateComponentConfig(config, 'EmptyTable');
-        
-        const component = new EmptyTableComponent(config);
-        this.trackInstance(config.id, 'EmptyTable', component);
-        
-        return component;
-    }
-
-    /**
-     * Create a FilterableTableComponent
-     */
-    public createFilterableTable(config: FilterableTableConfig): FilterableTableComponent {
-        this.validateComponentConfig(config, 'FilterableTable');
-        
-        const component = new FilterableTableComponent(config);
-        this.trackInstance(config.id, 'FilterableTable', component);
-        
-        return component;
-    }
 
     // Phase 5: Specialized Components
 

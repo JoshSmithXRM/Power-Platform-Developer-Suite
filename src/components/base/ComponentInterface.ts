@@ -305,8 +305,6 @@ export interface ComponentFactoryMethods {
     createSolutionSelector(config: SolutionSelectorConfig): any;
     createEntitySelector(config: EntitySelectorConfig): any;
     createDataTable(config: DataTableConfig): any;
-    createEmptyTable(config: Partial<DataTableConfig>): any;
-    createFilterableTable(config: DataTableConfig): any;
     createActionBar(config: ActionBarConfig): any;
     createSearchForm(config: SearchFormConfig): any;
     createFilterForm(config: FilterFormConfig): any;
