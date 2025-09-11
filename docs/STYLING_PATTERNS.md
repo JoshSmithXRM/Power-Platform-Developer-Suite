@@ -418,6 +418,39 @@ The semantic tokens work with the flexible panel layout system:
 - **Muted text**: Disabled states, placeholders, less important text
 - **Accent text**: Links, call-to-action elements, interactive text
 
+## Style Quality & Validation
+
+### **Theme Compatibility Guidelines**
+
+**Semantic Token Usage**:
+- Use `var(--component-*)` tokens instead of direct VS Code variables in component files
+- Only base files should reference VS Code variables for font-family/font-size
+- Avoid hardcoded colors (`#hex`, `rgba()`) that don't adapt to theme changes
+
+**CSS Architecture Standards**:
+- Minimize `!important` declarations (indicates architectural issues)
+- Follow consistent naming patterns (BEM or component-specific)
+- Use semantic tokens for all surface, border, and text colors
+
+### **Automated Validation**
+
+**Style Compliance Checks**:
+```bash
+# Check for hardcoded colors (should be minimal)
+grep -rE "#[0-9a-fA-F]{3,6}|rgba?\(" resources/webview/css/components/
+
+# Check for direct VS Code variable usage (prefer semantic tokens)
+grep -rn "var(--vscode-" resources/webview/css/components/ | grep -v "font-family\|font-size"
+
+# Check for excessive !important usage
+grep -c "!important" resources/webview/css/components/*.css
+```
+
+**Theme Testing**:
+- Test components across light/dark/high-contrast themes
+- Verify semantic token mapping provides appropriate contrast
+- Ensure accessibility standards are maintained
+
 ## Migration Guidelines
 
 ### **Updating Existing CSS**

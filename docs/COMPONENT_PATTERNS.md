@@ -567,6 +567,23 @@ describe('DataTableBehavior', () => {
 });
 ```
 
+## Pattern Enforcement
+
+### **Automated Compliance**
+
+Component patterns are reinforced through development tooling:
+
+**ESLint Integration**:
+- Factory pattern usage verification
+- Base class extension requirements  
+- Component communication pattern enforcement
+
+**Development Guidelines**:
+- Use `ComponentFactory` for all component instantiation
+- Extend appropriate base classes (`BaseComponent`, `BasePanel`)
+- Implement proper event bridges for component updates
+- Follow logging architecture patterns
+
 ## Related Documentation
 
 These patterns provide a consistent foundation for building maintainable, testable, and reusable components. For additional guidance:

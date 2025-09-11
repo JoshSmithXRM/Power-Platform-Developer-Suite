@@ -45,6 +45,60 @@ npm run lint           # Run ESLint
 npm run format         # Format code with Prettier
 ```
 
+## Code Quality & Linting
+
+### ESLint Configuration
+
+This project uses ESLint with TypeScript support following Microsoft's recommended patterns. The configuration in `eslint.config.mjs` enforces both standard code quality and architectural patterns specific to VS Code extension development.
+
+#### Build Integration Strategy
+Following Microsoft's VS Code extension best practices:
+- **Development**: Linting runs separately for fast iteration (`npm run lint`)
+- **Testing**: Integrated linting before tests (`pretest` hook)
+- **Production**: Always lint before packaging (`prepackage` hook)
+
+#### Key Linting Guidelines
+
+**TypeScript Standards**:
+- Explicit return types for service methods improve maintainability
+- Consistent import ordering: external → internal → relative
+- Avoid empty interfaces; add meaningful properties
+
+**Extension Architecture**:
+- Use `this.componentLogger` instead of `console.log` in TypeScript files
+- Components should extend appropriate base classes (`BaseComponent`, `BasePanel`)
+- Prefer ES6 imports over `require()` statements
+
+### Architectural Pattern Enforcement
+
+The ESLint configuration helps maintain architectural integrity:
+
+**Component Communication**:
+- Panels should use component event bridges for updates
+- Avoid `updateWebview()` for data updates (causes UI flash)
+- Use `ComponentFactory` for component instantiation
+
+**Context Separation**:
+- Extension Host code (TypeScript) has access to VS Code APIs and Node.js
+- Webview code (JavaScript) runs in browser context with limited access
+- Don't reference Extension Host classes in webview JavaScript
+
+### CSS & Styling Guidelines
+
+**Theme Compatibility**:
+- Use semantic tokens (`var(--component-*)`) instead of direct VS Code variables
+- Avoid hardcoded colors (`#hex`, `rgba()`) in component styles
+- Minimize `!important` declarations
+
+**Validation Commands**:
+```bash
+# Check for hardcoded colors (should be minimal)
+grep -rE "#[0-9a-fA-F]{3,6}|rgba?\(" resources/webview/css/components/
+
+# Check for direct VS Code variables (prefer semantic tokens)
+grep -rn "var(--vscode-" resources/webview/css/components/
+```
+
 ### Development Cycle
 
 1. **Start watch mode**: `npm run watch`

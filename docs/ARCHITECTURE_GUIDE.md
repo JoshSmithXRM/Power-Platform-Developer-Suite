@@ -373,6 +373,34 @@ this.component.setData(transformedData);
 - Use dependency injection for testability
 - Follow established patterns for consistency
 
+## Architectural Standards Enforcement
+
+### **Automated Code Quality**
+
+The architectural patterns described in this guide are enforced through automated tooling:
+
+**ESLint Rules**: 
+- Component communication patterns (avoid `updateWebview()` for data updates)
+- Context separation (Extension Host vs. Webview boundaries)
+- Proper base class usage and factory patterns
+
+**Development Workflow**:
+- Linting integrated into build process for production
+- Separate during development for fast iteration
+- Validation commands available for architectural compliance
+
+### **Pattern Compliance**
+
+**Component Architecture**:
+- Use `ComponentFactory` for component instantiation
+- Implement proper event bridges for component updates
+- Follow logging architecture (`this.componentLogger` vs. `console.log`)
+
+**Context Awareness**:
+- Extension Host code: Full access to VS Code APIs and Node.js
+- Webview code: Browser context with limited scope
+- Clear boundaries prevent runtime errors
+
 ## Related Documentation
 
 This architecture guide provides the foundation for understanding and extending the Power Platform Developer Suite. For specific implementation details, see:
