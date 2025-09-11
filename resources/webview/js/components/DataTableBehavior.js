@@ -57,9 +57,6 @@ class DataTableBehavior {
             const columnId = header.dataset.columnId;
             if (!columnId) return;
             
-            const sortButton = header.querySelector('.sort-button');
-            if (!sortButton) return;
-            
             const handler = (event) => {
                 event.preventDefault();
                 
@@ -84,7 +81,7 @@ class DataTableBehavior {
                 this.sort(columnId, newDirection, event.ctrlKey || event.metaKey);
             };
             
-            sortButton.addEventListener('click', handler);
+            header.addEventListener('click', handler);
             this.sortHandlers.set(columnId, handler);
         });
     }
@@ -401,25 +398,381 @@ class DataTableBehavior {
      * Sort table by column
      */
     sort(columnId, direction, multiSort = false) {
-        this.postMessage({
-            type: 'dataTable.sort',
-            tableId: this.tableId,
-            columnId,
-            direction,
-            multiSort
+        console.log(`Sorting table ${this.tableId} by ${columnId} ${direction}`);
+        
+        if (direction === null) {
+            // Remove sort for this column
+            this.removeSortByColumn(columnId);
+        } else {
+            // Apply sort for this column
+            this.sortTableByColumn(columnId, direction, multiSort);
+        }
+        
+        // Update sort indicators
+        this.updateSortIndicators(this.getCurrentSortConfig());
+    }
+    
+    /**
+     * Sort table rows by column value
+     */
+    sortTableByColumn(columnId, direction, multiSort = false) {
+        const tbody = this.table.querySelector('tbody');
+        if (!tbody) {
+            console.warn(`No tbody found in table ${this.tableId}`);
+            return;
+        }
+        
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        if (rows.length === 0) {
+            console.log(`No rows to sort in table ${this.tableId}`);
+            return;
+        }
+        
+        // Get column index for sorting
+        const header = this.table.querySelector(`th[data-column-id="${columnId}"]`);
+        if (!header) {
+            console.warn(`Column header not found: ${columnId}`);
+            return;
+        }
+        
+        const columnIndex = Array.from(header.parentElement.children).indexOf(header);
+        const columnType = header.dataset.columnType || 'text';
+        
+        console.log(`Sorting column ${columnId} (index: ${columnIndex}, type: ${columnType}) ${direction}`);
+        
+        // Sort rows
+        rows.sort((a, b) => {
+            const cellA = a.children[columnIndex];
+            const cellB = b.children[columnIndex];
+            
+            if (!cellA || !cellB) return 0;
+            
+            let valueA = this.getCellValue(cellA, columnType);
+            let valueB = this.getCellValue(cellB, columnType);
+            
+            // Handle null/undefined values
+            if (valueA === null || valueA === undefined) valueA = '';
+            if (valueB === null || valueB === undefined) valueB = '';
+            
+            let comparison = this.compareValues(valueA, valueB, columnType);
+            
+            // Apply direction
+            if (direction === 'desc') {
+                comparison = -comparison;
+            }
+            
+            return comparison;
         });
+        
+        // Re-append sorted rows to tbody
+        rows.forEach(row => tbody.appendChild(row));
+        
+        // Update header sort state
+        if (!multiSort) {
+            // Clear other sort indicators
+            this.table.querySelectorAll('th.sortable').forEach(th => {
+                if (th !== header) {
+                    th.removeAttribute('data-sort-direction');
+                    th.classList.remove('sorted-asc', 'sorted-desc');
+                }
+            });
+        }
+        
+        // Set current header sort state
+        header.setAttribute('data-sort-direction', direction);
+        header.classList.remove('sorted-asc', 'sorted-desc');
+        header.classList.add(`sorted-${direction}`);
+        
+        console.log(`Table ${this.tableId} sorted by ${columnId} ${direction}`);
+    }
+    
+    /**
+     * Remove sort for a specific column
+     */
+    removeSortByColumn(columnId) {
+        const header = this.table.querySelector(`th[data-column-id="${columnId}"]`);
+        if (header) {
+            header.removeAttribute('data-sort-direction');
+            header.classList.remove('sorted-asc', 'sorted-desc');
+            console.log(`Removed sort for column ${columnId}`);
+        }
+    }
+    
+    /**
+     * Get cell value for sorting
+     */
+    getCellValue(cell, columnType) {
+        if (!cell) return '';
+        
+        // Try to get value from data attribute first
+        if (cell.dataset.sortValue !== undefined) {
+            return cell.dataset.sortValue;
+        }
+        
+        // Get text content and convert based on type
+        const textContent = cell.textContent.trim();
+        
+        switch (columnType) {
+            case 'number':
+                const num = parseFloat(textContent.replace(/[^0-9.-]/g, ''));
+                return isNaN(num) ? 0 : num;
+                
+            case 'date':
+                const date = new Date(textContent);
+                return isNaN(date.getTime()) ? new Date(0) : date;
+                
+            case 'boolean':
+                return textContent.toLowerCase() === 'true' || textContent === '1';
+                
+            default:
+                return textContent.toLowerCase();
+        }
+    }
+    
+    /**
+     * Compare two values based on type
+     */
+    compareValues(a, b, columnType) {
+        switch (columnType) {
+            case 'number':
+                return a - b;
+                
+            case 'date':
+                return a.getTime() - b.getTime();
+                
+            case 'boolean':
+                if (a === b) return 0;
+                return a ? 1 : -1;
+                
+            default:
+                return a.localeCompare(b);
+        }
+    }
+    
+    /**
+     * Get current sort configuration
+     */
+    getCurrentSortConfig() {
+        const sortConfig = [];
+        const sortableHeaders = this.table.querySelectorAll('th.sortable[data-sort-direction]');
+        
+        sortableHeaders.forEach(header => {
+            const columnId = header.dataset.columnId;
+            const direction = header.dataset.sortDirection;
+            if (columnId && direction) {
+                sortConfig.push({ column: columnId, direction });
+            }
+        });
+        
+        return sortConfig;
     }
     
     /**
      * Filter table by column
      */
     filter(columnId, value) {
-        this.postMessage({
-            type: 'dataTable.filter',
-            tableId: this.tableId,
-            columnId,
-            value
+        console.log(`Filtering table ${this.tableId} column ${columnId} with value: "${value}"`);
+        
+        // Apply filter directly in webview
+        this.filterTableByColumn(columnId, value);
+        
+        // Update filter state
+        this.updateFilterState(columnId, value);
+    }
+    
+    /**
+     * Filter table rows by column value
+     */
+    filterTableByColumn(columnId, filterValue) {
+        const tbody = this.table.querySelector('tbody');
+        if (!tbody) {
+            console.warn(`No tbody found in table ${this.tableId}`);
+            return;
+        }
+        
+        const rows = tbody.querySelectorAll('tr');
+        if (rows.length === 0) {
+            console.log(`No rows to filter in table ${this.tableId}`);
+            return;
+        }
+        
+        // Get column index for filtering
+        const header = this.table.querySelector(`th[data-column-id="${columnId}"]`);
+        if (!header) {
+            console.warn(`Column header not found: ${columnId}`);
+            return;
+        }
+        
+        const columnIndex = Array.from(header.parentElement.children).indexOf(header);
+        const filterType = header.dataset.filterType || 'text';
+        
+        console.log(`Filtering column ${columnId} (index: ${columnIndex}, type: ${filterType}) with value: "${filterValue}"`);
+        
+        let visibleRowCount = 0;
+        
+        rows.forEach(row => {
+            const cell = row.children[columnIndex];
+            if (!cell) {
+                row.style.display = 'none';
+                return;
+            }
+            
+            const cellValue = this.getCellFilterValue(cell, filterType);
+            const isVisible = this.matchesFilter(cellValue, filterValue, filterType);
+            
+            row.style.display = isVisible ? '' : 'none';
+            if (isVisible) visibleRowCount++;
         });
+        
+        console.log(`Filter applied: ${visibleRowCount} of ${rows.length} rows visible`);
+        
+        // Update empty state if no rows are visible
+        this.updateEmptyStateVisibility(visibleRowCount === 0);
+    }
+    
+    /**
+     * Get cell value for filtering
+     */
+    getCellFilterValue(cell, filterType) {
+        if (!cell) return '';
+        
+        // Try to get value from data attribute first
+        if (cell.dataset.filterValue !== undefined) {
+            return cell.dataset.filterValue;
+        }
+        
+        // Get text content
+        const textContent = cell.textContent.trim();
+        
+        switch (filterType) {
+            case 'number':
+                const num = parseFloat(textContent.replace(/[^0-9.-]/g, ''));
+                return isNaN(num) ? 0 : num;
+                
+            case 'date':
+                return new Date(textContent);
+                
+            case 'boolean':
+                return textContent.toLowerCase() === 'true' || textContent === '1';
+                
+            default:
+                return textContent.toLowerCase();
+        }
+    }
+    
+    /**
+     * Check if cell value matches filter
+     */
+    matchesFilter(cellValue, filterValue, filterType) {
+        // Empty filter shows all rows
+        if (!filterValue || filterValue.trim() === '') {
+            return true;
+        }
+        
+        const filter = filterValue.toLowerCase().trim();
+        
+        switch (filterType) {
+            case 'number':
+                const numFilter = parseFloat(filter);
+                return !isNaN(numFilter) && cellValue === numFilter;
+                
+            case 'date':
+                // Simple date filtering - could be enhanced for date ranges
+                const dateFilter = new Date(filter);
+                if (isNaN(dateFilter.getTime())) {
+                    // If not a valid date, fall back to text matching
+                    return cellValue.toString().toLowerCase().includes(filter);
+                }
+                return cellValue.toDateString() === dateFilter.toDateString();
+                
+            case 'boolean':
+                const boolFilter = filter === 'true' || filter === '1';
+                return cellValue === boolFilter;
+                
+            case 'select':
+            case 'multiselect':
+                // Exact match for select filters
+                return cellValue.toString().toLowerCase() === filter;
+                
+            default:
+                // Text filtering - contains match
+                return cellValue.toString().toLowerCase().includes(filter);
+        }
+    }
+    
+    /**
+     * Update filter state tracking
+     */
+    updateFilterState(columnId, value) {
+        if (!this.activeFilters) {
+            this.activeFilters = new Map();
+        }
+        
+        if (value && value.trim() !== '') {
+            this.activeFilters.set(columnId, value);
+        } else {
+            this.activeFilters.delete(columnId);
+        }
+        
+        console.log(`Active filters:`, Array.from(this.activeFilters.entries()));
+    }
+    
+    /**
+     * Update empty state visibility based on filtered results
+     */
+    updateEmptyStateVisibility(isEmpty) {
+        const table = this.container || this.table.closest('.data-table');
+        if (!table) return;
+        
+        const emptyState = table.querySelector('.data-table-empty-state');
+        if (emptyState) {
+            if (isEmpty) {
+                emptyState.classList.add('visible');
+                emptyState.style.display = 'block';
+                emptyState.textContent = 'No matching results found';
+            } else {
+                emptyState.classList.remove('visible');
+                emptyState.style.display = 'none';
+            }
+        }
+    }
+    
+    /**
+     * Clear all filters
+     */
+    clearAllFilters() {
+        console.log(`Clearing all filters for table ${this.tableId}`);
+        
+        // Clear filter inputs
+        const filterInputs = this.table.querySelectorAll('.filter-input');
+        filterInputs.forEach(input => {
+            input.value = '';
+        });
+        
+        // Clear filter selects
+        const filterSelects = this.table.querySelectorAll('.filter-select');
+        filterSelects.forEach(select => {
+            select.selectedIndex = 0;
+        });
+        
+        // Show all rows
+        const tbody = this.table.querySelector('tbody');
+        if (tbody) {
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(row => {
+                row.style.display = '';
+            });
+        }
+        
+        // Clear filter state
+        if (this.activeFilters) {
+            this.activeFilters.clear();
+        }
+        
+        // Hide empty state
+        this.updateEmptyStateVisibility(false);
+        
+        console.log(`All filters cleared for table ${this.tableId}`);
     }
     
     /**

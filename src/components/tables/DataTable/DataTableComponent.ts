@@ -37,16 +37,34 @@ export class DataTableComponent extends BaseComponent {
      * Initialize component state from config
      */
     private initializeState(): void {
+        this.componentLogger.debug('Initializing DataTable state', {
+            componentId: this.config.id,
+            initialDataLength: this.config.data?.length || 0,
+            columnCount: this.config.columns.length,
+            sortable: this.config.sortable,
+            filterable: this.config.filterable,
+            paginated: this.config.paginated,
+            pageSize: this.config.pageSize
+        });
+
         if (this.config.data) {
             this.setData(this.config.data);
         }
         
         if (this.config.selectedRows) {
             this.selectedRows = new Set(this.config.selectedRows);
+            this.componentLogger.debug('Initial row selection set', {
+                componentId: this.config.id,
+                selectedCount: this.selectedRows.size
+            });
         }
         
         if (this.config.defaultSort) {
             this.sortConfig = [...this.config.defaultSort];
+            this.componentLogger.debug('Default sort configuration applied', {
+                componentId: this.config.id,
+                sortConfig: this.sortConfig
+            });
         }
         
         if (this.config.pageSize) {
@@ -70,6 +88,12 @@ export class DataTableComponent extends BaseComponent {
             this.columnVisibility.set(column.id, column.visible !== false);
         });
         this.columnOrder = this.config.columns.map(c => c.id);
+        
+        this.componentLogger.info('DataTable initialized successfully', {
+            componentId: this.config.id,
+            visibleColumns: Array.from(this.columnVisibility.entries()).filter(([_, visible]) => visible).length,
+            totalColumns: this.config.columns.length
+        });
     }
 
     /**
@@ -121,9 +145,23 @@ export class DataTableComponent extends BaseComponent {
      * Set table data
      */
     public setData(data: DataTableRow[]): void {
+        this.componentLogger.debug('Setting table data', {
+            componentId: this.config.id,
+            newDataLength: data.length,
+            previousDataLength: this.data.length
+        });
+
         this.data = [...data];
         this.processData();
         this.notifyUpdate();
+        
+        this.componentLogger.info('Table data updated', {
+            componentId: this.config.id,
+            totalRows: this.data.length,
+            processedRows: this.processedData.length,
+            currentPage: this.currentPage,
+            pageSize: this.pageSize
+        });
     }
 
     /**
@@ -137,21 +175,48 @@ export class DataTableComponent extends BaseComponent {
      * Process data with sorting, filtering, and search
      */
     private processData(): void {
+        this.componentLogger.debug('Processing table data', {
+            componentId: this.config.id,
+            originalDataLength: this.data.length,
+            hasSearchQuery: !!this.searchQuery,
+            activeFilters: Object.keys(this.filters).length,
+            sortConfigLength: this.sortConfig.length
+        });
+
         let processed = [...this.data];
+        const originalLength = processed.length;
         
         // Apply search
         if (this.searchQuery && this.config.searchable) {
             processed = this.applySearch(processed, this.searchQuery);
+            this.componentLogger.debug('Search applied', {
+                componentId: this.config.id,
+                searchQuery: this.searchQuery,
+                beforeSearch: originalLength,
+                afterSearch: processed.length
+            });
         }
         
         // Apply filters
         if (Object.keys(this.filters).length > 0 && this.config.filterable) {
+            const beforeFilter = processed.length;
             processed = this.applyFilters(processed, this.filters);
+            this.componentLogger.debug('Filters applied', {
+                componentId: this.config.id,
+                activeFilters: Object.keys(this.filters),
+                beforeFilter: beforeFilter,
+                afterFilter: processed.length
+            });
         }
         
         // Apply sorting
         if (this.sortConfig.length > 0 && this.config.sortable) {
             processed = this.applySort(processed, this.sortConfig);
+            this.componentLogger.debug('Sort applied', {
+                componentId: this.config.id,
+                sortConfig: this.sortConfig,
+                sortedRowCount: processed.length
+            });
         }
         
         this.processedData = processed;
@@ -159,8 +224,21 @@ export class DataTableComponent extends BaseComponent {
         // Reset to first page if current page is out of bounds
         const maxPage = Math.ceil(this.processedData.length / this.pageSize);
         if (this.currentPage > maxPage && maxPage > 0) {
+            this.componentLogger.debug('Resetting to first page due to bounds', {
+                componentId: this.config.id,
+                previousPage: this.currentPage,
+                maxPage: maxPage
+            });
             this.currentPage = 1;
         }
+
+        this.componentLogger.info('Data processing completed', {
+            componentId: this.config.id,
+            originalRows: this.data.length,
+            processedRows: this.processedData.length,
+            currentPage: this.currentPage,
+            totalPages: Math.ceil(this.processedData.length / this.pageSize)
+        });
     }
 
     /**
@@ -552,18 +630,40 @@ export class DataTableComponent extends BaseComponent {
      * Validate configuration
      */
     protected validateConfig(): void {
+        this.componentLogger.debug('Validating DataTable configuration', {
+            componentId: this.config.id,
+            columnCount: this.config.columns?.length || 0,
+            hasData: !!this.config.data,
+            sortable: this.config.sortable,
+            filterable: this.config.filterable
+        });
+
         super.validateConfig();
         
         const validation = DataTableConfigValidator.validate(this.config);
         if (!validation.isValid) {
-            throw new Error(`DataTable configuration errors: ${validation.errors.join(', ')}`);
+            const errorMessage = `DataTable configuration errors: ${validation.errors.join(', ')}`;
+            const error = new Error(errorMessage);
+            this.componentLogger.error('DataTable configuration validation failed', error, {
+                componentId: this.config.id,
+                errors: validation.errors
+            });
+            throw error;
         }
         
         if (validation.warnings.length > 0) {
+            this.componentLogger.warn('DataTable configuration has warnings', {
+                componentId: this.config.id,
+                warnings: validation.warnings
+            });
             validation.warnings.forEach(warning => {
                 console.warn(`DataTable warning: ${warning}`);
             });
         }
+
+        this.componentLogger.debug('DataTable configuration validation passed', {
+            componentId: this.config.id
+        });
     }
 
     /**

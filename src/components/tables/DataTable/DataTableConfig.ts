@@ -268,7 +268,7 @@ export const DEFAULT_DATA_TABLE_CONFIG: Partial<DataTableConfig> = {
     showCheckboxes: true,
     sortable: true,
     multiSort: false,
-    filterable: false,
+    filterable: true,
     filterMode: 'menu',
     filterDebounce: 300,
     paginated: false,

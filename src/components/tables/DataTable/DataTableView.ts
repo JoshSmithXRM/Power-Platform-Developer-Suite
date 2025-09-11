@@ -242,8 +242,8 @@ export class DataTableView {
         
         const cellClass = [
             'data-table-header-cell',
-            sortable ? 'data-table-sortable' : '',
-            sortConfig ? `data-table-sorted--${sortConfig.direction}` : '',
+            sortable ? 'sortable' : '',
+            sortConfig ? `sorted-${sortConfig.direction}` : '',
             column.className ? (typeof column.className === 'string' ? column.className : '') : '',
             `data-table-align--${column.align || 'left'}`
         ].filter(Boolean).join(' ');
@@ -287,14 +287,13 @@ export class DataTableView {
         column: DataTableColumn, 
         sortConfig?: { column: string; direction: 'asc' | 'desc' }
     ): string {
-        const icon = sortConfig?.direction === 'asc' ? ICONS.CHEVRON_UP : 
-                    sortConfig?.direction === 'desc' ? ICONS.CHEVRON_DOWN : '';
+        if (!sortConfig) {
+            return '';
+        }
         
-        return `
-            <span class="data-table-header-sort" data-component-element="sort">
-                ${icon}
-            </span>
-        `;
+        const icon = sortConfig.direction === 'asc' ? '↑' : '↓';
+        
+        return `<span class="sort-indicator">${icon}</span>`;
     }
 
     /**

@@ -109,66 +109,19 @@
 .data-table-header-cell.sortable {
     cursor: pointer;
     transition: all 0.15s ease;
-    border-radius: 4px 4px 0 0;
+    user-select: none;
 }
 
 .data-table-header-cell.sortable:hover {
     background: rgba(128, 128, 128, 0.1);
+}
+
+/* Clean inline sort indicator */
+.sort-indicator {
     color: var(--vscode-charts-blue);
-    transform: translateY(-1px);
-}
-
-.sort-button {
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: inherit;
-    font: inherit;
-}
-
-.sort-icon {
-    width: 12px;
-    height: 12px;
-    opacity: 0.6;
-    transition: opacity 0.15s ease;
-    position: relative;
-}
-
-.sort-icon::before {
-    content: '↕';
-    font-size: 10px;
-}
-
-.sort-icon.sort-asc::before {
-    content: '↑';
-    opacity: 1;
-    color: var(--vscode-charts-blue);
-}
-
-.sort-icon.sort-desc::before {
-    content: '↓';
-    opacity: 1;
-    color: var(--vscode-charts-blue);
-}
-
-.sort-icon[data-sort-order]::after {
-    content: attr(data-sort-order);
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    background: var(--vscode-charts-blue);
-    color: white;
-    border-radius: 50%;
-    width: 14px;
-    height: 14px;
-    font-size: 9px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    font-size: 12px;
+    margin-left: 4px;
+    font-weight: bold;
 }
 
 /* Filter row */
