@@ -264,4 +264,4 @@ npm run test-release     # Build, package, and install locally
 - ❌ Transform data in Service or Component layers
 - ❌ Create one-off implementations instead of reusable components
 
-For detailed architecture patterns and component design guidelines, see `docs/ARCHITECTURE_GUIDE.md` and `docs/COMPONENT_PATTERNS.md`.
+For detailed patterns and guidelines, see `docs/`.
