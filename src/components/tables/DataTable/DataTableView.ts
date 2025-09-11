@@ -185,10 +185,12 @@ export class DataTableView {
         columns: DataTableColumn[], 
         state: DataTableViewState
     ): string {
+        const headerCells = columns.map(column => this.renderHeaderCell(column, config, state)).join('');
+        
         return `
             <thead class="data-table-thead">
                 <tr class="data-table-header-row">
-                    ${columns.map(column => this.renderHeaderCell(column, config, state)).join('')}
+                    ${headerCells}
                 </tr>
             </thead>
         `;
@@ -206,15 +208,7 @@ export class DataTableView {
         const sortable = config.sortable && column.sortable !== false;
         const sortConfig = state.sortConfig.find(s => s.column === column.id);
         
-        this.logger.debug('Rendering header cell', {
-            columnId: column.id,
-            columnLabel: column.label,
-            sortable: sortable,
-            stateSortConfig: state.sortConfig,
-            foundSortConfig: sortConfig,
-            hasSortConfig: !!sortConfig,
-            willRenderSortIndicator: sortable && !!sortConfig
-        });
+        // Header cell rendering - keep minimal logging for debugging
         
         const cellClass = [
             'data-table-header-cell',
@@ -262,35 +256,14 @@ export class DataTableView {
         column: DataTableColumn, 
         sortConfig?: { column: string; direction: 'asc' | 'desc' }
     ): string {
-        this.logger.debug('Rendering sort indicator', {
-            columnId: column.id,
-            columnLabel: column.label,
-            sortConfig: sortConfig,
-            hasSortConfig: !!sortConfig,
-            sortDirection: sortConfig?.direction
-        });
-
         // Only show indicator if this column is actually sorted
         if (!sortConfig) {
-            this.logger.debug('No sort indicator rendered - no sort config', {
-                columnId: column.id
-            });
             return '';
         }
         
         const icon = sortConfig.direction === 'asc' ? '▲' : '▼';
         const directionClass = `sort-indicator--${sortConfig.direction}`;
-        const html = `<span class="sort-indicator ${directionClass}" title="Sorted ${sortConfig.direction}ending">${icon}</span>`;
-        
-        this.logger.debug('Sort indicator HTML generated', {
-            columnId: column.id,
-            direction: sortConfig.direction,
-            icon: icon,
-            className: directionClass,
-            generatedHtml: html
-        });
-        
-        return html;
+        return `<span class="sort-indicator ${directionClass}" title="Sorted ${sortConfig.direction}ending">${icon}</span>`;
     }
 
     /**
@@ -375,14 +348,14 @@ export class DataTableView {
                     config.rowStyle(row, index) : config.rowStyle) : ''
         ].filter(Boolean).join('; ');
 
+        const bodyCells = columns.map(column => this.renderBodyCell(row, column, config)).join('');
+
         return `
             <tr class="${rowClass}" 
                 style="${rowStyle}"
                 data-row-id="${row.id}"
                 data-row-index="${index}">
-                ${columns.map(column => 
-                    this.renderBodyCell(row, column, config)
-                ).join('')}
+                ${bodyCells}
             </tr>
             ${config.expandableRows && row._expanded ? 
                 this.renderExpandedRow(row, columns.length, config) : ''}

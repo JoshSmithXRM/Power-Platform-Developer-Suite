@@ -1525,6 +1525,7 @@ class DataTableBehavior {
         }
         
         const headerCells = headerRow.querySelectorAll('th[data-column-id]');
+        
         Array.from(headerCells).forEach((header, index) => {
             const columnId = header.getAttribute('data-column-id');
             const td = document.createElement('td');
@@ -1539,7 +1540,6 @@ class DataTableBehavior {
             
             tr.appendChild(td);
         });
-        
         return tr;
     }
     

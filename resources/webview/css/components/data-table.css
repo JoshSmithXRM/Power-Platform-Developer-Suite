@@ -338,16 +338,6 @@
     border-bottom: none;
 }
 
-.data-table-body-row::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: transparent;
-    transition: background-color 0.2s ease;
-}
 
 /* Striped rows - Modern, subtle approach */
 .data-table-tbody .data-table-body-row:nth-child(even) {
@@ -361,13 +351,9 @@
 .data-table-body-row:hover {
     background: rgba(var(--vscode-list-hoverBackground), 0.8) !important;
     color: var(--vscode-list-activeSelectionForeground);
-    transform: translateX(2px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.data-table-body-row:hover::before {
-    background: var(--vscode-charts-blue);
-}
 
 .data-table-body-row.selected {
     background: var(--vscode-list-activeSelectionBackground);
