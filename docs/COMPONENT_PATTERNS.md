@@ -567,4 +567,12 @@ describe('DataTableBehavior', () => {
 });
 ```
 
-These patterns provide a consistent foundation for building maintainable, testable, and reusable components. Follow these patterns when creating new components or modifying existing ones to ensure architectural consistency across the extension.
+## Related Documentation
+
+These patterns provide a consistent foundation for building maintainable, testable, and reusable components. For additional guidance:
+
+- **[Architecture Guide](ARCHITECTURE_GUIDE.md)** - High-level architectural principles and SOLID design patterns
+- **[Styling Patterns](STYLING_PATTERNS.md)** - CSS architecture and visual consistency for components
+- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Practical workflow for implementing these patterns
+
+Follow these patterns when creating new components or modifying existing ones to ensure architectural consistency across the extension.

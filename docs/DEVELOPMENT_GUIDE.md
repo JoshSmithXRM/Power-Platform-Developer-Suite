@@ -402,4 +402,12 @@ code --install-extension power-platform-developer-suite-*.vsix
 4. **Test isolation**: Unit test individual components
 5. **Check dependencies**: Services, factories, configuration
 
-This development guide provides the foundation for effective development within the Power Platform Developer Suite architecture. Follow these patterns and practices to maintain code quality and consistency.
+## Related Documentation
+
+This development guide provides the foundation for effective development within the Power Platform Developer Suite architecture. For architectural and design guidance:
+
+- **[Architecture Guide](ARCHITECTURE_GUIDE.md)** - Architectural decisions, SOLID principles, and design patterns
+- **[Component Patterns](COMPONENT_PATTERNS.md)** - Component design patterns and implementation guidelines  
+- **[Styling Patterns](STYLING_PATTERNS.md)** - CSS architecture and visual consistency standards
+
+Follow these patterns and practices to maintain code quality and consistency across the extension.

@@ -373,4 +373,12 @@ this.component.setData(transformedData);
 - Use dependency injection for testability
 - Follow established patterns for consistency
 
-This architecture guide provides the foundation for understanding and extending the Power Platform Developer Suite. For specific implementation details, see the component patterns and development guides in this documentation folder.
+## Related Documentation
+
+This architecture guide provides the foundation for understanding and extending the Power Platform Developer Suite. For specific implementation details, see:
+
+- **[Component Patterns](COMPONENT_PATTERNS.md)** - Detailed component design patterns and lifecycle management
+- **[Styling Patterns](STYLING_PATTERNS.md)** - CSS architecture and visual consistency guidelines
+- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Practical development workflow, debugging, and testing
+
+Together, these guides provide comprehensive guidance for maintaining and extending the extension's architecture.
