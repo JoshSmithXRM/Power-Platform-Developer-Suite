@@ -512,6 +512,16 @@ export class AuthenticationService {
         return this.context.globalState.get('power-platform-dev-suite-environments', []);
     }
 
+    public async getEnvironmentsForQuickPick(): Promise<Array<{label: string, description: string, detail: string, env: EnvironmentConnection}>> {
+        const environments = await this.getEnvironments();
+        return environments.map(env => ({
+            label: env.name,
+            description: env.settings.dataverseUrl,
+            detail: `Auth: ${env.settings.authenticationMethod}`,
+            env: env
+        }));
+    }
+
     public async getEnvironment(environmentId: string): Promise<EnvironmentConnection | null> {
         const environments = await this.getEnvironments();
         return environments.find(env => env.id === environmentId) || null;

@@ -109,6 +109,24 @@ export default tseslint.config(
     }
   },
   {
+    // Services are ALLOWED to do data transformation - that's their job!
+    files: ['src/services/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='updateWebview']",
+          message: '❌ Use component event bridges instead of updateWebview() for data updates'
+        },
+        {
+          selector: "CallExpression[callee.object.name='console']",
+          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
+        }
+        // Note: Data transformation (map) is ALLOWED in services
+      ]
+    }
+  },
+  {
     // Special allowance for BasePanel updateWebview usage
     files: ['src/panels/BasePanel.ts'],
     rules: {

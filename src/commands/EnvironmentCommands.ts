@@ -61,13 +61,9 @@ export class EnvironmentCommands {
             return;
         }
 
+        const environmentOptions = await this.authService.getEnvironmentsForQuickPick();
         const selected = await vscode.window.showQuickPick(
-            environments.map(env => ({
-                label: env.name,
-                description: env.settings.dataverseUrl,
-                detail: `Auth: ${env.settings.authenticationMethod}`,
-                env: env
-            })),
+            environmentOptions,
             { placeHolder: 'Select environment to test' }
         );
 
@@ -139,13 +135,9 @@ export class EnvironmentCommands {
             return;
         }
 
+        const environmentOptions = await this.authService.getEnvironmentsForQuickPick();
         const selected = await vscode.window.showQuickPick(
-            environments.map(env => ({
-                label: env.name,
-                description: env.settings.dataverseUrl,
-                detail: `Auth: ${env.settings.authenticationMethod}`,
-                env: env
-            })),
+            environmentOptions,
             { placeHolder: 'Select environment to edit' }
         );
 
@@ -197,13 +189,9 @@ export class EnvironmentCommands {
             return;
         }
 
+        const environmentOptions = await this.authService.getEnvironmentsForQuickPick();
         const selected = await vscode.window.showQuickPick(
-            environments.map(env => ({
-                label: env.name,
-                description: env.settings.dataverseUrl,
-                detail: `Auth: ${env.settings.authenticationMethod}`,
-                env: env
-            })),
+            environmentOptions,
             { placeHolder: 'Select environment to remove' }
         );
 
