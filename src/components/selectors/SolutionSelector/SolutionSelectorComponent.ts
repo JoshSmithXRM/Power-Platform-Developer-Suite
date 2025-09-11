@@ -1,7 +1,8 @@
 import { BaseComponent } from '../../base/BaseComponent';
+import { Solution } from '../../../services/SolutionService'; // Use standardized Solution interface
+
 import { SolutionSelectorConfig, SolutionSelectorSelectionEvent, SolutionSelectorLoadEvent, DEFAULT_SOLUTION_SELECTOR_CONFIG, SolutionSelectorConfigValidator } from './SolutionSelectorConfig';
 import { SolutionSelectorView, SolutionSelectorViewState } from './SolutionSelectorView';
-import { Solution } from '../../../services/SolutionService'; // Use standardized Solution interface
 
 /**
  * SolutionSelectorComponent - Power Platform solution selector with advanced filtering

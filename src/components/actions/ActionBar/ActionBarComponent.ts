@@ -1,4 +1,5 @@
 import { BaseComponent } from '../../base/BaseComponent';
+
 import { ActionBarConfig, ActionBarAction, ActionBarGroup, DEFAULT_ACTION_BAR_CONFIG } from './ActionBarConfig';
 import { ActionBarView } from './ActionBarView';
 

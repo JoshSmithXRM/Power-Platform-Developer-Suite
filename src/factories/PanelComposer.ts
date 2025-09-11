@@ -1,5 +1,6 @@
-import { BaseComponent } from '../components/base/BaseComponent';
 import * as vscode from 'vscode';
+
+import { BaseComponent } from '../components/base/BaseComponent';
 
 /**
  * WebviewResources interface for resource management
@@ -656,7 +657,7 @@ export class PanelComposer {
         
         // Split by main component types using simple string detection
         const lines = componentHTML.split('\n');
-        let currentComponent = '';
+        const currentComponent = '';
         let isInTableComponent = false;
         
         for (const line of lines) {

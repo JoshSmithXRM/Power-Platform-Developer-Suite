@@ -1,11 +1,14 @@
+import * as path from 'path';
+import * as os from 'os';
+
 import * as vscode from 'vscode';
 import * as msal from '@azure/msal-node';
 import storage from 'node-persist';
-import * as path from 'path';
-import * as os from 'os';
+
 import { PowerPlatformSettings, EnvironmentConnection } from '../models/PowerPlatformSettings';
 import { AuthenticationMethod } from '../models/AuthenticationMethod';
 import { AuthenticationResult, TokenCacheEntry } from '../models/AuthenticationResult';
+
 import { ServiceFactory } from './ServiceFactory';
 
 export class AuthenticationService {

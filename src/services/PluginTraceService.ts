@@ -1,4 +1,5 @@
 import { AuthenticationService } from './AuthenticationService';
+import { ServiceFactory } from './ServiceFactory';
 
 export interface PluginTraceLog {
     plugintracelogid: string;
@@ -46,6 +47,15 @@ export interface OrganizationSettings {
 }
 
 export class PluginTraceService {
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('PluginTraceService');
+        }
+        return this._logger;
+    }
+
     constructor(private authService: AuthenticationService) { }
 
     async getPluginTraceLogs(environmentId: string, filterOptions: PluginTraceFilterOptions = {}): Promise<PluginTraceLog[]> {
@@ -127,7 +137,7 @@ export class PluginTraceService {
         const top = filterOptions.top || 100;
         url += `&$top=${top}`;
 
-        console.log('PluginTraceService: Fetching plugin traces with URL:', url);
+        this.logger.debug('Fetching plugin traces', { url });
 
         const response = await fetch(url, {
             headers: {
@@ -140,7 +150,7 @@ export class PluginTraceService {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('PluginTraceService API Error:', {
+            this.logger.error('PluginTraceService API Error', new Error('API request failed'), {
                 status: response.status,
                 statusText: response.statusText,
                 url: url,

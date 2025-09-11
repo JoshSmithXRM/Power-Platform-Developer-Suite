@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+
 import { AuthenticationService } from '../services/AuthenticationService';
 
 export class EnvironmentsProvider implements vscode.TreeDataProvider<EnvironmentItem | ToolItem> {

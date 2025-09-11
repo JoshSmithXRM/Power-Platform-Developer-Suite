@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+
 import { AuthenticationService } from '../services/AuthenticationService';
 import { EnvironmentItem, EnvironmentsProvider } from '../providers/EnvironmentsProvider';
 import { EnvironmentSetupPanel } from '../panels/EnvironmentSetupPanel';

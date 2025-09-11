@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
-import { BasePanel } from './base/BasePanel';
+
 import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
+
+import { BasePanel } from './base/BasePanel';
 
 // Placeholder - will be rewritten with component architecture
 export class PluginTraceViewerPanel extends BasePanel {

@@ -1,5 +1,6 @@
-import { ActionBarConfig, ActionBarAction, ActionBarDropdownItem, ActionBarGroup } from './ActionBarConfig';
 import { CSS_CLASSES, ICONS } from '../../base/ComponentConfig';
+
+import { ActionBarConfig, ActionBarAction, ActionBarDropdownItem, ActionBarGroup } from './ActionBarConfig';
 
 /**
  * ActionBarView - HTML generation for ActionBar component

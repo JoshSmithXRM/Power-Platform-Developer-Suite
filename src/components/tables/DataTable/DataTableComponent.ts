@@ -1,4 +1,5 @@
 import { BaseComponent } from '../../base/BaseComponent';
+
 import { DataTableConfig, DataTableRow, DataTableColumn, DataTableSortEvent, DataTableFilterEvent, DataTablePageEvent, DataTableSelectionEvent, DEFAULT_DATA_TABLE_CONFIG, DATA_TABLE_VALIDATION, DataTableConfigValidator } from './DataTableConfig';
 import { DataTableView, DataTableViewState } from './DataTableView';
 

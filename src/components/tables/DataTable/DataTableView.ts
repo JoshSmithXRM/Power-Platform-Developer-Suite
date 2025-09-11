@@ -1,7 +1,8 @@
-import { DataTableConfig, DataTableColumn, DataTableRow } from './DataTableConfig';
 import { CSS_CLASSES, ICONS } from '../../base/ComponentConfig';
 import { escapeHtml } from '../../base/HtmlUtils';
 import { ServiceFactory } from '../../../services/ServiceFactory';
+
+import { DataTableConfig, DataTableColumn, DataTableRow } from './DataTableConfig';
 
 /**
  * DataTableView - HTML generation for DataTable component

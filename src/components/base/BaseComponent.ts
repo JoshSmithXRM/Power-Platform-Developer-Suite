@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+
 import { ServiceFactory } from '../../services/ServiceFactory';
 
 export interface BaseComponentConfig {

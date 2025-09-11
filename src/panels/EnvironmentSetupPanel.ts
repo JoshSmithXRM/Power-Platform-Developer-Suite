@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { BasePanel } from './base/BasePanel';
+
 import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
 import { ComponentFactory } from '../factories/ComponentFactory';
@@ -8,6 +8,8 @@ import { EnvironmentSelectorComponent } from '../components/selectors/Environmen
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { Environment } from '../components/base/ComponentInterface';
 import { EnvironmentConnection } from '../models/PowerPlatformSettings';
+
+import { BasePanel } from './base/BasePanel';
 
 export class EnvironmentSetupPanel extends BasePanel {
     public static readonly viewType = 'environmentSetup';

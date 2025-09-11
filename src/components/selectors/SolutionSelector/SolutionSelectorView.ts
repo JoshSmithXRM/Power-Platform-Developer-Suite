@@ -1,7 +1,8 @@
-import { SolutionSelectorConfig, SOLUTION_SELECTOR_CSS } from './SolutionSelectorConfig';
 import { Solution } from '../../../services/SolutionService'; // Use standardized Solution interface
 import { CSS_CLASSES, ICONS } from '../../base/ComponentConfig';
 import { escapeHtml } from '../../base/HtmlUtils';
+
+import { SolutionSelectorConfig, SOLUTION_SELECTOR_CSS } from './SolutionSelectorConfig';
 
 /**
  * SolutionSelectorView - HTML generation for SolutionSelector component

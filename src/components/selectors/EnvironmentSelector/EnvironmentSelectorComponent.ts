@@ -1,6 +1,7 @@
 import { BaseComponent } from '../../base/BaseComponent';
 import { EnvironmentSelectorConfig, Environment } from '../../base/ComponentInterface';
 import { DEFAULT_ENVIRONMENT_SELECTOR_CONFIG, mergeConfig } from '../../base/ComponentConfig';
+
 import { EnvironmentSelectorView } from './EnvironmentSelectorView';
 
 /**

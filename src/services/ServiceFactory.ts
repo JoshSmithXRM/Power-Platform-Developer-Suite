@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+
 import { AuthenticationService } from './AuthenticationService';
 import { StateService } from './StateService';
 import { SolutionService } from './SolutionService';
