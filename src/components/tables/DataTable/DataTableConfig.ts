@@ -43,7 +43,6 @@ export interface DataTableColumn {
 export interface DataTableRow {
     id: string | number;
     [key: string]: any;
-    _selected?: boolean;
     _expanded?: boolean;
     _disabled?: boolean;
     _className?: string;
@@ -91,12 +90,6 @@ export interface DataTableConfig extends BaseComponentConfig {
     expandableRows?: boolean;
     expandedRowRenderer?: (row: DataTableRow) => string;
     
-    // Selection options
-    selectable?: boolean;
-    selectMode?: 'single' | 'multiple';
-    showCheckboxes?: boolean;
-    selectedRows?: Array<string | number>;
-    onSelectionChange?: (selectedRows: DataTableRow[]) => void;
     
     // Sorting options
     sortable?: boolean;
@@ -220,9 +213,6 @@ export const DEFAULT_DATA_TABLE_CONFIG: Partial<DataTableConfig> = {
     responsive: true,
     showHeader: true,
     stickyHeader: false,
-    selectable: false,
-    selectMode: 'multiple',
-    showCheckboxes: false,
     sortable: true,
     multiSort: false,
     filterable: true,

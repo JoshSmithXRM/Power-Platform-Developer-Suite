@@ -11,7 +11,6 @@ export class DataTableComponent extends BaseComponent {
     protected config: DataTableConfig;
     private data: DataTableRow[] = [];
     private processedData: DataTableRow[] = [];
-    private selectedRows: Set<string | number> = new Set();
     private sortConfig: Array<{ column: string; direction: 'asc' | 'desc' }> = [];
     private filters: Record<string, any> = {};
     private currentPage: number = 1;
@@ -49,14 +48,6 @@ export class DataTableComponent extends BaseComponent {
 
         if (this.config.data) {
             this.setData(this.config.data);
-        }
-        
-        if (this.config.selectedRows) {
-            this.selectedRows = new Set(this.config.selectedRows);
-            this.componentLogger.debug('Initial row selection set', {
-                componentId: this.config.id,
-                selectedCount: this.selectedRows.size
-            });
         }
         
         if (this.config.defaultSort) {
@@ -113,7 +104,6 @@ export class DataTableComponent extends BaseComponent {
 
         const viewState: DataTableViewState = {
             data: this.getPageData(),
-            selectedRows: Array.from(this.selectedRows),
             sortConfig: this.sortConfig,
             filters: this.filters,
             currentPage: this.currentPage,
@@ -530,62 +520,6 @@ export class DataTableComponent extends BaseComponent {
         this.notifyUpdate();
     }
 
-    /**
-     * Select/deselect rows
-     */
-    public selectRows(rowIds: Array<string | number>, selected: boolean = true): void {
-        if (selected) {
-            if (this.config.selectMode === 'single') {
-                this.selectedRows.clear();
-                if (rowIds.length > 0) {
-                    this.selectedRows.add(rowIds[0]);
-                }
-            } else {
-                rowIds.forEach(id => this.selectedRows.add(id));
-            }
-        } else {
-            rowIds.forEach(id => this.selectedRows.delete(id));
-        }
-        
-        this.emitSelectionEvent();
-        this.notifyUpdate();
-    }
-
-    /**
-     * Toggle row selection
-     */
-    public toggleRowSelection(rowId: string | number): void {
-        if (this.selectedRows.has(rowId)) {
-            this.selectRows([rowId], false);
-        } else {
-            this.selectRows([rowId], true);
-        }
-    }
-
-    /**
-     * Select all rows
-     */
-    public selectAll(): void {
-        const pageData = this.getPageData();
-        const ids = pageData.map(row => row.id);
-        this.selectRows(ids, true);
-    }
-
-    /**
-     * Clear selection
-     */
-    public clearSelection(): void {
-        this.selectedRows.clear();
-        this.emitSelectionEvent();
-        this.notifyUpdate();
-    }
-
-    /**
-     * Get selected rows
-     */
-    public getSelectedRows(): DataTableRow[] {
-        return this.data.filter(row => this.selectedRows.has(row.id));
-    }
 
     /**
      * Expand/collapse row
@@ -671,7 +605,6 @@ export class DataTableComponent extends BaseComponent {
         return {
             data: this.data,
             processedData: this.processedData,
-            selectedRows: Array.from(this.selectedRows),
             sortConfig: this.sortConfig,
             filters: this.filters,
             currentPage: this.currentPage,
@@ -777,24 +710,5 @@ export class DataTableComponent extends BaseComponent {
         }
     }
 
-    /**
-     * Emit selection event
-     */
-    private emitSelectionEvent(): void {
-        const selectedRows = this.getSelectedRows();
-        const event: DataTableSelectionEvent = {
-            componentId: this.getId(),
-            selectedRows,
-            addedRows: [],
-            removedRows: [],
-            timestamp: Date.now()
-        };
-        
-        this.emit('selection', event);
-        
-        if (this.config.onSelectionChange) {
-            this.config.onSelectionChange(selectedRows);
-        }
-    }
 
 }

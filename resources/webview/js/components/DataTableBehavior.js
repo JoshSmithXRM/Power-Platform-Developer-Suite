@@ -1465,6 +1465,26 @@ class DataTableBehavior {
             console.log(`  Header ${idx}: columnId="${header.columnId}", text="${header.text}"`);
         });
         
+        // DUMP HTML STRUCTURE FOR DEBUGGING
+        console.log(`DataTableBehavior: === HTML STRUCTURE DEBUG ===`);
+        const headerRow = this.table.querySelector('thead tr');
+        if (headerRow) {
+            console.log(`HEADER ROW HTML:`, headerRow.outerHTML);
+            const allThElements = Array.from(headerRow.querySelectorAll('th'));
+            console.log(`ALL TH ELEMENTS (${allThElements.length} total):`);
+            allThElements.forEach((th, index) => {
+                console.log(`  TH ${index}: columnId="${th.getAttribute('data-column-id')}", text="${th.textContent.trim()}", classes="${th.className}"`);
+            });
+            
+            const dataColumnThs = Array.from(headerRow.querySelectorAll('th[data-column-id]'));
+            console.log(`DATA COLUMN TH ELEMENTS (${dataColumnThs.length} total):`);
+            dataColumnThs.forEach((th, index) => {
+                console.log(`  DATA TH ${index}: columnId="${th.getAttribute('data-column-id')}", text="${th.textContent.trim()}"`);
+            });
+        } else {
+            console.log(`NO HEADER ROW FOUND!`);
+        }
+        
         if (data.length > 0) {
             const sampleRow = data[0];
             console.log(`DataTableBehavior: Column value mapping:`);
@@ -1487,7 +1507,6 @@ class DataTableBehavior {
             tbody.appendChild(tr);
         });
         
-        console.log(`DataTableBehavior: Table ${this.tableId} updated successfully`);
     }
     
     /**
@@ -1505,14 +1524,15 @@ class DataTableBehavior {
             return tr;
         }
         
-        const headerCells = headerRow.querySelectorAll('th');
-        Array.from(headerCells).forEach(header => {
+        const headerCells = headerRow.querySelectorAll('th[data-column-id]');
+        Array.from(headerCells).forEach((header, index) => {
             const columnId = header.getAttribute('data-column-id');
             const td = document.createElement('td');
             td.className = 'data-table-body-cell';
             
             if (columnId && rowData.hasOwnProperty(columnId)) {
-                td.textContent = rowData[columnId] || '';
+                const value = rowData[columnId] || '';
+                td.textContent = value;
             } else {
                 td.textContent = ''; // Empty cell for non-data columns
             }

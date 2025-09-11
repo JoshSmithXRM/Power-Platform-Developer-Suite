@@ -10,7 +10,6 @@ import { ServiceFactory } from '../../../services/ServiceFactory';
 
 export interface DataTableViewState {
     data: DataTableRow[];
-    selectedRows: Array<string | number>;
     sortConfig: Array<{ column: string; direction: 'asc' | 'desc' }>;
     filters: Record<string, any>;
     currentPage: number;
@@ -186,38 +185,15 @@ export class DataTableView {
         columns: DataTableColumn[], 
         state: DataTableViewState
     ): string {
-        const hasCheckbox = Boolean(config.selectable && config.showCheckboxes);
-
         return `
             <thead class="data-table-thead">
                 <tr class="data-table-header-row">
-                    ${hasCheckbox ? this.renderCheckboxHeader(config, state) : ''}
-                    
                     ${columns.map(column => this.renderHeaderCell(column, config, state)).join('')}
                 </tr>
-                
             </thead>
         `;
     }
 
-    /**
-     * Render checkbox header for select all
-     */
-    private static renderCheckboxHeader(config: DataTableConfig, state: DataTableViewState): string {
-        const allSelected = state.data.length > 0 && 
-                           state.data.every(row => state.selectedRows.includes(row.id));
-        const someSelected = state.data.some(row => state.selectedRows.includes(row.id));
-
-        return `
-            <th class="data-table-header-cell data-table-checkbox-cell">
-                <input type="checkbox" 
-                       class="data-table-checkbox data-table-checkbox-all"
-                       ${allSelected ? 'checked' : ''}
-                       ${someSelected && !allSelected ? 'indeterminate' : ''}
-                       data-component-element="select-all">
-            </th>
-        `;
-    }
 
     /**
      * Render a single header cell
@@ -383,12 +359,8 @@ export class DataTableView {
         config: DataTableConfig,
         state: DataTableViewState
     ): string {
-        const isSelected = state.selectedRows.includes(row.id);
-        const hasCheckbox = Boolean(config.selectable && config.showCheckboxes);
-
         const rowClass = [
             'data-table-body-row',
-            isSelected ? 'data-table-row--selected' : '',
             row._disabled ? 'data-table-row--disabled' : '',
             row._className || '',
             config.rowClassName ? 
@@ -408,35 +380,15 @@ export class DataTableView {
                 style="${rowStyle}"
                 data-row-id="${row.id}"
                 data-row-index="${index}">
-                
-                ${hasCheckbox ? this.renderCheckboxCell(row, isSelected, config) : ''}
-                
                 ${columns.map(column => 
                     this.renderBodyCell(row, column, config)
                 ).join('')}
-                
             </tr>
-            
             ${config.expandableRows && row._expanded ? 
-                this.renderExpandedRow(row, columns.length + (hasCheckbox ? 1 : 0), config) : ''}
+                this.renderExpandedRow(row, columns.length, config) : ''}
         `;
     }
 
-    /**
-     * Render checkbox cell
-     */
-    private static renderCheckboxCell(row: DataTableRow, isSelected: boolean, config: DataTableConfig): string {
-        return `
-            <td class="data-table-body-cell data-table-checkbox-cell">
-                <input type="checkbox" 
-                       class="data-table-checkbox"
-                       data-row-id="${row.id}"
-                       ${isSelected ? 'checked' : ''}
-                       ${row._disabled ? 'disabled' : ''}
-                       data-component-element="select-row">
-            </td>
-        `;
-    }
 
     /**
      * Render a body cell

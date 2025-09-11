@@ -213,8 +213,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                 filterable: false,
                 showFooter: true,
                 striped: true,
-                selectable: false,   // Explicitly disable row selection
-                showCheckboxes: false,  // Explicitly disable checkboxes
                 className: 'connection-references-table'
             });
             this.componentLogger.trace('DataTableComponent created successfully');
@@ -647,7 +645,6 @@ export class ConnectionReferencesPanel extends BasePanel {
             flowName: rel.flowName || 'No Flow Associated',
             connectionReference: rel.connectionReferenceLogicalName || 'No Connection Reference',
             connectorType: rel.connectorType || 'Unknown Connector',
-            relationshipType: rel.relationshipType || 'unknown',
             connectionName: rel.connectionName || 'No Connection',
             isManaged: (rel.flowIsManaged || rel.crIsManaged) ? 'Yes' : 'No',
             modifiedOn: rel.flowModifiedOn || rel.crModifiedOn || '',
