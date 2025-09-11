@@ -602,7 +602,7 @@ export class DataTableComponent extends BaseComponent {
     /**
      * Get table state
      */
-    public getState() {
+    public getState(): any {
         return {
             data: this.data,
             processedData: this.processedData,

@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+
 import * as vscode from 'vscode';
 
 import { ServiceFactory } from '../services/ServiceFactory';
@@ -473,7 +475,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 return; // User cancelled
             }
 
-            const isNewFile = !require('fs').existsSync(filePath);
+            const isNewFile = !fs.existsSync(filePath);
             
             // Sync environment variables with the file
             const result = await deploymentSettingsService.syncEnvironmentVariables(filePath, environmentVariablesData, isNewFile);

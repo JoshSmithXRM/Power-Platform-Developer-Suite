@@ -1,13 +1,8 @@
 import * as vscode from 'vscode';
 
-// Services
 import { ServiceFactory } from './services/ServiceFactory';
-
-// Providers
 import { EnvironmentsProvider } from './providers/EnvironmentsProvider';
 import { ToolsProvider } from './providers/ToolsProvider';
-
-// Commands
 import { EnvironmentCommands } from './commands/EnvironmentCommands';
 import { PanelCommands } from './commands/PanelCommands';
 import { MetadataBrowserCommands } from './commands/MetadataBrowserCommands';

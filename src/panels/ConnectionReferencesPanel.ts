@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+
 import * as vscode from 'vscode';
 
 import { ServiceFactory } from '../services/ServiceFactory';
@@ -442,7 +444,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                     case 'refreshBtn':
                         await this.refreshConnectionReferences();
                         break;
-                    case 'syncDeploymentBtn':
+                    case 'syncDeploymentBtn': {
                         // Get current data for deployment settings sync
                         const currentData = this.dataTableComponent?.getData() || [];
                         const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
@@ -451,7 +453,8 @@ export class ConnectionReferencesPanel extends BasePanel {
                             relationships: currentData
                         }, selectedSolution?.uniqueName);
                         break;
-                    case 'openInMakerBtn':
+                    }
+                    case 'openInMakerBtn': {
                         const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
                         const solId = this.solutionSelectorComponent?.getSelectedSolution()?.id;
                         
@@ -461,6 +464,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                             vscode.window.showWarningMessage('Please select an environment and solution first');
                         }
                         break;
+                    }
                     default:
                         this.componentLogger.warn('Unknown action ID', { actionId });
                 }
@@ -674,7 +678,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                 return; // User cancelled
             }
 
-            const isNewFile = !require('fs').existsSync(filePath);
+            const isNewFile = !fs.existsSync(filePath);
 
             // Sync connection references with the file
             const result = await deploymentSettingsService.syncConnectionReferences(filePath, relationships, isNewFile);

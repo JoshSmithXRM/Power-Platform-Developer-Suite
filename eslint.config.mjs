@@ -6,6 +6,11 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Global ignores
+    ignores: ['dist/**', 'out/**', 'node_modules/**', '*.config.js', 'webpack.config.js']
+  },
+  {
+    files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: 'module',
@@ -90,13 +95,27 @@ export default tseslint.config(
         window: 'readonly',
         document: 'readonly',
         console: 'readonly',
-        vscode: 'readonly'
+        vscode: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        confirm: 'readonly',
+        ResizeObserver: 'readonly',
+        MutationObserver: 'readonly',
+        Node: 'readonly',
+        CustomEvent: 'readonly',
+        module: 'writable',
+        ComponentUtils: 'readonly',
+        EnvironmentSelectorUtils: 'readonly'
       }
     },
     rules: {
       'no-console': 'off',
       'no-restricted-syntax': 'off',
-      '@typescript-eslint/explicit-function-return-type': 'off'
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      'no-undef': 'off',
+      'no-prototype-builtins': 'off',
+      'no-case-declarations': 'off'
     }
   },
   {

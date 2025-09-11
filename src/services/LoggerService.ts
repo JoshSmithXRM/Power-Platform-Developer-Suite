@@ -174,7 +174,13 @@ export class LoggerService {
     /**
      * Create a component-specific logger for easier usage
      */
-    public createComponentLogger(componentName: string) {
+    public createComponentLogger(componentName: string): {
+        trace: (message: string, metadata?: Record<string, any>) => void;
+        debug: (message: string, metadata?: Record<string, any>) => void;
+        info: (message: string, metadata?: Record<string, any>) => void;
+        warn: (message: string, metadata?: Record<string, any>) => void;
+        error: (message: string, error?: Error, metadata?: Record<string, any>) => void;
+    } {
         return {
             trace: (message: string, metadata?: Record<string, any>) => this.trace(componentName, message, metadata),
             debug: (message: string, metadata?: Record<string, any>) => this.debug(componentName, message, metadata),

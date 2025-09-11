@@ -649,7 +649,7 @@ export class DataverseQueryService {
                 case FilterOperator.NotNull:
                     filterStr += `${filter.field} ne null`;
                     break;
-                case FilterOperator.In:
+                case FilterOperator.In: {
                     // For 'in' operator, expect value to be an array
                     const inValues = Array.isArray(filter.value) ? filter.value : [filter.value];
                     const inConditions = await Promise.all(inValues.map(async v => {
@@ -658,10 +658,12 @@ export class DataverseQueryService {
                     }));
                     filterStr += `(${inConditions.join(' or ')})`;
                     break;
-                default:
+                }
+                default: {
                     // For standard comparison operators - use metadata-driven formatting
                     const formatted = await this.formatFilterValue(filter.value, filter.field, environmentId, entityLogicalName, metadataService);
                     filterStr += `${formatted.fieldName} ${filter.operator} ${formatted.value}`;
+                }
             }
             
             return filterStr;

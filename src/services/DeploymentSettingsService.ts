@@ -175,7 +175,8 @@ export class DeploymentSettingsService {
         const existingSettings = await this.readDeploymentSettings(filePath);
         const solutionConnectionRefs = relationshipData.connectionReferences || [];
         
-        let added = 0, removed = 0, updated = 0;
+        let added = 0, removed = 0;
+        const updated = 0;
         
         if (isNewFile) {
             // For new files, create complete entries with all three properties
@@ -240,7 +241,8 @@ export class DeploymentSettingsService {
         const existingSettings = await this.readDeploymentSettings(filePath);
         const solutionEnvVars = envVarData.definitions || [];
         
-        let added = 0, removed = 0, updated = 0;
+        let added = 0, removed = 0;
+        const updated = 0;
         
         if (isNewFile) {
             // For new files, create complete entries

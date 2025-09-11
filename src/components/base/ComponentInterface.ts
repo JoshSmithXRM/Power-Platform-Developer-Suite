@@ -17,7 +17,8 @@ export interface ComponentEvent {
 }
 
 export interface ComponentUpdateEvent extends ComponentEvent {
-    // Event fired when component needs re-rendering
+    updateType?: 'data' | 'config' | 'state';
+    reason?: string;
 }
 
 export interface ComponentStateChangeEvent extends ComponentEvent {
@@ -34,11 +35,13 @@ export interface ComponentErrorEvent extends ComponentEvent {
 }
 
 export interface ComponentInitializedEvent extends ComponentEvent {
-    // Event fired when component is fully initialized
+    initializationTime: number;
+    hasErrors: boolean;
 }
 
 export interface ComponentDisposedEvent extends ComponentEvent {
-    // Event fired when component is disposed
+    disposalReason: 'manual' | 'error' | 'panel-closed';
+    cleanupCompleted: boolean;
 }
 
 export interface ComponentConfigChangedEvent extends ComponentEvent {
