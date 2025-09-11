@@ -763,7 +763,14 @@ class SolutionSelectorBehavior {
     }
 
     emitEvent(componentId, eventType, data) {
-        if (typeof vscode !== 'undefined') {
+        if (typeof ComponentUtils !== 'undefined' && ComponentUtils.sendMessage) {
+            ComponentUtils.sendMessage('component-event', {
+                componentId: componentId,
+                eventType: eventType,
+                data: data
+            });
+        } else if (typeof vscode !== 'undefined') {
+            // Fallback to direct vscode.postMessage if ComponentUtils not available
             vscode.postMessage({
                 command: 'component-event',
                 componentId: componentId,

@@ -350,7 +350,10 @@ export class ConnectionReferencesPanel extends BasePanel {
                 command, 
                 hasData: !!message.data,
                 hasAction: !!message.action,
-                messageKeys: Object.keys(message)
+                componentId: message.data?.componentId,
+                eventType: message.data?.eventType,
+                actionId: message.data?.actionId,
+                fullMessage: message
             });
             
             // Handle empty or undefined command
@@ -371,7 +374,9 @@ export class ConnectionReferencesPanel extends BasePanel {
                         hasData: !!message.data,
                         dataComponentId: message.data?.componentId,
                         dataEventType: message.data?.eventType,
-                        dataHasData: !!message.data?.data
+                        dataHasData: !!message.data?.data,
+                        dataProperties: message.data ? Object.keys(message.data).join(', ') : 'none',
+                        innerDataProperties: message.data?.data ? Object.keys(message.data.data).join(', ') : 'none'
                     });
                     await this.handleComponentEvent(message);
                     break;
