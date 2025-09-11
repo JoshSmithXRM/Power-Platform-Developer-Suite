@@ -319,7 +319,6 @@
 - [ ] Verify all functionality works in clean VS Code installation
 
 ### Cleanup
-- [ ] Delete `src/old/` folder and all archived code
 - [ ] Remove any temporary or test files
 - [ ] Final build verification
 - [ ] Final Extension Development Host test
