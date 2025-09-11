@@ -596,7 +596,7 @@ export class SolutionSelectorComponent extends BaseComponent {
         
         if (validation.warnings.length > 0) {
             validation.warnings.forEach(warning => {
-                console.warn(`SolutionSelector warning: ${warning}`);
+                this.componentLogger.warn('SolutionSelector validation warning', { warning });
             });
         }
     }
@@ -611,7 +611,7 @@ export class SolutionSelectorComponent extends BaseComponent {
             try {
                 this.config.onError(error);
             } catch (callbackError) {
-                console.error('Error in onError callback:', callbackError);
+                this.componentLogger.error('Error in onError callback', callbackError as Error);
             }
         }
     }

@@ -1,4 +1,5 @@
 import { AuthenticationService } from './AuthenticationService';
+import { ServiceFactory } from './ServiceFactory';
 
 // Entity Definition Interfaces - Made comprehensive to handle all fields from API
 export interface EntityDefinition {
@@ -365,6 +366,14 @@ export class MetadataService {
     private static readonly DEFAULT_CACHE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
     private cache = new Map<string, any>();
     private cacheTimeout = MetadataService.DEFAULT_CACHE_TIMEOUT_MS;
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('MetadataService');
+        }
+        return this._logger;
+    }
 
     constructor(private authService: AuthenticationService) { }
 
@@ -424,11 +433,10 @@ export class MetadataService {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('MetadataService API Error:', {
+            this.logger.error('MetadataService API Error', new Error(`${response.status} ${response.statusText}: ${errorText}`), {
                 status: response.status,
                 statusText: response.statusText,
-                url: url,
-                errorText: errorText
+                url: url
             });
             throw new Error(`Failed to fetch entity definitions: ${response.status} ${response.statusText}. ${errorText}`);
         }

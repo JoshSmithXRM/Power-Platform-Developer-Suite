@@ -179,7 +179,7 @@ export abstract class BasePanel implements IPanelBase {
                 data: environments
             });
         } catch (error: any) {
-            console.error('Error loading environments:', error);
+            this.componentLogger.error('Error loading environments', error instanceof Error ? error : new Error(String(error)));
             this.postMessage({
                 action: 'error',
                 message: `Failed to load environments: ${error.message}`
@@ -343,8 +343,7 @@ export abstract class BasePanel implements IPanelBase {
                 });
             }
             
-            // Refresh the webview to display the updated component
-            this.updateWebview();
+            // Component will handle its own update through event bridges
             
         } catch (error) {
             logger.error('Failed to load environments', error as Error);

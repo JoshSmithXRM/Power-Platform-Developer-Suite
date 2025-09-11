@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import { BaseComponent } from '../components/base/BaseComponent';
+import { ServiceFactory } from '../services/ServiceFactory';
 
 /**
  * WebviewResources interface for resource management
@@ -50,6 +51,14 @@ export interface PanelComposerConfig {
 export class PanelComposer {
     private config: PanelComposerConfig;
     private extensionUri: vscode.Uri;
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('PanelComposer');
+        }
+        return this._logger;
+    }
 
     constructor(extensionUri: vscode.Uri, config: PanelComposerConfig = {}) {
         this.extensionUri = extensionUri;
@@ -60,6 +69,14 @@ export class PanelComposer {
             resourceUriScheme: 'vscode-resource',
             ...config
         };
+    }
+
+    /**
+     * Static logger for static methods
+     */
+    private static logWarning(message: string, metadata?: any): void {
+        const logger = ServiceFactory.getLoggerService().createComponentLogger('PanelComposer');
+        logger.warn(message, metadata);
     }
 
     /**
@@ -173,7 +190,9 @@ export class PanelComposer {
             try {
                 componentHtml[placeholder] = componentDef.component.generateHTML();
             } catch (error) {
-                console.error(`Error generating HTML for component ${componentDef.component.getId()}:`, error);
+                this.logger.error('Error generating HTML for component', error as Error, { 
+                    componentId: componentDef.component.getId() 
+                });
                 componentHtml[placeholder] = this.generateErrorHtml(componentDef.component.getId(), error);
             }
         }
@@ -213,7 +232,10 @@ export class PanelComposer {
                     jsFiles.add(componentJsFile);
                 }
             } catch (error) {
-                console.warn(`Warning collecting resources for component ${componentDef.component.getId()}:`, error);
+                this.logger.warn('Warning collecting resources for component', { 
+                    componentId: componentDef.component.getId(),
+                    error: error
+                });
             }
         }
         
@@ -599,7 +621,10 @@ export class PanelComposer {
                     cssFiles.add(cssPath);
                 }
             } catch (error) {
-                console.warn(`Warning collecting CSS for component ${component.getId()}:`, error);
+                PanelComposer.logWarning('Warning collecting CSS for component', {
+                    componentId: component.getId(),
+                    error: error
+                });
             }
         });
         
@@ -633,7 +658,10 @@ export class PanelComposer {
                     }
                 }
             } catch (error) {
-                console.warn(`Warning collecting scripts for component ${component.getId()}:`, error);
+                PanelComposer.logWarning('Warning collecting scripts for component', {
+                    componentId: component.getId(),
+                    error: error
+                });
             }
         });
         

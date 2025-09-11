@@ -238,7 +238,7 @@ export class DataverseMetadataService {
                 return this.formatNumericValue(value);
                 
             default:
-                console.warn(`Unknown attribute type: ${attributeMetadata.attributeType}, falling back to string`);
+                this.logger.warn('Unknown attribute type, falling back to string', { attributeType: attributeMetadata.attributeType });
                 return `'${value}'`;
         }
     }
@@ -319,7 +319,7 @@ export class DataverseMetadataService {
      */
     clearCache(): void {
         this.metadataCache = {};
-        console.log('Metadata cache cleared');
+        this.logger.info('Metadata cache cleared');
     }
 
     /**

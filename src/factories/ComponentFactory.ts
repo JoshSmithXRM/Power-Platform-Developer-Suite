@@ -7,6 +7,7 @@ import { DataTableConfig } from '../components/tables/DataTable/DataTableConfig'
 import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
 import { SolutionSelectorConfig } from '../components/selectors/SolutionSelector/SolutionSelectorConfig';
 import { BaseComponent } from '../components/base/BaseComponent';
+import { ServiceFactory } from '../services/ServiceFactory';
 
 /**
  * ComponentFactory.ts
@@ -36,6 +37,14 @@ export class ComponentFactory {
     private instances: Map<string, ComponentInstance> = new Map();
     private config: ComponentFactoryConfig;
     private cleanupTimer?: NodeJS.Timeout;
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('ComponentFactory');
+        }
+        return this._logger;
+    }
 
     constructor(config: ComponentFactoryConfig = {}) {
         this.config = {
@@ -286,7 +295,7 @@ export class ComponentFactory {
         }
 
         if (toRemove.length > 0) {
-            console.log(`ComponentFactory: Cleaned up ${toRemove.length} inactive instances`);
+            this.logger.debug('Cleaned up inactive instances', { cleanedCount: toRemove.length });
         }
     }
 

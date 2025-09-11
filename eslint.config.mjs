@@ -127,15 +127,34 @@ export default tseslint.config(
     }
   },
   {
-    // Special allowance for BasePanel updateWebview usage
-    files: ['src/panels/BasePanel.ts'],
+    // View classes, config files, and panels are allowed to transform data for UI rendering purposes
+    files: ['src/components/**/*View.ts', 'src/components/**/*Config.ts', 'src/factories/**/*.ts', 'src/panels/**/*Panel.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
         {
-          selector: "ArrowFunctionExpression[parent.callee.property.name='map'] ObjectExpression",
-          message: '❌ Move data transformation logic to services'
+          selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='updateWebview']",
+          message: '❌ Use component event bridges instead of updateWebview() for data updates'
+        },
+        {
+          selector: "CallExpression[callee.object.name='console']",
+          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
         }
+        // Note: Data transformation (map) is ALLOWED in View classes and Factories for UI rendering
+      ]
+    }
+  },
+  {
+    // Special allowance for BasePanel - both updateWebview and data transformation allowed
+    files: ['src/panels/BasePanel.ts', 'src/panels/base/BasePanel.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.object.name='console']",
+          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
+        }
+        // Note: Both updateWebview() and data transformation (map) are ALLOWED in BasePanel
       ]
     }
   }

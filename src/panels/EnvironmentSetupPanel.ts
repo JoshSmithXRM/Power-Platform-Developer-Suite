@@ -189,12 +189,6 @@ export class EnvironmentSetupPanel extends BasePanel {
                     url: selectedEnvironment.settings.dataverseUrl 
                 });
                 vscode.window.showInformationMessage(`Environment selected: ${selectedEnvironment.displayName}`);
-                
-                // Enable the save button since an environment is now selected
-                if (this.actionBarComponent) {
-                    // Update action bar to enable save button
-                    this.updateWebview();
-                }
             } else {
                 this.componentLogger.warn('Selected environment not found in available environments');
             }
@@ -210,7 +204,7 @@ export class EnvironmentSetupPanel extends BasePanel {
             vscode.window.showInformationMessage('Environment settings saved successfully');
 
         } catch (error) {
-            console.error('Error saving environment settings:', error);
+            this.componentLogger.error('Error saving environment settings', error instanceof Error ? error : new Error(String(error)));
             vscode.window.showErrorMessage('Failed to save environment settings');
         }
     }
@@ -220,7 +214,7 @@ export class EnvironmentSetupPanel extends BasePanel {
             vscode.window.showInformationMessage('Environments refreshed successfully');
 
         } catch (error) {
-            console.error('Error refreshing environments:', error);
+            this.componentLogger.error('Error refreshing environments', error instanceof Error ? error : new Error(String(error)));
             vscode.window.showErrorMessage('Failed to refresh environments');
         }
     }
@@ -230,7 +224,7 @@ export class EnvironmentSetupPanel extends BasePanel {
             vscode.window.showInformationMessage('Settings reset to default values');
 
         } catch (error) {
-            console.error('Error resetting settings:', error);
+            this.componentLogger.error('Error resetting settings', error instanceof Error ? error : new Error(String(error)));
             vscode.window.showErrorMessage('Failed to reset settings');
         }
     }

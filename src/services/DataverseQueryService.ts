@@ -1,5 +1,6 @@
 import { AuthenticationService } from './AuthenticationService';
 import { DataverseMetadataService } from './DataverseMetadataService';
+import { ServiceFactory } from './ServiceFactory';
 
 export interface EntityMetadata {
     id: string;
@@ -80,6 +81,15 @@ export interface QueryResult {
  * Service for querying Dataverse data
  */
 export class DataverseQueryService {
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('DataverseQueryService');
+        }
+        return this._logger;
+    }
+
     constructor(private authService: AuthenticationService) {}
 
     /**
@@ -96,7 +106,7 @@ export class DataverseQueryService {
         // Build the query URL - note: some fields might not exist in all versions
         const queryUrl = `${baseUrl}/api/data/v9.2/EntityDefinitions?$select=LogicalName,SchemaName,EntitySetName,IsCustomEntity,PrimaryIdAttribute,PrimaryNameAttribute&$filter=IsValidForAdvancedFind eq true`;
         
-        console.log('Fetching entities from:', queryUrl);
+        this.logger.debug('Fetching entities from URL', { queryUrl });
         
         const response = await fetch(queryUrl, {
             headers: {
@@ -110,7 +120,7 @@ export class DataverseQueryService {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Entity fetch error:', errorText);
+            this.logger.error('Entity fetch error', new Error(errorText));
             throw new Error(`Failed to fetch entities: ${response.statusText}`);
         }
 
@@ -154,7 +164,8 @@ export class DataverseQueryService {
         });
 
         if (!response.ok) {
-            console.error('Failed to fetch entity views:', await response.text());
+            const errorText = await response.text();
+            this.logger.error('Failed to fetch entity views', new Error(errorText));
             // Return empty array instead of throwing - views are optional
             return [];
         }
@@ -162,7 +173,7 @@ export class DataverseQueryService {
         const data = await response.json();
         
         // Log raw view data for debugging
-        console.log('Raw views data from API:', data.value);
+        this.logger.debug('Raw views data from API', { count: data.value?.length || 0 });
         
         const views = data.value.map((view: any) => {
             const mappedView = {
@@ -177,16 +188,18 @@ export class DataverseQueryService {
             };
             
             // Log each view's details
-            console.log(`View: ${mappedView.name}`);
-            console.log('  - ID:', mappedView.id);
-            console.log('  - Is Default:', mappedView.isDefault);
-            console.log('  - FetchXML preview:', mappedView.fetchXml?.substring(0, 200) + '...');
-            console.log('  - LayoutXML preview:', mappedView.layoutXml?.substring(0, 200) + '...');
+            this.logger.debug('View details', {
+                name: mappedView.name,
+                id: mappedView.id,
+                isDefault: mappedView.isDefault,
+                hasFetchXml: !!mappedView.fetchXml,
+                hasLayoutXml: !!mappedView.layoutXml
+            });
             
             return mappedView;
         });
         
-        console.log(`Total views loaded for ${entityLogicalName}:`, views.length);
+        this.logger.info('Entity views loaded', { entityLogicalName, count: views.length });
         return views;
     }
 
@@ -255,9 +268,7 @@ export class DataverseQueryService {
         const encodedFetchXml = encodeURIComponent(fetchXml);
         const url = `${baseUrl}/api/data/v9.2/${entitySetName}?fetchXml=${encodedFetchXml}`;
 
-        console.log('DataverseQueryService: Executing FetchXML');
-        console.log('URL:', url);
-        console.log('FetchXML:', fetchXml);
+        this.logger.debug('Executing FetchXML query', { url, entityLogicalName });
 
         const headers = {
             'Authorization': `Bearer ${token}`,
@@ -271,7 +282,7 @@ export class DataverseQueryService {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
         
-        console.log('Starting FetchXML request...');
+        this.logger.debug('Starting FetchXML request');
         let response: Response;
         try {
             response = await fetch(url, { 
@@ -279,10 +290,10 @@ export class DataverseQueryService {
                 signal: controller.signal 
             });
             clearTimeout(timeoutId);
-            console.log('FetchXML completed, status:', response.status, response.statusText);
+            this.logger.debug('FetchXML request completed', { status: response.status, statusText: response.statusText });
         } catch (error) {
             clearTimeout(timeoutId);
-            console.error('FetchXML fetch error:', error);
+            this.logger.error('FetchXML fetch error', error instanceof Error ? error : new Error(String(error)));
             if (error instanceof Error && error.name === 'AbortError') {
                 throw new Error('FetchXML request timed out after 30 seconds');
             }
@@ -291,7 +302,7 @@ export class DataverseQueryService {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('FetchXML error response:', errorText);
+            this.logger.error('FetchXML error response', new Error(errorText));
             throw new Error(`FetchXML query failed: ${response.statusText}`);
         }
 
@@ -304,10 +315,11 @@ export class DataverseQueryService {
             hasMore: !!data['@odata.nextLink']
         };
 
-        console.log('FetchXML query completed successfully');
-        console.log('Records returned:', result.value.length);
-        console.log('Total count:', result.count);
-        console.log('Has more pages:', result.hasMore);
+        this.logger.info('FetchXML query completed successfully', {
+            recordsReturned: result.value.length,
+            totalCount: result.count,
+            hasMore: result.hasMore
+        });
 
         return result;
     }
@@ -338,10 +350,10 @@ export class DataverseQueryService {
         
         // Filters
         if (options.filters && options.filters.length > 0) {
-            console.log('Building filter string for filters:', options.filters);
+            this.logger.debug('Building filter string', { filterCount: options.filters.length });
             const entityLogicalName = this.getEntityLogicalNameFromSetName(entitySetName);
             const filterString = await this.buildFilterString(options.filters, environmentId, entityLogicalName, metadataService);
-            console.log('Built filter string:', filterString);
+            this.logger.debug('Built filter string', { filterString });
             if (filterString) {
                 queryParts.push(`$filter=${filterString}`);
             }
@@ -363,9 +375,7 @@ export class DataverseQueryService {
         const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
         const url = `${baseUrl}/api/data/v9.2/${entitySetName}${queryString}`;
         
-        console.log('DataverseQueryService: Executing query');
-        console.log('URL:', url);
-        console.log('Query options:', options);
+        this.logger.debug('Executing OData query', { url, entitySetName });
         
         // Build headers with proper pagination
         const headers: Record<string, string> = {
@@ -375,7 +385,7 @@ export class DataverseQueryService {
             'OData-Version': '4.0'
         };
         
-        console.log('Headers prepared, token exists:', !!token);
+        this.logger.debug('Headers prepared', { hasToken: !!token });
         
         // Set page size using Prefer header (NOT $top)
         if (options.maxPageSize && options.maxPageSize > 0) {
@@ -386,7 +396,7 @@ export class DataverseQueryService {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
         
-        console.log('Starting fetch request...');
+        this.logger.debug('Starting OData fetch request');
         let response: Response;
         try {
             response = await fetch(url, { 
@@ -394,10 +404,10 @@ export class DataverseQueryService {
                 signal: controller.signal 
             });
             clearTimeout(timeoutId);
-            console.log('Fetch completed, status:', response.status, response.statusText);
+            this.logger.debug('OData fetch completed', { status: response.status, statusText: response.statusText });
         } catch (error) {
             clearTimeout(timeoutId);
-            console.error('Fetch error:', error);
+            this.logger.error('OData fetch error', error instanceof Error ? error : new Error(String(error)));
             if (error instanceof Error && error.name === 'AbortError') {
                 throw new Error('Request timed out after 30 seconds');
             }
@@ -406,13 +416,13 @@ export class DataverseQueryService {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('HTTP error response:', errorText);
+            this.logger.error('HTTP error response', new Error(errorText));
             throw new Error(`Failed to query records: ${response.statusText}`);
         }
 
-        console.log('Parsing response JSON...');
+        this.logger.debug('Parsing response JSON');
         const data = await response.json();
-        console.log('Response parsed, record count:', data.value?.length || 0);
+        this.logger.debug('Response parsed', { recordCount: data.value?.length || 0 });
         
         const result = {
             value: data.value,
@@ -421,7 +431,7 @@ export class DataverseQueryService {
             hasMore: !!data['@odata.nextLink']
         };
         
-        console.log('Returning query result:', {
+        this.logger.debug('Returning query result', {
             recordCount: result.value?.length || 0,
             hasMore: result.hasMore,
             nextLinkExists: !!result.nextLink
@@ -525,7 +535,7 @@ export class DataverseQueryService {
                     return { fieldName: formattedFieldName, value: formattedValue };
                 }
             } catch (error) {
-                console.warn(`Failed to get metadata for field ${fieldName}:`, error);
+                this.logger.warn('Failed to get metadata for field', { fieldName, error });
             }
         }
 
@@ -578,32 +588,32 @@ export class DataverseQueryService {
             if (filter.value === 'CURRENT_USER' && environmentId) {
                 try {
                     const currentUser = await this.getCurrentUser(environmentId);
-                    console.log('WhoAmI API response:', currentUser);
+                    this.logger.debug('WhoAmI API response received');
                     
                     // The WhoAmI API returns UserId, not systemuserid
                     const userId = currentUser.UserId;
                     if (!userId) {
-                        console.error('No UserId found in WhoAmI response:', currentUser);
+                        this.logger.error('No UserId found in WhoAmI response', new Error('Missing UserId'));
                         return null;
                     }
                     
                     // Validate that it's a proper GUID format
                     const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                     if (!guidRegex.test(userId)) {
-                        console.error('Invalid GUID format for UserId:', userId);
+                        this.logger.error('Invalid GUID format for UserId', new Error(`Invalid GUID: ${userId}`));
                         return null;
                     }
                     
                     resolvedFilter.value = userId;
-                    console.log('Resolved CURRENT_USER to:', resolvedFilter.value);
+                    this.logger.debug('Resolved CURRENT_USER placeholder', { userId: resolvedFilter.value });
                     
                     // Special handling for lookup fields - convert field name to OData syntax
                     if (filter.field === 'ownerid') {
                         resolvedFilter.field = '_ownerid_value';
-                        console.log(`Converted lookup field 'ownerid' to '_ownerid_value' for OData query`);
+                        this.logger.debug('Converted lookup field for OData query', { from: 'ownerid', to: '_ownerid_value' });
                     }
                 } catch (error) {
-                    console.warn('Failed to resolve current user ID, skipping filter:', error);
+                    this.logger.warn('Failed to resolve current user ID, skipping filter', { error });
                     return null; // Skip this filter if we can't resolve the user
                 }
             }
@@ -697,7 +707,7 @@ export class DataverseQueryService {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('WhoAmI API error response:', errorText);
+            this.logger.error('WhoAmI API error response', new Error(errorText));
             throw new Error(`Failed to get current user: ${response.statusText}`);
         }
 
