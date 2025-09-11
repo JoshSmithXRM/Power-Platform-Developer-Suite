@@ -2,13 +2,57 @@
  * DataTableBehavior.js - Webview-side behavior for DataTable components
  * Handles user interactions, DOM manipulation, and communication with Extension Host
  * Supports multi-instance tables with independent event handling
+ * 
+ * ARCHITECTURE_COMPLIANCE: Follows ComponentUtils registry pattern with required static methods
  */
 
 class DataTableBehavior {
-    constructor(tableId) {
+    static instances = new Map(); // Track component instances
+    
+    // ✅ REQUIRED: Static initialize method for ComponentUtils compatibility
+    static initialize(componentId, config, element) {
+        if (!componentId || !element) {
+            console.error('DataTableBehavior: componentId and element are required');
+            return null;
+        }
+        
+        // Prevent double initialization
+        if (this.instances.has(componentId)) {
+            console.warn(`DataTableBehavior: ${componentId} already initialized`);
+            return this.instances.get(componentId);
+        }
+        
+        // Create and store instance
+        const instance = new DataTableBehavior(componentId, element, config);
+        this.instances.set(componentId, instance);
+        console.log(`DataTableBehavior: Initialized ${componentId}`);
+        return instance;
+    }
+    
+    // ✅ REQUIRED: Static handleMessage method for Extension Host communication
+    static handleMessage(message) {
+        console.log('DEBUG: DataTableBehavior.handleMessage called with:', message);
+        
+        if (!message || !message.componentId) {
+            console.warn('DataTableBehavior handleMessage: Invalid message format', message);
+            return;
+        }
+        
+        const instance = this.instances.get(message.componentId);
+        if (!instance) {
+            console.warn(`DataTableBehavior: No instance found for ${message.componentId}`);
+            return;
+        }
+        
+        // Route to instance method
+        instance.handleMessage(message);
+    }
+    
+    constructor(tableId, element, config = {}) {
         this.tableId = tableId;
-        this.table = document.getElementById(tableId);
+        this.table = element || document.getElementById(tableId);
         this.container = this.table?.closest('.data-table');
+        this.config = config;
         this.initialized = false;
         this.sortHandlers = new Map();
         this.filterHandlers = new Map();
@@ -48,41 +92,65 @@ class DataTableBehavior {
     }
     
     /**
-     * Setup column sorting
+     * Setup column sorting and filtering
      */
     setupSorting() {
-        const headers = this.table.querySelectorAll('th.sortable');
+        const headers = this.table.querySelectorAll('th[data-column-id]');
         
         headers.forEach(header => {
             const columnId = header.dataset.columnId;
             if (!columnId) return;
             
-            const handler = (event) => {
-                event.preventDefault();
-                
-                // Determine new sort direction
-                const currentDirection = header.dataset.sortDirection;
-                let newDirection;
-                
-                if (event.ctrlKey || event.metaKey) {
-                    // Multi-sort mode
-                    if (currentDirection === 'asc') {
-                        newDirection = 'desc';
-                    } else if (currentDirection === 'desc') {
-                        newDirection = null; // Remove sort
-                    } else {
-                        newDirection = 'asc';
-                    }
-                } else {
-                    // Single sort mode
-                    newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
-                }
-                
-                this.sort(columnId, newDirection, event.ctrlKey || event.metaKey);
-            };
+            const isSortable = header.classList.contains('sortable');
+            const isFilterable = header.dataset.filterable === 'true';
             
-            header.addEventListener('click', handler);
-            this.sortHandlers.set(columnId, handler);
+            // Left click for sorting
+            if (isSortable) {
+                const sortHandler = (event) => {
+                    // Only sort if not clicking on filter dropdown button
+                    if (event.target.closest('.data-table-filter-dropdown')) {
+                        return;
+                    }
+                    
+                    event.preventDefault();
+                    
+                    // Determine new sort direction
+                    const currentDirection = header.dataset.sortDirection;
+                    let newDirection;
+                    
+                    if (event.ctrlKey || event.metaKey) {
+                        // Multi-sort mode
+                        if (currentDirection === 'asc') {
+                            newDirection = 'desc';
+                        } else if (currentDirection === 'desc') {
+                            newDirection = null; // Remove sort
+                        } else {
+                            newDirection = 'asc';
+                        }
+                    } else {
+                        // Single sort mode
+                        newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+                    }
+                    
+                    this.sort(columnId, newDirection, event.ctrlKey || event.metaKey);
+                };
+                
+                header.addEventListener('click', sortHandler);
+                this.sortHandlers.set(columnId, sortHandler);
+            }
+            
+            // Filter dropdown button click (left click)
+            const filterDropdown = header.querySelector('.data-table-filter-dropdown');
+            if (filterDropdown) {
+                const filterHandler = (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    this.showFilterDropdown(columnId, event);
+                };
+                
+                filterDropdown.addEventListener('click', filterHandler);
+                this.filterHandlers.set(columnId + '_dropdown', filterHandler);
+            }
         });
     }
     
@@ -90,7 +158,7 @@ class DataTableBehavior {
      * Setup column filtering
      */
     setupFiltering() {
-        const filterInputs = this.table.querySelectorAll('.filter-input');
+        const filterInputs = this.table.querySelectorAll('.data-table-filter-input');
         
         filterInputs.forEach(input => {
             const columnId = input.dataset.columnId;
@@ -114,7 +182,7 @@ class DataTableBehavior {
         });
         
         // Setup filter dropdowns
-        const filterSelects = this.table.querySelectorAll('.filter-select');
+        const filterSelects = this.table.querySelectorAll('select.data-table-filter-input');
         filterSelects.forEach(select => {
             const columnId = select.dataset.columnId;
             if (!columnId) return;
@@ -738,22 +806,199 @@ class DataTableBehavior {
     }
     
     /**
+     * Show Power Platform-style filter dropdown
+     */
+    showFilterDropdown(columnId, event) {
+        console.log(`Showing filter dropdown for column ${columnId}`);
+        
+        // Close any existing dropdowns
+        this.closeAllFilterDropdowns();
+        
+        // Create dropdown element
+        const dropdown = document.createElement('div');
+        dropdown.className = 'filter-dropdown';
+        dropdown.innerHTML = `
+            <div class="filter-dropdown-content">
+                <div class="filter-dropdown-header">
+                    <span>Filter by</span>
+                    <button class="filter-dropdown-close">×</button>
+                </div>
+                
+                <div class="filter-dropdown-body">
+                    <div class="filter-operator-section">
+                        <label>Filter by operator</label>
+                        <select class="filter-operator-select">
+                            <option value="contains">Contains</option>
+                            <option value="equals">Equals</option>
+                            <option value="not_equals">Does not equal</option>
+                            <option value="starts_with">Starts with</option>
+                            <option value="ends_with">Ends with</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-value-section">
+                        <label>Filter by value</label>
+                        <input type="text" class="filter-value-input" placeholder="Enter value...">
+                    </div>
+                    
+                    <div class="filter-actions">
+                        <button class="filter-apply-btn">Apply</button>
+                        <button class="filter-clear-btn">Clear</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Position dropdown
+        const rect = event.target.closest('th').getBoundingClientRect();
+        dropdown.style.position = 'absolute';
+        dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+        dropdown.style.left = `${rect.left + window.scrollX}px`;
+        dropdown.style.zIndex = '1000';
+        
+        // Add to page
+        document.body.appendChild(dropdown);
+        
+        // Setup event handlers
+        this.setupFilterDropdownHandlers(dropdown, columnId);
+        
+        // Auto-focus the text input
+        const valueInput = dropdown.querySelector('.filter-value-input');
+        if (valueInput) {
+            setTimeout(() => valueInput.focus(), 0);
+        }
+        
+        // Store reference
+        this.activeFilterDropdown = { dropdown, columnId };
+    }
+    
+    /**
+     * Setup filter dropdown event handlers
+     */
+    setupFilterDropdownHandlers(dropdown, columnId) {
+        const closeBtn = dropdown.querySelector('.filter-dropdown-close');
+        const applyBtn = dropdown.querySelector('.filter-apply-btn');
+        const clearBtn = dropdown.querySelector('.filter-clear-btn');
+        const operatorSelect = dropdown.querySelector('.filter-operator-select');
+        const valueInput = dropdown.querySelector('.filter-value-input');
+        
+        // Close dropdown
+        closeBtn.addEventListener('click', () => {
+            this.closeAllFilterDropdowns();
+        });
+        
+        // Apply filter function
+        const applyFilter = () => {
+            const operator = operatorSelect.value;
+            const value = valueInput.value.trim();
+            
+            if (value) {
+                this.applyColumnFilter(columnId, operator, value);
+            }
+            this.closeAllFilterDropdowns();
+        };
+        
+        // Apply filter on button click
+        applyBtn.addEventListener('click', applyFilter);
+        
+        // Apply filter on Enter key press
+        valueInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                applyFilter();
+            }
+        });
+        
+        // Clear filter
+        clearBtn.addEventListener('click', () => {
+            this.clearColumnFilter(columnId);
+            this.closeAllFilterDropdowns();
+        });
+        
+        // Prevent dropdown from closing when clicking inside
+        dropdown.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        
+        // Close on outside click
+        setTimeout(() => {
+            document.addEventListener('click', (e) => {
+                if (!dropdown.contains(e.target)) {
+                    this.closeAllFilterDropdowns();
+                }
+            });
+        }, 0);
+    }
+    
+    /**
+     * Close all filter dropdowns
+     */
+    closeAllFilterDropdowns() {
+        const dropdowns = document.querySelectorAll('.filter-dropdown');
+        dropdowns.forEach(dropdown => dropdown.remove());
+        this.activeFilterDropdown = null;
+    }
+    
+    /**
+     * Apply column filter with operator
+     */
+    applyColumnFilter(columnId, operator, value) {
+        console.log(`Applying filter: ${columnId} ${operator} "${value}"`);
+        
+        // Store filter state
+        if (!this.activeFilters) {
+            this.activeFilters = new Map();
+        }
+        this.activeFilters.set(columnId, { operator, value });
+        
+        // Apply filter logic
+        this.filterTableByColumn(columnId, value);
+        
+        // Update filter state
+        this.updateFilterState(columnId, value);
+    }
+    
+    /**
+     * Clear column filter
+     */
+    clearColumnFilter(columnId) {
+        console.log(`Clearing filter for column ${columnId}`);
+        
+        if (this.activeFilters) {
+            this.activeFilters.delete(columnId);
+        }
+        
+        // Show all rows and reapply other filters
+        this.reapplyAllFilters();
+    }
+    
+    /**
+     * Reapply all active filters
+     */
+    reapplyAllFilters() {
+        const tbody = this.table.querySelector('tbody');
+        if (!tbody) return;
+        
+        const rows = tbody.querySelectorAll('tr');
+        
+        // First show all rows
+        rows.forEach(row => {
+            row.style.display = '';
+        });
+        
+        // Then apply each active filter
+        if (this.activeFilters && this.activeFilters.size > 0) {
+            this.activeFilters.forEach((filterData, columnId) => {
+                this.filterTableByColumn(columnId, filterData.value);
+            });
+        }
+    }
+    
+    /**
      * Clear all filters
      */
     clearAllFilters() {
         console.log(`Clearing all filters for table ${this.tableId}`);
-        
-        // Clear filter inputs
-        const filterInputs = this.table.querySelectorAll('.filter-input');
-        filterInputs.forEach(input => {
-            input.value = '';
-        });
-        
-        // Clear filter selects
-        const filterSelects = this.table.querySelectorAll('.filter-select');
-        filterSelects.forEach(select => {
-            select.selectedIndex = 0;
-        });
         
         // Show all rows
         const tbody = this.table.querySelector('tbody');
@@ -972,19 +1217,22 @@ class DataTableBehavior {
      * Update sort indicators
      */
     updateSortIndicators(sortConfig) {
-        // Clear all sort indicators
+        console.log('Updating sort indicators:', sortConfig);
+        
+        // Clear all sort indicators and remove existing ones
         const sortableHeaders = this.table.querySelectorAll('th.sortable');
         sortableHeaders.forEach(header => {
             header.classList.remove('sorted-asc', 'sorted-desc');
             header.removeAttribute('data-sort-direction');
             
-            const sortIcon = header.querySelector('.sort-icon');
-            if (sortIcon) {
-                sortIcon.className = 'sort-icon';
+            // Remove existing sort indicators
+            const existingIndicator = header.querySelector('.sort-indicator');
+            if (existingIndicator) {
+                existingIndicator.remove();
             }
         });
         
-        // Apply current sort indicators
+        // Apply current sort indicators by creating new elements
         sortConfig.forEach((sort, index) => {
             const header = this.table.querySelector(`th[data-column-id="${sort.column}"]`);
             if (!header) return;
@@ -992,12 +1240,17 @@ class DataTableBehavior {
             header.classList.add(`sorted-${sort.direction}`);
             header.setAttribute('data-sort-direction', sort.direction);
             
-            const sortIcon = header.querySelector('.sort-icon');
-            if (sortIcon) {
-                sortIcon.className = `sort-icon sort-${sort.direction}`;
-                if (sortConfig.length > 1) {
-                    sortIcon.setAttribute('data-sort-order', index + 1);
-                }
+            // Create and insert sort indicator
+            const sortIndicator = document.createElement('span');
+            sortIndicator.className = `sort-indicator sort-indicator--${sort.direction}`;
+            sortIndicator.title = `Sorted ${sort.direction}ending`;
+            sortIndicator.textContent = sort.direction === 'asc' ? '▲' : '▼';
+            
+            // Insert the indicator after the header label
+            const headerContent = header.querySelector('.data-table-header-content');
+            const headerLabel = header.querySelector('.data-table-header-label');
+            if (headerContent && headerLabel) {
+                headerLabel.insertAdjacentElement('afterend', sortIndicator);
             }
         });
     }
@@ -1142,6 +1395,170 @@ class DataTableBehavior {
     }
     
     /**
+     * Instance method to handle messages from Extension Host
+     */
+    handleMessage(message) {
+        console.log(`DataTableBehavior: Handling message for ${this.tableId}:`, message);
+        
+        if (!message || !message.action) {
+            console.warn('DataTableBehavior: Invalid message format', message);
+            return;
+        }
+        
+        // Handle different message actions
+        const { action, data } = message;
+        
+        switch (action) {
+            case 'componentUpdate':
+                if (data && Array.isArray(data)) {
+                    this.updateTableData(data);
+                } else {
+                    console.log(`DataTableBehavior: componentUpdate received, data:`, data);
+                }
+                break;
+                
+            case 'setData':
+                if (data && Array.isArray(data)) {
+                    this.updateTableData(data);
+                }
+                break;
+                
+            case 'setLoading':
+                this.toggleLoadingState(data?.loading, data?.message);
+                break;
+                
+            case 'setError':
+                this.showErrorOverlay(data?.error || 'An error occurred');
+                break;
+                
+            case 'clearError':
+                this.hideErrorOverlay();
+                break;
+                
+            default:
+                console.warn(`DataTableBehavior: Unknown action: ${action}`);
+        }
+    }
+    
+    /**
+     * Update table data efficiently without full HTML regeneration
+     */
+    updateTableData(data) {
+        console.log(`DataTableBehavior: Updating table ${this.tableId} with ${data.length} rows`);
+        
+        const tbody = this.table.querySelector('tbody');
+        if (!tbody) {
+            console.warn(`DataTableBehavior: No tbody found in table ${this.tableId}`);
+            return;
+        }
+        
+        // Debug: Analyze header structure vs data
+        const headers = this.table.querySelectorAll('th[data-column-id]');
+        const headerInfo = Array.from(headers).map(h => ({
+            columnId: h.getAttribute('data-column-id'),
+            text: h.textContent.trim(),
+            index: Array.from(h.parentElement.children).indexOf(h)
+        }));
+        
+        console.log(`DataTableBehavior: Found ${headers.length} headers`);
+        headerInfo.forEach((header, idx) => {
+            console.log(`  Header ${idx}: columnId="${header.columnId}", text="${header.text}"`);
+        });
+        
+        if (data.length > 0) {
+            const sampleRow = data[0];
+            console.log(`DataTableBehavior: Column value mapping:`);
+            headerInfo.forEach((header, idx) => {
+                const columnId = header.columnId;
+                const dataValue = sampleRow[columnId];
+                const truncatedValue = typeof dataValue === 'string' && dataValue.length > 50 
+                    ? dataValue.substring(0, 50) + '...' 
+                    : dataValue;
+                console.log(`  ${idx}: "${header.text}" (${columnId}) = "${truncatedValue}"`);
+            });
+        }
+        
+        // Clear existing rows
+        tbody.innerHTML = '';
+        
+        // Add new rows
+        data.forEach(rowData => {
+            const tr = this.createTableRow(rowData);
+            tbody.appendChild(tr);
+        });
+        
+        console.log(`DataTableBehavior: Table ${this.tableId} updated successfully`);
+    }
+    
+    /**
+     * Create a table row from data
+     */
+    createTableRow(rowData) {
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-row-id', rowData.id);
+        tr.className = 'data-table-body-row';
+        
+        // Get all header cells in the exact order they appear in the table
+        const headerRow = this.table.querySelector('thead tr');
+        if (!headerRow) {
+            console.error('DataTableBehavior: No header row found');
+            return tr;
+        }
+        
+        const headerCells = headerRow.querySelectorAll('th');
+        Array.from(headerCells).forEach(header => {
+            const columnId = header.getAttribute('data-column-id');
+            const td = document.createElement('td');
+            td.className = 'data-table-body-cell';
+            
+            if (columnId && rowData.hasOwnProperty(columnId)) {
+                td.textContent = rowData[columnId] || '';
+            } else {
+                td.textContent = ''; // Empty cell for non-data columns
+            }
+            
+            tr.appendChild(td);
+        });
+        
+        return tr;
+    }
+    
+    /**
+     * Toggle loading state
+     */
+    toggleLoadingState(loading, message) {
+        if (loading) {
+            this.showLoadingOverlay(message || 'Loading...');
+        } else {
+            this.hideLoadingOverlay();
+        }
+    }
+    
+    /**
+     * Hide loading overlay
+     */
+    hideLoadingOverlay() {
+        if (!this.container) return;
+        
+        const overlay = this.container.querySelector('.loading-overlay');
+        if (overlay) {
+            overlay.remove();
+        }
+    }
+    
+    /**
+     * Hide error overlay
+     */
+    hideErrorOverlay() {
+        if (!this.container) return;
+        
+        const overlay = this.container.querySelector('.error-overlay');
+        if (overlay) {
+            overlay.remove();
+        }
+    }
+    
+    /**
      * Cleanup event listeners
      */
     destroy() {
@@ -1149,13 +1566,6 @@ class DataTableBehavior {
         this.filterHandlers.clear();
         this.actionHandlers.clear();
         this.initialized = false;
-    }
-    
-    /**
-     * Static initialize method for ComponentUtils compatibility
-     */
-    static initialize(componentId, config, element) {
-        return DataTableBehaviorStatic.initialize(componentId, config, element);
     }
 }
 
@@ -1488,52 +1898,16 @@ const DataTableBehaviorStatic = {
     }
 };
 
-// Auto-initialize tables when DOM is ready
+// ✅ REQUIRED: Component Registry Pattern for ComponentUtils integration
 if (typeof window !== 'undefined') {
+    // Make behavior available globally
     window.DataTableBehavior = DataTableBehavior;
-    window.DataTableBehaviorStatic = DataTableBehaviorStatic;
     
-    // Add static initialize method to global DataTableBehavior for ComponentUtils
-    DataTableBehavior.initialize = DataTableBehavior.initialize || DataTableBehaviorStatic.initialize;
-    
-    // Add static handleMessage method to global DataTableBehavior for ComponentUtils  
-    DataTableBehavior.handleMessage = DataTableBehavior.handleMessage || DataTableBehaviorStatic.handleMessage;
-    
-    // Register with ComponentUtils if available
+    // ✅ CRITICAL: Register with ComponentUtils (stub or real) following ARCHITECTURE_GUIDE.md pattern
     if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
         window.ComponentUtils.registerBehavior('DataTable', DataTableBehavior);
         console.log('DataTableBehavior registered with ComponentUtils');
     } else {
         console.log('DataTableBehavior loaded, ComponentUtils not available yet');
     }
-    
-    // Initialize all data tables
-    function initializeDataTables() {
-        const tables = document.querySelectorAll('.data-table table[id]');
-        tables.forEach(table => {
-            if (!table.dataset.initialized) {
-                // Use both class-based and static initialization for compatibility
-                new DataTableBehavior(table.id);
-                DataTableBehaviorStatic.initialize(table.id, {}, table);
-                table.dataset.initialized = 'true';
-            }
-        });
-    }
-    
-    // Initialize on DOM ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeDataTables);
-    } else {
-        initializeDataTables();
-    }
-    
-    // Re-initialize when new content is added
-    const observer = new MutationObserver(() => {
-        initializeDataTables();
-    });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
 }

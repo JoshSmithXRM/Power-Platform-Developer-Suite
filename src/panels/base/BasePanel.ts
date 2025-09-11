@@ -190,18 +190,10 @@ export abstract class BasePanel implements IPanelBase {
      * Get common webview resources (CSS and JS files)
      */
     protected getCommonWebviewResources(): { 
-        tableUtilsScript: vscode.Uri; 
-        tableStylesSheet: vscode.Uri; 
         panelStylesSheet: vscode.Uri;
         panelUtilsScript: vscode.Uri;
     } {
         return {
-            tableUtilsScript: this._panel.webview.asWebviewUri(
-                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'table-utils.js')
-            ),
-            tableStylesSheet: this._panel.webview.asWebviewUri(
-                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'css', 'table.css')
-            ),
             panelStylesSheet: this._panel.webview.asWebviewUri(
                 vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'css', 'panel-base.css')
             ),

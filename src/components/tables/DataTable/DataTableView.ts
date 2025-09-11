@@ -1,6 +1,7 @@
-import { DataTableConfig, DataTableColumn, DataTableRow, DataTableAction } from './DataTableConfig';
+import { DataTableConfig, DataTableColumn, DataTableRow } from './DataTableConfig';
 import { CSS_CLASSES, ICONS } from '../../base/ComponentConfig';
 import { escapeHtml } from '../../base/HtmlUtils';
+import { ServiceFactory } from '../../../services/ServiceFactory';
 
 /**
  * DataTableView - HTML generation for DataTable component
@@ -25,10 +26,27 @@ export interface DataTableViewState {
 }
 
 export class DataTableView {
+    private static _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private static get logger() {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('DataTableView');
+        }
+        return this._logger;
+    }
+
     /**
      * Render the complete HTML for the DataTable component
      */
     static render(config: DataTableConfig, state: DataTableViewState): string {
+        this.logger.debug('Rendering DataTable HTML', {
+            componentId: config.id,
+            dataRows: state.data.length,
+            sortConfig: state.sortConfig,
+            hasSort: state.sortConfig.length > 0,
+            activeFilters: Object.keys(state.filters),
+            columns: config.columns.length
+        });
         const {
             id,
             height = 'auto',
@@ -86,7 +104,7 @@ export class DataTableView {
      * Render the table toolbar with search and actions
      */
     private static renderToolbar(config: DataTableConfig, state: DataTableViewState): string {
-        const hasToolbar = config.searchable || config.exportable || config.showColumnChooser;
+        const hasToolbar = config.searchable || config.showColumnChooser;
         
         if (!hasToolbar) {
             return '';
@@ -98,7 +116,6 @@ export class DataTableView {
                 
                 <div class="data-table-toolbar-actions">
                     ${config.showColumnChooser ? this.renderColumnChooser(config, state) : ''}
-                    ${config.exportable ? this.renderExportButtons(config) : ''}
                 </div>
             </div>
         `;
@@ -145,35 +162,13 @@ export class DataTableView {
         `;
     }
 
-    /**
-     * Render export buttons
-     */
-    private static renderExportButtons(config: DataTableConfig): string {
-        const formats = config.exportFormats || ['csv', 'excel', 'json'];
-        
-        return `
-            <div class="data-table-export">
-                <button class="data-table-export-toggle" 
-                        data-component-element="export">
-                    ${ICONS.DOWNLOAD} Export
-                </button>
-                <div class="data-table-export-menu" style="display: none;">
-                    ${formats.map(format => `
-                        <button class="data-table-export-item" 
-                                data-export-format="${format}">
-                            Export as ${format.toUpperCase()}
-                        </button>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
 
     /**
      * Render the main table
      */
     private static renderTable(config: DataTableConfig, state: DataTableViewState): string {
         const visibleColumns = config.columns.filter((col: DataTableColumn) => state.columnVisibility[col.id] !== false);
+
 
         return `
             <table id="${config.id}" class="data-table-element">
@@ -192,7 +187,6 @@ export class DataTableView {
         state: DataTableViewState
     ): string {
         const hasCheckbox = Boolean(config.selectable && config.showCheckboxes);
-        const hasActions = Boolean(config.actions && config.actions.length > 0);
 
         return `
             <thead class="data-table-thead">
@@ -200,12 +194,8 @@ export class DataTableView {
                     ${hasCheckbox ? this.renderCheckboxHeader(config, state) : ''}
                     
                     ${columns.map(column => this.renderHeaderCell(column, config, state)).join('')}
-                    
-                    ${hasActions ? this.renderActionsHeader(config) : ''}
                 </tr>
                 
-                ${config.filterable && config.showFilterRow ? 
-                    this.renderFilterRow(config, columns, hasCheckbox, hasActions) : ''}
             </thead>
         `;
     }
@@ -240,6 +230,16 @@ export class DataTableView {
         const sortable = config.sortable && column.sortable !== false;
         const sortConfig = state.sortConfig.find(s => s.column === column.id);
         
+        this.logger.debug('Rendering header cell', {
+            columnId: column.id,
+            columnLabel: column.label,
+            sortable: sortable,
+            stateSortConfig: state.sortConfig,
+            foundSortConfig: sortConfig,
+            hasSortConfig: !!sortConfig,
+            willRenderSortIndicator: sortable && !!sortConfig
+        });
+        
         const cellClass = [
             'data-table-header-cell',
             sortable ? 'sortable' : '',
@@ -259,7 +259,8 @@ export class DataTableView {
             <th class="${cellClass}" 
                 style="${cellStyle}"
                 data-column-id="${column.id}"
-                ${sortable ? 'data-sortable="true"' : ''}>
+                ${sortable ? 'data-sortable="true"' : ''}
+                ${config.filterable && column.filterable !== false ? 'data-filterable="true"' : ''}>
                 
                 <div class="data-table-header-content">
                     <span class="data-table-header-label">
@@ -270,12 +271,10 @@ export class DataTableView {
                     
                     ${sortable ? this.renderSortIndicator(column, sortConfig) : ''}
                     
-                    ${config.columnResizable && column.resizable !== false ? 
-                        '<span class="data-table-header-resize" data-component-element="resize"></span>' : ''}
+                    ${config.filterable && column.filterable !== false ?
+                        this.renderFilterIcon(column, state) : ''}
+                    
                 </div>
-                
-                ${config.filterable && config.filterMode === 'menu' && column.filterable !== false ?
-                    this.renderFilterMenu(column, state) : ''}
             </th>
         `;
     }
@@ -287,103 +286,58 @@ export class DataTableView {
         column: DataTableColumn, 
         sortConfig?: { column: string; direction: 'asc' | 'desc' }
     ): string {
+        this.logger.debug('Rendering sort indicator', {
+            columnId: column.id,
+            columnLabel: column.label,
+            sortConfig: sortConfig,
+            hasSortConfig: !!sortConfig,
+            sortDirection: sortConfig?.direction
+        });
+
+        // Only show indicator if this column is actually sorted
         if (!sortConfig) {
+            this.logger.debug('No sort indicator rendered - no sort config', {
+                columnId: column.id
+            });
             return '';
         }
         
-        const icon = sortConfig.direction === 'asc' ? '↑' : '↓';
+        const icon = sortConfig.direction === 'asc' ? '▲' : '▼';
+        const directionClass = `sort-indicator--${sortConfig.direction}`;
+        const html = `<span class="sort-indicator ${directionClass}" title="Sorted ${sortConfig.direction}ending">${icon}</span>`;
         
-        return `<span class="sort-indicator">${icon}</span>`;
+        this.logger.debug('Sort indicator HTML generated', {
+            columnId: column.id,
+            direction: sortConfig.direction,
+            icon: icon,
+            className: directionClass,
+            generatedHtml: html
+        });
+        
+        return html;
     }
 
     /**
-     * Render filter menu for a column
+     * Render filter dropdown arrow (always visible on filterable columns)
      */
-    private static renderFilterMenu(column: DataTableColumn, state: DataTableViewState): string {
+    private static renderFilterIcon(column: DataTableColumn, state: DataTableViewState): string {
+        const hasActiveFilter = state.filters && state.filters[column.id] && 
+                               state.filters[column.id] !== '' && 
+                               state.filters[column.id] !== null && 
+                               state.filters[column.id] !== undefined;
+        
+        const iconClass = hasActiveFilter ? 'filter-icon--active' : 'filter-icon--inactive';
+        const title = hasActiveFilter ? `Filter applied: ${state.filters[column.id]}` : 'Click to filter';
+        
         return `
-            <button class="data-table-header-filter" 
+            <button class="data-table-filter-dropdown" 
                     data-component-element="filter"
-                    data-column-id="${column.id}">
-                ${ICONS.FILTER}
+                    data-column-id="${column.id}"
+                    title="${title}">
+                <span class="filter-dropdown-arrow ${iconClass}">▼</span>
+                ${hasActiveFilter ? '<span class="filter-active-indicator">●</span>' : ''}
             </button>
         `;
-    }
-
-    /**
-     * Render actions header
-     */
-    private static renderActionsHeader(config: DataTableConfig): string {
-        return `
-            <th class="data-table-header-cell data-table-actions-cell">
-                ${config.actionsLabel || 'Actions'}
-            </th>
-        `;
-    }
-
-    /**
-     * Render filter row
-     */
-    private static renderFilterRow(
-        config: DataTableConfig, 
-        columns: DataTableColumn[],
-        hasCheckbox: boolean,
-        hasActions: boolean
-    ): string {
-        return `
-            <tr class="data-table-filter-row">
-                ${hasCheckbox ? '<td class="data-table-filter-cell"></td>' : ''}
-                
-                ${columns.map(column => `
-                    <td class="data-table-filter-cell">
-                        ${column.filterable !== false ? 
-                            this.renderFilterInput(column) : ''}
-                    </td>
-                `).join('')}
-                
-                ${hasActions ? '<td class="data-table-filter-cell"></td>' : ''}
-            </tr>
-        `;
-    }
-
-    /**
-     * Render filter input for a column
-     */
-    private static renderFilterInput(column: DataTableColumn): string {
-        const filterType = column.filterType || 'text';
-        
-        switch (filterType) {
-            case 'select':
-            case 'multiselect':
-                return `
-                    <select class="data-table-filter-input" 
-                            data-column-id="${column.id}"
-                            ${filterType === 'multiselect' ? 'multiple' : ''}>
-                        <option value="">All</option>
-                        ${column.filterOptions?.map(option => 
-                            `<option value="${this.escapeHtml(String(option.value))}">
-                                ${this.escapeHtml(option.label)}
-                            </option>`
-                        ).join('') || ''}
-                    </select>
-                `;
-            
-            case 'boolean':
-                return `
-                    <select class="data-table-filter-input" data-column-id="${column.id}">
-                        <option value="">All</option>
-                        <option value="true">Yes</option>
-                        <option value="false">No</option>
-                    </select>
-                `;
-            
-            default:
-                return `
-                    <input type="${filterType === 'number' ? 'number' : 'text'}" 
-                           class="data-table-filter-input"
-                           data-column-id="${column.id}"
-                           placeholder="${this.escapeHtml(column.filterPlaceholder || 'Filter...')}">
-                `;
-        }
     }
 
     /**
@@ -431,7 +385,6 @@ export class DataTableView {
     ): string {
         const isSelected = state.selectedRows.includes(row.id);
         const hasCheckbox = Boolean(config.selectable && config.showCheckboxes);
-        const hasActions = Boolean(config.actions && config.actions.length > 0);
 
         const rowClass = [
             'data-table-body-row',
@@ -462,11 +415,10 @@ export class DataTableView {
                     this.renderBodyCell(row, column, config)
                 ).join('')}
                 
-                ${hasActions ? this.renderActionsCell(row, config, state) : ''}
             </tr>
             
             ${config.expandableRows && row._expanded ? 
-                this.renderExpandedRow(row, columns.length + (hasCheckbox ? 1 : 0) + (hasActions ? 1 : 0), config) : ''}
+                this.renderExpandedRow(row, columns.length + (hasCheckbox ? 1 : 0), config) : ''}
         `;
     }
 
@@ -527,99 +479,6 @@ export class DataTableView {
                     ${cellContent}
                 </div>
             </td>
-        `;
-    }
-
-    /**
-     * Render actions cell
-     */
-    private static renderActionsCell(
-        row: DataTableRow, 
-        config: DataTableConfig, 
-        state: DataTableViewState
-    ): string {
-        const actions = config.actions || [];
-        const visibleActions = actions.filter(action => {
-            if (typeof action.visible === 'function') {
-                return action.visible(row);
-            }
-            return action.visible !== false;
-        });
-
-        if (visibleActions.length === 0) {
-            return '<td class="data-table-body-cell data-table-actions-cell"></td>';
-        }
-
-        if (visibleActions.length === 1) {
-            // Single action - show as button
-            const action = visibleActions[0];
-            return `
-                <td class="data-table-body-cell data-table-actions-cell">
-                    ${this.renderActionButton(action, row)}
-                </td>
-            `;
-        }
-
-        // Multiple actions - show as dropdown
-        return `
-            <td class="data-table-body-cell data-table-actions-cell">
-                <div class="data-table-actions-menu">
-                    <button class="data-table-actions-toggle" 
-                            data-row-id="${row.id}"
-                            data-component-element="actions-toggle">
-                        ${ICONS.MORE_HORIZONTAL}
-                    </button>
-                    <div class="data-table-actions-dropdown" style="display: none;">
-                        ${visibleActions.map(action => 
-                            this.renderActionMenuItem(action, row)
-                        ).join('')}
-                    </div>
-                </div>
-            </td>
-        `;
-    }
-
-    /**
-     * Render single action button
-     */
-    private static renderActionButton(action: DataTableAction, row: DataTableRow): string {
-        const isDisabled = typeof action.disabled === 'function' ? 
-            action.disabled(row) : action.disabled;
-
-        const buttonClass = [
-            'data-table-action-button',
-            action.variant ? `data-table-action--${action.variant}` : ''
-        ].filter(Boolean).join(' ');
-
-        return `
-            <button class="${buttonClass}"
-                    data-action-id="${action.id}"
-                    data-row-id="${row.id}"
-                    data-component-element="action"
-                    title="${this.escapeHtml(action.tooltip || action.label)}"
-                    ${isDisabled ? 'disabled' : ''}>
-                ${action.icon ? `<span class="action-icon">${action.icon}</span>` : ''}
-                <span class="action-label">${this.escapeHtml(action.label)}</span>
-            </button>
-        `;
-    }
-
-    /**
-     * Render action menu item
-     */
-    private static renderActionMenuItem(action: DataTableAction, row: DataTableRow): string {
-        const isDisabled = typeof action.disabled === 'function' ? 
-            action.disabled(row) : action.disabled;
-
-        return `
-            <button class="data-table-action-item"
-                    data-action-id="${action.id}"
-                    data-row-id="${row.id}"
-                    data-component-element="action"
-                    ${isDisabled ? 'disabled' : ''}>
-                ${action.icon ? `<span class="action-icon">${action.icon}</span>` : ''}
-                <span class="action-label">${this.escapeHtml(action.label)}</span>
-            </button>
         `;
     }
 

@@ -50,17 +50,6 @@ export interface DataTableRow {
     _style?: string;
 }
 
-export interface DataTableAction {
-    id: string;
-    label: string;
-    icon?: string;
-    tooltip?: string;
-    visible?: boolean | ((row: DataTableRow) => boolean);
-    disabled?: boolean | ((row: DataTableRow) => boolean);
-    variant?: 'primary' | 'secondary' | 'danger' | 'warning' | 'info';
-    confirmMessage?: string | ((row: DataTableRow) => string);
-    onClick?: (row: DataTableRow, action: DataTableAction) => void;
-}
 
 export interface DataTableContextMenuItem {
     id: string;
@@ -117,8 +106,6 @@ export interface DataTableConfig extends BaseComponentConfig {
     
     // Filtering options
     filterable?: boolean;
-    filterMode?: 'menu' | 'row' | 'simple';
-    showFilterRow?: boolean;
     filterDebounce?: number;
     onFilter?: (filters: Record<string, any>) => void;
     
@@ -131,12 +118,6 @@ export interface DataTableConfig extends BaseComponentConfig {
     showFooter?: boolean;
     onPageChange?: (page: number, pageSize: number) => void;
     
-    // Actions
-    actions?: DataTableAction[];
-    showActions?: boolean;
-    actionsPosition?: 'start' | 'end';
-    actionsLabel?: string;
-    onAction?: (action: DataTableAction, row: DataTableRow) => void;
     
     // Context menu
     contextMenu?: boolean;
@@ -144,11 +125,7 @@ export interface DataTableConfig extends BaseComponentConfig {
     onContextMenu?: (item: DataTableContextMenuItem, row: DataTableRow) => void;
     
     // Column management
-    columnReorderable?: boolean;
-    columnResizable?: boolean;
     showColumnChooser?: boolean;
-    onColumnReorder?: (columns: DataTableColumn[]) => void;
-    onColumnResize?: (column: string, width: number) => void;
     
     // Empty state
     emptyMessage?: string;
@@ -160,22 +137,11 @@ export interface DataTableConfig extends BaseComponentConfig {
     loadingMessage?: string;
     loadingRows?: number;
     
-    // Export options
-    exportable?: boolean;
-    exportFormats?: ('csv' | 'excel' | 'json' | 'pdf')[];
-    exportFileName?: string;
-    onExport?: (format: string, data: DataTableRow[]) => void;
-    
     // Search
     searchable?: boolean;
     searchPlaceholder?: string;
     searchDebounce?: number;
     onSearch?: (query: string) => void;
-    
-    // Virtual scrolling
-    virtualScroll?: boolean;
-    virtualRowHeight?: number;
-    overscan?: number;
     
     // Appearance
     variant?: 'default' | 'compact' | 'comfortable' | 'spacious';
@@ -186,9 +152,6 @@ export interface DataTableConfig extends BaseComponentConfig {
     trackBy?: string | ((row: DataTableRow, index: number) => any);
     debounceTime?: number;
     throttleTime?: number;
-    lazyLoad?: boolean;
-    infiniteScroll?: boolean;
-    onScrollEnd?: () => void;
     
     // Accessibility
     ariaLabel?: string;
@@ -241,12 +204,6 @@ export interface DataTablePageEvent {
     timestamp: number;
 }
 
-export interface DataTableActionEvent {
-    componentId: string;
-    action: DataTableAction;
-    row: DataTableRow;
-    timestamp: number;
-}
 
 /**
  * Default configuration values
@@ -265,42 +222,29 @@ export const DEFAULT_DATA_TABLE_CONFIG: Partial<DataTableConfig> = {
     stickyHeader: false,
     selectable: false,
     selectMode: 'multiple',
-    showCheckboxes: true,
+    showCheckboxes: false,
     sortable: true,
     multiSort: false,
     filterable: true,
-    filterMode: 'menu',
     filterDebounce: 300,
     paginated: false,
     pageSize: 50,
     pageSizeOptions: [10, 25, 50, 100],
     currentPage: 1,
-    showActions: true,
-    actionsPosition: 'end',
-    actionsLabel: 'Actions',
     contextMenu: false,
-    columnReorderable: false,
-    columnResizable: false,
     showColumnChooser: false,
     emptyMessage: 'No data available',
     loading: false,
     loadingMessage: 'Loading...',
     loadingRows: 5,
-    exportable: false,
-    exportFormats: ['csv', 'excel', 'json'],
     searchable: false,
     searchPlaceholder: 'Search...',
     searchDebounce: 300,
-    virtualScroll: false,
-    virtualRowHeight: 40,
-    overscan: 3,
     variant: 'default',
     theme: 'auto',
     zebra: false,
     debounceTime: 150,
     throttleTime: 50,
-    lazyLoad: false,
-    infiniteScroll: false,
     announceRowCount: true
 };
 
@@ -317,8 +261,7 @@ export const DATA_TABLE_VALIDATION = {
     MIN_COLUMN_WIDTH: 30,
     MAX_COLUMN_WIDTH: 2000,
     MIN_DEBOUNCE_TIME: 0,
-    MAX_DEBOUNCE_TIME: 5000,
-    MAX_EXPORT_ROWS: 10000
+    MAX_DEBOUNCE_TIME: 5000
 };
 
 /**
@@ -363,11 +306,6 @@ export const DATA_TABLE_CSS = {
     FILTER_ROW: 'data-table-filter-row',
     FILTER_CELL: 'data-table-filter-cell',
     FILTER_INPUT: 'data-table-filter-input',
-    
-    // Actions
-    ACTIONS_CELL: 'data-table-actions-cell',
-    ACTIONS_MENU: 'data-table-actions-menu',
-    ACTION_BUTTON: 'data-table-action-button',
     
     // States
     LOADING: 'data-table--loading',
@@ -462,12 +400,8 @@ export class DataTableConfigValidator {
         // Warnings (skip empty data warning during initialization as this is expected)
         // Note: Empty data is normal during component initialization
 
-        if (config.virtualScroll && config.stickyHeader) {
-            warnings.push('Virtual scrolling with sticky header may have performance implications');
-        }
-
-        if (config.data && config.data.length > 1000 && !config.virtualScroll && !config.paginated) {
-            warnings.push('Large dataset without virtual scrolling or pagination may impact performance');
+        if (config.data && config.data.length > 1000 && !config.paginated) {
+            warnings.push('Large dataset without pagination may impact performance');
         }
 
         return {

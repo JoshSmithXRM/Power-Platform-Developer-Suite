@@ -159,32 +159,28 @@ export class ConnectionReferencesPanel extends BasePanel {
                         label: 'Flow Name',
                         field: 'flowName',
                         sortable: true,
-                        filterable: true,
-                        width: '250px'
+                        filterable: true
                     },
                     {
                         id: 'connectionReference',
                         label: 'Connection Reference',
                         field: 'connectionReference',
                         sortable: true,
-                        filterable: true,
-                        width: '200px'
+                        filterable: true
                     },
                     {
                         id: 'connectorType',
                         label: 'Connector Type',
                         field: 'connectorType',
                         sortable: true,
-                        filterable: true,
-                        width: '150px'
+                        filterable: true
                     },
                     {
                         id: 'connectionName',
                         label: 'Connection',
                         field: 'connectionName',
                         sortable: true,
-                        filterable: true,
-                        width: '150px'
+                        filterable: true
                     },
                     {
                         id: 'isManaged',
@@ -214,9 +210,11 @@ export class ConnectionReferencesPanel extends BasePanel {
                 ],
                 data: [],
                 sortable: true,
-                filterable: true,
+                filterable: false,
                 showFooter: true,
                 striped: true,
+                selectable: false,   // Explicitly disable row selection
+                showCheckboxes: false,  // Explicitly disable checkboxes
                 className: 'connection-references-table'
             });
             this.componentLogger.trace('DataTableComponent created successfully');

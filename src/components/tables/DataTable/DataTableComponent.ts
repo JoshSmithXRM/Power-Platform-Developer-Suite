@@ -1,9 +1,9 @@
 import { BaseComponent } from '../../base/BaseComponent';
-import { DataTableConfig, DataTableRow, DataTableColumn, DataTableAction, DataTableSortEvent, DataTableFilterEvent, DataTablePageEvent, DataTableSelectionEvent, DataTableActionEvent, DEFAULT_DATA_TABLE_CONFIG, DATA_TABLE_VALIDATION, DataTableConfigValidator } from './DataTableConfig';
+import { DataTableConfig, DataTableRow, DataTableColumn, DataTableSortEvent, DataTableFilterEvent, DataTablePageEvent, DataTableSelectionEvent, DEFAULT_DATA_TABLE_CONFIG, DATA_TABLE_VALIDATION, DataTableConfigValidator } from './DataTableConfig';
 import { DataTableView, DataTableViewState } from './DataTableView';
 
 /**
- * DataTableComponent - Comprehensive data table with sorting, filtering, pagination, and actions
+ * DataTableComponent - Comprehensive data table with sorting, filtering, and pagination
  * Used throughout the extension for displaying tabular data with rich interactions
  * Supports multi-instance usage with independent state management
  */
@@ -100,6 +100,17 @@ export class DataTableComponent extends BaseComponent {
      * Generate HTML for this component
      */
     public generateHTML(): string {
+        this.componentLogger.debug('Generating HTML for DataTable', {
+            componentId: this.config.id,
+            dataLength: this.data.length,
+            processedDataLength: this.processedData.length,
+            sortConfig: this.sortConfig,
+            hasActiveSort: this.sortConfig.length > 0,
+            activeFilters: Object.keys(this.filters),
+            currentPage: this.currentPage,
+            pageSize: this.pageSize
+        });
+
         const viewState: DataTableViewState = {
             data: this.getPageData(),
             selectedRows: Array.from(this.selectedRows),
@@ -117,7 +128,23 @@ export class DataTableComponent extends BaseComponent {
             columnOrder: this.columnOrder
         };
         
-        return DataTableView.render(this.config, viewState);
+        this.componentLogger.debug('ViewState created for HTML generation', {
+            componentId: this.config.id,
+            viewDataLength: viewState.data.length,
+            sortConfig: viewState.sortConfig,
+            sortConfigLength: viewState.sortConfig.length,
+            totalRows: viewState.totalRows
+        });
+        
+        const html = DataTableView.render(this.config, viewState);
+        
+        this.componentLogger.debug('HTML generation complete', {
+            componentId: this.config.id,
+            htmlLength: html.length,
+            sortConfigPassedToView: viewState.sortConfig
+        });
+        
+        return html;
     }
 
     /**
@@ -355,8 +382,23 @@ export class DataTableComponent extends BaseComponent {
      * Sort table by column
      */
     public sort(columnId: string, direction?: 'asc' | 'desc'): void {
+        this.componentLogger.debug('Sort requested', {
+            componentId: this.config.id,
+            columnId,
+            direction,
+            previousSortConfig: [...this.sortConfig]
+        });
+
         const column = this.config.columns.find(c => c.id === columnId);
-        if (!column || !column.sortable) return;
+        if (!column || !column.sortable) {
+            this.componentLogger.warn('Sort ignored - column not found or not sortable', {
+                componentId: this.config.id,
+                columnId,
+                columnExists: !!column,
+                columnSortable: column?.sortable
+            });
+            return;
+        }
         
         if (this.config.multiSort) {
             // Multi-sort: add or update sort for this column
@@ -379,25 +421,62 @@ export class DataTableComponent extends BaseComponent {
             }
         }
         
+        this.componentLogger.info('Sort configuration updated', {
+            componentId: this.config.id,
+            columnId,
+            direction,
+            newSortConfig: [...this.sortConfig],
+            multiSort: this.config.multiSort
+        });
+        
         this.processData();
         this.emitSortEvent();
         this.notifyUpdate();
+        
+        this.componentLogger.debug('Sort processing complete', {
+            componentId: this.config.id,
+            sortedDataLength: this.processedData.length
+        });
     }
 
     /**
      * Filter table by column
      */
     public filter(columnId: string, value: any): void {
+        this.componentLogger.debug('Filter requested', {
+            componentId: this.config.id,
+            columnId,
+            value,
+            valueType: typeof value,
+            previousFilters: { ...this.filters }
+        });
+
         if (value === null || value === undefined || value === '') {
             delete this.filters[columnId];
+            this.componentLogger.debug('Filter removed', {
+                componentId: this.config.id,
+                columnId
+            });
         } else {
             this.filters[columnId] = value;
+            this.componentLogger.debug('Filter applied', {
+                componentId: this.config.id,
+                columnId,
+                value
+            });
         }
         
         this.currentPage = 1; // Reset to first page
         this.processData();
         this.emitFilterEvent();
         this.notifyUpdate();
+        
+        this.componentLogger.info('Filter processing complete', {
+            componentId: this.config.id,
+            activeFilters: Object.keys(this.filters),
+            filteredDataLength: this.processedData.length,
+            resetToPage: this.currentPage
+        });
     }
 
     /**
@@ -528,21 +607,6 @@ export class DataTableComponent extends BaseComponent {
         this.notifyUpdate();
     }
 
-    /**
-     * Execute row action
-     */
-    public executeAction(actionId: string, rowId: string | number): void {
-        const action = this.config.actions?.find(a => a.id === actionId);
-        const row = this.data.find(r => r.id === rowId);
-        
-        if (!action || !row) return;
-        
-        if (action.onClick) {
-            action.onClick(row, action);
-        }
-        
-        this.emitActionEvent(action, row);
-    }
 
     /**
      * Set loading state
@@ -582,12 +646,7 @@ export class DataTableComponent extends BaseComponent {
         
         this.columnOrder = columnIds;
         
-        if (this.config.onColumnReorder) {
-            const orderedColumns = columnIds
-                .map(id => this.config.columns.find(c => c.id === id))
-                .filter(Boolean) as DataTableColumn[];
-            this.config.onColumnReorder(orderedColumns);
-        }
+        // Column reordering callback removed - feature not implemented
         
         this.notifyUpdate();
     }
@@ -654,11 +713,10 @@ export class DataTableComponent extends BaseComponent {
         if (validation.warnings.length > 0) {
             this.componentLogger.warn('DataTable configuration has warnings', {
                 componentId: this.config.id,
-                warnings: validation.warnings
+                warnings: validation.warnings,
+                warningCount: validation.warnings.length
             });
-            validation.warnings.forEach(warning => {
-                console.warn(`DataTable warning: ${warning}`);
-            });
+            // Individual warnings already logged in structured format above
         }
 
         this.componentLogger.debug('DataTable configuration validation passed', {
@@ -739,21 +797,4 @@ export class DataTableComponent extends BaseComponent {
         }
     }
 
-    /**
-     * Emit action event
-     */
-    private emitActionEvent(action: DataTableAction, row: DataTableRow): void {
-        const event: DataTableActionEvent = {
-            componentId: this.getId(),
-            action,
-            row,
-            timestamp: Date.now()
-        };
-        
-        this.emit('action', event);
-        
-        if (this.config.onAction) {
-            this.config.onAction(action, row);
-        }
-    }
 }

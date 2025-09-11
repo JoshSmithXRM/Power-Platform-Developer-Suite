@@ -5,8 +5,6 @@ import * as vscode from 'vscode';
  * WebviewResources interface for resource management
  */
 export interface WebviewResources {
-    tableUtilsScript: vscode.Uri;
-    tableStylesSheet: vscode.Uri;
     panelStylesSheet: vscode.Uri;
     panelUtilsScript: vscode.Uri;
 }

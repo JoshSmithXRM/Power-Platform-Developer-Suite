@@ -1,4 +1,4 @@
-import { DataTableConfig, DataTableColumn, DataTableRow, DataTableAction, DataTableContextMenuItem } from '../DataTable/DataTableConfig';
+import { DataTableConfig, DataTableColumn, DataTableRow, DataTableContextMenuItem } from '../DataTable/DataTableConfig';
 
 /**
  * Configuration interface for FilterableTableComponent

@@ -1,7 +1,7 @@
 /**
  * data-table.css - Comprehensive styling for DataTable components
  * Uses VS Code CSS custom properties for native theme integration
- * Supports all table features: sorting, filtering, pagination, actions, etc.
+ * Supports all table features: sorting, filtering, pagination, etc.
  */
 
 /* Base container styling */
@@ -44,7 +44,7 @@
 .data-table-element {
     width: 100%;
     border-collapse: collapse;
-    table-layout: auto;
+    table-layout: fixed;
     min-width: max-content; /* Ensure table can expand beyond container for horizontal scroll */
 }
 
@@ -116,43 +116,196 @@
     background: rgba(128, 128, 128, 0.1);
 }
 
-/* Clean inline sort indicator */
+/* Clean inline sort indicator - only shows when column is sorted */
 .sort-indicator {
-    color: var(--vscode-charts-blue);
     font-size: 12px;
-    margin-left: 4px;
+    margin-left: 6px;
     font-weight: bold;
+    color: var(--vscode-charts-blue);
+    opacity: 1;
 }
 
-/* Filter row */
-.data-table-filter-row {
-    background: var(--vscode-input-background);
-    border-bottom: 1px solid var(--component-border-subtle);
+.sort-indicator--asc {
+    color: var(--vscode-charts-blue);
 }
 
-.data-table-filter-cell {
-    padding: 4px 8px;
-    border-right: 1px solid var(--vscode-panel-border);
+.sort-indicator--desc {
+    color: var(--vscode-charts-blue);
 }
 
-.data-table-filter-cell:last-child {
-    border-right: none;
-}
-
-.filter-input {
-    width: 100%;
-    background: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border);
-    color: var(--vscode-input-foreground);
-    padding: 4px 8px;
+/* Power Platform style filter dropdown arrows - always visible on filterable columns */
+.data-table-filter-dropdown {
+    background: none;
+    border: none;
+    padding: 6px 8px;
+    margin-left: 4px;
+    cursor: pointer;
+    font-size: 10px;
     border-radius: 3px;
+    transition: all 0.2s ease;
+    position: relative;
+    min-width: 20px;
+    min-height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.data-table-filter-dropdown:hover {
+    background: rgba(128, 128, 128, 0.15);
+    transform: scale(1.05);
+}
+
+.data-table-filter-dropdown:active {
+    background: rgba(128, 128, 128, 0.2);
+    transform: scale(0.95);
+}
+
+.filter-dropdown-arrow {
+    font-size: 10px;
+    transition: color 0.2s ease;
+}
+
+.filter-dropdown-arrow.filter-icon--inactive {
+    color: var(--component-text-muted);
+    opacity: 0.6;
+}
+
+.filter-dropdown-arrow.filter-icon--active {
+    color: var(--vscode-charts-blue);
+    opacity: 1;
+}
+
+.filter-active-indicator {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    font-size: 8px;
+    color: var(--vscode-charts-blue);
+}
+
+.data-table-header-cell:hover .filter-dropdown-arrow.filter-icon--inactive {
+    opacity: 1;
+    color: var(--component-text-primary);
+}
+
+/* Power Platform style filter dropdown */
+.filter-dropdown {
+    position: absolute;
+    background: var(--component-elevated-surface);
+    border: 1px solid var(--component-border);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 280px;
+    z-index: 1000;
+}
+
+.filter-dropdown-content {
+    padding: 0;
+}
+
+.filter-dropdown-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--component-border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--component-header-surface);
+    font-weight: 600;
+    color: var(--component-text-primary);
+}
+
+.filter-dropdown-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--component-text-muted);
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.filter-dropdown-close:hover {
+    color: var(--component-text-primary);
+    background: var(--component-state-hover);
+    border-radius: 2px;
+}
+
+.filter-dropdown-body {
+    padding: 16px;
+}
+
+.filter-operator-section,
+.filter-value-section {
+    margin-bottom: 16px;
+}
+
+.filter-dropdown-body label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--component-text-primary);
     font-size: 13px;
 }
 
-.filter-input:focus {
+.filter-operator-select,
+.filter-value-input {
+    width: 100%;
+    background: var(--component-interactive-surface);
+    border: 1px solid var(--component-border);
+    color: var(--component-text-primary);
+    padding: 8px 12px;
+    border-radius: 3px;
+    font-size: 13px;
+    box-sizing: border-box;
+}
+
+.filter-operator-select:focus,
+.filter-value-input:focus {
     outline: none;
-    border-color: var(--vscode-focusBorder);
-    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+    border-color: var(--component-border-focus);
+    box-shadow: 0 0 0 1px var(--component-border-focus);
+}
+
+.filter-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+.filter-apply-btn,
+.filter-clear-btn {
+    padding: 8px 16px;
+    border-radius: 3px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--component-border);
+    transition: all 0.2s ease;
+}
+
+.filter-apply-btn {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border-color: var(--vscode-button-background);
+}
+
+.filter-apply-btn:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.filter-clear-btn {
+    background: var(--component-interactive-surface);
+    color: var(--component-text-primary);
+}
+
+.filter-clear-btn:hover {
+    background: var(--component-state-hover);
 }
 
 .filter-select {
@@ -268,142 +421,7 @@
     margin: 0;
 }
 
-/* Actions column */
-.data-table-actions-cell {
-    padding: 4px 8px;
-    text-align: center;
-    white-space: nowrap;
-    width: 1%;
-}
 
-.actions-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-}
-
-.action-button {
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    border: 1px solid var(--vscode-button-border, transparent);
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    transition: all 0.15s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.action-button:hover {
-    background: var(--vscode-button-hoverBackground);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-}
-
-.action-button:active {
-    background: var(--vscode-button-activeBackground);
-}
-
-.action-button.primary {
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-}
-
-.action-button.secondary {
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
-}
-
-.action-button.danger {
-    background: var(--vscode-errorForeground);
-    color: white;
-}
-
-.action-button.warning {
-    background: var(--vscode-warningForeground);
-    color: white;
-}
-
-.action-button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-/* Action dropdown */
-.actions-dropdown {
-    position: relative;
-    display: inline-block;
-}
-
-.dropdown-trigger {
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    border: 1px solid var(--vscode-button-border, transparent);
-    padding: 4px 8px;
-    border-radius: 3px;
-    cursor: pointer;
-    font-size: 12px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.dropdown-trigger::after {
-    content: '▼';
-    font-size: 10px;
-    opacity: 0.7;
-}
-
-.dropdown-menu {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    background: var(--vscode-menu-background);
-    border: 1px solid var(--vscode-menu-border);
-    border-radius: 3px;
-    min-width: 150px;
-    z-index: 1000;
-    display: none;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.actions-dropdown.open .dropdown-menu {
-    display: block;
-}
-
-.dropdown-item {
-    display: block;
-    width: 100%;
-    padding: 8px 12px;
-    text-align: left;
-    border: none;
-    background: none;
-    color: var(--vscode-menu-foreground);
-    cursor: pointer;
-    font-size: 13px;
-    transition: background-color 0.15s ease;
-}
-
-.dropdown-item:hover {
-    background: var(--vscode-menu-selectionBackground);
-    color: var(--vscode-menu-selectionForeground);
-}
-
-.dropdown-item:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.dropdown-separator {
-    height: 1px;
-    background: var(--vscode-menu-separatorBackground);
-    margin: 4px 0;
-}
 
 /* Expand/collapse buttons */
 .expand-button {
@@ -813,9 +831,7 @@
     }
     
     .data-table-pagination,
-    .search-container,
-    .action-button,
-    .actions-dropdown {
+    .search-container {
         display: none;
     }
     
