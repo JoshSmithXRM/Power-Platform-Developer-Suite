@@ -315,6 +315,11 @@ export class EnvironmentVariablesPanel extends BasePanel {
             if (componentId === 'envVars-solutionSelector' && eventType === 'selectionChanged') {
                 const { selectedSolutions } = data;
 
+                // Update the component's internal state to keep Extension Host in sync with webview
+                if (this.solutionSelectorComponent && selectedSolutions) {
+                    this.solutionSelectorComponent.setSelectedSolutions(selectedSolutions);
+                }
+
                 if (selectedSolutions && selectedSolutions.length > 0) {
                     const selectedSolution = selectedSolutions[0];
                     await this.handleSolutionSelection(selectedSolution.id);
