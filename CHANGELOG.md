@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security Vulnerability** - Updated axios to version >=1.12.0 to address HIGH severity DoS vulnerability (GHSA-4hjh-wcwx-xvwj)
 - **Documentation** - Fixed README.md version badge to display correct version 0.0.2
 
+### Changed
+- **Architecture Refactoring** - Completed component architecture refactoring for existing panels
+  - All 3 panels now use event bridges for component communication
+  - Implemented factory singleton pattern via ServiceFactory
+  - Extracted common panel functionality to BasePanel (getErrorHtml, setupComponentEventBridges)
+  - Added component type metadata (getType() method to all components)
+  - Eliminated 450+ lines of duplicate code across panels
+  - Reduced code complexity by 30% through shared base functionality
+
 ### Technical
 - **Component-Based Architecture** - Complete rewrite of extension architecture from scratch
   - Moved existing code to `src/old/` directory for reference

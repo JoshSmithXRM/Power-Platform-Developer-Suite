@@ -7,6 +7,7 @@ import { ServiceFactory } from '../../services/ServiceFactory';
 import { Environment } from '../../components/base/ComponentInterface';
 import { EnvironmentConnection } from '../../models/PowerPlatformSettings';
 import { EnvironmentSelectorComponent } from '../../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
+import { ComponentUpdateEvent, ComponentStateChangeEvent, ComponentWithEvents } from '../../types/ComponentEventTypes';
 
 /**
  * Base class for all webview panels providing common functionality
@@ -367,5 +368,110 @@ export abstract class BasePanel implements IPanelBase {
                 authenticationMethod: conn.settings?.authenticationMethod || 'interactive'
             }
         }));
+    }
+
+    /**
+     * Standard error HTML template
+     * Common error display used by all panels
+     */
+    protected getErrorHtml(title: string, message: string): string {
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>${title} - Error</title>
+                <style>
+                    body {
+                        font-family: var(--vscode-font-family);
+                        color: var(--vscode-errorForeground);
+                        background: var(--vscode-editor-background);
+                        padding: 20px;
+                        text-align: center;
+                    }
+                    .error-icon {
+                        font-size: 48px;
+                        margin-bottom: 16px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="error-icon">⚠️</div>
+                <h2>${title} Error</h2>
+                <p>${message}</p>
+            </body>
+            </html>
+        `;
+    }
+
+    /**
+     * Setup event bridges for component communication
+     * Automatically forwards component events to webview
+     * Common pattern used by all panels
+     */
+    protected setupComponentEventBridges(components: (ComponentWithEvents | undefined)[]): void {
+        this.componentLogger.debug('Setting up component event bridges');
+
+        const validComponents = components.filter((c): c is ComponentWithEvents => c !== undefined);
+
+        validComponents.forEach(component => {
+            // Set up update event bridge
+            component.on('update', (event: ComponentUpdateEvent) => {
+                this.componentLogger.trace('Component update event received', {
+                    componentId: event.componentId
+                });
+
+                // Get component data for update
+                const componentData = component.getData?.() || null;
+                const componentType = component.getType();
+
+                const dataLength = Array.isArray(componentData) ? componentData.length :
+                                  componentData?.solutions?.length ||
+                                  (componentData ? Object.keys(componentData).length : 0);
+
+                this.componentLogger.debug('Event bridge forwarding component update to webview', {
+                    componentId: event.componentId,
+                    componentType: componentType,
+                    dataLength: dataLength
+                });
+
+                // For components that need HTML regeneration (like SolutionSelector)
+                let messageData = componentData;
+                if (componentType === 'SolutionSelector' && componentData?.solutions) {
+                    const componentHtml = component.generateHTML();
+                    messageData = {
+                        ...componentData,
+                        html: componentHtml,
+                        requiresHtmlUpdate: true
+                    };
+                }
+
+                this.postMessage({
+                    action: 'componentUpdate',
+                    componentId: event.componentId,
+                    componentType: componentType,
+                    data: messageData
+                });
+
+                this.componentLogger.trace('Event bridge message posted to webview');
+            });
+
+            // Set up state change event bridge
+            component.on('stateChange', (event: ComponentStateChangeEvent) => {
+                this.componentLogger.trace('Component state change event received', {
+                    componentId: event.componentId
+                });
+                this.postMessage({
+                    action: 'componentStateChange',
+                    componentId: event.componentId,
+                    state: event.state
+                });
+            });
+        });
+
+        this.componentLogger.info('Component event bridges set up', {
+            bridgeCount: validComponents.length
+        });
     }
 }

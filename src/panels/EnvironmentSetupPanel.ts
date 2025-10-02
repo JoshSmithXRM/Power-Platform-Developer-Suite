@@ -15,8 +15,6 @@ export class EnvironmentSetupPanel extends BasePanel {
 
     private environmentSelectorComponent?: EnvironmentSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
-    private composer: PanelComposer;
-    private componentFactory: ComponentFactory;
 
     public static createOrShow(extensionUri: vscode.Uri, environment?: any): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
@@ -40,8 +38,8 @@ export class EnvironmentSetupPanel extends BasePanel {
     }
 
     private constructor(
-        panel: vscode.WebviewPanel, 
-        extensionUri: vscode.Uri, 
+        panel: vscode.WebviewPanel,
+        extensionUri: vscode.Uri,
         private initialEnvironment?: any
     ) {
         super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
@@ -49,34 +47,39 @@ export class EnvironmentSetupPanel extends BasePanel {
             title: 'Environment Setup'
         });
 
-        this.componentFactory = new ComponentFactory();
-        this.composer = new PanelComposer(extensionUri);
-
         this.panel.onDidDispose(() => {
             EnvironmentSetupPanel.currentPanel = undefined;
         });
 
-        this.componentLogger.debug('Constructor starting', { 
-            hasInitialEnvironment: !!initialEnvironment 
+        this.componentLogger.debug('Constructor starting', {
+            hasInitialEnvironment: !!initialEnvironment
         });
-        
+
         this.initializeComponents();
-        
+
+        // Set up event bridges for component communication using BasePanel method
+        this.setupComponentEventBridges([
+            this.environmentSelectorComponent,
+            this.actionBarComponent
+        ]);
+
         // Initialize the panel (this calls updateWebview which calls getHtmlContent)
         this.initialize();
-        
+
         // Load environments after initialization
         this.loadEnvironments();
-        
+
         this.componentLogger.info('Panel initialized successfully');
     }
 
     private initializeComponents(): void {
         this.componentLogger.debug('Initializing components');
         try {
+            const componentFactory = ServiceFactory.getComponentFactory();
+
             this.componentLogger.trace('Creating EnvironmentSelectorComponent');
             // Environment Selector Component
-            this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
+            this.environmentSelectorComponent = componentFactory.createEnvironmentSelector({
                 id: 'environmentSetup-envSelector',
                 label: 'Select Environment',
                 placeholder: 'Choose an environment to configure...',
@@ -93,7 +96,7 @@ export class EnvironmentSetupPanel extends BasePanel {
 
             this.componentLogger.trace('Creating ActionBarComponent');
             // Action Bar Component
-            this.actionBarComponent = this.componentFactory.createActionBar({
+            this.actionBarComponent = componentFactory.createActionBar({
                 id: 'environmentSetup-actions',
                 actions: [
                     {
@@ -238,11 +241,11 @@ export class EnvironmentSetupPanel extends BasePanel {
         try {
             if (!this.environmentSelectorComponent || !this.actionBarComponent) {
                 this.componentLogger.warn('Components not initialized when generating HTML');
-                return this.getErrorHtml('Failed to initialize components');
+                return this.getErrorHtml('Environment Setup', 'Failed to initialize components');
             }
 
             this.componentLogger.trace('Using simple PanelComposer.compose() as specified in architecture');
-            
+
             // Use simple composition method as specified in architecture guide
             return PanelComposer.compose([
                 this.environmentSelectorComponent,
@@ -251,47 +254,15 @@ export class EnvironmentSetupPanel extends BasePanel {
 
         } catch (error) {
             this.componentLogger.error('Error generating HTML content', error as Error);
-            return this.getErrorHtml('Failed to generate panel content: ' + error);
+            return this.getErrorHtml('Environment Setup', 'Failed to generate panel content: ' + error);
         }
-    }
-
-    private getErrorHtml(message: string): string {
-        return `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Environment Setup - Error</title>
-                <style>
-                    body {
-                        font-family: var(--vscode-font-family);
-                        color: var(--vscode-errorForeground);
-                        background: var(--vscode-editor-background);
-                        padding: 20px;
-                        text-align: center;
-                    }
-                    .error-icon {
-                        font-size: 48px;
-                        margin-bottom: 16px;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="error-icon">⚠️</div>
-                <h2>Environment Setup Error</h2>
-                <p>${message}</p>
-            </body>
-            </html>
-        `;
     }
 
     public dispose(): void {
         EnvironmentSetupPanel.currentPanel = undefined;
-        
+
         this.environmentSelectorComponent?.dispose();
         this.actionBarComponent?.dispose();
-        this.componentFactory?.dispose();
 
         super.dispose();
     }

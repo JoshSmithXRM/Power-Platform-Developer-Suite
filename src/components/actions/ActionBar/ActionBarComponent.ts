@@ -73,6 +73,13 @@ export class ActionBarComponent extends BaseComponent {
     }
 
     /**
+     * Get component type identifier
+     */
+    public getType(): string {
+        return 'ActionBar';
+    }
+
+    /**
      * Set the list of actions
      */
     public setActions(actions: ActionBarAction[]): void {

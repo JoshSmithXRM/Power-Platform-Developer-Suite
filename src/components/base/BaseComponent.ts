@@ -42,6 +42,12 @@ export abstract class BaseComponent extends EventEmitter {
     }
 
     /**
+     * Get the component type identifier
+     * Used for event routing and debugging
+     */
+    public abstract getType(): string;
+
+    /**
      * Get the component's CSS class name
      */
     public getClassName(): string {

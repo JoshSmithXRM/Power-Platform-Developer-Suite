@@ -12,6 +12,24 @@ import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarCom
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
 
 import { BasePanel } from './base/BasePanel';
+import {
+    EnvironmentVariableData,
+    EnvironmentVariableDefinition,
+    EnvironmentVariableValue
+} from '../services/EnvironmentVariablesService';
+
+// UI-specific type for table display
+interface EnvironmentVariableTableRow {
+    id: string;
+    displayName: string;
+    schemaName: string;
+    type: string;
+    defaultValue: string;
+    currentValue: string;
+    isManaged: string;
+    modifiedOn: string;
+    modifiedBy: string;
+}
 
 export class EnvironmentVariablesPanel extends BasePanel {
     public static readonly viewType = 'environmentVariables';
@@ -21,8 +39,6 @@ export class EnvironmentVariablesPanel extends BasePanel {
     private solutionSelectorComponent?: SolutionSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
     private dataTableComponent?: DataTableComponent;
-    private composer: PanelComposer;
-    private componentFactory: ComponentFactory;
 
     public static createOrShow(extensionUri: vscode.Uri): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
@@ -55,32 +71,39 @@ export class EnvironmentVariablesPanel extends BasePanel {
             title: 'Environment Variables'
         });
 
-        this.componentFactory = new ComponentFactory();
-        this.composer = new PanelComposer(extensionUri);
-
         this.panel.onDidDispose(() => {
             EnvironmentVariablesPanel.currentPanel = undefined;
         });
 
         this.componentLogger.debug('Constructor starting');
-        
+
         this.initializeComponents();
-        
+
+        // Set up event bridges for component communication using BasePanel method
+        this.setupComponentEventBridges([
+            this.environmentSelectorComponent,
+            this.solutionSelectorComponent,
+            this.actionBarComponent,
+            this.dataTableComponent
+        ]);
+
         // Initialize the panel (this calls updateWebview which calls getHtmlContent)
         this.initialize();
-        
+
         // Load environments after initialization
         this.loadEnvironments();
-        
+
         this.componentLogger.info('Panel initialized successfully');
     }
 
     private initializeComponents(): void {
         this.componentLogger.debug('Initializing components');
         try {
+            const componentFactory = ServiceFactory.getComponentFactory();
+
             this.componentLogger.trace('Creating EnvironmentSelectorComponent');
             // Environment Selector Component
-            this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
+            this.environmentSelectorComponent = componentFactory.createEnvironmentSelector({
                 id: 'envVars-envSelector',
                 label: 'Select Environment',
                 placeholder: 'Choose an environment to view variables...',
@@ -97,7 +120,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating SolutionSelectorComponent');
             // Solution Selector Component
-            this.solutionSelectorComponent = this.componentFactory.createSolutionSelector({
+            this.solutionSelectorComponent = componentFactory.createSolutionSelector({
                 id: 'envVars-solutionSelector',
                 label: 'Filter by Solution (Optional)',
                 placeholder: 'All Solutions',
@@ -109,7 +132,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating ActionBarComponent');
             // Action Bar Component
-            this.actionBarComponent = this.componentFactory.createActionBar({
+            this.actionBarComponent = componentFactory.createActionBar({
                 id: 'envVars-actions',
                 actions: [
                     {
@@ -141,7 +164,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating DataTableComponent');
             // Data Table Component
-            this.dataTableComponent = this.componentFactory.createDataTable({
+            this.dataTableComponent = componentFactory.createDataTable({
                 id: 'envVars-table',
                 columns: [
                     {
@@ -251,10 +274,10 @@ export class EnvironmentVariablesPanel extends BasePanel {
     protected getHtmlContent(): string {
         this.componentLogger.trace('Generating HTML content');
         try {
-            if (!this.environmentSelectorComponent || !this.solutionSelectorComponent || 
+            if (!this.environmentSelectorComponent || !this.solutionSelectorComponent ||
                 !this.actionBarComponent || !this.dataTableComponent) {
                 this.componentLogger.warn('Components not initialized when generating HTML');
-                return this.getErrorHtml('Failed to initialize components');
+                return this.getErrorHtml('Environment Variables', 'Failed to initialize components');
             }
 
             this.componentLogger.trace('Using simple PanelComposer.compose() as specified in architecture');
@@ -269,39 +292,8 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
         } catch (error) {
             this.componentLogger.error('Error generating HTML content', error as Error);
-            return this.getErrorHtml('Failed to generate panel content: ' + error);
+            return this.getErrorHtml('Environment Variables', 'Failed to generate panel content: ' + error);
         }
-    }
-
-    private getErrorHtml(message: string): string {
-        return `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Environment Variables - Error</title>
-                <style>
-                    body {
-                        font-family: var(--vscode-font-family);
-                        color: var(--vscode-errorForeground);
-                        background: var(--vscode-editor-background);
-                        padding: 20px;
-                        text-align: center;
-                    }
-                    .error-icon {
-                        font-size: 48px;
-                        margin-bottom: 16px;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="error-icon">⚠️</div>
-                <h2>Environment Variables Error</h2>
-                <p>${message}</p>
-            </body>
-            </html>
-        `;
     }
 
     private async loadEnvironments(): Promise<void> {
@@ -422,18 +414,18 @@ export class EnvironmentVariablesPanel extends BasePanel {
         }
     }
 
-    private transformEnvironmentVariablesData(data: any): any[] {
+    private transformEnvironmentVariablesData(data: EnvironmentVariableData): EnvironmentVariableTableRow[] {
         const definitions = data.definitions || [];
         const values = data.values || [];
 
         // Create a map of environment variable values by definition ID
-        const valuesMap = new Map();
-        values.forEach((value: any) => {
+        const valuesMap = new Map<string, EnvironmentVariableValue>();
+        values.forEach((value: EnvironmentVariableValue) => {
             valuesMap.set(value.environmentvariabledefinitionid, value);
         });
 
         // Transform definitions to include values and formatting for table display
-        return definitions.map((def: any) => {
+        return definitions.map((def: EnvironmentVariableDefinition): EnvironmentVariableTableRow => {
             const value = valuesMap.get(def.environmentvariabledefinitionid);
             return {
                 id: def.environmentvariabledefinitionid,
@@ -444,7 +436,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 currentValue: value ? value.value : '<em>No value set</em>',
                 isManaged: def.ismanaged ? 'Yes' : 'No',
                 modifiedOn: this.formatDate(value ? value.modifiedon : def.modifiedon),
-                modifiedBy: value ? value.modifiedby : def.modifiedby || ''
+                modifiedBy: (value ? value.modifiedby : def.modifiedby) || ''
             };
         });
     }
@@ -465,7 +457,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
         return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
     }
 
-    private async handleSyncDeploymentSettings(environmentVariablesData: any, solutionUniqueName?: string): Promise<void> {
+    private async handleSyncDeploymentSettings(environmentVariablesData: EnvironmentVariableData, solutionUniqueName?: string): Promise<void> {
         try {
             const deploymentSettingsService = ServiceFactory.getDeploymentSettingsService();
             
@@ -554,7 +546,6 @@ export class EnvironmentVariablesPanel extends BasePanel {
         this.solutionSelectorComponent?.dispose();
         this.actionBarComponent?.dispose();
         this.dataTableComponent?.dispose();
-        this.componentFactory?.dispose();
 
         super.dispose();
     }

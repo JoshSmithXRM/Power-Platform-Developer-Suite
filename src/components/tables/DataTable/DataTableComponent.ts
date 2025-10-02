@@ -160,6 +160,13 @@ export class DataTableComponent extends BaseComponent {
     }
 
     /**
+     * Get component type identifier
+     */
+    public getType(): string {
+        return 'DataTable';
+    }
+
+    /**
      * Set table data
      */
     public setData(data: DataTableRow[]): void {

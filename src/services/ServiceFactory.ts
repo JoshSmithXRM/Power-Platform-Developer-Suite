@@ -13,6 +13,8 @@ import { MetadataService } from './MetadataService';
 import { DataverseQueryService } from './DataverseQueryService';
 import { DataverseMetadataService } from './DataverseMetadataService';
 import { LoggerService } from './LoggerService';
+import { ComponentFactory } from '../factories/ComponentFactory';
+import { PanelComposer } from '../factories/PanelComposer';
 
 export class ServiceFactory {
     private static authService: AuthenticationService;
@@ -27,6 +29,8 @@ export class ServiceFactory {
     private static dataverseQueryService: DataverseQueryService;
     private static dataverseMetadataService: DataverseMetadataService;
     private static loggerService: LoggerService;
+    private static componentFactory: ComponentFactory;
+    private static panelComposers: Map<string, PanelComposer> = new Map();
     private static initialized = false;
     
     static initialize(context: vscode.ExtensionContext): void {
@@ -144,7 +148,22 @@ export class ServiceFactory {
     static getUrlBuilderService(): typeof UrlBuilderService {
         return UrlBuilderService;
     }
-    
+
+    static getComponentFactory(): ComponentFactory {
+        if (!ServiceFactory.componentFactory) {
+            ServiceFactory.componentFactory = new ComponentFactory();
+        }
+        return ServiceFactory.componentFactory;
+    }
+
+    static getPanelComposer(extensionUri: vscode.Uri): PanelComposer {
+        const uriKey = extensionUri.toString();
+        if (!ServiceFactory.panelComposers.has(uriKey)) {
+            ServiceFactory.panelComposers.set(uriKey, new PanelComposer(extensionUri));
+        }
+        return ServiceFactory.panelComposers.get(uriKey)!;
+    }
+
     static isInitialized(): boolean {
         return ServiceFactory.initialized;
     }

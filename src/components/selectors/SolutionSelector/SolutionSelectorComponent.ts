@@ -104,6 +104,13 @@ export class SolutionSelectorComponent extends BaseComponent {
     }
 
     /**
+     * Get component type identifier
+     */
+    public getType(): string {
+        return 'SolutionSelector';
+    }
+
+    /**
      * Set solutions list
      */
     public setSolutions(solutions: Solution[]): void {

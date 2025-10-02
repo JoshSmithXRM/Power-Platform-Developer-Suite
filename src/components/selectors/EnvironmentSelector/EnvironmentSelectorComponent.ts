@@ -67,6 +67,13 @@ export class EnvironmentSelectorComponent extends BaseComponent {
     }
 
     /**
+     * Get component type identifier
+     */
+    public getType(): string {
+        return 'EnvironmentSelector';
+    }
+
+    /**
      * Set the list of available environments
      */
     public setEnvironments(environments: Environment[]): void {

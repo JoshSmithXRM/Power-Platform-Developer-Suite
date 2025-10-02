@@ -12,6 +12,25 @@ import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarCom
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
 
 import { BasePanel } from './base/BasePanel';
+import { Solution } from '../components/base/ComponentInterface';
+import { RelationshipResult, FlowConnectionRelationship } from '../services/ConnectionReferencesService';
+
+// UI-specific types for table display
+interface ConnectionReferencesTableRow {
+    id: string;
+    flowName: string;
+    connectionReference: string;
+    connectorType: string;
+    connectionName: string;
+    isManaged: string;
+    modifiedOn: string;
+    modifiedBy: string;
+}
+
+interface ConnectionReferencesSyncMetadata {
+    uniqueSolutionIds: string[];
+    relationshipTypes: string[];
+}
 
 export class ConnectionReferencesPanel extends BasePanel {
     public static readonly viewType = 'connectionReferences';
@@ -21,8 +40,7 @@ export class ConnectionReferencesPanel extends BasePanel {
     private solutionSelectorComponent?: SolutionSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
     private dataTableComponent?: DataTableComponent;
-    private composer: PanelComposer;
-    private componentFactory: ComponentFactory;
+    private currentRelationshipData?: RelationshipResult; // Store original service data for deployment settings
 
     public static createOrShow(extensionUri: vscode.Uri): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
@@ -55,9 +73,6 @@ export class ConnectionReferencesPanel extends BasePanel {
             title: 'Connection References'
         });
 
-        this.componentFactory = new ComponentFactory();
-        this.composer = new PanelComposer(extensionUri);
-
         this.panel.onDidDispose(() => {
             ConnectionReferencesPanel.currentPanel = undefined;
         });
@@ -65,9 +80,14 @@ export class ConnectionReferencesPanel extends BasePanel {
         this.componentLogger.debug('Constructor starting');
 
         this.initializeComponents();
-        
-        // Set up event bridges for component communication
-        this.setupComponentEventBridges();
+
+        // Set up event bridges for component communication using BasePanel method
+        this.setupComponentEventBridges([
+            this.environmentSelectorComponent,
+            this.solutionSelectorComponent,
+            this.actionBarComponent,
+            this.dataTableComponent
+        ]);
 
         // Initialize the panel (this calls updateWebview which calls getHtmlContent)
         this.initialize();
@@ -81,9 +101,11 @@ export class ConnectionReferencesPanel extends BasePanel {
     private initializeComponents(): void {
         this.componentLogger.debug('Initializing components');
         try {
+            const componentFactory = ServiceFactory.getComponentFactory();
+
             this.componentLogger.trace('Creating EnvironmentSelectorComponent');
             // Environment Selector Component
-            this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
+            this.environmentSelectorComponent = componentFactory.createEnvironmentSelector({
                 id: 'connectionRefs-envSelector',
                 label: 'Select Environment',
                 placeholder: 'Choose an environment to view connection references...',
@@ -100,7 +122,7 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating SolutionSelectorComponent');
             // Solution Selector Component
-            this.solutionSelectorComponent = this.componentFactory.createSolutionSelector({
+            this.solutionSelectorComponent = componentFactory.createSolutionSelector({
                 id: 'connectionRefs-solutionSelector',
                 label: 'Filter by Solution (Optional)',
                 placeholder: 'All Solutions',
@@ -111,7 +133,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                 showManaged: true,
                 showUnmanaged: true,
                 className: 'connection-references-solution-selector',
-                onSelectionChange: (selectedSolutions: any[]) => {
+                onSelectionChange: (selectedSolutions: Solution[]) => {
                     const solutionId = selectedSolutions.length > 0 ? selectedSolutions[0].id : '';
                     this.componentLogger.debug('Solution onSelectionChange triggered', { solutionId, selectedSolutions });
                     this.handleSolutionSelection(solutionId);
@@ -121,7 +143,7 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating ActionBarComponent');
             // Action Bar Component
-            this.actionBarComponent = this.componentFactory.createActionBar({
+            this.actionBarComponent = componentFactory.createActionBar({
                 id: 'connectionRefs-actions',
                 actions: [
                     {
@@ -153,7 +175,7 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating DataTableComponent');
             // Data Table Component
-            this.dataTableComponent = this.componentFactory.createDataTable({
+            this.dataTableComponent = componentFactory.createDataTable({
                 id: 'connectionRefs-table',
                 columns: [
                     {
@@ -224,116 +246,6 @@ export class ConnectionReferencesPanel extends BasePanel {
             this.componentLogger.error('Error initializing components', error as Error);
             vscode.window.showErrorMessage('Failed to initialize Connection References panel');
         }
-    }
-
-    /**
-     * Get component type from component instance
-     */
-    private getComponentType(component: any): string {
-        if (!component) {
-            this.componentLogger.warn('getComponentType called with null/undefined component');
-            return 'Unknown';
-        }
-        
-        const constructor = component.constructor;
-        const className = constructor.name;
-        
-        // Map class names to component types
-        const typeMapping: { [key: string]: string } = {
-            'DataTableComponent': 'DataTable',
-            'EnvironmentSelectorComponent': 'EnvironmentSelector', 
-            'SolutionSelectorComponent': 'SolutionSelector',
-            'ActionBarComponent': 'ActionBar',
-            'SearchFormComponent': 'SearchForm',
-            'FilterFormComponent': 'FilterForm'
-        };
-        
-        const mappedType = typeMapping[className] || className || 'Unknown';
-        
-        this.componentLogger.trace('Component type mapped', { 
-            className, 
-            mappedType, 
-            hasComponent: !!component 
-        });
-        
-        return mappedType;
-    }
-
-    /**
-     * Set up event bridges to forward component events to webview
-     */
-    private setupComponentEventBridges(): void {
-        this.componentLogger.debug('Setting up component event bridges');
-        
-        const components = [
-            this.environmentSelectorComponent,
-            this.solutionSelectorComponent,
-            this.actionBarComponent,
-            this.dataTableComponent
-        ].filter(Boolean); // Filter out any undefined components
-        
-        components.forEach(component => {
-            if (component) {
-                // Set up update event bridge
-                component.on('update', (event) => {
-                    this.componentLogger.trace('Component update event received', { 
-                        componentId: event.componentId 
-                    });
-                    
-                    // Get component data for update
-                    const componentData = (component as any).getData?.() || null;
-                    const componentType = this.getComponentType(component);
-                    
-                    const dataLength = Array.isArray(componentData) ? componentData.length : 
-                                      componentData?.solutions?.length || 
-                                      (componentData ? Object.keys(componentData).length : 0);
-                    
-                    this.componentLogger.debug('Event bridge forwarding component update to webview', {
-                        componentId: event.componentId,
-                        componentType: componentType,
-                        dataLength: dataLength
-                    });
-                    
-                    
-                    // For components that need HTML regeneration (like SolutionSelector with dynamic options)
-                    let messageData = componentData;
-                    if (componentType === 'SolutionSelector' && componentData?.solutions) {
-                        // Include fresh HTML in the data for HTML-regenerating components
-                        const componentHtml = (component as any).generateHTML();
-                        messageData = {
-                            ...componentData,
-                            html: componentHtml,
-                            requiresHtmlUpdate: true
-                        };
-                    }
-                    
-                    this.postMessage({
-                        action: 'componentUpdate',
-                        componentId: event.componentId,
-                        componentType: componentType,
-                        data: messageData
-                    });
-                    
-                    this.componentLogger.trace('Event bridge message posted to webview');
-                });
-                
-                // Set up state change event bridge
-                component.on('stateChange', (event) => {
-                    this.componentLogger.trace('Component state change event received', { 
-                        componentId: event.componentId 
-                    });
-                    this.postMessage({
-                        action: 'componentStateChange',
-                        componentId: event.componentId,
-                        state: event.state
-                    });
-                });
-            }
-        });
-        
-        this.componentLogger.info('Component event bridges set up', { 
-            bridgeCount: components.length 
-        });
     }
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
@@ -444,13 +356,17 @@ export class ConnectionReferencesPanel extends BasePanel {
                         await this.refreshConnectionReferences();
                         break;
                     case 'syncDeploymentBtn': {
-                        // Get current data for deployment settings sync
-                        const currentData = this.dataTableComponent?.getData() || [];
+                        // Use original service data for deployment settings sync
+                        if (!this.currentRelationshipData) {
+                            this.postMessage({ action: 'error', message: 'No relationship data available for sync' });
+                            break;
+                        }
                         const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
-                        
-                        await this.handleSyncDeploymentSettings({
-                            relationships: currentData
-                        }, selectedSolution?.uniqueName);
+
+                        await this.handleSyncDeploymentSettings(
+                            this.currentRelationshipData,
+                            selectedSolution?.uniqueName
+                        );
                         break;
                     }
                     case 'openInMakerBtn': {
@@ -576,6 +492,9 @@ export class ConnectionReferencesPanel extends BasePanel {
             const crService = ServiceFactory.getConnectionReferencesService();
             const relationships = await crService.aggregateRelationships(environmentId, solutionId);
 
+            // Store original service data for deployment settings
+            this.currentRelationshipData = relationships;
+
             this.componentLogger.debug('Connection references loaded', {
                 flows: relationships?.flows?.length || 0,
                 connectionReferences: relationships?.connectionReferences?.length || 0,
@@ -604,8 +523,8 @@ export class ConnectionReferencesPanel extends BasePanel {
                     length: tableData.relationships?.length,
                     hasIdProperty: tableData.relationships?.[0]?.id !== undefined,
                     sampleRow: tableData.relationships?.[0],
-                    uniqueSolutionIds: [...new Set(tableData.relationships?.map((r: any) => r.solutionId).filter(Boolean))],
-                    relationshipTypes: [...new Set(tableData.relationships?.map((r: any) => r.relationshipType))]
+                    uniqueSolutionIds: [...new Set(relationships.relationships?.map(r => r.solutionId).filter(Boolean))],
+                    relationshipTypes: [...new Set(relationships.relationships?.map(r => r.relationshipType))]
                 });
                 this.dataTableComponent.setData(tableData.relationships || []);
                 this.componentLogger.trace('setData() call completed - event bridge should have forwarded to webview');
@@ -629,18 +548,20 @@ export class ConnectionReferencesPanel extends BasePanel {
         }
     }
 
-    private transformConnectionReferencesData(relationships: any): any {
-        if (!relationships || !relationships.relationships) {
-            this.componentLogger.debug('No relationships data to transform', { relationships });
+    private transformConnectionReferencesData(
+        data: RelationshipResult
+    ): { relationships: ConnectionReferencesTableRow[]; metadata?: ConnectionReferencesSyncMetadata } {
+        if (!data || !data.relationships) {
+            this.componentLogger.debug('No relationships data to transform', { data });
             return { relationships: [] };
         }
 
-        const relationshipItems = relationships.relationships || [];
+        const relationshipItems = data.relationships;
         this.componentLogger.debug('Transforming relationships for table display', {
             relationshipCount: relationshipItems.length
         });
 
-        const transformedRelationships = relationshipItems.map((rel: any) => ({
+        const transformedRelationships: ConnectionReferencesTableRow[] = relationshipItems.map((rel: FlowConnectionRelationship) => ({
             id: rel.id, // Already has unique ID from service
             flowName: rel.flowName || 'No Flow Associated',
             connectionReference: rel.connectionReferenceLogicalName || 'No Connection Reference',
@@ -665,7 +586,10 @@ export class ConnectionReferencesPanel extends BasePanel {
         return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
     }
 
-    private async handleSyncDeploymentSettings(relationships: any, solutionUniqueName?: string): Promise<void> {
+    private async handleSyncDeploymentSettings(
+        relationshipData: RelationshipResult,
+        solutionUniqueName?: string
+    ): Promise<void> {
         try {
             const deploymentSettingsService = ServiceFactory.getDeploymentSettingsService();
 
@@ -678,7 +602,7 @@ export class ConnectionReferencesPanel extends BasePanel {
             const isNewFile = !fs.existsSync(filePath);
 
             // Sync connection references with the file
-            const result = await deploymentSettingsService.syncConnectionReferences(filePath, relationships, isNewFile);
+            const result = await deploymentSettingsService.syncConnectionReferences(filePath, relationshipData, isNewFile);
 
             // Send success message back to UI
             this.postMessage({
@@ -753,7 +677,7 @@ export class ConnectionReferencesPanel extends BasePanel {
             if (!this.environmentSelectorComponent || !this.solutionSelectorComponent ||
                 !this.actionBarComponent || !this.dataTableComponent) {
                 this.componentLogger.warn('Components not initialized when generating HTML');
-                return this.getErrorHtml('Failed to initialize components');
+                return this.getErrorHtml('Connection References', 'Failed to initialize components');
             }
 
             this.componentLogger.trace('Using simple PanelComposer.compose() as specified in architecture');
@@ -768,39 +692,8 @@ export class ConnectionReferencesPanel extends BasePanel {
 
         } catch (error) {
             this.componentLogger.error('Error generating HTML content', error as Error);
-            return this.getErrorHtml('Failed to generate panel content: ' + error);
+            return this.getErrorHtml('Connection References', 'Failed to generate panel content: ' + error);
         }
-    }
-
-    private getErrorHtml(message: string): string {
-        return `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Connection References - Error</title>
-                <style>
-                    body {
-                        font-family: var(--vscode-font-family);
-                        color: var(--vscode-errorForeground);
-                        background: var(--vscode-editor-background);
-                        padding: 20px;
-                        text-align: center;
-                    }
-                    .error-icon {
-                        font-size: 48px;
-                        margin-bottom: 16px;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="error-icon">⚠️</div>
-                <h2>Connection References Error</h2>
-                <p>${message}</p>
-            </body>
-            </html>
-        `;
     }
 
     private async loadEnvironments(): Promise<void> {
@@ -816,7 +709,6 @@ export class ConnectionReferencesPanel extends BasePanel {
         this.solutionSelectorComponent?.dispose();
         this.actionBarComponent?.dispose();
         this.dataTableComponent?.dispose();
-        this.componentFactory?.dispose();
 
         super.dispose();
     }
