@@ -158,7 +158,6 @@ export class EnvironmentVariablesPanel extends BasePanel {
                     {
                         id: 'openInMakerBtn',
                         label: 'Open in Maker',
-                        icon: 'external-link',
                         variant: 'primary',
                         disabled: false
                     },
@@ -166,7 +165,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
                         id: 'refresh',
                         label: 'Refresh',
                         icon: 'refresh',
-                        variant: 'info',
+                        variant: 'secondary',
                         disabled: false
                     }
                 ],
@@ -218,6 +217,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 data: [],
                 sortable: true,
                 searchable: true,
+                showFooter: true,
                 className: 'environment-variables-table'
             });
             this.componentLogger.trace('DataTableComponent created successfully');
@@ -240,7 +240,10 @@ export class EnvironmentVariablesPanel extends BasePanel {
             switch (message.command) {
                 case 'environment-selected':
                 case 'environment-changed':
-                    await this.handleEnvironmentSelection(message.data?.environmentId);
+                    // Only sync component state - onChange callback will handle data loading
+                    if (this.environmentSelectorComponent && message.data?.environmentId) {
+                        this.environmentSelectorComponent.setSelectedEnvironment(message.data.environmentId);
+                    }
                     break;
 
                 case 'solution-selected':

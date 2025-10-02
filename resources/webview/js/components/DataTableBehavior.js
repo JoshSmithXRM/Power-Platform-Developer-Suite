@@ -645,25 +645,30 @@ class DataTableBehavior {
         const filterType = header.dataset.filterType || 'text';
         
         console.log(`Filtering column ${columnId} (index: ${columnIndex}, type: ${filterType}) with value: "${filterValue}"`);
-        
+
         let visibleRowCount = 0;
-        
+        const totalRowCount = rows.length;
+
         rows.forEach(row => {
             const cell = row.children[columnIndex];
             if (!cell) {
                 row.style.display = 'none';
                 return;
             }
-            
+
             const cellValue = this.getCellFilterValue(cell, filterType);
             const isVisible = this.matchesFilter(cellValue, filterValue, filterType);
-            
+
             row.style.display = isVisible ? '' : 'none';
             if (isVisible) visibleRowCount++;
         });
-        
+
         console.log(`Filter applied: ${visibleRowCount} of ${rows.length} rows visible`);
-        
+
+        // Update footer count
+        const isFiltered = filterValue && filterValue.toString().trim() !== '';
+        this.updateSearchCount(visibleRowCount, totalRowCount, isFiltered);
+
         // Update empty state if no rows are visible
         this.updateEmptyStateVisibility(visibleRowCount === 0);
     }
@@ -761,7 +766,7 @@ class DataTableBehavior {
     updateEmptyStateVisibility(isEmpty) {
         const table = this.container || this.table.closest('.data-table');
         if (!table) return;
-        
+
         const emptyState = table.querySelector('.data-table-empty-state');
         if (emptyState) {
             if (isEmpty) {
@@ -774,7 +779,21 @@ class DataTableBehavior {
             }
         }
     }
-    
+
+    /**
+     * Update footer count after client-side search/filter
+     */
+    updateSearchCount(visibleCount, totalCount, isFiltered) {
+        const pageInfo = this.container?.querySelector('.page-info') || this.container?.querySelector('.data-table-page-info');
+        if (!pageInfo) return;
+
+        const newText = isFiltered
+            ? `Showing ${visibleCount} of ${totalCount} items`
+            : `Showing ${totalCount} items`;
+
+        pageInfo.textContent = newText;
+    }
+
     /**
      * Show Power Platform-style filter dropdown
      */
@@ -969,24 +988,28 @@ class DataTableBehavior {
      */
     clearAllFilters() {
         console.log(`Clearing all filters for table ${this.tableId}`);
-        
+
         // Show all rows
         const tbody = this.table.querySelector('tbody');
         if (tbody) {
             const rows = tbody.querySelectorAll('tr');
+            const totalRowCount = rows.length;
             rows.forEach(row => {
                 row.style.display = '';
             });
+
+            // Update footer count
+            this.updateSearchCount(totalRowCount, totalRowCount, false);
         }
-        
+
         // Clear filter state
         if (this.activeFilters) {
             this.activeFilters.clear();
         }
-        
+
         // Hide empty state
         this.updateEmptyStateVisibility(false);
-        
+
         console.log(`All filters cleared for table ${this.tableId}`);
     }
     
@@ -1010,6 +1033,7 @@ class DataTableBehavior {
 
         const searchQuery = (query || '').toLowerCase().trim();
         let visibleRowCount = 0;
+        const totalRowCount = rows.length;
 
         // Show all rows if search is empty
         if (searchQuery === '') {
@@ -1017,6 +1041,7 @@ class DataTableBehavior {
                 row.style.display = '';
             });
             this.updateEmptyStateVisibility(false);
+            this.updateSearchCount(totalRowCount, totalRowCount, false);
             console.log(`Search cleared: all ${rows.length} rows visible`);
             return;
         }
@@ -1040,6 +1065,9 @@ class DataTableBehavior {
         });
 
         console.log(`Search applied: ${visibleRowCount} of ${rows.length} rows visible`);
+
+        // Update footer count
+        this.updateSearchCount(visibleRowCount, totalRowCount, true);
 
         // Update empty state if no rows are visible
         this.updateEmptyStateVisibility(visibleRowCount === 0);
@@ -1529,7 +1557,7 @@ class DataTableBehavior {
 
                     // Update table data if provided
                     if (data.data && Array.isArray(data.data)) {
-                        this.updateTableData(data.data);
+                        this.updateTableData(data.data, data);
                     }
                 } else {
                     console.log(`DataTableBehavior: componentUpdate received unexpected format:`, data);
@@ -1562,7 +1590,7 @@ class DataTableBehavior {
     /**
      * Update table data efficiently without full HTML regeneration
      */
-    updateTableData(data) {
+    updateTableData(data, componentData = {}) {
         console.log(`DataTableBehavior: Updating table ${this.tableId} with ${data.length} rows`);
         
         const tbody = this.table.querySelector('tbody');
@@ -1619,13 +1647,30 @@ class DataTableBehavior {
         
         // Clear existing rows
         tbody.innerHTML = '';
-        
+
         // Add new rows
         data.forEach(rowData => {
             const tr = this.createTableRow(rowData);
             tbody.appendChild(tr);
         });
-        
+
+        // Update footer with row counts
+        const visibleCount = data.length; // Filtered/visible rows
+        const totalCount = componentData.totalRows !== undefined ? componentData.totalRows : data.length; // Total unfiltered rows
+        const pageInfo = this.container?.querySelector('.page-info') || this.container?.querySelector('.data-table-page-info');
+        if (pageInfo) {
+            const hasFilters = componentData.filters && Object.keys(componentData.filters).some(key => componentData.filters[key]);
+            const searchActive = componentData.searchQuery && componentData.searchQuery.trim() !== '';
+            const isFiltered = hasFilters || searchActive;
+
+            // Show "X of Y" when filtered, "X" when not
+            const newText = isFiltered
+                ? `Showing ${visibleCount} of ${totalCount} items`
+                : `Showing ${totalCount} items`;
+
+            pageInfo.textContent = newText;
+        }
+
     }
     
     /**
@@ -1715,334 +1760,6 @@ class DataTableBehavior {
     }
 }
 
-// Static behavior object for ComponentUtils integration
-const DataTableBehaviorStatic = {
-    instances: new Map(),
-    
-    /**
-     * Initialize a data table behavior instance
-     */
-    initialize(componentId, config, element) {
-        if (this.instances.has(componentId)) {
-            return this.instances.get(componentId);
-        }
-        
-        const table = element || document.getElementById(componentId);
-        if (!table) {
-            console.error(`DataTable element with ID '${componentId}' not found`);
-            return null;
-        }
-        
-        // Create behavior instance using existing class
-        const behaviorInstance = new DataTableBehavior(componentId);
-        
-        const instance = {
-            id: componentId,
-            config: config || {},
-            element: table,
-            behaviorInstance: behaviorInstance
-        };
-        
-        this.instances.set(componentId, instance);
-        
-        return instance;
-    },
-    
-    /**
-     * Handle messages from Extension Host
-     */
-    handleMessage(message) {
-        
-        if (!message || !message.componentId) {
-            console.warn('DataTable handleMessage: Invalid message format', message);
-            return;
-        }
-        
-        const instance = this.instances.get(message.componentId);
-        if (!instance) {
-            console.warn(`DataTable instance not found: ${message.componentId}. Available instances:`, Array.from(this.instances.keys()));
-            return;
-        }
-        
-        
-        switch (message.action) {
-            case 'componentUpdate':
-                this.updateDisplayData(message.componentId, message.data);
-                break;
-            case 'componentStateChange':
-                this.updateState(message.componentId, message.data);
-                break;
-            case 'setData':
-                this.updateDisplayData(message.componentId, message.data);
-                break;
-            case 'setColumns':
-                this.updateColumns(message.componentId, message.data);
-                break;
-            case 'setLoading':
-                this.setLoadingState(message.componentId, message.data);
-                break;
-            default:
-                console.warn(`Unknown DataTable action: ${message.action}`);
-        }
-    },
-    
-    /**
-     * Update table data efficiently without full page reload
-     */
-    updateDisplayData(componentId, data) {
-        
-        const instance = this.instances.get(componentId);
-        if (!instance) {
-            console.error(`DataTable instance not found for update: ${componentId}`);
-            return;
-        }
-        
-        console.log(`Updating DataTable ${componentId} with ${data?.length || 0} rows`);
-        
-        try {
-            const tbody = instance.element.querySelector('tbody');
-            if (!tbody) {
-                console.error(`Table body not found in ${componentId}`);
-                return;
-            }
-            
-            // Clear existing rows
-            tbody.innerHTML = '';
-            
-            if (!data || !Array.isArray(data)) {
-                this.showEmptyState(instance);
-                return;
-            }
-            
-            // Add new rows
-            data.forEach((rowData, index) => {
-                const row = this.createTableRow(instance, rowData, index);
-                if (row) {
-                    tbody.appendChild(row);
-                }
-            });
-            
-            // Update table meta information
-            this.updateTableMeta(instance, data);
-            
-            console.log(`DataTable ${componentId} updated successfully with ${data.length} rows`);
-            
-        } catch (error) {
-            console.error(`Error updating DataTable ${componentId}:`, error);
-            this.showErrorState(instance, error.message);
-        }
-    },
-    
-    /**
-     * Create a table row from data
-     */
-    createTableRow(instance, rowData, index) {
-        if (!rowData || !rowData.id) {
-            console.warn('Row data missing required id field:', rowData);
-            return null;
-        }
-        
-        const tr = document.createElement('tr');
-        tr.setAttribute('data-row-id', rowData.id);
-        tr.setAttribute('data-row-index', index.toString());
-        
-        // Get current column configuration
-        const table = instance.element;
-        const headers = table.querySelectorAll('thead th[data-column-id]');
-        
-        headers.forEach(header => {
-            const columnId = header.getAttribute('data-column-id');
-            const td = document.createElement('td');
-            
-            // Get cell value
-            const cellValue = rowData[columnId];
-            if (cellValue !== null && cellValue !== undefined) {
-                // Handle HTML content or plain text
-                if (typeof cellValue === 'string' && cellValue.includes('<')) {
-                    td.innerHTML = cellValue;
-                } else {
-                    td.textContent = cellValue.toString();
-                }
-            } else {
-                td.textContent = '';
-            }
-            
-            td.className = `table-cell table-cell-${columnId}`;
-            td.setAttribute('data-column-id', columnId);
-            
-            tr.appendChild(td);
-        });
-        
-        // Add row actions if configured
-        if (instance.config.onRowAction) {
-            tr.addEventListener('click', (e) => {
-                if (e.target.closest('.row-action')) {
-                    const action = e.target.closest('.row-action').getAttribute('data-action');
-                    this.handleRowAction(instance, action, rowData);
-                }
-            });
-        }
-        
-        return tr;
-    },
-    
-    /**
-     * Handle row actions
-     */
-    handleRowAction(instance, action, rowData) {
-        console.log(`Row action triggered: ${action} on row:`, rowData);
-        
-        // Send action back to Extension Host
-        if (typeof ComponentUtils !== 'undefined') {
-            ComponentUtils.sendMessage('component-action', {
-                componentId: instance.id,
-                action: 'rowAction',
-                data: {
-                    action: action,
-                    rowData: rowData
-                },
-                timestamp: Date.now()
-            });
-        }
-    },
-    
-    /**
-     * Update table metadata (row count, pagination, etc.)
-     */
-    updateTableMeta(instance, data) {
-        const table = instance.element.closest('.data-table');
-        if (!table) return;
-        
-        // Update row count
-        const rowCountElement = table.querySelector('.table-row-count');
-        if (rowCountElement) {
-            rowCountElement.textContent = `${data.length} rows`;
-        }
-        
-        // Update empty state visibility - use correct CSS class
-        const emptyState = table.querySelector('.data-table-empty-state');
-        if (emptyState) {
-            if (data.length === 0) {
-                emptyState.classList.add('visible');
-                emptyState.style.display = 'block';
-            } else {
-                emptyState.classList.remove('visible');
-                emptyState.style.display = 'none';
-            }
-        }
-        
-        // Re-enable sorting and filtering
-        if (instance.behaviorInstance && instance.behaviorInstance.setupSorting) {
-            instance.behaviorInstance.setupSorting();
-            instance.behaviorInstance.setupFiltering();
-        }
-    },
-    
-    /**
-     * Show empty state
-     */
-    showEmptyState(instance) {
-        const table = instance.element.closest('.data-table');
-        if (!table) return;
-        
-        // Clear tbody content
-        const tbody = instance.element.querySelector('tbody');
-        if (tbody) {
-            tbody.innerHTML = '';
-        }
-        
-        // Show the dedicated empty state element
-        const emptyState = table.querySelector('.data-table-empty-state');
-        if (emptyState) {
-            emptyState.classList.add('visible');
-            emptyState.style.display = 'block';
-        }
-    },
-    
-    /**
-     * Show error state
-     */
-    showErrorState(instance, error) {
-        const table = instance.element.closest('.data-table');
-        if (!table) return;
-        
-        const tbody = instance.element.querySelector('tbody');
-        if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="100%" class="error-state">Error loading data: ${error}</td></tr>`;
-        }
-    },
-    
-    /**
-     * Update component state
-     */
-    updateState(componentId, state) {
-        const instance = this.instances.get(componentId);
-        if (!instance) return;
-        
-        console.log(`Updating state for ${componentId}:`, state);
-        
-        // Update configuration
-        instance.config = { ...instance.config, ...state.config };
-        
-        // Handle specific state changes
-        if (state.loading !== undefined) {
-            this.setLoadingState(componentId, state.loading);
-        }
-    },
-    
-    /**
-     * Set loading state
-     */
-    setLoadingState(componentId, isLoading) {
-        const instance = this.instances.get(componentId);
-        if (!instance) return;
-        
-        const table = instance.element.closest('.data-table');
-        if (!table) return;
-        
-        if (isLoading) {
-            table.classList.add('table-loading');
-            const tbody = instance.element.querySelector('tbody');
-            if (tbody) {
-                tbody.innerHTML = '<tr><td colspan="100%" class="loading-state">Loading...</td></tr>';
-            }
-        } else {
-            table.classList.remove('table-loading');
-        }
-    },
-    
-    /**
-     * Update table columns
-     */
-    updateColumns(componentId, columns) {
-        const instance = this.instances.get(componentId);
-        if (!instance) return;
-        
-        console.log(`Updating columns for ${componentId}:`, columns);
-        // This would require more complex table header reconstruction
-        // For now, log and potentially trigger full table rebuild
-        console.warn('Column updates require full table rebuild - consider using updateWebview()');
-    },
-    
-    /**
-     * Get instance by component ID
-     */
-    getInstance(componentId) {
-        return this.instances.get(componentId);
-    },
-    
-    /**
-     * Cleanup instance
-     */
-    dispose(componentId) {
-        const instance = this.instances.get(componentId);
-        if (instance && instance.behaviorInstance) {
-            instance.behaviorInstance.destroy();
-        }
-        this.instances.delete(componentId);
-        console.log(`DataTable behavior disposed: ${componentId}`);
-    }
-};
 
 // ✅ REQUIRED: Component Registry Pattern for ComponentUtils integration
 if (typeof window !== 'undefined') {

@@ -161,7 +161,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                     {
                         id: 'openInMakerBtn',
                         label: 'Open in Maker',
-                        icon: 'external-link',
                         variant: 'primary',
                         disabled: false
                     },
@@ -169,7 +168,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                         id: 'refreshBtn',
                         label: 'Refresh',
                         icon: 'refresh',
-                        variant: 'info',
+                        variant: 'secondary',
                         disabled: false
                     }
                 ],
@@ -262,16 +261,16 @@ export class ConnectionReferencesPanel extends BasePanel {
             }
 
             const { command } = message;
-            
-            this.componentLogger.debug('Message received', { 
-                command, 
+
+            this.componentLogger.debug('Message received', {
+                command,
                 componentId: message.data?.componentId,
                 eventType: message.data?.eventType
             });
-            
+
             // Handle empty or undefined command
             if (!command) {
-                this.componentLogger.trace('Received message with no command property', { 
+                this.componentLogger.trace('Received message with no command property', {
                     message,
                     keys: Object.keys(message || {}),
                     hasData: !!message.data,
@@ -279,7 +278,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                 });
                 return;
             }
-            
+
             switch (command) {
                 case 'component-event':
                     await this.handleComponentEvent(message);
@@ -287,7 +286,10 @@ export class ConnectionReferencesPanel extends BasePanel {
 
                 case 'environment-selected':
                 case 'environment-changed':
-                    await this.handleEnvironmentSelection(message.data?.environmentId);
+                    // Only sync component state - onChange callback will handle data loading
+                    if (this.environmentSelectorComponent && message.data?.environmentId) {
+                        this.environmentSelectorComponent.setSelectedEnvironment(message.data.environmentId);
+                    }
                     break;
 
                 case 'refresh-data':
@@ -322,7 +324,7 @@ export class ConnectionReferencesPanel extends BasePanel {
         try {
             // ComponentUtils.sendMessage puts everything in message.data
             const { componentId, eventType, data } = message.data || {};
-            
+
             // Log based on event significance
             if (eventType === 'selectionChanged') {
                 // Business event - INFO level
@@ -366,7 +368,7 @@ export class ConnectionReferencesPanel extends BasePanel {
             // Handle action bar events
             if (componentId === 'connectionRefs-actions' && eventType === 'actionClicked') {
                 const { actionId } = data;
-                
+
                 switch (actionId) {
                     case 'refreshBtn':
                         await this.refreshConnectionReferences();
@@ -406,9 +408,9 @@ export class ConnectionReferencesPanel extends BasePanel {
             this.componentLogger.trace('Component event not handled', { componentId, eventType });
 
         } catch (error) {
-            this.componentLogger.error('Error handling component event', error as Error, { 
-                componentId: message.componentId, 
-                eventType: message.eventType 
+            this.componentLogger.error('Error handling component event', error as Error, {
+                componentId: message.componentId,
+                eventType: message.eventType
             });
         }
     }
@@ -485,7 +487,7 @@ export class ConnectionReferencesPanel extends BasePanel {
 
                 // Use solutions directly from service - no transformation needed
                 this.solutionSelectorComponent.setSolutions(solutions);
-                
+
                 this.componentLogger.debug('setSolutions() completed - checking component state', {
                     componentSolutions: this.solutionSelectorComponent.getSolutions().length,
                     componentFiltered: this.solutionSelectorComponent.getFilteredSolutions().length

@@ -23,6 +23,7 @@ export class DataTableComponent extends BaseComponent {
     private expandedRows: Set<string | number> = new Set();
     private columnVisibility: Map<string, boolean> = new Map();
     private columnOrder: string[] = [];
+    private hasLoadedData: boolean = false; // Track if data has been loaded at least once
 
     constructor(config: DataTableConfig) {
         const mergedConfig = { ...DEFAULT_DATA_TABLE_CONFIG, ...config } as DataTableConfig;
@@ -116,7 +117,8 @@ export class DataTableComponent extends BaseComponent {
             error: this.error,
             expandedRows: Array.from(this.expandedRows),
             columnVisibility: Object.fromEntries(this.columnVisibility),
-            columnOrder: this.columnOrder
+            columnOrder: this.columnOrder,
+            hasLoadedData: this.hasLoadedData
         };
         
         this.componentLogger.debug('ViewState created for HTML generation', {
@@ -179,7 +181,7 @@ export class DataTableComponent extends BaseComponent {
         this.data = [...data];
         this.processData();
         this.notifyUpdate();
-        
+
         this.componentLogger.info('Table data updated', {
             componentId: this.config.id,
             totalRows: this.data.length,
@@ -201,15 +203,21 @@ export class DataTableComponent extends BaseComponent {
         totalRows: number;
         currentPage: number;
         pageSize: number;
+        hasLoadedData: boolean;
+        filters: Record<string, any>;
+        searchQuery: string;
     } {
         return {
-            data: [...this.data],
+            data: [...this.processedData],
             loading: this.loading,
             loadingMessage: this.loadingMessage,
             error: this.error,
             totalRows: this.data.length,
             currentPage: this.currentPage,
-            pageSize: this.pageSize
+            pageSize: this.pageSize,
+            hasLoadedData: this.hasLoadedData,
+            filters: { ...this.filters },
+            searchQuery: this.searchQuery
         };
     }
 
@@ -575,6 +583,12 @@ export class DataTableComponent extends BaseComponent {
         if (message) {
             this.loadingMessage = message;
         }
+
+        // Mark data as loaded when loading completes
+        if (!loading) {
+            this.hasLoadedData = true;
+        }
+
         this.notifyUpdate();
     }
 

@@ -116,7 +116,6 @@ export class SolutionExplorerPanel extends BasePanel {
                     {
                         id: 'openInMaker',
                         label: 'Open in Maker',
-                        icon: 'link-external',
                         variant: 'primary',
                         disabled: true
                     },
@@ -190,6 +189,7 @@ export class SolutionExplorerPanel extends BasePanel {
                 data: [],
                 sortable: true,
                 searchable: true,
+                showFooter: true,
                 contextMenu: true,
                 contextMenuItems: SOLUTION_CONTEXT_MENU_ITEMS,
                 className: 'solutions-table'
@@ -214,7 +214,10 @@ export class SolutionExplorerPanel extends BasePanel {
             switch (message.command) {
                 case 'environment-selected':
                 case 'environment-changed':
-                    await this.handleEnvironmentSelection(message.data?.environmentId);
+                    // Only sync component state - onChange callback will handle data loading
+                    if (this.environmentSelectorComponent && message.data?.environmentId) {
+                        this.environmentSelectorComponent.setSelectedEnvironment(message.data.environmentId);
+                    }
                     break;
 
                 case 'load-solutions':
@@ -547,12 +550,6 @@ export class SolutionExplorerPanel extends BasePanel {
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
 
             if (selectedEnvironment) {
-                // Show loading state
-                if (this.dataTableComponent) {
-                    this.dataTableComponent.setData([]);
-                    this.dataTableComponent.setLoading(true, 'Refreshing solutions...');
-                }
-
                 await this.handleLoadSolutions(selectedEnvironment.id);
                 vscode.window.showInformationMessage('Solutions refreshed');
             } else {

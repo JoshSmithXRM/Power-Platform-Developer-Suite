@@ -23,6 +23,7 @@ export interface DataTableViewState {
     expandedRows: Array<string | number>;
     columnVisibility: Record<string, boolean>;
     columnOrder: string[];
+    hasLoadedData: boolean; // Track if data has been loaded at least once
 }
 
 export class DataTableView {
@@ -437,14 +438,14 @@ export class DataTableView {
         
         if (!config.paginated) {
             // Always show footer with item count, even without pagination
-            const totalItems = state.data.length;
+            const totalItems = state.totalRows; // Use totalRows for accurate count
             const hasFilters = Object.keys(state.filters).some(key => state.filters[key]);
             const searchActive = state.searchQuery && state.searchQuery.trim() !== '';
-            
+
             return `
                 <div class="data-table-pagination">
                     <div class="page-info">
-                        ${hasFilters || searchActive 
+                        ${hasFilters || searchActive
                             ? `Showing ${totalItems} filtered items`
                             : `Showing ${totalItems} items`
                         }
@@ -524,22 +525,25 @@ export class DataTableView {
      * Render empty state
      */
     private static renderEmptyState(config: DataTableConfig, state: DataTableViewState): string {
-        // Only show empty state if there's actually no data and not loading
+        // Always render the empty state div, but only show it if:
+        // 1. Data has been loaded at least once (hasLoadedData)
+        // 2. Not currently loading
+        // 3. No data available
         const hasData = state.data && state.data.length > 0;
         const isLoading = state.loading;
-        
-        if (hasData || isLoading) {
-            return '';
-        }
+        const hasLoadedData = state.hasLoadedData;
+
+        // Determine visibility: show only if no data, not loading, and has loaded at least once
+        const shouldShow = !hasData && !isLoading && hasLoadedData;
 
         return `
-            <div class="data-table-empty-state visible">
+            <div class="data-table-empty-state${shouldShow ? ' visible' : ''}" style="display: ${shouldShow ? 'block' : 'none'}">
                 ${config.emptyIcon ? `<div class="data-table-empty-icon">${config.emptyIcon}</div>` : ''}
                 <div class="data-table-empty-message">
                     ${this.escapeHtml(config.emptyMessage || 'No data available')}
                 </div>
                 ${config.emptyAction ? `
-                    <button class="data-table-empty-action" 
+                    <button class="data-table-empty-action"
                             data-component-element="empty-action">
                         ${this.escapeHtml(config.emptyAction.label)}
                     </button>

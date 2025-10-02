@@ -118,7 +118,6 @@ export class ImportJobViewerPanel extends BasePanel {
                     {
                         id: 'openSolutionHistory',
                         label: 'Open in Maker',
-                        icon: 'link-external',
                         variant: 'primary',
                         disabled: true
                     },
@@ -201,6 +200,7 @@ export class ImportJobViewerPanel extends BasePanel {
                 data: [],
                 sortable: true,
                 searchable: true,
+                showFooter: true,
                 contextMenu: true,
                 contextMenuItems: IMPORT_JOB_CONTEXT_MENU_ITEMS,
                 className: 'import-jobs-table'
@@ -225,7 +225,10 @@ export class ImportJobViewerPanel extends BasePanel {
             switch (message.command) {
                 case 'environment-selected':
                 case 'environment-changed':
-                    await this.handleEnvironmentSelection(message.data?.environmentId);
+                    // Only sync component state - onChange callback will handle data loading
+                    if (this.environmentSelectorComponent && message.data?.environmentId) {
+                        this.environmentSelectorComponent.setSelectedEnvironment(message.data.environmentId);
+                    }
                     break;
 
                 case 'load-import-jobs':
@@ -556,12 +559,6 @@ export class ImportJobViewerPanel extends BasePanel {
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
 
             if (selectedEnvironment) {
-                // Show loading state
-                if (this.dataTableComponent) {
-                    this.dataTableComponent.setData([]);
-                    this.dataTableComponent.setLoading(true, 'Refreshing import jobs...');
-                }
-
                 await this.handleLoadImportJobs(selectedEnvironment.id);
                 vscode.window.showInformationMessage('Import Jobs refreshed');
             } else {

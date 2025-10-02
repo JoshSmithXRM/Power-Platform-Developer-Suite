@@ -20,10 +20,10 @@ export class EnvironmentSelectorComponent extends BaseComponent {
         // Merge with defaults
         const mergedConfig = mergeConfig(DEFAULT_ENVIRONMENT_SELECTOR_CONFIG, config);
         super(mergedConfig);
-        
+
         this.config = mergedConfig;
         this.validateConfig();
-        
+
         // Set initial state
         if (config.selectedEnvironmentId) {
             this.selectedEnvironmentId = config.selectedEnvironmentId;
@@ -79,19 +79,19 @@ export class EnvironmentSelectorComponent extends BaseComponent {
     public setEnvironments(environments: Environment[]): void {
         const oldEnvironments = [...this.environments];
         this.environments = [...environments];
-        
+
         // If currently selected environment is no longer available, clear selection
-        if (this.selectedEnvironmentId && 
+        if (this.selectedEnvironmentId &&
             !environments.find(env => env.id === this.selectedEnvironmentId)) {
             this.clearSelection();
         }
-        
+
         this.notifyStateChange({
             environments: this.environments,
             oldEnvironments,
             selectedEnvironmentId: this.selectedEnvironmentId
         });
-        
+
         this.notifyUpdate();
     }
 
@@ -106,26 +106,30 @@ export class EnvironmentSelectorComponent extends BaseComponent {
      * Set the selected environment by ID
      */
     public setSelectedEnvironment(environmentId: string | null): void {
+        if (environmentId === this.selectedEnvironmentId) {
+            return;
+        }
+
         const oldSelectedId = this.selectedEnvironmentId;
         const environment = environmentId ? this.environments.find(env => env.id === environmentId) : null;
-        
+
         if (environmentId && !environment) {
             this.notifyError(new Error(`Environment with ID ${environmentId} not found`), 'setSelectedEnvironment');
             return;
         }
-        
+
         this.selectedEnvironmentId = environmentId;
-        
+
         // Update connection status based on selection
         this.connectionStatus = environmentId ? 'connected' : 'disconnected';
-        
+
         this.notifyStateChange({
             selectedEnvironmentId: environmentId,
             oldSelectedEnvironmentId: oldSelectedId,
             selectedEnvironment: environment,
             connectionStatus: this.connectionStatus
         });
-        
+
         // Trigger onChange callback if provided
         if (this.config.onChange) {
             try {
@@ -134,7 +138,7 @@ export class EnvironmentSelectorComponent extends BaseComponent {
                 this.notifyError(error as Error, 'onChange callback');
             }
         }
-        
+
         this.notifyUpdate();
     }
 
@@ -168,13 +172,13 @@ export class EnvironmentSelectorComponent extends BaseComponent {
     public setLoading(loading: boolean, loadingMessage?: string): void {
         const oldLoading = this.loading;
         this.loading = loading;
-        
+
         this.notifyStateChange({
             loading,
             oldLoading,
             loadingMessage
         });
-        
+
         this.notifyUpdate();
     }
 
@@ -191,12 +195,12 @@ export class EnvironmentSelectorComponent extends BaseComponent {
     public setConnectionStatus(status: 'connected' | 'disconnected' | 'error'): void {
         const oldStatus = this.connectionStatus;
         this.connectionStatus = status;
-        
+
         this.notifyStateChange({
             connectionStatus: status,
             oldConnectionStatus: oldStatus
         });
-        
+
         this.notifyUpdate();
     }
 
@@ -212,13 +216,13 @@ export class EnvironmentSelectorComponent extends BaseComponent {
      */
     public refresh(): void {
         this.setLoading(true, 'Refreshing environments...');
-        
+
         // Emit refresh event to notify parent panel
         this.emit('refresh', {
             componentId: this.getId(),
             timestamp: Date.now()
         });
-        
+
         this.notifyUpdate();
     }
 
@@ -260,14 +264,14 @@ export class EnvironmentSelectorComponent extends BaseComponent {
                 error: 'Environment selection is required'
             };
         }
-        
+
         if (this.selectedEnvironmentId && !this.getSelectedEnvironment()) {
             return {
                 isValid: false,
                 error: 'Selected environment is no longer available'
             };
         }
-        
+
         return { isValid: true };
     }
 
@@ -291,15 +295,15 @@ export class EnvironmentSelectorComponent extends BaseComponent {
      */
     protected validateConfig(): void {
         super.validateConfig();
-        
+
         if (this.config.onChange && typeof this.config.onChange !== 'function') {
             throw new Error('onChange must be a function');
         }
-        
+
         if (this.config.onError && typeof this.config.onError !== 'function') {
             throw new Error('onError must be a function');
         }
-        
+
         if (this.config.environments && !Array.isArray(this.config.environments)) {
             throw new Error('environments must be an array');
         }
@@ -310,15 +314,15 @@ export class EnvironmentSelectorComponent extends BaseComponent {
      */
     protected notifyError(error: Error, context?: string): void {
         super.notifyError(error, context);
-        
+
         // Call onError callback if provided
         if (this.config.onError) {
             try {
                 this.config.onError(error);
             } catch (callbackError) {
-                this.componentLogger.error('Error in onError callback', callbackError as Error, { 
+                this.componentLogger.error('Error in onError callback', callbackError as Error, {
                     componentId: this.config.id,
-                    originalError: error.message 
+                    originalError: error.message
                 });
             }
         }
@@ -330,7 +334,7 @@ export class EnvironmentSelectorComponent extends BaseComponent {
     public updateConfig(newConfig: Partial<EnvironmentSelectorConfig>): void {
         const oldConfig = { ...this.config };
         this.config = { ...this.config, ...newConfig };
-        
+
         // Re-validate after config update
         try {
             this.validateConfig();
@@ -339,14 +343,14 @@ export class EnvironmentSelectorComponent extends BaseComponent {
             this.config = oldConfig;
             throw error;
         }
-        
+
         this.emit('configChanged', {
             componentId: this.getId(),
             oldConfig,
             newConfig: this.config,
             timestamp: Date.now()
         });
-        
+
         this.notifyUpdate();
     }
 }
