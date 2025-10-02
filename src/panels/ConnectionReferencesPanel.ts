@@ -548,8 +548,9 @@ export class ConnectionReferencesPanel extends BasePanel {
                     uniqueSolutionIds: [...new Set(relationships.relationships?.map(r => r.solutionId).filter(Boolean))],
                     relationshipTypes: [...new Set(relationships.relationships?.map(r => r.relationshipType))]
                 });
-                this.dataTableComponent.setData(tableData.relationships || []);
+                // Clear loading state BEFORE setting data to ensure proper state in update event
                 this.dataTableComponent.setLoading(false);
+                this.dataTableComponent.setData(tableData.relationships || []);
                 this.componentLogger.trace('setData() call completed - event bridge should have forwarded to webview');
                 // Note: setData() already calls notifyUpdate() to update the table in webview
                 // No need to call updateWebview() which would reload the entire HTML
@@ -698,6 +699,17 @@ export class ConnectionReferencesPanel extends BasePanel {
             const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
 
             if (selectedEnvironment) {
+                // Clear table and show loading state for visual feedback
+                if (this.dataTableComponent) {
+                    this.dataTableComponent.setData([]);
+                    this.dataTableComponent.setLoading(true, 'Refreshing connection references...');
+                }
+
+                // Disable sync button while refreshing
+                if (this.actionBarComponent) {
+                    this.actionBarComponent.setActionDisabled('syncDeploymentBtn', true);
+                }
+
                 await this.handleLoadConnectionReferences(selectedEnvironment.id, selectedSolution?.id);
                 vscode.window.showInformationMessage('Connection References refreshed');
             } else {
@@ -705,6 +717,9 @@ export class ConnectionReferencesPanel extends BasePanel {
             }
         } catch (error) {
             this.componentLogger.error('Error refreshing connection references', error as Error);
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setLoading(false);
+            }
             vscode.window.showErrorMessage('Failed to refresh connection references');
         }
     }

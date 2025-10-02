@@ -10,6 +10,7 @@ import { EnvironmentSelectorComponent } from '../components/selectors/Environmen
 import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
+import { Solution } from '../components/base/ComponentInterface';
 import {
     EnvironmentVariableData,
     EnvironmentVariableDefinition,
@@ -124,14 +125,19 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating SolutionSelectorComponent');
             // Solution Selector Component
-            // Note: User selections are handled via component-event messages, not callbacks
+            // Note: Callback handles programmatic selection, component-event handles user selection
             this.solutionSelectorComponent = this.componentFactory.createSolutionSelector({
                 id: 'envVars-solutionSelector',
                 label: 'Filter by Solution (Optional)',
                 placeholder: 'All Solutions',
                 required: false,
                 solutions: [],
-                className: 'environment-variables-solution-selector'
+                className: 'environment-variables-solution-selector',
+                onSelectionChange: (selectedSolutions: Solution[]) => {
+                    const solutionId = selectedSolutions.length > 0 ? selectedSolutions[0].id : '';
+                    this.componentLogger.debug('Solution onSelectionChange callback triggered (programmatic)', { solutionId });
+                    this.handleSolutionSelection(solutionId);
+                }
             });
             this.componentLogger.trace('SolutionSelectorComponent created successfully');
 
@@ -521,8 +527,9 @@ export class EnvironmentVariablesPanel extends BasePanel {
                     rowCount: tableData.length
                 });
 
-                this.dataTableComponent.setData(tableData);
+                // Clear loading state BEFORE setting data to ensure proper state in update event
                 this.dataTableComponent.setLoading(false);
+                this.dataTableComponent.setData(tableData);
                 // Note: setData() already calls notifyUpdate() to update the table in webview
             }
 
@@ -669,6 +676,17 @@ export class EnvironmentVariablesPanel extends BasePanel {
             const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
 
             if (selectedEnvironment) {
+                // Clear table and show loading state for visual feedback
+                if (this.dataTableComponent) {
+                    this.dataTableComponent.setData([]);
+                    this.dataTableComponent.setLoading(true, 'Refreshing environment variables...');
+                }
+
+                // Disable sync button while refreshing
+                if (this.actionBarComponent) {
+                    this.actionBarComponent.setActionDisabled('syncDeploymentBtn', true);
+                }
+
                 await this.handleLoadEnvironmentVariables(selectedEnvironment.id, selectedSolution?.id);
                 vscode.window.showInformationMessage('Environment Variables refreshed');
             } else {
@@ -676,6 +694,9 @@ export class EnvironmentVariablesPanel extends BasePanel {
             }
         } catch (error) {
             this.componentLogger.error('Error refreshing environment variables', error as Error);
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setLoading(false);
+            }
             vscode.window.showErrorMessage('Failed to refresh environment variables');
         }
     }
