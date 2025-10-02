@@ -4,19 +4,18 @@ import * as vscode from 'vscode';
 
 import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
-import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
-
-import { BasePanel } from './base/BasePanel';
 import {
     EnvironmentVariableData,
     EnvironmentVariableDefinition,
     EnvironmentVariableValue
 } from '../services/EnvironmentVariablesService';
+
+import { BasePanel } from './base/BasePanel';
 
 // UI-specific type for table display
 interface EnvironmentVariableTableRow {

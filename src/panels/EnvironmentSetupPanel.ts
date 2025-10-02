@@ -2,10 +2,10 @@ import * as vscode from 'vscode';
 
 import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
-import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
+import { EnvironmentConnection } from '../models/PowerPlatformSettings';
 
 import { BasePanel } from './base/BasePanel';
 
@@ -16,7 +16,7 @@ export class EnvironmentSetupPanel extends BasePanel {
     private environmentSelectorComponent?: EnvironmentSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
 
-    public static createOrShow(extensionUri: vscode.Uri, environment?: any): void {
+    public static createOrShow(extensionUri: vscode.Uri, environment?: EnvironmentConnection): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         if (EnvironmentSetupPanel.currentPanel) {
@@ -40,7 +40,7 @@ export class EnvironmentSetupPanel extends BasePanel {
     private constructor(
         panel: vscode.WebviewPanel,
         extensionUri: vscode.Uri,
-        private initialEnvironment?: any
+        private initialEnvironment?: EnvironmentConnection
     ) {
         super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: EnvironmentSetupPanel.viewType,

@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 
+import { ComponentFactory } from '../factories/ComponentFactory';
+import { PanelComposer } from '../factories/PanelComposer';
+
 import { AuthenticationService } from './AuthenticationService';
 import { StateService } from './StateService';
 import { SolutionService } from './SolutionService';
@@ -13,8 +16,6 @@ import { MetadataService } from './MetadataService';
 import { DataverseQueryService } from './DataverseQueryService';
 import { DataverseMetadataService } from './DataverseMetadataService';
 import { LoggerService } from './LoggerService';
-import { ComponentFactory } from '../factories/ComponentFactory';
-import { PanelComposer } from '../factories/PanelComposer';
 
 export class ServiceFactory {
     private static authService: AuthenticationService;
