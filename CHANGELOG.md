@@ -7,12 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Environment Setup Panel** - Complete environment management interface with add/edit/delete functionality
+  - Clean, focused form interface with improved layout and spacing
+  - Dynamic page title showing "New Environment" or "Edit Environment: [name]"
+  - Comprehensive form with all EnvironmentConnection fields (name, URL, tenant ID, authentication settings)
+  - Two-column grid layout for compact field organization
+  - Conditional field visibility based on authentication method (Interactive, ServicePrincipal, UsernamePassword, DeviceCode)
+  - Test connection functionality to validate configuration before saving
+  - Support for secure credential storage (client secrets and passwords)
+  - Form validation and user-friendly error messages
+  - Improved visual hierarchy with proper section grouping
+
 ### Fixed
 - **Security Vulnerability** - Updated axios to version >=1.12.0 to address HIGH severity DoS vulnerability (GHSA-4hjh-wcwx-xvwj)
 - **Documentation** - Fixed README.md version badge to display correct version 0.0.2
 - **Panel Lifecycle** - Fixed component ID collision error when reopening panels by using per-panel ComponentFactory instances instead of singleton
 - **Panel Lifecycle** - Fixed tab switching causing panel reload by adding `retainContextWhenHidden: true` to all panel webview configurations
 - **Message Handling** - Fixed "Unknown message command environment-changed" warnings in ConnectionReferencesPanel by adding missing message handler
+- **Environment Setup Panel** - Fixed UI/UX issues:
+  - Added proper VS Code button styling (missing CSS was causing unstyled buttons)
+  - Hidden loading/error containers that were showing incorrectly
+  - Removed "Set as active environment" checkbox (environment selection is per-panel, not global)
+  - Improved button styling with proper primary/secondary colors and hover states
+  - Fixed singleton pattern preventing multiple environment panels from being open simultaneously
+  - Panel title now dynamically shows environment name when editing
+  - **CRITICAL**: Fixed credential preservation - now preserves stored secrets when editing environments (was wiping credentials on save)
+  - **CRITICAL**: Fixed test connection wiping production secrets - test environments now use `preserveCredentials: true` to avoid deleting shared secrets
 
 ### Changed
 - **Architecture Refactoring** - Completed component architecture refactoring for existing panels
