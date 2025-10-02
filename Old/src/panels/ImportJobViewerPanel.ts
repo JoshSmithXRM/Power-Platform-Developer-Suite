@@ -381,7 +381,7 @@ export class ImportJobViewerPanel extends BasePanel {
                 <h1 class="title">Import Job Viewer</h1>
                 <div class="header-actions">
                     <button class="solution-history-btn" onclick="openSolutionHistory()" id="solutionHistoryBtn" disabled>
-                        View in Maker
+                        Open in Maker
                     </button>
                     <button class="btn" onclick="refreshImportJobs()">
                         Refresh

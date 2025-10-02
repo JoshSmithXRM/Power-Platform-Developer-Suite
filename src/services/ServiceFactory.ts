@@ -16,6 +16,8 @@ import { MetadataService } from './MetadataService';
 import { DataverseQueryService } from './DataverseQueryService';
 import { DataverseMetadataService } from './DataverseMetadataService';
 import { LoggerService } from './LoggerService';
+import { ImportJobService } from './ImportJobService';
+import { XmlFormatterService } from './XmlFormatterService';
 
 export class ServiceFactory {
     private static authService: AuthenticationService;
@@ -30,6 +32,8 @@ export class ServiceFactory {
     private static dataverseQueryService: DataverseQueryService;
     private static dataverseMetadataService: DataverseMetadataService;
     private static loggerService: LoggerService;
+    private static importJobService: ImportJobService;
+    private static xmlFormatterService: XmlFormatterService;
     private static componentFactory: ComponentFactory;
     private static panelComposers: Map<string, PanelComposer> = new Map();
     private static initialized = false;
@@ -54,7 +58,9 @@ export class ServiceFactory {
         ServiceFactory.metadataService = new MetadataService(ServiceFactory.authService);
         ServiceFactory.dataverseQueryService = new DataverseQueryService(ServiceFactory.authService);
         ServiceFactory.dataverseMetadataService = new DataverseMetadataService(ServiceFactory.authService);
-        
+        ServiceFactory.xmlFormatterService = new XmlFormatterService();
+        ServiceFactory.importJobService = new ImportJobService(ServiceFactory.authService, ServiceFactory.xmlFormatterService);
+
         ServiceFactory.initialized = true;
         
         // Use logger service instead of console.log
@@ -148,6 +154,20 @@ export class ServiceFactory {
     
     static getUrlBuilderService(): typeof UrlBuilderService {
         return UrlBuilderService;
+    }
+
+    static getImportJobService(): ImportJobService {
+        if (!ServiceFactory.initialized) {
+            throw new Error('ServiceFactory not initialized. Call initialize() first.');
+        }
+        return ServiceFactory.importJobService;
+    }
+
+    static getXmlFormatterService(): XmlFormatterService {
+        if (!ServiceFactory.initialized) {
+            throw new Error('ServiceFactory not initialized. Call initialize() first.');
+        }
+        return ServiceFactory.xmlFormatterService;
     }
 
     static getComponentFactory(): ComponentFactory {

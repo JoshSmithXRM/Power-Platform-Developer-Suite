@@ -236,16 +236,45 @@ class DataTableBehavior {
      * Setup context menu
      */
     setupContextMenu() {
-        const contextRows = this.table.querySelectorAll('tbody tr[data-context-menu="true"]');
-        
-        contextRows.forEach(row => {
-            const rowId = row.dataset.rowId;
-            if (!rowId) return;
-            
-            row.addEventListener('contextmenu', (event) => {
-                event.preventDefault();
-                this.showContextMenu(event, rowId);
+        const contextMenu = this.container?.querySelector('.data-table-context-menu');
+        if (!contextMenu) return;
+
+        // Store reference
+        this.contextMenu = contextMenu;
+        this.currentContextRow = null;
+
+        // Setup right-click listeners on table rows
+        this.table.addEventListener('contextmenu', (event) => {
+            const row = event.target.closest('tbody tr[data-row-id]');
+            if (!row) return;
+
+            event.preventDefault();
+            this.showContextMenu(event, row);
+        });
+
+        // Setup click listeners on context menu items
+        const menuItems = contextMenu.querySelectorAll('[data-menu-id]');
+        menuItems.forEach(item => {
+            item.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const menuId = item.dataset.menuId;
+                this.handleContextMenuItemClick(menuId);
+                this.hideContextMenu();
             });
+        });
+
+        // Close context menu when clicking outside
+        document.addEventListener('click', (event) => {
+            if (!contextMenu.contains(event.target) && contextMenu.style.display !== 'none') {
+                this.hideContextMenu();
+            }
+        });
+
+        // Close context menu on scroll
+        this.table.addEventListener('scroll', () => {
+            if (contextMenu.style.display !== 'none') {
+                this.hideContextMenu();
+            }
         });
     }
     
@@ -1126,14 +1155,93 @@ class DataTableBehavior {
     /**
      * Show context menu
      */
-    showContextMenu(event, rowId) {
-        this.postMessage({
-            type: 'dataTable.contextMenu',
-            tableId: this.tableId,
-            rowId,
-            x: event.clientX,
-            y: event.clientY
+    showContextMenu(event, row) {
+        if (!this.contextMenu || !row) return;
+
+        // Store current row for later use
+        this.currentContextRow = row;
+
+        // Position the context menu at mouse location
+        this.contextMenu.style.display = 'block';
+        this.contextMenu.style.left = `${event.clientX}px`;
+        this.contextMenu.style.top = `${event.clientY}px`;
+
+        // Adjust if menu would go off-screen
+        const menuRect = this.contextMenu.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        if (menuRect.right > viewportWidth) {
+            this.contextMenu.style.left = `${viewportWidth - menuRect.width - 10}px`;
+        }
+
+        if (menuRect.bottom > viewportHeight) {
+            this.contextMenu.style.top = `${viewportHeight - menuRect.height - 10}px`;
+        }
+    }
+
+    /**
+     * Hide context menu
+     */
+    hideContextMenu() {
+        if (!this.contextMenu) return;
+
+        this.contextMenu.style.display = 'none';
+        this.currentContextRow = null;
+    }
+
+    /**
+     * Handle context menu item click
+     */
+    handleContextMenuItemClick(itemId) {
+        if (!this.currentContextRow) return;
+
+        const rowId = this.currentContextRow.dataset.rowId;
+        const rowData = this.getRowData(rowId);
+
+        // Send component event to Extension Host using ComponentUtils
+        if (typeof ComponentUtils !== 'undefined') {
+            ComponentUtils.emitComponentEvent(this.tableId, 'contextMenuItemClicked', {
+                itemId: itemId,
+                rowId: rowId,
+                rowData: rowData
+            });
+        } else {
+            // Fallback to direct postMessage if ComponentUtils not available
+            this.postMessage({
+                command: 'component-event',
+                data: {
+                    componentId: this.tableId,
+                    eventType: 'contextMenuItemClicked',
+                    data: {
+                        itemId: itemId,
+                        rowId: rowId,
+                        rowData: rowData
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Get row data by row ID
+     */
+    getRowData(rowId) {
+        const row = this.table.querySelector(`tr[data-row-id="${rowId}"]`);
+        if (!row) return null;
+
+        const rowData = { id: rowId };
+        const cells = row.querySelectorAll('td[data-column-id]');
+
+        cells.forEach(cell => {
+            const columnId = cell.dataset.columnId;
+            if (columnId) {
+                // Get text content, but preserve original value if available
+                rowData[columnId] = cell.textContent.trim();
+            }
         });
+
+        return rowData;
     }
     
     /**
@@ -1539,16 +1647,23 @@ class DataTableBehavior {
         
         Array.from(headerCells).forEach((header, index) => {
             const columnId = header.getAttribute('data-column-id');
+            const columnType = header.getAttribute('data-column-type'); // Get column type
             const td = document.createElement('td');
             td.className = 'data-table-body-cell';
-            
+            td.setAttribute('data-column-id', columnId);
+
             if (columnId && rowData.hasOwnProperty(columnId)) {
                 const value = rowData[columnId] || '';
-                td.textContent = value;
+                // Use innerHTML for HTML columns, textContent for others (security)
+                if (columnType === 'html') {
+                    td.innerHTML = value;
+                } else {
+                    td.textContent = value;
+                }
             } else {
                 td.textContent = ''; // Empty cell for non-data columns
             }
-            
+
             tr.appendChild(td);
         });
         return tr;

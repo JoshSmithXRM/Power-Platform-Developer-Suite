@@ -227,12 +227,13 @@ export class DataTableView {
         ].filter(Boolean).join(' ');
 
         return `
-            <th class="${cellClass}" 
+            <th class="${cellClass}"
                 style="${cellStyle}"
                 data-column-id="${column.id}"
+                data-column-type="${column.type || 'text'}"
                 ${sortable ? 'data-sortable="true"' : ''}
                 ${config.filterable && column.filterable !== false ? 'data-filterable="true"' : ''}>
-                
+
                 <div class="data-table-header-content">
                     <span class="data-table-header-label">
                         ${column.headerRenderer ?
@@ -572,12 +573,17 @@ export class DataTableView {
             return '<div class="data-table-context-separator"></div>';
         }
 
+        // Use VSCode Codicons for icons
+        const iconHtml = item.icon
+            ? `<i class="codicon codicon-${item.icon}"></i>`
+            : '';
+
         return `
             <button class="data-table-context-item"
                     data-menu-id="${item.id}"
                     data-component-element="context-item"
                     ${item.disabled ? 'disabled' : ''}>
-                ${item.icon ? `<span class="menu-icon">${item.icon}</span>` : ''}
+                ${iconHtml}
                 <span class="menu-label">${this.escapeHtml(item.label)}</span>
             </button>
         `;
