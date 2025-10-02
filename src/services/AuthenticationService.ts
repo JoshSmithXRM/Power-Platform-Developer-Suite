@@ -472,11 +472,11 @@ export class AuthenticationService {
         const environments = await this.getEnvironments();
         const existingIndex = environments.findIndex(env => env.id === environment.id);
         let existingEnvironment: EnvironmentConnection | null = null;
-        
+
         if (existingIndex >= 0) {
             existingEnvironment = environments[existingIndex];
             // Merge with existing environment to preserve any missing fields
-            environment = this.mergeEnvironmentSettings(existingEnvironment, environment, preserveCredentials);
+            environment = await this.mergeEnvironmentSettings(existingEnvironment, environment, preserveCredentials);
             environments[existingIndex] = environment;
         } else {
             environments.push(environment);
@@ -484,6 +484,23 @@ export class AuthenticationService {
 
         // Store sensitive data in VS Code secret storage
         if (environment.settings.clientSecret) {
+            // If clientId changed, delete the old secret from storage
+            if (existingEnvironment?.settings.clientId &&
+                existingEnvironment.settings.clientId !== environment.settings.clientId) {
+                try {
+                    await this.secretStorage.delete(`power-platform-dev-suite-secret-${existingEnvironment.settings.clientId}`);
+                    this.logger.debug('Deleted old client secret from secure storage', {
+                        oldClientId: existingEnvironment.settings.clientId
+                    });
+                } catch (error) {
+                    this.logger.warn('Failed to delete old client secret', {
+                        oldClientId: existingEnvironment.settings.clientId,
+                        error: (error as Error).message
+                    });
+                }
+            }
+
+            // Store new/updated secret
             await this.secretStorage.store(
                 `power-platform-dev-suite-secret-${environment.settings.clientId}`,
                 environment.settings.clientSecret
@@ -495,6 +512,23 @@ export class AuthenticationService {
         }
 
         if (environment.settings.password) {
+            // If username changed, delete the old password from storage
+            if (existingEnvironment?.settings.username &&
+                existingEnvironment.settings.username !== environment.settings.username) {
+                try {
+                    await this.secretStorage.delete(`power-platform-dev-suite-password-${existingEnvironment.settings.username}`);
+                    this.logger.debug('Deleted old password from secure storage', {
+                        oldUsername: existingEnvironment.settings.username
+                    });
+                } catch (error) {
+                    this.logger.warn('Failed to delete old password', {
+                        oldUsername: existingEnvironment.settings.username,
+                        error: (error as Error).message
+                    });
+                }
+            }
+
+            // Store new/updated password
             await this.secretStorage.store(
                 `power-platform-dev-suite-password-${environment.settings.username}`,
                 environment.settings.password
@@ -523,34 +557,137 @@ export class AuthenticationService {
     }
 
     public async getEnvironment(environmentId: string): Promise<EnvironmentConnection | null> {
-        const environments = await this.getEnvironments();
-        return environments.find(env => env.id === environmentId) || null;
+        // Use getEnvironmentSettings which loads credentials from secure storage
+        return await this.getEnvironmentSettings(environmentId);
     }
 
     public async getEnvironmentSettings(environmentId: string): Promise<EnvironmentConnection | null> {
         const environments = await this.getEnvironments();
-        return environments.find(env => env.id === environmentId) || null;
+        const environment = environments.find(env => env.id === environmentId);
+
+        if (!environment) {
+            return null;
+        }
+
+        // Load credentials from secure storage
+        return await this.loadEnvironmentWithCredentials(environment);
+    }
+
+    /**
+     * Load an environment with credentials from secure storage
+     */
+    private async loadEnvironmentWithCredentials(environment: EnvironmentConnection): Promise<EnvironmentConnection> {
+        const envWithCredentials = { ...environment };
+
+        // Load client secret if this is a Service Principal auth environment
+        if (envWithCredentials.settings.clientId && !envWithCredentials.settings.clientSecret) {
+            try {
+                const clientSecret = await this.secretStorage.get(`power-platform-dev-suite-secret-${envWithCredentials.settings.clientId}`);
+                if (clientSecret) {
+                    envWithCredentials.settings.clientSecret = clientSecret;
+                    this.logger.debug('Loaded client secret from secure storage', {
+                        environmentId: environment.id,
+                        clientId: environment.settings.clientId
+                    });
+                }
+            } catch (error) {
+                this.logger.warn('Failed to load client secret from secure storage', {
+                    environmentId: environment.id,
+                    clientId: environment.settings.clientId,
+                    error: (error as Error).message
+                });
+            }
+        }
+
+        // Load password if this is a Username/Password auth environment
+        if (envWithCredentials.settings.username && !envWithCredentials.settings.password) {
+            try {
+                const password = await this.secretStorage.get(`power-platform-dev-suite-password-${envWithCredentials.settings.username}`);
+                if (password) {
+                    envWithCredentials.settings.password = password;
+                    this.logger.debug('Loaded password from secure storage', {
+                        environmentId: environment.id,
+                        username: environment.settings.username
+                    });
+                }
+            } catch (error) {
+                this.logger.warn('Failed to load password from secure storage', {
+                    environmentId: environment.id,
+                    username: environment.settings.username,
+                    error: (error as Error).message
+                });
+            }
+        }
+
+        return envWithCredentials;
     }
 
     /**
      * Merge environment settings, preserving existing credentials when requested
      */
-    private mergeEnvironmentSettings(existing: EnvironmentConnection, updated: EnvironmentConnection, preserveCredentials: boolean): EnvironmentConnection {
+    private async mergeEnvironmentSettings(existing: EnvironmentConnection, updated: EnvironmentConnection, preserveCredentials: boolean): Promise<EnvironmentConnection> {
         const merged = { ...updated };
-        
+
         if (preserveCredentials) {
-            // If new environment doesn't have credentials, preserve existing ones
-            if (!updated.settings.clientSecret && existing.settings.clientId === updated.settings.clientId) {
-                // Keep the existing clientId reference for secret lookup
-                merged.settings.clientId = existing.settings.clientId;
+            // If new environment doesn't have credentials, fetch them from secure storage
+
+            // Handle client secret (Service Principal authentication)
+            if (!updated.settings.clientSecret && existing.settings.clientId) {
+                // Fetch the existing secret from secure storage using the old clientId
+                try {
+                    const existingSecret = await this.secretStorage.get(`power-platform-dev-suite-secret-${existing.settings.clientId}`);
+                    if (existingSecret) {
+                        // Add the fetched secret to merged settings
+                        // If clientId changed, the secret will be re-saved with the new clientId key
+                        // If clientId stayed the same, it will just re-save with the same key
+                        merged.settings.clientSecret = existingSecret;
+                        this.logger.debug('Preserved client secret from secure storage', {
+                            oldClientId: existing.settings.clientId,
+                            newClientId: updated.settings.clientId || existing.settings.clientId
+                        });
+
+                        // If clientId is not provided in updated, keep the existing one
+                        if (!updated.settings.clientId) {
+                            merged.settings.clientId = existing.settings.clientId;
+                        }
+                    }
+                } catch (error) {
+                    this.logger.warn('Failed to fetch existing client secret from secure storage', {
+                        clientId: existing.settings.clientId,
+                        error: (error as Error).message
+                    });
+                }
             }
-            
-            if (!updated.settings.password && existing.settings.username === updated.settings.username) {
-                // Keep the existing username reference for password lookup
-                merged.settings.username = existing.settings.username;
+
+            // Handle password (Username/Password authentication)
+            if (!updated.settings.password && existing.settings.username) {
+                // Fetch the existing password from secure storage using the old username
+                try {
+                    const existingPassword = await this.secretStorage.get(`power-platform-dev-suite-password-${existing.settings.username}`);
+                    if (existingPassword) {
+                        // Add the fetched password to merged settings
+                        // If username changed, the password will be re-saved with the new username key
+                        // If username stayed the same, it will just re-save with the same key
+                        merged.settings.password = existingPassword;
+                        this.logger.debug('Preserved password from secure storage', {
+                            oldUsername: existing.settings.username,
+                            newUsername: updated.settings.username || existing.settings.username
+                        });
+
+                        // If username is not provided in updated, keep the existing one
+                        if (!updated.settings.username) {
+                            merged.settings.username = existing.settings.username;
+                        }
+                    }
+                } catch (error) {
+                    this.logger.warn('Failed to fetch existing password from secure storage', {
+                        username: existing.settings.username,
+                        error: (error as Error).message
+                    });
+                }
             }
         }
-        
+
         return merged;
     }
 

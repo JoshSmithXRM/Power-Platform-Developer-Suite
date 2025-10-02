@@ -1,0 +1,155 @@
+/* Environment Setup Panel Styles */
+
+body {
+    padding: 0;
+    margin: 0;
+}
+
+.page-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
+}
+
+.page-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: var(--vscode-foreground);
+}
+
+.page-subtitle {
+    font-size: 13px;
+    color: var(--vscode-descriptionForeground);
+    margin: 0;
+}
+
+.form-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+.action-bar-container {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.form-section {
+    margin-bottom: 32px;
+}
+
+.form-section-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--vscode-foreground);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.form-row.single {
+    grid-template-columns: 1fr;
+}
+
+.form-field {
+    margin-bottom: 0;
+}
+
+.form-field label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--vscode-foreground);
+}
+
+.form-field input,
+.form-field select {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 3px;
+    font-family: var(--vscode-font-family);
+    font-size: 13px;
+    box-sizing: border-box;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    border-color: var(--vscode-focusBorder);
+}
+
+.form-field .hint {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+.form-field.required label::after {
+    content: " *";
+    color: var(--vscode-inputValidation-errorBorder);
+}
+
+.conditional-field {
+    display: none;
+}
+
+.conditional-field.visible {
+    display: block;
+}
+
+/* Action Bar Button Styling */
+.action-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.action-bar button {
+    padding: 6px 14px;
+    font-size: 13px;
+    line-height: 18px;
+    font-family: var(--vscode-font-family);
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: 1px solid var(--vscode-button-border, transparent);
+    border-radius: 2px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.action-bar button:hover:not(:disabled) {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.action-bar button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.action-bar button.secondary {
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+}
+
+.action-bar button.secondary:hover:not(:disabled) {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.component-loading-container,
+.component-error-container {
+    display: none;
+}

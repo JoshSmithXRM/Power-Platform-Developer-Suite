@@ -195,7 +195,13 @@ export class EnvironmentSetupPanel extends BasePanel {
         this.componentLogger.info('Creating new environment');
         this.isEditMode = false;
         this.currentEnvironment = undefined;
-        this.updateWebview();
+
+        // Disable delete button for new environment
+        if (this.actionBarComponent) {
+            this.actionBarComponent.setActionDisabled('delete', true);
+        }
+
+        // Send message to webview to clear form
         this.postMessage({
             action: 'environment-loaded',
             data: null
@@ -218,6 +224,13 @@ export class EnvironmentSetupPanel extends BasePanel {
         this.componentLogger.info('Loading environment for editing', { environmentId: environment.id });
         this.isEditMode = true;
         this.currentEnvironment = environment;
+
+        // Enable delete button for existing environment
+        if (this.actionBarComponent) {
+            this.actionBarComponent.setActionDisabled('delete', false);
+        }
+
+        // Send environment data to webview
         this.postMessage({
             action: 'environment-loaded',
             data: environment
@@ -235,6 +248,8 @@ export class EnvironmentSetupPanel extends BasePanel {
             }
 
             // Build environment connection object
+            // For credentials: only include if provided in form (non-empty)
+            // Pass undefined for empty credentials, let saveEnvironmentSettings preserve existing ones from secure storage
             const environment: EnvironmentConnection = {
                 id: this.isEditMode && this.currentEnvironment ? this.currentEnvironment.id : this.generateId(),
                 name: data.name,
@@ -245,6 +260,8 @@ export class EnvironmentSetupPanel extends BasePanel {
                     tenantId: data.tenantId,
                     publicClientId: data.publicClientId,
                     authenticationMethod: data.authenticationMethod || AuthenticationMethod.Interactive,
+                    // Only include credentials if provided (non-empty)
+                    // undefined means "don't change" when preserveCredentials=true
                     clientId: data.clientId || undefined,
                     clientSecret: data.clientSecret || undefined,
                     username: data.username || undefined,
@@ -252,7 +269,8 @@ export class EnvironmentSetupPanel extends BasePanel {
                 }
             };
 
-            // Save environment - preserve credentials if not provided (allows editing without re-entering secrets)
+            // Save environment - preserveCredentials=true means AuthenticationService will fetch
+            // existing credentials from secure storage if we pass undefined
             await this._authService.saveEnvironmentSettings(environment, true);
 
             vscode.window.showInformationMessage(`Environment '${environment.name}' saved successfully`);
@@ -374,6 +392,20 @@ export class EnvironmentSetupPanel extends BasePanel {
         return 'env-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
     }
 
+    private getPanelSpecificResources(): {
+        environmentSetupStylesSheet: vscode.Uri;
+        environmentSetupBehaviorScript: vscode.Uri;
+    } {
+        return {
+            environmentSetupStylesSheet: this._panel.webview.asWebviewUri(
+                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'css', 'panels', 'environment-setup.css')
+            ),
+            environmentSetupBehaviorScript: this._panel.webview.asWebviewUri(
+                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'panels', 'environmentSetupBehavior.js')
+            )
+        };
+    }
+
     protected getHtmlContent(): string {
         this.componentLogger.trace('Generating HTML content');
         try {
@@ -383,147 +415,17 @@ export class EnvironmentSetupPanel extends BasePanel {
             }
 
             const resources = this.getCommonWebviewResources();
+            const panelSpecificResources = this.getPanelSpecificResources();
 
             return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this._panel.webview.cspSource} 'unsafe-inline'; script-src ${this._panel.webview.cspSource} 'unsafe-inline';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this._panel.webview.cspSource}; script-src ${this._panel.webview.cspSource};">
     <title>Environment Setup</title>
     <link rel="stylesheet" href="${resources.panelStylesSheet}">
-    <style>
-        body {
-            padding: 0;
-            margin: 0;
-        }
-        .page-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid var(--vscode-panel-border);
-            background: var(--vscode-editor-background);
-        }
-        .page-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin: 0 0 4px 0;
-            color: var(--vscode-foreground);
-        }
-        .page-subtitle {
-            font-size: 13px;
-            color: var(--vscode-descriptionForeground);
-            margin: 0;
-        }
-        .form-container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-        .action-bar-container {
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--vscode-panel-border);
-        }
-        .form-section {
-            margin-bottom: 32px;
-        }
-        .form-section-title {
-            font-size: 15px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            color: var(--vscode-foreground);
-        }
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 16px;
-        }
-        .form-row.single {
-            grid-template-columns: 1fr;
-        }
-        .form-field {
-            margin-bottom: 0;
-        }
-        .form-field label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 500;
-            font-size: 13px;
-            color: var(--vscode-foreground);
-        }
-        .form-field input,
-        .form-field select {
-            width: 100%;
-            padding: 8px 10px;
-            background: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
-            border: 1px solid var(--vscode-input-border);
-            border-radius: 3px;
-            font-family: var(--vscode-font-family);
-            font-size: 13px;
-            box-sizing: border-box;
-        }
-        .form-field input:focus,
-        .form-field select:focus {
-            outline: 1px solid var(--vscode-focusBorder);
-            border-color: var(--vscode-focusBorder);
-        }
-        .form-field .hint {
-            font-size: 12px;
-            color: var(--vscode-descriptionForeground);
-            margin-top: 4px;
-            line-height: 1.4;
-        }
-        .form-field.required label::after {
-            content: " *";
-            color: var(--vscode-inputValidation-errorBorder);
-        }
-        .conditional-field {
-            display: none;
-        }
-        .conditional-field.visible {
-            display: block;
-        }
-
-        /* Action Bar Button Styling */
-        .action-bar {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .action-bar button {
-            padding: 6px 14px;
-            font-size: 13px;
-            line-height: 18px;
-            font-family: var(--vscode-font-family);
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: 1px solid var(--vscode-button-border, transparent);
-            border-radius: 2px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .action-bar button:hover:not(:disabled) {
-            background: var(--vscode-button-hoverBackground);
-        }
-        .action-bar button:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-        .action-bar button.secondary {
-            background: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
-        }
-        .action-bar button.secondary:hover:not(:disabled) {
-            background: var(--vscode-button-secondaryHoverBackground);
-        }
-        .component-loading-container,
-        .component-error-container {
-            display: none;
-        }
-    </style>
+    <link rel="stylesheet" href="${panelSpecificResources.environmentSetupStylesSheet}">
 </head>
 <body>
     <div class="page-header">
@@ -633,168 +535,7 @@ export class EnvironmentSetupPanel extends BasePanel {
     </div>
 
     <script src="${resources.panelUtilsScript}"></script>
-    <script>
-        (function() {
-            const vscode = acquireVsCodeApi();
-            let currentEnvironmentId = null;
-
-            // Handle authentication method changes
-            document.getElementById('authenticationMethod').addEventListener('change', function() {
-                updateConditionalFields(this.value);
-            });
-
-            function updateConditionalFields(authMethod) {
-                // Hide all conditional fields
-                document.querySelectorAll('.conditional-field').forEach(field => {
-                    field.classList.remove('visible');
-                });
-
-                // Show fields for selected auth method
-                document.querySelectorAll(\`[data-auth-method="\${authMethod}"]\`).forEach(field => {
-                    field.classList.add('visible');
-                });
-            }
-
-            // Handle messages from extension
-            window.addEventListener('message', event => {
-                const message = event.data;
-
-                switch (message.action) {
-                    case 'componentUpdate':
-                        // Action bar events handled via component-event
-                        break;
-
-                    case 'environment-loaded':
-                        loadEnvironmentData(message.data);
-                        break;
-
-                    case 'environment-saved':
-                        currentEnvironmentId = message.data?.id;
-                        updateActionBarState(true);
-                        updatePageTitle(message.data?.name);
-                        break;
-                }
-            });
-
-            function loadEnvironmentData(env) {
-                if (!env) {
-                    // Clear form for new environment
-                    document.getElementById('environmentForm').reset();
-                    currentEnvironmentId = null;
-                    updateActionBarState(false);
-                    updateConditionalFields('Interactive');
-                    updatePageTitle(null);
-                    return;
-                }
-
-                // Load environment data into form
-                currentEnvironmentId = env.id;
-                document.getElementById('name').value = env.name || '';
-                document.getElementById('dataverseUrl').value = env.settings.dataverseUrl || '';
-                document.getElementById('environmentId').value = env.environmentId || '';
-                document.getElementById('tenantId').value = env.settings.tenantId || '';
-                document.getElementById('publicClientId').value = env.settings.publicClientId || '';
-                document.getElementById('authenticationMethod').value = env.settings.authenticationMethod || 'Interactive';
-                document.getElementById('clientId').value = env.settings.clientId || '';
-                document.getElementById('username').value = env.settings.username || '';
-
-                updateConditionalFields(env.settings.authenticationMethod || 'Interactive');
-                updateActionBarState(true);
-                updatePageTitle(env.name);
-            }
-
-            function updatePageTitle(environmentName) {
-                const titleElement = document.getElementById('pageTitle');
-                const subtitleElement = document.getElementById('pageSubtitle');
-
-                if (environmentName) {
-                    titleElement.textContent = \`Edit Environment: \${environmentName}\`;
-                    subtitleElement.textContent = 'Update authentication and connection settings';
-                } else {
-                    titleElement.textContent = 'New Environment';
-                    subtitleElement.textContent = 'Configure authentication and connection settings';
-                }
-            }
-
-            function updateActionBarState(isEditMode) {
-                // Enable/disable delete button based on whether we're editing
-                const deleteAction = document.querySelector('[data-action-id="delete"]');
-                if (deleteAction) {
-                    if (isEditMode) {
-                        deleteAction.removeAttribute('disabled');
-                    } else {
-                        deleteAction.setAttribute('disabled', 'true');
-                    }
-                }
-            }
-
-            // Intercept action bar button clicks and collect form data
-            document.addEventListener('click', function(e) {
-                const actionBtn = e.target.closest('[data-action-id]');
-                if (!actionBtn) return;
-
-                const actionId = actionBtn.getAttribute('data-action-id');
-
-                if (actionId === 'save') {
-                    e.stopPropagation();
-                    saveEnvironment();
-                } else if (actionId === 'test') {
-                    e.stopPropagation();
-                    testConnection();
-                } else if (actionId === 'delete') {
-                    e.stopPropagation();
-                    deleteEnvironment();
-                } else if (actionId === 'new') {
-                    e.stopPropagation();
-                    vscode.postMessage({ command: 'new-environment' });
-                }
-            });
-
-            function saveEnvironment() {
-                const formData = {
-                    name: document.getElementById('name').value,
-                    dataverseUrl: document.getElementById('dataverseUrl').value,
-                    environmentId: document.getElementById('environmentId').value,
-                    tenantId: document.getElementById('tenantId').value,
-                    publicClientId: document.getElementById('publicClientId').value,
-                    authenticationMethod: document.getElementById('authenticationMethod').value,
-                    clientId: document.getElementById('clientId').value,
-                    clientSecret: document.getElementById('clientSecret').value,
-                    username: document.getElementById('username').value,
-                    password: document.getElementById('password').value
-                };
-
-                vscode.postMessage({ command: 'save-environment', data: formData });
-            }
-
-            function testConnection() {
-                const formData = {
-                    dataverseUrl: document.getElementById('dataverseUrl').value,
-                    tenantId: document.getElementById('tenantId').value,
-                    publicClientId: document.getElementById('publicClientId').value,
-                    authenticationMethod: document.getElementById('authenticationMethod').value,
-                    clientId: document.getElementById('clientId').value,
-                    clientSecret: document.getElementById('clientSecret').value,
-                    username: document.getElementById('username').value,
-                    password: document.getElementById('password').value
-                };
-
-                vscode.postMessage({ command: 'test-connection', data: formData });
-            }
-
-            function deleteEnvironment() {
-                if (currentEnvironmentId) {
-                    vscode.postMessage({
-                        command: 'delete-environment',
-                        data: { environmentId: currentEnvironmentId }
-                    });
-                }
-            }
-
-            // Initialize conditional fields
-            updateConditionalFields('Interactive');
-        })();
-    </script>
+    <script src="${panelSpecificResources.environmentSetupBehaviorScript}"></script>
 </body>
 </html>`;
 
