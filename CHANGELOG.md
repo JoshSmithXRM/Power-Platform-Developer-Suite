@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Debounced input (300ms) for smooth search experience
   - Cleaner, simpler interface - one search box instead of multiple filter inputs
   - Deployed to Connection References and Environment Variables panels
+- **Connection References Panel** - "Open in Maker" now navigates to connection references view
+  - Changed URL from `/objects/cloudflows` to `/objects/connectionreferences`
+  - Provides direct management interface for connection references
+  - Shows which flows use which connections in solution context
 - **Architecture Refactoring** - Completed component architecture refactoring for existing panels
   - All 3 panels now use event bridges for component communication
   - Implemented factory singleton pattern via ServiceFactory

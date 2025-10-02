@@ -190,10 +190,27 @@ export class DataTableComponent extends BaseComponent {
     }
 
     /**
-     * Get current data
+     * Get current data and state for event bridge
+     * Returns full state so webview can update loading, error, etc.
      */
-    public getData(): DataTableRow[] {
-        return [...this.data];
+    public getData(): {
+        data: DataTableRow[];
+        loading: boolean;
+        loadingMessage: string;
+        error: string | null;
+        totalRows: number;
+        currentPage: number;
+        pageSize: number;
+    } {
+        return {
+            data: [...this.data],
+            loading: this.loading,
+            loadingMessage: this.loadingMessage,
+            error: this.error,
+            totalRows: this.data.length,
+            currentPage: this.currentPage,
+            pageSize: this.pageSize
+        };
     }
 
     /**

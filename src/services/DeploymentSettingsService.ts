@@ -77,7 +77,10 @@ export class DeploymentSettingsService {
     async selectDeploymentSettingsFile(solutionUniqueName?: string): Promise<string | undefined> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
-            vscode.window.showErrorMessage('No workspace folder is open');
+            vscode.window.showErrorMessage(
+                'Please open a folder or workspace to sync deployment settings. ' +
+                'Deployment settings files must be saved within your project folder.'
+            );
             return undefined;
         }
 

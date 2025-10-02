@@ -809,24 +809,57 @@ window.ActionBarBehavior = ActionBarBehavior;
 // Add static handleMessage method for ComponentUtils compatibility
 ActionBarBehavior.handleMessage = function(message) {
     console.log('DEBUG: ActionBarBehavior.handleMessage called with:', message);
-    
+
     if (!message || !message.componentId) {
         console.warn('ActionBar handleMessage: Invalid message format', message);
         return;
     }
-    
+
     // Find the instance for this componentId
     const instance = ActionBarBehavior.instances.get(message.componentId);
     if (!instance) {
         console.warn(`ActionBar instance not found: ${message.componentId}`);
         return;
     }
-    
+
     // Route message to instance method (find the actual instance method name)
     // For now, just handle basic action updates
     if (message.action === 'componentUpdate' && message.data) {
-        console.log(`ActionBar: Handling component update for ${message.componentId}`);
-        // Update action states if needed
+        console.log(`ActionBar: Handling component update for ${message.componentId}`, message.data);
+
+        // If data contains actions array, update all actions
+        if (message.data.actions && Array.isArray(message.data.actions)) {
+            console.log(`ActionBar: Updating ${message.data.actions.length} actions`);
+
+            // Update each action in the DOM
+            message.data.actions.forEach(action => {
+                const actionElement = instance.element.querySelector(`[data-action-id="${action.id}"]`);
+                if (actionElement) {
+                    // Update disabled state
+                    if (action.disabled !== undefined) {
+                        actionElement.disabled = action.disabled;
+                        actionElement.classList.toggle('action-bar-button--disabled', action.disabled);
+                        console.log(`ActionBar: Updated action ${action.id} disabled=${action.disabled}`);
+                    }
+
+                    // Update visible state
+                    if (action.visible !== undefined) {
+                        actionElement.style.display = action.visible ? '' : 'none';
+                    }
+
+                    // Update label if provided
+                    if (action.label) {
+                        const labelElement = actionElement.querySelector('.action-label');
+                        if (labelElement) {
+                            labelElement.textContent = action.label;
+                        }
+                    }
+                }
+            });
+
+            // Update instance state
+            instance.actions = message.data.actions;
+        }
     }
 };
 

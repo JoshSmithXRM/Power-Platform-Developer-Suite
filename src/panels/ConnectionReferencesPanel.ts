@@ -153,7 +153,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                         id: 'syncDeploymentBtn',
                         label: 'Sync Deployment Settings',
                         icon: 'sync',
-                        variant: 'secondary',
+                        variant: 'primary',
                         disabled: true
                     },
                     {
@@ -380,9 +380,9 @@ export class ConnectionReferencesPanel extends BasePanel {
                     case 'openInMakerBtn': {
                         const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
                         const solId = this.solutionSelectorComponent?.getSelectedSolution()?.id;
-                        
+
                         if (envId && solId) {
-                            await this.handleOpenInMaker(envId, solId, 'workflows');
+                            await this.handleOpenInMaker(envId, solId, 'connectionreferences');
                         } else {
                             vscode.window.showWarningMessage('Please select an environment and solution first');
                         }
@@ -432,6 +432,17 @@ export class ConnectionReferencesPanel extends BasePanel {
         }
 
         try {
+            // Clear table and show loading state immediately for visual feedback
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setData([]);
+                this.dataTableComponent.setLoading(true, 'Loading connection references...');
+            }
+
+            // Disable sync button while loading
+            if (this.actionBarComponent) {
+                this.actionBarComponent.setActionDisabled('syncDeploymentBtn', true);
+            }
+
             // Get current environment ID
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
             if (selectedEnvironment) {
@@ -440,6 +451,9 @@ export class ConnectionReferencesPanel extends BasePanel {
 
         } catch (error) {
             this.componentLogger.error('Error handling solution selection', error as Error, { solutionId });
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setLoading(false);
+            }
             vscode.window.showErrorMessage('Failed to load solution configuration');
         }
     }
@@ -522,7 +536,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                 this.componentLogger.debug('Sample connection reference data', {
                     sampleData: tableData.relationships?.slice(0, 2) || []
                 });
-                
+
                 this.componentLogger.trace('About to call setData() which should trigger update event');
                 this.componentLogger.debug('DEBUG: Data being passed to setData()', {
                     requestedSolutionId: solutionId,
@@ -535,9 +549,25 @@ export class ConnectionReferencesPanel extends BasePanel {
                     relationshipTypes: [...new Set(relationships.relationships?.map(r => r.relationshipType))]
                 });
                 this.dataTableComponent.setData(tableData.relationships || []);
+                this.dataTableComponent.setLoading(false);
                 this.componentLogger.trace('setData() call completed - event bridge should have forwarded to webview');
                 // Note: setData() already calls notifyUpdate() to update the table in webview
                 // No need to call updateWebview() which would reload the entire HTML
+            }
+
+            // Enable sync deployment settings button if we have data
+            if (this.actionBarComponent && tableData.relationships && tableData.relationships.length > 0) {
+                this.componentLogger.info('Enabling sync deployment settings button', {
+                    hasActionBar: !!this.actionBarComponent,
+                    dataCount: tableData.relationships.length
+                });
+                const result = this.actionBarComponent.setActionDisabled('syncDeploymentBtn', false);
+                this.componentLogger.info('Sync button enable result', { success: result });
+            } else {
+                this.componentLogger.warn('Not enabling sync button', {
+                    hasActionBar: !!this.actionBarComponent,
+                    dataCount: tableData.relationships?.length || 0
+                });
             }
 
 

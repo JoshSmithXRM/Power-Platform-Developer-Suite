@@ -1396,9 +1396,35 @@ class DataTableBehavior {
         switch (action) {
             case 'componentUpdate':
                 if (data && Array.isArray(data)) {
+                    // Legacy format: just an array
                     this.updateTableData(data);
+                } else if (data && typeof data === 'object') {
+                    // New format: object with data, loading, error, etc.
+                    console.log(`DataTableBehavior: componentUpdate with state:`, {
+                        hasData: !!data.data,
+                        dataLength: data.data?.length,
+                        loading: data.loading,
+                        loadingMessage: data.loadingMessage
+                    });
+
+                    // Handle loading state
+                    if (data.loading !== undefined) {
+                        this.toggleLoadingState(data.loading, data.loadingMessage);
+                    }
+
+                    // Handle error state
+                    if (data.error) {
+                        this.showErrorOverlay(data.error);
+                    } else if (data.error === null && !data.loading) {
+                        this.hideErrorOverlay();
+                    }
+
+                    // Update table data if provided
+                    if (data.data && Array.isArray(data.data)) {
+                        this.updateTableData(data.data);
+                    }
                 } else {
-                    console.log(`DataTableBehavior: componentUpdate received, data:`, data);
+                    console.log(`DataTableBehavior: componentUpdate received unexpected format:`, data);
                 }
                 break;
                 

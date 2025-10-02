@@ -103,6 +103,16 @@ export class ActionBarComponent extends BaseComponent {
     }
 
     /**
+     * Get component data for event bridge (used by BasePanel to send updates to webview)
+     */
+    public getData(): { actions: ActionBarAction[]; groups: ActionBarGroup[] } {
+        return {
+            actions: this.getActions(),
+            groups: [...this.groups]
+        };
+    }
+
+    /**
      * Add a single action
      */
     public addAction(action: ActionBarAction, position?: number): void {
