@@ -1,0 +1,18 @@
+{
+    "files.exclude": {
+        "out": false,
+        "node_modules": true,
+        ".git": true,
+        ".DS_Store": true
+    },
+    "search.exclude": {
+        "out": true,
+        "node_modules": true
+    },
+    "typescript.preferences.inlayHints.enumMemberValues.enabled": false,
+    "typescript.preferences.inlayHints.functionLikeReturnTypes.enabled": false,
+    "typescript.preferences.inlayHints.parameterNames.enabled": "none",
+    "typescript.preferences.inlayHints.parameterTypes.enabled": false,
+    "typescript.preferences.inlayHints.propertyDeclarationTypes.enabled": false,
+    "typescript.preferences.inlayHints.variableTypes.enabled": false
+}
