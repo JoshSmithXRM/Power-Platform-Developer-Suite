@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Security Vulnerability** - Updated axios to version >=1.12.0 to address HIGH severity DoS vulnerability (GHSA-4hjh-wcwx-xvwj)
+- **Documentation** - Fixed README.md version badge to display correct version 0.0.2
+
 ### Technical
 - **Component-Based Architecture** - Complete rewrite of extension architecture from scratch
   - Moved existing code to `src/old/` directory for reference
