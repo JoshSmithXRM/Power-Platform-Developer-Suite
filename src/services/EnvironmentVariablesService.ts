@@ -38,8 +38,9 @@ export class EnvironmentVariablesService {
     constructor(private authService: AuthenticationService) {}
 
     async getEnvironmentVariables(environmentId: string, solutionId?: string): Promise<EnvironmentVariableData> {
+        const startTime = Date.now();
         this.logger.info('Starting environment variables retrieval', { environmentId, solutionId });
-        
+
         const environments = await this.authService.getEnvironments();
         const environment = environments.find(env => env.id === environmentId);
 
@@ -48,76 +49,91 @@ export class EnvironmentVariablesService {
             throw new Error('Environment not found');
         }
 
-        this.logger.debug('Environment found', { 
-            environmentId, 
+        this.logger.debug('Environment found', {
+            environmentId,
             environmentName: environment.name,
-            dataverseUrl: environment.settings.dataverseUrl 
+            dataverseUrl: environment.settings.dataverseUrl
         });
 
         const token = await this.authService.getAccessToken(environment.id);
+        const timings: Record<string, number> = {};
 
-        // Base URLs for API calls
-        let definitionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/environmentvariabledefinitions` +
+        // Load ALL environment variables and solution components in parallel (client-side filtering approach)
+        const definitionsUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/environmentvariabledefinitions` +
             `?$select=environmentvariabledefinitionid,displayname,schemaname,type,ismanaged,modifiedon,defaultvalue` +
             `&$expand=modifiedby($select=fullname)`;
 
-        let valuesUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/environmentvariablevalues` +
+        const valuesUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/environmentvariablevalues` +
             `?$select=environmentvariablevalueid,_environmentvariabledefinitionid_value,value,modifiedon` +
             `&$expand=modifiedby($select=fullname)`;
 
-        // If solution filtering is requested, get the solution component IDs
-        if (solutionId && solutionId !== 'test-bypass') {
-            const { ServiceFactory } = await import('./ServiceFactory');
-            const solutionComponentService = ServiceFactory.getSolutionComponentService();
-            
-            // Get environment variable definition IDs in the solution
-            const envVarIds = await solutionComponentService.getEnvironmentVariableIdsInSolution(environmentId, solutionId);
-            this.logger.debug('Solution component environment variable IDs retrieved', { 
-                environmentId, 
-                solutionId, 
-                environmentVariableIdsCount: envVarIds.length 
-            });
-            
-            if (envVarIds.length > 0) {
-                // Filter definitions by solution membership
-                const definitionFilter = envVarIds.map(id => `environmentvariabledefinitionid eq ${id}`).join(' or ');
-                definitionsUrl += `&$filter=(${definitionFilter})`;
-                
-                // Filter values by definition IDs
-                const valueFilter = envVarIds.map(id => `_environmentvariabledefinitionid_value eq ${id}`).join(' or ');
-                valuesUrl += `&$filter=(${valueFilter})`;
-            } else {
-                // No environment variables in solution, use impossible filter
-                definitionsUrl += `&$filter=environmentvariabledefinitionid eq '00000000-0000-0000-0000-000000000000'`;
-                valuesUrl += `&$filter=environmentvariablevalueid eq '00000000-0000-0000-0000-000000000000'`;
-            }
-        }
-
-        this.logger.debug('Fetching environment variables data', {
+        this.logger.info('Loading environment variables and solution components in parallel', {
             environmentId,
             solutionId,
-            definitionsUrl,
-            valuesUrl
+            filteringApplied: !!solutionId && solutionId !== 'test-bypass'
         });
 
-        const [definitionsResponse, valuesResponse] = await Promise.all([
-            fetch(definitionsUrl, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                    'OData-MaxVersion': '4.0',
-                    'OData-Version': '4.0'
-                }
-            }),
-            fetch(valuesUrl, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                    'OData-MaxVersion': '4.0',
-                    'OData-Version': '4.0'
-                }
-            })
-        ]);
+        // Execute all operations in parallel
+        const apiStartTime = Date.now();
+
+        let definitionsResponse: Response;
+        let valuesResponse: Response;
+        let envVarIds: string[] = [];
+
+        if (solutionId && solutionId !== 'test-bypass') {
+            // Parallel: Fetch all data + get solution component IDs simultaneously
+            const { ServiceFactory } = await import('./ServiceFactory');
+            const solutionComponentService = ServiceFactory.getSolutionComponentService();
+
+            const [defsResp, valsResp, solutionEnvVarIds] = await Promise.all([
+                fetch(definitionsUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'OData-MaxVersion': '4.0',
+                        'OData-Version': '4.0'
+                    }
+                }),
+                fetch(valuesUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'OData-MaxVersion': '4.0',
+                        'OData-Version': '4.0'
+                    }
+                }),
+                solutionComponentService.getEnvironmentVariableIdsInSolution(environmentId, solutionId)
+            ]);
+
+            definitionsResponse = defsResp;
+            valuesResponse = valsResp;
+            envVarIds = solutionEnvVarIds;
+            timings.parallelApiCalls = Date.now() - apiStartTime;
+        } else {
+            // No solution filtering - just fetch data in parallel
+            const [defsResp, valsResp] = await Promise.all([
+                fetch(definitionsUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'OData-MaxVersion': '4.0',
+                        'OData-Version': '4.0'
+                    }
+                }),
+                fetch(valuesUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'OData-MaxVersion': '4.0',
+                        'OData-Version': '4.0'
+                    }
+                })
+            ]);
+
+            definitionsResponse = defsResp;
+            valuesResponse = valsResp;
+            timings.parallelApiCalls = Date.now() - apiStartTime;
+        }
 
         if (!definitionsResponse.ok) {
             this.logger.error('Failed to fetch environment variable definitions', new Error('API request failed'), {
@@ -145,12 +161,13 @@ export class EnvironmentVariablesService {
         this.logger.debug('Environment variables data retrieved', {
             environmentId,
             solutionId,
-            definitionsCount: definitionsData.value?.length || 0,
-            valuesCount: valuesData.value?.length || 0
+            allDefinitionsCount: definitionsData.value?.length || 0,
+            allValuesCount: valuesData.value?.length || 0,
+            solutionEnvVarIdsCount: envVarIds.length
         });
 
-        // Transform definitions data
-        const definitions: EnvironmentVariableDefinition[] = (definitionsData.value || []).map((def: any) => ({
+        // Transform all definitions data
+        const allDefinitions: EnvironmentVariableDefinition[] = (definitionsData.value || []).map((def: any) => ({
             environmentvariabledefinitionid: def.environmentvariabledefinitionid,
             displayname: def.displayname || '',
             schemaname: def.schemaname || '',
@@ -161,8 +178,8 @@ export class EnvironmentVariablesService {
             defaultvalue: def.defaultvalue || ''
         }));
 
-        // Transform values data
-        const values: EnvironmentVariableValue[] = (valuesData.value || []).map((val: any) => ({
+        // Transform all values data
+        const allValues: EnvironmentVariableValue[] = (valuesData.value || []).map((val: any) => ({
             environmentvariablevalueid: val.environmentvariablevalueid,
             environmentvariabledefinitionid: val._environmentvariabledefinitionid_value,
             value: val.value || '',
@@ -170,11 +187,48 @@ export class EnvironmentVariablesService {
             modifiedby: val.modifiedby?.fullname || ''
         }));
 
+        // Filter by solution membership if needed (client-side filtering)
+        let definitions: EnvironmentVariableDefinition[];
+        let values: EnvironmentVariableValue[];
+
+        if (solutionId && solutionId !== 'test-bypass' && envVarIds.length > 0) {
+            const filterStartTime = Date.now();
+            const envVarIdSet = new Set(envVarIds);
+
+            // Filter definitions by solution membership
+            definitions = allDefinitions.filter(def => envVarIdSet.has(def.environmentvariabledefinitionid));
+
+            // Filter values by definition IDs that are in the solution
+            values = allValues.filter(val => envVarIdSet.has(val.environmentvariabledefinitionid));
+
+            timings.clientSideFiltering = Date.now() - filterStartTime;
+
+            this.logger.info('Filtered environment variables by solution membership', {
+                environmentId,
+                solutionId,
+                filteredDefinitionsCount: definitions.length,
+                filteredValuesCount: values.length,
+                totalDefinitionsCount: allDefinitions.length,
+                totalValuesCount: allValues.length
+            });
+        } else {
+            // No filtering needed
+            definitions = allDefinitions;
+            values = allValues;
+        }
+
+        timings.totalDuration = Date.now() - startTime;
+
         this.logger.info('Environment variables retrieval completed', {
             environmentId,
             solutionId,
             definitionsCount: definitions.length,
-            valuesCount: values.length
+            valuesCount: values.length,
+            timings: {
+                parallelApiCalls: `${timings.parallelApiCalls}ms`,
+                clientSideFiltering: `${timings.clientSideFiltering || 0}ms`,
+                totalDuration: `${timings.totalDuration}ms`
+            }
         });
 
         return {

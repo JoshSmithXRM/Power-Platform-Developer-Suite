@@ -79,8 +79,9 @@ export class ConnectionReferencesService {
     constructor(private authService: AuthenticationService) { }
 
     async aggregateRelationships(environmentId: string, solutionId?: string): Promise<RelationshipResult> {
+        const startTime = Date.now();
         this.logger.info('Starting connection references aggregation', { environmentId, solutionId });
-        
+
         const environments = await this.authService.getEnvironments();
         const environment = environments.find(e => e.id === environmentId);
         if (!environment) {
@@ -88,55 +89,93 @@ export class ConnectionReferencesService {
             throw new Error('Environment not found');
         }
 
-        this.logger.debug('Environment found', { 
-            environmentId, 
+        this.logger.debug('Environment found', {
+            environmentId,
             environmentName: environment.name,
-            dataverseUrl: environment.settings.dataverseUrl 
+            dataverseUrl: environment.settings.dataverseUrl
         });
 
         const token = await this.authService.getAccessToken(environment.id);
         const baseUrl = `${environment.settings.dataverseUrl}/api/data/v9.2`;
         const debug: Record<string, any> = {};
+        const timings: Record<string, number> = {};
 
-        // Step 1: Load ALL flows from the environment (cached approach)
+        // Step 1 & 2: Load flows and connection references in parallel for better performance
         const allFlowsUrl = `${baseUrl}/workflows?$select=workflowid,name,clientdata,modifiedon,ismanaged&$expand=modifiedby($select=fullname)&$filter=category eq 5`;
-        
+        const allCRUrl = `${baseUrl}/connectionreferences?$select=connectionreferenceid,connectionreferencelogicalname,connectionreferencedisplayname,connectorid,connectionid,modifiedon,ismanaged&$expand=modifiedby($select=fullname)`;
+
         debug.allFlowsUrl = allFlowsUrl;
-        this.logger.info('Loading flows from environment for filtering', { 
-            environmentId, 
+        debug.allCRUrl = allCRUrl;
+
+        this.logger.info('Loading flows and connection references in parallel', {
+            environmentId,
             solutionId: solutionId || 'all',
             filteringApplied: !!solutionId && solutionId !== 'test-bypass'
         });
 
-        const allFlowsResp = await fetch(allFlowsUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+        // Execute API calls in parallel using Promise.all
+        const apiStartTime = Date.now();
+        const [allFlowsResp, allCRResp] = await Promise.all([
+            fetch(allFlowsUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } }),
+            fetch(allCRUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } })
+        ]);
+        timings.parallelApiCalls = Date.now() - apiStartTime;
+
         debug.allFlowsRespOk = !!allFlowsResp && allFlowsResp.ok;
         debug.allFlowsStatus = allFlowsResp?.status;
-        
+        debug.allCRRespOk = !!allCRResp && allCRResp.ok;
+        debug.allCRStatus = allCRResp?.status;
+
+        // Process flows response
         let allFlowsJson: any = { value: [] };
         if (allFlowsResp && allFlowsResp.ok) {
             allFlowsJson = await allFlowsResp.json();
-            this.logger.info('Flows loaded from environment', { 
-                environmentId, 
-                flowCount: allFlowsJson.value?.length || 0 
+            this.logger.info('Flows loaded from environment', {
+                environmentId,
+                flowCount: allFlowsJson.value?.length || 0
             });
         } else {
-            this.logger.error('Failed to load flows from environment', new Error('API request failed'), { 
-                environmentId, 
-                status: allFlowsResp?.status, 
-                statusText: allFlowsResp?.statusText 
+            this.logger.error('Failed to load flows from environment', new Error('API request failed'), {
+                environmentId,
+                status: allFlowsResp?.status,
+                statusText: allFlowsResp?.statusText
             });
-            try { 
-                const errorJson = await allFlowsResp.json(); 
+            try {
+                const errorJson = await allFlowsResp.json();
                 this.logger.debug('API error details', { errorJson });
                 debug.allFlowsError = errorJson;
-            } catch { 
+            } catch {
                 this.logger.warn('Could not parse API error response');
             }
         }
 
+        // Process connection references response
+        let allCRJson: any = { value: [] };
+        if (allCRResp && allCRResp.ok) {
+            allCRJson = await allCRResp.json();
+            this.logger.info('Connection references loaded from environment', {
+                environmentId,
+                connectionReferencesCount: allCRJson.value?.length || 0
+            });
+        } else {
+            this.logger.error('Failed to load connection references from environment', new Error('API request failed'), {
+                environmentId,
+                status: allCRResp?.status,
+                statusText: allCRResp?.statusText
+            });
+            try {
+                const errorJson = await allCRResp.json();
+                this.logger.debug('Connection references API error details', { errorJson });
+                debug.allCRError = errorJson;
+            } catch {
+                this.logger.warn('Could not parse connection references API error response');
+            }
+        }
+
+        // Transform flows data
         const allFlows = (allFlowsJson.value || []).map((f: any) => ({
-            id: f.workflowid, 
-            name: f.name, 
+            id: f.workflowid,
+            name: f.name,
             clientData: f.clientdata || null,
             modifiedon: f.modifiedon || '',
             modifiedby: f.modifiedby?.fullname || '',
@@ -145,42 +184,7 @@ export class ConnectionReferencesService {
 
         debug.allFlowsCount = allFlows.length;
 
-        // Step 2: Load ALL connection references from the environment (cached approach)
-        const allCRUrl = `${baseUrl}/connectionreferences?$select=connectionreferenceid,connectionreferencelogicalname,connectionreferencedisplayname,connectorid,connectionid,modifiedon,ismanaged&$expand=modifiedby($select=fullname)`;
-        
-        debug.allCRUrl = allCRUrl;
-        this.logger.info('Loading connection references from environment for filtering', { 
-            environmentId, 
-            solutionId: solutionId || 'all',
-            filteringApplied: !!solutionId && solutionId !== 'test-bypass'
-        });
-
-        const allCRResp = await fetch(allCRUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
-        debug.allCRRespOk = !!allCRResp && allCRResp.ok;
-        debug.allCRStatus = allCRResp?.status;
-        
-        let allCRJson: any = { value: [] };
-        if (allCRResp && allCRResp.ok) {
-            allCRJson = await allCRResp.json();
-            this.logger.info('Connection references loaded from environment', { 
-                environmentId, 
-                connectionReferencesCount: allCRJson.value?.length || 0 
-            });
-        } else {
-            this.logger.error('Failed to load connection references from environment', new Error('API request failed'), { 
-                environmentId, 
-                status: allCRResp?.status, 
-                statusText: allCRResp?.statusText 
-            });
-            try { 
-                const errorJson = await allCRResp.json(); 
-                this.logger.debug('Connection references API error details', { errorJson });
-                debug.allCRError = errorJson;
-            } catch { 
-                this.logger.warn('Could not parse connection references API error response');
-            }
-        }
-
+        // Transform connection references data
         const allConnectionReferences = [] as ConnectionReferenceItem[];
         (allCRJson.value || []).forEach((c: any) => {
             allConnectionReferences.push({
@@ -204,27 +208,29 @@ export class ConnectionReferencesService {
         if (solutionId && solutionId !== 'test-bypass') {
             const { ServiceFactory } = await import('./ServiceFactory');
             const solutionComponentService = ServiceFactory.getSolutionComponentService();
-            
-            // Get flow IDs from solution components
-            const flowIds = await solutionComponentService.getCloudFlowIdsInSolution(environmentId, solutionId);
+
+            // Parallelize solution component queries to reduce wait time
+            const solutionComponentStartTime = Date.now();
+            const [flowIds, crIds] = await Promise.all([
+                solutionComponentService.getCloudFlowIdsInSolution(environmentId, solutionId),
+                solutionComponentService.getConnectionReferenceIdsInSolution(environmentId, solutionId)
+            ]);
+            timings.solutionComponentQueries = Date.now() - solutionComponentStartTime;
+
             solutionFlowIds = new Set(flowIds);
+            solutionCRIds = new Set(crIds);
+
             debug.solutionFlowIds = flowIds;
             debug.solutionFlowIdsCount = flowIds.length;
-            this.logger.debug('Solution component flow IDs retrieved', { 
-                environmentId, 
-                solutionId, 
-                flowIdsCount: flowIds.length 
-            });
-            
-            // Get connection reference IDs from solution components
-            const crIds = await solutionComponentService.getConnectionReferenceIdsInSolution(environmentId, solutionId);
-            solutionCRIds = new Set(crIds);
             debug.solutionCRIds = crIds;
             debug.solutionCRIdsCount = crIds.length;
-            this.logger.debug('Solution component connection reference IDs retrieved', { 
-                environmentId, 
-                solutionId, 
-                connectionReferenceIdsCount: crIds.length 
+
+            this.logger.info('Solution component IDs retrieved in parallel', {
+                environmentId,
+                solutionId,
+                flowIdsCount: flowIds.length,
+                connectionReferenceIdsCount: crIds.length,
+                durationMs: timings.solutionComponentQueries
             });
         }
 
@@ -327,14 +333,17 @@ export class ConnectionReferencesService {
         }
 
         // Build relationship data structure
+        const relationshipBuildStartTime = Date.now();
         const relationships = this.buildFlowConnectionRelationships(flows, connectionReferences);
+        timings.relationshipBuilding = Date.now() - relationshipBuildStartTime;
+        timings.totalDuration = Date.now() - startTime;
 
-        const result: RelationshipResult = { 
-            flows, 
-            connectionReferences, 
-            connections: [], 
-            relationships, 
-            _debug: debug 
+        const result: RelationshipResult = {
+            flows,
+            connectionReferences,
+            connections: [],
+            relationships,
+            _debug: debug
         };
 
         this.logger.info('Connection references aggregation completed', {
@@ -342,7 +351,13 @@ export class ConnectionReferencesService {
             solutionId,
             flowsCount: flows.length,
             connectionReferencesCount: connectionReferences.length,
-            relationshipsCount: relationships.length
+            relationshipsCount: relationships.length,
+            timings: {
+                parallelApiCalls: `${timings.parallelApiCalls}ms`,
+                solutionComponentQueries: `${timings.solutionComponentQueries || 0}ms`,
+                relationshipBuilding: `${timings.relationshipBuilding}ms`,
+                totalDuration: `${timings.totalDuration}ms`
+            }
         });
 
         // Only log debug data at trace level for troubleshooting

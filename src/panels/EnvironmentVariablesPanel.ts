@@ -404,9 +404,20 @@ export class EnvironmentVariablesPanel extends BasePanel {
             // Transform data for table display
             const tableData = this.transformEnvironmentVariablesData(environmentVariablesData);
 
-            this.postMessage({
-                action: 'environmentVariablesLoaded',
-                data: tableData
+            // Update the data table component directly (matches ConnectionReferencesPanel pattern)
+            if (this.dataTableComponent) {
+                this.componentLogger.info('Updating DataTableComponent with environment variables data', {
+                    rowCount: tableData.length
+                });
+
+                this.dataTableComponent.setData(tableData);
+                // Note: setData() already calls notifyUpdate() to update the table in webview
+            }
+
+            this.componentLogger.info('Environment variables loaded successfully', {
+                environmentId,
+                solutionId: solutionId || 'all',
+                variablesCount: tableData.length
             });
         } catch (error) {
             this.componentLogger.error('Error loading environment variables', error as Error, { environmentId, solutionId });

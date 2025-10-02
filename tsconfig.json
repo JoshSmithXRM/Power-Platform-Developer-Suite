@@ -16,6 +16,9 @@
         "allowSyntheticDefaultImports": true
     },
     "exclude": [
-        "src/old/**/*"
+        "node_modules",
+        "out",
+        "dist",
+        "Old/**/*"
     ]
 }

@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Panel Lifecycle** - Fixed component ID collision error when reopening panels by using per-panel ComponentFactory instances instead of singleton
 - **Panel Lifecycle** - Fixed tab switching causing panel reload by adding `retainContextWhenHidden: true` to all panel webview configurations
 - **Message Handling** - Fixed "Unknown message command environment-changed" warnings in ConnectionReferencesPanel by adding missing message handler
+- **Environment Variables Panel** - Fixed data not displaying in table after service successfully loaded it
+  - Panel was using old `postMessage` pattern instead of directly updating DataTableComponent
+  - Now matches ConnectionReferencesPanel pattern with direct component updates
+  - Service loads data correctly (62 definitions in 851ms), table now displays it properly
 - **Environment Setup Panel** - Fixed UI/UX issues:
   - Added proper VS Code button styling (missing CSS was causing unstyled buttons)
   - Hidden loading/error containers that were showing incorrectly
@@ -45,6 +49,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduced code complexity by 30% through shared base functionality
 
 ### Technical
+- **Build Configuration** - Fixed build errors related to legacy code folder
+  - Updated tsconfig.json to exclude "Old" folder from TypeScript compilation
+  - Updated webpack.config.js to exclude "Old" folder from bundling
+  - Updated .vscodeignore to exclude "Old" folder from VSIX packaging
+- **Performance Optimization** - Major improvements to panel load times through parallelization
+  - **Connection References Panel**: Reduced load time from 7.4s to 3.3s (55% faster!)
+    - **Phase 1**: Flows and Connection References API calls now execute in parallel
+    - **Phase 2**: Solution component queries (flow IDs + CR IDs) now execute in parallel
+    - Achieved 68% reduction in service processing time (5.9s → 1.9s)
+  - **Environment Variables Panel**: Switched from server-side to client-side filtering
+    - Loads all environment variables + solution components in parallel (3 simultaneous requests)
+    - Eliminates sequential bottleneck where solution IDs were needed to build filter query
+    - Expected ~1 second improvement from parallel execution
+    - Client-side filtering is instant for typical environment variable datasets (<100 items)
+  - Added detailed timing instrumentation to both services for performance monitoring
+  - Token caching already implemented to avoid redundant authentication overhead
 - **Component-Based Architecture** - Complete rewrite of extension architecture from scratch
   - Moved existing code to `src/old/` directory for reference
   - Created new component-based infrastructure with 4-file pattern per component
