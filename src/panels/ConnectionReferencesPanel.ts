@@ -41,6 +41,7 @@ export class ConnectionReferencesPanel extends BasePanel {
     private actionBarComponent?: ActionBarComponent;
     private dataTableComponent?: DataTableComponent;
     private currentRelationshipData?: RelationshipResult; // Store original service data for deployment settings
+    private currentSolutionId?: string; // Track current solution for "Open in Maker"
     private componentFactory: ComponentFactory; // Per-panel instance to avoid component ID collisions
 
     public static createOrShow(extensionUri: vscode.Uri): void {
@@ -139,6 +140,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                 onSelectionChange: (selectedSolutions: Solution[]) => {
                     const solutionId = selectedSolutions.length > 0 ? selectedSolutions[0].id : '';
                     this.componentLogger.debug('Solution onSelectionChange triggered', { solutionId, selectedSolutions });
+                    this.currentSolutionId = solutionId || undefined; // Store for "Open in Maker"
                     this.handleSolutionSelection(solutionId);
                 }
             });
@@ -346,15 +348,16 @@ export class ConnectionReferencesPanel extends BasePanel {
             if (componentId === 'connectionRefs-solutionSelector' && eventType === 'selectionChanged') {
                 const { selectedSolutions } = data;
 
-                // Update the component's internal state to keep Extension Host in sync with webview
-                if (this.solutionSelectorComponent && selectedSolutions) {
-                    this.solutionSelectorComponent.setSelectedSolutions(selectedSolutions);
-                }
+                // Note: Don't call setSelectedSolutions() here as it would trigger the callback
+                // and cause duplicate data loading. The webview already has the correct selection.
+                // We just store the solution ID for "Open in Maker" and handle selection once.
 
                 if (selectedSolutions && selectedSolutions.length > 0) {
                     const selectedSolution = selectedSolutions[0];
+                    this.currentSolutionId = selectedSolution.id; // Store for "Open in Maker"
                     await this.handleSolutionSelection(selectedSolution.id);
                 } else {
+                    this.currentSolutionId = undefined;
                     await this.handleSolutionSelection('');
                 }
                 return;
@@ -384,7 +387,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                     }
                     case 'openInMakerBtn': {
                         const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
-                        const solId = this.solutionSelectorComponent?.getSelectedSolution()?.id;
+                        const solId = this.currentSolutionId; // Use tracked solution ID
 
                         if (envId && solId) {
                             await this.handleOpenInMaker(envId, solId, 'connectionreferences');
@@ -585,6 +588,12 @@ export class ConnectionReferencesPanel extends BasePanel {
 
         } catch (error) {
             this.componentLogger.error('Error loading connection references', error as Error, { environmentId, solutionId });
+
+            // Clear loading state on error to prevent stuck spinner
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setLoading(false);
+            }
+
             this.postMessage({
                 action: 'error',
                 message: `Failed to load connection references: ${(error as Error).message}`
