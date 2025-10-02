@@ -127,11 +127,11 @@ export class DataTableView {
     private static renderSearch(config: DataTableConfig): string {
         return `
             <div class="data-table-search">
-                <input type="text" 
+                <span class="data-table-search-icon">${ICONS.SEARCH}</span>
+                <input type="text"
                        class="data-table-search-input"
                        placeholder="${this.escapeHtml(config.searchPlaceholder || 'Search...')}"
                        data-component-element="search">
-                <span class="data-table-search-icon">${ICONS.SEARCH}</span>
             </div>
         `;
     }
@@ -182,12 +182,12 @@ export class DataTableView {
      * Render table header
      */
     private static renderTableHeader(
-        config: DataTableConfig, 
-        columns: DataTableColumn[], 
+        config: DataTableConfig,
+        columns: DataTableColumn[],
         state: DataTableViewState
     ): string {
         const headerCells = columns.map(column => this.renderHeaderCell(column, config, state)).join('');
-        
+
         return `
             <thead class="data-table-thead">
                 <tr class="data-table-header-row">
@@ -235,16 +235,12 @@ export class DataTableView {
                 
                 <div class="data-table-header-content">
                     <span class="data-table-header-label">
-                        ${column.headerRenderer ? 
-                            column.headerRenderer(column) : 
+                        ${column.headerRenderer ?
+                            column.headerRenderer(column) :
                             this.escapeHtml(column.label)}
                     </span>
-                    
+
                     ${sortable ? this.renderSortIndicator(column, sortConfig) : ''}
-                    
-                    ${config.filterable && column.filterable !== false ?
-                        this.renderFilterIcon(column, state) : ''}
-                    
                 </div>
             </th>
         `;

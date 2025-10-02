@@ -74,7 +74,6 @@ class DataTableBehavior {
         
         try {
             this.setupSorting();
-            this.setupFiltering();
             this.setupSelection();
             this.setupRowActions();
             this.setupContextMenu();
@@ -83,7 +82,7 @@ class DataTableBehavior {
             this.setupColumnResize();
             this.setupRowExpansion();
             this.setupExport();
-            
+
             this.initialized = true;
             this.notifyReady();
         } catch (error) {
@@ -92,32 +91,26 @@ class DataTableBehavior {
     }
     
     /**
-     * Setup column sorting and filtering
+     * Setup column sorting
      */
     setupSorting() {
         const headers = this.table.querySelectorAll('th[data-column-id]');
-        
+
         headers.forEach(header => {
             const columnId = header.dataset.columnId;
             if (!columnId) return;
-            
+
             const isSortable = header.classList.contains('sortable');
-            const isFilterable = header.dataset.filterable === 'true';
-            
+
             // Left click for sorting
             if (isSortable) {
                 const sortHandler = (event) => {
-                    // Only sort if not clicking on filter dropdown button
-                    if (event.target.closest('.data-table-filter-dropdown')) {
-                        return;
-                    }
-                    
                     event.preventDefault();
-                    
+
                     // Determine new sort direction
                     const currentDirection = header.dataset.sortDirection;
                     let newDirection;
-                    
+
                     if (event.ctrlKey || event.metaKey) {
                         // Multi-sort mode
                         if (currentDirection === 'asc') {
@@ -131,68 +124,16 @@ class DataTableBehavior {
                         // Single sort mode
                         newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
                     }
-                    
+
                     this.sort(columnId, newDirection, event.ctrlKey || event.metaKey);
                 };
-                
+
                 header.addEventListener('click', sortHandler);
                 this.sortHandlers.set(columnId, sortHandler);
             }
-            
-            // Filter dropdown button click (left click)
-            const filterDropdown = header.querySelector('.data-table-filter-dropdown');
-            if (filterDropdown) {
-                const filterHandler = (event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    this.showFilterDropdown(columnId, event);
-                };
-                
-                filterDropdown.addEventListener('click', filterHandler);
-                this.filterHandlers.set(columnId + '_dropdown', filterHandler);
-            }
         });
     }
-    
-    /**
-     * Setup column filtering
-     */
-    setupFiltering() {
-        const filterInputs = this.table.querySelectorAll('.data-table-filter-input');
-        
-        filterInputs.forEach(input => {
-            const columnId = input.dataset.columnId;
-            if (!columnId) return;
-            
-            let timeoutId;
-            const handler = () => {
-                clearTimeout(timeoutId);
-                timeoutId = setTimeout(() => {
-                    this.filter(columnId, input.value);
-                }, 300); // Debounce filter input
-            };
-            
-            input.addEventListener('input', handler);
-            input.addEventListener('change', () => {
-                clearTimeout(timeoutId);
-                this.filter(columnId, input.value);
-            });
-            
-            this.filterHandlers.set(columnId, handler);
-        });
-        
-        // Setup filter dropdowns
-        const filterSelects = this.table.querySelectorAll('select.data-table-filter-input');
-        filterSelects.forEach(select => {
-            const columnId = select.dataset.columnId;
-            if (!columnId) return;
-            
-            select.addEventListener('change', () => {
-                this.filter(columnId, select.value);
-            });
-        });
-    }
-    
+
     /**
      * Setup row selection
      */
@@ -358,9 +299,9 @@ class DataTableBehavior {
      * Setup search functionality
      */
     setupSearch() {
-        const searchInput = this.container?.querySelector('.search-input');
+        const searchInput = this.container?.querySelector('.data-table-search-input');
         if (!searchInput) return;
-        
+
         let timeoutId;
         const handler = () => {
             clearTimeout(timeoutId);
@@ -368,7 +309,7 @@ class DataTableBehavior {
                 this.search(searchInput.value);
             }, 300);
         };
-        
+
         searchInput.addEventListener('input', handler);
         searchInput.addEventListener('keypress', (event) => {
             if (event.key === 'Enter') {
@@ -1021,14 +962,58 @@ class DataTableBehavior {
     }
     
     /**
-     * Search table
+     * Search table across all columns
      */
     search(query) {
-        this.postMessage({
-            type: 'dataTable.search',
-            tableId: this.tableId,
-            query
+        console.log(`Searching table ${this.tableId} with query: "${query}"`);
+
+        const tbody = this.table.querySelector('tbody');
+        if (!tbody) {
+            console.warn(`No tbody found in table ${this.tableId}`);
+            return;
+        }
+
+        const rows = tbody.querySelectorAll('tr');
+        if (rows.length === 0) {
+            console.log(`No rows to search in table ${this.tableId}`);
+            return;
+        }
+
+        const searchQuery = (query || '').toLowerCase().trim();
+        let visibleRowCount = 0;
+
+        // Show all rows if search is empty
+        if (searchQuery === '') {
+            rows.forEach(row => {
+                row.style.display = '';
+            });
+            this.updateEmptyStateVisibility(false);
+            console.log(`Search cleared: all ${rows.length} rows visible`);
+            return;
+        }
+
+        // Filter rows based on search query (searches across all columns)
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            let rowMatches = false;
+
+            // Check if any cell in the row matches the search query
+            for (const cell of cells) {
+                const cellText = cell.textContent.toLowerCase().trim();
+                if (cellText.includes(searchQuery)) {
+                    rowMatches = true;
+                    break;
+                }
+            }
+
+            row.style.display = rowMatches ? '' : 'none';
+            if (rowMatches) visibleRowCount++;
         });
+
+        console.log(`Search applied: ${visibleRowCount} of ${rows.length} rows visible`);
+
+        // Update empty state if no rows are visible
+        this.updateEmptyStateVisibility(visibleRowCount === 0);
     }
     
     /**

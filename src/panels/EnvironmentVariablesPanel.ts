@@ -207,7 +207,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 ],
                 data: [],
                 sortable: true,
-                filterable: true,
+                searchable: true,
                 className: 'environment-variables-table'
             });
             this.componentLogger.trace('DataTableComponent created successfully');

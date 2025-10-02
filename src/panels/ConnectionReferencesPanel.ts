@@ -237,7 +237,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                 ],
                 data: [],
                 sortable: true,
-                filterable: false,
+                searchable: true,
                 showFooter: true,
                 striped: true,
                 className: 'connection-references-table'

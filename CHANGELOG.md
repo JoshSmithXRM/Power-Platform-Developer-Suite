@@ -40,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **CRITICAL**: Fixed test connection wiping production secrets - test environments now use `preserveCredentials: true` to avoid deleting shared secrets
 
 ### Changed
+- **Data Table Search UI** - Simplified filtering with global search box
+  - Replaced per-column inline filters with single global search box above table
+  - Search box filters across all columns simultaneously (case-insensitive contains match)
+  - Debounced input (300ms) for smooth search experience
+  - Cleaner, simpler interface - one search box instead of multiple filter inputs
+  - Deployed to Connection References and Environment Variables panels
 - **Architecture Refactoring** - Completed component architecture refactoring for existing panels
   - All 3 panels now use event bridges for component communication
   - Implemented factory singleton pattern via ServiceFactory
