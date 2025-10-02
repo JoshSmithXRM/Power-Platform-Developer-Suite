@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Security Vulnerability** - Updated axios to version >=1.12.0 to address HIGH severity DoS vulnerability (GHSA-4hjh-wcwx-xvwj)
 - **Documentation** - Fixed README.md version badge to display correct version 0.0.2
+- **Panel Lifecycle** - Fixed component ID collision error when reopening panels by using per-panel ComponentFactory instances instead of singleton
+- **Panel Lifecycle** - Fixed tab switching causing panel reload by adding `retainContextWhenHidden: true` to all panel webview configurations
+- **Message Handling** - Fixed "Unknown message command environment-changed" warnings in ConnectionReferencesPanel by adding missing message handler
 
 ### Changed
 - **Architecture Refactoring** - Completed component architecture refactoring for existing panels

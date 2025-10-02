@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 
 import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
+import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
@@ -38,6 +39,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
     private solutionSelectorComponent?: SolutionSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
     private dataTableComponent?: DataTableComponent;
+    private componentFactory: ComponentFactory;
 
     public static createOrShow(extensionUri: vscode.Uri): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
@@ -53,6 +55,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
             column || vscode.ViewColumn.One,
             {
                 enableScripts: true,
+                retainContextWhenHidden: true,
                 localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
             }
         );
@@ -76,6 +79,9 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
         this.componentLogger.debug('Constructor starting');
 
+        // Create per-panel ComponentFactory instance to avoid ID collisions
+        this.componentFactory = new ComponentFactory();
+
         this.initializeComponents();
 
         // Set up event bridges for component communication using BasePanel method
@@ -98,11 +104,9 @@ export class EnvironmentVariablesPanel extends BasePanel {
     private initializeComponents(): void {
         this.componentLogger.debug('Initializing components');
         try {
-            const componentFactory = ServiceFactory.getComponentFactory();
-
             this.componentLogger.trace('Creating EnvironmentSelectorComponent');
             // Environment Selector Component
-            this.environmentSelectorComponent = componentFactory.createEnvironmentSelector({
+            this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
                 id: 'envVars-envSelector',
                 label: 'Select Environment',
                 placeholder: 'Choose an environment to view variables...',
@@ -119,7 +123,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating SolutionSelectorComponent');
             // Solution Selector Component
-            this.solutionSelectorComponent = componentFactory.createSolutionSelector({
+            this.solutionSelectorComponent = this.componentFactory.createSolutionSelector({
                 id: 'envVars-solutionSelector',
                 label: 'Filter by Solution (Optional)',
                 placeholder: 'All Solutions',
@@ -131,7 +135,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating ActionBarComponent');
             // Action Bar Component
-            this.actionBarComponent = componentFactory.createActionBar({
+            this.actionBarComponent = this.componentFactory.createActionBar({
                 id: 'envVars-actions',
                 actions: [
                     {
@@ -163,7 +167,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating DataTableComponent');
             // Data Table Component
-            this.dataTableComponent = componentFactory.createDataTable({
+            this.dataTableComponent = this.componentFactory.createDataTable({
                 id: 'envVars-table',
                 columns: [
                     {

@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 
 import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
+import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
@@ -40,6 +41,7 @@ export class ConnectionReferencesPanel extends BasePanel {
     private actionBarComponent?: ActionBarComponent;
     private dataTableComponent?: DataTableComponent;
     private currentRelationshipData?: RelationshipResult; // Store original service data for deployment settings
+    private componentFactory: ComponentFactory; // Per-panel instance to avoid component ID collisions
 
     public static createOrShow(extensionUri: vscode.Uri): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
@@ -55,6 +57,7 @@ export class ConnectionReferencesPanel extends BasePanel {
             column || vscode.ViewColumn.One,
             {
                 enableScripts: true,
+                retainContextWhenHidden: true,
                 localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
             }
         );
@@ -78,6 +81,9 @@ export class ConnectionReferencesPanel extends BasePanel {
 
         this.componentLogger.debug('Constructor starting');
 
+        // Create per-panel ComponentFactory instance to avoid ID collisions
+        this.componentFactory = new ComponentFactory();
+
         this.initializeComponents();
 
         // Set up event bridges for component communication using BasePanel method
@@ -100,11 +106,9 @@ export class ConnectionReferencesPanel extends BasePanel {
     private initializeComponents(): void {
         this.componentLogger.debug('Initializing components');
         try {
-            const componentFactory = ServiceFactory.getComponentFactory();
-
             this.componentLogger.trace('Creating EnvironmentSelectorComponent');
             // Environment Selector Component
-            this.environmentSelectorComponent = componentFactory.createEnvironmentSelector({
+            this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
                 id: 'connectionRefs-envSelector',
                 label: 'Select Environment',
                 placeholder: 'Choose an environment to view connection references...',
@@ -121,7 +125,7 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating SolutionSelectorComponent');
             // Solution Selector Component
-            this.solutionSelectorComponent = componentFactory.createSolutionSelector({
+            this.solutionSelectorComponent = this.componentFactory.createSolutionSelector({
                 id: 'connectionRefs-solutionSelector',
                 label: 'Filter by Solution (Optional)',
                 placeholder: 'All Solutions',
@@ -142,7 +146,7 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating ActionBarComponent');
             // Action Bar Component
-            this.actionBarComponent = componentFactory.createActionBar({
+            this.actionBarComponent = this.componentFactory.createActionBar({
                 id: 'connectionRefs-actions',
                 actions: [
                     {
@@ -174,7 +178,7 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             this.componentLogger.trace('Creating DataTableComponent');
             // Data Table Component
-            this.dataTableComponent = componentFactory.createDataTable({
+            this.dataTableComponent = this.componentFactory.createDataTable({
                 id: 'connectionRefs-table',
                 columns: [
                     {
@@ -277,6 +281,11 @@ export class ConnectionReferencesPanel extends BasePanel {
             switch (command) {
                 case 'component-event':
                     await this.handleComponentEvent(message);
+                    break;
+
+                case 'environment-selected':
+                case 'environment-changed':
+                    await this.handleEnvironmentSelection(message.data?.environmentId);
                     break;
 
                 case 'refresh-data':

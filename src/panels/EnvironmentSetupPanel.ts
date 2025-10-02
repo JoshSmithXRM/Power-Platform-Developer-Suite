@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
+import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
@@ -15,6 +16,7 @@ export class EnvironmentSetupPanel extends BasePanel {
 
     private environmentSelectorComponent?: EnvironmentSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
+    private componentFactory: ComponentFactory;
 
     public static createOrShow(extensionUri: vscode.Uri, environment?: EnvironmentConnection): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
@@ -30,6 +32,7 @@ export class EnvironmentSetupPanel extends BasePanel {
             column || vscode.ViewColumn.One,
             {
                 enableScripts: true,
+                retainContextWhenHidden: true,
                 localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
             }
         );
@@ -55,6 +58,9 @@ export class EnvironmentSetupPanel extends BasePanel {
             hasInitialEnvironment: !!initialEnvironment
         });
 
+        // Create per-panel ComponentFactory instance to avoid ID collisions
+        this.componentFactory = new ComponentFactory();
+
         this.initializeComponents();
 
         // Set up event bridges for component communication using BasePanel method
@@ -75,11 +81,9 @@ export class EnvironmentSetupPanel extends BasePanel {
     private initializeComponents(): void {
         this.componentLogger.debug('Initializing components');
         try {
-            const componentFactory = ServiceFactory.getComponentFactory();
-
             this.componentLogger.trace('Creating EnvironmentSelectorComponent');
             // Environment Selector Component
-            this.environmentSelectorComponent = componentFactory.createEnvironmentSelector({
+            this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
                 id: 'environmentSetup-envSelector',
                 label: 'Select Environment',
                 placeholder: 'Choose an environment to configure...',
@@ -96,7 +100,7 @@ export class EnvironmentSetupPanel extends BasePanel {
 
             this.componentLogger.trace('Creating ActionBarComponent');
             // Action Bar Component
-            this.actionBarComponent = componentFactory.createActionBar({
+            this.actionBarComponent = this.componentFactory.createActionBar({
                 id: 'environmentSetup-actions',
                 actions: [
                     {
