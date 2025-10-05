@@ -112,6 +112,44 @@ export class PanelComposer {
     }
 
     /**
+     * Compose panel with custom HTML layout
+     * Allows panels to use custom layout while reusing PanelComposer's script/CSS collection logic
+     * Follows Open/Closed Principle - extends functionality without modifying existing compose() method
+     *
+     * @param customHTML Custom HTML layout with component HTML already integrated
+     * @param components Array of components used (for script/CSS collection)
+     * @param additionalCSSFiles Additional panel-specific CSS files
+     * @param additionalScripts Additional panel-specific behavior scripts
+     * @param webviewResources Resource URIs for CSS and JS files
+     * @param panelTitle Optional panel title
+     * @returns Complete HTML document string
+     */
+    public static composeWithCustomHTML(
+        customHTML: string,
+        components: BaseComponent[],
+        additionalCSSFiles: string[],
+        additionalScripts: string[],
+        webviewResources: WebviewResources,
+        panelTitle?: string
+    ): string {
+        // Collect required CSS files (component-based + additional)
+        const cssFiles = [...PanelComposer.collectCSSFiles(components), ...additionalCSSFiles];
+
+        // Collect required behavior scripts (component-based + additional)
+        const behaviorScripts = [...PanelComposer.collectBehaviorScripts(components), ...additionalScripts];
+
+        // Generate complete HTML document with custom layout (skip auto-organization)
+        return PanelComposer.generateCompleteHTML({
+            title: panelTitle || 'Panel',
+            componentHTML: customHTML,  // Use custom layout instead of auto-organizing
+            cssFiles,
+            behaviorScripts,
+            webviewResources,
+            skipOrganization: true  // Don't wrap custom HTML in panel-container divs
+        });
+    }
+
+    /**
      * Compose a complete panel from components
      */
     public compose(template: PanelTemplate, webview: vscode.Webview): ComposedPanel {
@@ -722,21 +760,24 @@ export class PanelComposer {
         cssFiles: string[];
         behaviorScripts: string[];
         webviewResources: WebviewResources;
+        skipOrganization?: boolean;
     }): string {
         // Create proper webview URIs for CSS and JS files
         // Extract the base URI pattern from existing resources and construct proper paths
         const baseUri = params.webviewResources.panelStylesSheet.toString().replace('/css/panel-base.css', '');
-        
-        const cssLinks = params.cssFiles.map(css => 
+
+        const cssLinks = params.cssFiles.map(css =>
             `<link rel="stylesheet" href="${baseUri}/${css}">`
         ).join('\n    ');
-        
-        const jsScripts = params.behaviorScripts.map(script => 
+
+        const jsScripts = params.behaviorScripts.map(script =>
             `<script src="${baseUri}/${script}"></script>`
         ).join('\n    ');
-        
-        // Organize components for flexible layout
-        const organizedHTML = PanelComposer.organizeComponentsForFlexibleLayout(params.componentHTML);
+
+        // Organize components for flexible layout (skip for custom HTML layouts)
+        const organizedHTML = params.skipOrganization
+            ? params.componentHTML
+            : PanelComposer.organizeComponentsForFlexibleLayout(params.componentHTML);
         
         return `<!DOCTYPE html>
 <html lang="en">

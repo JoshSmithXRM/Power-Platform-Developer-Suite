@@ -179,12 +179,6 @@ export class MetadataBrowserPanel extends BasePanel {
                         label: 'Open in Maker',
                         variant: 'primary',
                         disabled: true
-                    },
-                    {
-                        id: 'browseTables',
-                        label: 'Browse Tables...',
-                        variant: 'secondary',
-                        disabled: true
                     }
                 ],
                 layout: 'horizontal',
@@ -440,6 +434,18 @@ export class MetadataBrowserPanel extends BasePanel {
                     await this.refreshCurrentMetadata();
                     break;
 
+                case 'select-entity':
+                    if (message.data) {
+                        await this.handleEntitySelection(message.data);
+                    }
+                    break;
+
+                case 'select-choice':
+                    if (message.data) {
+                        await this.handleChoiceSelection(message.data);
+                    }
+                    break;
+
                 case 'panel-ready':
                     this.componentLogger.debug('Panel ready event received');
                     break;
@@ -480,9 +486,6 @@ export class MetadataBrowserPanel extends BasePanel {
                 const { actionId } = data;
 
                 switch (actionId) {
-                    case 'browseTables':
-                        await this.showTableChoicePicker();
-                        break;
                     case 'refresh':
                         await this.refreshCurrentMetadata();
                         break;
@@ -526,6 +529,16 @@ export class MetadataBrowserPanel extends BasePanel {
         }
     }
 
+    private getPanelSpecificResources(): {
+        metadataBrowserStylesSheet: vscode.Uri;
+    } {
+        return {
+            metadataBrowserStylesSheet: this._panel.webview.asWebviewUri(
+                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'css', 'panels', 'metadata-browser.css')
+            )
+        };
+    }
+
     protected getHtmlContent(): string {
         this.componentLogger.trace('Generating HTML content');
         try {
@@ -537,6 +550,7 @@ export class MetadataBrowserPanel extends BasePanel {
                 return this.getErrorHtml('Metadata Browser', 'Failed to initialize components');
             }
 
+            const panelResources = this.getPanelSpecificResources();
             const currentSelection = this.selectedEntityDisplayName || this.selectedChoiceDisplayName || 'None selected';
             const isAttributesExpanded = !this.collapsedSections.has('attributes');
             const isKeysExpanded = !this.collapsedSections.has('keys');
@@ -544,131 +558,51 @@ export class MetadataBrowserPanel extends BasePanel {
             const isPrivilegesExpanded = !this.collapsedSections.has('privileges');
             const isChoicesExpanded = !this.collapsedSections.has('choices');
 
-            const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this._panel.webview.cspSource}; script-src ${this._panel.webview.cspSource};">
-    <title>Metadata Browser</title>
-    <link rel="stylesheet" href="${this.getCommonWebviewResources().panelStylesSheet}">
-    <style>
-        body {
-            padding: 0;
-            margin: 0;
-            overflow-x: hidden;
-        }
-
-        .sticky-header {
-            position: sticky;
-            top: 0;
-            background: var(--vscode-editor-background);
-            border-bottom: 1px solid var(--vscode-panel-border);
-            padding: 16px 20px;
-            z-index: 100;
-        }
-
-        .header-row {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .table-selector {
-            flex: 1;
-            min-width: 200px;
-        }
-
-        .table-selector-label {
-            font-size: 12px;
-            color: var(--vscode-descriptionForeground);
-            margin-bottom: 4px;
-        }
-
-        .table-selector-value {
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--vscode-foreground);
-        }
-
-        .metadata-sections {
-            padding: 20px;
-        }
-
-        .section {
-            margin-bottom: 16px;
-            border: 1px solid var(--vscode-panel-border);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .section-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 16px;
-            background: var(--vscode-tab-activeBackground);
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .section-header:hover {
-            background: var(--vscode-list-hoverBackground);
-        }
-
-        .section-icon {
-            font-size: 12px;
-            width: 16px;
-            transition: transform 0.2s;
-        }
-
-        .section.expanded .section-icon {
-            transform: rotate(90deg);
-        }
-
-        .section-title {
-            flex: 1;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .section-count {
-            font-size: 12px;
-            color: var(--vscode-descriptionForeground);
-        }
-
-        .section-content {
-            display: none;
-            padding: 16px;
-            background: var(--vscode-editor-background);
-        }
-
-        .section.expanded .section-content {
-            display: block;
-        }
-
-        .component-loading-container,
-        .component-error-container {
-            display: none;
-        }
-    </style>
-</head>
-<body>
+            // Build custom HTML layout with two-panel design: left sidebar + main content
+            const customHTML = `
     <div class="sticky-header">
         <div class="header-row">
             ${this.environmentSelectorComponent.generateHTML()}
-
-            <div class="table-selector">
-                <div class="table-selector-label">Selected:</div>
-                <div class="table-selector-value" id="current-selection">${currentSelection}</div>
-            </div>
-
             ${this.actionBarComponent.generateHTML()}
         </div>
     </div>
 
-    <div class="metadata-sections">
+    <div class="metadata-container">
+        <!-- Left Panel: Entity/Choice Tree -->
+        <div class="left-panel">
+            <div class="left-panel-header">
+                <input
+                    type="text"
+                    class="entity-search"
+                    id="entity-search"
+                    placeholder="Search tables and choices..."
+                    oninput="filterEntityTree(this.value)"
+                />
+            </div>
+            <div class="entity-tree-container">
+                <div class="tree-section">
+                    <div class="tree-section-header">TABLES</div>
+                    <ul class="tree-section-list" id="tables-list">
+                        <!-- Populated dynamically -->
+                    </ul>
+                </div>
+                <div class="tree-section">
+                    <div class="tree-section-header">CHOICES</div>
+                    <ul class="tree-section-list" id="choices-list">
+                        <!-- Populated dynamically -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Metadata Content -->
+        <div class="right-panel">
+            <div class="selection-header">
+                <div class="selection-label">Selected:</div>
+                <div class="selection-value" id="current-selection">${currentSelection}</div>
+            </div>
+
+            <div class="metadata-sections">
         <!-- Attributes Section -->
         <div class="section ${isAttributesExpanded ? 'expanded' : ''}" data-section="attributes">
             <div class="section-header" onclick="toggleSection('attributes')">
@@ -728,25 +662,28 @@ export class MetadataBrowserPanel extends BasePanel {
                 ${this.choiceValuesTableComponent.generateHTML()}
             </div>
         </div>
-    </div>
+            </div>
+        </div>
+    </div>`;
 
-    <script>
-        const vscode = acquireVsCodeApi();
-
-        function toggleSection(sectionId) {
-            vscode.postMessage({
-                command: 'toggle-section',
-                data: { sectionId }
-            });
-        }
-
-        // Send panel ready message
-        vscode.postMessage({ command: 'panel-ready' });
-    </script>
-</body>
-</html>`;
-
-            return html;
+            // Use PanelComposer with custom HTML layout
+            // This follows SOLID principles by reusing PanelComposer's script/CSS collection logic
+            return PanelComposer.composeWithCustomHTML(
+                customHTML,
+                [
+                    this.environmentSelectorComponent,
+                    this.actionBarComponent,
+                    this.attributesTableComponent,
+                    this.keysTableComponent,
+                    this.relationshipsTableComponent,
+                    this.privilegesTableComponent,
+                    this.choiceValuesTableComponent
+                ],
+                ['css/panels/metadata-browser.css'],  // Additional panel-specific CSS
+                ['js/panels/metadataBrowserBehavior.js'],  // Additional panel-specific behavior scripts
+                this.getCommonWebviewResources(),
+                'Metadata Browser'
+            );
 
         } catch (error) {
             this.componentLogger.error('Error generating HTML content', error as Error);
@@ -769,10 +706,11 @@ export class MetadataBrowserPanel extends BasePanel {
         try {
             this.componentLogger.info('Environment selected', { environmentId });
 
-            // Enable action bar buttons
-            if (this.actionBarComponent) {
-                this.actionBarComponent.setActionDisabled('browseTables', false);
-            }
+            // Load entities and choices for the tree
+            await this.loadEntityChoiceTree(environmentId);
+
+            // Keep action buttons disabled until an entity/choice is selected
+            this.updateActionBar(false, false);
 
             // Save state
             await this._stateService.savePanelState(MetadataBrowserPanel.viewType, {
@@ -783,6 +721,76 @@ export class MetadataBrowserPanel extends BasePanel {
             this.componentLogger.error('Error handling environment selection', error as Error, { environmentId });
             vscode.window.showErrorMessage('Failed to load environment configuration');
         }
+    }
+
+    private async loadEntityChoiceTree(environmentId: string): Promise<void> {
+        try {
+            this.componentLogger.info('Loading entity and choice tree', { environmentId });
+
+            const metadataService = ServiceFactory.getMetadataService();
+            const [entities, choices] = await Promise.all([
+                metadataService.getEntityDefinitions(environmentId),
+                metadataService.getGlobalOptionSets(environmentId)
+            ]);
+
+            // Send to webview to populate tree
+            this.postMessage({
+                action: 'populate-tree',
+                command: 'populate-tree',
+                data: {
+                    entities: entities.map(e => ({
+                        logicalName: e.LogicalName,
+                        displayName: e.DisplayName?.UserLocalizedLabel?.Label || e.LogicalName,
+                        metadataId: e.MetadataId,
+                        isManaged: e.IsManaged,
+                        isCustom: e.IsCustomEntity
+                    })),
+                    choices: choices.map(c => ({
+                        name: c.Name,
+                        displayName: c.DisplayName?.UserLocalizedLabel?.Label || c.Name,
+                        isManaged: c.IsManaged,
+                        isCustom: c.IsCustomOptionSet
+                    }))
+                }
+            });
+
+            this.componentLogger.info('Entity and choice tree populated', {
+                entitiesCount: entities.length,
+                choicesCount: choices.length
+            });
+
+        } catch (error) {
+            this.componentLogger.error('Error loading entity/choice tree', error as Error, { environmentId });
+            vscode.window.showErrorMessage(`Failed to load tables and choices: ${(error as Error).message}`);
+        }
+    }
+
+    private async handleEntitySelection(data: any): Promise<void> {
+        const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
+        if (!selectedEnvironment) {
+            return;
+        }
+
+        const { logicalName, displayName, metadataId } = data;
+        if (!logicalName) {
+            return;
+        }
+
+        await this.loadEntityMetadata(selectedEnvironment.id, logicalName, metadataId, displayName);
+    }
+
+    private async handleChoiceSelection(data: any): Promise<void> {
+        const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
+        if (!selectedEnvironment) {
+            return;
+        }
+
+        const { name, displayName } = data;
+        if (!name) {
+            return;
+        }
+
+        await this.loadChoiceMetadata(selectedEnvironment.id, name, displayName);
     }
 
     private async showTableChoicePicker(): Promise<void> {
@@ -899,29 +907,19 @@ export class MetadataBrowserPanel extends BasePanel {
             }
 
             // Enable refresh and open in maker buttons
-            if (this.actionBarComponent) {
-                this.actionBarComponent.setActionDisabled('refresh', false);
-                this.actionBarComponent.setActionDisabled('openInMaker', false);
-            }
+            this.updateActionBar(true, true);
 
             // Update selection display
-            this.postMessage({
-                action: 'update-selection',
-                command: 'update-selection',
-                data: { displayName, counts: {
-                    attributes: attributesData.length,
-                    keys: keysData.length,
-                    relationships: relationshipsData.length,
-                    privileges: privilegesData.length,
-                    choices: 0
-                }}
+            this.updateSelection(displayName, {
+                attributes: attributesData.length,
+                keys: keysData.length,
+                relationships: relationshipsData.length,
+                privileges: privilegesData.length,
+                choices: 0
             });
 
-            // Expand attributes section by default
-            if (this.collapsedSections.has('attributes')) {
-                this.collapsedSections.delete('attributes');
-                this.updateWebview();
-            }
+            // Expand attributes section by default (no updateWebview needed - counts message triggers UI update)
+            this.collapsedSections.delete('attributes');
 
             this.componentLogger.info('Entity metadata loaded successfully', { logicalName, attributesCount: attributesData.length });
 
@@ -967,30 +965,20 @@ export class MetadataBrowserPanel extends BasePanel {
                 this.choiceValuesTableComponent.setLoading(false);
             }
 
-            // Disable entity-specific actions
-            if (this.actionBarComponent) {
-                this.actionBarComponent.setActionDisabled('refresh', false);
-                this.actionBarComponent.setActionDisabled('openInMaker', true); // No maker URL for choices
-            }
+            // Enable refresh, disable open in maker (no maker URL for choices)
+            this.updateActionBar(true, false);
 
             // Update selection display
-            this.postMessage({
-                action: 'update-selection',
-                command: 'update-selection',
-                data: { displayName, counts: {
-                    attributes: 0,
-                    keys: 0,
-                    relationships: 0,
-                    privileges: 0,
-                    choices: choiceValuesData.length
-                }}
+            this.updateSelection(displayName, {
+                attributes: 0,
+                keys: 0,
+                relationships: 0,
+                privileges: 0,
+                choices: choiceValuesData.length
             });
 
-            // Expand choices section
-            if (this.collapsedSections.has('choices')) {
-                this.collapsedSections.delete('choices');
-                this.updateWebview();
-            }
+            // Expand choices section (no updateWebview needed - counts message triggers UI update)
+            this.collapsedSections.delete('choices');
 
             this.componentLogger.info('Choice metadata loaded successfully', { name, valuesCount: choiceValuesData.length });
 
@@ -1098,25 +1086,40 @@ export class MetadataBrowserPanel extends BasePanel {
     }
 
     private setAllTablesLoading(loading: boolean, message?: string): void {
-        if (this.attributesTableComponent) {
-            this.attributesTableComponent.setLoading(loading, message);
-            if (!loading) this.attributesTableComponent.setData([]);
-        }
-        if (this.keysTableComponent) {
-            this.keysTableComponent.setLoading(loading, message);
-            if (!loading) this.keysTableComponent.setData([]);
-        }
-        if (this.relationshipsTableComponent) {
-            this.relationshipsTableComponent.setLoading(loading, message);
-            if (!loading) this.relationshipsTableComponent.setData([]);
-        }
-        if (this.privilegesTableComponent) {
-            this.privilegesTableComponent.setLoading(loading, message);
-            if (!loading) this.privilegesTableComponent.setData([]);
-        }
-        if (this.choiceValuesTableComponent) {
-            this.choiceValuesTableComponent.setLoading(loading, message);
-            if (!loading) this.choiceValuesTableComponent.setData([]);
+        const tables = [
+            this.attributesTableComponent,
+            this.keysTableComponent,
+            this.relationshipsTableComponent,
+            this.privilegesTableComponent,
+            this.choiceValuesTableComponent
+        ];
+
+        tables.forEach(table => {
+            if (table) {
+                table.setLoading(loading, message);
+                if (!loading) table.setData([]);
+            }
+        });
+    }
+
+    private updateSelection(displayName: string, counts: {
+        attributes: number;
+        keys: number;
+        relationships: number;
+        privileges: number;
+        choices: number;
+    }): void {
+        this.postMessage({
+            action: 'update-selection',
+            command: 'update-selection',
+            data: { displayName, counts }
+        });
+    }
+
+    private updateActionBar(enableRefresh: boolean, enableOpenInMaker: boolean): void {
+        if (this.actionBarComponent) {
+            this.actionBarComponent.setActionDisabled('refresh', !enableRefresh);
+            this.actionBarComponent.setActionDisabled('openInMaker', !enableOpenInMaker);
         }
     }
 
@@ -1127,8 +1130,9 @@ export class MetadataBrowserPanel extends BasePanel {
             this.collapsedSections.add(sectionId);
         }
 
-        // Update the webview to reflect collapsed state
-        this.updateWebview();
+        // No updateWebview() needed - webview behavior handles visual toggle optimistically
+        // State is tracked here for persistence when getHtmlContent() is called again
+        this.componentLogger.debug('Section toggled', { sectionId, isExpanded: !this.collapsedSections.has(sectionId) });
     }
 
     private async refreshCurrentMetadata(): Promise<void> {
@@ -1166,17 +1170,9 @@ export class MetadataBrowserPanel extends BasePanel {
                 return;
             }
 
-            let url: string;
-
-            if (this.selectedEntityMetadataId) {
-                // Entity-specific URL
-                url = `https://make.powerapps.com/environments/${selectedEnvironment.environmentId}/entities/${this.selectedEntityMetadataId}`;
-                this.componentLogger.info('Opening entity in Maker', { url, entity: this.selectedEntityLogicalName });
-            } else {
-                // Global entities page
-                url = `https://make.powerapps.com/environments/${selectedEnvironment.environmentId}/entities`;
-                this.componentLogger.info('Opening entities page in Maker', { url });
-            }
+            // Action bar "Open in Maker" always goes to entities list
+            const url = `https://make.powerapps.com/environments/${selectedEnvironment.environmentId}/entities`;
+            this.componentLogger.info('Opening entities page in Maker', { url });
 
             await vscode.env.openExternal(vscode.Uri.parse(url));
 
