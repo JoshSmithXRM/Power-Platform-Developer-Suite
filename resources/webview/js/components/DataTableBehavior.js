@@ -1418,11 +1418,12 @@ class DataTableBehavior {
      */
     updateLoadingState(loading, message = 'Loading...') {
         const loadingOverlay = this.container?.querySelector('.loading-overlay');
-        
+
         if (loading) {
             if (!loadingOverlay) {
                 this.showLoadingOverlay(message);
             } else {
+                loadingOverlay.classList.add('visible');
                 const loadingText = loadingOverlay.querySelector('.loading-text');
                 if (loadingText) {
                     loadingText.textContent = message;
@@ -1433,7 +1434,7 @@ class DataTableBehavior {
                 loadingOverlay.remove();
             }
         }
-        
+
         this.container?.classList.toggle('loading', loading);
     }
     
@@ -1466,14 +1467,20 @@ class DataTableBehavior {
      */
     showLoadingOverlay(message) {
         if (!this.container) return;
-        
+
+        // Remove any existing overlay first
+        const existingOverlay = this.container.querySelector('.loading-overlay');
+        if (existingOverlay) {
+            existingOverlay.remove();
+        }
+
         const overlay = document.createElement('div');
-        overlay.className = 'loading-overlay';
+        overlay.className = 'loading-overlay visible'; // Add 'visible' class
         overlay.innerHTML = `
             <div class="loading-spinner"></div>
             <div class="loading-text">${message}</div>
         `;
-        
+
         this.container.appendChild(overlay);
     }
     
@@ -1718,6 +1725,7 @@ class DataTableBehavior {
      * Toggle loading state
      */
     toggleLoadingState(loading, message) {
+        console.log(`DataTableBehavior ${this.tableId}: toggleLoadingState(${loading}, "${message}")`);
         if (loading) {
             this.showLoadingOverlay(message || 'Loading...');
         } else {

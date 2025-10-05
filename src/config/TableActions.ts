@@ -80,3 +80,35 @@ export const PLUGIN_TRACE_CONTEXT_MENU_ITEMS: DataTableContextMenuItem[] = [
         icon: 'copy'
     }
 ];
+
+/**
+ * Metadata Browser Context Menus
+ * Actions for metadata browsing and navigation
+ */
+export const METADATA_CONTEXT_MENU_ITEMS = {
+    attributes: [
+        {
+            id: 'copyLogicalName',
+            label: 'Copy Logical Name',
+            icon: 'copy'
+        },
+        {
+            id: 'openAttributeInMaker',
+            label: 'Open in Maker',
+            icon: 'globe'
+        }
+    ] as DataTableContextMenuItem[],
+
+    relationships: [
+        {
+            id: 'openRelatedEntity',
+            label: 'Open Related Entity',
+            icon: 'link-external'
+        },
+        {
+            id: 'copyLogicalName',
+            label: 'Copy Relationship Name',
+            icon: 'copy'
+        }
+    ] as DataTableContextMenuItem[]
+};

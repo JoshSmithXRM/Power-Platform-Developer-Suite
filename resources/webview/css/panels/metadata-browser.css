@@ -1,0 +1,234 @@
+/* Metadata Browser Panel Styles */
+
+body {
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.sticky-header {
+    position: sticky;
+    top: 0;
+    background: var(--vscode-editor-background);
+    border-bottom: 1px solid var(--vscode-panel-border);
+    padding: 12px 16px;
+    z-index: 100;
+    flex-shrink: 0;
+}
+
+.header-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+/* Ensure environment selector takes appropriate width */
+.header-row .environment-selector {
+    flex: 1 1 300px;
+    min-width: 250px;
+    max-width: 500px;
+}
+
+/* Action bar should stay compact */
+.header-row .action-bar {
+    flex: 0 0 auto;
+}
+
+/* Two-panel layout container */
+.metadata-container {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    height: calc(100vh - 120px);
+    max-height: calc(100vh - 120px);
+    gap: 0;
+    overflow: hidden;
+}
+
+/* Left panel - Entity/Choice tree */
+.left-panel {
+    background: var(--vscode-sideBar-background);
+    border-right: 1px solid var(--vscode-panel-border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.left-panel-header {
+    padding: 12px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    flex-shrink: 0;
+}
+
+.entity-search {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.entity-search:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+}
+
+.entity-search::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+.entity-tree-container {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.tree-section {
+    margin-bottom: 16px;
+}
+
+.tree-section-header {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--vscode-descriptionForeground);
+    background: var(--vscode-sideBar-background);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.tree-section-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.tree-item {
+    padding: 6px 12px 6px 24px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--vscode-foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tree-item:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.tree-item.selected {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.tree-item.hidden {
+    display: none;
+}
+
+.tree-item-icon {
+    display: inline-block;
+    width: 16px;
+    margin-right: 6px;
+    opacity: 0.7;
+}
+
+/* Right panel - Content area */
+.right-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--vscode-editor-background);
+    min-height: 0;
+}
+
+.selection-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    flex-shrink: 0;
+}
+
+.selection-label {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 4px;
+}
+
+.selection-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--vscode-foreground);
+}
+
+.metadata-sections {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px;
+}
+
+.section {
+    margin-bottom: 16px;
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--vscode-tab-activeBackground);
+    cursor: pointer;
+    user-select: none;
+}
+
+.section-header:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.section-icon {
+    font-size: 12px;
+    width: 16px;
+    transition: transform 0.2s;
+}
+
+.section.expanded .section-icon {
+    transform: rotate(90deg);
+}
+
+.section-title {
+    flex: 1;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.section-count {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.section-content {
+    display: none;
+    padding: 16px;
+    background: var(--vscode-editor-background);
+}
+
+.section.expanded .section-content {
+    display: block;
+}
+
+.component-loading-container,
+.component-error-container {
+    display: none;
+}

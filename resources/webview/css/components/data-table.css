@@ -662,12 +662,18 @@
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.1);
-    display: flex;
+    display: none; /* Hidden by default - only shown when loading */
     flex-direction: column;
     align-items: center;
     justify-content: center;
     z-index: 100;
     gap: 12px;
+}
+
+/* Only block pointer events when actually visible */
+.loading-overlay.visible {
+    display: flex;
+    pointer-events: all;
 }
 
 .loading-spinner {
