@@ -278,6 +278,255 @@ export class MyPanel extends BasePanel {
 }
 ```
 
+## View Helpers Pattern
+
+### When to Use View Helpers vs Components
+
+**View Helpers** are lightweight, stateless classes that generate HTML strings for panel-specific rendering logic that doesn't warrant a full component.
+
+### Decision Tree
+
+**Create a Component When**:
+- ✅ Reusable across multiple panels
+- ✅ Has state or lifecycle management
+- ✅ Needs event handling
+- ✅ Requires configuration validation
+- ✅ Benefits from multi-instance tracking
+
+**Create View Helpers When**:
+- ✅ Panel-specific rendering logic
+- ✅ Stateless HTML generation
+- ✅ Type-specific formatting (e.g., different attribute types)
+- ✅ Keeps panel file manageable
+- ✅ No reuse expected across panels
+
+### View Helper Structure
+
+View helpers are static classes with static methods that return HTML strings:
+
+```typescript
+// src/panels/MetadataBrowserPanel/views/AttributePropertyView.ts
+
+import { AttributeMetadata } from '../../../services/MetadataService';
+
+export class AttributePropertyView {
+    /**
+     * Render complete attribute property view
+     */
+    static render(attribute: AttributeMetadata): string {
+        return `
+            <div class="property-view">
+                ${this.renderCommonProperties(attribute)}
+                ${this.renderTypeSpecificProperties(attribute)}
+                ${this.renderManagedProperties(attribute)}
+            </div>
+        `;
+    }
+
+    /**
+     * Render common properties (all attributes have these)
+     */
+    private static renderCommonProperties(attr: AttributeMetadata): string {
+        return `
+            <div class="property-section">
+                <div class="property-section-title">General</div>
+                <div class="property-row">
+                    <span class="property-label">Display Name:</span>
+                    <span class="property-value">${this.escapeHtml(attr.DisplayName?.UserLocalizedLabel?.Label || '')}</span>
+                </div>
+                <div class="property-row">
+                    <span class="property-label">Logical Name:</span>
+                    <span class="property-value">${attr.LogicalName}</span>
+                </div>
+                <div class="property-row">
+                    <span class="property-label">Type:</span>
+                    <span class="property-value">${attr.AttributeType}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Render type-specific properties based on attribute type
+     */
+    private static renderTypeSpecificProperties(attr: AttributeMetadata): string {
+        switch (attr.AttributeType) {
+            case 'String':
+                return this.renderStringProperties(attr);
+            case 'Picklist':
+            case 'State':
+            case 'Status':
+                return this.renderPicklistProperties(attr);
+            case 'Lookup':
+            case 'Customer':
+            case 'Owner':
+                return this.renderLookupProperties(attr);
+            case 'Integer':
+            case 'BigInt':
+            case 'Decimal':
+            case 'Double':
+            case 'Money':
+                return this.renderNumericProperties(attr);
+            case 'DateTime':
+                return this.renderDateTimeProperties(attr);
+            case 'Boolean':
+                return this.renderBooleanProperties(attr);
+            default:
+                return '';
+        }
+    }
+
+    private static renderPicklistProperties(attr: AttributeMetadata): string {
+        const options = attr.OptionSet?.Options || [];
+
+        return `
+            <div class="property-section">
+                <div class="property-section-title">Choice Properties</div>
+                <div class="property-row">
+                    <span class="property-label">Default Value:</span>
+                    <span class="property-value">${attr.DefaultFormValue ?? 'None'}</span>
+                </div>
+                ${options.length > 0 ? `
+                    <div class="property-row">
+                        <span class="property-label">Options:</span>
+                        <span class="property-value">${options.length} option(s)</span>
+                    </div>
+                    <div class="property-list">
+                        ${options.map(opt => `
+                            <div class="property-list-item">
+                                <span class="option-value">${opt.Value}</span>
+                                <span class="option-label">${opt.Label?.UserLocalizedLabel?.Label || ''}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    private static renderLookupProperties(attr: AttributeMetadata): string {
+        const targets = attr.Targets || [];
+
+        return `
+            <div class="property-section">
+                <div class="property-section-title">Lookup Properties</div>
+                <div class="property-row">
+                    <span class="property-label">Target Entities:</span>
+                    <span class="property-value">${targets.join(', ') || 'None'}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // ... other type-specific renderers
+
+    private static renderManagedProperties(attr: AttributeMetadata): string {
+        return `
+            <div class="property-section">
+                <div class="property-section-title">Managed Properties</div>
+                <div class="property-row">
+                    <span class="property-label">Is Managed:</span>
+                    <span class="property-value ${attr.IsManaged ? 'boolean-true' : 'boolean-false'}">
+                        ${attr.IsManaged ? 'Yes' : 'No'}
+                    </span>
+                </div>
+                <div class="property-row">
+                    <span class="property-label">Is Customizable:</span>
+                    <span class="property-value ${attr.IsCustomizable?.Value ? 'boolean-true' : 'boolean-false'}">
+                        ${attr.IsCustomizable?.Value ? 'Yes' : 'No'}
+                    </span>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    private static escapeHtml(text: string): string {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+}
+```
+
+### Usage in Panel
+
+View helpers are imported and used in the Panel class (Extension Host context):
+
+```typescript
+// In MetadataBrowserPanel.ts
+
+import { AttributePropertyView } from './views/AttributePropertyView';
+import { RelationshipPropertyView } from './views/RelationshipPropertyView';
+
+export class MetadataBrowserPanel extends BasePanel {
+
+    private generateDetailPanelContent(item: any, itemType: string): string {
+        switch (itemType) {
+            case 'attribute':
+                return AttributePropertyView.render(item);
+            case 'relationship':
+                return RelationshipPropertyView.render(item);
+            // ... other types
+            default:
+                return '<p>No detail view available</p>';
+        }
+    }
+
+    protected handleMessage(message: WebviewMessage): Promise<void> {
+        if (message.command === 'row-clicked') {
+            const detailHtml = this.generateDetailPanelContent(
+                message.data.item,
+                message.data.type
+            );
+
+            this.postMessage({
+                command: 'show-detail-panel',
+                html: detailHtml
+            });
+        }
+    }
+}
+```
+
+### Best Practices for View Helpers
+
+1. **Keep Them Static**: All methods should be static - no instance state
+2. **HTML Escaping**: Always escape user-provided text to prevent XSS
+3. **Type Safety**: Use TypeScript interfaces for all parameters
+4. **Modular**: Break down rendering into small, focused methods
+5. **Reusable Within Panel**: Methods can be reused across different views
+6. **Documentation**: Document what each renderer handles
+7. **File Organization**: Keep in `panels/PanelName/views/` directory
+
+### Example: Multiple View Helpers for One Panel
+
+```
+src/panels/MetadataBrowserPanel/
+├── MetadataBrowserPanel.ts
+└── views/
+    ├── AttributePropertyView.ts      # Handles all attribute types
+    ├── RelationshipPropertyView.ts   # Handles 1:N, N:1, N:N relationships
+    ├── KeyPropertyView.ts            # Handles entity keys
+    ├── PrivilegePropertyView.ts      # Handles privileges
+    └── ChoicePropertyView.ts         # Handles global choices
+```
+
+### When View Helpers Might Become Components
+
+If you find yourself needing view helpers in **multiple panels**, consider promoting them to components:
+
+1. **Multiple panels need same rendering** → Create component
+2. **Need state management** → Create component
+3. **Need event handling** → Create component
+4. **Need configuration** → Create component
+
+**Example**: If both MetadataBrowser and a hypothetical "Schema Compare" panel need attribute rendering, promote `AttributePropertyView` to `AttributeDetailComponent`.
+
+---
+
 ## Factory Integration Pattern
 
 ### Component Registration

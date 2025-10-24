@@ -14,38 +14,34 @@ body {
     top: 0;
     background: var(--vscode-editor-background);
     border-bottom: 1px solid var(--vscode-panel-border);
-    padding: 12px 16px;
+    padding: 16px 20px;
     z-index: 100;
     flex-shrink: 0;
 }
 
-.header-row {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-    flex-wrap: wrap;
-}
-
-/* Ensure environment selector takes appropriate width */
-.header-row .environment-selector {
-    flex: 1 1 300px;
-    min-width: 250px;
-    max-width: 500px;
-}
-
-/* Action bar should stay compact */
-.header-row .action-bar {
-    flex: 0 0 auto;
-}
-
-/* Two-panel layout container */
+/* Three-panel layout container */
 .metadata-container {
     display: grid;
-    grid-template-columns: 300px 1fr;
+    grid-template-columns: 280px 1fr 400px;
     height: calc(100vh - 120px);
     max-height: calc(100vh - 120px);
     gap: 0;
     overflow: hidden;
+    position: relative;
+}
+
+/* When detail panel is hidden, use two-column layout */
+.metadata-container.detail-hidden {
+    grid-template-columns: 280px 1fr;
+}
+
+/* When left panel is collapsed */
+.metadata-container.left-collapsed {
+    grid-template-columns: 0px 1fr 400px;
+}
+
+.metadata-container.left-collapsed.detail-hidden {
+    grid-template-columns: 0px 1fr;
 }
 
 /* Left panel - Entity/Choice tree */
@@ -56,6 +52,45 @@ body {
     flex-direction: column;
     overflow: hidden;
     min-height: 0;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.left-panel.collapsed {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.panel-collapse-btn {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--vscode-sideBar-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-left: none;
+    color: var(--vscode-icon-foreground);
+    cursor: pointer;
+    padding: 20px 4px;
+    font-size: 12px;
+    line-height: 1;
+    border-radius: 0 4px 4px 0;
+    z-index: 1000;
+    transition: all 0.2s ease;
+    width: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.panel-collapse-btn:hover {
+    background: var(--vscode-toolbar-hoverBackground);
+    width: 20px;
+}
+
+.metadata-container.left-collapsed .panel-collapse-btn {
+    left: 0;
+    background: var(--vscode-sideBar-background);
 }
 
 .left-panel-header {
@@ -72,6 +107,7 @@ body {
     border: 1px solid var(--vscode-input-border);
     border-radius: 4px;
     font-size: 13px;
+    box-sizing: border-box;
 }
 
 .entity-search:focus {
@@ -86,7 +122,7 @@ body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 
 .tree-section {
@@ -117,8 +153,6 @@ body {
     font-size: 13px;
     color: var(--vscode-foreground);
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .tree-item:hover {
@@ -141,6 +175,12 @@ body {
     opacity: 0.7;
 }
 
+.tree-item-secondary {
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    opacity: 0.8;
+}
+
 /* Right panel - Content area */
 .right-panel {
     display: flex;
@@ -151,19 +191,24 @@ body {
 }
 
 .selection-header {
-    padding: 12px 20px;
+    padding: 6px 16px;
     border-bottom: 1px solid var(--vscode-panel-border);
     flex-shrink: 0;
+    background: var(--vscode-editorGroupHeader-tabsBackground);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
 }
 
 .selection-label {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--vscode-descriptionForeground);
-    margin-bottom: 4px;
+    text-transform: uppercase;
+    font-weight: 600;
 }
 
 .selection-value {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--vscode-foreground);
 }
@@ -173,11 +218,11 @@ body {
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 20px;
+    padding: 12px;
 }
 
 .section {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     border: 1px solid var(--vscode-panel-border);
     border-radius: 4px;
     overflow: hidden;
@@ -187,7 +232,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 16px;
+    padding: 8px 12px;
     background: var(--vscode-tab-activeBackground);
     cursor: pointer;
     user-select: none;
@@ -231,4 +276,215 @@ body {
 .component-loading-container,
 .component-error-container {
     display: none;
+}
+
+/* Hide sections based on selection type */
+/* When in choice mode, hide entity-only sections */
+.metadata-sections.choice-mode .section.entity-only {
+    display: none;
+}
+
+/* When in entity mode, hide choice-only sections */
+.metadata-sections.entity-mode .section.choice-only {
+    display: none;
+}
+
+/* When nothing is selected, hide all sections */
+.metadata-sections:not(.entity-mode):not(.choice-mode) .section {
+    display: none;
+}
+
+/* Detail Panel (3rd column) */
+.detail-panel {
+    background: var(--vscode-editor-background);
+    border-left: 1px solid var(--vscode-panel-border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.detail-panel.hidden {
+    display: none;
+}
+
+.detail-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-tab-activeBackground);
+    flex-shrink: 0;
+}
+
+.detail-panel-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--vscode-foreground);
+}
+
+.detail-panel-close {
+    background: none;
+    border: none;
+    color: var(--vscode-icon-foreground);
+    cursor: pointer;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    font-size: 20px;
+    line-height: 1;
+    font-weight: 300;
+}
+
+.detail-panel-close:hover {
+    background: var(--vscode-toolbar-hoverBackground);
+}
+
+.detail-panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editorGroupHeader-tabsBackground);
+    flex-shrink: 0;
+}
+
+.detail-panel-tab {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--vscode-tab-inactiveForeground);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.1s;
+}
+
+.detail-panel-tab:hover {
+    color: var(--vscode-tab-activeForeground);
+}
+
+.detail-panel-tab.active {
+    color: var(--vscode-tab-activeForeground);
+    border-bottom-color: var(--vscode-tab-activeBorderTop);
+}
+
+.detail-panel-content {
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+    min-height: 0;
+    outline: none;
+}
+
+.detail-panel-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+    text-align: center;
+    padding: 40px 20px;
+}
+
+/* JSON Display Styling */
+.json-display {
+    font-family: var(--vscode-editor-font-family);
+    font-size: 12px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 12px;
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+.json-display .json-key {
+    color: var(--vscode-symbolIcon-propertyForeground);
+}
+
+.json-display .json-string {
+    color: var(--vscode-debugTokenExpression-string);
+}
+
+.json-display .json-number {
+    color: var(--vscode-debugTokenExpression-number);
+}
+
+.json-display .json-boolean {
+    color: var(--vscode-debugTokenExpression-boolean);
+}
+
+.json-display .json-null {
+    color: var(--vscode-debugTokenExpression-error);
+    font-style: italic;
+}
+
+.json-display .json-undefined {
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
+/* Properties Table Styling */
+.properties-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin: 0;
+}
+
+.properties-table thead {
+    background: var(--vscode-editorGroupHeader-tabsBackground);
+}
+
+.properties-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.properties-table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--vscode-editorWidget-border);
+    vertical-align: top;
+}
+
+.property-key {
+    font-weight: 500;
+    color: var(--vscode-symbolIcon-propertyForeground);
+    width: 40%;
+    word-break: break-word;
+}
+
+.property-value {
+    color: var(--vscode-foreground);
+    font-family: var(--vscode-editor-font-family);
+    word-break: break-word;
+}
+
+.property-section td {
+    background: var(--vscode-editorGroupHeader-tabsBackground);
+    padding: 8px 12px;
+    font-weight: 600;
+    border-top: 2px solid var(--vscode-panel-border);
+}
+
+.property-array-header {
+    background: var(--vscode-editorWidget-background);
+}
+
+.property-array-count {
+    color: var(--vscode-debugTokenExpression-number);
+    font-style: italic;
+}
+
+.properties-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
 }

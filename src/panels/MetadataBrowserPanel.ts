@@ -80,6 +80,7 @@ export class MetadataBrowserPanel extends BasePanel {
     private selectedChoiceName?: string;
     private selectedChoiceDisplayName?: string;
     private currentMetadata?: CompleteEntityMetadata;
+    private currentChoiceMetadata?: OptionSetMetadata;
     private collapsedSections: Set<string> = new Set(['keys', 'relationships', 'privileges', 'choices']);
 
     public static createOrShow(extensionUri: vscode.Uri): void {
@@ -90,16 +91,13 @@ export class MetadataBrowserPanel extends BasePanel {
             return;
         }
 
-        const panel = vscode.window.createWebviewPanel(
-            MetadataBrowserPanel.viewType,
-            'Metadata Browser',
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-            }
-        );
+        const panel = BasePanel.createWebviewPanel({
+            viewType: MetadataBrowserPanel.viewType,
+            title: 'Metadata Browser',
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+        }, column);
 
         MetadataBrowserPanel.currentPanel = new MetadataBrowserPanel(panel, extensionUri);
     }
@@ -238,7 +236,8 @@ export class MetadataBrowserPanel extends BasePanel {
                 showFooter: true,
                 contextMenu: true,
                 contextMenuItems: METADATA_CONTEXT_MENU_ITEMS.attributes,
-                className: 'metadata-attributes-table'
+                className: 'metadata-attributes-table',
+                defaultSort: [{ column: 'displayName', direction: 'asc' }]
             });
 
             // Keys Table Component
@@ -274,7 +273,8 @@ export class MetadataBrowserPanel extends BasePanel {
                 sortable: true,
                 searchable: true,
                 showFooter: true,
-                className: 'metadata-keys-table'
+                className: 'metadata-keys-table',
+                defaultSort: [{ column: 'name', direction: 'asc' }]
             });
 
             // Relationships Table Component
@@ -321,7 +321,8 @@ export class MetadataBrowserPanel extends BasePanel {
                 showFooter: true,
                 contextMenu: true,
                 contextMenuItems: METADATA_CONTEXT_MENU_ITEMS.relationships,
-                className: 'metadata-relationships-table'
+                className: 'metadata-relationships-table',
+                defaultSort: [{ column: 'name', direction: 'asc' }]
             });
 
             // Privileges Table Component
@@ -357,7 +358,8 @@ export class MetadataBrowserPanel extends BasePanel {
                 sortable: true,
                 searchable: true,
                 showFooter: true,
-                className: 'metadata-privileges-table'
+                className: 'metadata-privileges-table',
+                defaultSort: [{ column: 'name', direction: 'asc' }]
             });
 
             // Choice Values Table Component
@@ -394,7 +396,8 @@ export class MetadataBrowserPanel extends BasePanel {
                 sortable: true,
                 searchable: true,
                 showFooter: true,
-                className: 'metadata-choice-values-table'
+                className: 'metadata-choice-values-table',
+                defaultSort: [{ column: 'value', direction: 'asc' }]
             });
 
             this.componentLogger.debug('All components initialized successfully');
@@ -443,6 +446,12 @@ export class MetadataBrowserPanel extends BasePanel {
                 case 'select-choice':
                     if (message.data) {
                         await this.handleChoiceSelection(message.data);
+                    }
+                    break;
+
+                case 'metadata-row-click':
+                    if (message.data) {
+                        await this.handleMetadataRowClick(message.data);
                     }
                     break;
 
@@ -558,18 +567,24 @@ export class MetadataBrowserPanel extends BasePanel {
             const isPrivilegesExpanded = !this.collapsedSections.has('privileges');
             const isChoicesExpanded = !this.collapsedSections.has('choices');
 
+            // Determine what type of metadata is selected
+            const isEntitySelected = !!this.selectedEntityLogicalName;
+            const isChoiceSelected = !!this.selectedChoiceName;
+
             // Build custom HTML layout with two-panel design: left sidebar + main content
             const customHTML = `
     <div class="sticky-header">
-        <div class="header-row">
-            ${this.environmentSelectorComponent.generateHTML()}
-            ${this.actionBarComponent.generateHTML()}
-        </div>
+        ${this.environmentSelectorComponent.generateHTML()}
+        ${this.actionBarComponent.generateHTML()}
     </div>
 
     <div class="metadata-container">
+        <button class="panel-collapse-btn" id="left-panel-collapse" onclick="toggleLeftPanel()" title="Collapse sidebar" aria-label="Collapse sidebar">
+            ◀
+        </button>
+
         <!-- Left Panel: Entity/Choice Tree -->
-        <div class="left-panel">
+        <div class="left-panel" id="left-panel">
             <div class="left-panel-header">
                 <input
                     type="text"
@@ -598,13 +613,13 @@ export class MetadataBrowserPanel extends BasePanel {
         <!-- Right Panel: Metadata Content -->
         <div class="right-panel">
             <div class="selection-header">
-                <div class="selection-label">Selected:</div>
-                <div class="selection-value" id="current-selection">${currentSelection}</div>
+                <span class="selection-label">Selected:</span>
+                <span class="selection-value" id="current-selection">${currentSelection}</span>
             </div>
 
-            <div class="metadata-sections">
-        <!-- Attributes Section -->
-        <div class="section ${isAttributesExpanded ? 'expanded' : ''}" data-section="attributes">
+            <div class="metadata-sections ${isEntitySelected ? 'entity-mode' : ''} ${isChoiceSelected ? 'choice-mode' : ''}">
+        <!-- Attributes Section (Entity Only) -->
+        <div class="section entity-only ${isAttributesExpanded ? 'expanded' : ''}" data-section="attributes">
             <div class="section-header" onclick="toggleSection('attributes')">
                 <span class="section-icon">▶</span>
                 <span class="section-title">Attributes</span>
@@ -615,8 +630,8 @@ export class MetadataBrowserPanel extends BasePanel {
             </div>
         </div>
 
-        <!-- Keys Section -->
-        <div class="section ${isKeysExpanded ? 'expanded' : ''}" data-section="keys">
+        <!-- Keys Section (Entity Only) -->
+        <div class="section entity-only ${isKeysExpanded ? 'expanded' : ''}" data-section="keys">
             <div class="section-header" onclick="toggleSection('keys')">
                 <span class="section-icon">▶</span>
                 <span class="section-title">Keys</span>
@@ -627,8 +642,8 @@ export class MetadataBrowserPanel extends BasePanel {
             </div>
         </div>
 
-        <!-- Relationships Section -->
-        <div class="section ${isRelationshipsExpanded ? 'expanded' : ''}" data-section="relationships">
+        <!-- Relationships Section (Entity Only) -->
+        <div class="section entity-only ${isRelationshipsExpanded ? 'expanded' : ''}" data-section="relationships">
             <div class="section-header" onclick="toggleSection('relationships')">
                 <span class="section-icon">▶</span>
                 <span class="section-title">Relationships</span>
@@ -639,8 +654,8 @@ export class MetadataBrowserPanel extends BasePanel {
             </div>
         </div>
 
-        <!-- Privileges Section -->
-        <div class="section ${isPrivilegesExpanded ? 'expanded' : ''}" data-section="privileges">
+        <!-- Privileges Section (Entity Only) -->
+        <div class="section entity-only ${isPrivilegesExpanded ? 'expanded' : ''}" data-section="privileges">
             <div class="section-header" onclick="toggleSection('privileges')">
                 <span class="section-icon">▶</span>
                 <span class="section-title">Privileges</span>
@@ -651,8 +666,8 @@ export class MetadataBrowserPanel extends BasePanel {
             </div>
         </div>
 
-        <!-- Choices Section -->
-        <div class="section ${isChoicesExpanded ? 'expanded' : ''}" data-section="choices">
+        <!-- Choice Values Section (Choice Only) -->
+        <div class="section choice-only ${isChoicesExpanded ? 'expanded' : ''}" data-section="choices">
             <div class="section-header" onclick="toggleSection('choices')">
                 <span class="section-icon">▶</span>
                 <span class="section-title">Choice Values</span>
@@ -662,6 +677,32 @@ export class MetadataBrowserPanel extends BasePanel {
                 ${this.choiceValuesTableComponent.generateHTML()}
             </div>
         </div>
+            </div>
+        </div>
+
+        <!-- Detail Panel (3rd column) -->
+        <div class="detail-panel hidden" id="detail-panel">
+            <div class="detail-panel-header">
+                <span class="detail-panel-title" id="detail-panel-title">Details</span>
+                <button class="detail-panel-close" onclick="closeDetailPanel()" title="Close" aria-label="Close">
+                    ×
+                </button>
+            </div>
+            <div class="detail-panel-tabs">
+                <button class="detail-panel-tab active" data-tab="properties" onclick="switchDetailTab('properties')">
+                    Properties
+                </button>
+                <button class="detail-panel-tab" data-tab="json" onclick="switchDetailTab('json')">
+                    JSON
+                </button>
+            </div>
+            <div class="detail-panel-content">
+                <div id="detail-properties-content" style="display: block;">
+                    <!-- Properties will be rendered here by JavaScript -->
+                </div>
+                <div id="detail-json-content" style="display: none;">
+                    <!-- JSON will be rendered here by JavaScript -->
+                </div>
             </div>
         </div>
     </div>`;
@@ -793,6 +834,76 @@ export class MetadataBrowserPanel extends BasePanel {
         await this.loadChoiceMetadata(selectedEnvironment.id, name, displayName);
     }
 
+    private async handleMetadataRowClick(data: any): Promise<void> {
+        const { tableId, rowId } = data;
+        if (!tableId || !rowId) {
+            return;
+        }
+
+        try {
+            // Determine which table was clicked and get the metadata
+            let metadata: any = null;
+            let title: string = '';
+
+            if (tableId === 'metadata-attributes-table') {
+                // Find attribute in current metadata
+                const attribute = this.currentMetadata?.attributes.find(a => a.LogicalName === rowId);
+                if (attribute) {
+                    metadata = attribute;
+                    title = `Attribute: ${attribute.DisplayName?.UserLocalizedLabel?.Label || attribute.LogicalName}`;
+                }
+            } else if (tableId === 'metadata-keys-table') {
+                // Find key in current metadata
+                const key = this.currentMetadata?.keys.find(k => k.LogicalName === rowId);
+                if (key) {
+                    metadata = key;
+                    title = `Key: ${key.DisplayName?.UserLocalizedLabel?.Label || key.LogicalName}`;
+                }
+            } else if (tableId === 'metadata-relationships-table') {
+                // Find relationship in current metadata
+                const relationship = [
+                    ...(this.currentMetadata?.oneToManyRelationships || []),
+                    ...(this.currentMetadata?.manyToOneRelationships || []),
+                    ...(this.currentMetadata?.manyToManyRelationships || [])
+                ].find(r => r.SchemaName === rowId);
+                if (relationship) {
+                    metadata = relationship;
+                    title = `Relationship: ${relationship.SchemaName}`;
+                }
+            } else if (tableId === 'metadata-privileges-table') {
+                // Find privilege in current metadata
+                const privilege = this.currentMetadata?.privileges.find(p => p.Name === rowId);
+                if (privilege) {
+                    metadata = privilege;
+                    title = `Privilege: ${privilege.Name}`;
+                }
+            } else if (tableId === 'metadata-choice-values-table') {
+                // Find the option in current choice metadata
+                if (this.currentChoiceMetadata?.Options) {
+                    const option = this.currentChoiceMetadata.Options.find(o => o.Value?.toString() === rowId);
+                    if (option) {
+                        metadata = option;
+                        title = `Choice Value: ${option.Label?.UserLocalizedLabel?.Label || rowId}`;
+                    }
+                }
+            }
+
+            if (metadata) {
+                // Send to webview to display
+                this.postMessage({
+                    command: 'show-detail',
+                    action: 'showDetail',
+                    data: {
+                        title,
+                        metadata
+                    }
+                });
+            }
+        } catch (error) {
+            this.componentLogger.error('Error handling metadata row click', error as Error, { tableId, rowId });
+        }
+    }
+
     private async showTableChoicePicker(): Promise<void> {
         try {
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
@@ -865,6 +976,7 @@ export class MetadataBrowserPanel extends BasePanel {
             const metadata = await metadataService.getCompleteEntityMetadata(environmentId, logicalName);
 
             this.currentMetadata = metadata;
+            this.currentChoiceMetadata = undefined;
             this.selectedEntityLogicalName = logicalName;
             this.selectedEntityMetadataId = metadataId;
             this.selectedEntityDisplayName = displayName;
@@ -951,6 +1063,7 @@ export class MetadataBrowserPanel extends BasePanel {
             const choice = await metadataService.getOptionSetMetadata(environmentId, name);
 
             this.currentMetadata = undefined;
+            this.currentChoiceMetadata = choice;
             this.selectedEntityLogicalName = undefined;
             this.selectedEntityMetadataId = undefined;
             this.selectedEntityDisplayName = undefined;
@@ -993,10 +1106,10 @@ export class MetadataBrowserPanel extends BasePanel {
 
     private transformAttributesData(attributes: AttributeMetadata[]): AttributeTableRow[] {
         return attributes.map(attr => ({
-            id: attr.MetadataId,
+            id: attr.LogicalName,  // Use LogicalName as ID for row click matching
             displayName: attr.DisplayName?.UserLocalizedLabel?.Label || attr.LogicalName,
             logicalName: attr.LogicalName,
-            type: attr.AttributeTypeName?.Value || attr.AttributeType,
+            type: attr.AttributeType || attr.AttributeTypeName?.Value,
             required: attr.RequiredLevel?.Value || 'None',
             maxLength: attr.MaxLength?.toString() || '-'
         }));
@@ -1004,7 +1117,7 @@ export class MetadataBrowserPanel extends BasePanel {
 
     private transformKeysData(keys: EntityKeyMetadata[]): KeyTableRow[] {
         return keys.map(key => ({
-            id: key.MetadataId,
+            id: key.LogicalName,  // Use LogicalName as ID for row click matching
             name: key.LogicalName,
             type: key.KeyAttributes && key.KeyAttributes.length === 1 ? 'Primary' : 'Alternate',
             keyAttributes: key.KeyAttributes?.join(', ') || ''
@@ -1021,7 +1134,7 @@ export class MetadataBrowserPanel extends BasePanel {
         // 1:N relationships
         oneToMany.forEach(rel => {
             rows.push({
-                id: rel.MetadataId,
+                id: rel.SchemaName,  // Use SchemaName as ID for row click matching
                 name: rel.SchemaName,
                 type: '1:N',
                 relatedEntity: rel.ReferencedEntity || '',
@@ -1032,7 +1145,7 @@ export class MetadataBrowserPanel extends BasePanel {
         // N:1 relationships
         manyToOne.forEach(rel => {
             rows.push({
-                id: rel.MetadataId,
+                id: rel.SchemaName,  // Use SchemaName as ID for row click matching
                 name: rel.SchemaName,
                 type: 'N:1',
                 relatedEntity: rel.ReferencedEntity || '',
@@ -1043,7 +1156,7 @@ export class MetadataBrowserPanel extends BasePanel {
         // N:N relationships
         manyToMany.forEach(rel => {
             rows.push({
-                id: rel.MetadataId,
+                id: rel.SchemaName,  // Use SchemaName as ID for row click matching
                 name: rel.SchemaName,
                 type: 'N:N',
                 relatedEntity: `${rel.Entity1LogicalName} ↔ ${rel.Entity2LogicalName}`,

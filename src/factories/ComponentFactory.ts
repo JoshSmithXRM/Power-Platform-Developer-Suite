@@ -6,6 +6,8 @@ import { DataTableComponent } from '../components/tables/DataTable/DataTableComp
 import { DataTableConfig } from '../components/tables/DataTable/DataTableConfig';
 import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
 import { SolutionSelectorConfig } from '../components/selectors/SolutionSelector/SolutionSelectorConfig';
+import { JsonViewerComponent } from '../components/viewers/JsonViewer/JsonViewerComponent';
+import { JsonViewerConfig } from '../components/viewers/JsonViewer/JsonViewerConfig';
 import { BaseComponent } from '../components/base/BaseComponent';
 import { ServiceFactory } from '../services/ServiceFactory';
 
@@ -109,13 +111,24 @@ export class ComponentFactory {
      */
     public createSolutionSelector(config: SolutionSelectorConfig): SolutionSelectorComponent {
         this.validateComponentConfig(config, 'SolutionSelector');
-        
+
         const component = new SolutionSelectorComponent(config);
         this.trackInstance(config.id, 'SolutionSelector', component);
-        
+
         return component;
     }
 
+    /**
+     * Create a JsonViewerComponent
+     */
+    public createJsonViewer(config: JsonViewerConfig): JsonViewerComponent {
+        this.validateComponentConfig(config, 'JsonViewer');
+
+        const component = new JsonViewerComponent(config);
+        this.trackInstance(config.id, 'JsonViewer', component);
+
+        return component;
+    }
 
 
     // Instance Management
