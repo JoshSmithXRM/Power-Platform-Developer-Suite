@@ -23,16 +23,13 @@ export class EnvironmentSetupPanel extends BasePanel {
         // Always create a new panel to allow editing multiple environments simultaneously
         const panelTitle = environment ? `Edit Environment: ${environment.name}` : 'New Environment';
 
-        const panel = vscode.window.createWebviewPanel(
-            EnvironmentSetupPanel.viewType,
-            panelTitle,
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-            }
-        );
+        const panel = BasePanel.createWebviewPanel({
+            viewType: EnvironmentSetupPanel.viewType,
+            title: panelTitle,
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+        }, column);
 
         new EnvironmentSetupPanel(panel, extensionUri, environment);
     }

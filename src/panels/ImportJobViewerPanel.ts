@@ -42,16 +42,13 @@ export class ImportJobViewerPanel extends BasePanel {
             return;
         }
 
-        const panel = vscode.window.createWebviewPanel(
-            ImportJobViewerPanel.viewType,
-            'Import Job Viewer',
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-            }
-        );
+        const panel = BasePanel.createWebviewPanel({
+            viewType: ImportJobViewerPanel.viewType,
+            title: 'Import Job Viewer',
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+        }, column);
 
         ImportJobViewerPanel.currentPanel = new ImportJobViewerPanel(panel, extensionUri);
     }

@@ -40,16 +40,13 @@ export class SolutionExplorerPanel extends BasePanel {
             return;
         }
 
-        const panel = vscode.window.createWebviewPanel(
-            SolutionExplorerPanel.viewType,
-            'Solution Explorer',
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-            }
-        );
+        const panel = BasePanel.createWebviewPanel({
+            viewType: SolutionExplorerPanel.viewType,
+            title: 'Solution Explorer',
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+        }, column);
 
         SolutionExplorerPanel.currentPanel = new SolutionExplorerPanel(panel, extensionUri);
     }

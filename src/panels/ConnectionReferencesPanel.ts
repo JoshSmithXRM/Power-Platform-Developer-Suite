@@ -52,16 +52,13 @@ export class ConnectionReferencesPanel extends BasePanel {
             return;
         }
 
-        const panel = vscode.window.createWebviewPanel(
-            ConnectionReferencesPanel.viewType,
-            'Connection References',
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-            }
-        );
+        const panel = BasePanel.createWebviewPanel({
+            viewType: ConnectionReferencesPanel.viewType,
+            title: 'Connection References',
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+        }, column);
 
         ConnectionReferencesPanel.currentPanel = new ConnectionReferencesPanel(panel, extensionUri);
     }

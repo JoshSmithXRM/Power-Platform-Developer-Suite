@@ -52,16 +52,13 @@ export class EnvironmentVariablesPanel extends BasePanel {
             return;
         }
 
-        const panel = vscode.window.createWebviewPanel(
-            EnvironmentVariablesPanel.viewType,
-            'Environment Variables',
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-            }
-        );
+        const panel = BasePanel.createWebviewPanel({
+            viewType: EnvironmentVariablesPanel.viewType,
+            title: 'Environment Variables',
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+        }, column);
 
         EnvironmentVariablesPanel.currentPanel = new EnvironmentVariablesPanel(panel, extensionUri);
     }
