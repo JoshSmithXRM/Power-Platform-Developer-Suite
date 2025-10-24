@@ -45,7 +45,7 @@ export class EnvironmentSelectorView {
         ].filter(Boolean).join(' ');
 
         return `
-            <div class="${containerClass}" 
+            <div class="${containerClass}"
                  data-component-id="${id}"
                  data-component-type="EnvironmentSelector"
                  data-config-label="${escapeHtml(label)}"
@@ -53,18 +53,15 @@ export class EnvironmentSelectorView {
                  data-config-show-status="${showStatus}"
                  data-config-required="${required}"
                  data-config-disabled="${disabled}">
-                
-                ${this.renderLabel(label, required, id)}
-                
+
                 <div class="${CSS_CLASSES.COMPONENT_ROW}">
+                    ${this.renderLabel(label, required, id)}
                     ${this.renderSelector(id, placeholder, environments, selectedEnvironmentId, disabled, loading)}
-                    ${showStatus ? this.renderStatusIndicator(connectionStatus, loading) : ''}
-                    ${this.renderRefreshButton(id, disabled, loading)}
                 </div>
-                
+
                 ${this.renderLoadingContainer()}
                 ${this.renderErrorContainer()}
-                
+
             </div>
         `;
     }

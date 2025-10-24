@@ -113,9 +113,9 @@
     table-layout: fixed;
 }
 
-/* Header styling - Clean consistent appearance matching environment selector */
+/* Header styling - Clean consistent appearance with teal/blue accent */
 .data-table-thead {
-    background: var(--component-header-surface);
+    background: var(--component-table-header-surface);
     border-bottom: 2px solid var(--component-border-subtle);
     position: sticky;
     top: 0;
@@ -136,7 +136,7 @@
     user-select: none;
     white-space: nowrap;
     vertical-align: middle;
-    color: var(--vscode-foreground);
+    color: var(--vscode-list-activeSelectionForeground);
     transition: background-color 0.15s ease;
 }
 
@@ -400,13 +400,13 @@
 }
 
 
-/* Striped rows - Modern, subtle approach */
+/* Striped rows - Using VS Code theme variables for proper contrast */
 .data-table-tbody .data-table-body-row:nth-child(even) {
-    background: var(--vscode-editor-background) !important;
+    background: var(--vscode-list-inactiveSelectionBackground) !important;
 }
 
 .data-table-tbody .data-table-body-row:nth-child(odd) {
-    background: rgba(128, 128, 128, 0.05) !important;
+    background: var(--vscode-editor-background) !important;
 }
 
 .data-table-body-row:hover {
@@ -775,22 +775,32 @@
     font-size: 14px;
 }
 
-/* Table variants - Clean alternating row colors */
+/* Table variants - Using VS Code theme variables for striped tables */
+.data-table--striped .data-table-thead {
+    background: var(--component-table-header-surface) !important;
+}
+
 .data-table--striped .data-table-body-row:nth-child(even) {
-    background: rgba(255, 255, 255, 0.1) !important;
+    background: var(--vscode-list-inactiveSelectionBackground) !important;
 }
 
 .data-table--striped .data-table-body-row:nth-child(odd) {
-    background: rgba(0, 0, 0, 0.2) !important;
+    background: var(--vscode-editor-background) !important;
 }
 
 /* Fallback selectors for maximum compatibility */
 .data-table--striped tr:nth-child(even) {
-    background: rgba(255, 255, 255, 0.08) !important;
+    background: var(--vscode-list-inactiveSelectionBackground) !important;
 }
 
 .data-table--striped tr:nth-child(odd) {
-    background: rgba(0, 0, 0, 0.15) !important;
+    background: var(--vscode-editor-background) !important;
+}
+
+/* Ensure striped table headers always show */
+.data-table--striped thead,
+.data-table--striped thead tr {
+    background: var(--component-table-header-surface) !important;
 }
 
 /* Add borders for even more distinction */

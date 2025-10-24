@@ -108,7 +108,7 @@ export class ConnectionReferencesPanel extends BasePanel {
             // Environment Selector Component
             this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
                 id: 'connectionRefs-envSelector',
-                label: 'Select Environment',
+                label: 'Environment',
                 placeholder: 'Choose an environment to view connection references...',
                 required: true,
                 environments: [],
@@ -125,7 +125,7 @@ export class ConnectionReferencesPanel extends BasePanel {
             // Solution Selector Component
             this.solutionSelectorComponent = this.componentFactory.createSolutionSelector({
                 id: 'connectionRefs-solutionSelector',
-                label: 'Filter by Solution (Optional)',
+                label: 'Solution',
                 placeholder: 'All Solutions',
                 required: false,
                 allowMultiSelect: false,
@@ -149,13 +149,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                 id: 'connectionRefs-actions',
                 actions: [
                     {
-                        id: 'syncDeploymentBtn',
-                        label: 'Sync Deployment Settings',
-                        icon: 'sync',
-                        variant: 'primary',
-                        disabled: true
-                    },
-                    {
                         id: 'openInMakerBtn',
                         label: 'Open in Maker',
                         variant: 'primary',
@@ -167,6 +160,13 @@ export class ConnectionReferencesPanel extends BasePanel {
                         icon: 'refresh',
                         variant: 'secondary',
                         disabled: false
+                    },
+                    {
+                        id: 'syncDeploymentBtn',
+                        label: 'Sync Deployment Settings',
+                        icon: 'sync',
+                        variant: 'primary',
+                        disabled: true
                     }
                 ],
                 layout: 'horizontal',
@@ -235,6 +235,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                 ],
                 data: [],
                 sortable: true,
+                defaultSort: [{ column: 'connectionReference', direction: 'asc' }],
                 searchable: true,
                 showFooter: true,
                 striped: true,
@@ -705,7 +706,10 @@ export class ConnectionReferencesPanel extends BasePanel {
 
     private async refreshConnectionReferences(): Promise<void> {
         try {
-            this.componentLogger.debug('Refreshing connection references');
+            this.componentLogger.debug('Refreshing connection references and environments');
+
+            // First refresh the environment list
+            await this.loadEnvironments();
 
             // Get current selections
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
@@ -750,9 +754,9 @@ export class ConnectionReferencesPanel extends BasePanel {
 
             // Use simple composition method as specified in architecture guide
             return PanelComposer.compose([
-                this.environmentSelectorComponent,
-                this.solutionSelectorComponent,
                 this.actionBarComponent,
+                this.solutionSelectorComponent,
+                this.environmentSelectorComponent,
                 this.dataTableComponent
             ], this.getCommonWebviewResources(), 'Connection References');
 

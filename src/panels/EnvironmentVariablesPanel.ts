@@ -108,7 +108,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
             // Environment Selector Component
             this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
                 id: 'envVars-envSelector',
-                label: 'Select Environment',
+                label: 'Environment',
                 placeholder: 'Choose an environment to view variables...',
                 required: true,
                 environments: [],
@@ -126,7 +126,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
             // Note: Callback handles programmatic selection, component-event handles user selection
             this.solutionSelectorComponent = this.componentFactory.createSolutionSelector({
                 id: 'envVars-solutionSelector',
-                label: 'Filter by Solution (Optional)',
+                label: 'Solution',
                 placeholder: 'All Solutions',
                 required: false,
                 solutions: [],
@@ -146,13 +146,6 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 id: 'envVars-actions',
                 actions: [
                     {
-                        id: 'syncDeploymentBtn',
-                        label: 'Sync Deployment Settings',
-                        icon: 'sync',
-                        variant: 'primary',
-                        disabled: true
-                    },
-                    {
                         id: 'openInMakerBtn',
                         label: 'Open in Maker',
                         variant: 'primary',
@@ -164,6 +157,13 @@ export class EnvironmentVariablesPanel extends BasePanel {
                         icon: 'refresh',
                         variant: 'secondary',
                         disabled: false
+                    },
+                    {
+                        id: 'syncDeploymentBtn',
+                        label: 'Sync Deployment Settings',
+                        icon: 'sync',
+                        variant: 'primary',
+                        disabled: true
                     }
                 ],
                 layout: 'horizontal',
@@ -213,6 +213,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 ],
                 data: [],
                 sortable: true,
+                defaultSort: [{ column: 'displayName', direction: 'asc' }],
                 searchable: true,
                 showFooter: true,
                 className: 'environment-variables-table'
@@ -395,9 +396,9 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
             // Use simple composition method as specified in architecture guide
             return PanelComposer.compose([
-                this.environmentSelectorComponent,
-                this.solutionSelectorComponent,
                 this.actionBarComponent,
+                this.solutionSelectorComponent,
+                this.environmentSelectorComponent,
                 this.dataTableComponent
             ], this.getCommonWebviewResources(), 'Environment Variables');
 
@@ -683,7 +684,10 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
     private async refreshEnvironmentVariables(): Promise<void> {
         try {
-            this.componentLogger.debug('Refreshing environment variables');
+            this.componentLogger.debug('Refreshing environment variables and environments');
+
+            // First refresh the environment list
+            await this.loadEnvironments();
 
             // Get current selections
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();

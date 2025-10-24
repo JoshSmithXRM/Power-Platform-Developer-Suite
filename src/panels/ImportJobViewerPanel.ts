@@ -96,7 +96,7 @@ export class ImportJobViewerPanel extends BasePanel {
             // Environment Selector Component
             this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
                 id: 'importJobs-envSelector',
-                label: 'Select Environment',
+                label: 'Environment',
                 placeholder: 'Choose an environment to view import jobs...',
                 required: true,
                 environments: [],
@@ -196,6 +196,7 @@ export class ImportJobViewerPanel extends BasePanel {
                 ],
                 data: [],
                 sortable: true,
+                defaultSort: [{ column: 'startedon', direction: 'desc' }],
                 searchable: true,
                 showFooter: true,
                 contextMenu: true,
@@ -551,8 +552,12 @@ export class ImportJobViewerPanel extends BasePanel {
 
     private async refreshImportJobs(): Promise<void> {
         try {
-            this.componentLogger.debug('Refreshing import jobs');
+            this.componentLogger.debug('Refreshing import jobs and environments');
 
+            // First refresh the environment list
+            await this.loadEnvironments();
+
+            // Then refresh the import jobs for the selected environment
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
 
             if (selectedEnvironment) {

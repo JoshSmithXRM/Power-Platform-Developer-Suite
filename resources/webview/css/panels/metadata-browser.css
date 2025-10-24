@@ -1,30 +1,14 @@
 /* Metadata Browser Panel Styles */
+/* Body styles removed - now using standard panel layout from component-base.css */
 
-body {
-    padding: 0;
-    margin: 0;
-    overflow: hidden;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-
-.sticky-header {
-    position: sticky;
-    top: 0;
-    background: var(--vscode-editor-background);
-    border-bottom: 1px solid var(--vscode-panel-border);
-    padding: 16px 20px;
-    z-index: 100;
-    flex-shrink: 0;
-}
+/* Removed sticky-header - now using standard panel-controls from component-base.css */
 
 /* Three-panel layout container */
 .metadata-container {
     display: grid;
     grid-template-columns: 280px 1fr 400px;
-    height: calc(100vh - 120px);
-    max-height: calc(100vh - 120px);
+    flex: 1;
+    min-height: 0;
     gap: 0;
     overflow: hidden;
     position: relative;

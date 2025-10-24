@@ -149,7 +149,7 @@ export class MetadataBrowserPanel extends BasePanel {
             // Environment Selector Component
             this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
                 id: 'metadata-envSelector',
-                label: 'Select Environment',
+                label: 'Environment',
                 placeholder: 'Choose an environment to browse metadata...',
                 required: true,
                 environments: [],
@@ -166,16 +166,16 @@ export class MetadataBrowserPanel extends BasePanel {
                 id: 'metadata-actions',
                 actions: [
                     {
+                        id: 'openInMaker',
+                        label: 'Open in Maker',
+                        variant: 'primary',
+                        disabled: true
+                    },
+                    {
                         id: 'refresh',
                         label: 'Refresh',
                         icon: 'refresh',
                         variant: 'secondary',
-                        disabled: true
-                    },
-                    {
-                        id: 'openInMaker',
-                        label: 'Open in Maker',
-                        variant: 'primary',
                         disabled: true
                     }
                 ],
@@ -397,7 +397,7 @@ export class MetadataBrowserPanel extends BasePanel {
                 searchable: true,
                 showFooter: true,
                 className: 'metadata-choice-values-table',
-                defaultSort: [{ column: 'value', direction: 'asc' }]
+                defaultSort: [{ column: 'label', direction: 'asc' }]
             });
 
             this.componentLogger.debug('All components initialized successfully');
@@ -573,12 +573,13 @@ export class MetadataBrowserPanel extends BasePanel {
 
             // Build custom HTML layout with two-panel design: left sidebar + main content
             const customHTML = `
-    <div class="sticky-header">
-        ${this.environmentSelectorComponent.generateHTML()}
-        ${this.actionBarComponent.generateHTML()}
-    </div>
+    <div class="panel-container">
+        <div class="panel-controls">
+            ${this.actionBarComponent.generateHTML()}
+            ${this.environmentSelectorComponent.generateHTML()}
+        </div>
 
-    <div class="metadata-container">
+        <div class="metadata-container">
         <button class="panel-collapse-btn" id="left-panel-collapse" onclick="toggleLeftPanel()" title="Collapse sidebar" aria-label="Collapse sidebar">
             ◀
         </button>
@@ -704,6 +705,7 @@ export class MetadataBrowserPanel extends BasePanel {
                     <!-- JSON will be rendered here by JavaScript -->
                 </div>
             </div>
+        </div>
         </div>
     </div>`;
 
@@ -1249,6 +1251,9 @@ export class MetadataBrowserPanel extends BasePanel {
     }
 
     private async refreshCurrentMetadata(): Promise<void> {
+        // First refresh the environment list
+        await this.loadEnvironments();
+
         const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
         if (!selectedEnvironment) {
             vscode.window.showWarningMessage('Please select an environment first');

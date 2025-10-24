@@ -53,6 +53,7 @@
     --component-interactive-surface: var(--vscode-input-background); /* Buttons, inputs, dropdowns */
     --component-table-surface: var(--vscode-editor-background);      /* Table backgrounds - standardized */
     --component-header-surface: var(--vscode-editor-background);     /* Table headers, action bars */
+    --component-table-header-surface: var(--vscode-list-activeSelectionBackground);     /* Table headers only - theme accent */
     
     /* Semantic Component Borders */
     --component-border: var(--vscode-input-border);                  /* Standard component borders */
@@ -432,12 +433,39 @@
 /* Top controls section - natural height, doesn't grow */
 .panel-controls {
     flex: 0 0 auto;
-    padding: var(--component-padding);
+    padding: 6px 12px;
     border-bottom: 1px solid var(--vscode-panel-border);
     background: var(--vscode-editor-background);
     display: flex;
-    flex-direction: column;
-    gap: var(--component-gap);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
+}
+
+/* Action bar in controls - left side */
+.panel-controls .action-bar {
+    flex: 0 1 auto;
+    margin-bottom: 0;
+    order: 1;
+}
+
+/* Solution selector in controls - middle (when present) */
+.panel-controls .solution-selector {
+    flex: 0 0 auto;  /* Don't grow or shrink - maintain consistent width */
+    width: 250px;    /* Fixed width for consistency */
+    margin-bottom: 0;
+    order: 2;
+}
+
+/* Environment selector in controls - right side */
+.panel-controls .environment-selector {
+    flex: 0 0 auto;  /* Don't grow or shrink - maintain consistent width */
+    width: 350px;    /* Fixed width for consistency across all panels */
+    margin-bottom: 0;
+    margin-left: auto;
+    order: 3;
 }
 
 /* Main content area - grows to fill remaining space */

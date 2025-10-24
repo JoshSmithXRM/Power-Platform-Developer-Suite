@@ -7,29 +7,50 @@
 .solution-selector {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    background: var(--component-elevated-surface);
-    border: 1px solid var(--component-border);
-    border-radius: 4px;
-    padding: 12px;
+    gap: 4px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
     font-family: var(--vscode-font-family);
     font-size: var(--vscode-font-size);
     color: var(--component-text-primary);
 }
 
-.solution-selector-label {
-    font-weight: 600;
-    color: var(--component-text-primary);
-    margin-bottom: 4px;
+/* Row layout for inline label */
+.solution-selector .component-row {
     display: flex;
     align-items: center;
     gap: 8px;
+    width: 100%;
+    min-height: 28px;
+}
+
+.solution-selector-label {
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--component-text-primary);
+    margin-bottom: 0;
+    margin-right: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .solution-selector-icon {
     width: 16px;
     height: 16px;
     opacity: 0.8;
+}
+
+/* Solution selector container - take remaining space */
+.solution-selector-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 /* Solution selector trigger button */
@@ -41,12 +62,12 @@
     background: var(--vscode-input-background) !important;
     border: 1px solid var(--vscode-dropdown-border);
     color: var(--vscode-dropdown-foreground);
-    padding: 8px 12px;
+    padding: 4px 8px;
     border-radius: 4px;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
     transition: all 0.15s ease;
-    min-height: 20px;
+    height: 28px;
     text-align: left;
 }
 

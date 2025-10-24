@@ -10,12 +10,12 @@
 .environment-selector {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    background: var(--component-elevated-surface);
-    border: 1px solid var(--component-border);
-    border-radius: 4px;
-    padding: 12px;
-    margin-bottom: 8px;
+    gap: 4px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 0;
 }
 
 .environment-selector.environment-selector--compact {
@@ -35,8 +35,9 @@
 .environment-selector .component-row {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     width: 100%;
+    min-height: 28px;
 }
 
 .environment-selector .component-label {
@@ -44,8 +45,10 @@
     font-weight: 500;
     font-size: 13px;
     min-width: 100px;
-    margin-bottom: 4px;
+    margin-bottom: 0;
+    margin-right: 12px;
     user-select: none;
+    white-space: nowrap;
 }
 
 .environment-selector .component-label.component-required::after {
@@ -65,8 +68,8 @@
     color: var(--vscode-input-foreground);
     border: 1px solid var(--component-border);
     border-radius: 3px;
-    padding: 6px 12px;
-    height: 32px;
+    padding: 4px 8px;
+    height: 28px;
     font-family: var(--vscode-font-family);
     font-size: 13px;
     transition: all 150ms ease-in-out;

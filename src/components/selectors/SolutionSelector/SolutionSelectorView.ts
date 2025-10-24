@@ -52,15 +52,16 @@ export class SolutionSelectorView {
         ].filter(Boolean).join(' ');
 
         return `
-            <div class="${containerClass}" 
+            <div class="${containerClass}"
                  data-component-id="${id}"
                  data-component-type="SolutionSelector">
-                
-                ${label ? this.renderLabel(config, state) : ''}
-                
-                <div class="${SOLUTION_SELECTOR_CSS.CONTAINER}">
-                    ${this.renderSelector(config, state)}
-                    ${state.error ? this.renderError(state.error) : ''}
+
+                <div class="${CSS_CLASSES.COMPONENT_ROW}">
+                    ${label ? this.renderLabel(config, state) : ''}
+                    <div class="${SOLUTION_SELECTOR_CSS.CONTAINER}">
+                        ${this.renderSelector(config, state)}
+                        ${state.error ? this.renderError(state.error) : ''}
+                    </div>
                 </div>
             </div>
         `;

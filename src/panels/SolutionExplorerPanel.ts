@@ -94,7 +94,7 @@ export class SolutionExplorerPanel extends BasePanel {
             // Environment Selector Component
             this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
                 id: 'solutions-envSelector',
-                label: 'Select Environment',
+                label: 'Environment',
                 placeholder: 'Choose an environment to browse solutions...',
                 required: true,
                 environments: [],
@@ -185,6 +185,7 @@ export class SolutionExplorerPanel extends BasePanel {
                 ],
                 data: [],
                 sortable: true,
+                defaultSort: [{ column: 'friendlyName', direction: 'asc' }],
                 searchable: true,
                 showFooter: true,
                 contextMenu: true,
@@ -542,8 +543,12 @@ export class SolutionExplorerPanel extends BasePanel {
 
     private async refreshSolutions(): Promise<void> {
         try {
-            this.componentLogger.debug('Refreshing solutions');
+            this.componentLogger.debug('Refreshing solutions and environments');
 
+            // First refresh the environment list
+            await this.loadEnvironments();
+
+            // Then refresh the solutions for the selected environment
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
 
             if (selectedEnvironment) {
