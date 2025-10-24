@@ -2,6 +2,15 @@
 
 This guide covers the practical aspects of developing with the Power Platform Developer Suite codebase, including setup, workflow, debugging, and deployment.
 
+## Related Documentation
+
+- **Quick Reference**: `../CLAUDE.md` - AI assistant quick reference
+- **Execution Contexts**: `EXECUTION_CONTEXTS.md` - Extension Host vs Webview separation
+- **Panel Layouts**: `PANEL_LAYOUT_GUIDE.md` - Mandatory panel structure patterns
+- **Architecture**: `ARCHITECTURE_GUIDE.md` - SOLID principles and design
+- **Components**: `COMPONENT_PATTERNS.md` - Component design patterns
+- **Styling**: `STYLING_PATTERNS.md` - CSS semantic tokens and theming
+
 ## Development Environment Setup
 
 ### Prerequisites
@@ -98,6 +107,57 @@ grep -rE "#[0-9a-fA-F]{3,6}|rgba?\(" resources/webview/css/components/
 # Check for direct VS Code variables (prefer semantic tokens)
 grep -rn "var(--vscode-" resources/webview/css/components/
 ```
+
+📖 **See**: `STYLING_PATTERNS.md` for complete CSS guidelines
+
+### Panel Structure Requirements
+
+**CRITICAL**: All panels MUST follow the standard structure:
+
+```html
+<div class="panel-container">
+    <div class="panel-controls"><!-- Top bar --></div>
+    <div class="panel-content"><!-- Content area --></div>
+</div>
+```
+
+**Common Mistakes**:
+- ❌ Skipping `panel-content` wrapper (causes misalignment)
+- ❌ Adding custom body/container styles (breaks layout)
+- ❌ Using custom header classes instead of `panel-controls`
+
+**Standard Panel Implementation**:
+```typescript
+protected getHtmlContent(): string {
+    return PanelComposer.compose([
+        this.actionBar,
+        this.environmentSelector,
+        this.dataTable
+    ], this.getCommonWebviewResources(), 'Panel Title');
+}
+```
+
+**Custom Layouts** (use sparingly):
+```typescript
+protected getHtmlContent(): string {
+    const customHTML = `
+        <div class="panel-container">
+            <div class="panel-controls">
+                ${this.actionBar.generateHTML()}
+                ${this.environmentSelector.generateHTML()}
+            </div>
+            <div class="panel-content">
+                <!-- Custom layout INSIDE panel-content -->
+                <div class="my-custom-layout">...</div>
+            </div>
+        </div>
+    `;
+
+    return PanelComposer.composeWithCustomHTML(...);
+}
+```
+
+📖 **See**: `PANEL_LAYOUT_GUIDE.md` for complete panel structure documentation
 
 ### Development Cycle
 
