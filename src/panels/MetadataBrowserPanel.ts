@@ -579,7 +579,8 @@ export class MetadataBrowserPanel extends BasePanel {
             ${this.environmentSelectorComponent.generateHTML()}
         </div>
 
-        <div class="metadata-container">
+        <div class="panel-content">
+            <div class="metadata-container">
         <button class="panel-collapse-btn" id="left-panel-collapse" onclick="toggleLeftPanel()" title="Collapse sidebar" aria-label="Collapse sidebar">
             ◀
         </button>
@@ -706,6 +707,7 @@ export class MetadataBrowserPanel extends BasePanel {
                 </div>
             </div>
         </div>
+            </div>
         </div>
     </div>`;
 
