@@ -1,0 +1,371 @@
+/**
+ * Filter Panel Component Styles
+ * Modern, semantic-token-based styling for advanced filter panel
+ */
+
+.filter-panel {
+    background: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-editorWidget-border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+    width: 100%;
+}
+
+/* Header (Collapsible) */
+.filter-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid var(--vscode-editorWidget-border);
+    transition: background-color 0.2s ease;
+}
+
+.filter-panel-header:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.filter-panel-toggle {
+    font-size: 14px;
+    color: var(--vscode-foreground);
+    font-family: monospace;
+    min-width: 14px;
+    text-align: center;
+}
+
+.filter-panel-title {
+    font-weight: 600;
+    color: var(--vscode-textLink-foreground);
+    font-size: 13px;
+}
+
+/* Content */
+.filter-panel-content {
+    padding: 16px;
+}
+
+/* Filter Sections */
+.filter-section {
+    margin-bottom: 20px;
+}
+
+.filter-section:last-child {
+    margin-bottom: 0;
+}
+
+.filter-section-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--vscode-descriptionForeground);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+/* Quick Filters */
+.quick-filter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.quick-filter-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.quick-filter-item:hover {
+    background: var(--vscode-list-hoverBackground);
+    border-color: var(--vscode-focusBorder);
+}
+
+.quick-filter-checkbox {
+    cursor: pointer;
+    margin: 0;
+}
+
+.quick-filter-label {
+    font-size: 13px;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    user-select: none;
+}
+
+.quick-filter-item:has(.quick-filter-checkbox:checked) {
+    background: var(--vscode-list-activeSelectionBackground);
+    border-color: var(--vscode-focusBorder);
+}
+
+.quick-filter-item:has(.quick-filter-checkbox:checked) .quick-filter-label {
+    color: var(--vscode-list-activeSelectionForeground);
+    font-weight: 500;
+}
+
+/* Advanced Filters */
+.filter-conditions-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.filter-conditions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Filter Condition Row */
+.filter-condition {
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    padding: 12px;
+}
+
+.filter-condition-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.filter-field,
+.filter-operator {
+    min-width: 150px;
+    flex: 0 1 auto;
+}
+
+.filter-field,
+.filter-operator,
+.filter-value,
+.logical-operator-select {
+    padding: 6px 10px;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.filter-field:focus,
+.filter-operator:focus,
+.filter-value:focus,
+.logical-operator-select:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.filter-field:disabled,
+.filter-operator:disabled,
+.filter-value:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.filter-value-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+}
+
+.filter-value {
+    flex: 1 1 auto;
+    min-width: 150px;
+}
+
+.filter-value-between {
+    flex: 0 1 120px;
+}
+
+.filter-value-separator {
+    font-size: 13px;
+    color: var(--vscode-descriptionForeground);
+    padding: 0 4px;
+}
+
+.filter-no-value {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+    padding: 6px 10px;
+}
+
+.btn-remove-condition {
+    background: transparent;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    color: var(--vscode-errorForeground);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: bold;
+    transition: all 0.2s ease;
+}
+
+.btn-remove-condition:hover {
+    background: var(--vscode-inputValidation-errorBackground);
+    border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.btn-icon-only {
+    padding: 0;
+    min-width: unset;
+}
+
+/* Logical Operator */
+.filter-logical-operator {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.logical-operator-select {
+    width: 80px;
+}
+
+/* Add Condition Button */
+.add-condition-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border: 1px solid var(--vscode-button-border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.add-condition-btn:hover:not(:disabled) {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.add-condition-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.add-condition-btn .btn-icon {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* Filter Actions */
+.filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--vscode-editorWidget-border);
+}
+
+.filter-actions .btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.filter-actions .btn-primary {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.filter-actions .btn-primary:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.filter-actions .btn-secondary {
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border-color: var(--vscode-button-border);
+}
+
+.filter-actions .btn-secondary:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.filter-preview-count {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .filter-condition-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-field,
+    .filter-operator,
+    .filter-value {
+        min-width: unset;
+        width: 100%;
+    }
+
+    .btn-remove-condition {
+        align-self: flex-end;
+    }
+
+    .quick-filter-list {
+        flex-direction: column;
+    }
+
+    .quick-filter-item {
+        width: 100%;
+    }
+}
+
+/* Empty State */
+.filter-conditions-list:empty::after {
+    content: 'No filter conditions added. Click "Add Condition" to start filtering.';
+    display: block;
+    padding: 24px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
+/* Animation */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.filter-condition {
+    animation: slideIn 0.2s ease-out;
+}

@@ -151,7 +151,6 @@ export class MetadataBrowserPanel extends BasePanel {
                 id: 'metadata-envSelector',
                 label: 'Environment',
                 placeholder: 'Choose an environment to browse metadata...',
-                required: true,
                 environments: [],
                 showRefreshButton: true,
                 className: 'metadata-env-selector',
@@ -612,14 +611,21 @@ export class MetadataBrowserPanel extends BasePanel {
             </div>
         </div>
 
-        <!-- Right Panel: Metadata Content -->
-        <div class="right-panel">
-            <div class="selection-header">
-                <span class="selection-label">Selected:</span>
-                <span class="selection-value" id="current-selection">${currentSelection}</span>
-            </div>
+        <!-- Right Panel: Metadata Content (Split Panel Container) -->
+        <div class="right-panel-container"
+             data-component-type="SplitPanel"
+             data-component-id="metadata-detail-split-panel"
+             data-orientation="horizontal"
+             data-min-size="400"
+             data-resizable="true">
 
-            <div class="metadata-sections ${isEntitySelected ? 'entity-mode' : ''} ${isChoiceSelected ? 'choice-mode' : ''}">
+            <div class="right-panel" data-panel="left">
+                <div class="selection-header">
+                    <span class="selection-label">Selected:</span>
+                    <span class="selection-value" id="current-selection">${currentSelection}</span>
+                </div>
+
+                <div class="metadata-sections ${isEntitySelected ? 'entity-mode' : ''} ${isChoiceSelected ? 'choice-mode' : ''}">
         <!-- Attributes Section (Entity Only) -->
         <div class="section entity-only ${isAttributesExpanded ? 'expanded' : ''}" data-section="attributes">
             <div class="section-header" onclick="toggleSection('attributes')">
@@ -679,23 +685,26 @@ export class MetadataBrowserPanel extends BasePanel {
                 ${this.choiceValuesTableComponent.generateHTML()}
             </div>
         </div>
+                </div>
             </div>
-        </div>
 
-        <!-- Detail Panel (3rd column) -->
-        <div class="detail-panel hidden" id="detail-panel">
-            <div class="detail-panel-header">
-                <span class="detail-panel-title" id="detail-panel-title">Details</span>
-                <button class="detail-panel-close" onclick="closeDetailPanel()" title="Close" aria-label="Close">
-                    ×
-                </button>
-            </div>
+            <!-- Split Panel Divider -->
+            <div class="split-panel-divider" data-divider></div>
+
+            <!-- Detail Panel (3rd column) -->
+            <div class="detail-panel hidden" id="detail-panel" data-panel="right">
+                <div class="detail-panel-header">
+                    <span class="detail-panel-title" id="detail-panel-title">Details</span>
+                    <button class="detail-panel-close" data-action="closeRightPanel" onclick="closeDetailPanel()" title="Close" aria-label="Close">
+                        ×
+                    </button>
+                </div>
             <div class="detail-panel-tabs">
                 <button class="detail-panel-tab active" data-tab="properties" onclick="switchDetailTab('properties')">
                     Properties
                 </button>
                 <button class="detail-panel-tab" data-tab="json" onclick="switchDetailTab('json')">
-                    JSON
+                    Raw Data
                 </button>
             </div>
             <div class="detail-panel-content">
@@ -706,7 +715,10 @@ export class MetadataBrowserPanel extends BasePanel {
                     <!-- JSON will be rendered here by JavaScript -->
                 </div>
             </div>
-        </div>
+            </div>
+
+        </div> <!-- end right-panel-container (split panel) -->
+
             </div>
         </div>
     </div>`;
@@ -725,7 +737,10 @@ export class MetadataBrowserPanel extends BasePanel {
                     this.choiceValuesTableComponent
                 ],
                 ['css/panels/metadata-browser.css'],  // Additional panel-specific CSS
-                ['js/panels/metadataBrowserBehavior.js'],  // Additional panel-specific behavior scripts
+                [
+                    'js/panels/metadataBrowserBehavior.js',
+                    'js/components/SplitPanelBehavior.js'
+                ],  // Additional panel-specific behavior scripts
                 this.getCommonWebviewResources(),
                 'Metadata Browser'
             );

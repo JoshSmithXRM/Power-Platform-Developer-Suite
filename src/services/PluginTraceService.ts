@@ -220,17 +220,23 @@ export class PluginTraceService {
     }
 
     async setPluginTraceLevel(environmentId: string, level: PluginTraceLevel): Promise<void> {
+        this.logger.info('Setting plugin trace level', { environmentId, level, levelName: this.getTraceLevelDisplayName(level) });
+
         const environments = await this.authService.getEnvironments();
         const environment = environments.find(env => env.id === environmentId);
 
         if (!environment) {
+            this.logger.error('Environment not found', new Error('Environment not found'), { environmentId });
             throw new Error('Environment not found');
         }
 
         const token = await this.authService.getAccessToken(environment.id);
 
         // First get the organization ID
-        const orgResponse = await fetch(`${environment.settings.dataverseUrl}/api/data/v9.2/organizations?$select=organizationid`, {
+        const orgUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/organizations?$select=organizationid`;
+        this.logger.debug('Fetching organization ID', { orgUrl });
+
+        const orgResponse = await fetch(orgUrl, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -240,6 +246,12 @@ export class PluginTraceService {
         });
 
         if (!orgResponse.ok) {
+            const errorText = await orgResponse.text();
+            this.logger.error('Failed to get organization', new Error('API request failed'), {
+                status: orgResponse.status,
+                statusText: orgResponse.statusText,
+                errorText
+            });
             throw new Error(`Failed to get organization: ${orgResponse.statusText}`);
         }
 
@@ -247,11 +259,20 @@ export class PluginTraceService {
         const organizationId = orgData.value?.[0]?.organizationid;
 
         if (!organizationId) {
+            this.logger.error('Organization ID not found', new Error('Organization ID not found'));
             throw new Error('Organization ID not found');
         }
 
+        this.logger.debug('Found organization ID', { organizationId });
+
         // Update the plugin trace log setting
         const updateUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/organizations(${organizationId})`;
+        this.logger.info('Updating plugin trace log setting', {
+            updateUrl,
+            organizationId,
+            level,
+            levelName: this.getTraceLevelDisplayName(level)
+        });
 
         const updateResponse = await fetch(updateUrl, {
             method: 'PATCH',
@@ -267,8 +288,21 @@ export class PluginTraceService {
         });
 
         if (!updateResponse.ok) {
+            const errorText = await updateResponse.text();
+            this.logger.error('Failed to update plugin trace level', new Error('API request failed'), {
+                status: updateResponse.status,
+                statusText: updateResponse.statusText,
+                errorText,
+                level
+            });
             throw new Error(`Failed to update plugin trace level: ${updateResponse.statusText}`);
         }
+
+        this.logger.info('Plugin trace level updated successfully', {
+            organizationId,
+            level,
+            levelName: this.getTraceLevelDisplayName(level)
+        });
     }
 
     getModeDisplayName(mode: number): string {
@@ -314,5 +348,182 @@ export class PluginTraceService {
         if (!dateString) return '';
         const date = new Date(dateString);
         return date.toLocaleString();
+    }
+
+    /**
+     * Delete a single plugin trace log
+     */
+    async deleteTrace(environmentId: string, traceId: string): Promise<void> {
+        const environments = await this.authService.getEnvironments();
+        const environment = environments.find(env => env.id === environmentId);
+
+        if (!environment) {
+            throw new Error('Environment not found');
+        }
+
+        const token = await this.authService.getAccessToken(environment.id);
+        const url = `${environment.settings.dataverseUrl}/api/data/v9.2/plugintracelogs(${traceId})`;
+
+        this.logger.info('Deleting plugin trace', { traceId });
+
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'OData-MaxVersion': '4.0',
+                'OData-Version': '4.0'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            this.logger.error('Failed to delete plugin trace', new Error('API request failed'), {
+                status: response.status,
+                errorText
+            });
+            throw new Error(`Failed to delete plugin trace: ${response.status} ${response.statusText}`);
+        }
+
+        this.logger.info('Plugin trace deleted successfully', { traceId });
+    }
+
+    /**
+     * Delete all plugin trace logs in the environment
+     */
+    async deleteAllTraces(environmentId: string): Promise<number> {
+        const environments = await this.authService.getEnvironments();
+        const environment = environments.find(env => env.id === environmentId);
+
+        if (!environment) {
+            throw new Error('Environment not found');
+        }
+
+        const token = await this.authService.getAccessToken(environment.id);
+
+        // First, get all trace IDs
+        const countUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/plugintracelogs?$select=plugintracelogid&$count=true`;
+
+        this.logger.info('Fetching all plugin traces for deletion');
+
+        const countResponse = await fetch(countUrl, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'OData-MaxVersion': '4.0',
+                'OData-Version': '4.0',
+                'Prefer': 'odata.include-annotations="*"'
+            }
+        });
+
+        if (!countResponse.ok) {
+            throw new Error(`Failed to fetch plugin traces: ${countResponse.statusText}`);
+        }
+
+        const countData = await countResponse.json();
+        const totalCount = countData['@odata.count'] || countData.value?.length || 0;
+
+        if (totalCount === 0) {
+            this.logger.info('No plugin traces to delete');
+            return 0;
+        }
+
+        this.logger.info(`Deleting ${totalCount} plugin traces`);
+
+        // Delete in batches using batch API for better performance
+        const traceIds = countData.value.map((trace: any) => trace.plugintracelogid);
+        const batchSize = 100;
+        let deletedCount = 0;
+
+        for (let i = 0; i < traceIds.length; i += batchSize) {
+            const batch = traceIds.slice(i, i + batchSize);
+
+            // Delete batch
+            for (const traceId of batch) {
+                try {
+                    await this.deleteTrace(environmentId, traceId);
+                    deletedCount++;
+                } catch (error) {
+                    this.logger.error('Failed to delete trace in batch', error as Error, { traceId });
+                    // Continue with next trace
+                }
+            }
+
+            this.logger.debug(`Deleted ${deletedCount}/${totalCount} traces`);
+        }
+
+        this.logger.info(`Successfully deleted ${deletedCount} plugin traces`);
+        return deletedCount;
+    }
+
+    /**
+     * Delete plugin trace logs older than specified days
+     */
+    async deleteOldTraces(environmentId: string, olderThanDays: number): Promise<number> {
+        const environments = await this.authService.getEnvironments();
+        const environment = environments.find(env => env.id === environmentId);
+
+        if (!environment) {
+            throw new Error('Environment not found');
+        }
+
+        const token = await this.authService.getAccessToken(environment.id);
+
+        // Calculate date threshold
+        const thresholdDate = new Date();
+        thresholdDate.setDate(thresholdDate.getDate() - olderThanDays);
+        const thresholdISO = thresholdDate.toISOString();
+
+        // Get traces older than threshold
+        const url = `${environment.settings.dataverseUrl}/api/data/v9.2/plugintracelogs?$select=plugintracelogid&$filter=createdon lt ${thresholdISO}&$count=true`;
+
+        this.logger.info('Fetching old plugin traces for deletion', { olderThanDays, thresholdDate });
+
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'OData-MaxVersion': '4.0',
+                'OData-Version': '4.0',
+                'Prefer': 'odata.include-annotations="*"'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch old plugin traces: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const totalCount = data['@odata.count'] || data.value?.length || 0;
+
+        if (totalCount === 0) {
+            this.logger.info('No old plugin traces to delete');
+            return 0;
+        }
+
+        this.logger.info(`Deleting ${totalCount} old plugin traces`);
+
+        // Delete in batches
+        const traceIds = data.value.map((trace: any) => trace.plugintracelogid);
+        const batchSize = 100;
+        let deletedCount = 0;
+
+        for (let i = 0; i < traceIds.length; i += batchSize) {
+            const batch = traceIds.slice(i, i + batchSize);
+
+            for (const traceId of batch) {
+                try {
+                    await this.deleteTrace(environmentId, traceId);
+                    deletedCount++;
+                } catch (error) {
+                    this.logger.error('Failed to delete old trace in batch', error as Error, { traceId });
+                    // Continue with next trace
+                }
+            }
+
+            this.logger.debug(`Deleted ${deletedCount}/${totalCount} old traces`);
+        }
+
+        this.logger.info(`Successfully deleted ${deletedCount} old plugin traces`);
+        return deletedCount;
     }
 }

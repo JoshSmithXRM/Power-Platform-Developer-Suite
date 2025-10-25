@@ -8,6 +8,7 @@ export interface PanelState {
     selectedItems?: string[];
     viewConfig?: any;
     lastUpdated?: Date;
+    autoRefreshIntervalSeconds?: number;
 }
 
 export interface StateChangedEvent {

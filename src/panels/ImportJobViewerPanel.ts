@@ -98,7 +98,6 @@ export class ImportJobViewerPanel extends BasePanel {
                 id: 'importJobs-envSelector',
                 label: 'Environment',
                 placeholder: 'Choose an environment to view import jobs...',
-                required: true,
                 environments: [],
                 showRefreshButton: true,
                 className: 'import-jobs-env-selector',

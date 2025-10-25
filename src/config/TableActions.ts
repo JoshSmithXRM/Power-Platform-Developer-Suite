@@ -71,13 +71,53 @@ export const ENVIRONMENT_VARIABLE_CONTEXT_MENU_ITEMS: DataTableContextMenuItem[]
 export const PLUGIN_TRACE_CONTEXT_MENU_ITEMS: DataTableContextMenuItem[] = [
     {
         id: 'viewDetails',
-        label: 'View Trace Details',
-        icon: 'file-code'
+        label: 'View Details',
+        icon: 'eye'
     },
     {
-        id: 'copyError',
-        label: 'Copy Error Message',
+        id: 'openInDynamics',
+        label: 'Open in Dynamics',
+        icon: 'link-external'
+    },
+    {
+        id: 'separator1',
+        label: '',
+        separator: true
+    },
+    {
+        id: 'copyTraceId',
+        label: 'Copy Trace ID',
         icon: 'copy'
+    },
+    {
+        id: 'copyCorrelationId',
+        label: 'Copy Correlation ID',
+        icon: 'copy'
+    },
+    {
+        id: 'separator2',
+        label: '',
+        separator: true
+    },
+    {
+        id: 'showRelated',
+        label: 'Show Related Traces',
+        icon: 'group'
+    },
+    {
+        id: 'showInTimeline',
+        label: 'Show in Timeline',
+        icon: 'timeline'
+    },
+    {
+        id: 'separator3',
+        label: '',
+        separator: true
+    },
+    {
+        id: 'deleteTrace',
+        label: 'Delete This Trace',
+        icon: 'trash'
     }
 ];
 

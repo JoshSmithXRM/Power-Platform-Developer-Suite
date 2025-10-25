@@ -110,7 +110,6 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 id: 'envVars-envSelector',
                 label: 'Environment',
                 placeholder: 'Choose an environment to view variables...',
-                required: true,
                 environments: [],
                 showRefreshButton: true,
                 className: 'environment-variables-env-selector',

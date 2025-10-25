@@ -386,10 +386,26 @@ class MetadataBrowserBehavior {
     static showDetailPanel(data) {
         const detailPanel = document.getElementById('detail-panel');
         const metadataContainer = document.querySelector('.metadata-container');
+        const splitContainer = document.querySelector('[data-component-id="metadata-detail-split-panel"]');
 
         if (!detailPanel || !metadataContainer) return;
 
         console.log('Showing detail panel:', data.title);
+
+        // Initialize split panel behavior if not already initialized
+        if (splitContainer && window.SplitPanelBehavior && !window.SplitPanelBehavior.instances.has('metadata-detail-split-panel')) {
+            window.SplitPanelBehavior.initialize(
+                'metadata-detail-split-panel',
+                {
+                    orientation: 'horizontal',
+                    minSize: 400,
+                    resizable: true,
+                    initialSplit: 60,
+                    rightPanelDefaultHidden: true
+                },
+                splitContainer
+            );
+        }
 
         // Update title
         const title = document.getElementById('detail-panel-title');
@@ -409,9 +425,15 @@ class MetadataBrowserBehavior {
             propertiesContent.innerHTML = this.renderProperties(data.metadata);
         }
 
-        // Show panel
-        detailPanel.classList.remove('hidden');
-        metadataContainer.classList.remove('detail-hidden');
+        // Show panel using split panel behavior
+        if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('metadata-detail-split-panel')) {
+            const instance = window.SplitPanelBehavior.instances.get('metadata-detail-split-panel');
+            window.SplitPanelBehavior.showRightPanel(instance);
+        } else {
+            // Fallback if split panel behavior isn't available
+            detailPanel.classList.remove('hidden');
+            metadataContainer.classList.remove('detail-hidden');
+        }
 
         // Default to properties tab (more user-friendly)
         this.switchDetailTab('properties');
@@ -432,12 +454,19 @@ class MetadataBrowserBehavior {
         const detailPanel = document.getElementById('detail-panel');
         const metadataContainer = document.querySelector('.metadata-container');
 
-        if (detailPanel) {
-            detailPanel.classList.add('hidden');
-        }
+        // Close using split panel behavior
+        if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('metadata-detail-split-panel')) {
+            const instance = window.SplitPanelBehavior.instances.get('metadata-detail-split-panel');
+            window.SplitPanelBehavior.closeRightPanel(instance);
+        } else {
+            // Fallback if split panel behavior isn't available
+            if (detailPanel) {
+                detailPanel.classList.add('hidden');
+            }
 
-        if (metadataContainer) {
-            metadataContainer.classList.add('detail-hidden');
+            if (metadataContainer) {
+                metadataContainer.classList.add('detail-hidden');
+            }
         }
     }
 

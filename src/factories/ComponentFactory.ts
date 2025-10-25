@@ -8,6 +8,10 @@ import { SolutionSelectorComponent } from '../components/selectors/SolutionSelec
 import { SolutionSelectorConfig } from '../components/selectors/SolutionSelector/SolutionSelectorConfig';
 import { JsonViewerComponent } from '../components/viewers/JsonViewer/JsonViewerComponent';
 import { JsonViewerConfig } from '../components/viewers/JsonViewer/JsonViewerConfig';
+import { FilterPanelComponent } from '../components/panels/FilterPanel/FilterPanelComponent';
+import { FilterPanelConfig } from '../components/panels/FilterPanel/FilterPanelConfig';
+import { SplitPanelComponent } from '../components/panels/SplitPanel/SplitPanelComponent';
+import { SplitPanelConfig } from '../components/panels/SplitPanel/SplitPanelConfig';
 import { BaseComponent } from '../components/base/BaseComponent';
 import { ServiceFactory } from '../services/ServiceFactory';
 
@@ -126,6 +130,30 @@ export class ComponentFactory {
 
         const component = new JsonViewerComponent(config);
         this.trackInstance(config.id, 'JsonViewer', component);
+
+        return component;
+    }
+
+    /**
+     * Create a FilterPanelComponent
+     */
+    public createFilterPanel(config: FilterPanelConfig): FilterPanelComponent {
+        this.validateComponentConfig(config, 'FilterPanel');
+
+        const component = new FilterPanelComponent(config);
+        this.trackInstance(config.id, 'FilterPanel', component);
+
+        return component;
+    }
+
+    /**
+     * Create a SplitPanelComponent
+     */
+    public createSplitPanel(config: SplitPanelConfig): SplitPanelComponent {
+        this.validateComponentConfig(config, 'SplitPanel');
+
+        const component = new SplitPanelComponent(config);
+        this.trackInstance(config.id, 'SplitPanel', component);
 
         return component;
     }

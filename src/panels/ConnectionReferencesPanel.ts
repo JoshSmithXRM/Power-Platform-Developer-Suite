@@ -110,7 +110,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                 id: 'connectionRefs-envSelector',
                 label: 'Environment',
                 placeholder: 'Choose an environment to view connection references...',
-                required: true,
                 environments: [],
                 showRefreshButton: true,
                 className: 'connection-references-env-selector',

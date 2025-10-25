@@ -30,8 +30,8 @@ class ComponentUtils {
      * Auto-register behaviors that are available in global scope
      */
     static registerAvailableBehaviors() {
-        const behaviorTypes = ['EnvironmentSelector', 'SolutionSelector', 'ActionBar', 'DataTable', 'SearchForm', 'EntitySelector'];
-        
+        const behaviorTypes = ['EnvironmentSelector', 'SolutionSelector', 'ActionBar', 'DataTable', 'SearchForm', 'EntitySelector', 'FilterPanel', 'SplitPanel'];
+
         console.log('ComponentUtils: registerAvailableBehaviors() called');
         console.log('ComponentUtils: window object keys:', Object.keys(window).filter(k => k.includes('Behavior')));
         
@@ -498,7 +498,23 @@ class ComponentUtils {
                     console.warn('ActionBarBehavior not available');
                 }
                 break;
-                
+
+            case 'FilterPanel':
+                if (window.FilterPanelBehavior) {
+                    window.FilterPanelBehavior.handleMessage(message);
+                } else {
+                    console.warn('FilterPanelBehavior not available');
+                }
+                break;
+
+            case 'SplitPanel':
+                if (window.SplitPanelBehavior) {
+                    window.SplitPanelBehavior.handleMessage(message);
+                } else {
+                    console.warn('SplitPanelBehavior not available');
+                }
+                break;
+
             default:
                 // Fallback: try to find behavior based on componentId pattern
                 this.routeByIdPattern(message);

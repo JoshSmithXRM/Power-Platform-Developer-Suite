@@ -1,0 +1,221 @@
+/**
+ * Split Panel Component Styles
+ * Resizable split layout with draggable divider
+ */
+
+.split-panel {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Orientations */
+.split-panel-horizontal {
+    flex-direction: row;
+}
+
+.split-panel-vertical {
+    flex-direction: column;
+}
+
+/* Panels */
+.split-panel-left,
+.split-panel-right {
+    position: relative;
+    overflow: auto;
+    background: var(--vscode-editor-background);
+}
+
+.split-panel-left {
+    flex-shrink: 0;
+}
+
+.split-panel-right {
+    flex-shrink: 0;
+    position: relative;
+}
+
+/* Right panel content wrapper */
+.split-panel-right-content {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+}
+
+/* Divider */
+.split-panel-divider {
+    position: relative;
+    flex-shrink: 0;
+    background: var(--vscode-editorWidget-border);
+    transition: background-color 0.2s ease;
+    z-index: 10;
+}
+
+.split-panel-horizontal .split-panel-divider {
+    width: 4px;
+    cursor: ew-resize;
+}
+
+.split-panel-vertical .split-panel-divider {
+    height: 4px;
+    cursor: ns-resize;
+}
+
+.split-panel-divider:hover {
+    background: var(--vscode-focusBorder);
+}
+
+/* Divider handle (visual indicator) */
+.split-panel-divider-handle {
+    position: absolute;
+    background: var(--vscode-foreground);
+    opacity: 0.3;
+    transition: opacity 0.2s ease;
+}
+
+.split-panel-horizontal .split-panel-divider-handle {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 40px;
+    border-radius: 1px;
+}
+
+.split-panel-vertical .split-panel-divider-handle {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 2px;
+    border-radius: 1px;
+}
+
+.split-panel-divider:hover .split-panel-divider-handle {
+    opacity: 0.6;
+}
+
+/* Dragging state */
+.split-panel-dragging {
+    user-select: none;
+}
+
+.split-panel-dragging .split-panel-divider {
+    background: var(--vscode-focusBorder);
+}
+
+.split-panel-dragging .split-panel-divider-handle {
+    opacity: 0.8;
+}
+
+/* Close button (for right panel) */
+.split-panel-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-editorWidget-border);
+    border-radius: 4px;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1;
+    z-index: 100;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+}
+
+.split-panel-close-btn:hover {
+    opacity: 1;
+    background: var(--vscode-inputValidation-errorBackground);
+    border-color: var(--vscode-inputValidation-errorBorder);
+    color: var(--vscode-errorForeground);
+}
+
+/* Hidden right panel state */
+.split-panel-right-hidden .split-panel-right {
+    display: none;
+}
+
+.split-panel-right-hidden .split-panel-divider {
+    display: none;
+}
+
+.split-panel-right-hidden .split-panel-left {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Non-resizable variant */
+.split-panel:not(.split-panel-resizable) .split-panel-divider {
+    cursor: default;
+    pointer-events: none;
+}
+
+.split-panel:not(.split-panel-resizable) .split-panel-divider-handle {
+    display: none;
+}
+
+/* Smooth transitions when toggling panels */
+.split-panel-left,
+.split-panel-right {
+    transition: width 0.3s ease, height 0.3s ease;
+}
+
+.split-panel-dragging .split-panel-left,
+.split-panel-dragging .split-panel-right {
+    transition: none;
+}
+
+/* Scrollbar styling for panels */
+.split-panel-left::-webkit-scrollbar,
+.split-panel-right::-webkit-scrollbar,
+.split-panel-right-content::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.split-panel-left::-webkit-scrollbar-track,
+.split-panel-right::-webkit-scrollbar-track,
+.split-panel-right-content::-webkit-scrollbar-track {
+    background: var(--vscode-scrollbarSlider-background);
+}
+
+.split-panel-left::-webkit-scrollbar-thumb,
+.split-panel-right::-webkit-scrollbar-thumb,
+.split-panel-right-content::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-hoverBackground);
+    border-radius: 5px;
+}
+
+.split-panel-left::-webkit-scrollbar-thumb:hover,
+.split-panel-right::-webkit-scrollbar-thumb:hover,
+.split-panel-right-content::-webkit-scrollbar-thumb:hover {
+    background: var(--vscode-scrollbarSlider-activeBackground);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .split-panel-horizontal {
+        flex-direction: column;
+    }
+
+    .split-panel-horizontal .split-panel-divider {
+        width: 100%;
+        height: 4px;
+        cursor: ns-resize;
+    }
+
+    .split-panel-horizontal .split-panel-divider-handle {
+        width: 40px;
+        height: 2px;
+    }
+}

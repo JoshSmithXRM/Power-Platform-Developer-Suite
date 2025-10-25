@@ -96,7 +96,6 @@ export class SolutionExplorerPanel extends BasePanel {
                 id: 'solutions-envSelector',
                 label: 'Environment',
                 placeholder: 'Choose an environment to browse solutions...',
-                required: true,
                 environments: [],
                 showRefreshButton: true,
                 className: 'solutions-env-selector',
