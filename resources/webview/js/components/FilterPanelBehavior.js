@@ -348,6 +348,18 @@ class FilterPanelBehavior {
      * Apply filters
      */
     static applyFilters(instance) {
+        // Collect quick filters from actual checkbox state (not just from change events)
+        const quickFilterCheckboxes = instance.element.querySelectorAll('.quick-filter-checkbox');
+        const activeQuickFilters = [];
+        quickFilterCheckboxes.forEach(cb => {
+            if (cb.checked) {
+                activeQuickFilters.push(cb.dataset.filterId);
+            }
+        });
+
+        // Update instance state to match
+        instance.activeQuickFilters = new Set(activeQuickFilters);
+
         // Collect all conditions
         const conditions = this.collectConditions(instance);
 
@@ -360,7 +372,7 @@ class FilterPanelBehavior {
 
         // Notify Extension Host
         this.sendMessage(instance, 'filtersApplied', {
-            quickFilters: Array.from(instance.activeQuickFilters),
+            quickFilters: activeQuickFilters,
             advancedFilters: validConditions
         });
     }

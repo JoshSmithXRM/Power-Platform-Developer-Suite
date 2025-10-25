@@ -369,8 +369,7 @@ class SplitPanelBehavior {
      */
     static sendMessage(instance, action, data) {
         if (typeof window.ComponentUtils !== 'undefined' && window.ComponentUtils.sendMessage) {
-            window.ComponentUtils.sendMessage({
-                action,
+            window.ComponentUtils.sendMessage(action, {
                 componentId: instance.id,
                 componentType: 'SplitPanel',
                 ...data

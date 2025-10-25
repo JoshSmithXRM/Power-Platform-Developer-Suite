@@ -118,28 +118,29 @@ class ComponentUtils {
      */
     static initialize() {
         console.log('ComponentUtils: initialize() method called');
-        
+
         if (this.isInitialized) {
             console.warn('ComponentUtils already initialized');
             return;
         }
 
-        // Store VS Code API reference
+        // Store VS Code API reference - use getter function if not immediately available
         if (window.vscode) {
             this.vscode = window.vscode;
             console.log('ComponentUtils: VS Code API available');
         } else {
-            console.error('ComponentUtils: VS Code API not available - should be set by PanelComposer');
-            return;
+            console.warn('ComponentUtils: VS Code API not immediately available, will use window.vscode getter');
+            // Don't return - continue initialization
+            // The sendMessage method will check for window.vscode dynamically
         }
 
         console.log('ComponentUtils: About to call registerAvailableBehaviors()');
         // Auto-register any behaviors that loaded before ComponentUtils
         this.registerAvailableBehaviors();
-        
+
         // Process any pending registrations from the stub
         this.processPendingRegistrations();
-        
+
         console.log('ComponentUtils: About to call checkReadyToInitialize()');
         // Check if we're ready to initialize
         this.checkReadyToInitialize();
@@ -328,7 +329,10 @@ class ComponentUtils {
             timestamp: Date.now()
         };
 
-        if (!this.vscode) {
+        // Use stored vscode reference or fall back to window.vscode
+        const vscode = this.vscode || window.vscode;
+
+        if (!vscode) {
             // Queue the message until VS Code API is available
             console.log('Queueing message (VS Code API not ready):', message);
             this.messageQueue.push(message);
@@ -336,15 +340,21 @@ class ComponentUtils {
         }
 
         console.log('Sending message to Extension Host:', message);
-        this.vscode.postMessage(message);
+        vscode.postMessage(message);
     }
 
     /**
      * Flush queued messages when VS Code API becomes available
      */
     static flushMessageQueue() {
-        if (!this.vscode || this.messageQueue.length === 0) {
+        const vscode = this.vscode || window.vscode;
+        if (!vscode || this.messageQueue.length === 0) {
             return;
+        }
+
+        // Update stored reference if we didn't have it before
+        if (!this.vscode && window.vscode) {
+            this.vscode = window.vscode;
         }
 
         console.log(`Flushing ${this.messageQueue.length} queued messages`);
@@ -428,7 +438,11 @@ class ComponentUtils {
             }
 
             // Third priority: Route to specific behavior static handlers
-            if (message.action === 'componentUpdate' || message.action === 'componentStateChange') {
+            if (message.action === 'componentUpdate' ||
+                message.action === 'componentStateChange' ||
+                message.action === 'setQuickFilters' ||
+                message.action === 'setAdvancedFilters' ||
+                message.action === 'clearFilters') {
                 this.routeToComponentBehavior(message);
                 return;
             }

@@ -9,7 +9,6 @@ import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarCom
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
 import {
     CompleteEntityMetadata,
-    EntityDefinition,
     AttributeMetadata,
     EntityKeyMetadata,
     OneToManyRelationshipMetadata,
@@ -557,8 +556,6 @@ export class MetadataBrowserPanel extends BasePanel {
                 this.componentLogger.warn('Components not initialized when generating HTML');
                 return this.getErrorHtml('Metadata Browser', 'Failed to initialize components');
             }
-
-            const panelResources = this.getPanelSpecificResources();
             const currentSelection = this.selectedEntityDisplayName || this.selectedChoiceDisplayName || 'None selected';
             const isAttributesExpanded = !this.collapsedSections.has('attributes');
             const isKeysExpanded = !this.collapsedSections.has('keys');

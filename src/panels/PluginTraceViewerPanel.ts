@@ -52,6 +52,7 @@ export class PluginTraceViewerPanel extends BasePanel {
     private autoRefreshInterval?: NodeJS.Timeout;
     private autoRefreshIntervalSeconds: number = 0; // 0 = off
     private currentFilters: { quick: string[]; advanced: FilterCondition[] } = { quick: [], advanced: [] };
+    private pendingFilterRestoration?: { quick: string[]; advanced: FilterCondition[] };
 
     public static createOrShow(extensionUri: vscode.Uri): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
@@ -148,28 +149,12 @@ export class PluginTraceViewerPanel extends BasePanel {
                         advancedCount: advancedFiltersArray.length
                     });
 
-                    // Delay filter restoration to ensure webview is fully loaded
-                    // The filters will be applied via direct webview message after a short delay
-                    setTimeout(() => {
-                        if (quickFiltersArray.length > 0) {
-                            this.componentLogger.info('Applying restored quick filters to UI', { filters: quickFiltersArray });
-                            this.postMessage({
-                                action: 'setQuickFilters',
-                                componentId: this.filterPanelComponent!.getId(),
-                                componentType: 'FilterPanel',
-                                filterIds: quickFiltersArray
-                            });
-                        }
-                        if (advancedFiltersArray.length > 0) {
-                            this.componentLogger.info('Applying restored advanced filters to UI', { filters: advancedFiltersArray });
-                            this.postMessage({
-                                action: 'setAdvancedFilters',
-                                componentId: this.filterPanelComponent!.getId(),
-                                componentType: 'FilterPanel',
-                                conditions: advancedFiltersArray
-                            });
-                        }
-                    }, 500);
+                    // Store filters to apply after webview is ready
+                    // We'll apply them in response to the 'panel-ready' event
+                    this.pendingFilterRestoration = {
+                        quick: quickFiltersArray,
+                        advanced: advancedFiltersArray
+                    };
                 }
 
                 // Query current trace level from Dynamics
@@ -394,6 +379,31 @@ export class PluginTraceViewerPanel extends BasePanel {
 
                 case 'autoRefreshChanged':
                     await this.handleAutoRefreshChange(message.interval);
+                    break;
+
+                case 'panel-ready':
+                    this.componentLogger.debug('Panel ready event received');
+                    // Apply pending filter restoration if any
+                    if (this.pendingFilterRestoration) {
+                        this.componentLogger.info('Applying pending filter restoration');
+                        if (this.pendingFilterRestoration.quick.length > 0) {
+                            this.postMessage({
+                                action: 'setQuickFilters',
+                                componentId: this.filterPanelComponent!.getId(),
+                                componentType: 'FilterPanel',
+                                filterIds: this.pendingFilterRestoration.quick
+                            });
+                        }
+                        if (this.pendingFilterRestoration.advanced.length > 0) {
+                            this.postMessage({
+                                action: 'setAdvancedFilters',
+                                componentId: this.filterPanelComponent!.getId(),
+                                componentType: 'FilterPanel',
+                                conditions: this.pendingFilterRestoration.advanced
+                            });
+                        }
+                        this.pendingFilterRestoration = undefined;
+                    }
                     break;
 
                 default:
