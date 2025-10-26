@@ -1500,34 +1500,49 @@ export class PluginTraceViewerPanel extends BasePanel {
                         <div class="detail-section">
                             <div class="detail-section-title">General</div>
                             <div class="detail-grid">
-                                <div class="detail-label">Plugin</div>
-                                <div class="detail-value">\${trace.pluginname || '<span class="empty">N/A</span>'}</div>
+                                <div class="detail-label">System Created</div>
+                                <div class="detail-value">\${trace.issystem ? 'Yes' : 'No'}</div>
 
-                                <div class="detail-label">Message</div>
+                                <div class="detail-label">Type Name</div>
+                                <div class="detail-value">\${trace.typename || '<span class="empty">N/A</span>'}</div>
+
+                                <div class="detail-label">Message Name</div>
                                 <div class="detail-value">\${trace.messagename || '<span class="empty">N/A</span>'}</div>
 
-                                <div class="detail-label">Entity</div>
-                                <div class="detail-value">\${trace.entityname || '<span class="empty">N/A</span>'}</div>
+                                <div class="detail-label">Primary Entity</div>
+                                <div class="detail-value">\${trace.entityname || '<span class="empty">none</span>'}</div>
+
+                                <div class="detail-label">Configuration</div>
+                                <div class="detail-value">\${trace.configuration || '<span class="empty">---</span>'}</div>
+
+                                <div class="detail-label">Secure Configuration</div>
+                                <div class="detail-value">\${trace.secureconfiguration || '<span class="empty">---</span>'}</div>
+
+                                <div class="detail-label">Persistence Key</div>
+                                <div class="detail-value code">\${trace.persistencekey || '<span class="empty">N/A</span>'}</div>
 
                                 <div class="detail-label">Operation Type</div>
                                 <div class="detail-value">\${trace.operationtype || '<span class="empty">N/A</span>'}</div>
 
-                                <div class="detail-label">Mode</div>
-                                <div class="detail-value">\${trace.mode === 0 ? 'Synchronous' : 'Asynchronous'}</div>
-
-                                <div class="detail-label">Depth</div>
-                                <div class="detail-value">\${trace.depth || 1}</div>
+                                <div class="detail-label">Plugin Step Id</div>
+                                <div class="detail-value code">\${trace.pluginstepid || '<span class="empty">N/A</span>'}</div>
                             </div>
                         </div>
 
                         <div class="detail-section">
-                            <div class="detail-section-title">Identifiers</div>
+                            <div class="detail-section-title">Context</div>
                             <div class="detail-grid">
-                                <div class="detail-label">Trace ID</div>
-                                <div class="detail-value code">\${trace.plugintracelogid}</div>
+                                <div class="detail-label">Depth</div>
+                                <div class="detail-value">\${trace.depth || 1}</div>
 
-                                <div class="detail-label">Correlation ID</div>
+                                <div class="detail-label">Mode</div>
+                                <div class="detail-value">\${trace.mode === 0 ? 'Synchronous' : 'Asynchronous'}</div>
+
+                                <div class="detail-label">Correlation Id</div>
                                 <div class="detail-value code">\${trace.correlationid || '<span class="empty">N/A</span>'}</div>
+
+                                <div class="detail-label">Request Id</div>
+                                <div class="detail-value code">\${trace.requestid || '<span class="empty">N/A</span>'}</div>
                             </div>
                         </div>
                     \`;
@@ -1541,23 +1556,16 @@ export class PluginTraceViewerPanel extends BasePanel {
                         <div class="detail-section">
                             <div class="detail-section-title">Performance</div>
                             <div class="detail-grid">
-                                <div class="detail-label">Start Time</div>
+                                <div class="detail-label">Execution Start Time</div>
                                 <div class="detail-value">\${new Date(trace.createdon).toLocaleString()}</div>
 
-                                <div class="detail-label">Duration</div>
-                                <div class="detail-value">\${formatDuration(trace.duration)}</div>
+                                <div class="detail-label">Execution Duration (ms)</div>
+                                <div class="detail-value">\${trace.duration || 0}</div>
 
-                                <div class="detail-label">Performance Details</div>
-                                <div class="detail-value">\${trace.performancedetails || '<span class="empty">N/A</span>'}</div>
+                                <div class="detail-label">Message Block</div>
+                                <div class="detail-value">\${trace.messageblock || '<span class="empty">---</span>'}</div>
                             </div>
                         </div>
-
-                        \${hasMessage ? \`
-                        <div class="detail-section">
-                            <div class="detail-section-title">Message Block</div>
-                            <pre class="detail-code">\${escapeHtml(trace.messageblock)}</pre>
-                        </div>
-                        \` : ''}
 
                         \${hasException ? \`
                         <div class="detail-section">
@@ -1667,7 +1675,8 @@ export class PluginTraceViewerPanel extends BasePanel {
             [
                 'css/panels/plugin-trace-viewer.css',
                 'css/components/timeline.css',
-                'css/components/split-panel.css'
+                'css/components/split-panel.css',
+                'css/components/viewers/json-viewer.css'
             ],
             [
                 'js/utils/ExportUtils.js',
