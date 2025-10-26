@@ -28,6 +28,7 @@ class FilterPanelBehavior {
             // DOM elements
             header: null,
             content: null,
+            filterCountElement: null,
             quickFiltersContainer: null,
             conditionsContainer: null,
             conditionsList: null,
@@ -94,6 +95,7 @@ class FilterPanelBehavior {
 
         instance.header = element.querySelector('.filter-panel-header');
         instance.content = element.querySelector('.filter-panel-content');
+        instance.filterCountElement = element.querySelector('[data-filter-count]');
         instance.quickFiltersContainer = element.querySelector('.quick-filters');
         instance.conditionsContainer = element.querySelector('.filter-conditions-container');
         instance.conditionsList = element.querySelector('.filter-conditions-list');
@@ -170,6 +172,26 @@ class FilterPanelBehavior {
         if (instance.collapsed && instance.content) {
             instance.content.style.display = 'none';
         }
+
+        // Initialize filter count display
+        this.updateFilterCount(instance);
+    }
+
+    /**
+     * Update filter count display
+     */
+    static updateFilterCount(instance) {
+        if (!instance.filterCountElement) return;
+
+        const totalCount = instance.activeQuickFilters.size + instance.filterConditions.length;
+
+        if (totalCount > 0) {
+            instance.filterCountElement.textContent = `(${totalCount})`;
+            instance.filterCountElement.style.display = '';
+        } else {
+            instance.filterCountElement.textContent = '';
+            instance.filterCountElement.style.display = 'none';
+        }
     }
 
     /**
@@ -182,7 +204,7 @@ class FilterPanelBehavior {
 
         const toggleIcon = instance.header.querySelector('.filter-panel-toggle');
         if (toggleIcon) {
-            toggleIcon.textContent = instance.collapsed ? '▸' : '▾';
+            toggleIcon.textContent = instance.collapsed ? '▶' : '▼';
         }
 
         if (instance.content) {
@@ -207,6 +229,9 @@ class FilterPanelBehavior {
         } else {
             instance.activeQuickFilters.delete(filterId);
         }
+
+        // Update filter count display
+        this.updateFilterCount(instance);
 
         // Auto-apply if configured
         if (instance.config.autoApplyQuickFilters) {
@@ -252,6 +277,7 @@ class FilterPanelBehavior {
 
         // Update UI state
         this.updateAddButtonState(instance);
+        this.updateFilterCount(instance);
     }
 
     /**
@@ -271,6 +297,7 @@ class FilterPanelBehavior {
 
         // Update UI state
         this.updateAddButtonState(instance);
+        this.updateFilterCount(instance);
     }
 
     /**
@@ -380,6 +407,7 @@ class FilterPanelBehavior {
 
         // Update UI
         this.updateAddButtonState(instance);
+        this.updateFilterCount(instance);
         if (instance.previewCount) {
             instance.previewCount.textContent = '';
         }
@@ -673,7 +701,7 @@ class FilterPanelBehavior {
                         }
                         const toggleIcon = instance.header?.querySelector('.filter-panel-toggle');
                         if (toggleIcon) {
-                            toggleIcon.textContent = instance.collapsed ? '▸' : '▾';
+                            toggleIcon.textContent = instance.collapsed ? '▶' : '▼';
                         }
                     }
 
@@ -706,6 +734,7 @@ class FilterPanelBehavior {
                         console.log(`FilterPanelBehavior: Checkbox ${cb.dataset.filterId} - should be checked: ${shouldBeChecked}`);
                         cb.checked = shouldBeChecked;
                     });
+                    this.updateFilterCount(instance);
                 }
                 break;
 
@@ -715,7 +744,7 @@ class FilterPanelBehavior {
                     instance.conditionsList.innerHTML = '';
                     instance.filterConditions = [];
 
-                    // Add conditions
+                    // Add conditions (updateFilterCount is called inside addCondition)
                     message.conditions.forEach(condition => {
                         this.addCondition(instance, condition);
                     });

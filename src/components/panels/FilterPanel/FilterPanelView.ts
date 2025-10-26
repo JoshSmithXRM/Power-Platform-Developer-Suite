@@ -9,7 +9,7 @@ export class FilterPanelView {
      * Generate complete filter panel HTML
      */
     static generateHTML(config: FilterPanelConfig): string {
-        const collapseIcon = config.defaultCollapsed ? '▸' : '▾';
+        const collapseIcon = config.defaultCollapsed ? '▶' : '▼';
         const contentStyle = config.defaultCollapsed ? 'style="display: none;"' : '';
 
         return `
@@ -23,6 +23,7 @@ export class FilterPanelView {
                     <div class="filter-panel-header" data-toggle="collapse">
                         <span class="filter-panel-toggle">${collapseIcon}</span>
                         <span class="filter-panel-title">Filters</span>
+                        <span class="filter-panel-count" data-filter-count></span>
                     </div>
                 ` : ''}
                 <div class="filter-panel-content" ${contentStyle}>

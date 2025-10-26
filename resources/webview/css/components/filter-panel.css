@@ -28,17 +28,25 @@
 }
 
 .filter-panel-toggle {
-    font-size: 14px;
+    font-size: 12px;
     color: var(--vscode-foreground);
-    font-family: monospace;
-    min-width: 14px;
+    min-width: 12px;
     text-align: center;
+    font-weight: bold;
+    line-height: 1;
 }
 
 .filter-panel-title {
     font-weight: 600;
     color: var(--vscode-textLink-foreground);
     font-size: 13px;
+}
+
+.filter-panel-count {
+    margin-left: 4px;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    font-weight: normal;
 }
 
 /* Content */

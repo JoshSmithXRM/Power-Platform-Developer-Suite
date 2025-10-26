@@ -11,6 +11,7 @@ export interface PanelState {
     autoRefreshIntervalSeconds?: number;
     splitRatio?: number;
     rightPanelVisible?: boolean;
+    filterPanelCollapsed?: boolean;
 }
 
 export interface StateChangedEvent {

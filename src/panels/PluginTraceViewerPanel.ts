@@ -178,6 +178,23 @@ export class PluginTraceViewerPanel extends BasePanel {
                     };
                 }
 
+                // Restore filter panel collapsed state
+                if (typeof cachedState?.filterPanelCollapsed === 'boolean') {
+                    this.componentLogger.info('Restoring filter panel collapsed state', {
+                        collapsed: cachedState.filterPanelCollapsed
+                    });
+                    // Send message to webview after panel-ready
+                    setTimeout(() => {
+                        this.postMessage({
+                            action: 'componentStateChange',
+                            componentId: 'pluginTrace-filterPanel',
+                            state: {
+                                collapsed: cachedState.filterPanelCollapsed
+                            }
+                        });
+                    }, 100);
+                }
+
                 // Query current trace level from Dynamics
                 await this.handleGetTraceLevel(this.selectedEnvironmentId);
 
@@ -455,8 +472,8 @@ export class PluginTraceViewerPanel extends BasePanel {
                     break;
 
                 case 'filterPanelCollapsed':
-                    // Handle filter panel collapse/expand state if needed
-                    this.componentLogger.debug('Filter panel collapsed state changed', { collapsed: message.data?.collapsed });
+                    this.componentLogger.info('✅ Filter panel collapsed state changed', { collapsed: message.data?.collapsed });
+                    await this.updateState({ filterPanelCollapsed: message.data?.collapsed });
                     break;
 
                 default:
