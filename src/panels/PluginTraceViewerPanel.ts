@@ -120,6 +120,14 @@ export class PluginTraceViewerPanel extends BasePanel {
                 // Restore state from cache
                 const cachedState = await this._stateService.getPanelState(PluginTraceViewerPanel.viewType);
 
+                this.componentLogger.info('📦 Loaded cached state', {
+                    hasState: !!cachedState,
+                    splitRatio: cachedState?.splitRatio,
+                    rightPanelVisible: cachedState?.rightPanelVisible,
+                    hasFilters: !!cachedState?.filters,
+                    fullState: cachedState
+                });
+
                 // Restore auto-refresh interval from cached state
                 if (cachedState?.autoRefreshIntervalSeconds) {
                     this.autoRefreshIntervalSeconds = cachedState.autoRefreshIntervalSeconds;
@@ -1369,6 +1377,20 @@ export class PluginTraceViewerPanel extends BasePanel {
         // Get saved split ratio from state (default to 50)
         const savedSplitRatio = this.currentState.splitRatio || 50;
 
+        // Always start with detail panel hidden (only show when user selects a trace)
+        // But we preserve the split ratio so it opens at their preferred size
+        const rightPanelVisible = false;
+        const hiddenClass = 'split-panel-right-hidden';
+
+        this.componentLogger.info('🎨 getHtmlContent called', {
+            currentStateSplitRatio: this.currentState.splitRatio,
+            savedSplitRatio: savedSplitRatio,
+            savedRightPanelVisible: this.currentState.rightPanelVisible,
+            actualRightPanelVisible: rightPanelVisible,
+            hiddenClass: hiddenClass,
+            fullCurrentState: this.currentState
+        });
+
         const customHTML = `
             <div class="panel-container">
                 <div class="panel-controls">
@@ -1379,14 +1401,14 @@ export class PluginTraceViewerPanel extends BasePanel {
                     ${this.filterPanelComponent!.generateHTML()}
                 </div>
                 <div class="panel-content">
-                    <div id="splitPanelContainer" class="split-panel split-panel-horizontal split-panel-resizable split-panel-right-hidden"
+                    <div id="splitPanelContainer" class="split-panel split-panel-horizontal split-panel-resizable ${hiddenClass}"
                          data-component-type="SplitPanel"
                          data-component-id="plugin-trace-split-panel"
                          data-orientation="horizontal"
                          data-min-size="300"
                          data-resizable="true"
                          data-split-ratio="${savedSplitRatio}">
-                        <div id="traceTableContainer" class="split-panel-left" data-panel="left">
+                        <div id="traceTableContainer" class="split-panel-left" data-panel="left" style="${rightPanelVisible ? `width: ${savedSplitRatio}%;` : ''}">
                             ${this.dataTableComponent!.generateHTML()}
                         </div>
 
@@ -1394,7 +1416,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                             <div class="split-panel-divider-handle"></div>
                         </div>
 
-                        <div id="traceDetailContainer" class="split-panel-right trace-detail-panel" data-panel="right" style="display: none;">
+                        <div id="traceDetailContainer" class="split-panel-right trace-detail-panel" data-panel="right" style="${rightPanelVisible ? `width: ${100 - savedSplitRatio}%;` : 'display: none;'}">
                             <div class="trace-detail-header">
                                 <h3 id="detailPanelTitle">Trace Details</h3>
                                 <button id="closeDetailBtn" class="btn-icon-only" data-action="closeRightPanel" title="Close">×</button>

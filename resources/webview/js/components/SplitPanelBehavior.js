@@ -96,6 +96,11 @@ class SplitPanelBehavior {
         if (dataResizable !== undefined) {
             instance.resizable = dataResizable === 'true';
         }
+
+        const dataSplitRatio = element.dataset.splitRatio;
+        if (dataSplitRatio) {
+            instance.config.initialSplit = parseFloat(dataSplitRatio);
+        }
     }
 
     /**
@@ -129,7 +134,13 @@ class SplitPanelBehavior {
      * Initialize state
      */
     static initializeState(instance) {
-        // Set initial panel visibility
+        // Check if panel is initially hidden based on CSS class
+        const isHiddenByClass = instance.element.classList.contains('split-panel-right-hidden');
+
+        // Set initial panel visibility based on HTML state
+        instance.rightPanelVisible = !isHiddenByClass;
+
+        // Apply hidden state if needed
         if (!instance.rightPanelVisible) {
             this.hideRightPanelInternal(instance);
         }
