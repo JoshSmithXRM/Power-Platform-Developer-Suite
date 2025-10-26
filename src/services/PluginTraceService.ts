@@ -23,6 +23,7 @@ export interface PluginTraceLog {
     ownerid?: string;
     businessunitid?: string;
     organizationid?: string;
+    pluginstepid?: string;
 }
 
 export interface PluginTraceFilterOptions {
@@ -196,7 +197,8 @@ export class PluginTraceService {
             typename: log.typename || '',
             configuration: log.configuration || '',
             performancedetails: `Execution: ${log.performanceexecutionduration || 0}ms, Constructor: ${log.performanceconstructorduration || 0}ms`,
-            correlationid: log.correlationid || ''
+            correlationid: log.correlationid || '',
+            pluginstepid: log.pluginstepid || ''
         }));
 
         return traceLogs;

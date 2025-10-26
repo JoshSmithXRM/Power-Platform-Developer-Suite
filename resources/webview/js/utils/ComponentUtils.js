@@ -453,7 +453,7 @@ class ComponentUtils {
                 handler(message);
             } else {
                 // Only warn about truly unexpected actions (not informational messages)
-                const informationalActions = ['traceLevelLoaded', 'tracesLoaded', 'solutionsLoaded', 'jobsLoaded'];
+                const informationalActions = ['traceLevelLoaded', 'tracesLoaded', 'solutionsLoaded', 'jobsLoaded', 'exportTraces'];
                 if (!informationalActions.includes(message.action)) {
                     console.warn(`No handler found for action: ${message.action}`);
                 }

@@ -17,15 +17,16 @@ import { BasePanel } from './base/BasePanel';
 // UI-specific type for table display
 interface PluginTraceTableRow {
     id: string;
-    expand: string;
     status: string; // HTML badge
     createdon: string;
     duration: string;
+    operationtype: string;
     pluginname: string;
+    pluginstepid: string;
+    depth: number;
+    mode: string;
     messagename: string;
     entityname: string;
-    mode: string;
-    depth: number;
     correlationid: string;
     hasException: boolean;
 }
@@ -230,12 +231,8 @@ export class PluginTraceViewerPanel extends BasePanel {
                     icon: 'export',
                     type: 'dropdown',
                     dropdownItems: [
-                        { id: 'all-csv', label: 'Export All (CSV)' },
-                        { id: 'all-json', label: 'Export All (JSON)' },
-                        { id: 'filtered-csv', label: 'Export Filtered (CSV)' },
-                        { id: 'filtered-json', label: 'Export Filtered (JSON)' },
-                        { id: 'selected-csv', label: 'Export Selected (CSV)' },
-                        { id: 'selected-json', label: 'Export Selected (JSON)' }
+                        { id: 'csv', label: 'Export to CSV' },
+                        { id: 'json', label: 'Export to JSON' }
                     ]
                 },
                 {
@@ -330,15 +327,16 @@ export class PluginTraceViewerPanel extends BasePanel {
         this.dataTableComponent = this.componentFactory.createDataTable({
             id: 'pluginTrace-table',
             columns: [
-                { id: 'expand', field: 'expand', label: '', width: '30px', sortable: false },
-                { id: 'status', field: 'status', label: 'Status', sortable: true, width: '90px', type: 'html' },
-                { id: 'createdon', field: 'createdon', label: 'Started', sortable: true, width: '140px' },
-                { id: 'duration', field: 'duration', label: 'Duration', sortable: true, width: '90px', align: 'right' },
-                { id: 'pluginname', field: 'pluginname', label: 'Plugin', sortable: true },
+                { id: 'status', field: 'status', label: 'Status', sortable: true, width: '100px', type: 'html' },
+                { id: 'createdon', field: 'createdon', label: 'Started', sortable: true, width: '160px' },
+                { id: 'duration', field: 'duration', label: 'Duration', sortable: true, width: '80px', align: 'right' },
+                { id: 'operationtype', field: 'operationtype', label: 'Operation', sortable: true, width: '90px' },
+                { id: 'pluginname', field: 'pluginname', label: 'Plugin', sortable: true, width: '360px' },
+                { id: 'pluginstepid', field: 'pluginstepid', label: 'Step', sortable: false, width: '250px' },
+                { id: 'depth', field: 'depth', label: 'Depth', sortable: true, width: '60px', align: 'center' },
+                { id: 'mode', field: 'mode', label: 'Mode', sortable: true, width: '70px' },
                 { id: 'messagename', field: 'messagename', label: 'Message', sortable: true, width: '120px' },
-                { id: 'entityname', field: 'entityname', label: 'Entity', sortable: true, width: '120px' },
-                { id: 'mode', field: 'mode', label: 'Mode', sortable: true, width: '100px' },
-                { id: 'depth', field: 'depth', label: 'Depth', sortable: true, width: '60px', align: 'center' }
+                { id: 'entityname', field: 'entityname', label: 'Entity', sortable: true, width: '120px' }
             ],
             defaultSort: [{ column: 'createdon', direction: 'desc' }],
             stickyHeader: true,
@@ -605,6 +603,7 @@ export class PluginTraceViewerPanel extends BasePanel {
 
         // Warn if leaving environment with traces enabled
         if (this.currentTraceLevel === PluginTraceLevel.All && this.selectedEnvironmentId) {
+            const previousEnvironmentId = this.selectedEnvironmentId;
             const result = await vscode.window.showWarningMessage(
                 'Plugin traces are currently set to "All" in the previous environment. This can impact performance. Turn off traces before switching?',
                 'Turn Off & Switch',
@@ -615,7 +614,7 @@ export class PluginTraceViewerPanel extends BasePanel {
             if (result === 'Cancel') {
                 // Revert environment selector back to old environment
                 if (this.environmentSelectorComponent) {
-                    this.environmentSelectorComponent.setSelectedEnvironment(this.selectedEnvironmentId);
+                    this.environmentSelectorComponent.setSelectedEnvironment(previousEnvironmentId);
                 }
                 return;
             }
@@ -623,12 +622,13 @@ export class PluginTraceViewerPanel extends BasePanel {
             if (result === 'Turn Off & Switch') {
                 try {
                     await this.pluginTraceService.setPluginTraceLevel(
-                        this.selectedEnvironmentId,
+                        previousEnvironmentId,
                         PluginTraceLevel.Off
                     );
                     this.componentLogger.info('Turned off traces in previous environment');
                 } catch (error) {
                     this.componentLogger.error('Failed to turn off traces', error as Error);
+                    vscode.window.showErrorMessage('Failed to turn off plugin traces in previous environment');
                 }
             }
         }
@@ -812,8 +812,7 @@ export class PluginTraceViewerPanel extends BasePanel {
             case 'export':
                 this.componentLogger.info('💾 Export action triggered', { itemId });
                 if (itemId) {
-                    const [scope, format] = itemId.split('-');
-                    await this.handleExportTraces(format as 'csv' | 'json', scope as 'all' | 'filtered' | 'selected');
+                    await this.handleExportTraces(itemId as 'csv' | 'json');
                 } else {
                     this.componentLogger.warn('⚠️ No itemId for export');
                 }
@@ -944,36 +943,99 @@ export class PluginTraceViewerPanel extends BasePanel {
         }
     }
 
-    private async handleExportTraces(format: 'csv' | 'json', scope: 'all' | 'filtered' | 'selected'): Promise<void> {
-        let dataToExport: PluginTraceLog[] = [];
-
-        switch (scope) {
-            case 'all':
-            case 'filtered': // TODO: Apply current table filters
-                dataToExport = this.currentTraceData;
-                break;
-            case 'selected':
-                if (this.selectedTraceId) {
-                    const trace = this.currentTraceData.find(t => t.plugintracelogid === this.selectedTraceId);
-                    if (trace) {
-                        dataToExport = [trace];
-                    }
-                }
-                break;
-        }
+    private async handleExportTraces(format: 'csv' | 'json'): Promise<void> {
+        // Export whatever is currently loaded (filtered data)
+        const dataToExport = this.currentTraceData;
 
         if (dataToExport.length === 0) {
-            vscode.window.showWarningMessage('No traces to export');
+            vscode.window.showWarningMessage('No traces to export. Load some data first.');
             return;
         }
 
-        // Send to webview for download
-        this.postMessage({
-            action: 'exportTraces',
-            format: format,
-            data: dataToExport,
-            filename: `plugin-traces-${this.selectedEnvironmentId || 'unknown'}`
+        // Generate content
+        let content: string;
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        const defaultFilename = `plugin-traces-${this.selectedEnvironmentId || 'unknown'}-${timestamp}.${format}`;
+
+        if (format === 'csv') {
+            content = this.convertToCSV(dataToExport);
+        } else {
+            content = JSON.stringify(dataToExport, null, 2);
+        }
+
+        // Show save dialog
+        const uri = await vscode.window.showSaveDialog({
+            defaultUri: vscode.Uri.file(defaultFilename),
+            filters: format === 'csv'
+                ? { 'CSV Files': ['csv'], 'All Files': ['*'] }
+                : { 'JSON Files': ['json'], 'All Files': ['*'] }
         });
+
+        if (!uri) {
+            return; // User cancelled
+        }
+
+        // Write file
+        try {
+            await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
+            vscode.window.showInformationMessage(`Exported ${dataToExport.length} trace(s) to ${uri.fsPath}`);
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to export: ${error.message}`);
+        }
+    }
+
+    private convertToCSV(data: PluginTraceLog[]): string {
+        if (data.length === 0) return '';
+
+        // Define all columns from PluginTraceLog interface in logical order
+        const columns = [
+            'plugintracelogid',
+            'createdon',
+            'operationtype',
+            'pluginname',
+            'typename',
+            'pluginstepid',
+            'entityname',
+            'messagename',
+            'mode',
+            'stage',
+            'depth',
+            'duration',
+            'exceptiondetails',
+            'messageblock',
+            'configuration',
+            'performancedetails',
+            'correlationid',
+            'userid',
+            'initiatinguserid',
+            'ownerid',
+            'businessunitid',
+            'organizationid'
+        ];
+
+        // CSV escape function
+        const escape = (val: any): string => {
+            if (val === null || val === undefined) return '';
+            const str = String(val);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        };
+
+        // Build CSV
+        const rows: string[] = [];
+
+        // Header row
+        rows.push(columns.join(','));
+
+        // Data rows
+        data.forEach(row => {
+            const values = columns.map(col => escape((row as any)[col]));
+            rows.push(values.join(','));
+        });
+
+        return rows.join('\n');
     }
 
     private async handleDeleteTrace(traceId: string): Promise<void> {
@@ -1180,15 +1242,16 @@ export class PluginTraceViewerPanel extends BasePanel {
     private transformTracesForDisplay(traces: PluginTraceLog[]): PluginTraceTableRow[] {
         return traces.map(trace => ({
             id: trace.plugintracelogid,
-            expand: '', // For expandable rows (future feature)
             status: this.createStatusBadge(trace),
             createdon: this.formatDate(trace.createdon),
             duration: this.formatDuration(trace.duration),
+            operationtype: this.getOperationTypeLabel(trace.operationtype),
             pluginname: trace.pluginname || '',
+            pluginstepid: trace.pluginstepid || '',
+            depth: trace.depth || 0,
+            mode: this.getModeLabel(trace.mode),
             messagename: trace.messagename || '',
             entityname: trace.entityname || '',
-            mode: this.getModeLabel(trace.mode),
-            depth: trace.depth || 0,
             correlationid: trace.correlationid || '',
             hasException: !!(trace.exceptiondetails && trace.exceptiondetails.trim().length > 0)
         }));
@@ -1198,9 +1261,9 @@ export class PluginTraceViewerPanel extends BasePanel {
         const hasException = trace.exceptiondetails && trace.exceptiondetails.trim().length > 0;
 
         if (hasException) {
-            return '<span class="badge badge-error">Exception</span>';
+            return '<span class="status-badge status-error"><span class="status-badge-indicator"></span><span class="status-badge-label">Exception</span></span>';
         } else {
-            return '<span class="badge badge-success">Success</span>';
+            return '<span class="status-badge status-success"><span class="status-badge-indicator"></span><span class="status-badge-label">Success</span></span>';
         }
     }
 
@@ -1229,6 +1292,18 @@ export class PluginTraceViewerPanel extends BasePanel {
 
     private getModeLabel(mode: number): string {
         return mode === 0 ? 'Sync' : 'Async';
+    }
+
+    private getOperationTypeLabel(operationType: string): string {
+        // operationtype values: 1 = Plugin, 2 = Workflow Activity
+        switch (operationType) {
+            case '1':
+                return 'Plugin';
+            case '2':
+                return 'Workflow';
+            default:
+                return operationType || 'Unknown';
+        }
     }
 
     /**
@@ -1532,10 +1607,23 @@ export class PluginTraceViewerPanel extends BasePanel {
                             break;
 
                         case 'exportTraces':
-                            if (message.format === 'csv') {
-                                ExportUtils.exportToCSV(message.data, message.filename);
-                            } else {
-                                ExportUtils.exportToJSON(message.data, message.filename);
+                            console.log('📤 Export request received', { format: message.format, dataLength: message.data?.length });
+                            try {
+                                if (!window.ExportUtils) {
+                                    console.error('ExportUtils not loaded!');
+                                    alert('Export functionality is not available. Please reload the panel.');
+                                    return;
+                                }
+                                if (message.format === 'csv') {
+                                    ExportUtils.exportToCSV(message.data, message.filename);
+                                    console.log('✅ CSV export completed');
+                                } else if (message.format === 'json') {
+                                    ExportUtils.exportToJSON(message.data, message.filename);
+                                    console.log('✅ JSON export completed');
+                                }
+                            } catch (error) {
+                                console.error('❌ Export failed:', error);
+                                alert('Export failed: ' + error.message);
                             }
                             break;
 
@@ -1840,36 +1928,32 @@ export class PluginTraceViewerPanel extends BasePanel {
     public dispose(): void {
         this.stopAutoRefresh();
 
-        // Check if traces are enabled and warn
-        if (this.currentTraceLevel === PluginTraceLevel.All) {
+        // Always clean up the panel reference and call super.dispose
+        // (this prevents the "Webview is disposed" error on reopen)
+        super.dispose();
+        PluginTraceViewerPanel.currentPanel = undefined;
+
+        // Show warning asynchronously if traces are enabled (non-blocking)
+        if (this.currentTraceLevel === PluginTraceLevel.All && this.selectedEnvironmentId) {
+            const envId = this.selectedEnvironmentId;
             vscode.window.showWarningMessage(
-                'Plugin traces are currently set to "All". This can impact performance. Turn off traces?',
-                'Turn Off & Close',
-                'Keep Enabled & Close',
-                'Cancel'
+                'Plugin traces were set to "All" in the environment. This can impact performance. Turn off traces?',
+                'Turn Off',
+                'Keep Enabled'
             ).then(async (choice) => {
-                if (choice === 'Turn Off & Close') {
-                    if (this.selectedEnvironmentId) {
-                        try {
-                            await this.pluginTraceService.setPluginTraceLevel(
-                                this.selectedEnvironmentId,
-                                PluginTraceLevel.Off
-                            );
-                        } catch (error) {
-                            this.componentLogger.error('Failed to turn off traces', error as Error);
-                        }
+                if (choice === 'Turn Off') {
+                    try {
+                        await this.pluginTraceService.setPluginTraceLevel(
+                            envId,
+                            PluginTraceLevel.Off
+                        );
+                        vscode.window.showInformationMessage('Plugin traces turned off successfully');
+                    } catch (error) {
+                        this.componentLogger.error('Failed to turn off traces', error as Error);
+                        vscode.window.showErrorMessage('Failed to turn off plugin traces');
                     }
-                    super.dispose();
-                    PluginTraceViewerPanel.currentPanel = undefined;
-                } else if (choice === 'Keep Enabled & Close') {
-                    super.dispose();
-                    PluginTraceViewerPanel.currentPanel = undefined;
                 }
-                // Cancel = do nothing, keep panel open
             });
-        } else {
-            super.dispose();
-            PluginTraceViewerPanel.currentPanel = undefined;
         }
     }
 }
