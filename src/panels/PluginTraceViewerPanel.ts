@@ -84,8 +84,8 @@ export class PluginTraceViewerPanel extends BasePanel {
         });
 
         this.panel.onDidDispose(() => {
-            PluginTraceViewerPanel.currentPanel = undefined;
-            this.stopAutoRefresh();
+            // Call the dispose method to check trace level and warn
+            this.dispose();
         });
 
         this.componentLogger.debug('Constructor starting');
@@ -381,8 +381,11 @@ export class PluginTraceViewerPanel extends BasePanel {
                     await this.handleLoadEnvironments();
                     break;
 
+                case 'environment-changed':
                 case 'environmentChanged':
-                    await this.handleEnvironmentChanged(message.environmentId);
+                    // Handle both hyphenated and camelCase for compatibility
+                    const envId = message.data?.environmentId || message.environmentId;
+                    await this.handleEnvironmentChanged(envId);
                     break;
 
                 case 'loadTraces':
@@ -597,12 +600,25 @@ export class PluginTraceViewerPanel extends BasePanel {
     }
 
     private async handleEnvironmentChanged(environmentId: string): Promise<void> {
+        this.componentLogger.info('🔄 Environment changed', {
+            oldEnvironmentId: this.selectedEnvironmentId,
+            newEnvironmentId: environmentId
+        });
+
         this.selectedEnvironmentId = environmentId;
 
         await this.updateState({ selectedEnvironmentId: environmentId });
 
+        // Stop auto-refresh when switching environments
+        this.stopAutoRefresh();
+
+        // Get trace level for new environment
         await this.handleGetTraceLevel(environmentId);
-        await this.handleLoadTraces(environmentId);
+
+        // Load traces for new environment with current filters
+        await this.handleLoadTraces(environmentId, this.currentFilters);
+
+        this.componentLogger.info('✅ Environment change complete');
     }
 
     private async handleLoadTraces(environmentId: string, filterOptions?: any): Promise<void> {
