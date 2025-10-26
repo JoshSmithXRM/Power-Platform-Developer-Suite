@@ -133,11 +133,24 @@ export class PluginTraceViewerPanel extends BasePanel {
                 if (cachedState?.filters) {
                     const savedFilters = cachedState.filters as any;
 
+                    this.componentLogger.debug('Raw saved filters from state', {
+                        savedFilters,
+                        quickType: Array.isArray(savedFilters.quick) ? 'array' : typeof savedFilters.quick,
+                        advancedType: Array.isArray(savedFilters.advanced) ? 'array' : typeof savedFilters.advanced
+                    });
+
                     // Convert objects to arrays if needed (happens when data is serialized/deserialized)
                     const quickFiltersArray = Array.isArray(savedFilters.quick) ? savedFilters.quick :
                         (savedFilters.quick && typeof savedFilters.quick === 'object' ? Object.values(savedFilters.quick) : []);
                     const advancedFiltersArray = Array.isArray(savedFilters.advanced) ? savedFilters.advanced :
                         (savedFilters.advanced && typeof savedFilters.advanced === 'object' ? Object.values(savedFilters.advanced) : []);
+
+                    this.componentLogger.debug('Converted to arrays', {
+                        quickFiltersArray,
+                        advancedFiltersArray,
+                        quickIsArray: Array.isArray(quickFiltersArray),
+                        advancedIsArray: Array.isArray(advancedFiltersArray)
+                    });
 
                     this.currentFilters = {
                         quick: quickFiltersArray,
@@ -385,8 +398,17 @@ export class PluginTraceViewerPanel extends BasePanel {
                     this.componentLogger.debug('Panel ready event received');
                     // Apply pending filter restoration if any
                     if (this.pendingFilterRestoration) {
-                        this.componentLogger.info('Applying pending filter restoration');
+                        this.componentLogger.info('Applying pending filter restoration', {
+                            pendingFilters: this.pendingFilterRestoration,
+                            quickLength: this.pendingFilterRestoration.quick.length,
+                            advancedLength: this.pendingFilterRestoration.advanced.length,
+                            quickIsArray: Array.isArray(this.pendingFilterRestoration.quick),
+                            advancedIsArray: Array.isArray(this.pendingFilterRestoration.advanced)
+                        });
                         if (this.pendingFilterRestoration.quick.length > 0) {
+                            this.componentLogger.info('Sending setQuickFilters message', {
+                                filterIds: this.pendingFilterRestoration.quick
+                            });
                             this.postMessage({
                                 action: 'setQuickFilters',
                                 componentId: this.filterPanelComponent!.getId(),
@@ -395,6 +417,9 @@ export class PluginTraceViewerPanel extends BasePanel {
                             });
                         }
                         if (this.pendingFilterRestoration.advanced.length > 0) {
+                            this.componentLogger.info('Sending setAdvancedFilters message', {
+                                conditions: this.pendingFilterRestoration.advanced
+                            });
                             this.postMessage({
                                 action: 'setAdvancedFilters',
                                 componentId: this.filterPanelComponent!.getId(),
