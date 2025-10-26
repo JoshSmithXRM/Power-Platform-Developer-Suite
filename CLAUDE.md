@@ -96,6 +96,31 @@ this.dataTable.setData(newData);  // Triggers event bridge automatically
 
 ❌ **DON'T use** `updateWebview()` - causes full HTML regeneration
 
+## Message Naming Convention
+
+**CRITICAL**: All message commands MUST use **kebab-case** (hyphens), NOT camelCase:
+
+```typescript
+// ✅ CORRECT
+case 'environment-changed':
+case 'environment-selected':
+case 'component-event':
+case 'filter-panel-collapsed':
+
+// ❌ WRONG
+case 'environmentChanged':
+case 'componentEvent':
+```
+
+**Environment Changes**: ALWAYS handle BOTH cases:
+```typescript
+case 'environment-selected':
+case 'environment-changed':
+    const envId = message.data?.environmentId || message.environmentId;
+    await this.handleEnvironmentChanged(envId);
+    break;
+```
+
 ## Data Flow
 
 ```typescript

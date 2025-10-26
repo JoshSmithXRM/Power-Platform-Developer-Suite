@@ -602,8 +602,39 @@ export class PluginTraceViewerPanel extends BasePanel {
     private async handleEnvironmentChanged(environmentId: string): Promise<void> {
         this.componentLogger.info('🔄 Environment changed', {
             oldEnvironmentId: this.selectedEnvironmentId,
-            newEnvironmentId: environmentId
+            newEnvironmentId: environmentId,
+            currentTraceLevel: this.currentTraceLevel
         });
+
+        // Warn if leaving environment with traces enabled
+        if (this.currentTraceLevel === PluginTraceLevel.All && this.selectedEnvironmentId) {
+            const result = await vscode.window.showWarningMessage(
+                'Plugin traces are currently set to "All" in the previous environment. This can impact performance. Turn off traces before switching?',
+                'Turn Off & Switch',
+                'Keep Enabled & Switch',
+                'Cancel'
+            );
+
+            if (result === 'Cancel') {
+                // Revert environment selector back to old environment
+                if (this.environmentSelectorComponent) {
+                    this.environmentSelectorComponent.setSelectedEnvironment(this.selectedEnvironmentId);
+                }
+                return;
+            }
+
+            if (result === 'Turn Off & Switch') {
+                try {
+                    await this.pluginTraceService.setPluginTraceLevel(
+                        this.selectedEnvironmentId,
+                        PluginTraceLevel.Off
+                    );
+                    this.componentLogger.info('Turned off traces in previous environment');
+                } catch (error) {
+                    this.componentLogger.error('Failed to turn off traces', error as Error);
+                }
+            }
+        }
 
         this.selectedEnvironmentId = environmentId;
 
@@ -611,6 +642,11 @@ export class PluginTraceViewerPanel extends BasePanel {
 
         // Stop auto-refresh when switching environments
         this.stopAutoRefresh();
+
+        // Close detail panel when switching environments
+        this.postMessage({
+            action: 'closeDetailPanel'
+        });
 
         // Get trace level for new environment
         await this.handleGetTraceLevel(environmentId);
@@ -1503,6 +1539,11 @@ export class PluginTraceViewerPanel extends BasePanel {
                             showTraceDetailPanel(message.trace, message.relatedTraces);
                             break;
 
+                        case 'closeDetailPanel':
+                            console.log('🚪 Closing detail panel');
+                            closeDetailPanel();
+                            break;
+
                         case 'exportTraces':
                             if (message.format === 'csv') {
                                 ExportUtils.exportToCSV(message.data, message.filename);
@@ -1759,6 +1800,28 @@ export class PluginTraceViewerPanel extends BasePanel {
                     }
 
                     return String(obj);
+                }
+
+                function closeDetailPanel() {
+                    console.log('🚪 closeDetailPanel called');
+
+                    const splitContainer = document.getElementById('splitPanelContainer');
+
+                    if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('plugin-trace-split-panel')) {
+                        console.log('Closing right panel via SplitPanelBehavior');
+                        const instance = window.SplitPanelBehavior.instances.get('plugin-trace-split-panel');
+                        window.SplitPanelBehavior.closeRightPanel(instance);
+                        console.log('✅ Right panel closed');
+                    } else {
+                        console.warn('SplitPanelBehavior not found, falling back to direct DOM manipulation');
+                        const detailPanel = document.getElementById('traceDetailContainer');
+                        if (detailPanel) {
+                            detailPanel.style.display = 'none';
+                        }
+                        if (splitContainer) {
+                            splitContainer.classList.add('split-panel-right-hidden');
+                        }
+                    }
                 }
             </script>
         `;
