@@ -1109,8 +1109,36 @@ export class PluginTraceViewerPanel extends BasePanel {
         }
 
         // Handle quick filters
-        if (filters.quick && filters.quick.includes('exceptionOnly')) {
-            serviceFilters.exceptionOnly = true;
+        if (filters.quick && Array.isArray(filters.quick)) {
+            filters.quick.forEach((filterId: string) => {
+                switch (filterId) {
+                    case 'exceptionOnly':
+                        serviceFilters.exceptionOnly = true;
+                        break;
+                    case 'lastHour':
+                        // Get date from 1 hour ago
+                        const oneHourAgo = new Date();
+                        oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+                        serviceFilters.fromDate = oneHourAgo.toISOString();
+                        break;
+                    case 'last24h':
+                        // Get date from 24 hours ago
+                        const oneDayAgo = new Date();
+                        oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+                        serviceFilters.fromDate = serviceFilters.fromDate
+                            ? (new Date(serviceFilters.fromDate) > oneDayAgo ? serviceFilters.fromDate : oneDayAgo.toISOString())
+                            : oneDayAgo.toISOString();
+                        break;
+                    case 'today':
+                        // Get start of today
+                        const startOfToday = new Date();
+                        startOfToday.setHours(0, 0, 0, 0);
+                        serviceFilters.fromDate = serviceFilters.fromDate
+                            ? (new Date(serviceFilters.fromDate) > startOfToday ? serviceFilters.fromDate : startOfToday.toISOString())
+                            : startOfToday.toISOString();
+                        break;
+                }
+            });
         }
 
         // Handle advanced filters
