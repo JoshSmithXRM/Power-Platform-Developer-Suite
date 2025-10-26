@@ -206,8 +206,8 @@ export class FilterPanelView {
             `;
         }
 
-        // isEmpty / isNotEmpty don't need value input
-        if (operator === 'isEmpty' || operator === 'isNotEmpty') {
+        // isNull / isNotNull don't need value input
+        if (operator === 'isNull' || operator === 'isNotNull') {
             return `<span class="filter-no-value">No value needed</span>`;
         }
 

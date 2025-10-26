@@ -250,7 +250,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                 {
                     id: 'exceptionOnly',
                     label: 'Exception Only',
-                    conditions: [{ id: 'qf1', field: 'exceptiondetails', operator: 'isNotEmpty', value: true, logicalOperator: 'AND' }]
+                    conditions: [{ id: 'qf1', field: 'exceptiondetails', operator: 'isNotNull', value: true, logicalOperator: 'AND' }]
                 },
                 {
                     id: 'lastHour',
@@ -286,7 +286,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                     ]
                 },
                 { field: 'correlationid', label: 'Correlation ID', type: 'text', operators: ['equals', 'contains'] },
-                { field: 'exceptiondetails', label: 'Has Exception', type: 'boolean', operators: ['isNotEmpty', 'isEmpty'] }
+                { field: 'exceptiondetails', label: 'Exception Details', type: 'text', operators: ['contains', 'isNotNull', 'isNull'] }
             ],
             showPreviewCount: true,
             maxConditions: 10
@@ -540,6 +540,11 @@ export class PluginTraceViewerPanel extends BasePanel {
 
             // Convert filters to service format
             const serviceFilters = this.convertFiltersToServiceFormat(filterOptions || this.currentFilters);
+
+            this.componentLogger.info('🔍 Loading traces with filters', {
+                inputFilters: filterOptions || this.currentFilters,
+                serviceFilters: serviceFilters
+            });
 
             // Fetch traces
             const traces = await this.pluginTraceService.getPluginTraceLogs(environmentId, serviceFilters);
@@ -1099,99 +1104,206 @@ export class PluginTraceViewerPanel extends BasePanel {
         return mode === 0 ? 'Sync' : 'Async';
     }
 
+    /**
+     * Build an OData filter condition from a single filter
+     */
+    private buildODataCondition(condition: FilterCondition): string {
+        const field = condition.field;
+        const operator = condition.operator;
+        const value = condition.value;
+
+        switch (field) {
+            case 'pluginname':
+                if (operator === 'contains') {
+                    return `contains(typename,'${value}')`;
+                } else if (operator === 'equals') {
+                    return `typename eq '${value}'`;
+                } else if (operator === 'startsWith') {
+                    return `startswith(typename,'${value}')`;
+                } else if (operator === 'endsWith') {
+                    return `endswith(typename,'${value}')`;
+                }
+                break;
+
+            case 'entityname':
+                if (operator === 'contains') {
+                    return `contains(primaryentity,'${value}')`;
+                } else if (operator === 'equals') {
+                    return `primaryentity eq '${value}'`;
+                } else if (operator === 'startsWith') {
+                    return `startswith(primaryentity,'${value}')`;
+                }
+                break;
+
+            case 'messagename':
+                if (operator === 'contains') {
+                    return `contains(messagename,'${value}')`;
+                } else if (operator === 'equals') {
+                    return `messagename eq '${value}'`;
+                }
+                break;
+
+            case 'duration':
+                if (operator === '>') {
+                    return `performanceexecutionduration gt ${value}`;
+                } else if (operator === '<') {
+                    return `performanceexecutionduration lt ${value}`;
+                } else if (operator === '>=') {
+                    return `performanceexecutionduration ge ${value}`;
+                } else if (operator === '<=') {
+                    return `performanceexecutionduration le ${value}`;
+                } else if (operator === 'between' && condition.value2) {
+                    return `(performanceexecutionduration ge ${value} and performanceexecutionduration le ${condition.value2})`;
+                }
+                break;
+
+            case 'createdon':
+                if (operator === '>') {
+                    const date = new Date(value);
+                    date.setMilliseconds(date.getMilliseconds() + 1);
+                    return `createdon ge ${date.toISOString()}`;
+                } else if (operator === '<') {
+                    const date = new Date(value);
+                    date.setMilliseconds(date.getMilliseconds() - 1);
+                    return `createdon le ${date.toISOString()}`;
+                } else if (operator === '>=') {
+                    return `createdon ge ${value}`;
+                } else if (operator === '<=') {
+                    return `createdon le ${value}`;
+                } else if (operator === 'between' && condition.value2) {
+                    return `(createdon ge ${value} and createdon le ${condition.value2})`;
+                }
+                break;
+
+            case 'depth':
+                if (operator === 'equals') {
+                    return `depth eq ${value}`;
+                } else if (operator === '>') {
+                    return `depth gt ${value}`;
+                } else if (operator === '<') {
+                    return `depth lt ${value}`;
+                }
+                break;
+
+            case 'mode':
+                if (operator === 'equals') {
+                    return `mode eq ${value}`;
+                }
+                break;
+
+            case 'exceptiondetails':
+                if (operator === 'isNotNull') {
+                    return `exceptiondetails ne null`;
+                } else if (operator === 'isNull') {
+                    return `exceptiondetails eq null`;
+                } else if (operator === 'contains') {
+                    return `contains(exceptiondetails,'${value}')`;
+                }
+                break;
+        }
+
+        this.componentLogger.warn('Unsupported filter condition', { field, operator, value });
+        return '';
+    }
+
+    /**
+     * Build OData filter string from advanced filters with OR/AND logic
+     */
+    private buildODataFilterString(advancedFilters: FilterCondition[]): string {
+        if (!advancedFilters || advancedFilters.length === 0) {
+            return '';
+        }
+
+        const conditions: string[] = [];
+
+        for (let i = 0; i < advancedFilters.length; i++) {
+            const condition = advancedFilters[i];
+            const odataCondition = this.buildODataCondition(condition);
+
+            if (odataCondition) {
+                if (i === 0) {
+                    // First condition - no logical operator prefix
+                    conditions.push(odataCondition);
+                } else {
+                    // Subsequent conditions - use the PREVIOUS condition's logical operator
+                    const previousCondition = advancedFilters[i - 1];
+                    const logicalOp = previousCondition.logicalOperator || 'AND';
+                    conditions.push(`${logicalOp.toLowerCase()} ${odataCondition}`);
+                }
+            }
+        }
+
+        return conditions.join(' ');
+    }
+
     private convertFiltersToServiceFormat(filters: any): any {
         const serviceFilters: any = {
             top: 100 // Default limit
         };
 
         if (!filters) {
+            this.componentLogger.info('No filters provided, using defaults');
             return serviceFilters;
         }
 
-        // Handle quick filters
+        this.componentLogger.info('🔄 Converting filters', { inputFilters: filters });
+
+        const odataConditions: string[] = [];
+
+        // Handle quick filters - convert to OData conditions
         if (filters.quick && Array.isArray(filters.quick)) {
+            this.componentLogger.info('Processing quick filters', { quickFilters: filters.quick });
             filters.quick.forEach((filterId: string) => {
                 switch (filterId) {
                     case 'exceptionOnly':
-                        serviceFilters.exceptionOnly = true;
+                        odataConditions.push('exceptiondetails ne null');
+                        this.componentLogger.debug('Added exceptionOnly OData condition');
                         break;
                     case 'lastHour':
-                        // Get date from 1 hour ago
                         const oneHourAgo = new Date();
                         oneHourAgo.setHours(oneHourAgo.getHours() - 1);
-                        serviceFilters.fromDate = oneHourAgo.toISOString();
+                        odataConditions.push(`createdon ge ${oneHourAgo.toISOString()}`);
+                        this.componentLogger.debug('Added lastHour OData condition', { date: oneHourAgo.toISOString() });
                         break;
                     case 'last24h':
-                        // Get date from 24 hours ago
                         const oneDayAgo = new Date();
                         oneDayAgo.setHours(oneDayAgo.getHours() - 24);
-                        serviceFilters.fromDate = serviceFilters.fromDate
-                            ? (new Date(serviceFilters.fromDate) > oneDayAgo ? serviceFilters.fromDate : oneDayAgo.toISOString())
-                            : oneDayAgo.toISOString();
+                        odataConditions.push(`createdon ge ${oneDayAgo.toISOString()}`);
+                        this.componentLogger.debug('Added last24h OData condition', { date: oneDayAgo.toISOString() });
                         break;
                     case 'today':
-                        // Get start of today
                         const startOfToday = new Date();
                         startOfToday.setHours(0, 0, 0, 0);
-                        serviceFilters.fromDate = serviceFilters.fromDate
-                            ? (new Date(serviceFilters.fromDate) > startOfToday ? serviceFilters.fromDate : startOfToday.toISOString())
-                            : startOfToday.toISOString();
+                        odataConditions.push(`createdon ge ${startOfToday.toISOString()}`);
+                        this.componentLogger.debug('Added today OData condition', { date: startOfToday.toISOString() });
                         break;
                 }
             });
         }
 
-        // Handle advanced filters
+        // Handle advanced filters - build OData filter string with OR/AND logic
         if (filters.advanced && filters.advanced.length > 0) {
-            this.componentLogger.info('Processing advanced filters', { count: filters.advanced.length, filters: filters.advanced });
-
-            filters.advanced.forEach((condition: FilterCondition) => {
-                // Map filter conditions to service parameters
-                const field = condition.field;
-                const operator = condition.operator;
-                const value = condition.value;
-
-                this.componentLogger.debug('Processing filter condition', { field, operator, value });
-
-                switch (field) {
-                    case 'pluginname':
-                        if (operator === 'contains') {
-                            serviceFilters.pluginName = value;
-                        }
-                        break;
-                    case 'entityname':
-                        if (operator === 'contains') {
-                            serviceFilters.entityName = value;
-                        }
-                        break;
-                    case 'exceptiondetails':
-                        if (operator === 'isNotEmpty') {
-                            serviceFilters.exceptionOnly = true;
-                        }
-                        break;
-                    case 'createdon':
-                        // Handle date filters
-                        if (operator === '>=') {
-                            serviceFilters.fromDate = value;
-                        } else if (operator === '<=') {
-                            serviceFilters.toDate = value;
-                        } else if (operator === '>') {
-                            // Greater than - add 1ms to make it work like >=
-                            const date = new Date(value);
-                            date.setMilliseconds(date.getMilliseconds() + 1);
-                            serviceFilters.fromDate = date.toISOString();
-                        } else if (operator === '<') {
-                            // Less than - subtract 1ms to make it work like <=
-                            const date = new Date(value);
-                            date.setMilliseconds(date.getMilliseconds() - 1);
-                            serviceFilters.toDate = date.toISOString();
-                        }
-                        break;
-                    // Add more mappings as needed
-                }
+            this.componentLogger.info('Processing advanced filters with OR/AND logic', {
+                count: filters.advanced.length,
+                filters: filters.advanced
             });
 
-            this.componentLogger.info('Converted filters to service format', { serviceFilters });
+            const advancedODataFilter = this.buildODataFilterString(filters.advanced);
+            if (advancedODataFilter) {
+                // Wrap advanced filters in parentheses if there are multiple conditions
+                if (filters.advanced.length > 1) {
+                    odataConditions.push(`(${advancedODataFilter})`);
+                } else {
+                    odataConditions.push(advancedODataFilter);
+                }
+                this.componentLogger.debug('Built advanced OData filter', { advancedODataFilter });
+            }
+        }
+
+        // Combine all OData conditions with AND (quick filters AND advanced filters)
+        if (odataConditions.length > 0) {
+            serviceFilters.odataFilter = odataConditions.join(' and ');
+            this.componentLogger.info('✅ Built complete OData filter', { odataFilter: serviceFilters.odataFilter });
         }
 
         return serviceFilters;

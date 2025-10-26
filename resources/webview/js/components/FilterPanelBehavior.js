@@ -354,7 +354,7 @@ class FilterPanelBehavior {
         // Validate conditions
         const validConditions = conditions.filter(c => {
             if (!c.field || !c.operator) return false;
-            if (c.operator !== 'isEmpty' && c.operator !== 'isNotEmpty' && !c.value) return false;
+            if (c.operator !== 'isNull' && c.operator !== 'isNotNull' && !c.value) return false;
             return true;
         });
 
@@ -503,8 +503,8 @@ class FilterPanelBehavior {
      * Generate value input HTML based on field type and operator
      */
     static generateValueInputHTML(fieldConfig, operator, value) {
-        // isEmpty / isNotEmpty don't need value input
-        if (operator === 'isEmpty' || operator === 'isNotEmpty') {
+        // isNull / isNotNull don't need value input
+        if (operator === 'isNull' || operator === 'isNotNull') {
             return `<span class="filter-no-value">No value needed</span>`;
         }
 
@@ -599,8 +599,8 @@ class FilterPanelBehavior {
             '>=': 'Greater Than or Equal',
             '<=': 'Less Than or Equal',
             'between': 'Between',
-            'isNotEmpty': 'Is Not Empty',
-            'isEmpty': 'Is Empty'
+            'isNotNull': 'Contains data',
+            'isNull': 'Does not contain data'
         };
         return labels[operator] || operator;
     }

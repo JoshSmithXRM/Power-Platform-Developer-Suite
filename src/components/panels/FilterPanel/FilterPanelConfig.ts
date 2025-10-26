@@ -17,8 +17,8 @@ export type FilterOperator =
     | '>='
     | '<='
     | 'between'
-    | 'isNotEmpty'
-    | 'isEmpty';
+    | 'isNotNull'
+    | 'isNull';
 
 export interface FilterCondition {
     id: string; // Unique ID for UI tracking
@@ -74,15 +74,15 @@ export const OPERATOR_LABELS: Record<FilterOperator, string> = {
     '>=': 'Greater Than or Equal',
     '<=': 'Less Than or Equal',
     'between': 'Between',
-    'isNotEmpty': 'Is Not Empty',
-    'isEmpty': 'Is Empty'
+    'isNotNull': 'Contains data',
+    'isNull': 'Does not contain data'
 };
 
 /**
  * Default operators by field type
  */
 export const DEFAULT_OPERATORS_BY_TYPE: Record<string, FilterOperator[]> = {
-    'text': ['contains', 'equals', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'],
+    'text': ['contains', 'equals', 'startsWith', 'endsWith', 'isNull', 'isNotNull'],
     'number': ['equals', '>', '<', '>=', '<=', 'between'],
     'datetime': ['equals', '>', '<', '>=', '<=', 'between'],
     'select': ['equals', 'notEquals'],

@@ -33,6 +33,7 @@ export interface PluginTraceFilterOptions {
     exceptionOnly?: boolean;
     top?: number;
     orderBy?: string;
+    odataFilter?: string; // Raw OData filter string for complex queries (OR/AND logic)
 }
 
 export enum PluginTraceLevel {
@@ -103,30 +104,47 @@ export class PluginTraceService {
         url += `?$select=${selectFields.join(',')}`;
 
         // Add filters
-        const filters: string[] = [];
+        this.logger.info('📋 Building OData filters', { filterOptions });
 
-        if (filterOptions.fromDate) {
-            filters.push(`createdon ge ${filterOptions.fromDate}`);
-        }
+        // If raw OData filter is provided, use it directly (for complex OR/AND logic)
+        if (filterOptions.odataFilter) {
+            url += `&$filter=${filterOptions.odataFilter}`;
+            this.logger.info('✅ Applied raw OData filter', { odataFilter: filterOptions.odataFilter });
+        } else {
+            // Otherwise, build filter from individual properties (legacy simple AND logic)
+            const filters: string[] = [];
 
-        if (filterOptions.toDate) {
-            filters.push(`createdon le ${filterOptions.toDate}`);
-        }
+            if (filterOptions.fromDate) {
+                filters.push(`createdon ge ${filterOptions.fromDate}`);
+                this.logger.debug('Added fromDate filter', { fromDate: filterOptions.fromDate });
+            }
 
-        if (filterOptions.pluginName) {
-            filters.push(`contains(typename,'${filterOptions.pluginName}')`);
-        }
+            if (filterOptions.toDate) {
+                filters.push(`createdon le ${filterOptions.toDate}`);
+                this.logger.debug('Added toDate filter', { toDate: filterOptions.toDate });
+            }
 
-        if (filterOptions.entityName) {
-            filters.push(`contains(primaryentity,'${filterOptions.entityName}')`);
-        }
+            if (filterOptions.pluginName) {
+                filters.push(`contains(typename,'${filterOptions.pluginName}')`);
+                this.logger.debug('Added pluginName filter', { pluginName: filterOptions.pluginName });
+            }
 
-        if (filterOptions.exceptionOnly) {
-            filters.push(`exceptiondetails ne ''`);
-        }
+            if (filterOptions.entityName) {
+                filters.push(`contains(primaryentity,'${filterOptions.entityName}')`);
+                this.logger.debug('Added entityName filter', { entityName: filterOptions.entityName });
+            }
 
-        if (filters.length > 0) {
-            url += `&$filter=${filters.join(' and ')}`;
+            if (filterOptions.exceptionOnly) {
+                filters.push(`exceptiondetails ne ''`);
+                this.logger.debug('Added exceptionOnly filter');
+            }
+
+            if (filters.length > 0) {
+                url += `&$filter=${filters.join(' and ')}`;
+                this.logger.info('✅ Applied filters to URL', { filterString: filters.join(' and ') });
+            } else {
+                this.logger.info('ℹ️ No filters applied');
+            }
         }
 
         // Add ordering (most recent first by default)
