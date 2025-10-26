@@ -302,14 +302,23 @@ class SplitPanelBehavior {
      * Show right panel
      */
     static showRightPanel(instance) {
-        if (instance.rightPanelVisible) return;
+        console.log('🔧 showRightPanel called', {
+            rightPanelVisible: instance.rightPanelVisible,
+            element: instance.element,
+            leftPanel: instance.leftPanel,
+            rightPanel: instance.rightPanel
+        });
 
+        // ALWAYS show the panel, even if state says it's visible (fixes state sync issues)
+        console.log('✅ Showing right panel (forced)');
         instance.rightPanelVisible = true;
         instance.element.classList.remove('split-panel-right-hidden');
+        instance.rightPanel.classList.remove('hidden'); // Remove any 'hidden' class
         instance.rightPanel.style.display = '';
 
         // Reset to initial split
         const initialSplit = instance.config.initialSplit || 50;
+        console.log('📏 Setting split ratio:', initialSplit);
         if (instance.orientation === 'horizontal') {
             instance.leftPanel.style.width = `${initialSplit}%`;
             instance.rightPanel.style.width = `${100 - initialSplit}%`;
@@ -318,6 +327,7 @@ class SplitPanelBehavior {
             instance.rightPanel.style.height = `${100 - initialSplit}%`;
         }
 
+        console.log('📢 Notifying Extension Host: rightPanelOpened');
         // Notify Extension Host
         this.sendMessage(instance, 'rightPanelOpened', {
             rightPanelVisible: true

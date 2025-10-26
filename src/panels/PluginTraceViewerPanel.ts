@@ -1403,8 +1403,11 @@ export class PluginTraceViewerPanel extends BasePanel {
                 window.addEventListener('message', (event) => {
                     const message = event.data;
 
+                    console.log('📨 Inline message handler received:', message.action);
+
                     switch (message.action) {
                         case 'showTraceDetails':
+                            console.log('🎯 Showing trace detail panel', message);
                             showTraceDetailPanel(message.trace, message.relatedTraces);
                             break;
 
@@ -1423,11 +1426,20 @@ export class PluginTraceViewerPanel extends BasePanel {
                 });
 
                 function showTraceDetailPanel(trace, relatedTraces) {
+                    console.log('📋 showTraceDetailPanel called', { trace, relatedTraces });
+
                     const detailPanel = document.getElementById('traceDetailContainer');
                     const splitContainer = document.getElementById('splitPanelContainer');
 
+                    console.log('🔍 Elements found:', {
+                        detailPanel: !!detailPanel,
+                        splitContainer: !!splitContainer,
+                        hasSplitPanelBehavior: !!window.SplitPanelBehavior
+                    });
+
                     // Initialize split panel behavior if not already initialized
                     if (window.SplitPanelBehavior && !window.SplitPanelBehavior.instances.has('plugin-trace-split-panel')) {
+                        console.log('🎬 Initializing SplitPanelBehavior');
                         window.SplitPanelBehavior.initialize(
                             'plugin-trace-split-panel',
                             {
@@ -1439,13 +1451,19 @@ export class PluginTraceViewerPanel extends BasePanel {
                             },
                             splitContainer
                         );
+                        console.log('✅ SplitPanelBehavior initialized');
+                    } else {
+                        console.log('ℹ️ SplitPanelBehavior already initialized or not available');
                     }
 
                     // Show the right panel using split panel behavior
                     if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('plugin-trace-split-panel')) {
+                        console.log('📂 Showing right panel via SplitPanelBehavior');
                         const instance = window.SplitPanelBehavior.instances.get('plugin-trace-split-panel');
                         window.SplitPanelBehavior.showRightPanel(instance);
+                        console.log('✅ Right panel shown');
                     } else {
+                        console.log('⚠️ Fallback: showing detail panel directly');
                         // Fallback if split panel behavior isn't available
                         detailPanel.style.display = 'flex';
                     }
