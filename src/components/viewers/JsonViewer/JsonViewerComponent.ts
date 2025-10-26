@@ -1,4 +1,5 @@
 import { BaseComponent } from '../../base/BaseComponent';
+
 import { JsonViewerConfig, DEFAULT_JSON_VIEWER_CONFIG } from './JsonViewerConfig';
 import { JsonViewerView } from './JsonViewerView';
 

@@ -1315,7 +1315,7 @@ export class MetadataBrowserPanel extends BasePanel {
         }
     }
 
-    private async handleOpenAttributeInMaker(rowData: any): Promise<void> {
+    private async handleOpenAttributeInMaker(_rowData: any): Promise<void> {
         try {
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
             if (!selectedEnvironment || !selectedEnvironment.environmentId || !this.selectedEntityMetadataId) {

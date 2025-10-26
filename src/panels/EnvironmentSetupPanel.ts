@@ -4,7 +4,7 @@ import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
 import { ComponentFactory } from '../factories/ComponentFactory';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
-import { EnvironmentConnection, PowerPlatformSettings } from '../models/PowerPlatformSettings';
+import { EnvironmentConnection } from '../models/PowerPlatformSettings';
 import { AuthenticationMethod } from '../models/AuthenticationMethod';
 
 import { BasePanel } from './base/BasePanel';
@@ -313,7 +313,7 @@ export class EnvironmentSetupPanel extends BasePanel {
                 location: vscode.ProgressLocation.Notification,
                 title: "Testing connection...",
                 cancellable: false
-            }, async (progress) => {
+            }, async (_progress) => {
                 try {
                     // Create a temporary in-memory environment for testing (don't save to storage)
                     const testEnv: EnvironmentConnection = {

@@ -375,11 +375,12 @@ export class PluginTraceViewerPanel extends BasePanel {
                     break;
 
                 case 'environment-changed':
-                case 'environmentChanged':
+                case 'environmentChanged': {
                     // Handle both hyphenated and camelCase for compatibility
                     const envId = message.data?.environmentId || message.environmentId;
                     await this.handleEnvironmentChanged(envId);
                     break;
+                }
 
                 case 'loadTraces':
                     await this.handleLoadTraces(message.environmentId, message.filterOptions);
@@ -1461,24 +1462,27 @@ export class PluginTraceViewerPanel extends BasePanel {
                         odataConditions.push('exceptiondetails ne null');
                         this.componentLogger.debug('Added exceptionOnly OData condition');
                         break;
-                    case 'lastHour':
+                    case 'lastHour': {
                         const oneHourAgo = new Date();
                         oneHourAgo.setHours(oneHourAgo.getHours() - 1);
                         odataConditions.push(`createdon ge ${oneHourAgo.toISOString()}`);
                         this.componentLogger.debug('Added lastHour OData condition', { date: oneHourAgo.toISOString() });
                         break;
-                    case 'last24h':
+                    }
+                    case 'last24h': {
                         const oneDayAgo = new Date();
                         oneDayAgo.setHours(oneDayAgo.getHours() - 24);
                         odataConditions.push(`createdon ge ${oneDayAgo.toISOString()}`);
                         this.componentLogger.debug('Added last24h OData condition', { date: oneDayAgo.toISOString() });
                         break;
-                    case 'today':
+                    }
+                    case 'today': {
                         const startOfToday = new Date();
                         startOfToday.setHours(0, 0, 0, 0);
                         odataConditions.push(`createdon ge ${startOfToday.toISOString()}`);
                         this.componentLogger.debug('Added today OData condition', { date: startOfToday.toISOString() });
                         break;
+                    }
                 }
             });
         }

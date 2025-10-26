@@ -1,4 +1,5 @@
 import { BaseComponent } from '../../base/BaseComponent';
+
 import { FilterPanelConfig, FilterCondition, FilterFieldConfig, QuickFilterConfig } from './FilterPanelConfig';
 import { FilterPanelView } from './FilterPanelView';
 

@@ -227,6 +227,8 @@ export class DataTableView {
             column.style ? (typeof column.style === 'string' ? column.style : '') : ''
         ].filter(Boolean).join(' ');
 
+        const resizable = column.resizable !== false; // Default to true unless explicitly disabled
+
         return `
             <th class="${cellClass}"
                 style="${cellStyle}"
@@ -244,6 +246,7 @@ export class DataTableView {
 
                     ${sortable ? this.renderSortIndicator(column, sortConfig) : ''}
                 </div>
+                ${resizable ? `<div class="column-resize-handle" data-column-id="${column.id}"></div>` : ''}
             </th>
         `;
     }
@@ -410,11 +413,11 @@ export class DataTableView {
      * Render expanded row content
      */
     private static renderExpandedRow(
-        row: DataTableRow, 
-        colspan: number, 
+        row: DataTableRow,
+        colspan: number,
         config: DataTableConfig
     ): string {
-        const content = config.expandedRowRenderer ? 
+        const content = config.expandedRowRenderer ?
             config.expandedRowRenderer(row) : '';
 
         return `

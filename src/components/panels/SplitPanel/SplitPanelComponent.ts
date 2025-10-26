@@ -1,4 +1,5 @@
 import { BaseComponent } from '../../base/BaseComponent';
+
 import { SplitPanelConfig, DEFAULT_SPLIT_PANEL_CONFIG } from './SplitPanelConfig';
 import { SplitPanelView } from './SplitPanelView';
 

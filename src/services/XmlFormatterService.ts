@@ -43,7 +43,7 @@ export class XmlFormatterService {
                     lines[i] = tab.repeat(indent) + line;
                 }
                 // Opening tag
-                else if (line.match(/^<\w[^>]*[^\/]>.*$/)) {
+                else if (line.match(/^<\w[^>]*[^/]>.*$/)) {
                     lines[i] = tab.repeat(indent) + line;
                     indent++;
                 }
@@ -54,7 +54,7 @@ export class XmlFormatterService {
             }
 
             return lines.join('\n');
-        } catch (error) {
+        } catch (_error) {
             // If formatting fails, return original XML
             return xml;
         }
@@ -76,7 +76,7 @@ export class XmlFormatterService {
             const xmlDoc = parser.parseFromString(xml, 'text/xml');
             const parserError = xmlDoc.getElementsByTagName('parsererror');
             return parserError.length === 0;
-        } catch (error) {
+        } catch (_error) {
             return false;
         }
     }
@@ -96,7 +96,7 @@ export class XmlFormatterService {
                 .replace(/>\s+</g, '><')  // Remove whitespace between tags
                 .replace(/\s+/g, ' ')      // Collapse multiple spaces
                 .trim();
-        } catch (error) {
+        } catch (_error) {
             return xml;
         }
     }

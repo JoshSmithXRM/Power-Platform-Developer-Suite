@@ -33,7 +33,7 @@ export class EnvironmentSelectorView {
             environments,
             selectedEnvironmentId,
             loading,
-            connectionStatus
+            connectionStatus: _connectionStatus
         } = state;
 
         const containerClass = [

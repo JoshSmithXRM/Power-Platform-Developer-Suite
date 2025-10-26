@@ -1,4 +1,5 @@
 import { BaseComponent } from '../../base/BaseComponent';
+
 import { StatusBadgeConfig, StatusBadgeVariant } from './StatusBadgeConfig';
 import { StatusBadgeView } from './StatusBadgeView';
 
