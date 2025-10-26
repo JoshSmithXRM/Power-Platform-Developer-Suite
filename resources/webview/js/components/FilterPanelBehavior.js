@@ -722,16 +722,12 @@ class FilterPanelBehavior {
                 break;
 
             case 'setQuickFilters':
-                console.log('FilterPanelBehavior: setQuickFilters received', { filterIds: message.filterIds });
                 if (Array.isArray(message.filterIds)) {
                     instance.activeQuickFilters = new Set(message.filterIds);
-                    console.log('FilterPanelBehavior: Active quick filters set to', Array.from(instance.activeQuickFilters));
                     // Update checkboxes
                     const checkboxes = instance.element.querySelectorAll('.quick-filter-checkbox');
-                    console.log('FilterPanelBehavior: Found', checkboxes.length, 'checkboxes');
                     checkboxes.forEach(cb => {
                         const shouldBeChecked = instance.activeQuickFilters.has(cb.dataset.filterId);
-                        console.log(`FilterPanelBehavior: Checkbox ${cb.dataset.filterId} - should be checked: ${shouldBeChecked}`);
                         cb.checked = shouldBeChecked;
                     });
                     this.updateFilterCount(instance);

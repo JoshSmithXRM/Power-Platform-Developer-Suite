@@ -452,7 +452,11 @@ class ComponentUtils {
             if (handler) {
                 handler(message);
             } else {
-                console.warn(`No handler found for action: ${message.action}`);
+                // Only warn about truly unexpected actions (not informational messages)
+                const informationalActions = ['traceLevelLoaded', 'tracesLoaded', 'solutionsLoaded', 'jobsLoaded'];
+                if (!informationalActions.includes(message.action)) {
+                    console.warn(`No handler found for action: ${message.action}`);
+                }
             }
         } catch (error) {
             console.error('Error handling message:', error);
@@ -598,7 +602,12 @@ class ComponentUtils {
             }
         }
         
-        console.warn(`Could not route message to component behavior: ${componentId}`, message);
+        // Only warn if this is an actionable message type
+        const action = message.action || message.command;
+        const silentActions = ['componentStateChange', 'componentUpdate'];
+        if (!silentActions.includes(action)) {
+            console.warn(`Could not route message to component behavior: ${componentId}`, message);
+        }
     }
 
     /**

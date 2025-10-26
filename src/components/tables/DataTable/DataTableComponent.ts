@@ -82,10 +82,8 @@ export class DataTableComponent extends BaseComponent {
         });
         this.columnOrder = this.config.columns.map(c => c.id);
         
-        this.componentLogger.info('DataTable initialized successfully', {
-            componentId: this.config.id,
-            visibleColumns: Array.from(this.columnVisibility.entries()).filter(([, visible]) => visible).length,
-            totalColumns: this.config.columns.length
+        this.componentLogger.debug('DataTable initialized successfully', {
+            componentId: this.config.id
         });
     }
 
@@ -182,12 +180,9 @@ export class DataTableComponent extends BaseComponent {
         this.processData();
         this.notifyUpdate();
 
-        this.componentLogger.info('Table data updated', {
+        this.componentLogger.debug('Table data updated', {
             componentId: this.config.id,
-            totalRows: this.data.length,
-            processedRows: this.processedData.length,
-            currentPage: this.currentPage,
-            pageSize: this.pageSize
+            totalRows: this.data.length
         });
     }
 
@@ -282,12 +277,9 @@ export class DataTableComponent extends BaseComponent {
             this.currentPage = 1;
         }
 
-        this.componentLogger.info('Data processing completed', {
+        this.componentLogger.debug('Data processing completed', {
             componentId: this.config.id,
-            originalRows: this.data.length,
-            processedRows: this.processedData.length,
-            currentPage: this.currentPage,
-            totalPages: Math.ceil(this.processedData.length / this.pageSize)
+            processedRows: this.processedData.length
         });
     }
 

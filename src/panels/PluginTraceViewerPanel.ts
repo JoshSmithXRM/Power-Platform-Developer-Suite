@@ -120,12 +120,9 @@ export class PluginTraceViewerPanel extends BasePanel {
                 // Restore state from cache
                 const cachedState = await this._stateService.getPanelState(PluginTraceViewerPanel.viewType);
 
-                this.componentLogger.info('📦 Loaded cached state', {
+                this.componentLogger.debug('📦 Loaded cached state', {
                     hasState: !!cachedState,
-                    splitRatio: cachedState?.splitRatio,
-                    rightPanelVisible: cachedState?.rightPanelVisible,
-                    hasFilters: !!cachedState?.filters,
-                    fullState: cachedState
+                    hasFilters: !!cachedState?.filters
                 });
 
                 // Restore auto-refresh interval from cached state
@@ -164,8 +161,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                         quick: quickFiltersArray,
                         advanced: advancedFiltersArray
                     };
-                    this.componentLogger.info('Restored filters from cache', {
-                        filters: this.currentFilters,
+                    this.componentLogger.debug('Restored filters from cache', {
                         quickCount: quickFiltersArray.length,
                         advancedCount: advancedFiltersArray.length
                     });
@@ -359,16 +355,15 @@ export class PluginTraceViewerPanel extends BasePanel {
         try {
             const action = message.action || message.command;
 
-            // LOG ALL MESSAGES
-            this.componentLogger.info('📨 MESSAGE RECEIVED', {
+            // Only log important messages (debug level for routine events)
+            this.componentLogger.debug('📨 MESSAGE RECEIVED', {
                 action,
-                command: message.command,
-                fullMessage: message
+                command: message.command
             });
 
             switch (action) {
                 case 'component-event':
-                    this.componentLogger.info('🎯 Handling component-event');
+                    this.componentLogger.debug('🎯 Handling component-event');
                     await this.handleComponentEvent(message);
                     break;
 
@@ -480,7 +475,10 @@ export class PluginTraceViewerPanel extends BasePanel {
                     break;
 
                 default:
-                    this.componentLogger.warn('⚠️ Unknown action', { action, message });
+                    // Only warn about truly unknown actions, not benign ones
+                    if (action !== 'overflow-changed' && action !== 'panel-ready') {
+                        this.componentLogger.debug('Unknown action', { action });
+                    }
             }
         } catch (error: any) {
             const action = message.action || message.command;
@@ -496,11 +494,9 @@ export class PluginTraceViewerPanel extends BasePanel {
         try {
             const { componentId, eventType, data } = message.data || {};
 
-            this.componentLogger.info('🔧 COMPONENT EVENT', {
+            this.componentLogger.debug('🔧 Component event', {
                 componentId,
-                eventType,
-                data,
-                fullMessageData: message.data
+                eventType
             });
 
             // Handle action bar events
@@ -526,8 +522,9 @@ export class PluginTraceViewerPanel extends BasePanel {
                 this.componentLogger.info('✅ Split panel visibility changed', { rightPanelVisible });
                 await this.updateState({ rightPanelVisible });
             }
-            else {
-                this.componentLogger.warn('⚠️ Unhandled component event', { componentId, eventType });
+            else if (eventType !== 'initialized') {
+                // Only log non-initialization events that we don't handle
+                this.componentLogger.debug('Unhandled component event', { componentId, eventType });
             }
         } catch (error: any) {
             this.componentLogger.error('❌ Error handling component event', error);
@@ -674,10 +671,7 @@ export class PluginTraceViewerPanel extends BasePanel {
             // Convert filters to service format
             const serviceFilters = this.convertFiltersToServiceFormat(filterOptions || this.currentFilters);
 
-            this.componentLogger.info('🔍 Loading traces with filters', {
-                inputFilters: filterOptions || this.currentFilters,
-                serviceFilters: serviceFilters
-            });
+            this.componentLogger.debug('🔍 Loading traces with filters');
 
             // Fetch traces
             const traces = await this.pluginTraceService.getPluginTraceLogs(environmentId, serviceFilters);
@@ -690,7 +684,7 @@ export class PluginTraceViewerPanel extends BasePanel {
             // Update table
             this.dataTableComponent?.setData(tableData);
 
-            this.componentLogger.info('Loaded traces', { count: traces.length });
+            this.componentLogger.debug('Loaded traces', { count: traces.length });
 
             this.postMessage({
                 action: 'tracesLoaded',
@@ -1451,14 +1445,7 @@ export class PluginTraceViewerPanel extends BasePanel {
         const rightPanelVisible = false;
         const hiddenClass = 'split-panel-right-hidden';
 
-        this.componentLogger.info('🎨 getHtmlContent called', {
-            currentStateSplitRatio: this.currentState.splitRatio,
-            savedSplitRatio: savedSplitRatio,
-            savedRightPanelVisible: this.currentState.rightPanelVisible,
-            actualRightPanelVisible: rightPanelVisible,
-            hiddenClass: hiddenClass,
-            fullCurrentState: this.currentState
-        });
+        this.componentLogger.debug('🎨 getHtmlContent called');
 
         const customHTML = `
             <div class="panel-container">

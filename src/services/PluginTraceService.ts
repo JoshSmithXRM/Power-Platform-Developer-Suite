@@ -406,6 +406,58 @@ export class PluginTraceService {
     }
 
     /**
+     * Delete multiple traces using OData $batch API
+     */
+    private async deleteBatch(environment: any, token: string, traceIds: string[]): Promise<number> {
+        const batchBoundary = `batch_${Date.now()}`;
+        const changesetBoundary = `changeset_${Date.now()}`;
+
+        // Build batch request body
+        let batchBody = `--${batchBoundary}\r\n`;
+        batchBody += `Content-Type: multipart/mixed; boundary=${changesetBoundary}\r\n\r\n`;
+
+        traceIds.forEach((traceId, index) => {
+            batchBody += `--${changesetBoundary}\r\n`;
+            batchBody += `Content-Type: application/http\r\n`;
+            batchBody += `Content-Transfer-Encoding: binary\r\n`;
+            batchBody += `Content-ID: ${index + 1}\r\n\r\n`;
+            batchBody += `DELETE ${environment.settings.dataverseUrl}/api/data/v9.2/plugintracelogs(${traceId}) HTTP/1.1\r\n`;
+            batchBody += `Content-Type: application/json\r\n\r\n`;
+        });
+
+        batchBody += `--${changesetBoundary}--\r\n`;
+        batchBody += `--${batchBoundary}--\r\n`;
+
+        const batchUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/$batch`;
+
+        const response = await fetch(batchUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': `multipart/mixed; boundary=${batchBoundary}`,
+                'OData-MaxVersion': '4.0',
+                'OData-Version': '4.0'
+            },
+            body: batchBody
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            this.logger.error('Batch delete failed', new Error('API request failed'), {
+                status: response.status,
+                errorText
+            });
+            throw new Error(`Batch delete failed: ${response.status} ${response.statusText}`);
+        }
+
+        // Parse batch response to count successes
+        const responseText = await response.text();
+        const successCount = (responseText.match(/HTTP\/1\.1 204/g) || []).length;
+
+        return successCount;
+    }
+
+    /**
      * Delete all plugin trace logs in the environment
      */
     async deleteAllTraces(environmentId: string): Promise<number> {
@@ -445,28 +497,24 @@ export class PluginTraceService {
             return 0;
         }
 
-        this.logger.info(`Deleting ${totalCount} plugin traces`);
+        this.logger.info(`Deleting ${totalCount} plugin traces using batch API`);
 
-        // Delete in batches using batch API for better performance
+        // Delete in batches using OData $batch API for better performance
         const traceIds = countData.value.map((trace: any) => trace.plugintracelogid);
-        const batchSize = 100;
+        const batchSize = 100; // Dataverse supports up to 1000 operations per batch, but 100 is safer
         let deletedCount = 0;
 
         for (let i = 0; i < traceIds.length; i += batchSize) {
             const batch = traceIds.slice(i, i + batchSize);
 
-            // Delete batch
-            for (const traceId of batch) {
-                try {
-                    await this.deleteTrace(environmentId, traceId);
-                    deletedCount++;
-                } catch (error) {
-                    this.logger.error('Failed to delete trace in batch', error as Error, { traceId });
-                    // Continue with next trace
-                }
+            try {
+                const successCount = await this.deleteBatch(environment, token, batch);
+                deletedCount += successCount;
+                this.logger.info(`Batch delete progress: ${deletedCount}/${totalCount} traces deleted`);
+            } catch (error) {
+                this.logger.error('Failed to delete batch', error as Error, { batchSize: batch.length });
+                // Continue with next batch
             }
-
-            this.logger.debug(`Deleted ${deletedCount}/${totalCount} traces`);
         }
 
         this.logger.info(`Successfully deleted ${deletedCount} plugin traces`);
@@ -518,27 +566,24 @@ export class PluginTraceService {
             return 0;
         }
 
-        this.logger.info(`Deleting ${totalCount} old plugin traces`);
+        this.logger.info(`Deleting ${totalCount} old plugin traces using batch API`);
 
-        // Delete in batches
+        // Delete in batches using OData $batch API for better performance
         const traceIds = data.value.map((trace: any) => trace.plugintracelogid);
-        const batchSize = 100;
+        const batchSize = 100; // Dataverse supports up to 1000 operations per batch, but 100 is safer
         let deletedCount = 0;
 
         for (let i = 0; i < traceIds.length; i += batchSize) {
             const batch = traceIds.slice(i, i + batchSize);
 
-            for (const traceId of batch) {
-                try {
-                    await this.deleteTrace(environmentId, traceId);
-                    deletedCount++;
-                } catch (error) {
-                    this.logger.error('Failed to delete old trace in batch', error as Error, { traceId });
-                    // Continue with next trace
-                }
+            try {
+                const successCount = await this.deleteBatch(environment, token, batch);
+                deletedCount += successCount;
+                this.logger.info(`Batch delete progress: ${deletedCount}/${totalCount} old traces deleted`);
+            } catch (error) {
+                this.logger.error('Failed to delete batch', error as Error, { batchSize: batch.length });
+                // Continue with next batch
             }
-
-            this.logger.debug(`Deleted ${deletedCount}/${totalCount} old traces`);
         }
 
         this.logger.info(`Successfully deleted ${deletedCount} old plugin traces`);

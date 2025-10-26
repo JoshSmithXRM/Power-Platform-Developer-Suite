@@ -1606,52 +1606,13 @@ class DataTableBehavior {
             return;
         }
         
-        // Debug: Analyze header structure vs data
+        // Analyze header structure
         const headers = this.table.querySelectorAll('th[data-column-id]');
         const headerInfo = Array.from(headers).map(h => ({
             columnId: h.getAttribute('data-column-id'),
             text: h.textContent.trim(),
             index: Array.from(h.parentElement.children).indexOf(h)
         }));
-        
-        console.log(`DataTableBehavior: Found ${headers.length} headers`);
-        headerInfo.forEach((header, idx) => {
-            console.log(`  Header ${idx}: columnId="${header.columnId}", text="${header.text}"`);
-        });
-        
-        // DUMP HTML STRUCTURE FOR DEBUGGING
-        console.log(`DataTableBehavior: === HTML STRUCTURE DEBUG ===`);
-        const headerRow = this.table.querySelector('thead tr');
-        if (headerRow) {
-            console.log(`HEADER ROW HTML:`, headerRow.outerHTML);
-            const allThElements = Array.from(headerRow.querySelectorAll('th'));
-            console.log(`ALL TH ELEMENTS (${allThElements.length} total):`);
-            allThElements.forEach((th, index) => {
-                console.log(`  TH ${index}: columnId="${th.getAttribute('data-column-id')}", text="${th.textContent.trim()}", classes="${th.className}"`);
-            });
-            
-            const dataColumnThs = Array.from(headerRow.querySelectorAll('th[data-column-id]'));
-            console.log(`DATA COLUMN TH ELEMENTS (${dataColumnThs.length} total):`);
-            dataColumnThs.forEach((th, index) => {
-                console.log(`  DATA TH ${index}: columnId="${th.getAttribute('data-column-id')}", text="${th.textContent.trim()}"`);
-            });
-        } else {
-            console.log(`NO HEADER ROW FOUND!`);
-        }
-        
-        if (data.length > 0) {
-            const sampleRow = data[0];
-            console.log(`DataTableBehavior: Column value mapping:`);
-            headerInfo.forEach((header, idx) => {
-                const columnId = header.columnId;
-                const dataValue = sampleRow[columnId];
-                const truncatedValue = typeof dataValue === 'string' && dataValue.length > 50 
-                    ? dataValue.substring(0, 50) + '...' 
-                    : dataValue;
-                console.log(`  ${idx}: "${header.text}" (${columnId}) = "${truncatedValue}"`);
-            });
-        }
-        
         // Clear existing rows
         tbody.innerHTML = '';
 
