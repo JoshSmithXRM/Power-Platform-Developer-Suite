@@ -309,22 +309,29 @@ class SplitPanelBehavior {
             rightPanel: instance.rightPanel
         });
 
-        // ALWAYS show the panel, even if state says it's visible (fixes state sync issues)
-        console.log('✅ Showing right panel (forced)');
+        const wasHidden = !instance.rightPanelVisible;
+
+        // Show the panel
+        console.log('✅ Showing right panel');
         instance.rightPanelVisible = true;
         instance.element.classList.remove('split-panel-right-hidden');
         instance.rightPanel.classList.remove('hidden'); // Remove any 'hidden' class
         instance.rightPanel.style.display = '';
 
-        // Reset to initial split
-        const initialSplit = instance.config.initialSplit || 50;
-        console.log('📏 Setting split ratio:', initialSplit);
-        if (instance.orientation === 'horizontal') {
-            instance.leftPanel.style.width = `${initialSplit}%`;
-            instance.rightPanel.style.width = `${100 - initialSplit}%`;
+        // Only reset split ratio if panel was previously hidden (first time showing)
+        // This preserves user's resize preferences when just updating content
+        if (wasHidden) {
+            const initialSplit = instance.config.initialSplit || 50;
+            console.log('📏 Setting initial split ratio (panel was hidden):', initialSplit);
+            if (instance.orientation === 'horizontal') {
+                instance.leftPanel.style.width = `${initialSplit}%`;
+                instance.rightPanel.style.width = `${100 - initialSplit}%`;
+            } else {
+                instance.leftPanel.style.height = `${initialSplit}%`;
+                instance.rightPanel.style.height = `${100 - initialSplit}%`;
+            }
         } else {
-            instance.leftPanel.style.height = `${initialSplit}%`;
-            instance.rightPanel.style.height = `${100 - initialSplit}%`;
+            console.log('ℹ️ Preserving existing split ratio (panel already visible)');
         }
 
         console.log('📢 Notifying Extension Host: rightPanelOpened');

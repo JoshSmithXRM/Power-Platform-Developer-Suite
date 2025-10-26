@@ -9,6 +9,8 @@ export interface PanelState {
     viewConfig?: any;
     lastUpdated?: Date;
     autoRefreshIntervalSeconds?: number;
+    splitRatio?: number;
+    rightPanelVisible?: boolean;
 }
 
 export interface StateChangedEvent {

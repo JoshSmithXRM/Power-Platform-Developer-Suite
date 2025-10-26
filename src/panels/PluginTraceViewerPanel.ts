@@ -431,6 +431,26 @@ export class PluginTraceViewerPanel extends BasePanel {
                     }
                     break;
 
+                case 'splitRatioChanged':
+                    this.componentLogger.info('✅ Split ratio changed', { splitRatio: message.data?.splitRatio });
+                    await this.updateState({ splitRatio: message.data?.splitRatio });
+                    break;
+
+                case 'rightPanelOpened':
+                    this.componentLogger.info('✅ Right panel opened');
+                    await this.updateState({ rightPanelVisible: true });
+                    break;
+
+                case 'rightPanelClosed':
+                    this.componentLogger.info('✅ Right panel closed');
+                    await this.updateState({ rightPanelVisible: false });
+                    break;
+
+                case 'filterPanelCollapsed':
+                    // Handle filter panel collapse/expand state if needed
+                    this.componentLogger.debug('Filter panel collapsed state changed', { collapsed: message.data?.collapsed });
+                    break;
+
                 default:
                     this.componentLogger.warn('⚠️ Unknown action', { action, message });
             }
@@ -466,6 +486,17 @@ export class PluginTraceViewerPanel extends BasePanel {
                 const { itemId, rowId } = data;
                 this.componentLogger.info('✅ Context menu action clicked', { itemId, rowId });
                 await this.handleContextMenuAction(itemId, rowId);
+            }
+            // Handle split panel events
+            else if (componentId === 'plugin-trace-split-panel' && eventType === 'splitRatioChanged') {
+                const { splitRatio } = data;
+                this.componentLogger.info('✅ Split ratio changed', { splitRatio });
+                await this.updateState({ splitRatio });
+            }
+            else if (componentId === 'plugin-trace-split-panel' && (eventType === 'rightPanelOpened' || eventType === 'rightPanelClosed')) {
+                const { rightPanelVisible } = data;
+                this.componentLogger.info('✅ Split panel visibility changed', { rightPanelVisible });
+                await this.updateState({ rightPanelVisible });
             }
             else {
                 this.componentLogger.warn('⚠️ Unhandled component event', { componentId, eventType });
@@ -1335,6 +1366,9 @@ export class PluginTraceViewerPanel extends BasePanel {
     }
 
     protected getHtmlContent(): string {
+        // Get saved split ratio from state (default to 50)
+        const savedSplitRatio = this.currentState.splitRatio || 50;
+
         const customHTML = `
             <div class="panel-container">
                 <div class="panel-controls">
@@ -1345,19 +1379,22 @@ export class PluginTraceViewerPanel extends BasePanel {
                     ${this.filterPanelComponent!.generateHTML()}
                 </div>
                 <div class="panel-content">
-                    <div id="splitPanelContainer" class="split-panel-wrapper"
+                    <div id="splitPanelContainer" class="split-panel split-panel-horizontal split-panel-resizable split-panel-right-hidden"
                          data-component-type="SplitPanel"
                          data-component-id="plugin-trace-split-panel"
                          data-orientation="horizontal"
                          data-min-size="300"
-                         data-resizable="true">
-                        <div id="traceTableContainer" data-panel="left">
+                         data-resizable="true"
+                         data-split-ratio="${savedSplitRatio}">
+                        <div id="traceTableContainer" class="split-panel-left" data-panel="left">
                             ${this.dataTableComponent!.generateHTML()}
                         </div>
 
-                        <div class="split-panel-divider" data-divider></div>
+                        <div class="split-panel-divider" data-divider>
+                            <div class="split-panel-divider-handle"></div>
+                        </div>
 
-                        <div id="traceDetailContainer" data-panel="right" class="trace-detail-panel" style="display: none;">
+                        <div id="traceDetailContainer" class="split-panel-right trace-detail-panel" data-panel="right" style="display: none;">
                             <div class="trace-detail-header">
                                 <h3 id="detailPanelTitle">Trace Details</h3>
                                 <button id="closeDetailBtn" class="btn-icon-only" data-action="closeRightPanel" title="Close">×</button>
@@ -1440,28 +1477,35 @@ export class PluginTraceViewerPanel extends BasePanel {
                     // Initialize split panel behavior if not already initialized
                     if (window.SplitPanelBehavior && !window.SplitPanelBehavior.instances.has('plugin-trace-split-panel')) {
                         console.log('🎬 Initializing SplitPanelBehavior');
+
+                        // Get saved split ratio from state (passed via data attribute)
+                        const savedSplitRatio = splitContainer.dataset.splitRatio ? parseFloat(splitContainer.dataset.splitRatio) : 50;
+
                         window.SplitPanelBehavior.initialize(
                             'plugin-trace-split-panel',
                             {
                                 orientation: 'horizontal',
                                 minSize: 300,
                                 resizable: true,
-                                initialSplit: 50,
+                                initialSplit: savedSplitRatio,
                                 rightPanelDefaultHidden: true
                             },
                             splitContainer
                         );
-                        console.log('✅ SplitPanelBehavior initialized');
+                        console.log('✅ SplitPanelBehavior initialized with split ratio:', savedSplitRatio);
                     } else {
-                        console.log('ℹ️ SplitPanelBehavior already initialized or not available');
+                        console.log('ℹ️ SplitPanelBehavior already initialized');
                     }
 
-                    // Show the right panel using split panel behavior
+                    // Show the right panel using split panel behavior (without changing size)
                     if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('plugin-trace-split-panel')) {
                         console.log('📂 Showing right panel via SplitPanelBehavior');
                         const instance = window.SplitPanelBehavior.instances.get('plugin-trace-split-panel');
+
+                        // Always call showRightPanel to ensure panel is visible
+                        // The showRightPanel method now preserves split ratio if already visible
                         window.SplitPanelBehavior.showRightPanel(instance);
-                        console.log('✅ Right panel shown');
+                        console.log('✅ Right panel shown/updated');
                     } else {
                         console.log('⚠️ Fallback: showing detail panel directly');
                         // Fallback if split panel behavior isn't available

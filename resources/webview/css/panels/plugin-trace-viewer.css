@@ -17,34 +17,16 @@
     border-bottom: none;
 }
 
-/* Split panel wrapper */
-.split-panel-wrapper {
-    display: flex;
-    height: 100%;
-    width: 100%;
-    position: relative;
-    overflow: hidden;
+/* Override split-panel overflow for table container */
+#traceTableContainer.split-panel-left {
+    overflow: visible; /* Let the DataTable handle its own scrolling */
 }
 
-#traceTableContainer {
-    flex: 1;
-    overflow: auto;
-    transition: width 0.3s ease;
-}
-
-#traceTableContainer.split-view {
-    width: 50% !important;
-}
-
-/* Detail panel */
+/* Detail panel - additional styling on top of split-panel base */
 .trace-detail-panel {
-    width: 50%;
-    border-left: 1px solid var(--vscode-editorWidget-border);
-    background: var(--vscode-editor-background);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    transition: all 0.3s ease;
 }
 
 .trace-detail-header {
@@ -275,22 +257,6 @@
 
 /* Responsive */
 @media (max-width: 1024px) {
-    .split-panel-wrapper {
-        flex-direction: column;
-    }
-
-    #traceTableContainer.split-view {
-        width: 100% !important;
-        height: 50%;
-    }
-
-    .trace-detail-panel {
-        width: 100%;
-        height: 50%;
-        border-left: none;
-        border-top: 1px solid var(--vscode-editorWidget-border);
-    }
-
     .detail-grid {
         grid-template-columns: 120px 1fr;
     }
