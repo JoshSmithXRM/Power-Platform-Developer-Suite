@@ -608,113 +608,101 @@ export class MetadataBrowserPanel extends BasePanel {
             </div>
         </div>
 
-        <!-- Right Panel: Metadata Content (Split Panel Container) -->
-        <div class="right-panel-container"
-             data-component-type="SplitPanel"
-             data-component-id="metadata-detail-split-panel"
-             data-orientation="horizontal"
-             data-min-size="400"
-             data-resizable="true">
-
-            <div class="right-panel" data-panel="left">
-                <div class="selection-header">
-                    <span class="selection-label">Selected:</span>
-                    <span class="selection-value" id="current-selection">${currentSelection}</span>
-                </div>
-
-                <div class="metadata-sections ${isEntitySelected ? 'entity-mode' : ''} ${isChoiceSelected ? 'choice-mode' : ''}">
-        <!-- Attributes Section (Entity Only) -->
-        <div class="section entity-only ${isAttributesExpanded ? 'expanded' : ''}" data-section="attributes">
-            <div class="section-header" onclick="toggleSection('attributes')">
-                <span class="section-icon">▶</span>
-                <span class="section-title">Attributes</span>
-                <span class="section-count" id="attributes-count">0</span>
+        <!-- Right Panel: Metadata Content -->
+        <div class="right-panel">
+            <div class="selection-header">
+                <span class="selection-label">Selected:</span>
+                <span class="selection-value" id="current-selection">${currentSelection}</span>
             </div>
-            <div class="section-content">
-                ${this.attributesTableComponent.generateHTML()}
+
+            <div class="metadata-sections ${isEntitySelected ? 'entity-mode' : ''} ${isChoiceSelected ? 'choice-mode' : ''}">
+    <!-- Attributes Section (Entity Only) -->
+    <div class="section entity-only ${isAttributesExpanded ? 'expanded' : ''}" data-section="attributes">
+        <div class="section-header" onclick="toggleSection('attributes')">
+            <span class="section-icon">▶</span>
+            <span class="section-title">Attributes</span>
+            <span class="section-count" id="attributes-count">0</span>
+        </div>
+        <div class="section-content">
+            ${this.attributesTableComponent.generateHTML()}
+        </div>
+    </div>
+
+    <!-- Keys Section (Entity Only) -->
+    <div class="section entity-only ${isKeysExpanded ? 'expanded' : ''}" data-section="keys">
+        <div class="section-header" onclick="toggleSection('keys')">
+            <span class="section-icon">▶</span>
+            <span class="section-title">Keys</span>
+            <span class="section-count" id="keys-count">0</span>
+        </div>
+        <div class="section-content">
+            ${this.keysTableComponent.generateHTML()}
+        </div>
+    </div>
+
+    <!-- Relationships Section (Entity Only) -->
+    <div class="section entity-only ${isRelationshipsExpanded ? 'expanded' : ''}" data-section="relationships">
+        <div class="section-header" onclick="toggleSection('relationships')">
+            <span class="section-icon">▶</span>
+            <span class="section-title">Relationships</span>
+            <span class="section-count" id="relationships-count">0</span>
+        </div>
+        <div class="section-content">
+            ${this.relationshipsTableComponent.generateHTML()}
+        </div>
+    </div>
+
+    <!-- Privileges Section (Entity Only) -->
+    <div class="section entity-only ${isPrivilegesExpanded ? 'expanded' : ''}" data-section="privileges">
+        <div class="section-header" onclick="toggleSection('privileges')">
+            <span class="section-icon">▶</span>
+            <span class="section-title">Privileges</span>
+            <span class="section-count" id="privileges-count">0</span>
+        </div>
+        <div class="section-content">
+            ${this.privilegesTableComponent.generateHTML()}
+        </div>
+    </div>
+
+    <!-- Choice Values Section (Choice Only) -->
+    <div class="section choice-only ${isChoicesExpanded ? 'expanded' : ''}" data-section="choices">
+        <div class="section-header" onclick="toggleSection('choices')">
+            <span class="section-icon">▶</span>
+            <span class="section-title">Choice Values</span>
+            <span class="section-count" id="choices-count">0</span>
+        </div>
+        <div class="section-content">
+            ${this.choiceValuesTableComponent.generateHTML()}
+        </div>
+    </div>
             </div>
         </div>
 
-        <!-- Keys Section (Entity Only) -->
-        <div class="section entity-only ${isKeysExpanded ? 'expanded' : ''}" data-section="keys">
-            <div class="section-header" onclick="toggleSection('keys')">
-                <span class="section-icon">▶</span>
-                <span class="section-title">Keys</span>
-                <span class="section-count" id="keys-count">0</span>
-            </div>
-            <div class="section-content">
-                ${this.keysTableComponent.generateHTML()}
-            </div>
-        </div>
-
-        <!-- Relationships Section (Entity Only) -->
-        <div class="section entity-only ${isRelationshipsExpanded ? 'expanded' : ''}" data-section="relationships">
-            <div class="section-header" onclick="toggleSection('relationships')">
-                <span class="section-icon">▶</span>
-                <span class="section-title">Relationships</span>
-                <span class="section-count" id="relationships-count">0</span>
-            </div>
-            <div class="section-content">
-                ${this.relationshipsTableComponent.generateHTML()}
-            </div>
-        </div>
-
-        <!-- Privileges Section (Entity Only) -->
-        <div class="section entity-only ${isPrivilegesExpanded ? 'expanded' : ''}" data-section="privileges">
-            <div class="section-header" onclick="toggleSection('privileges')">
-                <span class="section-icon">▶</span>
-                <span class="section-title">Privileges</span>
-                <span class="section-count" id="privileges-count">0</span>
-            </div>
-            <div class="section-content">
-                ${this.privilegesTableComponent.generateHTML()}
-            </div>
-        </div>
-
-        <!-- Choice Values Section (Choice Only) -->
-        <div class="section choice-only ${isChoicesExpanded ? 'expanded' : ''}" data-section="choices">
-            <div class="section-header" onclick="toggleSection('choices')">
-                <span class="section-icon">▶</span>
-                <span class="section-title">Choice Values</span>
-                <span class="section-count" id="choices-count">0</span>
-            </div>
-            <div class="section-content">
-                ${this.choiceValuesTableComponent.generateHTML()}
-            </div>
-        </div>
-                </div>
-            </div>
-
-            <!-- Split Panel Divider -->
-            <div class="split-panel-divider" data-divider></div>
-
-            <!-- Detail Panel (3rd column) -->
-            <div class="detail-panel hidden" id="detail-panel" data-panel="right">
-                <div class="detail-panel-header">
-                    <span class="detail-panel-title" id="detail-panel-title">Details</span>
-                    <button class="detail-panel-close" data-action="closeRightPanel" onclick="closeDetailPanel()" title="Close" aria-label="Close">
-                        ×
-                    </button>
-                </div>
-            <div class="detail-panel-tabs">
-                <button class="detail-panel-tab active" data-tab="properties" onclick="switchDetailTab('properties')">
-                    Properties
-                </button>
-                <button class="detail-panel-tab" data-tab="json" onclick="switchDetailTab('json')">
-                    Raw Data
+        <!-- Detail Panel (3rd column) -->
+        <div class="detail-panel hidden" id="detail-panel">
+            <div class="detail-panel-header">
+                <span class="detail-panel-title" id="detail-panel-title">Details</span>
+                <button class="detail-panel-close" onclick="closeDetailPanel()" title="Close" aria-label="Close">
+                    ×
                 </button>
             </div>
-            <div class="detail-panel-content">
-                <div id="detail-properties-content" style="display: block;">
-                    <!-- Properties will be rendered here by JavaScript -->
-                </div>
-                <div id="detail-json-content" style="display: none;">
-                    <!-- JSON will be rendered here by JavaScript -->
-                </div>
+        <div class="detail-panel-tabs">
+            <button class="detail-panel-tab active" data-tab="properties" onclick="switchDetailTab('properties')">
+                Properties
+            </button>
+            <button class="detail-panel-tab" data-tab="json" onclick="switchDetailTab('json')">
+                Raw Data
+            </button>
+        </div>
+        <div class="detail-panel-content">
+            <div id="detail-properties-content" style="display: block;">
+                <!-- Properties will be rendered here by JavaScript -->
             </div>
+            <div id="detail-json-content" style="display: none;">
+                <!-- JSON will be rendered here by JavaScript -->
             </div>
-
-        </div> <!-- end right-panel-container (split panel) -->
+        </div>
+        </div>
 
             </div>
         </div>
