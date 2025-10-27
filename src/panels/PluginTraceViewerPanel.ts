@@ -329,7 +329,7 @@ export class PluginTraceViewerPanel extends BasePanel {
             id: 'pluginTrace-table',
             columns: [
                 { id: 'status', field: 'status', label: 'Status', sortable: true, width: '100px', type: 'html' },
-                { id: 'createdon', field: 'createdon', label: 'Started', sortable: true, width: '160px' },
+                { id: 'createdon', field: 'createdon', label: 'Started', type: 'date', sortable: true, width: '160px' },
                 { id: 'duration', field: 'duration', label: 'Duration', sortable: true, width: '80px', align: 'right' },
                 { id: 'operationtype', field: 'operationtype', label: 'Operation', sortable: true, width: '90px' },
                 { id: 'pluginname', field: 'pluginname', label: 'Plugin', sortable: true, width: '360px' },
@@ -375,7 +375,6 @@ export class PluginTraceViewerPanel extends BasePanel {
                     await this.handleLoadEnvironments();
                     break;
 
-                case 'environment-selected':
                 case 'environment-changed': {
                     const envId = message.data?.environmentId || message.environmentId;
                     await this.handleEnvironmentChanged(envId);
@@ -808,7 +807,12 @@ export class PluginTraceViewerPanel extends BasePanel {
             case 'refresh':
                 this.componentLogger.info('🔄 Refresh action triggered');
                 if (this.selectedEnvironmentId) {
-                    await this.handleLoadTraces(this.selectedEnvironmentId);
+                    this.actionBarComponent?.setActionLoading('refresh', true);
+                    try {
+                        await this.handleLoadTraces(this.selectedEnvironmentId);
+                    } finally {
+                        this.actionBarComponent?.setActionLoading('refresh', false);
+                    }
                 } else {
                     this.componentLogger.warn('⚠️ No environment selected for refresh');
                 }

@@ -254,6 +254,10 @@ export default tseslint.config(
         {
           selector: "SwitchCase > Literal[value='environmentChanged']",
           message: "❌ Use kebab-case 'environment-changed' not camelCase 'environmentChanged'. Already handled by 'environment-changed' case. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='environment-selected']",
+          message: "❌ Remove 'environment-selected' case - it is never sent. Only 'environment-changed' is emitted by EnvironmentSelectorBehavior. See: resources/webview/js/components/EnvironmentSelectorBehavior.js:162"
         }
       ]
     }

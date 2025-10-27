@@ -237,7 +237,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                 defaultSort: [{ column: 'connectionReference', direction: 'asc' }],
                 searchable: true,
                 showFooter: true,
-                striped: true,
                 className: 'connection-references-table'
             });
             this.componentLogger.trace('DataTableComponent created successfully');
@@ -281,7 +280,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                     await this.handleComponentEvent(message);
                     break;
 
-                case 'environment-selected':
                 case 'environment-changed':
                     // Only sync component state - onChange callback will handle data loading
                     if (this.environmentSelectorComponent && message.data?.environmentId) {

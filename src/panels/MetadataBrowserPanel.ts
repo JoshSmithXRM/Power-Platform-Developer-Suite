@@ -425,7 +425,6 @@ export class MetadataBrowserPanel extends BasePanel {
             }
 
             switch (message.command) {
-                case 'environment-selected':
                 case 'environment-changed':
                     // Only sync component state - onChange callback will handle data loading
                     if (this.environmentSelectorComponent && message.data?.environmentId) {
@@ -442,7 +441,14 @@ export class MetadataBrowserPanel extends BasePanel {
                     break;
 
                 case 'refresh-data':
-                    await this.refreshCurrentMetadata();
+                    this.actionBarComponent?.setActionLoading('refresh', true);
+                    try {
+                        await this.refreshCurrentMetadata();
+                        // TODO: Remove 2s delay after testing spinner visibility
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    } finally {
+                        this.actionBarComponent?.setActionLoading('refresh', false);
+                    }
                     break;
 
                 case 'select-entity':
@@ -504,7 +510,14 @@ export class MetadataBrowserPanel extends BasePanel {
 
                 switch (actionId) {
                     case 'refresh':
-                        await this.refreshCurrentMetadata();
+                        this.actionBarComponent?.setActionLoading('refresh', true);
+                        try {
+                            await this.refreshCurrentMetadata();
+                            // TODO: Remove 2s delay after testing spinner visibility
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        } finally {
+                            this.actionBarComponent?.setActionLoading('refresh', false);
+                        }
                         break;
                     case 'openInMaker':
                         await this.handleOpenInMaker();

@@ -209,7 +209,6 @@ export class SolutionExplorerPanel extends BasePanel {
             }
 
             switch (message.command) {
-                case 'environment-selected':
                 case 'environment-changed':
                     // Only sync component state - onChange callback will handle data loading
                     if (this.environmentSelectorComponent && message.data?.environmentId) {

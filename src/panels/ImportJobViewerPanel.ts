@@ -154,6 +154,7 @@ export class ImportJobViewerPanel extends BasePanel {
                         id: 'startedon',
                         label: 'Started',
                         field: 'startedon',
+                        type: 'date',
                         sortable: true,
                         filterable: false,
                         width: '180px'
@@ -162,6 +163,7 @@ export class ImportJobViewerPanel extends BasePanel {
                         id: 'completedon',
                         label: 'Completed',
                         field: 'completedon',
+                        type: 'date',
                         sortable: true,
                         filterable: false,
                         width: '180px'
@@ -220,7 +222,6 @@ export class ImportJobViewerPanel extends BasePanel {
             }
 
             switch (message.command) {
-                case 'environment-selected':
                 case 'environment-changed':
                     // Only sync component state - onChange callback will handle data loading
                     if (this.environmentSelectorComponent && message.data?.environmentId) {

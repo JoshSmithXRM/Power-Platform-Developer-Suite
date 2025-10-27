@@ -128,6 +128,11 @@ export const PLUGIN_TRACE_CONTEXT_MENU_ITEMS: DataTableContextMenuItem[] = [
 export const METADATA_CONTEXT_MENU_ITEMS = {
     attributes: [
         {
+            id: 'viewDetails',
+            label: 'View Details',
+            icon: 'eye'
+        },
+        {
             id: 'copyLogicalName',
             label: 'Copy Logical Name',
             icon: 'copy'
@@ -140,6 +145,11 @@ export const METADATA_CONTEXT_MENU_ITEMS = {
     ] as DataTableContextMenuItem[],
 
     relationships: [
+        {
+            id: 'viewDetails',
+            label: 'View Details',
+            icon: 'eye'
+        },
         {
             id: 'openRelatedEntity',
             label: 'Open Related Entity',
