@@ -1,6 +1,19 @@
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
+// Dataverse API response interfaces
+interface DataverseAttributeResponse {
+    LogicalName: string;
+    AttributeType?: string;
+    '@odata.type'?: string;
+    DisplayName?: {
+        UserLocalizedLabel?: {
+            Label?: string;
+        };
+    };
+    Targets?: string[];
+}
+
 export interface AttributeMetadata {
     logicalName: string;
     attributeType: string;
@@ -112,10 +125,10 @@ export class DataverseMetadataService {
 
             // Process attributes
             if (entityData.Attributes) {
-                entityData.Attributes.forEach((attr: any) => {
+                entityData.Attributes.forEach((attr: DataverseAttributeResponse) => {
                     const attributeMetadata: AttributeMetadata = {
                         logicalName: attr.LogicalName,
-                        attributeType: attr.AttributeType || attr['@odata.type']?.split('.').pop(),
+                        attributeType: attr.AttributeType || attr['@odata.type']?.split('.').pop() || 'Unknown',
                         displayName: attr.DisplayName?.UserLocalizedLabel?.Label || attr.LogicalName,
                         isLookup: attr.AttributeType === 'Lookup' || attr.AttributeType === 'Customer' || attr.AttributeType === 'Owner',
                         lookupTargets: attr.Targets || []
@@ -194,7 +207,7 @@ export class DataverseMetadataService {
     /**
      * Format a value for OData based on attribute metadata
      */
-    formatODataValue(value: any, attributeMetadata: AttributeMetadata | null): string {
+    formatODataValue(value: unknown, attributeMetadata: AttributeMetadata | null): string {
         if (value === null || value === undefined) {
             return 'null';
         }
@@ -265,7 +278,7 @@ export class DataverseMetadataService {
     /**
      * Fallback formatting when metadata is not available
      */
-    private formatValueWithHeuristics(value: any): string {
+    private formatValueWithHeuristics(value: unknown): string {
         if (typeof value === 'number') {
             return value.toString();
         }
@@ -294,23 +307,23 @@ export class DataverseMetadataService {
         return `'${value}'`;
     }
 
-    private formatNumericValue(value: any): string {
+    private formatNumericValue(value: unknown): string {
         return Number(value).toString();
     }
 
-    private formatDateTimeValue(value: any): string {
+    private formatDateTimeValue(value: unknown): string {
         if (value instanceof Date) {
             return value.toISOString();
         }
-        return value.toString();
+        return String(value);
     }
 
-    private formatBooleanValue(value: any): string {
+    private formatBooleanValue(value: unknown): string {
         if (typeof value === 'boolean') {
             return value.toString().toLowerCase();
         }
         // Handle string boolean values
-        const stringValue = value.toString().toLowerCase();
+        const stringValue = String(value).toLowerCase();
         return (stringValue === 'true' || stringValue === '1') ? 'true' : 'false';
     }
 

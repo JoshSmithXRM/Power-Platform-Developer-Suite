@@ -1,6 +1,42 @@
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
+// Dataverse API response interfaces
+interface DataverseFlowResponse {
+    workflowid: string;
+    name: string;
+    clientdata?: string;
+    modifiedon?: string;
+    modifiedby?: {
+        fullname?: string;
+    };
+    ismanaged?: boolean;
+}
+
+interface DataverseConnectionReferenceResponse {
+    connectionreferenceid: string;
+    connectionreferencelogicalname?: string;
+    connectionreferencedisplayname?: string;
+    connectorid: string;
+    connectionid?: string;
+    modifiedon?: string;
+    modifiedby?: {
+        fullname?: string;
+    };
+    ismanaged?: boolean;
+}
+
+
+interface TransformedFlow {
+    id: string;
+    name: string;
+    clientData: string | null;
+    modifiedon: string;
+    modifiedby: string;
+    ismanaged: boolean;
+    solutionId?: string;
+}
+
 export interface FlowItem {
     id: string;
     name: string;
@@ -63,6 +99,7 @@ export interface RelationshipResult {
     connections: ConnectionItem[];  // Kept for backward compatibility but not used
     relationships: FlowConnectionRelationship[];
     // Optional debug information about web API calls
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     _debug?: Record<string, any>;
 }
 
@@ -97,6 +134,7 @@ export class ConnectionReferencesService {
 
         const token = await this.authService.getAccessToken(environment.id);
         const baseUrl = `${environment.settings.dataverseUrl}/api/data/v9.2`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const debug: Record<string, any> = {};
         const timings: Record<string, number> = {};
 
@@ -127,7 +165,7 @@ export class ConnectionReferencesService {
         debug.allCRStatus = allCRResp?.status;
 
         // Process flows response
-        let allFlowsJson: any = { value: [] };
+        let allFlowsJson: { value: DataverseFlowResponse[] } = { value: [] };
         if (allFlowsResp && allFlowsResp.ok) {
             allFlowsJson = await allFlowsResp.json();
             this.logger.info('Flows loaded from environment', {
@@ -150,7 +188,7 @@ export class ConnectionReferencesService {
         }
 
         // Process connection references response
-        let allCRJson: any = { value: [] };
+        let allCRJson: { value: DataverseConnectionReferenceResponse[] } = { value: [] };
         if (allCRResp && allCRResp.ok) {
             allCRJson = await allCRResp.json();
             this.logger.info('Connection references loaded from environment', {
@@ -173,7 +211,7 @@ export class ConnectionReferencesService {
         }
 
         // Transform flows data
-        const allFlows = (allFlowsJson.value || []).map((f: any) => ({
+        const allFlows = (allFlowsJson.value || []).map((f: DataverseFlowResponse) => ({
             id: f.workflowid,
             name: f.name,
             clientData: f.clientdata || null,
@@ -186,10 +224,10 @@ export class ConnectionReferencesService {
 
         // Transform connection references data
         const allConnectionReferences = [] as ConnectionReferenceItem[];
-        (allCRJson.value || []).forEach((c: any) => {
+        (allCRJson.value || []).forEach((c: DataverseConnectionReferenceResponse) => {
             allConnectionReferences.push({
                 id: c.connectionreferenceid,
-                name: c.connectionreferencelogicalname || c.connectionreferencedisplayname,
+                name: c.connectionreferencelogicalname || c.connectionreferencedisplayname || c.connectionreferenceid,
                 connectorLogicalName: c.connectorid,
                 referencedConnectionId: c.connectionid,
                 flowIds: [],
@@ -235,21 +273,21 @@ export class ConnectionReferencesService {
         }
 
         // Step 4: Filter cached data based on solution membership (or use all if no solution filtering)
-        let flows: any[] = [];
+        let flows: TransformedFlow[] = [];
         let connectionReferences: ConnectionReferenceItem[] = [];
 
         if (solutionId && solutionId !== 'test-bypass') {
             this.logger.info('Filtering data by solution membership', {
                 environmentId,
-                solutionId, 
+                solutionId,
                 totalFlowsCount: allFlows.length,
                 totalConnectionReferencesCount: allConnectionReferences.length,
                 solutionFlowIdsCount: solutionFlowIds.size,
                 solutionCRIdsCount: solutionCRIds.size
             });
-            
+
             // Filter flows by solution membership
-            flows = allFlows.filter((flow: any) => solutionFlowIds.has(flow.id));
+            flows = allFlows.filter((flow: TransformedFlow) => solutionFlowIds.has(flow.id));
             this.logger.info('Filtered flows by solution membership', { 
                 environmentId, 
                 solutionId, 
@@ -287,7 +325,7 @@ export class ConnectionReferencesService {
         debug.filteredCRCount = connectionReferences.length;
 
         // Step 6: Parse flow clientdata to map flows to connection references
-        const extractConnectionReferenceNames = (clientData: any): string[] => {
+        const extractConnectionReferenceNames = (clientData: unknown): string[] => {
             const names = new Set<string>();
 
             if (!clientData) return Array.from(names);
@@ -314,7 +352,7 @@ export class ConnectionReferencesService {
         };
 
         // Map flows to connection references by parsing clientdata
-        for (const flow of flows as any[]) {
+        for (const flow of flows) {
             const clientData = flow.clientData;
             const crNames = extractConnectionReferenceNames(clientData);
             
@@ -372,7 +410,7 @@ export class ConnectionReferencesService {
      * Build relationship data structure from flows and connection references
      */
     private buildFlowConnectionRelationships(
-        flows: any[], 
+        flows: TransformedFlow[],
         connectionReferences: ConnectionReferenceItem[]
     ): FlowConnectionRelationship[] {
         const relationships: FlowConnectionRelationship[] = [];

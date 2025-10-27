@@ -234,12 +234,20 @@ export class EnvironmentSetupPanel extends BasePanel {
         });
     }
 
-    private async saveEnvironment(data: any): Promise<void> {
+    private async saveEnvironment(data: unknown): Promise<void> {
         try {
             this.componentLogger.info('Saving environment', { isEditMode: this.isEditMode });
 
+            // Runtime validation
+            if (!data || typeof data !== 'object') {
+                vscode.window.showErrorMessage('Invalid environment data');
+                return;
+            }
+
+            const envData = data as Record<string, unknown>;
+
             // Validate required fields
-            if (!data.name || !data.dataverseUrl || !data.tenantId || !data.publicClientId) {
+            if (!envData.name || !envData.dataverseUrl || !envData.tenantId || !envData.publicClientId) {
                 vscode.window.showErrorMessage('Please fill in all required fields');
                 return;
             }
@@ -249,20 +257,20 @@ export class EnvironmentSetupPanel extends BasePanel {
             // Pass undefined for empty credentials, let saveEnvironmentSettings preserve existing ones from secure storage
             const environment: EnvironmentConnection = {
                 id: this.isEditMode && this.currentEnvironment ? this.currentEnvironment.id : this.generateId(),
-                name: data.name,
-                environmentId: data.environmentId || undefined,
+                name: envData.name as string,
+                environmentId: (envData.environmentId as string) || undefined,
                 isActive: this.currentEnvironment?.isActive ?? false,
                 settings: {
-                    dataverseUrl: data.dataverseUrl,
-                    tenantId: data.tenantId,
-                    publicClientId: data.publicClientId,
-                    authenticationMethod: data.authenticationMethod || AuthenticationMethod.Interactive,
+                    dataverseUrl: envData.dataverseUrl as string,
+                    tenantId: envData.tenantId as string,
+                    publicClientId: envData.publicClientId as string,
+                    authenticationMethod: (envData.authenticationMethod as AuthenticationMethod) || AuthenticationMethod.Interactive,
                     // Only include credentials if provided (non-empty)
                     // undefined means "don't change" when preserveCredentials=true
-                    clientId: data.clientId || undefined,
-                    clientSecret: data.clientSecret || undefined,
-                    username: data.username || undefined,
-                    password: data.password || undefined
+                    clientId: (envData.clientId as string) || undefined,
+                    clientSecret: (envData.clientSecret as string) || undefined,
+                    username: (envData.username as string) || undefined,
+                    password: (envData.password as string) || undefined
                 }
             };
 
@@ -287,23 +295,31 @@ export class EnvironmentSetupPanel extends BasePanel {
         }
     }
 
-    private async testConnection(data: any): Promise<void> {
+    private async testConnection(data: unknown): Promise<void> {
         try {
             this.componentLogger.info('Testing connection');
 
+            // Runtime validation
+            if (!data || typeof data !== 'object') {
+                vscode.window.showErrorMessage('Invalid connection data');
+                return;
+            }
+
+            const connData = data as Record<string, unknown>;
+
             // Validate required fields
-            if (!data.dataverseUrl || !data.tenantId || !data.publicClientId) {
+            if (!connData.dataverseUrl || !connData.tenantId || !connData.publicClientId) {
                 vscode.window.showErrorMessage('Please fill in required fields (Dataverse URL, Tenant ID, Public Client ID)');
                 return;
             }
 
             // Validate auth-specific required fields
-            const authMethod = data.authenticationMethod || AuthenticationMethod.Interactive;
-            if (authMethod === AuthenticationMethod.ServicePrincipal && (!data.clientId || !data.clientSecret)) {
+            const authMethod = (connData.authenticationMethod as AuthenticationMethod) || AuthenticationMethod.Interactive;
+            if (authMethod === AuthenticationMethod.ServicePrincipal && (!connData.clientId || !connData.clientSecret)) {
                 vscode.window.showErrorMessage('Client ID and Client Secret are required for Service Principal authentication');
                 return;
             }
-            if (authMethod === AuthenticationMethod.UsernamePassword && (!data.username || !data.password)) {
+            if (authMethod === AuthenticationMethod.UsernamePassword && (!connData.username || !connData.password)) {
                 vscode.window.showErrorMessage('Username and Password are required for Username/Password authentication');
                 return;
             }
@@ -321,14 +337,14 @@ export class EnvironmentSetupPanel extends BasePanel {
                         name: 'Test Connection (Temporary)',
                         isActive: false,
                         settings: {
-                            dataverseUrl: data.dataverseUrl,
-                            tenantId: data.tenantId,
-                            publicClientId: data.publicClientId,
+                            dataverseUrl: connData.dataverseUrl as string,
+                            tenantId: connData.tenantId as string,
+                            publicClientId: connData.publicClientId as string,
                             authenticationMethod: authMethod,
-                            clientId: data.clientId,
-                            clientSecret: data.clientSecret,
-                            username: data.username,
-                            password: data.password
+                            clientId: connData.clientId as string,
+                            clientSecret: connData.clientSecret as string,
+                            username: connData.username as string,
+                            password: connData.password as string
                         }
                     };
 

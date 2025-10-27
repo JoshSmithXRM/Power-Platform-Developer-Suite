@@ -30,6 +30,7 @@ export class LoggerService {
     /**
      * Log trace level message (most detailed)
      */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public trace(component: string, message: string, metadata?: Record<string, any>): void {
         this.log('trace', component, message, metadata);
     }
@@ -37,6 +38,7 @@ export class LoggerService {
     /**
      * Log debug level message
      */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public debug(component: string, message: string, metadata?: Record<string, any>): void {
         this.log('debug', component, message, metadata);
     }
@@ -44,6 +46,7 @@ export class LoggerService {
     /**
      * Log info level message (default)
      */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public info(component: string, message: string, metadata?: Record<string, any>): void {
         this.log('info', component, message, metadata);
     }
@@ -51,6 +54,7 @@ export class LoggerService {
     /**
      * Log warning level message
      */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public warn(component: string, message: string, metadata?: Record<string, any>): void {
         this.log('warn', component, message, metadata);
     }
@@ -58,6 +62,7 @@ export class LoggerService {
     /**
      * Log error level message
      */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public error(component: string, message: string, error?: Error, metadata?: Record<string, any>): void {
         const errorMetadata = error ? {
             errorName: error.name,
@@ -72,6 +77,7 @@ export class LoggerService {
     /**
      * Internal logging method with structured format
      */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private log(level: 'trace' | 'debug' | 'info' | 'warn' | 'error', component: string, message: string, metadata?: Record<string, any>): void {
         const formattedComponent = `[${component}]`;
         
@@ -109,7 +115,9 @@ export class LoggerService {
     /**
      * Sanitize metadata to remove sensitive information
      */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private sanitizeMetadata(metadata: Record<string, any>): Record<string, any> {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sanitized: Record<string, any> = {};
         const sensitiveKeys = [
             'token', 'password', 'secret', 'key', 'auth', 'credential',
@@ -175,17 +183,27 @@ export class LoggerService {
      * Create a component-specific logger for easier usage
      */
     public createComponentLogger(componentName: string): {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         trace: (message: string, metadata?: Record<string, any>) => void;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         debug: (message: string, metadata?: Record<string, any>) => void;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         info: (message: string, metadata?: Record<string, any>) => void;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         warn: (message: string, metadata?: Record<string, any>) => void;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         error: (message: string, error?: Error, metadata?: Record<string, any>) => void;
     } {
         return {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             trace: (message: string, metadata?: Record<string, any>) => this.trace(componentName, message, metadata),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             debug: (message: string, metadata?: Record<string, any>) => this.debug(componentName, message, metadata),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             info: (message: string, metadata?: Record<string, any>) => this.info(componentName, message, metadata),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             warn: (message: string, metadata?: Record<string, any>) => this.warn(componentName, message, metadata),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             error: (message: string, error?: Error, metadata?: Record<string, any>) => this.error(componentName, message, error, metadata)
         };
     }

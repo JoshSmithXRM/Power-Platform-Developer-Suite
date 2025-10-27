@@ -59,6 +59,16 @@ interface ChoiceValueTableRow {
     description: string;
 }
 
+interface QuickPickItemWithMetadata extends vscode.QuickPickItem {
+    metadata?: {
+        type: 'entity' | 'choice';
+        logicalName?: string;
+        metadataId?: string;
+        displayName?: string;
+        name?: string;
+    };
+}
+
 export class MetadataBrowserPanel extends BasePanel {
     public static readonly viewType = 'metadataBrowser';
     private static currentPanel: MetadataBrowserPanel | undefined;
@@ -810,43 +820,58 @@ export class MetadataBrowserPanel extends BasePanel {
         }
     }
 
-    private async handleEntitySelection(data: any): Promise<void> {
+    private async handleEntitySelection(data: unknown): Promise<void> {
         const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
         if (!selectedEnvironment) {
             return;
         }
 
-        const { logicalName, displayName, metadataId } = data;
+        if (!data || typeof data !== 'object') {
+            return;
+        }
+
+        const entityData = data as Record<string, unknown>;
+        const { logicalName, displayName, metadataId } = entityData;
         if (!logicalName) {
             return;
         }
 
-        await this.loadEntityMetadata(selectedEnvironment.id, logicalName, metadataId, displayName);
+        await this.loadEntityMetadata(selectedEnvironment.id, logicalName as string, metadataId as string, displayName as string);
     }
 
-    private async handleChoiceSelection(data: any): Promise<void> {
+    private async handleChoiceSelection(data: unknown): Promise<void> {
         const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
         if (!selectedEnvironment) {
             return;
         }
 
-        const { name, displayName } = data;
+        if (!data || typeof data !== 'object') {
+            return;
+        }
+
+        const choiceData = data as Record<string, unknown>;
+        const { name, displayName } = choiceData;
         if (!name) {
             return;
         }
 
-        await this.loadChoiceMetadata(selectedEnvironment.id, name, displayName);
+        await this.loadChoiceMetadata(selectedEnvironment.id, name as string, displayName as string);
     }
 
-    private async handleMetadataRowClick(data: any): Promise<void> {
-        const { tableId, rowId } = data;
+    private async handleMetadataRowClick(data: unknown): Promise<void> {
+        if (!data || typeof data !== 'object') {
+            return;
+        }
+
+        const clickData = data as Record<string, unknown>;
+        const { tableId, rowId } = clickData;
         if (!tableId || !rowId) {
             return;
         }
 
         try {
             // Determine which table was clicked and get the metadata
-            let metadata: any = null;
+            let metadata: unknown = null;
             let title: string = '';
 
             if (tableId === 'metadata-attributes-table') {
@@ -926,21 +951,21 @@ export class MetadataBrowserPanel extends BasePanel {
             ]);
 
             // Build quick pick items
-            const items: vscode.QuickPickItem[] = [
+            const items: QuickPickItemWithMetadata[] = [
                 { label: 'TABLES', kind: vscode.QuickPickItemKind.Separator },
                 ...entities.map(e => ({
                     label: e.DisplayName?.UserLocalizedLabel?.Label || e.LogicalName,
                     description: e.LogicalName,
                     detail: `${e.IsManaged ? 'Managed' : 'Unmanaged'} | ${e.IsCustomEntity ? 'Custom' : 'System'}`,
-                    metadata: { type: 'entity', logicalName: e.LogicalName, metadataId: e.MetadataId, displayName: e.DisplayName?.UserLocalizedLabel?.Label || e.LogicalName }
-                } as any)),
+                    metadata: { type: 'entity' as const, logicalName: e.LogicalName, metadataId: e.MetadataId, displayName: e.DisplayName?.UserLocalizedLabel?.Label || e.LogicalName }
+                })),
                 { label: 'CHOICES', kind: vscode.QuickPickItemKind.Separator },
                 ...choices.map(c => ({
                     label: c.DisplayName?.UserLocalizedLabel?.Label || c.Name,
                     description: c.Name,
                     detail: `${c.IsManaged ? 'Managed' : 'Unmanaged'} | ${c.IsCustomOptionSet ? 'Custom' : 'System'}`,
-                    metadata: { type: 'choice', name: c.Name, displayName: c.DisplayName?.UserLocalizedLabel?.Label || c.Name }
-                } as any))
+                    metadata: { type: 'choice' as const, name: c.Name, displayName: c.DisplayName?.UserLocalizedLabel?.Label || c.Name }
+                }))
             ];
 
             // Show quick pick
@@ -950,16 +975,16 @@ export class MetadataBrowserPanel extends BasePanel {
                 matchOnDetail: true
             });
 
-            if (!selected || !('metadata' in selected)) {
+            if (!selected || !selected.metadata) {
                 return;
             }
 
-            const metadata = (selected as any).metadata;
+            const metadata = selected.metadata;
 
-            if (metadata.type === 'entity') {
-                await this.loadEntityMetadata(selectedEnvironment.id, metadata.logicalName, metadata.metadataId, metadata.displayName);
-            } else if (metadata.type === 'choice') {
-                await this.loadChoiceMetadata(selectedEnvironment.id, metadata.name, metadata.displayName);
+            if (metadata.type === 'entity' && metadata.logicalName && metadata.metadataId) {
+                await this.loadEntityMetadata(selectedEnvironment.id, metadata.logicalName, metadata.metadataId, metadata.displayName || '');
+            } else if (metadata.type === 'choice' && metadata.name) {
+                await this.loadChoiceMetadata(selectedEnvironment.id, metadata.name, metadata.displayName || '');
             }
 
         } catch (error) {
@@ -1302,11 +1327,16 @@ export class MetadataBrowserPanel extends BasePanel {
         }
     }
 
-    private async handleCopyLogicalName(rowData: any): Promise<void> {
+    private async handleCopyLogicalName(rowData: unknown): Promise<void> {
         try {
-            const logicalName = rowData.logicalName;
+            if (!rowData || typeof rowData !== 'object') {
+                return;
+            }
+
+            const row = rowData as Record<string, unknown>;
+            const logicalName = row.logicalName;
             if (logicalName) {
-                await vscode.env.clipboard.writeText(logicalName);
+                await vscode.env.clipboard.writeText(String(logicalName));
                 vscode.window.showInformationMessage(`Copied logical name: ${logicalName}`);
             }
         } catch (error) {
@@ -1315,7 +1345,7 @@ export class MetadataBrowserPanel extends BasePanel {
         }
     }
 
-    private async handleOpenAttributeInMaker(_rowData: any): Promise<void> {
+    private async handleOpenAttributeInMaker(_rowData: unknown): Promise<void> {
         try {
             const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
             if (!selectedEnvironment || !selectedEnvironment.environmentId || !this.selectedEntityMetadataId) {
@@ -1333,18 +1363,25 @@ export class MetadataBrowserPanel extends BasePanel {
         }
     }
 
-    private async handleOpenRelatedEntity(rowData: any): Promise<void> {
+    private async handleOpenRelatedEntity(rowData: unknown): Promise<void> {
         try {
-            const relatedEntity = rowData.relatedEntity;
+            if (!rowData || typeof rowData !== 'object') {
+                return;
+            }
+
+            const row = rowData as Record<string, unknown>;
+            const relatedEntity = row.relatedEntity;
             if (!relatedEntity) {
                 vscode.window.showWarningMessage('Related entity not found');
                 return;
             }
 
+            const relatedEntityStr = String(relatedEntity);
+
             // Extract entity name (handle N:N format)
-            let entityName = relatedEntity;
-            if (relatedEntity.includes('↔')) {
-                const entities = relatedEntity.split('↔').map((e: string) => e.trim());
+            let entityName = relatedEntityStr;
+            if (relatedEntityStr.includes('↔')) {
+                const entities = relatedEntityStr.split('↔').map((e: string) => e.trim());
                 const selected = await vscode.window.showQuickPick(entities, {
                     placeHolder: 'Select which entity to open'
                 });

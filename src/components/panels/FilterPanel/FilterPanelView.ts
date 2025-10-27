@@ -103,7 +103,7 @@ export class FilterPanelView {
     /**
      * Generate single filter condition row (used by behavior script)
      */
-    static generateConditionRow(conditionId: string, fields: FilterFieldConfig[], fieldValue: string = '', operatorValue: string = '', value: any = '', logicalOperator: 'AND' | 'OR' = 'AND'): string {
+    static generateConditionRow(conditionId: string, fields: FilterFieldConfig[], fieldValue: string = '', operatorValue: string = '', value: unknown = '', logicalOperator: 'AND' | 'OR' = 'AND'): string {
         const selectedField = fields.find(f => f.field === fieldValue);
 
         return `
@@ -158,7 +158,7 @@ export class FilterPanelView {
     /**
      * Generate value input based on field type and operator
      */
-    private static generateValueInput(field: FilterFieldConfig, operator: string, value: any): string {
+    private static generateValueInput(field: FilterFieldConfig, operator: string, value: unknown): string {
         // Boolean type with 'equals' operator
         if (field.type === 'boolean' && operator === 'equals') {
             return `

@@ -2,6 +2,56 @@ import { AuthenticationService } from './AuthenticationService';
 import { DataverseMetadataService } from './DataverseMetadataService';
 import { ServiceFactory } from './ServiceFactory';
 
+// Dataverse API response interfaces
+interface DataverseEntityMetadataResponse {
+    MetadataId: string;
+    LogicalName: string;
+    DisplayName?: {
+        UserLocalizedLabel?: {
+            Label?: string;
+        };
+    };
+    SchemaName: string;
+    Description?: {
+        UserLocalizedLabel?: {
+            Label?: string;
+        };
+    };
+    EntitySetName: string;
+    IsCustomEntity?: boolean;
+    IsVirtualEntity?: boolean;
+    PrimaryIdAttribute: string;
+    PrimaryNameAttribute: string;
+}
+
+interface DataverseViewResponse {
+    savedqueryid: string;
+    name: string;
+    description?: string;
+    returnedtypecode: string;
+    fetchxml: string;
+    layoutxml?: string;
+    isdefault?: boolean;
+    querytype: number;
+}
+
+interface DataverseFieldMetadataResponse {
+    LogicalName: string;
+    DisplayName?: {
+        UserLocalizedLabel?: {
+            Label?: string;
+        };
+    };
+    SchemaName: string;
+    AttributeType: string;
+    RequiredLevel?: {
+        Value: string;
+    };
+    IsValidForAdvancedFind?: boolean;
+    IsPrimaryId?: boolean;
+    IsPrimaryName?: boolean;
+}
+
 export interface EntityMetadata {
     id: string;
     logicalName: string;
@@ -41,7 +91,8 @@ export interface EntityView {
 export interface QueryFilter {
     field: string;
     operator: FilterOperator;
-    value: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    value: any; // Filter values can be any type (string, number, boolean, array, etc.) - any is appropriate here
     logicalOperator?: 'and' | 'or';
 }
 
@@ -71,7 +122,8 @@ export interface QueryOptions {
 }
 
 export interface QueryResult {
-    value: any[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    value: any[]; // Dataverse query results can be any entity type - any is appropriate here
     count?: number;
     nextLink?: string;
     hasMore: boolean;
@@ -125,8 +177,8 @@ export class DataverseQueryService {
         }
 
         const data = await response.json();
-        
-        return data.value.map((entity: any) => ({
+
+        return data.value.map((entity: DataverseEntityMetadataResponse) => ({
             id: entity.MetadataId,
             logicalName: entity.LogicalName,
             displayName: entity.DisplayName?.UserLocalizedLabel?.Label || entity.LogicalName,
@@ -174,8 +226,8 @@ export class DataverseQueryService {
         
         // Log raw view data for debugging
         this.logger.debug('Raw views data from API', { count: data.value?.length || 0 });
-        
-        const views = data.value.map((view: any) => {
+
+        const views = data.value.map((view: DataverseViewResponse) => {
             const mappedView = {
                 id: view.savedqueryid,
                 name: view.name,
@@ -231,8 +283,8 @@ export class DataverseQueryService {
         }
 
         const data = await response.json();
-        
-        return data.value.map((field: any) => ({
+
+        return data.value.map((field: DataverseFieldMetadataResponse) => ({
             logicalName: field.LogicalName,
             displayName: field.DisplayName?.UserLocalizedLabel?.Label || field.LogicalName,
             schemaName: field.SchemaName,
@@ -516,7 +568,7 @@ export class DataverseQueryService {
      * Format a value for OData queries using metadata
      */
     private async formatFilterValue(
-        value: any, 
+        value: unknown, 
         fieldName: string,
         environmentId?: string,
         entityLogicalName?: string,
@@ -675,7 +727,8 @@ export class DataverseQueryService {
     /**
      * Get current user information
      */
-    private async getCurrentUser(environmentId: string): Promise<any> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private async getCurrentUser(environmentId: string): Promise<any> { // Returns WhoAmI API response with dynamic structure - any is appropriate here
         const token = await this.authService.getAccessToken(environmentId);
         const environment = await this.authService.getEnvironment(environmentId);
         if (!environment) {

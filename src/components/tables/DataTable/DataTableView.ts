@@ -12,7 +12,8 @@ import { DataTableConfig, DataTableColumn, DataTableRow, DataTableContextMenuIte
 export interface DataTableViewState {
     data: DataTableRow[];
     sortConfig: Array<{ column: string; direction: 'asc' | 'desc' }>;
-    filters: Record<string, any>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    filters: Record<string, any>; // Dynamic filter values by column - any is appropriate here
     currentPage: number;
     pageSize: number;
     totalRows: number;

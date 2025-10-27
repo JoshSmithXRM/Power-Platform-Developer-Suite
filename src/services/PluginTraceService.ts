@@ -1,5 +1,30 @@
+import { EnvironmentConnection } from '../models/PowerPlatformSettings';
+
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
+
+// Dataverse API response interfaces
+interface DataversePluginTraceLogResponse {
+    plugintracelogid: string;
+    createdon: string;
+    operationtype?: number;
+    typename?: string;
+    primaryentity?: string;
+    messagename?: string;
+    mode?: number;
+    depth?: number;
+    performanceexecutionduration?: number;
+    exceptiondetails?: string;
+    messageblock?: string;
+    configuration?: string;
+    performanceconstructorduration?: number;
+    correlationid?: string;
+    pluginstepid?: string;
+}
+
+interface DataverseTraceIdResponse {
+    plugintracelogid: string;
+}
 
 export interface PluginTraceLog {
     plugintracelogid: string;
@@ -181,7 +206,7 @@ export class PluginTraceService {
         const data = await response.json();
 
         // Transform data
-        const traceLogs: PluginTraceLog[] = (data.value || []).map((log: any) => ({
+        const traceLogs: PluginTraceLog[] = (data.value || []).map((log: DataversePluginTraceLogResponse) => ({
             plugintracelogid: log.plugintracelogid,
             createdon: log.createdon,
             operationtype: log.operationtype?.toString() || '',
@@ -410,7 +435,7 @@ export class PluginTraceService {
     /**
      * Delete multiple traces using OData $batch API
      */
-    private async deleteBatch(environment: any, token: string, traceIds: string[]): Promise<number> {
+    private async deleteBatch(environment: EnvironmentConnection, token: string, traceIds: string[]): Promise<number> {
         const batchBoundary = `batch_${Date.now()}`;
         const changesetBoundary = `changeset_${Date.now()}`;
 
@@ -502,7 +527,7 @@ export class PluginTraceService {
         this.logger.info(`Deleting ${totalCount} plugin traces using batch API`);
 
         // Delete in batches using OData $batch API for better performance
-        const traceIds = countData.value.map((trace: any) => trace.plugintracelogid);
+        const traceIds = countData.value.map((trace: DataverseTraceIdResponse) => trace.plugintracelogid);
         const batchSize = 100; // Dataverse supports up to 1000 operations per batch, but 100 is safer
         let deletedCount = 0;
 
@@ -571,7 +596,7 @@ export class PluginTraceService {
         this.logger.info(`Deleting ${totalCount} old plugin traces using batch API`);
 
         // Delete in batches using OData $batch API for better performance
-        const traceIds = data.value.map((trace: any) => trace.plugintracelogid);
+        const traceIds = data.value.map((trace: DataverseTraceIdResponse) => trace.plugintracelogid);
         const batchSize = 100; // Dataverse supports up to 1000 operations per batch, but 100 is safer
         let deletedCount = 0;
 

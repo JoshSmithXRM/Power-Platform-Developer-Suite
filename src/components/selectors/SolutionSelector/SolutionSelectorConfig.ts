@@ -366,31 +366,35 @@ export class SolutionSelectorConfigValidator {
         const sortDirection = config.sortDirection || 'asc';
         
         return [...solutions].sort((a, b) => {
-            let aVal: any = a[sortBy as keyof Solution];
-            let bVal: any = b[sortBy as keyof Solution];
-            
+            let aVal: unknown = a[sortBy as keyof Solution];
+            let bVal: unknown = b[sortBy as keyof Solution];
+
             // Handle null/undefined values
             if (aVal === null || aVal === undefined) aVal = '';
             if (bVal === null || bVal === undefined) bVal = '';
-            
+
+            // Transform to comparable values (string or number)
+            let aCompare: string | number;
+            let bCompare: string | number;
+
             // Handle different data types
             if (sortBy === 'version') {
                 // Version comparison (simple string comparison for now)
-                aVal = aVal.toString();
-                bVal = bVal.toString();
+                aCompare = String(aVal);
+                bCompare = String(bVal);
             } else if (sortBy === 'modifiedOn' || sortBy === 'installedOn') {
                 // Date comparison
-                aVal = new Date(aVal).getTime();
-                bVal = new Date(bVal).getTime();
+                aCompare = new Date(aVal as string | number | Date).getTime();
+                bCompare = new Date(bVal as string | number | Date).getTime();
             } else {
                 // String comparison
-                aVal = aVal.toString().toLowerCase();
-                bVal = bVal.toString().toLowerCase();
+                aCompare = String(aVal).toLowerCase();
+                bCompare = String(bVal).toLowerCase();
             }
-            
+
             let comparison = 0;
-            if (aVal < bVal) comparison = -1;
-            else if (aVal > bVal) comparison = 1;
+            if (aCompare < bCompare) comparison = -1;
+            else if (aCompare > bCompare) comparison = 1;
             
             return sortDirection === 'asc' ? comparison : -comparison;
         });

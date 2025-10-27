@@ -137,6 +137,7 @@ export class PluginTraceViewerPanel extends BasePanel {
 
                 // Restore filters from cached state
                 if (cachedState?.filters) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const savedFilters = cachedState.filters as any;
 
                     this.componentLogger.debug('Raw saved filters from state', {
@@ -479,12 +480,13 @@ export class PluginTraceViewerPanel extends BasePanel {
                         this.componentLogger.debug('Unknown action', { action });
                     }
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             const action = message.action || message.command;
-            this.componentLogger.error(`Error handling message ${action}`, error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.componentLogger.error(`Error handling message ${action}`, error as Error);
             this.postMessage({
                 action: 'error',
-                message: `Error: ${error.message}`
+                message: `Error: ${errorMessage}`
             });
         }
     }
@@ -525,8 +527,8 @@ export class PluginTraceViewerPanel extends BasePanel {
                 // Only log non-initialization events that we don't handle
                 this.componentLogger.debug('Unhandled component event', { componentId, eventType });
             }
-        } catch (error: any) {
-            this.componentLogger.error('❌ Error handling component event', error);
+        } catch (error: unknown) {
+            this.componentLogger.error('❌ Error handling component event', error as Error);
         }
     }
 
@@ -548,8 +550,8 @@ export class PluginTraceViewerPanel extends BasePanel {
             } else {
                 this.componentLogger.warn('⚠️ Unhandled dropdown from component', { componentId });
             }
-        } catch (error: any) {
-            this.componentLogger.error('❌ Error handling dropdown item click', error);
+        } catch (error: unknown) {
+            this.componentLogger.error('❌ Error handling dropdown item click', error as Error);
         }
     }
 
@@ -655,6 +657,7 @@ export class PluginTraceViewerPanel extends BasePanel {
         this.componentLogger.info('✅ Environment change complete');
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private async handleLoadTraces(environmentId: string, filterOptions?: any): Promise<void> {
         if (!environmentId) {
             this.postMessage({
@@ -691,11 +694,12 @@ export class PluginTraceViewerPanel extends BasePanel {
                 action: 'tracesLoaded',
                 count: traces.length
             });
-        } catch (error: any) {
-            this.componentLogger.error('Failed to load traces', error);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.componentLogger.error('Failed to load traces', error as Error);
             this.postMessage({
                 action: 'error',
-                message: `Failed to load traces: ${error.message}`
+                message: `Failed to load traces: ${errorMessage}`
             });
         }
     }
@@ -719,8 +723,8 @@ export class PluginTraceViewerPanel extends BasePanel {
                 level: level,
                 displayName: this.pluginTraceService.getTraceLevelDisplayName(level)
             });
-        } catch (error: any) {
-            this.componentLogger.error('Failed to get trace level', error);
+        } catch (error: unknown) {
+            this.componentLogger.error('Failed to get trace level', error as Error);
         }
     }
 
@@ -743,11 +747,12 @@ export class PluginTraceViewerPanel extends BasePanel {
                 }
             }, 1000);
 
-        } catch (error: any) {
-            this.componentLogger.error('Failed to set trace level', error);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.componentLogger.error('Failed to set trace level', error as Error);
             this.postMessage({
                 action: 'error',
-                message: `Failed to set trace level: ${error.message}`
+                message: `Failed to set trace level: ${errorMessage}`
             });
         }
     }
@@ -980,8 +985,9 @@ export class PluginTraceViewerPanel extends BasePanel {
         try {
             await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
             vscode.window.showInformationMessage(`Exported ${dataToExport.length} trace(s) to ${uri.fsPath}`);
-        } catch (error: any) {
-            vscode.window.showErrorMessage(`Failed to export: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to export: ${errorMessage}`);
         }
     }
 
@@ -1015,6 +1021,7 @@ export class PluginTraceViewerPanel extends BasePanel {
         ];
 
         // CSV escape function
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const escape = (val: any): string => {
             if (val === null || val === undefined) return '';
             const str = String(val);
@@ -1032,6 +1039,7 @@ export class PluginTraceViewerPanel extends BasePanel {
 
         // Data rows
         data.forEach(row => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const values = columns.map(col => escape((row as any)[col]));
             rows.push(values.join(','));
         });
@@ -1062,8 +1070,9 @@ export class PluginTraceViewerPanel extends BasePanel {
 
             // Reload traces
             await this.handleLoadTraces(this.selectedEnvironmentId);
-        } catch (error: any) {
-            vscode.window.showErrorMessage(`Failed to delete trace: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to delete trace: ${errorMessage}`);
         }
     }
 
@@ -1092,8 +1101,9 @@ export class PluginTraceViewerPanel extends BasePanel {
 
             // Reload traces
             await this.handleLoadTraces(this.selectedEnvironmentId);
-        } catch (error: any) {
-            vscode.window.showErrorMessage(`Failed to delete traces: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to delete traces: ${errorMessage}`);
         }
     }
 
@@ -1138,8 +1148,9 @@ export class PluginTraceViewerPanel extends BasePanel {
 
             // Reload traces
             await this.handleLoadTraces(this.selectedEnvironmentId);
-        } catch (error: any) {
-            vscode.window.showErrorMessage(`Failed to delete old traces: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to delete old traces: ${errorMessage}`);
         }
     }
 
@@ -1161,8 +1172,9 @@ export class PluginTraceViewerPanel extends BasePanel {
 
             await vscode.env.openExternal(vscode.Uri.parse(dynamicsUrl));
 
-        } catch (error: any) {
-            vscode.window.showErrorMessage(`Failed to open trace in Dynamics: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to open trace in Dynamics: ${errorMessage}`);
         }
     }
 
@@ -1439,7 +1451,9 @@ export class PluginTraceViewerPanel extends BasePanel {
         return conditions.join(' ');
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private convertFiltersToServiceFormat(filters: any): any {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const serviceFilters: any = {
             top: 100 // Default limit
         };

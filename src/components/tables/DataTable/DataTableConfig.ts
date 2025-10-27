@@ -101,7 +101,8 @@ export interface DataTableConfig extends BaseComponentConfig {
     // Filtering options
     filterable?: boolean;
     filterDebounce?: number;
-    onFilter?: (filters: Record<string, any>) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onFilter?: (filters: Record<string, any>) => void; // Dynamic filter values - any is appropriate here
     
     // Pagination options
     paginated?: boolean;
@@ -143,7 +144,8 @@ export interface DataTableConfig extends BaseComponentConfig {
     zebra?: boolean;
     
     // Advanced options
-    trackBy?: string | ((row: DataTableRow, index: number) => any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    trackBy?: string | ((row: DataTableRow, index: number) => any); // Row identifier can be any type - any is appropriate here
     debounceTime?: number;
     throttleTime?: number;
     
@@ -157,7 +159,8 @@ export interface DataTableConfig extends BaseComponentConfig {
     onRowDoubleClick?: (row: DataTableRow, event: MouseEvent) => void;
     onRowExpand?: (row: DataTableRow) => void;
     onRowCollapse?: (row: DataTableRow) => void;
-    onCellClick?: (row: DataTableRow, column: DataTableColumn, value: any) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onCellClick?: (row: DataTableRow, column: DataTableColumn, value: any) => void; // Cell value can be any type - any is appropriate here
 }
 
 /**
@@ -186,7 +189,8 @@ export interface DataTableSortEvent {
 
 export interface DataTableFilterEvent {
     componentId: string;
-    filters: Record<string, any>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    filters: Record<string, any>; // Dynamic filter values by column - any is appropriate here
     timestamp: number;
 }
 

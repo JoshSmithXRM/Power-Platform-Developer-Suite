@@ -73,8 +73,9 @@ export class EnvironmentCommands {
             vscode.window.showInformationMessage('Testing connection...');
             await this.authService.getAccessToken(selected.env.id);
             vscode.window.showInformationMessage(`Connection successful to ${selected.env.name}!`);
-        } catch (error: any) {
-            vscode.window.showErrorMessage(`Connection failed: ${error.message}`);
+        } catch (error: unknown) {
+            const errMsg = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Connection failed: ${errMsg}`);
         }
     }
 
@@ -151,8 +152,9 @@ export class EnvironmentCommands {
             try {
                 await this.authService.getAccessToken(environmentItem.envId);
                 vscode.window.showInformationMessage(`Connection test successful for ${environmentItem.label}!`);
-            } catch (error: any) {
-                vscode.window.showErrorMessage(`Connection test failed for ${environmentItem.label}: ${error.message}`);
+            } catch (error: unknown) {
+                const errMsg = error instanceof Error ? error.message : String(error);
+                vscode.window.showErrorMessage(`Connection test failed for ${environmentItem.label}: ${errMsg}`);
             }
         } else {
             vscode.window.showErrorMessage('No environment selected');
@@ -172,8 +174,9 @@ export class EnvironmentCommands {
                     await this.authService.removeEnvironment(environmentItem.envId);
                     vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
                     vscode.window.showInformationMessage(`Environment "${environmentItem.label}" removed successfully!`);
-                } catch (error: any) {
-                    vscode.window.showErrorMessage(`Failed to remove environment: ${error.message}`);
+                } catch (error: unknown) {
+                    const errMsg = error instanceof Error ? error.message : String(error);
+                    vscode.window.showErrorMessage(`Failed to remove environment: ${errMsg}`);
                 }
             }
         } else {
@@ -208,8 +211,9 @@ export class EnvironmentCommands {
                 await this.authService.removeEnvironment(selected.env.id);
                 vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
                 vscode.window.showInformationMessage(`Environment "${selected.env.name}" removed successfully!`);
-            } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to remove environment: ${error.message}`);
+            } catch (error: unknown) {
+                const errMsg = error instanceof Error ? error.message : String(error);
+                vscode.window.showErrorMessage(`Failed to remove environment: ${errMsg}`);
             }
         }
     }

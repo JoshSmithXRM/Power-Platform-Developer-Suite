@@ -13,7 +13,8 @@ export class DataTableComponent extends BaseComponent {
     private data: DataTableRow[] = [];
     private processedData: DataTableRow[] = [];
     private sortConfig: Array<{ column: string; direction: 'asc' | 'desc' }> = [];
-    private filters: Record<string, any> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private filters: Record<string, any> = {}; // Dynamic filter values by column - any is appropriate here
     private currentPage: number = 1;
     private pageSize: number = 50;
     private searchQuery: string = '';
@@ -199,7 +200,8 @@ export class DataTableComponent extends BaseComponent {
         currentPage: number;
         pageSize: number;
         hasLoadedData: boolean;
-        filters: Record<string, any>;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        filters: Record<string, any>; // Dynamic filter values by column - any is appropriate here
         searchQuery: string;
     } {
         return {
@@ -300,7 +302,8 @@ export class DataTableComponent extends BaseComponent {
     /**
      * Apply filters to data
      */
-    private applyFilters(data: DataTableRow[], filters: Record<string, any>): DataTableRow[] {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private applyFilters(data: DataTableRow[], filters: Record<string, any>): DataTableRow[] { // Dynamic filter values - any is appropriate here
         return data.filter(row => {
             return Object.entries(filters).every(([columnId, filterValue]) => {
                 if (!filterValue) return true;
@@ -632,7 +635,8 @@ export class DataTableComponent extends BaseComponent {
     /**
      * Get table state
      */
-    public getState(): any {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    public getState(): any { // Returns comprehensive state object with dynamic structure - any is appropriate here
         return {
             data: this.data,
             processedData: this.processedData,

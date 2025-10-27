@@ -30,7 +30,8 @@ export interface PanelTemplate {
     components: ComponentDefinition[];
     customCSS?: string[];
     customJS?: string[];
-    variables?: Record<string, any>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    variables?: Record<string, any>; // Dynamic template variables - any is appropriate here
 }
 
 export interface ComposedPanel {
@@ -74,7 +75,8 @@ export class PanelComposer {
     /**
      * Static logger for static methods
      */
-    private static logWarning(message: string, metadata?: any): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private static logWarning(message: string, metadata?: any): void { // Dynamic logging metadata - any is appropriate here
         const logger = ServiceFactory.getLoggerService().createComponentLogger('PanelComposer');
         logger.warn(message, metadata);
     }
@@ -418,7 +420,7 @@ export class PanelComposer {
     /**
      * Generate error HTML for failed components
      */
-    private generateErrorHtml(componentId: string, error: any): string {
+    private generateErrorHtml(componentId: string, error: unknown): string {
         const errorMessage = error instanceof Error ? error.message : String(error);
         
         return `
