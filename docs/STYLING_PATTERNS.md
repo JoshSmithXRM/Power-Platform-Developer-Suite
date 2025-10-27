@@ -141,6 +141,18 @@ The semantic tokens work with the flexible panel layout system:
    }
    ```
 
+   **Note on Automated Enforcement**:
+   This rule could be enforced via stylelint with custom patterns, but would require additional tooling (stylelint, custom config, separate linting pipeline). We opted not to implement automated CSS linting at this time due to the investment required. Instead, this is enforced through:
+   - Documentation (this guide)
+   - Code review process
+   - Manual validation when touching CSS files
+
+   **Future Enhancement**: If CSS violations become common, consider adding stylelint:
+   ```bash
+   # Example detection script
+   grep -rE "var\(--vscode-(?!font)" resources/webview/css/
+   ```
+
 2. **Follow consistent component structure patterns**
    ```css
    .component-base {

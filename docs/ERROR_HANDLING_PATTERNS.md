@@ -581,6 +581,37 @@ if (filters.length === 0) {
 
 ---
 
+## Automated Enforcement
+
+### What ESLint Catches
+
+Current ESLint rules enforce:
+- ✅ Type-safe catch blocks: `catch (error: unknown)` not `catch (error: any)`
+- ✅ Explicit return type annotations on functions
+- ✅ No `console.log()` in Extension Host context (must use `this.componentLogger`)
+
+### What ESLint Cannot Catch
+
+The following pattern **cannot** be automatically enforced without a custom ESLint rule:
+- ❌ Ensuring catch blocks include `this.postMessage({ action: 'error', ... })` for user notification
+- ❌ Verifying rich context metadata is included in `componentLogger.error()` calls
+- ❌ Detecting missing error handling in async operations
+
+**Why Not Implemented**:
+Writing a custom ESLint rule to enforce these patterns would require:
+- Complex AST analysis (detecting catch blocks, checking for postMessage, verifying context)
+- Context-awareness (not all catch blocks should notify users)
+- Significant development and maintenance effort
+
+**Instead, We Use**:
+- Documentation (this guide)
+- Code review process
+- Manual validation during development
+
+**Future Enhancement**: If error handling violations become common, consider implementing a custom ESLint rule. Estimated effort: 200+ lines of code, ongoing maintenance.
+
+---
+
 ## References
 
 - [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md) - Component architecture

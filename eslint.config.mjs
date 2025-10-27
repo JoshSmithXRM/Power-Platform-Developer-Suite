@@ -165,6 +165,18 @@ export default tseslint.config(
         {
           selector: "CallExpression[callee.object.name='console']",
           message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
+        },
+        {
+          selector: "TemplateLiteral TemplateElement[value.raw=/onclick\\s*=/]",
+          message: '❌ No inline onclick handlers in HTML templates. Use postMessage() and handle in message handler. See: docs/MESSAGE_CONVENTIONS.md and docs/EXECUTION_CONTEXTS.md'
+        },
+        {
+          selector: "TemplateLiteral TemplateElement[value.raw=/oninput\\s*=/]",
+          message: '❌ No inline oninput handlers in HTML templates. Use postMessage() and handle in message handler. See: docs/MESSAGE_CONVENTIONS.md and docs/EXECUTION_CONTEXTS.md'
+        },
+        {
+          selector: "TemplateLiteral TemplateElement[value.raw=/<script[^>]*>/]",
+          message: '❌ No inline <script> blocks in HTML templates. Move JavaScript to webview behavior files in resources/webview/js/. See: docs/EXECUTION_CONTEXTS.md'
         }
         // Note: Data transformation (map) is ALLOWED in View classes and Factories for UI rendering
       ]
@@ -181,6 +193,82 @@ export default tseslint.config(
           message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
         }
         // Note: Both updateWebview() and data transformation (map) are ALLOWED in BasePanel
+      ]
+    }
+  },
+  {
+    // PHASE 2: MESSAGE CONVENTIONS & ERROR HANDLING
+    // Stricter rules for panels to enforce message naming and error handling standards
+    files: ['src/panels/**/*Panel.ts', '!src/panels/base/**'],
+    rules: {
+      // Enforce kebab-case in case statement strings (common message patterns)
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='updateWebview']",
+          message: '❌ Use component event bridges instead of updateWebview() for data updates'
+        },
+        {
+          selector: "CallExpression[callee.object.name='console']",
+          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
+        },
+        {
+          selector: "TemplateLiteral TemplateElement[value.raw=/onclick\\s*=/]",
+          message: '❌ No inline onclick handlers in HTML templates. Use postMessage() and handle in message handler. See: docs/MESSAGE_CONVENTIONS.md'
+        },
+        {
+          selector: "TemplateLiteral TemplateElement[value.raw=/oninput\\s*=/]",
+          message: '❌ No inline oninput handlers in HTML templates. Use postMessage() and handle in message handler. See: docs/MESSAGE_CONVENTIONS.md'
+        },
+        {
+          selector: "TemplateLiteral TemplateElement[value.raw=/<script[^>]*>/]",
+          message: '❌ No inline <script> blocks in HTML templates. Move JavaScript to webview behavior files. See: docs/EXECUTION_CONTEXTS.md'
+        },
+        // Detect common camelCase patterns in case statements
+        {
+          selector: "SwitchCase > Literal[value='loadTraces']",
+          message: "❌ Use kebab-case 'load-traces' not camelCase 'loadTraces'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='loadEnvironments']",
+          message: "❌ Use kebab-case 'load-environments' not camelCase 'loadEnvironments'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='traceLevelChanged']",
+          message: "❌ Use kebab-case 'trace-level-changed' not camelCase 'traceLevelChanged'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='filtersApplied']",
+          message: "❌ Use kebab-case 'filters-applied' not camelCase 'filtersApplied'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='traceSelected']",
+          message: "❌ Use kebab-case 'trace-selected' not camelCase 'traceSelected'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='contextMenuAction']",
+          message: "❌ Use kebab-case 'context-menu-action' not camelCase 'contextMenuAction'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='autoRefreshChanged']",
+          message: "❌ Use kebab-case 'auto-refresh-changed' not camelCase 'autoRefreshChanged'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='splitRatioChanged']",
+          message: "❌ Use kebab-case 'split-ratio-changed' not camelCase 'splitRatioChanged'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='rightPanelOpened']",
+          message: "❌ Use kebab-case 'right-panel-opened' not camelCase 'rightPanelOpened'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='rightPanelClosed']",
+          message: "❌ Use kebab-case 'right-panel-closed' not camelCase 'rightPanelClosed'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='environmentChanged']",
+          message: "❌ Use kebab-case 'environment-changed' not camelCase 'environmentChanged'. Already handled by 'environment-changed' case. See: docs/MESSAGE_CONVENTIONS.md"
+        }
       ]
     }
   }
