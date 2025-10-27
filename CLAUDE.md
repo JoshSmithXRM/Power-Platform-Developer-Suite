@@ -228,8 +228,11 @@ if (typeof window !== 'undefined') {
 
 ## Documentation Reference
 
+- `docs/README.md` - Complete documentation index and navigation
 - `docs/EXECUTION_CONTEXTS.md` - Extension Host vs Webview deep dive
 - `docs/PANEL_LAYOUT_GUIDE.md` - Complete panel structure patterns
+- `docs/MESSAGE_CONVENTIONS.md` - Message naming and structure standards
+- `docs/ERROR_HANDLING_PATTERNS.md` - Error handling and notification patterns
 - `docs/ARCHITECTURE_GUIDE.md` - High-level architecture and SOLID principles
 - `docs/COMPONENT_PATTERNS.md` - Component design patterns and lifecycle
 - `docs/STYLING_PATTERNS.md` - CSS semantic tokens and styling patterns
