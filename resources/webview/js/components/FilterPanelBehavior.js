@@ -212,7 +212,7 @@ class FilterPanelBehavior {
         }
 
         // Notify Extension Host
-        this.sendMessage(instance, 'filterPanelCollapsed', {
+        this.sendMessage(instance, 'filter-panel-collapsed', {
             collapsed: instance.collapsed
         });
     }
@@ -386,7 +386,7 @@ class FilterPanelBehavior {
         });
 
         // Notify Extension Host
-        this.sendMessage(instance, 'filtersApplied', {
+        this.sendMessage(instance, 'filters-applied', {
             quickFilters: Array.from(instance.activeQuickFilters),
             advancedFilters: validConditions
         });
@@ -413,7 +413,7 @@ class FilterPanelBehavior {
         }
 
         // Notify Extension Host
-        this.sendMessage(instance, 'filtersCleared', {});
+        this.sendMessage(instance, 'filters-cleared', {});
     }
 
     /**

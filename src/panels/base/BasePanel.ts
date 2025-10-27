@@ -323,30 +323,59 @@ export abstract class BasePanel implements IPanelBase {
     protected async loadEnvironmentsWithAutoSelect(
         environmentSelectorComponent: EnvironmentSelectorComponent,
         logger: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>,
+        viewType?: string,
         autoSelect: boolean = true
     ): Promise<void> {
         logger.debug('Loading environments');
         try {
             const environmentConnections = await this._authService.getEnvironments();
             logger.info('Environments loaded', { count: environmentConnections.length });
-            
+
             // Convert EnvironmentConnection[] to Environment[]
             const environments = this.convertEnvironmentConnections(environmentConnections);
-            
+
             // Update the environment selector component with loaded environments
             environmentSelectorComponent.setEnvironments(environments);
-            
-            // Auto-select first environment if requested and available
-            if (autoSelect && environments.length > 0) {
-                environmentSelectorComponent.setSelectedEnvironment(environments[0].id);
-                logger.info('Auto-selected first environment', { 
-                    environmentId: environments[0].id,
-                    name: environments[0].displayName 
+
+            // Try to restore previously selected environment from cached state
+            let selectedEnvironmentId: string | undefined;
+
+            if (viewType) {
+                const cachedState = await this._stateService.getPanelState(viewType);
+                selectedEnvironmentId = cachedState?.selectedEnvironmentId;
+
+                if (selectedEnvironmentId) {
+                    // Verify the cached environment still exists
+                    const environmentExists = environments.some(env => env.id === selectedEnvironmentId);
+                    if (environmentExists) {
+                        logger.info('Restored environment from cached state', {
+                            environmentId: selectedEnvironmentId
+                        });
+                    } else {
+                        logger.warn('Cached environment no longer exists', {
+                            environmentId: selectedEnvironmentId
+                        });
+                        selectedEnvironmentId = undefined;
+                    }
+                }
+            }
+
+            // Fall back to auto-selecting first environment if no cached state
+            if (!selectedEnvironmentId && autoSelect && environments.length > 0) {
+                selectedEnvironmentId = environments[0].id;
+                logger.info('Auto-selected first environment', {
+                    environmentId: selectedEnvironmentId,
+                    name: environments[0].displayName
                 });
             }
-            
+
+            // Set the selected environment
+            if (selectedEnvironmentId) {
+                environmentSelectorComponent.setSelectedEnvironment(selectedEnvironmentId);
+            }
+
             // Component will handle its own update through event bridges
-            
+
         } catch (error) {
             logger.error('Failed to load environments', error as Error);
             vscode.window.showErrorMessage('Failed to load environments: ' + (error as Error).message);

@@ -57,6 +57,7 @@ export interface FilterPanelConfig {
     advancedFilters: FilterFieldConfig[];
     showPreviewCount?: boolean; // Show "X items match" preview
     maxConditions?: number; // Max number of advanced filter conditions (default: 10)
+    autoApplyQuickFilters?: boolean; // Auto-apply quick filters when toggled (default: false)
 }
 
 /**

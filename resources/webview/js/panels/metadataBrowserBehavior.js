@@ -71,8 +71,8 @@ class MetadataBrowserBehavior {
             }
         });
 
-        // Setup table row click handlers
-        MetadataBrowserBehavior.setupTableClickHandlers();
+        // ROW CLICK DISABLED - Use context menu "View Details" instead
+        // MetadataBrowserBehavior.setupTableClickHandlers();
 
         // Setup keyboard shortcuts
         MetadataBrowserBehavior.setupKeyboardShortcuts();
@@ -106,6 +106,7 @@ class MetadataBrowserBehavior {
                     break;
                 }
 
+                case 'closeRightPanel':
                 case 'close-detail-panel':
                     MetadataBrowserBehavior.closeDetailPanel();
                     break;

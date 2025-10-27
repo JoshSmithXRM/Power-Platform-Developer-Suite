@@ -134,8 +134,8 @@ export class PluginTraceService {
 
         // If raw OData filter is provided, use it directly (for complex OR/AND logic)
         if (filterOptions.odataFilter) {
-            url += `&$filter=${filterOptions.odataFilter}`;
-            this.logger.info('✅ Applied raw OData filter', { odataFilter: filterOptions.odataFilter });
+            url += `&$filter=${encodeURIComponent(filterOptions.odataFilter)}`;
+            this.logger.info('✅ Applied raw OData filter', { odataFilter: filterOptions.odataFilter, encoded: encodeURIComponent(filterOptions.odataFilter) });
         } else {
             // Otherwise, build filter from individual properties (legacy simple AND logic)
             const filters: string[] = [];
@@ -166,8 +166,9 @@ export class PluginTraceService {
             }
 
             if (filters.length > 0) {
-                url += `&$filter=${filters.join(' and ')}`;
-                this.logger.info('✅ Applied filters to URL', { filterString: filters.join(' and ') });
+                const filterString = filters.join(' and ');
+                url += `&$filter=${encodeURIComponent(filterString)}`;
+                this.logger.info('✅ Applied filters to URL', { filterString, encoded: encodeURIComponent(filterString) });
             } else {
                 this.logger.info('ℹ️ No filters applied');
             }

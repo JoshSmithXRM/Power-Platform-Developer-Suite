@@ -1019,6 +1019,13 @@ class DataTableBehavior {
     search(query) {
         console.log(`Searching table ${this.tableId} with query: "${query}"`);
 
+        // Notify Extension Host so search is persisted across data refreshes
+        this.postMessage({
+            command: 'table-search',
+            tableId: this.tableId,
+            searchQuery: query || ''
+        });
+
         const tbody = this.table.querySelector('tbody');
         if (!tbody) {
             console.warn(`No tbody found in table ${this.tableId}`);

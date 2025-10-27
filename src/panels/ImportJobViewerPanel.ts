@@ -254,6 +254,12 @@ export class ImportJobViewerPanel extends BasePanel {
                     await this.handleComponentEvent(message);
                     break;
 
+                case 'table-search':
+                    if (message.tableId && this.dataTableComponent) {
+                        this.dataTableComponent.search(message.searchQuery || '');
+                    }
+                    break;
+
                 default:
                     this.componentLogger.warn('Unknown message command', { command: message.command });
             }
@@ -353,7 +359,7 @@ export class ImportJobViewerPanel extends BasePanel {
 
     private async loadEnvironments(): Promise<void> {
         if (this.environmentSelectorComponent) {
-            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger);
+            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger, ImportJobViewerPanel.viewType);
         }
     }
 

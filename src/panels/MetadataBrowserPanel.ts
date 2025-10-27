@@ -472,11 +472,12 @@ export class MetadataBrowserPanel extends BasePanel {
                     }
                     break;
 
-                case 'metadata-row-click':
-                    if (message.data) {
-                        await this.handleMetadataRowClick(message.data);
-                    }
-                    break;
+                // ROW CLICK DISABLED - Use context menu "View Details" instead
+                // case 'metadata-row-click':
+                //     if (message.data) {
+                //         await this.handleMetadataRowClick(message.data);
+                //     }
+                //     break;
 
                 case 'panel-ready':
                     this.componentLogger.debug('Panel ready event received');
@@ -485,6 +486,39 @@ export class MetadataBrowserPanel extends BasePanel {
                 case 'component-event':
                     this.componentLogger.debug('Component event received', { data: message.data });
                     await this.handleComponentEvent(message);
+                    break;
+
+                case 'table-search':
+                    if (message.tableId) {
+                        // Determine which table to search based on tableId
+                        switch (message.tableId) {
+                            case 'metadata-attributes-table':
+                                if (this.attributesTableComponent) {
+                                    this.attributesTableComponent.search(message.searchQuery || '');
+                                }
+                                break;
+                            case 'metadata-keys-table':
+                                if (this.keysTableComponent) {
+                                    this.keysTableComponent.search(message.searchQuery || '');
+                                }
+                                break;
+                            case 'metadata-relationships-table':
+                                if (this.relationshipsTableComponent) {
+                                    this.relationshipsTableComponent.search(message.searchQuery || '');
+                                }
+                                break;
+                            case 'metadata-privileges-table':
+                                if (this.privilegesTableComponent) {
+                                    this.privilegesTableComponent.search(message.searchQuery || '');
+                                }
+                                break;
+                            case 'metadata-choice-values-table':
+                                if (this.choiceValuesTableComponent) {
+                                    this.choiceValuesTableComponent.search(message.searchQuery || '');
+                                }
+                                break;
+                        }
+                    }
                     break;
 
                 default:
@@ -551,6 +585,9 @@ export class MetadataBrowserPanel extends BasePanel {
                 const { itemId, rowData } = data;
 
                 switch (itemId) {
+                    case 'viewDetails':
+                        await this.handleViewDetails(componentId, rowData);
+                        break;
                     case 'copyLogicalName':
                         await this.handleCopyLogicalName(rowData);
                         break;
@@ -563,6 +600,18 @@ export class MetadataBrowserPanel extends BasePanel {
                     default:
                         this.componentLogger.warn('Unknown context menu item ID', { itemId });
                 }
+                return;
+            }
+
+            // Handle split panel events
+            if (componentId === 'metadata-detail-split-panel' && eventType === 'splitRatioChanged') {
+                // Could save split ratio to state if needed
+                this.componentLogger.debug('Split ratio changed', { splitRatio: data?.splitRatio });
+                return;
+            }
+
+            if (componentId === 'metadata-detail-split-panel' && (eventType === 'rightPanelOpened' || eventType === 'rightPanelClosed')) {
+                this.componentLogger.debug('Split panel visibility changed', { rightPanelVisible: data?.rightPanelVisible });
                 return;
             }
 
@@ -649,100 +698,115 @@ export class MetadataBrowserPanel extends BasePanel {
             </div>
         </div>
 
-        <!-- Right Panel: Metadata Content -->
-        <div class="right-panel">
-            <div class="selection-header">
-                <span class="selection-label">Selected:</span>
-                <span class="selection-value" id="current-selection">${currentSelection}</span>
+        <!-- Split Panel: Metadata Content + Detail Panel -->
+        <div id="metadataSplitPanelContainer" class="split-panel split-panel-horizontal split-panel-resizable split-panel-right-hidden"
+             data-component-type="SplitPanel"
+             data-component-id="metadata-detail-split-panel"
+             data-orientation="horizontal"
+             data-min-size="400"
+             data-resizable="true"
+             data-split-ratio="70">
+
+            <!-- Left: Metadata Tables -->
+            <div class="split-panel-left right-panel" data-panel="left">
+                <div class="selection-header">
+                    <span class="selection-label">Selected:</span>
+                    <span class="selection-value" id="current-selection">${currentSelection}</span>
+                </div>
+
+                <div class="metadata-sections ${isEntitySelected ? 'entity-mode' : ''} ${isChoiceSelected ? 'choice-mode' : ''}">
+        <!-- Attributes Section (Entity Only) -->
+        <div class="section entity-only ${isAttributesExpanded ? 'expanded' : ''}" data-section="attributes">
+            <div class="section-header" data-action="toggle-section" data-section="attributes">
+                <span class="section-icon">▶</span>
+                <span class="section-title">Attributes</span>
+                <span class="section-count" id="attributes-count">0</span>
             </div>
-
-            <div class="metadata-sections ${isEntitySelected ? 'entity-mode' : ''} ${isChoiceSelected ? 'choice-mode' : ''}">
-    <!-- Attributes Section (Entity Only) -->
-    <div class="section entity-only ${isAttributesExpanded ? 'expanded' : ''}" data-section="attributes">
-        <div class="section-header" data-action="toggle-section" data-section="attributes">
-            <span class="section-icon">▶</span>
-            <span class="section-title">Attributes</span>
-            <span class="section-count" id="attributes-count">0</span>
-        </div>
-        <div class="section-content">
-            ${this.attributesTableComponent.generateHTML()}
-        </div>
-    </div>
-
-    <!-- Keys Section (Entity Only) -->
-    <div class="section entity-only ${isKeysExpanded ? 'expanded' : ''}" data-section="keys">
-        <div class="section-header" data-action="toggle-section" data-section="keys">
-            <span class="section-icon">▶</span>
-            <span class="section-title">Keys</span>
-            <span class="section-count" id="keys-count">0</span>
-        </div>
-        <div class="section-content">
-            ${this.keysTableComponent.generateHTML()}
-        </div>
-    </div>
-
-    <!-- Relationships Section (Entity Only) -->
-    <div class="section entity-only ${isRelationshipsExpanded ? 'expanded' : ''}" data-section="relationships">
-        <div class="section-header" data-action="toggle-section" data-section="relationships">
-            <span class="section-icon">▶</span>
-            <span class="section-title">Relationships</span>
-            <span class="section-count" id="relationships-count">0</span>
-        </div>
-        <div class="section-content">
-            ${this.relationshipsTableComponent.generateHTML()}
-        </div>
-    </div>
-
-    <!-- Privileges Section (Entity Only) -->
-    <div class="section entity-only ${isPrivilegesExpanded ? 'expanded' : ''}" data-section="privileges">
-        <div class="section-header" data-action="toggle-section" data-section="privileges">
-            <span class="section-icon">▶</span>
-            <span class="section-title">Privileges</span>
-            <span class="section-count" id="privileges-count">0</span>
-        </div>
-        <div class="section-content">
-            ${this.privilegesTableComponent.generateHTML()}
-        </div>
-    </div>
-
-    <!-- Choice Values Section (Choice Only) -->
-    <div class="section choice-only ${isChoicesExpanded ? 'expanded' : ''}" data-section="choices">
-        <div class="section-header" data-action="toggle-section" data-section="choices">
-            <span class="section-icon">▶</span>
-            <span class="section-title">Choice Values</span>
-            <span class="section-count" id="choices-count">0</span>
-        </div>
-        <div class="section-content">
-            ${this.choiceValuesTableComponent.generateHTML()}
-        </div>
-    </div>
+            <div class="section-content">
+                ${this.attributesTableComponent.generateHTML()}
             </div>
         </div>
 
-        <!-- Detail Panel (3rd column) -->
-        <div class="detail-panel hidden" id="detail-panel">
-            <div class="detail-panel-header">
-                <span class="detail-panel-title" id="detail-panel-title">Details</span>
-                <button class="detail-panel-close" data-action="close-detail-panel" title="Close" aria-label="Close">
-                    ×
-                </button>
+        <!-- Keys Section (Entity Only) -->
+        <div class="section entity-only ${isKeysExpanded ? 'expanded' : ''}" data-section="keys">
+            <div class="section-header" data-action="toggle-section" data-section="keys">
+                <span class="section-icon">▶</span>
+                <span class="section-title">Keys</span>
+                <span class="section-count" id="keys-count">0</span>
             </div>
-        <div class="detail-panel-tabs">
-            <button class="detail-panel-tab active" data-tab="properties" data-action="switch-detail-tab">
-                Properties
-            </button>
-            <button class="detail-panel-tab" data-tab="json" data-action="switch-detail-tab">
-                Raw Data
-            </button>
-        </div>
-        <div class="detail-panel-content">
-            <div id="detail-properties-content" style="display: block;">
-                <!-- Properties will be rendered here by JavaScript -->
-            </div>
-            <div id="detail-json-content" style="display: none;">
-                <!-- JSON will be rendered here by JavaScript -->
+            <div class="section-content">
+                ${this.keysTableComponent.generateHTML()}
             </div>
         </div>
+
+        <!-- Relationships Section (Entity Only) -->
+        <div class="section entity-only ${isRelationshipsExpanded ? 'expanded' : ''}" data-section="relationships">
+            <div class="section-header" data-action="toggle-section" data-section="relationships">
+                <span class="section-icon">▶</span>
+                <span class="section-title">Relationships</span>
+                <span class="section-count" id="relationships-count">0</span>
+            </div>
+            <div class="section-content">
+                ${this.relationshipsTableComponent.generateHTML()}
+            </div>
+        </div>
+
+        <!-- Privileges Section (Entity Only) -->
+        <div class="section entity-only ${isPrivilegesExpanded ? 'expanded' : ''}" data-section="privileges">
+            <div class="section-header" data-action="toggle-section" data-section="privileges">
+                <span class="section-icon">▶</span>
+                <span class="section-title">Privileges</span>
+                <span class="section-count" id="privileges-count">0</span>
+            </div>
+            <div class="section-content">
+                ${this.privilegesTableComponent.generateHTML()}
+            </div>
+        </div>
+
+        <!-- Choice Values Section (Choice Only) -->
+        <div class="section choice-only ${isChoicesExpanded ? 'expanded' : ''}" data-section="choices">
+            <div class="section-header" data-action="toggle-section" data-section="choices">
+                <span class="section-icon">▶</span>
+                <span class="section-title">Choice Values</span>
+                <span class="section-count" id="choices-count">0</span>
+            </div>
+            <div class="section-content">
+                ${this.choiceValuesTableComponent.generateHTML()}
+            </div>
+        </div>
+                </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="split-panel-divider" data-divider>
+                <div class="split-panel-divider-handle"></div>
+            </div>
+
+            <!-- Right: Detail Panel -->
+            <div class="split-panel-right detail-panel" data-panel="right" id="detail-panel">
+                <div class="detail-panel-header">
+                    <span class="detail-panel-title" id="detail-panel-title">Details</span>
+                    <button class="detail-panel-close" data-action="closeRightPanel" title="Close" aria-label="Close">
+                        ×
+                    </button>
+                </div>
+                <div class="detail-panel-tabs">
+                    <button class="detail-panel-tab active" data-tab="properties" data-action="switch-detail-tab">
+                        Properties
+                    </button>
+                    <button class="detail-panel-tab" data-tab="json" data-action="switch-detail-tab">
+                        Raw Data
+                    </button>
+                </div>
+                <div class="detail-panel-content">
+                    <div id="detail-properties-content" style="display: block;">
+                        <!-- Properties will be rendered here by JavaScript -->
+                    </div>
+                    <div id="detail-json-content" style="display: none;">
+                        <!-- JSON will be rendered here by JavaScript -->
+                    </div>
+                </div>
+            </div>
         </div>
 
             </div>
@@ -762,7 +826,10 @@ export class MetadataBrowserPanel extends BasePanel {
                     this.privilegesTableComponent,
                     this.choiceValuesTableComponent
                 ],
-                ['css/panels/metadata-browser.css'],  // Additional panel-specific CSS
+                [
+                    'css/panels/metadata-browser.css',
+                    'css/components/split-panel.css'
+                ],  // Additional panel-specific CSS
                 [
                     'js/panels/metadataBrowserBehavior.js',
                     'js/components/SplitPanelBehavior.js'
@@ -779,7 +846,7 @@ export class MetadataBrowserPanel extends BasePanel {
 
     private async loadEnvironments(): Promise<void> {
         if (this.environmentSelectorComponent) {
-            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger);
+            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger, MetadataBrowserPanel.viewType);
         }
     }
 
@@ -915,37 +982,34 @@ export class MetadataBrowserPanel extends BasePanel {
         await this.loadChoiceMetadata(selectedEnvironment.id, name as string, displayName as string);
     }
 
-    private async handleMetadataRowClick(data: unknown): Promise<void> {
-        if (!data || typeof data !== 'object') {
+    /**
+     * Handle View Details context menu action
+     * Opens the detail panel showing full metadata for the selected row
+     */
+    private async handleViewDetails(componentId: string, rowData: unknown): Promise<void> {
+        if (!rowData || typeof rowData !== 'object') {
             return;
         }
 
-        const clickData = data as Record<string, unknown>;
-        const { tableId, rowId } = clickData;
-        if (!tableId || !rowId) {
+        const row = rowData as Record<string, unknown>;
+        const rowId = row.id as string;
+        if (!rowId) {
             return;
         }
 
         try {
-            // Determine which table was clicked and get the metadata
+            // Determine which table the row is from and get the full metadata
             let metadata: unknown = null;
             let title: string = '';
 
-            if (tableId === 'metadata-attributes-table') {
+            if (componentId === 'metadata-attributes-table') {
                 // Find attribute in current metadata
                 const attribute = this.currentMetadata?.attributes.find(a => a.LogicalName === rowId);
                 if (attribute) {
                     metadata = attribute;
                     title = `Attribute: ${attribute.DisplayName?.UserLocalizedLabel?.Label || attribute.LogicalName}`;
                 }
-            } else if (tableId === 'metadata-keys-table') {
-                // Find key in current metadata
-                const key = this.currentMetadata?.keys.find(k => k.LogicalName === rowId);
-                if (key) {
-                    metadata = key;
-                    title = `Key: ${key.DisplayName?.UserLocalizedLabel?.Label || key.LogicalName}`;
-                }
-            } else if (tableId === 'metadata-relationships-table') {
+            } else if (componentId === 'metadata-relationships-table') {
                 // Find relationship in current metadata
                 const relationship = [
                     ...(this.currentMetadata?.oneToManyRelationships || []),
@@ -956,26 +1020,10 @@ export class MetadataBrowserPanel extends BasePanel {
                     metadata = relationship;
                     title = `Relationship: ${relationship.SchemaName}`;
                 }
-            } else if (tableId === 'metadata-privileges-table') {
-                // Find privilege in current metadata
-                const privilege = this.currentMetadata?.privileges.find(p => p.Name === rowId);
-                if (privilege) {
-                    metadata = privilege;
-                    title = `Privilege: ${privilege.Name}`;
-                }
-            } else if (tableId === 'metadata-choice-values-table') {
-                // Find the option in current choice metadata
-                if (this.currentChoiceMetadata?.Options) {
-                    const option = this.currentChoiceMetadata.Options.find(o => o.Value?.toString() === rowId);
-                    if (option) {
-                        metadata = option;
-                        title = `Choice Value: ${option.Label?.UserLocalizedLabel?.Label || rowId}`;
-                    }
-                }
             }
 
             if (metadata) {
-                // Send to webview to display
+                // Send to webview to display in split panel
                 this.postMessage({
                     command: 'show-detail',
                     action: 'showDetail',
@@ -986,9 +1034,14 @@ export class MetadataBrowserPanel extends BasePanel {
                 });
             }
         } catch (error) {
-            this.componentLogger.error('Error handling metadata row click', error as Error, { tableId, rowId });
+            this.componentLogger.error('Error handling view details', error as Error, { componentId, rowId });
         }
     }
+
+    // ROW CLICK DISABLED - Use context menu "View Details" instead
+    // private async handleMetadataRowClick(data: unknown): Promise<void> {
+    //     ...row click implementation removed...
+    // }
 
     private async showTableChoicePicker(): Promise<void> {
         try {

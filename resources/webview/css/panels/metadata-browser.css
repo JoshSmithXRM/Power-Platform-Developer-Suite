@@ -3,10 +3,10 @@
 
 /* Removed sticky-header - now using standard panel-controls from component-base.css */
 
-/* Three-panel layout container */
+/* Two-panel layout container: left tree + split panel (contains tables + detail) */
 .metadata-container {
     display: grid;
-    grid-template-columns: 280px 1fr 400px;
+    grid-template-columns: 280px 1fr;
     flex: 1;
     min-height: 0;
     gap: 0;
@@ -14,18 +14,14 @@
     position: relative;
 }
 
-/* When detail panel is hidden, use two-column layout */
-.metadata-container.detail-hidden {
-    grid-template-columns: 280px 1fr;
-}
-
 /* When left panel is collapsed */
 .metadata-container.left-collapsed {
-    grid-template-columns: 0px 1fr 400px;
+    grid-template-columns: 0px 1fr;
 }
 
-.metadata-container.left-collapsed.detail-hidden {
-    grid-template-columns: 0px 1fr;
+/* Legacy class for compatibility - no longer needed with split panel */
+.metadata-container.detail-hidden {
+    /* No-op: split panel handles detail visibility internally */
 }
 
 /* Left panel - Entity/Choice tree */

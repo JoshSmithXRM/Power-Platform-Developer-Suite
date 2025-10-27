@@ -321,7 +321,8 @@ export class PluginTraceViewerPanel extends BasePanel {
                 { field: 'exceptiondetails', label: 'Exception Details', type: 'text', operators: ['contains', 'isNotNull', 'isNull'] }
             ],
             showPreviewCount: true,
-            maxConditions: 10
+            maxConditions: 10,
+            autoApplyQuickFilters: true
         });
 
         // 4. Data Table
@@ -411,6 +412,12 @@ export class PluginTraceViewerPanel extends BasePanel {
                     await this.handleContextMenuAction(message.actionId, message.rowId);
                     break;
 
+                case 'table-search':
+                    if (message.tableId && this.dataTableComponent) {
+                        this.dataTableComponent.search(message.searchQuery || '');
+                    }
+                    break;
+
                 case 'auto-refresh-changed':
                     await this.handleAutoRefreshChange(message.interval);
                     break;
@@ -467,7 +474,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                     await this.updateState({ rightPanelVisible: false });
                     break;
 
-                case 'filterPanelCollapsed':
+                case 'filter-panel-collapsed':
                     this.componentLogger.info('✅ Filter panel collapsed state changed', { collapsed: message.data?.collapsed });
                     await this.updateState({ filterPanelCollapsed: message.data?.collapsed });
                     break;
@@ -1485,12 +1492,17 @@ export class PluginTraceViewerPanel extends BasePanel {
         const odataConditions: string[] = [];
 
         // Handle quick filters - convert to OData conditions
-        if (filters.quick && Array.isArray(filters.quick)) {
-            this.componentLogger.info('Processing quick filters', { quickFilters: filters.quick });
-            filters.quick.forEach((filterId: string) => {
+        // Ensure quick filters is an array (handle serialization issues)
+        const quickFiltersArray = filters.quick && Array.isArray(filters.quick) ? filters.quick :
+            (filters.quick && typeof filters.quick === 'object' ? Object.values(filters.quick) : []);
+
+        if (quickFiltersArray.length > 0) {
+            this.componentLogger.info('Processing quick filters', { quickFilters: quickFiltersArray });
+            quickFiltersArray.forEach((filterId: string) => {
                 switch (filterId) {
                     case 'exceptionOnly':
-                        odataConditions.push('exceptiondetails ne null');
+                        // In Dynamics, empty exception details are stored as empty string, not null
+                        odataConditions.push("exceptiondetails ne ''");
                         this.componentLogger.debug('Added exceptionOnly OData condition');
                         break;
                     case 'lastHour': {

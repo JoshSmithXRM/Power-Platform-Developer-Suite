@@ -131,7 +131,38 @@ export default tseslint.config(
     },
     rules: {
       'no-console': 'off',
-      'no-restricted-syntax': 'off'
+      'no-restricted-syntax': [
+        'error',
+        // Detect camelCase in sendMessage calls (2nd argument is the action/command name)
+        {
+          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='filtersApplied']",
+          message: "❌ Use kebab-case 'filters-applied' not camelCase 'filtersApplied' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='filtersCleared']",
+          message: "❌ Use kebab-case 'filters-cleared' not camelCase 'filtersCleared' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='filterPanelCollapsed']",
+          message: "❌ Use kebab-case 'filter-panel-collapsed' not camelCase 'filterPanelCollapsed' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='loadEnvironments']",
+          message: "❌ Use kebab-case 'load-environments' not camelCase 'loadEnvironments' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='environmentChanged']",
+          message: "❌ Use kebab-case 'environment-changed' not camelCase 'environmentChanged' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='traceSelected']",
+          message: "❌ Use kebab-case 'trace-selected' not camelCase 'traceSelected' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='splitRatioChanged']",
+          message: "❌ Use kebab-case 'split-ratio-changed' not camelCase 'splitRatioChanged' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
+        }
+      ]
     }
   },
   {
@@ -258,6 +289,14 @@ export default tseslint.config(
         {
           selector: "SwitchCase > Literal[value='environment-selected']",
           message: "❌ Remove 'environment-selected' case - it is never sent. Only 'environment-changed' is emitted by EnvironmentSelectorBehavior. See: resources/webview/js/components/EnvironmentSelectorBehavior.js:162"
+        },
+        {
+          selector: "SwitchCase > Literal[value='filtersCleared']",
+          message: "❌ Use kebab-case 'filters-cleared' not camelCase 'filtersCleared'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "SwitchCase > Literal[value='filterPanelCollapsed']",
+          message: "❌ Use kebab-case 'filter-panel-collapsed' not camelCase 'filterPanelCollapsed'. See: docs/MESSAGE_CONVENTIONS.md"
         }
       ]
     }
