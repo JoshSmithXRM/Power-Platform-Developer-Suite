@@ -670,6 +670,11 @@ export class PluginTraceViewerPanel extends BasePanel {
 
             await this.updateState({ selectedEnvironmentId: environmentId });
 
+            // Show loading state
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setLoading(true, 'Loading plugin traces...');
+            }
+
             // Convert filters to service format
             const serviceFilters = this.convertFiltersToServiceFormat(filterOptions || this.currentFilters);
 
@@ -685,6 +690,7 @@ export class PluginTraceViewerPanel extends BasePanel {
 
             // Update table
             this.dataTableComponent?.setData(tableData);
+            this.dataTableComponent?.setLoading(false);
 
             this.componentLogger.debug('Loaded traces', { count: traces.length });
 
@@ -695,6 +701,9 @@ export class PluginTraceViewerPanel extends BasePanel {
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.componentLogger.error('Failed to load traces', error as Error);
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setLoading(false);
+            }
             this.postMessage({
                 action: 'error',
                 message: `Failed to load traces: ${errorMessage}`
@@ -807,6 +816,11 @@ export class PluginTraceViewerPanel extends BasePanel {
             case 'refresh':
                 this.componentLogger.info('🔄 Refresh action triggered');
                 if (this.selectedEnvironmentId) {
+                    // Clear table immediately
+                    if (this.dataTableComponent) {
+                        this.dataTableComponent.setData([]);
+                    }
+
                     this.actionBarComponent?.setActionLoading('refresh', true);
                     try {
                         await this.handleLoadTraces(this.selectedEnvironmentId);

@@ -177,14 +177,14 @@ export class MetadataBrowserPanel extends BasePanel {
                         id: 'openInMaker',
                         label: 'Open in Maker',
                         variant: 'primary',
-                        disabled: true
+                        disabled: false
                     },
                     {
                         id: 'refresh',
                         label: 'Refresh',
                         icon: 'refresh',
                         variant: 'secondary',
-                        disabled: true
+                        disabled: false
                     }
                 ],
                 layout: 'horizontal',
@@ -441,13 +441,22 @@ export class MetadataBrowserPanel extends BasePanel {
                     break;
 
                 case 'refresh-data':
+                    // Clear all tables first
+                    if (this.attributesTableComponent) this.attributesTableComponent.setData([]);
+                    if (this.keysTableComponent) this.keysTableComponent.setData([]);
+                    if (this.relationshipsTableComponent) this.relationshipsTableComponent.setData([]);
+                    if (this.privilegesTableComponent) this.privilegesTableComponent.setData([]);
+                    if (this.choiceValuesTableComponent) this.choiceValuesTableComponent.setData([]);
+
+                    // Show loading state
+                    this.setAllTablesLoading(true, 'Refreshing metadata...');
+
                     this.actionBarComponent?.setActionLoading('refresh', true);
                     try {
                         await this.refreshCurrentMetadata();
-                        // TODO: Remove 2s delay after testing spinner visibility
-                        await new Promise(resolve => setTimeout(resolve, 2000));
                     } finally {
                         this.actionBarComponent?.setActionLoading('refresh', false);
+                        this.setAllTablesLoading(false);
                     }
                     break;
 
@@ -510,13 +519,22 @@ export class MetadataBrowserPanel extends BasePanel {
 
                 switch (actionId) {
                     case 'refresh':
+                        // Clear all tables first
+                        if (this.attributesTableComponent) this.attributesTableComponent.setData([]);
+                        if (this.keysTableComponent) this.keysTableComponent.setData([]);
+                        if (this.relationshipsTableComponent) this.relationshipsTableComponent.setData([]);
+                        if (this.privilegesTableComponent) this.privilegesTableComponent.setData([]);
+                        if (this.choiceValuesTableComponent) this.choiceValuesTableComponent.setData([]);
+
+                        // Show loading state
+                        this.setAllTablesLoading(true, 'Refreshing metadata...');
+
                         this.actionBarComponent?.setActionLoading('refresh', true);
                         try {
                             await this.refreshCurrentMetadata();
-                            // TODO: Remove 2s delay after testing spinner visibility
-                            await new Promise(resolve => setTimeout(resolve, 2000));
                         } finally {
                             this.actionBarComponent?.setActionLoading('refresh', false);
+                            this.setAllTablesLoading(false);
                         }
                         break;
                     case 'openInMaker':
@@ -599,7 +617,7 @@ export class MetadataBrowserPanel extends BasePanel {
         </div>
 
         <div class="panel-content">
-            <div class="metadata-container">
+            <div class="metadata-container detail-hidden">
         <button class="panel-collapse-btn" id="left-panel-collapse" data-action="toggle-left-panel" title="Collapse sidebar" aria-label="Collapse sidebar">
             ◀
         </button>
@@ -795,6 +813,12 @@ export class MetadataBrowserPanel extends BasePanel {
         try {
             this.componentLogger.info('Loading entity and choice tree', { environmentId });
 
+            // Show loading state for tree
+            this.postMessage({
+                action: 'tree-loading',
+                loading: true
+            });
+
             const metadataService = ServiceFactory.getMetadataService();
             const [entities, choices] = await Promise.all([
                 metadataService.getEntityDefinitions(environmentId),
@@ -849,6 +873,15 @@ export class MetadataBrowserPanel extends BasePanel {
             return;
         }
 
+        // Set entity mode FIRST so sections become visible
+        this.postMessage({
+            action: 'set-mode',
+            mode: 'entity'
+        });
+
+        // Show loading state immediately (important for first load when tables are empty)
+        this.setAllTablesLoading(true, 'Loading entity metadata...');
+
         await this.loadEntityMetadata(selectedEnvironment.id, logicalName as string, metadataId as string, displayName as string);
     }
 
@@ -866,6 +899,17 @@ export class MetadataBrowserPanel extends BasePanel {
         const { name, displayName } = choiceData;
         if (!name) {
             return;
+        }
+
+        // Set choice mode FIRST so sections become visible
+        this.postMessage({
+            action: 'set-mode',
+            mode: 'choice'
+        });
+
+        // Show loading state immediately (important for first load)
+        if (this.choiceValuesTableComponent) {
+            this.choiceValuesTableComponent.setLoading(true, 'Loading choice values...');
         }
 
         await this.loadChoiceMetadata(selectedEnvironment.id, name as string, displayName as string);
@@ -1010,6 +1054,13 @@ export class MetadataBrowserPanel extends BasePanel {
         try {
             this.componentLogger.info('Loading entity metadata', { logicalName });
 
+            // Clear all tables first
+            if (this.attributesTableComponent) this.attributesTableComponent.setData([]);
+            if (this.keysTableComponent) this.keysTableComponent.setData([]);
+            if (this.relationshipsTableComponent) this.relationshipsTableComponent.setData([]);
+            if (this.privilegesTableComponent) this.privilegesTableComponent.setData([]);
+            if (this.choiceValuesTableComponent) this.choiceValuesTableComponent.setData([]);
+
             // Show loading state
             this.setAllTablesLoading(true);
 
@@ -1088,17 +1139,20 @@ export class MetadataBrowserPanel extends BasePanel {
         try {
             this.componentLogger.info('Loading choice metadata', { name });
 
+            // Clear all tables first
+            if (this.attributesTableComponent) this.attributesTableComponent.setData([]);
+            if (this.keysTableComponent) this.keysTableComponent.setData([]);
+            if (this.relationshipsTableComponent) this.relationshipsTableComponent.setData([]);
+            if (this.privilegesTableComponent) this.privilegesTableComponent.setData([]);
+            if (this.choiceValuesTableComponent) this.choiceValuesTableComponent.setData([]);
+
             // Show loading state for choice values table
             if (this.choiceValuesTableComponent) {
                 this.choiceValuesTableComponent.setLoading(true, 'Loading choice values...');
             }
 
-            // Clear other tables
+            // Turn off loading for other tables
             this.setAllTablesLoading(false);
-            if (this.attributesTableComponent) this.attributesTableComponent.setData([]);
-            if (this.keysTableComponent) this.keysTableComponent.setData([]);
-            if (this.relationshipsTableComponent) this.relationshipsTableComponent.setData([]);
-            if (this.privilegesTableComponent) this.privilegesTableComponent.setData([]);
 
             // Fetch choice metadata
             const metadataService = ServiceFactory.getMetadataService();

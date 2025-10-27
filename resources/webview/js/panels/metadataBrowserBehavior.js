@@ -56,7 +56,11 @@ class MetadataBrowserBehavior {
         window.addEventListener('message', (event) => {
             const message = event.data;
 
-            if (message.command === 'populate-tree') {
+            if (message.action === 'set-mode') {
+                MetadataBrowserBehavior.setMode(message.mode);
+            } else if (message.action === 'tree-loading') {
+                MetadataBrowserBehavior.setTreeLoading(message.loading);
+            } else if (message.command === 'populate-tree') {
                 MetadataBrowserBehavior.populateTree(message.data);
             } else if (message.command === 'update-selection') {
                 MetadataBrowserBehavior.updateSelection(message.data);
@@ -221,6 +225,40 @@ class MetadataBrowserBehavior {
                 }
             });
         });
+    }
+
+    /**
+     * Set the mode (entity or choice) to show/hide appropriate sections
+     */
+    static setMode(mode) {
+        const sectionsContainer = document.querySelector('.metadata-sections');
+        if (sectionsContainer) {
+            // Remove both mode classes
+            sectionsContainer.classList.remove('entity-mode', 'choice-mode');
+            // Add the appropriate mode class
+            if (mode === 'entity') {
+                sectionsContainer.classList.add('entity-mode');
+            } else if (mode === 'choice') {
+                sectionsContainer.classList.add('choice-mode');
+            }
+        }
+    }
+
+    /**
+     * Show/hide loading state for tree
+     */
+    static setTreeLoading(loading) {
+        const tablesList = document.getElementById('tables-list');
+        const choicesList = document.getElementById('choices-list');
+
+        if (loading) {
+            if (tablesList) {
+                tablesList.innerHTML = '<li class="tree-loading">Loading tables...</li>';
+            }
+            if (choicesList) {
+                choicesList.innerHTML = '<li class="tree-loading">Loading choices...</li>';
+            }
+        }
     }
 
     /**
