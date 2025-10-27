@@ -43,8 +43,8 @@ export function activate(context: vscode.ExtensionContext): void {
             ...panelCommands.registerCommands(),
             ...metadataBrowserCommands.registerCommands()
         ];
-    } catch (err: any) {
-        logger.error('Extension', 'Failed to register commands during activation', err);
+    } catch (err: unknown) {
+        logger.error('Extension', 'Failed to register commands during activation', err instanceof Error ? err : new Error(String(err)));
 
         // Fallback for the metadata browser command to avoid 'command not found'
         const fallback = vscode.commands.registerCommand('power-platform-dev-suite.openMetadataBrowser', () => {

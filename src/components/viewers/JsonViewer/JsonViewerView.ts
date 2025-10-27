@@ -1,7 +1,7 @@
 import { JsonViewerConfig } from './JsonViewerConfig';
 
 export class JsonViewerView {
-    static render(config: JsonViewerConfig, data: any): string {
+    static render(config: JsonViewerConfig, data: unknown): string {
         const maxHeightStyle = config.maxHeight && config.maxHeight !== 'none'
             ? `max-height: ${config.maxHeight};`
             : '';
@@ -44,12 +44,12 @@ export class JsonViewerView {
         return '<div class="json-viewer-empty">No data to display</div>';
     }
 
-    private static renderJson(data: any, config: JsonViewerConfig, depth: number): string {
+    private static renderJson(data: unknown, config: JsonViewerConfig, depth: number): string {
         const isCollapsed = depth >= (config.initialCollapseDepth || 0) && (config.collapsible === true);
         return this.renderValue(data, depth, config, isCollapsed);
     }
 
-    private static renderValue(value: any, depth: number, config: JsonViewerConfig, isCollapsed: boolean): string {
+    private static renderValue(value: unknown, depth: number, config: JsonViewerConfig, isCollapsed: boolean): string {
         if (value === null) {
             return `<span class="json-null">null</span>`;
         }
@@ -68,7 +68,7 @@ export class JsonViewerView {
                 return `<span class="json-number">${value}</span>`;
 
             case 'string':
-                return `<span class="json-string">"${this.escapeHtml(value)}"</span>`;
+                return `<span class="json-string">"${this.escapeHtml(value as string)}"</span>`;
 
             case 'object':
                 if (Array.isArray(value)) {
@@ -82,7 +82,10 @@ export class JsonViewerView {
         }
     }
 
-    private static renderObject(obj: any, depth: number, config: JsonViewerConfig, isCollapsed: boolean): string {
+    private static renderObject(obj: unknown, depth: number, config: JsonViewerConfig, isCollapsed: boolean): string {
+        if (!obj || typeof obj !== 'object') {
+            return '';
+        }
         const keys = Object.keys(obj);
 
         if (keys.length === 0) {
@@ -98,7 +101,7 @@ export class JsonViewerView {
         const lines = keys.map((key, index) => {
             const isLast = index === keys.length - 1;
             const comma = isLast ? '' : ',';
-            const valueHtml = this.renderValue(obj[key], depth + 1, config, config.initialCollapseDepth ? depth + 1 >= config.initialCollapseDepth : false);
+            const valueHtml = this.renderValue((obj as Record<string, unknown>)[key], depth + 1, config, config.initialCollapseDepth ? depth + 1 >= config.initialCollapseDepth : false);
 
             return `
                 <div class="json-line json-object-line">
@@ -118,7 +121,7 @@ export class JsonViewerView {
         `;
     }
 
-    private static renderArray(arr: any[], depth: number, config: JsonViewerConfig, isCollapsed: boolean): string {
+    private static renderArray(arr: unknown[], depth: number, config: JsonViewerConfig, isCollapsed: boolean): string {
         if (arr.length === 0) {
             return `<span class="json-array">[]</span>`;
         }

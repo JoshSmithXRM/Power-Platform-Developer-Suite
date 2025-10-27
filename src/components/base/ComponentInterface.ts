@@ -22,7 +22,7 @@ export interface ComponentUpdateEvent extends ComponentEvent {
 }
 
 export interface ComponentStateChangeEvent extends ComponentEvent {
-    state: any;
+    state: unknown;
 }
 
 export interface ComponentErrorEvent extends ComponentEvent {
@@ -61,7 +61,8 @@ export interface Environment {
     settings: {
         dataverseUrl: string;
         authenticationMethod: string;
-        [key: string]: any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        [key: string]: any; // Dynamic environment settings - any is appropriate here
     };
 }
 
@@ -86,7 +87,7 @@ export interface SelectorOption {
     label: string;
     description?: string;
     disabled?: boolean;
-    data?: any;
+    data?: unknown;
 }
 
 // =============================================================================
@@ -100,7 +101,7 @@ export interface TableColumn {
     filterable?: boolean;
     width?: string | number;
     align?: 'left' | 'center' | 'right';
-    formatter?: (value: any, row: any) => string;
+    formatter?: (value: unknown, row: TableData) => string;
     className?: string;
 }
 
@@ -110,8 +111,8 @@ export interface TableAction {
     label: string;
     icon?: string;
     className?: string;
-    disabled?: (row: any) => boolean;
-    visible?: (row: any) => boolean;
+    disabled?: (row: TableData) => boolean;
+    visible?: (row: TableData) => boolean;
 }
 
 export interface ContextMenuItem {
@@ -119,8 +120,8 @@ export interface ContextMenuItem {
     action: string;
     label: string;
     type?: 'item' | 'separator';
-    disabled?: (row: any) => boolean;
-    visible?: (row: any) => boolean;
+    disabled?: (row: TableData) => boolean;
+    visible?: (row: TableData) => boolean;
 }
 
 export interface BulkAction {
@@ -139,7 +140,7 @@ export interface TableSortConfig {
 
 export interface TableData {
     id: string | number; // Required for row actions
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 // =============================================================================
@@ -153,7 +154,7 @@ export interface FormField {
     placeholder?: string;
     required?: boolean;
     disabled?: boolean;
-    value?: any;
+    value?: unknown;
     options?: SelectorOption[]; // For select/radio
     validation?: {
         pattern?: string;
@@ -161,7 +162,7 @@ export interface FormField {
         maxLength?: number;
         min?: number;
         max?: number;
-        customValidator?: (value: any) => string | null; // Returns error message or null
+        customValidator?: (value: unknown) => string | null; // Returns error message or null
     };
 }
 
@@ -260,7 +261,7 @@ export interface ComponentResources {
 
 export interface PanelCompositionConfig {
     title: string;
-    components: any[]; // BaseComponent instances
+    components: unknown[]; // BaseComponent instances - using unknown to avoid circular dependency
     layout?: 'vertical' | 'horizontal' | 'grid';
     webviewResources: WebviewResources;
     additionalCSS?: string[];
@@ -274,10 +275,10 @@ export interface PanelCompositionConfig {
 // =============================================================================
 
 export interface ComponentFactoryMethods {
-    createEnvironmentSelector(config: EnvironmentSelectorConfig): any;
-    createSolutionSelector(config: SolutionSelectorConfig): any;
-    createDataTable(config: DataTableConfig): any;
-    createActionBar(config: ActionBarConfig): any;
+    createEnvironmentSelector(config: EnvironmentSelectorConfig): unknown;
+    createSolutionSelector(config: SolutionSelectorConfig): unknown;
+    createDataTable(config: DataTableConfig): unknown;
+    createActionBar(config: ActionBarConfig): unknown;
 }
 
 // =============================================================================

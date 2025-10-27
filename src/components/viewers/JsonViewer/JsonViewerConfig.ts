@@ -2,9 +2,9 @@ import { BaseComponentConfig } from '../../base/BaseComponent';
 
 export interface JsonViewerConfig extends BaseComponentConfig {
     /**
-     * Initial JSON data to display
+     * Initial JSON data to display (any valid JSON structure)
      */
-    data?: any;
+    data?: unknown;
 
     /**
      * Enable collapsible sections for nested objects/arrays

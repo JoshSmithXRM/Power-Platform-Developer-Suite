@@ -4,6 +4,15 @@ import { SplitPanelConfig, DEFAULT_SPLIT_PANEL_CONFIG } from './SplitPanelConfig
 import { SplitPanelView } from './SplitPanelView';
 
 /**
+ * Persisted state structure for SplitPanelComponent
+ */
+interface SplitPanelState {
+    id: string;
+    splitRatio: number;
+    rightPanelVisible: boolean;
+}
+
+/**
  * SplitPanelComponent - Reusable resizable split panel
  * Provides horizontal or vertical split layout with draggable divider
  * Used by panels that need side-by-side or top-bottom views
@@ -181,7 +190,7 @@ export class SplitPanelComponent extends BaseComponent {
     /**
      * Export component state (for persistence)
      */
-    public exportState(): any {
+    public exportState(): SplitPanelState {
         return {
             id: this.config.id,
             splitRatio: this.splitRatio,
@@ -192,13 +201,19 @@ export class SplitPanelComponent extends BaseComponent {
     /**
      * Import component state (from persistence)
      */
-    public importState(state: any): void {
-        if (typeof state.splitRatio === 'number') {
-            this.splitRatio = state.splitRatio;
+    public importState(state: unknown): void {
+        if (!state || typeof state !== 'object') {
+            return;
         }
 
-        if (typeof state.rightPanelVisible === 'boolean') {
-            this.rightPanelVisible = state.rightPanelVisible;
+        const typedState = state as Record<string, unknown>;
+
+        if (typeof typedState.splitRatio === 'number') {
+            this.splitRatio = typedState.splitRatio;
+        }
+
+        if (typeof typedState.rightPanelVisible === 'boolean') {
+            this.rightPanelVisible = typedState.rightPanelVisible;
         }
     }
 }

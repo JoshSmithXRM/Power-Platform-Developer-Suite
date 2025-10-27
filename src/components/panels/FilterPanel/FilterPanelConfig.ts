@@ -24,8 +24,8 @@ export interface FilterCondition {
     id: string; // Unique ID for UI tracking
     field: string; // Field name
     operator: FilterOperator; // Operator
-    value: any; // Filter value
-    value2?: any; // Second value for 'between' operator
+    value: unknown; // Filter value - can be string, number, boolean, Date, array, etc.
+    value2?: unknown; // Second value for 'between' operator
     logicalOperator: 'AND' | 'OR'; // How to combine with next condition
 }
 

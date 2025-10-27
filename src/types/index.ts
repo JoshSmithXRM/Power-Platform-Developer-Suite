@@ -20,7 +20,8 @@ export interface IPanelBase {
 // Message types for webview communication
 export interface WebviewMessage {
     action: string;
-    [key: string]: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [key: string]: any; // Dynamic message properties from webview - any is appropriate here
 }
 
 export interface Environment {
@@ -28,7 +29,8 @@ export interface Environment {
     name: string;
     settings: {
         dataverseUrl: string;
-        [key: string]: any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        [key: string]: any; // Dynamic environment settings - any is appropriate here
     };
     environmentId?: string;
 }

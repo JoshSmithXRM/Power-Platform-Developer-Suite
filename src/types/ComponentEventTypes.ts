@@ -12,14 +12,14 @@ export interface ComponentUpdateEvent {
 
 export interface ComponentStateChangeEvent {
     componentId: string;
-    state: any;
+    state: unknown;
     timestamp: number;
 }
 
 export interface ComponentWithEvents extends BaseComponent {
     on(event: 'update', listener: (event: ComponentUpdateEvent) => void): this;
     on(event: 'stateChange', listener: (event: ComponentStateChangeEvent) => void): this;
-    getData?(): any;
+    getData?(): unknown;
     getType(): string;
     generateHTML(): string;
 }

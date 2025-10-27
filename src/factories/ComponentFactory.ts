@@ -243,22 +243,23 @@ export class ComponentFactory {
     /**
      * Validate component configuration
      */
-    private validateComponentConfig(config: any, type: string): void {
-        if (!config) {
+    private validateComponentConfig(config: unknown, type: string): void {
+        if (!config || typeof config !== 'object') {
             throw new Error(`Component configuration is required for ${type}`);
         }
 
-        if (!config.id || typeof config.id !== 'string') {
+        const cfg = config as Record<string, unknown>;
+        if (!cfg.id || typeof cfg.id !== 'string') {
             throw new Error(`Component ID is required and must be a string for ${type}`);
         }
 
-        if (config.id.trim() === '') {
+        if (cfg.id.trim() === '') {
             throw new Error(`Component ID cannot be empty for ${type}`);
         }
 
         // Check for duplicate IDs
-        if (this.instances.has(config.id)) {
-            throw new Error(`Component with ID '${config.id}' already exists`);
+        if (this.instances.has(cfg.id)) {
+            throw new Error(`Component with ID '${cfg.id}' already exists`);
         }
 
         // Check instance limits

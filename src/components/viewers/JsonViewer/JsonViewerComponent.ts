@@ -5,7 +5,7 @@ import { JsonViewerView } from './JsonViewerView';
 
 export class JsonViewerComponent extends BaseComponent {
     protected config: JsonViewerConfig;
-    private data: any = null;
+    private data: unknown = null;
 
     constructor(config: JsonViewerConfig) {
         const mergedConfig = { ...DEFAULT_JSON_VIEWER_CONFIG, ...config } as JsonViewerConfig;
@@ -49,7 +49,7 @@ export class JsonViewerComponent extends BaseComponent {
     /**
      * Set JSON data to display
      */
-    public setData(data: any): void {
+    public setData(data: unknown): void {
         this.data = data;
         this.notifyUpdate();
     }
@@ -57,7 +57,7 @@ export class JsonViewerComponent extends BaseComponent {
     /**
      * Get current JSON data
      */
-    public getData(): any {
+    public getData(): unknown {
         return this.data;
     }
 

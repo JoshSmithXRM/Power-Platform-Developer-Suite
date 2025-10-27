@@ -1,6 +1,30 @@
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
+// Dataverse API response structures
+interface DataverseEnvVarDefinitionResponse {
+    environmentvariabledefinitionid: string;
+    displayname?: string;
+    schemaname?: string;
+    type?: number;
+    ismanaged?: boolean;
+    modifiedon?: string;
+    modifiedby?: {
+        fullname?: string;
+    };
+    defaultvalue?: string;
+}
+
+interface DataverseEnvVarValueResponse {
+    environmentvariablevalueid: string;
+    _environmentvariabledefinitionid_value: string;
+    value?: string;
+    modifiedon?: string;
+    modifiedby?: {
+        fullname?: string;
+    };
+}
+
 export interface EnvironmentVariableDefinition {
     environmentvariabledefinitionid: string;
     displayname: string;
@@ -167,7 +191,7 @@ export class EnvironmentVariablesService {
         });
 
         // Transform all definitions data
-        const allDefinitions: EnvironmentVariableDefinition[] = (definitionsData.value || []).map((def: any) => ({
+        const allDefinitions: EnvironmentVariableDefinition[] = (definitionsData.value || []).map((def: DataverseEnvVarDefinitionResponse) => ({
             environmentvariabledefinitionid: def.environmentvariabledefinitionid,
             displayname: def.displayname || '',
             schemaname: def.schemaname || '',
@@ -179,7 +203,7 @@ export class EnvironmentVariablesService {
         }));
 
         // Transform all values data
-        const allValues: EnvironmentVariableValue[] = (valuesData.value || []).map((val: any) => ({
+        const allValues: EnvironmentVariableValue[] = (valuesData.value || []).map((val: DataverseEnvVarValueResponse) => ({
             environmentvariablevalueid: val.environmentvariablevalueid,
             environmentvariabledefinitionid: val._environmentvariabledefinitionid_value,
             value: val.value || '',

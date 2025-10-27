@@ -30,7 +30,7 @@ export class SolutionSelectorComponent extends BaseComponent {
     };
     
     // Search debounce timer
-    private searchTimer: any = null;
+    private searchTimer: NodeJS.Timeout | null = null;
 
     constructor(config: SolutionSelectorConfig) {
         const mergedConfig = { ...DEFAULT_SOLUTION_SELECTOR_CONFIG, ...config } as SolutionSelectorConfig;

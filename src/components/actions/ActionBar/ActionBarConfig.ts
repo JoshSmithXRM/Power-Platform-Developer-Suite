@@ -20,7 +20,7 @@ export interface ActionBarAction {
     keyboard?: string;
     badge?: string | number;
     loading?: boolean;
-    onClick?: (actionId: string, context?: any) => void;
+    onClick?: (actionId: string, context?: unknown) => void;
 }
 
 export interface ActionBarDropdownItem {
@@ -30,7 +30,7 @@ export interface ActionBarDropdownItem {
     disabled?: boolean;
     visible?: boolean;
     separator?: boolean;
-    onClick?: (itemId: string, context?: any) => void;
+    onClick?: (itemId: string, context?: unknown) => void;
 }
 
 export interface ActionBarConfig extends BaseComponentConfig {
@@ -67,7 +67,7 @@ export interface ActionBarConfig extends BaseComponentConfig {
     overflowButton?: ActionBarAction;
     
     // Event handlers
-    onAction?: (actionId: string, action: ActionBarAction, context?: any) => void;
+    onAction?: (actionId: string, action: ActionBarAction, context?: unknown) => void;
     onDropdownOpen?: (actionId: string) => void;
     onDropdownClose?: (actionId: string) => void;
     onOverflow?: (hiddenActions: ActionBarAction[]) => void;
@@ -97,7 +97,7 @@ export interface ActionBarActionEvent {
     componentId: string;
     actionId: string;
     action: ActionBarAction;
-    context?: any;
+    context?: unknown;
     timestamp: number;
 }
 

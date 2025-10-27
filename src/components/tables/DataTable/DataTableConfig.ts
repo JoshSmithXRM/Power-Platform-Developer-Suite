@@ -21,28 +21,29 @@ export interface DataTableColumn {
     fixed?: boolean;
     
     // Formatting options
-    format?: (value: any, row: any) => string;
-    className?: string | ((value: any, row: any) => string);
-    style?: string | ((value: any, row: any) => string);
-    
+    format?: (value: unknown, row: DataTableRow) => string;
+    className?: string | ((value: unknown, row: DataTableRow) => string);
+    style?: string | ((value: unknown, row: DataTableRow) => string);
+
     // Filtering options
     filterType?: 'text' | 'select' | 'multiselect' | 'date' | 'daterange' | 'number' | 'boolean';
-    filterOptions?: Array<{ label: string; value: any }>;
+    filterOptions?: Array<{ label: string; value: unknown }>;
     filterPlaceholder?: string;
-    
+
     // Sorting options
     sortDirection?: 'asc' | 'desc' | null;
     sortOrder?: number;
-    customSort?: (a: any, b: any) => number;
-    
+    customSort?: (a: DataTableRow, b: DataTableRow) => number;
+
     // Cell rendering
-    cellRenderer?: (value: any, row: any, column: DataTableColumn) => string;
+    cellRenderer?: (value: unknown, row: DataTableRow, column: DataTableColumn) => string;
     headerRenderer?: (column: DataTableColumn) => string;
 }
 
 export interface DataTableRow {
     id: string | number;
-    [key: string]: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [key: string]: any; // Dynamic row data - any is appropriate here
     _expanded?: boolean;
     _disabled?: boolean;
     _className?: string;

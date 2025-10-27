@@ -1362,11 +1362,11 @@ export class PluginTraceViewerPanel extends BasePanel {
 
             case 'createdon':
                 if (operator === '>') {
-                    const date = new Date(value);
+                    const date = new Date(value as string | number | Date);
                     date.setMilliseconds(date.getMilliseconds() + 1);
                     return `createdon ge ${date.toISOString()}`;
                 } else if (operator === '<') {
-                    const date = new Date(value);
+                    const date = new Date(value as string | number | Date);
                     date.setMilliseconds(date.getMilliseconds() - 1);
                     return `createdon le ${date.toISOString()}`;
                 } else if (operator === '>=') {

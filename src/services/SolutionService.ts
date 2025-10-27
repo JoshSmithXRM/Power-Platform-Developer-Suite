@@ -1,6 +1,23 @@
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
+// Dataverse API response structure for solutions
+interface DataverseSolutionResponse {
+    solutionid: string;
+    uniquename: string;
+    friendlyname?: string;
+    displayname?: string;
+    version?: string;
+    ismanaged?: boolean;
+    _publisherid_value?: string;
+    'publisherid@OData.Community.Display.V1.FormattedValue'?: string;
+    publisherid?: {
+        friendlyname?: string;
+    };
+    installedon?: string;
+    description?: string;
+}
+
 export interface Solution {
     id: string;              // Using 'id' to match SolutionSelectorComponent expectations
     solutionId: string;      // Keep for backward compatibility
@@ -89,7 +106,7 @@ export class SolutionService {
             solutionsCount: solutions.length
         });
 
-        const mappedSolutions = solutions.map((solution: any) => ({
+        const mappedSolutions = solutions.map((solution: DataverseSolutionResponse) => ({
             id: solution.solutionid,                                    // Primary id field for components
             solutionId: solution.solutionid,                           // Backward compatibility
             uniqueName: solution.uniquename,

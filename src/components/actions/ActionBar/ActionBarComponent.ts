@@ -383,7 +383,7 @@ export class ActionBarComponent extends BaseComponent {
     /**
      * Execute an action by ID
      */
-    public executeAction(actionId: string, context?: any): boolean {
+    public executeAction(actionId: string, context?: unknown): boolean {
         const action = this.getAction(actionId);
         if (!action || action.disabled) {
             return false;

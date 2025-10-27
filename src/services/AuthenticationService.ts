@@ -11,9 +11,11 @@ import { AuthenticationResult, TokenCacheEntry } from '../models/AuthenticationR
 
 import { ServiceFactory } from './ServiceFactory';
 
+type LocalStorage = ReturnType<typeof storage.create>;
+
 export class AuthenticationService {
     private static instance: AuthenticationService;
-    private tokenStorage: any;
+    private tokenStorage: LocalStorage | null = null;
     private secretStorage: vscode.SecretStorage;
     private context: vscode.ExtensionContext;
     private storageInitialized: boolean = false;
@@ -182,8 +184,9 @@ export class AuthenticationService {
                     tenantId: settings.tenantId
                 }
             };
-        } catch (error: any) {
-            throw new Error(`Service Principal authentication failed: ${error.message}`);
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            throw new Error(`Service Principal authentication failed: ${err.message}`);
         }
     }
 
@@ -208,10 +211,11 @@ export class AuthenticationService {
                     tenantId: settings.tenantId
                 }
             };
-        } catch (error: any) {
+        } catch (error: unknown) {
             // If VS Code auth fails, fall back to manual implementation
+            const err = error instanceof Error ? error : new Error(String(error));
             this.logger.warn('VS Code authentication failed, falling back to manual auth', {
-                errorMessage: error.message,
+                errorMessage: err.message,
                 scopes,
                 dataverseUrl: settings.dataverseUrl,
                 fallbackMethod: 'manual-interactive'
@@ -287,8 +291,9 @@ export class AuthenticationService {
                     tenantId: settings.tenantId
                 }
             };
-        } catch (error: any) {
-            throw new Error(`Interactive authentication failed: ${error.message}`);
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            throw new Error(`Interactive authentication failed: ${err.message}`);
         }
     }
 
@@ -332,8 +337,9 @@ export class AuthenticationService {
                     tenantId: settings.tenantId
                 }
             };
-        } catch (error: any) {
-            throw new Error(`Username/Password authentication failed: ${error.message}. Note: This method does not support MFA.`);
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            throw new Error(`Username/Password authentication failed: ${err.message}. Note: This method does not support MFA.`);
         }
     }
 
@@ -380,8 +386,9 @@ export class AuthenticationService {
                     tenantId: settings.tenantId
                 }
             };
-        } catch (error: any) {
-            throw new Error(`Device Code authentication failed: ${error.message}`);
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            throw new Error(`Device Code authentication failed: ${err.message}`);
         }
     }
 

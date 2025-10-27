@@ -1,13 +1,21 @@
 import { QueryOptions, FilterOperator, QueryFilter } from './DataverseQueryService';
 import { ServiceFactory } from './ServiceFactory';
 
+interface LinkEntity {
+    name: string;
+    from: string;
+    to: string;
+    alias?: string;
+    linkType: string;
+}
+
 export interface ParsedFetchXml {
     entity: string;
     attributes: string[];
     filters: QueryFilter[];
     orderBy?: { field: string; direction: 'asc' | 'desc' }[];
     top?: number;
-    linkEntities?: any[];
+    linkEntities?: LinkEntity[];
 }
 
 export interface ParsedLayoutXml {
@@ -274,7 +282,7 @@ export class FetchXmlParser {
      */
     private static convertConditionToFilter(attribute: string, operator: string, value: string | null): QueryFilter | null {
         let filterOp: FilterOperator;
-        let filterValue: any = value;
+        let filterValue: string | number | boolean | string[] | null = value;
 
         // Handle special operators
         switch (operator) {

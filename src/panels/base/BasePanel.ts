@@ -179,11 +179,12 @@ export abstract class BasePanel implements IPanelBase {
                 action: 'environmentsLoaded',
                 data: environments
             });
-        } catch (error: any) {
-            this.componentLogger.error('Error loading environments', error instanceof Error ? error : new Error(String(error)));
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            this.componentLogger.error('Error loading environments', err);
             this.postMessage({
                 action: 'error',
-                message: `Failed to load environments: ${error.message}`
+                message: `Failed to load environments: ${err.message}`
             });
         }
     }
@@ -427,8 +428,8 @@ export abstract class BasePanel implements IPanelBase {
                 const componentType = component.getType();
 
                 const dataLength = Array.isArray(componentData) ? componentData.length :
-                                  componentData?.solutions?.length ||
-                                  (componentData ? Object.keys(componentData).length : 0);
+                                  (componentData && typeof componentData === 'object' && 'solutions' in componentData && Array.isArray((componentData as { solutions: unknown[] }).solutions)) ? (componentData as { solutions: unknown[] }).solutions.length :
+                                  (componentData && typeof componentData === 'object') ? Object.keys(componentData).length : 0;
 
                 this.componentLogger.debug('Event bridge forwarding component update to webview', {
                     componentId: event.componentId,
@@ -438,7 +439,7 @@ export abstract class BasePanel implements IPanelBase {
 
                 // For components that need HTML regeneration (like SolutionSelector)
                 let messageData = componentData;
-                if (componentType === 'SolutionSelector' && componentData?.solutions) {
+                if (componentType === 'SolutionSelector' && componentData && typeof componentData === 'object' && 'solutions' in componentData) {
                     const componentHtml = component.generateHTML();
                     messageData = {
                         ...componentData,

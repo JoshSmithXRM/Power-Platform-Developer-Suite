@@ -4,6 +4,16 @@ import { FilterPanelConfig, FilterCondition, FilterFieldConfig, QuickFilterConfi
 import { FilterPanelView } from './FilterPanelView';
 
 /**
+ * Persisted state structure for FilterPanelComponent
+ */
+interface FilterPanelState {
+    id: string;
+    activeQuickFilters: string[];
+    advancedFilterConditions: FilterCondition[];
+    collapsed: boolean;
+}
+
+/**
  * FilterPanelComponent - Reusable advanced filter panel
  * Provides quick filters and advanced filter builder functionality
  * Used by panels that need complex filtering capabilities
@@ -212,7 +222,7 @@ export class FilterPanelComponent extends BaseComponent {
     /**
      * Export component state (for persistence)
      */
-    public exportState(): any {
+    public exportState(): FilterPanelState {
         return {
             id: this.config.id,
             activeQuickFilters: Array.from(this.activeQuickFilters),
@@ -224,17 +234,23 @@ export class FilterPanelComponent extends BaseComponent {
     /**
      * Import component state (from persistence)
      */
-    public importState(state: any): void {
-        if (state.activeQuickFilters) {
-            this.activeQuickFilters = new Set(state.activeQuickFilters);
+    public importState(state: unknown): void {
+        if (!state || typeof state !== 'object') {
+            return;
         }
 
-        if (state.advancedFilterConditions) {
-            this.advancedFilterConditions = [...state.advancedFilterConditions];
+        const typedState = state as Record<string, unknown>;
+
+        if (Array.isArray(typedState.activeQuickFilters)) {
+            this.activeQuickFilters = new Set(typedState.activeQuickFilters as string[]);
         }
 
-        if (typeof state.collapsed === 'boolean') {
-            this.collapsed = state.collapsed;
+        if (Array.isArray(typedState.advancedFilterConditions)) {
+            this.advancedFilterConditions = [...typedState.advancedFilterConditions as FilterCondition[]];
+        }
+
+        if (typeof typedState.collapsed === 'boolean') {
+            this.collapsed = typedState.collapsed;
         }
     }
 }

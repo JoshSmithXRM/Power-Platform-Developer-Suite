@@ -2,11 +2,13 @@ import * as vscode from 'vscode';
 
 export interface PanelState {
     selectedEnvironmentId?: string;
-    filters?: Record<string, any>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    filters?: Record<string, any>; // Dynamic filter values - any is appropriate here
     sortColumn?: string;
     sortDirection?: 'asc' | 'desc';
     selectedItems?: string[];
-    viewConfig?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    viewConfig?: any; // Dynamic view configuration - any is appropriate here
     lastUpdated?: Date;
     autoRefreshIntervalSeconds?: number;
     splitRatio?: number;

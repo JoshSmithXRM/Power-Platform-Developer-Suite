@@ -87,7 +87,7 @@ export abstract class BaseComponent extends EventEmitter {
     /**
      * Notify that the component's state has changed
      */
-    protected notifyStateChange(state: any): void {
+    protected notifyStateChange(state: unknown): void {
         this.emit('stateChange', { 
             componentId: this.config.id,
             state,

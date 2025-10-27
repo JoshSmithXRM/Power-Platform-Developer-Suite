@@ -457,7 +457,7 @@ export class DataTableComponent extends BaseComponent {
     /**
      * Filter table by column
      */
-    public filter(columnId: string, value: any): void {
+    public filter(columnId: string, value: unknown): void {
         this.componentLogger.debug('Filter requested', {
             componentId: this.config.id,
             columnId,
