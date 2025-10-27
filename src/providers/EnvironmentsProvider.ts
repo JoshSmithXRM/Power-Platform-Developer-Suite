@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
+
 import { AuthenticationService } from '../services/AuthenticationService';
+import { ServiceFactory } from '../services/ServiceFactory';
 
 export class EnvironmentsProvider implements vscode.TreeDataProvider<EnvironmentItem | ToolItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<EnvironmentItem | ToolItem | undefined | null | void> =
@@ -7,6 +9,14 @@ export class EnvironmentsProvider implements vscode.TreeDataProvider<Environment
     readonly onDidChangeTreeData: vscode.Event<EnvironmentItem | ToolItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
     private _authService: AuthenticationService;
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger(): ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']> {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('EnvironmentsProvider');
+        }
+        return this._logger;
+    }
 
     constructor(authService: AuthenticationService) {
         this._authService = authService;
@@ -21,34 +31,34 @@ export class EnvironmentsProvider implements vscode.TreeDataProvider<Environment
     }
 
     async getChildren(element?: EnvironmentItem | ToolItem): Promise<(EnvironmentItem | ToolItem)[]> {
-        console.log('EnvironmentsProvider.getChildren called', element ? 'with element' : 'without element');
+        this.logger.debug('EnvironmentsProvider.getChildren called', { hasElement: !!element });
 
         if (!element) {
             const items: (EnvironmentItem | ToolItem)[] = [];
 
             // Add configured environments
             try {
-                console.log('Getting environments from authService...');
+                this.logger.debug('Getting environments from authService');
                 const environments = await this._authService.getEnvironments();
-                console.log('Environments retrieved:', environments.length, environments);
+                this.logger.debug('Environments retrieved', { count: environments.length });
 
                 if (environments.length === 0) {
-                    console.log('No environments found, showing placeholder');
+                    this.logger.info('No environments found, showing placeholder');
                     items.push(new ToolItem('No environments configured', 'Click + to add an environment', vscode.TreeItemCollapsibleState.None, ''));
                 } else {
-                    console.log('Processing environments...');
+                    this.logger.debug('Processing environments');
                     for (const env of environments) {
                         const envItem = new EnvironmentItem(env.name, env.settings.dataverseUrl, env.id);
                         envItem.contextValue = 'environment';
                         items.push(envItem);
-                        console.log('Added environment item:', env.name);
+                        this.logger.debug('Added environment item', { name: env.name });
                     }
                 }
             } catch (error) {
-                console.error('Error loading environments for tree view:', error);
+                this.logger.error('Error loading environments for tree view', error instanceof Error ? error : new Error(String(error)));
             }
 
-            console.log('Returning items:', items.length);
+            this.logger.debug('Returning items', { count: items.length });
             return items;
         }
         return [];

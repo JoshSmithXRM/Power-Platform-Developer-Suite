@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+
 import { AuthenticationService } from '../services/AuthenticationService';
 import { EnvironmentItem, EnvironmentsProvider } from '../providers/EnvironmentsProvider';
 import { EnvironmentSetupPanel } from '../panels/EnvironmentSetupPanel';
@@ -52,7 +53,7 @@ export class EnvironmentCommands {
         ];
     }
 
-    private async testConnection() {
+    private async testConnection(): Promise<void> {
         const environments = await this.authService.getEnvironments();
 
         if (environments.length === 0) {
@@ -60,13 +61,9 @@ export class EnvironmentCommands {
             return;
         }
 
+        const environmentOptions = await this.authService.getEnvironmentsForQuickPick();
         const selected = await vscode.window.showQuickPick(
-            environments.map(env => ({
-                label: env.name,
-                description: env.settings.dataverseUrl,
-                detail: `Auth: ${env.settings.authenticationMethod}`,
-                env: env
-            })),
+            environmentOptions,
             { placeHolder: 'Select environment to test' }
         );
 
@@ -74,14 +71,15 @@ export class EnvironmentCommands {
 
         try {
             vscode.window.showInformationMessage('Testing connection...');
-            const token = await this.authService.getAccessToken(selected.env.id);
+            await this.authService.getAccessToken(selected.env.id);
             vscode.window.showInformationMessage(`Connection successful to ${selected.env.name}!`);
-        } catch (error: any) {
-            vscode.window.showErrorMessage(`Connection failed: ${error.message}`);
+        } catch (error: unknown) {
+            const errMsg = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Connection failed: ${errMsg}`);
         }
     }
 
-    private async openMaker(environmentItem?: EnvironmentItem) {
+    private async openMaker(environmentItem?: EnvironmentItem): Promise<void> {
         if (!environmentItem) {
             vscode.window.showErrorMessage('No environment selected');
             return;
@@ -102,7 +100,7 @@ export class EnvironmentCommands {
         vscode.env.openExternal(vscode.Uri.parse(makerUrl));
     }
 
-    private async openDynamics(environmentItem?: EnvironmentItem) {
+    private async openDynamics(environmentItem?: EnvironmentItem): Promise<void> {
         if (environmentItem) {
             // Open the Dataverse URL directly
             const environment = await this.authService.getEnvironment(environmentItem.envId);
@@ -116,7 +114,7 @@ export class EnvironmentCommands {
         }
     }
 
-    private async editEnvironment(environmentItem?: EnvironmentItem) {
+    private async editEnvironment(environmentItem?: EnvironmentItem): Promise<void> {
         if (environmentItem) {
             const environment = await this.authService.getEnvironment(environmentItem.envId);
             if (environment) {
@@ -130,7 +128,7 @@ export class EnvironmentCommands {
         }
     }
 
-    private async editEnvironmentFromQuickPick() {
+    private async editEnvironmentFromQuickPick(): Promise<void> {
         const environments = await this.authService.getEnvironments();
 
         if (environments.length === 0) {
@@ -138,13 +136,9 @@ export class EnvironmentCommands {
             return;
         }
 
+        const environmentOptions = await this.authService.getEnvironmentsForQuickPick();
         const selected = await vscode.window.showQuickPick(
-            environments.map(env => ({
-                label: env.name,
-                description: env.settings.dataverseUrl,
-                detail: `Auth: ${env.settings.authenticationMethod}`,
-                env: env
-            })),
+            environmentOptions,
             { placeHolder: 'Select environment to edit' }
         );
 
@@ -153,20 +147,21 @@ export class EnvironmentCommands {
         EnvironmentSetupPanel.createOrShow(this.context.extensionUri, selected.env);
     }
 
-    private async testEnvironmentConnection(environmentItem?: EnvironmentItem) {
+    private async testEnvironmentConnection(environmentItem?: EnvironmentItem): Promise<void> {
         if (environmentItem) {
             try {
                 await this.authService.getAccessToken(environmentItem.envId);
                 vscode.window.showInformationMessage(`Connection test successful for ${environmentItem.label}!`);
-            } catch (error: any) {
-                vscode.window.showErrorMessage(`Connection test failed for ${environmentItem.label}: ${error.message}`);
+            } catch (error: unknown) {
+                const errMsg = error instanceof Error ? error.message : String(error);
+                vscode.window.showErrorMessage(`Connection test failed for ${environmentItem.label}: ${errMsg}`);
             }
         } else {
             vscode.window.showErrorMessage('No environment selected');
         }
     }
 
-    private async removeEnvironment(environmentItem?: EnvironmentItem) {
+    private async removeEnvironment(environmentItem?: EnvironmentItem): Promise<void> {
         if (environmentItem) {
             const confirmResult = await vscode.window.showWarningMessage(
                 `Are you sure you want to remove the environment "${environmentItem.label}"?`,
@@ -179,8 +174,9 @@ export class EnvironmentCommands {
                     await this.authService.removeEnvironment(environmentItem.envId);
                     vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
                     vscode.window.showInformationMessage(`Environment "${environmentItem.label}" removed successfully!`);
-                } catch (error: any) {
-                    vscode.window.showErrorMessage(`Failed to remove environment: ${error.message}`);
+                } catch (error: unknown) {
+                    const errMsg = error instanceof Error ? error.message : String(error);
+                    vscode.window.showErrorMessage(`Failed to remove environment: ${errMsg}`);
                 }
             }
         } else {
@@ -188,7 +184,7 @@ export class EnvironmentCommands {
         }
     }
 
-    private async removeEnvironmentFromQuickPick() {
+    private async removeEnvironmentFromQuickPick(): Promise<void> {
         const environments = await this.authService.getEnvironments();
 
         if (environments.length === 0) {
@@ -196,13 +192,9 @@ export class EnvironmentCommands {
             return;
         }
 
+        const environmentOptions = await this.authService.getEnvironmentsForQuickPick();
         const selected = await vscode.window.showQuickPick(
-            environments.map(env => ({
-                label: env.name,
-                description: env.settings.dataverseUrl,
-                detail: `Auth: ${env.settings.authenticationMethod}`,
-                env: env
-            })),
+            environmentOptions,
             { placeHolder: 'Select environment to remove' }
         );
 
@@ -219,8 +211,9 @@ export class EnvironmentCommands {
                 await this.authService.removeEnvironment(selected.env.id);
                 vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
                 vscode.window.showInformationMessage(`Environment "${selected.env.name}" removed successfully!`);
-            } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to remove environment: ${error.message}`);
+            } catch (error: unknown) {
+                const errMsg = error instanceof Error ? error.message : String(error);
+                vscode.window.showErrorMessage(`Failed to remove environment: ${errMsg}`);
             }
         }
     }

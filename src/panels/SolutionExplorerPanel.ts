@@ -1,51 +1,58 @@
 import * as vscode from 'vscode';
-import { BasePanel } from './base/BasePanel';
-import { AuthenticationService } from '../services/AuthenticationService';
-import { ComponentFactory } from '../components/ComponentFactory';
-import { WebviewMessage, EnvironmentConnection } from '../types';
+
 import { ServiceFactory } from '../services/ServiceFactory';
-import { Solution, SolutionService } from '../services/SolutionService';
-import { UrlBuilderService } from '../services/UrlBuilderService';
+import { WebviewMessage } from '../types';
+import { ComponentFactory } from '../factories/ComponentFactory';
+import { PanelComposer } from '../factories/PanelComposer';
+import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
+import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
+import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
+import { Solution } from '../services/SolutionService';
+import { SOLUTION_CONTEXT_MENU_ITEMS } from '../config/TableActions';
+
+import { BasePanel } from './base/BasePanel';
+
+// UI-specific type for table display
+interface SolutionTableRow {
+    id: string;
+    friendlyName: string;
+    uniqueName: string;
+    version: string;
+    type: string;
+    publisherName: string;
+    installedDate: string;
+}
 
 export class SolutionExplorerPanel extends BasePanel {
     public static readonly viewType = 'solutionExplorer';
+    private static currentPanel: SolutionExplorerPanel | undefined;
 
-    private _selectedEnvironmentId: string | undefined;
-    private _solutionService: SolutionService;
-    private _urlBuilderService: typeof UrlBuilderService;
+    private environmentSelectorComponent?: EnvironmentSelectorComponent;
+    private actionBarComponent?: ActionBarComponent;
+    private dataTableComponent?: DataTableComponent;
+    private componentFactory: ComponentFactory;
 
-    public static createOrShow(extensionUri: vscode.Uri) {
-        // Try to focus existing panel first
-        const existing = BasePanel.focusExisting(SolutionExplorerPanel.viewType);
-        if (existing) {
+    public static createOrShow(extensionUri: vscode.Uri): void {
+        const column = vscode.window.activeTextEditor?.viewColumn;
+
+        if (SolutionExplorerPanel.currentPanel) {
+            SolutionExplorerPanel.currentPanel.panel.reveal(column);
             return;
         }
 
-        const column = vscode.window.activeTextEditor?.viewColumn;
-
         const panel = BasePanel.createWebviewPanel({
             viewType: SolutionExplorerPanel.viewType,
             title: 'Solution Explorer',
             enableScripts: true,
             retainContextWhenHidden: true,
-            enableFindWidget: true
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
         }, column);
 
-        new SolutionExplorerPanel(panel, extensionUri);
+        SolutionExplorerPanel.currentPanel = new SolutionExplorerPanel(panel, extensionUri);
     }
 
-    public static createNew(extensionUri: vscode.Uri) {
-        const column = vscode.window.activeTextEditor?.viewColumn;
-
-        const panel = BasePanel.createWebviewPanel({
-            viewType: SolutionExplorerPanel.viewType,
-            title: 'Solution Explorer',
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            enableFindWidget: true
-        }, column);
-
-        new SolutionExplorerPanel(panel, extensionUri);
+    public static createNew(extensionUri: vscode.Uri): void {
+        this.createOrShow(extensionUri);
     }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
@@ -54,290 +61,522 @@ export class SolutionExplorerPanel extends BasePanel {
             title: 'Solution Explorer'
         });
 
-        this._solutionService = ServiceFactory.getSolutionService();
-        this._urlBuilderService = ServiceFactory.getUrlBuilderService();
+        this.panel.onDidDispose(() => {
+            SolutionExplorerPanel.currentPanel = undefined;
+        });
 
-        // Initialize after construction
+        this.componentLogger.debug('Constructor starting');
+
+        // Create per-panel ComponentFactory instance
+        this.componentFactory = new ComponentFactory();
+
+        this.initializeComponents();
+
+        // Set up event bridges for component communication
+        this.setupComponentEventBridges([
+            this.environmentSelectorComponent,
+            this.actionBarComponent,
+            this.dataTableComponent
+        ]);
+
+        // Initialize the panel
         this.initialize();
+
+        // Load environments after initialization
+        this.loadEnvironments();
+
+        this.componentLogger.info('Panel initialized successfully');
+    }
+
+    private initializeComponents(): void {
+        this.componentLogger.debug('Initializing components');
+        try {
+            // Environment Selector Component
+            this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
+                id: 'solutions-envSelector',
+                label: 'Environment',
+                placeholder: 'Choose an environment to browse solutions...',
+                environments: [],
+                showRefreshButton: true,
+                className: 'solutions-env-selector',
+                onChange: (environmentId: string) => {
+                    this.componentLogger.debug('Environment onChange triggered', { environmentId });
+                    this.handleEnvironmentSelection(environmentId);
+                }
+            });
+
+            // Action Bar Component
+            this.actionBarComponent = this.componentFactory.createActionBar({
+                id: 'solutions-actions',
+                actions: [
+                    {
+                        id: 'openInMaker',
+                        label: 'Open in Maker',
+                        variant: 'primary',
+                        disabled: true
+                    },
+                    {
+                        id: 'refresh',
+                        label: 'Refresh',
+                        icon: 'refresh',
+                        variant: 'secondary',
+                        disabled: false
+                    }
+                ],
+                layout: 'horizontal',
+                className: 'solutions-actions'
+            });
+
+            // Data Table Component
+            this.dataTableComponent = this.componentFactory.createDataTable({
+                id: 'solutions-table',
+                columns: [
+                    {
+                        id: 'friendlyName',
+                        label: 'Solution Name',
+                        field: 'friendlyName',
+                        sortable: true,
+                        filterable: true,
+                        width: '250px'
+                    },
+                    {
+                        id: 'uniqueName',
+                        label: 'Unique Name',
+                        field: 'uniqueName',
+                        sortable: true,
+                        filterable: true,
+                        width: '200px'
+                    },
+                    {
+                        id: 'version',
+                        label: 'Version',
+                        field: 'version',
+                        sortable: true,
+                        filterable: false,
+                        width: '120px',
+                        align: 'center'
+                    },
+                    {
+                        id: 'type',
+                        label: 'Type',
+                        field: 'type',
+                        sortable: true,
+                        filterable: true,
+                        width: '120px',
+                        align: 'center'
+                    },
+                    {
+                        id: 'publisherName',
+                        label: 'Publisher',
+                        field: 'publisherName',
+                        sortable: true,
+                        filterable: true,
+                        width: '180px'
+                    },
+                    {
+                        id: 'installedDate',
+                        label: 'Installed',
+                        field: 'installedDate',
+                        sortable: true,
+                        filterable: false,
+                        width: '180px'
+                    }
+                ],
+                data: [],
+                sortable: true,
+                defaultSort: [{ column: 'friendlyName', direction: 'asc' }],
+                searchable: true,
+                showFooter: true,
+                contextMenu: true,
+                contextMenuItems: SOLUTION_CONTEXT_MENU_ITEMS,
+                className: 'solutions-table'
+            });
+
+            this.componentLogger.debug('All components initialized successfully');
+
+        } catch (error) {
+            this.componentLogger.error('Error initializing components', error as Error);
+            vscode.window.showErrorMessage('Failed to initialize Solution Explorer panel');
+        }
     }
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
-        switch (message.action) {
-            case 'loadEnvironments':
-                await this.handleLoadEnvironments();
-                break;
-
-            case 'loadSolutions':
-                await this.handleLoadSolutions(message.environmentId, message.forceRefresh);
-                break;
-
-            case 'openSolutionInMaker':
-                await this.handleOpenSolutionInMaker(message.environmentId, message.solutionId);
-                break;
-
-            case 'openSolutionInClassic':
-                await this.handleOpenSolutionInClassic(message.environmentId, message.solutionId);
-                break;
-
-            case 'exportSolution':
-                await this.handleExportSolution(message.environmentId, message.solutionId);
-                break;
-
-            case 'viewSolutionDetails':
-                await this.handleViewSolutionDetails(message.environmentId, message.solutionId);
-                break;
-
-            case 'manageSolutionSecurity':
-                await this.handleManageSolutionSecurity(message.environmentId, message.solutionId);
-                break;
-
-            case 'bulkExportSolutions':
-                await this.handleBulkExportSolutions(message.environmentId, message.solutionIds);
-                break;
-
-            case 'bulkUpdateSolutions':
-                await this.handleBulkUpdateSolutions(message.environmentId, message.solutionIds);
-                break;
-
-            default:
-                console.log('Unknown action:', message.action);
-        }
-    }
-
-    private async handleLoadEnvironments(): Promise<void> {
         try {
-            const environments = await this._authService.getEnvironments();
+            // Ignore empty/malformed messages
+            if (!message || !message.command) {
+                this.componentLogger.trace('Received message without command, ignoring', { message });
+                return;
+            }
 
-            // Get previously selected environment from state
-            const cachedState = await this._stateService.getPanelState(SolutionExplorerPanel.viewType);
-            const selectedEnvironmentId = this._selectedEnvironmentId || cachedState?.selectedEnvironmentId || environments[0]?.id;
-
-            this._panel.webview.postMessage({
-                action: 'environmentsLoaded',
-                data: environments,
-                selectedEnvironmentId: selectedEnvironmentId
-            });
-        } catch (error: any) {
-            console.error('Error loading environments:', error);
-            this._panel.webview.postMessage({
-                action: 'error',
-                message: `Failed to load environments: ${error.message}`
-            });
-        }
-    }
-
-    private async handleLoadSolutions(environmentId: string, forceRefresh: boolean = false): Promise<void> {
-        if (!environmentId) return;
-
-        try {
-            this._selectedEnvironmentId = environmentId;
-
-            // Use cached data if available and not forcing refresh
-            if (!forceRefresh) {
-                const cachedState = await this._stateService.getPanelState(SolutionExplorerPanel.viewType);
-                if (cachedState?.selectedEnvironmentId === environmentId && cachedState.lastUpdated) {
-                    const cacheAge = Date.now() - new Date(cachedState.lastUpdated).getTime();
-                    const maxCacheAge = 5 * 60 * 1000; // 5 minutes
-
-                    if (cacheAge < maxCacheAge) {
-                        // Use cached data
-                        this._panel.webview.postMessage({
-                            action: 'solutionsLoaded',
-                            data: cachedState.viewConfig?.solutions || []
-                        });
-                        return;
+            switch (message.command) {
+                case 'environment-changed':
+                    // Only sync component state - onChange callback will handle data loading
+                    if (this.environmentSelectorComponent && message.data?.environmentId) {
+                        this.environmentSelectorComponent.setSelectedEnvironment(message.data.environmentId);
                     }
-                }
+                    break;
+
+                case 'load-solutions':
+                    await this.handleLoadSolutions(message.data?.environmentId);
+                    break;
+
+                case 'open-solution-in-maker':
+                    await this.handleOpenSolutionInMaker(message.data?.environmentId, message.data?.solutionId);
+                    break;
+
+                case 'open-solution-in-classic':
+                    await this.handleOpenSolutionInClassic(message.data?.environmentId, message.data?.solutionId);
+                    break;
+
+                case 'refresh-data':
+                    await this.refreshSolutions();
+                    break;
+
+                case 'panel-ready':
+                    this.componentLogger.debug('Panel ready event received');
+                    break;
+
+                case 'component-event':
+                    this.componentLogger.debug('Component event received', { data: message.data });
+                    await this.handleComponentEvent(message);
+                    break;
+
+                case 'table-search':
+                    if (message.tableId && this.dataTableComponent) {
+                        this.dataTableComponent.search(message.searchQuery || '');
+                    }
+                    break;
+
+                default:
+                    this.componentLogger.warn('Unknown message command', { command: message.command });
             }
-
-            // Load solutions using the service
-            const solutions = await this._solutionService.getSolutions(environmentId);
-
-            // Cache the results
-            await this._stateService.savePanelState(SolutionExplorerPanel.viewType, {
-                selectedEnvironmentId: environmentId,
-                viewConfig: { solutions }
-            });
-
-            this._panel.webview.postMessage({
-                action: 'solutionsLoaded',
-                data: solutions
-            });
-
-        } catch (error: any) {
-            console.error('Error loading solutions:', error);
-            this._panel.webview.postMessage({
+        } catch (error) {
+            this.componentLogger.error('Error handling message', error as Error, { command: message.command });
+            this.postMessage({
+                command: 'error',
                 action: 'error',
-                message: `Failed to load solutions: ${error.message}`
+                message: 'An error occurred while processing your request'
             });
         }
     }
 
-    private async handleOpenSolutionInMaker(environmentId: string, solutionId: string): Promise<void> {
+    private async handleComponentEvent(message: WebviewMessage): Promise<void> {
         try {
-            const environments = await this._authService.getEnvironments();
-            const environment = environments.find(env => env.id === environmentId);
+            const { componentId, eventType, data } = message.data || {};
 
-            if (!environment) {
-                throw new Error('Environment not found');
+            // Log based on event significance
+            if (eventType === 'actionClicked') {
+                this.componentLogger.info(`Action clicked: ${data?.actionId}`, { componentId });
+            } else if (eventType === 'contextMenuItemClicked') {
+                this.componentLogger.info(`Context menu item clicked: ${data?.itemId}`, { componentId });
+            } else {
+                this.componentLogger.debug('Component event received', { componentId, eventType });
             }
 
-            const makerUrl = this._urlBuilderService.buildMakerSolutionUrl(environment, solutionId);
-            await vscode.env.openExternal(vscode.Uri.parse(makerUrl));
-        } catch (error: any) {
-            console.error('Error opening solution in Maker:', error);
-            vscode.window.showErrorMessage(`Failed to open solution in Maker: ${error.message}`);
-        }
-    }
+            // Handle action bar events
+            if (componentId === 'solutions-actions' && eventType === 'actionClicked') {
+                const { actionId } = data;
 
-    private async handleOpenSolutionInClassic(environmentId: string, solutionId: string): Promise<void> {
-        try {
-            const environments = await this._authService.getEnvironments();
-            const environment = environments.find(env => env.id === environmentId);
-
-            if (!environment) {
-                throw new Error('Environment not found');
+                switch (actionId) {
+                    case 'openInMaker': {
+                        const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
+                        if (envId) {
+                            await this.handleOpenSolutionsPageInMaker(envId);
+                        } else {
+                            vscode.window.showWarningMessage('Please select an environment first');
+                        }
+                        break;
+                    }
+                    case 'refresh':
+                        await this.refreshSolutions();
+                        break;
+                    default:
+                        this.componentLogger.warn('Unknown action ID', { actionId });
+                }
+                return;
             }
 
-            const classicUrl = this._urlBuilderService.buildClassicSolutionUrl(environment, solutionId);
-            await vscode.env.openExternal(vscode.Uri.parse(classicUrl));
-        } catch (error: any) {
-            console.error('Error opening solution in Classic:', error);
-            vscode.window.showErrorMessage(`Failed to open solution in Classic: ${error.message}`);
-        }
-    }
+            // Handle data table context menu events
+            if (componentId === 'solutions-table' && eventType === 'contextMenuItemClicked') {
+                const { itemId, rowData } = data;
 
-    private async handleExportSolution(environmentId: string, solutionId: string): Promise<void> {
-        try {
-            vscode.window.showInformationMessage('Solution export functionality coming soon!');
-        } catch (error: any) {
-            console.error('Error exporting solution:', error);
-            vscode.window.showErrorMessage(`Failed to export solution: ${error.message}`);
-        }
-    }
+                switch (itemId) {
+                    case 'openMaker':
+                        await this.handleOpenSolutionInMaker(undefined, rowData.id);
+                        break;
+                    case 'openClassic':
+                        await this.handleOpenSolutionInClassic(undefined, rowData.id);
+                        break;
+                    default:
+                        this.componentLogger.warn('Unknown context menu item ID', { itemId });
+                }
+                return;
+            }
 
-    private async handleViewSolutionDetails(environmentId: string, solutionId: string): Promise<void> {
-        try {
-            vscode.window.showInformationMessage('Solution details view coming soon!');
-        } catch (error: any) {
-            console.error('Error viewing solution details:', error);
-            vscode.window.showErrorMessage(`Failed to view solution details: ${error.message}`);
-        }
-    }
+            // Other component events
+            this.componentLogger.trace('Component event not handled', { componentId, eventType });
 
-    private async handleManageSolutionSecurity(environmentId: string, solutionId: string): Promise<void> {
-        try {
-            vscode.window.showInformationMessage('Solution security management coming soon!');
-        } catch (error: any) {
-            console.error('Error managing solution security:', error);
-            vscode.window.showErrorMessage(`Failed to manage solution security: ${error.message}`);
-        }
-    }
-
-    private async handleBulkExportSolutions(environmentId: string, solutionIds: string[]): Promise<void> {
-        try {
-            vscode.window.showInformationMessage(`Bulk export of ${solutionIds.length} solutions coming soon!`);
-        } catch (error: any) {
-            console.error('Error bulk exporting solutions:', error);
-            vscode.window.showErrorMessage(`Failed to bulk export solutions: ${error.message}`);
-        }
-    }
-
-    private async handleBulkUpdateSolutions(environmentId: string, solutionIds: string[]): Promise<void> {
-        try {
-            vscode.window.showInformationMessage(`Bulk update of ${solutionIds.length} solutions coming soon!`);
-        } catch (error: any) {
-            console.error('Error bulk updating solutions:', error);
-            vscode.window.showErrorMessage(`Failed to bulk update solutions: ${error.message}`);
+        } catch (error) {
+            this.componentLogger.error('Error handling component event', error as Error, {
+                componentId: message.componentId,
+                eventType: message.eventType
+            });
         }
     }
 
     protected getHtmlContent(): string {
-        // Get common webview resources
-        const { tableUtilsScript, tableStylesSheet, panelStylesSheet, panelUtilsScript } = this.getCommonWebviewResources();
+        this.componentLogger.trace('Generating HTML content');
+        try {
+            if (!this.environmentSelectorComponent || !this.actionBarComponent || !this.dataTableComponent) {
+                this.componentLogger.warn('Components not initialized when generating HTML');
+                return this.getErrorHtml('Solution Explorer', 'Failed to initialize components');
+            }
 
-        const envSelectorUtilsScript = this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'environment-selector-utils.js')
-        );
+            this.componentLogger.trace('Using PanelComposer.compose()');
 
-        return `<!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Solution Explorer</title>
-            <link rel="stylesheet" href="${panelStylesSheet}">
-            <link rel="stylesheet" href="${tableStylesSheet}">
-            <style>
-                /* Solution-specific styles */
-                .solution-name-link {
-                    color: var(--vscode-textLink-foreground);
-                    text-decoration: none;
-                    cursor: pointer;
-                    font-weight: 500;
-                }
-                
-                .solution-name-link:hover {
-                    text-decoration: underline;
-                }
-            </style>
-        </head>
-        <body>
-            ${ComponentFactory.createEnvironmentSelector({
-            id: 'environmentSelect',
-            label: 'Environment:',
-            placeholder: 'Loading environments...'
-        })}
+            // Use PanelComposer for composition
+            return PanelComposer.compose([
+                this.environmentSelectorComponent,
+                this.actionBarComponent,
+                this.dataTableComponent
+            ], this.getCommonWebviewResources(), 'Solution Explorer');
 
-            <div class="header">
-                <h1 class="title">Solution Explorer</h1>
-                <button class="btn" onclick="refreshSolutions()">Refresh</button>
-            </div>
-            
-            <div id="content">
-                <div class="loading">
-                    <p>Select an environment to load solutions...</p>
-                </div>
-            </div>
-
-            <!-- Pre-generated table template (hidden initially) -->
-            <div id="solutionsTableTemplate" style="display: none;">
-                ${ComponentFactory.createDataTable({
-            id: 'solutionsTable',
-            columns: [
-                { key: 'friendlyName', label: 'Solution Name', sortable: true },
-                { key: 'uniqueName', label: 'Unique Name', sortable: true },
-                { key: 'version', label: 'Version', sortable: true },
-                { key: 'type', label: 'Type', sortable: true },
-                { key: 'publisherName', label: 'Publisher', sortable: true },
-                { key: 'installedDate', label: 'Installed', sortable: true }
-            ],
-            defaultSort: { column: 'friendlyName', direction: 'asc' },
-            filterable: true,
-            stickyFirstColumn: false,
-            showFooter: true,
-            rowActions: [
-                { id: 'openMaker', action: 'openInMaker', label: 'Maker', icon: '🎨' },
-                { id: 'openClassic', action: 'openInClassic', label: 'Classic', icon: '📋' }
-            ],
-            contextMenu: [
-                { id: 'openMaker', action: 'openInMaker', label: 'Open in Maker' },
-                { id: 'openClassic', action: 'openInClassic', label: 'Open in Classic' }
-            ]
-        })}
-            </div>
-
-            <script src="${envSelectorUtilsScript}"></script>
-            <script src="${panelUtilsScript}"></script>
-            <script src="${tableUtilsScript}"></script>
-            <script src="${this.getSolutionExplorerScript()}"></script>
-        </body>
-        </html>`;
+        } catch (error) {
+            this.componentLogger.error('Error generating HTML content', error as Error);
+            return this.getErrorHtml('Solution Explorer', 'Failed to generate panel content: ' + error);
+        }
     }
 
-    private getSolutionExplorerScript(): vscode.Uri {
-        return this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'solution-explorer.js')
-        );
+    private async loadEnvironments(): Promise<void> {
+        if (this.environmentSelectorComponent) {
+            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger, SolutionExplorerPanel.viewType);
+        }
+    }
+
+    private async handleEnvironmentSelection(environmentId: string): Promise<void> {
+        if (!environmentId) {
+            this.componentLogger.debug('Environment selection cleared');
+            return;
+        }
+
+        try {
+            this.componentLogger.info('Environment selected', { environmentId });
+
+            // Enable "Open in Maker" button
+            if (this.actionBarComponent) {
+                this.actionBarComponent.setActionDisabled('openInMaker', false);
+            }
+
+            // Load solutions for this environment
+            await this.handleLoadSolutions(environmentId);
+
+        } catch (error) {
+            this.componentLogger.error('Error handling environment selection', error as Error, { environmentId });
+            vscode.window.showErrorMessage('Failed to load environment configuration');
+        }
+    }
+
+    private async handleLoadSolutions(environmentId: string): Promise<void> {
+        if (!environmentId) {
+            this.postMessage({
+                action: 'error',
+                message: 'Environment ID is required'
+            });
+            return;
+        }
+
+        try {
+            this.componentLogger.info('Loading solutions', { environmentId });
+
+            // Show loading state
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setData([]);
+                this.dataTableComponent.setLoading(true, 'Loading solutions...');
+            }
+
+            // Save state (UI preferences only, NOT data caching)
+            await this._stateService.savePanelState(SolutionExplorerPanel.viewType, {
+                selectedEnvironmentId: environmentId
+            });
+
+            // Fetch solutions data (always fresh, no caching per architecture)
+            const solutionService = ServiceFactory.getSolutionService();
+            const solutions = await solutionService.getSolutions(environmentId);
+
+            // Transform data for table display
+            const tableData = this.transformSolutionsData(solutions);
+
+            // Update the data table component directly
+            if (this.dataTableComponent) {
+                this.componentLogger.info('Updating DataTableComponent with solutions data', {
+                    rowCount: tableData.length
+                });
+
+                this.dataTableComponent.setLoading(false);
+                this.dataTableComponent.setData(tableData);
+            }
+
+            this.componentLogger.info('Solutions loaded successfully', {
+                environmentId,
+                solutionsCount: tableData.length
+            });
+        } catch (error) {
+            this.componentLogger.error('Error loading solutions', error as Error, { environmentId });
+
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setLoading(false);
+            }
+
+            this.postMessage({
+                action: 'error',
+                message: `Failed to load solutions: ${(error as Error).message}`
+            });
+        }
+    }
+
+    private transformSolutionsData(solutions: Solution[]): SolutionTableRow[] {
+        return solutions.map((solution: Solution): SolutionTableRow => ({
+            id: solution.id,
+            friendlyName: solution.friendlyName || solution.displayName,
+            uniqueName: solution.uniqueName,
+            version: solution.version,
+            type: solution.isManaged ? 'Managed' : 'Unmanaged',
+            publisherName: solution.publisherName,
+            installedDate: solution.installedOn ? new Date(solution.installedOn).toLocaleDateString() : 'N/A'
+        }));
+    }
+
+    private async handleOpenSolutionInMaker(environmentId: string | undefined, solutionId: string): Promise<void> {
+        try {
+            // Get current environment if not provided
+            if (!environmentId) {
+                const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
+                environmentId = selectedEnvironment?.id;
+            }
+
+            if (!environmentId || !solutionId) {
+                vscode.window.showErrorMessage('Environment and Solution ID are required');
+                return;
+            }
+
+            const environments = await this._authService.getEnvironments();
+            const environment = environments.find(env => env.id === environmentId);
+
+            if (!environment) {
+                vscode.window.showErrorMessage('Environment not found');
+                return;
+            }
+
+            const urlBuilderService = ServiceFactory.getUrlBuilderService();
+            const makerUrl = urlBuilderService.buildMakerSolutionUrl(environment, solutionId);
+
+            this.componentLogger.info('Opening solution in Maker', { url: makerUrl, solutionId });
+
+            // Open in external browser
+            await vscode.env.openExternal(vscode.Uri.parse(makerUrl));
+
+        } catch (error) {
+            this.componentLogger.error('Error opening solution in Maker', error as Error, { solutionId });
+            vscode.window.showErrorMessage(`Failed to open solution in Maker: ${(error as Error).message}`);
+        }
+    }
+
+    private async handleOpenSolutionInClassic(environmentId: string | undefined, solutionId: string): Promise<void> {
+        try {
+            // Get current environment if not provided
+            if (!environmentId) {
+                const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
+                environmentId = selectedEnvironment?.id;
+            }
+
+            if (!environmentId || !solutionId) {
+                vscode.window.showErrorMessage('Environment and Solution ID are required');
+                return;
+            }
+
+            const environments = await this._authService.getEnvironments();
+            const environment = environments.find(env => env.id === environmentId);
+
+            if (!environment) {
+                vscode.window.showErrorMessage('Environment not found');
+                return;
+            }
+
+            const urlBuilderService = ServiceFactory.getUrlBuilderService();
+            const classicUrl = urlBuilderService.buildClassicSolutionUrl(environment, solutionId);
+
+            this.componentLogger.info('Opening solution in Classic', { url: classicUrl, solutionId });
+
+            // Open in external browser
+            await vscode.env.openExternal(vscode.Uri.parse(classicUrl));
+
+        } catch (error) {
+            this.componentLogger.error('Error opening solution in Classic', error as Error, { solutionId });
+            vscode.window.showErrorMessage(`Failed to open solution in Classic: ${(error as Error).message}`);
+        }
+    }
+
+    private async handleOpenSolutionsPageInMaker(environmentId: string): Promise<void> {
+        try {
+            const environments = await this._authService.getEnvironments();
+            const environment = environments.find(env => env.id === environmentId);
+
+            if (!environment) {
+                vscode.window.showErrorMessage('Environment not found');
+                return;
+            }
+
+            if (!environment.environmentId) {
+                vscode.window.showErrorMessage('Environment ID not found. Please configure the Environment ID in environment settings.');
+                return;
+            }
+
+            // Build solutions page URL
+            const solutionsPageUrl = `https://make.powerapps.com/environments/${environment.environmentId}/solutions`;
+
+            this.componentLogger.info('Opening solutions page in Maker', { url: solutionsPageUrl });
+
+            // Open in external browser
+            await vscode.env.openExternal(vscode.Uri.parse(solutionsPageUrl));
+
+        } catch (error) {
+            this.componentLogger.error('Error opening solutions page in Maker', error as Error);
+            vscode.window.showErrorMessage(`Failed to open solutions page in Maker: ${(error as Error).message}`);
+        }
+    }
+
+    private async refreshSolutions(): Promise<void> {
+        try {
+            this.componentLogger.debug('Refreshing solutions and environments');
+
+            // First refresh the environment list
+            await this.loadEnvironments();
+
+            // Then refresh the solutions for the selected environment
+            const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
+
+            if (selectedEnvironment) {
+                await this.handleLoadSolutions(selectedEnvironment.id);
+                vscode.window.showInformationMessage('Solutions refreshed');
+            } else {
+                vscode.window.showWarningMessage('Please select an environment first');
+            }
+        } catch (error) {
+            this.componentLogger.error('Error refreshing solutions', error as Error);
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setLoading(false);
+            }
+            vscode.window.showErrorMessage('Failed to refresh solutions');
+        }
+    }
+
+    public dispose(): void {
+        SolutionExplorerPanel.currentPanel = undefined;
+
+        this.environmentSelectorComponent?.dispose();
+        this.actionBarComponent?.dispose();
+        this.dataTableComponent?.dispose();
+
+        super.dispose();
     }
 }

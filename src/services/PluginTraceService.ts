@@ -1,4 +1,30 @@
+import { EnvironmentConnection } from '../models/PowerPlatformSettings';
+
 import { AuthenticationService } from './AuthenticationService';
+import { ServiceFactory } from './ServiceFactory';
+
+// Dataverse API response interfaces
+interface DataversePluginTraceLogResponse {
+    plugintracelogid: string;
+    createdon: string;
+    operationtype?: number;
+    typename?: string;
+    primaryentity?: string;
+    messagename?: string;
+    mode?: number;
+    depth?: number;
+    performanceexecutionduration?: number;
+    exceptiondetails?: string;
+    messageblock?: string;
+    configuration?: string;
+    performanceconstructorduration?: number;
+    correlationid?: string;
+    pluginstepid?: string;
+}
+
+interface DataverseTraceIdResponse {
+    plugintracelogid: string;
+}
 
 export interface PluginTraceLog {
     plugintracelogid: string;
@@ -22,6 +48,7 @@ export interface PluginTraceLog {
     ownerid?: string;
     businessunitid?: string;
     organizationid?: string;
+    pluginstepid?: string;
 }
 
 export interface PluginTraceFilterOptions {
@@ -32,6 +59,7 @@ export interface PluginTraceFilterOptions {
     exceptionOnly?: boolean;
     top?: number;
     orderBy?: string;
+    odataFilter?: string; // Raw OData filter string for complex queries (OR/AND logic)
 }
 
 export enum PluginTraceLevel {
@@ -46,6 +74,15 @@ export interface OrganizationSettings {
 }
 
 export class PluginTraceService {
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger(): ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']> {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('PluginTraceService');
+        }
+        return this._logger;
+    }
+
     constructor(private authService: AuthenticationService) { }
 
     async getPluginTraceLogs(environmentId: string, filterOptions: PluginTraceFilterOptions = {}): Promise<PluginTraceLog[]> {
@@ -93,30 +130,48 @@ export class PluginTraceService {
         url += `?$select=${selectFields.join(',')}`;
 
         // Add filters
-        const filters: string[] = [];
+        this.logger.info('📋 Building OData filters', { filterOptions });
 
-        if (filterOptions.fromDate) {
-            filters.push(`createdon ge ${filterOptions.fromDate}`);
-        }
+        // If raw OData filter is provided, use it directly (for complex OR/AND logic)
+        if (filterOptions.odataFilter) {
+            url += `&$filter=${encodeURIComponent(filterOptions.odataFilter)}`;
+            this.logger.info('✅ Applied raw OData filter', { odataFilter: filterOptions.odataFilter, encoded: encodeURIComponent(filterOptions.odataFilter) });
+        } else {
+            // Otherwise, build filter from individual properties (legacy simple AND logic)
+            const filters: string[] = [];
 
-        if (filterOptions.toDate) {
-            filters.push(`createdon le ${filterOptions.toDate}`);
-        }
+            if (filterOptions.fromDate) {
+                filters.push(`createdon ge ${filterOptions.fromDate}`);
+                this.logger.debug('Added fromDate filter', { fromDate: filterOptions.fromDate });
+            }
 
-        if (filterOptions.pluginName) {
-            filters.push(`contains(typename,'${filterOptions.pluginName}')`);
-        }
+            if (filterOptions.toDate) {
+                filters.push(`createdon le ${filterOptions.toDate}`);
+                this.logger.debug('Added toDate filter', { toDate: filterOptions.toDate });
+            }
 
-        if (filterOptions.entityName) {
-            filters.push(`contains(primaryentity,'${filterOptions.entityName}')`);
-        }
+            if (filterOptions.pluginName) {
+                filters.push(`contains(typename,'${filterOptions.pluginName}')`);
+                this.logger.debug('Added pluginName filter', { pluginName: filterOptions.pluginName });
+            }
 
-        if (filterOptions.exceptionOnly) {
-            filters.push(`exceptiondetails ne ''`);
-        }
+            if (filterOptions.entityName) {
+                filters.push(`contains(primaryentity,'${filterOptions.entityName}')`);
+                this.logger.debug('Added entityName filter', { entityName: filterOptions.entityName });
+            }
 
-        if (filters.length > 0) {
-            url += `&$filter=${filters.join(' and ')}`;
+            if (filterOptions.exceptionOnly) {
+                filters.push(`exceptiondetails ne ''`);
+                this.logger.debug('Added exceptionOnly filter');
+            }
+
+            if (filters.length > 0) {
+                const filterString = filters.join(' and ');
+                url += `&$filter=${encodeURIComponent(filterString)}`;
+                this.logger.info('✅ Applied filters to URL', { filterString, encoded: encodeURIComponent(filterString) });
+            } else {
+                this.logger.info('ℹ️ No filters applied');
+            }
         }
 
         // Add ordering (most recent first by default)
@@ -127,7 +182,7 @@ export class PluginTraceService {
         const top = filterOptions.top || 100;
         url += `&$top=${top}`;
 
-        console.log('PluginTraceService: Fetching plugin traces with URL:', url);
+        this.logger.debug('Fetching plugin traces', { url });
 
         const response = await fetch(url, {
             headers: {
@@ -140,7 +195,7 @@ export class PluginTraceService {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('PluginTraceService API Error:', {
+            this.logger.error('PluginTraceService API Error', new Error('API request failed'), {
                 status: response.status,
                 statusText: response.statusText,
                 url: url,
@@ -152,7 +207,7 @@ export class PluginTraceService {
         const data = await response.json();
 
         // Transform data
-        const traceLogs: PluginTraceLog[] = (data.value || []).map((log: any) => ({
+        const traceLogs: PluginTraceLog[] = (data.value || []).map((log: DataversePluginTraceLogResponse) => ({
             plugintracelogid: log.plugintracelogid,
             createdon: log.createdon,
             operationtype: log.operationtype?.toString() || '',
@@ -168,7 +223,8 @@ export class PluginTraceService {
             typename: log.typename || '',
             configuration: log.configuration || '',
             performancedetails: `Execution: ${log.performanceexecutionduration || 0}ms, Constructor: ${log.performanceconstructorduration || 0}ms`,
-            correlationid: log.correlationid || ''
+            correlationid: log.correlationid || '',
+            pluginstepid: log.pluginstepid || ''
         }));
 
         return traceLogs;
@@ -210,17 +266,23 @@ export class PluginTraceService {
     }
 
     async setPluginTraceLevel(environmentId: string, level: PluginTraceLevel): Promise<void> {
+        this.logger.info('Setting plugin trace level', { environmentId, level, levelName: this.getTraceLevelDisplayName(level) });
+
         const environments = await this.authService.getEnvironments();
         const environment = environments.find(env => env.id === environmentId);
 
         if (!environment) {
+            this.logger.error('Environment not found', new Error('Environment not found'), { environmentId });
             throw new Error('Environment not found');
         }
 
         const token = await this.authService.getAccessToken(environment.id);
 
         // First get the organization ID
-        const orgResponse = await fetch(`${environment.settings.dataverseUrl}/api/data/v9.2/organizations?$select=organizationid`, {
+        const orgUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/organizations?$select=organizationid`;
+        this.logger.debug('Fetching organization ID', { orgUrl });
+
+        const orgResponse = await fetch(orgUrl, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -230,6 +292,12 @@ export class PluginTraceService {
         });
 
         if (!orgResponse.ok) {
+            const errorText = await orgResponse.text();
+            this.logger.error('Failed to get organization', new Error('API request failed'), {
+                status: orgResponse.status,
+                statusText: orgResponse.statusText,
+                errorText
+            });
             throw new Error(`Failed to get organization: ${orgResponse.statusText}`);
         }
 
@@ -237,11 +305,20 @@ export class PluginTraceService {
         const organizationId = orgData.value?.[0]?.organizationid;
 
         if (!organizationId) {
+            this.logger.error('Organization ID not found', new Error('Organization ID not found'));
             throw new Error('Organization ID not found');
         }
 
+        this.logger.debug('Found organization ID', { organizationId });
+
         // Update the plugin trace log setting
         const updateUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/organizations(${organizationId})`;
+        this.logger.info('Updating plugin trace log setting', {
+            updateUrl,
+            organizationId,
+            level,
+            levelName: this.getTraceLevelDisplayName(level)
+        });
 
         const updateResponse = await fetch(updateUrl, {
             method: 'PATCH',
@@ -257,8 +334,21 @@ export class PluginTraceService {
         });
 
         if (!updateResponse.ok) {
+            const errorText = await updateResponse.text();
+            this.logger.error('Failed to update plugin trace level', new Error('API request failed'), {
+                status: updateResponse.status,
+                statusText: updateResponse.statusText,
+                errorText,
+                level
+            });
             throw new Error(`Failed to update plugin trace level: ${updateResponse.statusText}`);
         }
+
+        this.logger.info('Plugin trace level updated successfully', {
+            organizationId,
+            level,
+            levelName: this.getTraceLevelDisplayName(level)
+        });
     }
 
     getModeDisplayName(mode: number): string {
@@ -304,5 +394,227 @@ export class PluginTraceService {
         if (!dateString) return '';
         const date = new Date(dateString);
         return date.toLocaleString();
+    }
+
+    /**
+     * Delete a single plugin trace log
+     */
+    async deleteTrace(environmentId: string, traceId: string): Promise<void> {
+        const environments = await this.authService.getEnvironments();
+        const environment = environments.find(env => env.id === environmentId);
+
+        if (!environment) {
+            throw new Error('Environment not found');
+        }
+
+        const token = await this.authService.getAccessToken(environment.id);
+        const url = `${environment.settings.dataverseUrl}/api/data/v9.2/plugintracelogs(${traceId})`;
+
+        this.logger.info('Deleting plugin trace', { traceId });
+
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'OData-MaxVersion': '4.0',
+                'OData-Version': '4.0'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            this.logger.error('Failed to delete plugin trace', new Error('API request failed'), {
+                status: response.status,
+                errorText
+            });
+            throw new Error(`Failed to delete plugin trace: ${response.status} ${response.statusText}`);
+        }
+
+        this.logger.info('Plugin trace deleted successfully', { traceId });
+    }
+
+    /**
+     * Delete multiple traces using OData $batch API
+     */
+    private async deleteBatch(environment: EnvironmentConnection, token: string, traceIds: string[]): Promise<number> {
+        const batchBoundary = `batch_${Date.now()}`;
+        const changesetBoundary = `changeset_${Date.now()}`;
+
+        // Build batch request body
+        let batchBody = `--${batchBoundary}\r\n`;
+        batchBody += `Content-Type: multipart/mixed; boundary=${changesetBoundary}\r\n\r\n`;
+
+        traceIds.forEach((traceId, index) => {
+            batchBody += `--${changesetBoundary}\r\n`;
+            batchBody += `Content-Type: application/http\r\n`;
+            batchBody += `Content-Transfer-Encoding: binary\r\n`;
+            batchBody += `Content-ID: ${index + 1}\r\n\r\n`;
+            batchBody += `DELETE ${environment.settings.dataverseUrl}/api/data/v9.2/plugintracelogs(${traceId}) HTTP/1.1\r\n`;
+            batchBody += `Content-Type: application/json\r\n\r\n`;
+        });
+
+        batchBody += `--${changesetBoundary}--\r\n`;
+        batchBody += `--${batchBoundary}--\r\n`;
+
+        const batchUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/$batch`;
+
+        const response = await fetch(batchUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': `multipart/mixed; boundary=${batchBoundary}`,
+                'OData-MaxVersion': '4.0',
+                'OData-Version': '4.0'
+            },
+            body: batchBody
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            this.logger.error('Batch delete failed', new Error('API request failed'), {
+                status: response.status,
+                errorText
+            });
+            throw new Error(`Batch delete failed: ${response.status} ${response.statusText}`);
+        }
+
+        // Parse batch response to count successes
+        const responseText = await response.text();
+        const successCount = (responseText.match(/HTTP\/1\.1 204/g) || []).length;
+
+        return successCount;
+    }
+
+    /**
+     * Delete all plugin trace logs in the environment
+     */
+    async deleteAllTraces(environmentId: string): Promise<number> {
+        const environments = await this.authService.getEnvironments();
+        const environment = environments.find(env => env.id === environmentId);
+
+        if (!environment) {
+            throw new Error('Environment not found');
+        }
+
+        const token = await this.authService.getAccessToken(environment.id);
+
+        // First, get all trace IDs
+        const countUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/plugintracelogs?$select=plugintracelogid&$count=true`;
+
+        this.logger.info('Fetching all plugin traces for deletion');
+
+        const countResponse = await fetch(countUrl, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'OData-MaxVersion': '4.0',
+                'OData-Version': '4.0',
+                'Prefer': 'odata.include-annotations="*"'
+            }
+        });
+
+        if (!countResponse.ok) {
+            throw new Error(`Failed to fetch plugin traces: ${countResponse.statusText}`);
+        }
+
+        const countData = await countResponse.json();
+        const totalCount = countData['@odata.count'] || countData.value?.length || 0;
+
+        if (totalCount === 0) {
+            this.logger.info('No plugin traces to delete');
+            return 0;
+        }
+
+        this.logger.info(`Deleting ${totalCount} plugin traces using batch API`);
+
+        // Delete in batches using OData $batch API for better performance
+        const traceIds = countData.value.map((trace: DataverseTraceIdResponse) => trace.plugintracelogid);
+        const batchSize = 100; // Dataverse supports up to 1000 operations per batch, but 100 is safer
+        let deletedCount = 0;
+
+        for (let i = 0; i < traceIds.length; i += batchSize) {
+            const batch = traceIds.slice(i, i + batchSize);
+
+            try {
+                const successCount = await this.deleteBatch(environment, token, batch);
+                deletedCount += successCount;
+                this.logger.info(`Batch delete progress: ${deletedCount}/${totalCount} traces deleted`);
+            } catch (error) {
+                this.logger.error('Failed to delete batch', error as Error, { batchSize: batch.length });
+                // Continue with next batch
+            }
+        }
+
+        this.logger.info(`Successfully deleted ${deletedCount} plugin traces`);
+        return deletedCount;
+    }
+
+    /**
+     * Delete plugin trace logs older than specified days
+     */
+    async deleteOldTraces(environmentId: string, olderThanDays: number): Promise<number> {
+        const environments = await this.authService.getEnvironments();
+        const environment = environments.find(env => env.id === environmentId);
+
+        if (!environment) {
+            throw new Error('Environment not found');
+        }
+
+        const token = await this.authService.getAccessToken(environment.id);
+
+        // Calculate date threshold
+        const thresholdDate = new Date();
+        thresholdDate.setDate(thresholdDate.getDate() - olderThanDays);
+        const thresholdISO = thresholdDate.toISOString();
+
+        // Get traces older than threshold
+        const url = `${environment.settings.dataverseUrl}/api/data/v9.2/plugintracelogs?$select=plugintracelogid&$filter=createdon lt ${thresholdISO}&$count=true`;
+
+        this.logger.info('Fetching old plugin traces for deletion', { olderThanDays, thresholdDate });
+
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'OData-MaxVersion': '4.0',
+                'OData-Version': '4.0',
+                'Prefer': 'odata.include-annotations="*"'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch old plugin traces: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const totalCount = data['@odata.count'] || data.value?.length || 0;
+
+        if (totalCount === 0) {
+            this.logger.info('No old plugin traces to delete');
+            return 0;
+        }
+
+        this.logger.info(`Deleting ${totalCount} old plugin traces using batch API`);
+
+        // Delete in batches using OData $batch API for better performance
+        const traceIds = data.value.map((trace: DataverseTraceIdResponse) => trace.plugintracelogid);
+        const batchSize = 100; // Dataverse supports up to 1000 operations per batch, but 100 is safer
+        let deletedCount = 0;
+
+        for (let i = 0; i < traceIds.length; i += batchSize) {
+            const batch = traceIds.slice(i, i + batchSize);
+
+            try {
+                const successCount = await this.deleteBatch(environment, token, batch);
+                deletedCount += successCount;
+                this.logger.info(`Batch delete progress: ${deletedCount}/${totalCount} old traces deleted`);
+            } catch (error) {
+                this.logger.error('Failed to delete batch', error as Error, { batchSize: batch.length });
+                // Continue with next batch
+            }
+        }
+
+        this.logger.info(`Successfully deleted ${deletedCount} old plugin traces`);
+        return deletedCount;
     }
 }

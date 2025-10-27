@@ -1,4 +1,5 @@
 import { AuthenticationService } from './AuthenticationService';
+import { ServiceFactory } from './ServiceFactory';
 
 // Entity Definition Interfaces - Made comprehensive to handle all fields from API
 export interface EntityDefinition {
@@ -151,11 +152,14 @@ export interface EntityDefinition {
     EntityHelpUrl?: string;
 
     // Additional fields for any other properties that might come back
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     PrimaryKey?: any[];
     Privileges?: EntityPrivilegeMetadata[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Settings?: any[];
 
     // Allow for additional dynamic properties
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
 }
 
@@ -203,6 +207,7 @@ export interface AttributeMetadata {
 // Relationship Interfaces
 export interface OneToManyRelationshipMetadata {
     MetadataId: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     HasChanged?: any;
     SchemaName: string;
     SecurityTypes: string;
@@ -216,12 +221,15 @@ export interface OneToManyRelationshipMetadata {
     ReferencingAttribute: string;
     ReferencingEntity: string;
     IsHierarchical: boolean;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     EntityKey?: any;
     IsRelationshipAttributeDenormalized: boolean;
     ReferencedEntityNavigationPropertyName: string;
     ReferencingEntityNavigationPropertyName: string;
     RelationshipBehavior: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     IsDenormalizedLookup?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     DenormalizedAttributeName?: any;
     IsCustomizable: {
         Value: boolean;
@@ -244,6 +252,7 @@ export interface OneToManyRelationshipMetadata {
                 LanguageCode: number;
                 IsManaged: boolean;
                 MetadataId: string;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 HasChanged?: any;
             }>;
             UserLocalizedLabel?: {
@@ -251,6 +260,7 @@ export interface OneToManyRelationshipMetadata {
                 LanguageCode: number;
                 IsManaged: boolean;
                 MetadataId: string;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 HasChanged?: any;
             } | null;
         };
@@ -265,6 +275,7 @@ export interface OneToManyRelationshipMetadata {
         Unshare: string;
         RollupView: string;
     };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     RelationshipAttributes: any[];
 }
 
@@ -363,8 +374,17 @@ export interface CompleteEntityMetadata {
 
 export class MetadataService {
     private static readonly DEFAULT_CACHE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private cache = new Map<string, any>();
     private cacheTimeout = MetadataService.DEFAULT_CACHE_TIMEOUT_MS;
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger(): ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']> {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('MetadataService');
+        }
+        return this._logger;
+    }
 
     constructor(private authService: AuthenticationService) { }
 
@@ -424,11 +444,10 @@ export class MetadataService {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('MetadataService API Error:', {
+            this.logger.error('MetadataService API Error', new Error(`${response.status} ${response.statusText}: ${errorText}`), {
                 status: response.status,
                 statusText: response.statusText,
-                url: url,
-                errorText: errorText
+                url: url
             });
             throw new Error(`Failed to fetch entity definitions: ${response.status} ${response.statusText}. ${errorText}`);
         }
@@ -437,7 +456,7 @@ export class MetadataService {
         const entities = data.value || [];
 
         // Sort client-side by LogicalName since server-side sorting isn't supported
-        entities.sort((a: any, b: any) => {
+        entities.sort((a: EntityDefinition, b: EntityDefinition) => {
             return (a.LogicalName || '').localeCompare(b.LogicalName || '');
         });
 
@@ -705,7 +724,7 @@ export class MetadataService {
         const optionSets = data.value || [];
 
         // Sort client-side by Name since server-side sorting isn't supported
-        optionSets.sort((a: any, b: any) => {
+        optionSets.sort((a: OptionSetMetadata, b: OptionSetMetadata) => {
             return (a.Name || '').localeCompare(b.Name || '');
         });
 
@@ -810,6 +829,7 @@ export class MetadataService {
         return booleanProperty?.Value || false;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     canBeChanged(property: { Value: any; CanBeChanged: boolean } | null): boolean {
         return property?.CanBeChanged || false;
     }

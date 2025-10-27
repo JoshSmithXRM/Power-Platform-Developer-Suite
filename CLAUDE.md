@@ -1,273 +1,239 @@
 # CLAUDE.md
 
-**IMPORTANT: Keep this file synchronized with `.github/copilot-instructions.md`. Any updates should be made to both files identically.**
+Quick reference for AI assistants working with this VS Code extension codebase.
+**For detailed examples and explanations, see the `docs/` folder.**
 
-This file provides guidance to AI assistants (Claude, GitHub Copilot, Cursor, etc.) and developers when working with code in this repository.
+## CRITICAL: Execution Contexts
 
-## CRITICAL: Understanding Execution Contexts
+**Two separate environments** - NEVER mix them:
 
-### Extension Host Context (Node.js/TypeScript)
-- **What it is**: Runs in VS Code's Node.js process
-- **Has access to**: ComponentFactory, ServiceFactory, all TypeScript classes, Node.js APIs, file system, VS Code APIs
-- **Where it executes**: getHtmlContent() method, message handlers, all TypeScript code
-- **Can do**: Generate HTML using ComponentFactory, make API calls, access services
+| Context | Language | Has Access To | Purpose |
+|---------|----------|---------------|---------|
+| **Extension Host** | TypeScript | ComponentFactory, ServiceFactory, Node.js APIs | Generate HTML, manage state, business logic |
+| **Webview** | JavaScript | DOM, postMessage only | Display UI, handle interactions |
 
-### Webview Context (Browser/JavaScript)
-- **What it is**: Runs in isolated browser sandbox where users interact
-- **Has access to**: ONLY what's in the HTML string or loaded via `<script>` tags
-- **Available utilities**: TableUtils, PanelUtils, EnvironmentSelectorUtils (loaded as .js files)
-- **Cannot access**: ComponentFactory, ServiceFactory, or any TypeScript classes
-- **Communication**: Only via vscode.postMessage() to Extension Host
+❌ **NEVER** try to use `ComponentFactory` or `ServiceFactory` in webview JavaScript
+✅ **ALWAYS** generate HTML in Extension Host using ComponentFactory
 
-### Common Mistakes to Avoid
+📖 **See**: `docs/EXECUTION_CONTEXTS.md` for complete guide
 
-❌ **NEVER DO THIS** - Trying to use Extension Host classes in Webview:
-```javascript
-// In webview JavaScript - THIS WILL FAIL
-function displayResults(data) {
-    const tableHtml = ComponentFactory.generateDataTable(...); // ERROR: ComponentFactory is not defined
-    document.getElementById('results').innerHTML = tableHtml;
+## Panel Structure (MANDATORY)
+
+ALL panels MUST use this structure:
+
+```html
+<div class="panel-container">
+    <div class="panel-controls"><!-- Top bar --></div>
+    <div class="panel-content"><!-- Content area --></div>
+</div>
+```
+
+❌ **NEVER** skip `panel-content` wrapper (causes misalignment)
+❌ **NEVER** add custom body/container styles (breaks layout)
+✅ **ALWAYS** use `PanelComposer.compose()` for standard layouts
+
+📖 **See**: `docs/PANEL_LAYOUT_GUIDE.md` for complete guide
+
+## Component Creation Pattern
+
+```typescript
+export class MyPanel extends BasePanel {
+    private environmentSelector: EnvironmentSelectorComponent;
+    private dataTable: DataTableComponent;
+
+    private initializeComponents(): void {
+        this.environmentSelector = ComponentFactory.createEnvironmentSelector({...});
+        this.dataTable = ComponentFactory.createDataTable({...});
+    }
+
+    protected getHtmlContent(): string {
+        return PanelComposer.compose([
+            this.environmentSelector,
+            this.dataTable
+        ], this.getCommonWebviewResources());
+    }
 }
 ```
 
-✅ **ALWAYS DO THIS** - Generate HTML in Extension Host:
+## Custom Layouts (Advanced Only)
+
+Use `composeWithCustomHTML()` ONLY for complex multi-panel layouts:
+
 ```typescript
-// In getHtmlContent() method - Extension Host context
 protected getHtmlContent(): string {
-    const tableHtml = ComponentFactory.createDataTable({
-        id: 'resultsTable',
-        columns: [...]
-    });
-    
-    return `<!DOCTYPE html>
-        <html>
-        <body>
-            <div id="tableContainer">
-                ${tableHtml}  <!-- ComponentFactory runs in Extension Host -->
+    const customHTML = `
+        <div class="panel-container">
+            <div class="panel-controls">
+                ${this.actionBar.generateHTML()}
+                ${this.environmentSelector.generateHTML()}
             </div>
-            <script>
-                // Webview can only use loaded utilities
-                TableUtils.initializeTable('resultsTable', {...});
-            </script>
-        </body>
-        </html>`;
+            <div class="panel-content">
+                <!-- ⚠️ CRITICAL: Keep panel-content wrapper -->
+                <div class="my-custom-layout">...</div>
+            </div>
+        </div>
+    `;
+
+    return PanelComposer.composeWithCustomHTML(
+        customHTML,
+        [this.actionBar, this.environmentSelector, ...],
+        ['css/panels/my-panel.css'],
+        [],
+        this.getCommonWebviewResources(),
+        'Panel Title'
+    );
 }
 ```
 
-## Component Development & Reuse Rules
+📖 **See**: `docs/PANEL_LAYOUT_GUIDE.md` for custom layout patterns
 
-### ComponentFactory Usage (MANDATORY)
+## Component Updates
 
-ComponentFactory generates reusable HTML components in the Extension Host context. **Always check ComponentFactory first before writing custom HTML.**
-
-**Available Components:**
-- `createDataTable()` - Full-featured data tables with sorting, filtering
-- `createEmptyTable()` - Table structure without data  
-- `generateDataTable()` - Table with inline data
-- Environment selectors, buttons, forms, panels
-
-**Component Usage Rules:**
-1. **ALWAYS** use ComponentFactory for tables - never hand-code table HTML
-2. **CHECK FIRST** - does ComponentFactory have what you need?
-3. **ADD IF MISSING** - extend ComponentFactory rather than creating one-off HTML
-4. **REFERENCE** - Look at ImportJobViewerPanel.ts and PluginTraceViewerPanel.ts for patterns
-
-### Pattern Examples
-
-**Static Table (structure known at build time):**
+✅ **Use event bridges** - efficient, no UI flash:
 ```typescript
-// In getHtmlContent() - see ImportJobViewerPanel.ts
-return `<script type="text/template" id="tableTemplate">
-    ${ComponentFactory.createDataTable({
-        id: 'myTable',
-        columns: [...],
-        defaultSort: { column: 'name', direction: 'asc' }
-    })}
-</script>`;
+this.dataTable.setData(newData);  // Triggers event bridge automatically
 ```
 
-**Dynamic Table (data loaded via API):**
-```typescript
-// In getHtmlContent() - generate structure
-const tableStructure = ComponentFactory.createEmptyTable({
-    id: 'dynamicTable',
-    columns: [...]
-});
+❌ **DON'T use** `updateWebview()` - causes full HTML regeneration
 
-// In webview JavaScript - populate with data
-TableUtils.loadTableData('dynamicTable', tableData);
+## Message Naming Convention
+
+**CRITICAL**: All message commands MUST use **kebab-case** (hyphens), NOT camelCase:
+
+```typescript
+// ✅ CORRECT
+case 'environment-changed':
+case 'environment-selected':
+case 'component-event':
+case 'filter-panel-collapsed':
+
+// ❌ WRONG
+case 'environmentChanged':
+case 'componentEvent':
 ```
 
-## Security Rules (Non-Negotiable)
+**Environment Changes**: ALWAYS handle BOTH cases:
+```typescript
+case 'environment-selected':
+case 'environment-changed':
+    const envId = message.data?.environmentId || message.environmentId;
+    await this.handleEnvironmentChanged(envId);
+    break;
+```
 
-- **Never log, expose, or exfiltrate** tokens, credentials, or sensitive data
-- **Use VS Code SecretStorage** for all sensitive information storage
-- **All API calls** must go through AuthenticationService - never create alternate auth patterns
-- **Validate all user inputs** before making API calls
-- **No external network calls** except through proper authentication channels
-- **Ask clarifying questions** when requirements are ambiguous
+## Data Flow
+
+```typescript
+// 1. Service returns business data
+const data = await this.service.getData(params);
+
+// 2. Panel transforms for display (add 'id' property for tables)
+const uiData = this.transformDataForDisplay(data);
+
+// 3. Component receives UI-ready data
+this.dataTable.setData(uiData);
+```
+
+## Logging by Context
+
+**Extension Host** (TypeScript):
+```typescript
+// Panels & Components: Use this.componentLogger
+this.componentLogger.info('Loading data', { environmentId });
+
+// Services: Use private logger getter
+private get logger() {
+    if (!this._logger) {
+        this._logger = ServiceFactory.getLoggerService().createComponentLogger('MyService');
+    }
+    return this._logger;
+}
+```
+
+**Webview** (JavaScript):
+```javascript
+// Use console.log (LoggerService not available)
+console.log('Handling message:', message);
+```
+
+## Security Rules
+
+- **NEVER** log, expose, or exfiltrate tokens/credentials
+- **ALL** API calls go through AuthenticationService
+- **USE** VS Code SecretStorage for sensitive data
+- **VALIDATE** all user inputs before API calls
 
 ## Development Commands
 
-**Build and Development:**
 ```bash
-npm install              # Install dependencies
 npm run compile          # Development build
-npm run watch            # Watch mode for development 
-npm run package          # Production build with webpack (includes TypeScript type checking)
-```
-
-**Extension Testing:**
-```bash
-npm run vsce-package     # Create .vsix package
+npm run watch            # Watch mode for development
+npm run package          # Production build with webpack
 npm run test-release     # Build, package, and install locally
-npm run clean-install    # Uninstall and reinstall fresh
-code --install-extension power-platform-developer-suite-0.0.1.vsix  # Manual install
 ```
 
-**Development Workflow:**
-- Use `npm run watch` for continuous compilation during development
-- Press F5 in VS Code to launch Extension Development Host
-- Use VS Code task "Build Extension" for webpack compilation
+## Quick Reference - DO's
 
-## Architecture Overview
+- ✅ Use ComponentFactory for ALL component creation
+- ✅ Compose panels from reusable component instances
+- ✅ Use event bridges for component updates
+- ✅ Transform data in Panel layer (not Service/Component)
+- ✅ Follow Extension Host vs Webview separation
+- ✅ Maintain standard panel structure: `panel-container` → `panel-controls` → `panel-content`
+- ✅ Use `PanelComposer.compose()` for standard layouts
+- ✅ Use semantic CSS tokens (not hardcoded colors)
 
-This VS Code extension for Microsoft Dynamics 365/Power Platform follows a modular architecture with clean separation of concerns:
+## Quick Reference - DON'Ts
 
-### Core Structure
-- **panels/** - Webview panels extending BasePanel (7 panels implemented)
-- **services/** - Business logic with dependency injection via ServiceFactory
-- **components/** - Reusable UI generation via ComponentFactory  
-- **providers/** - VS Code tree view providers (environments, tools)
-- **commands/** - Command handlers organized by domain
-- **resources/webview/** - Shared webview utilities and CSS
-
-### Key Architectural Patterns
-
-**Panel Development:**
-- All panels extend `BasePanel` class with consistent structure
-- Use `ServiceFactory` for dependency injection - never direct instantiation
-- Include common webview resources via `getCommonWebviewResources()`
-- Follow standard message handling pattern with try/catch error handling
-
-**Service Layer:**
-- Services accept dependencies through constructor (especially AuthenticationService)
-- Register all services in ServiceFactory with proper initialization
-- Focus on single responsibility per service
-- Use AuthenticationService for all token management
-
-**UI Components:**
-- Use `ComponentFactory` for ALL HTML generation in Extension Host
-- Include shared utilities: TableUtils, PanelUtils, EnvironmentSelectorUtils
-- Table data MUST have 'id' property for row actions to work
-- Support HTML content in table cells for badges and formatting
-
-**Webview Utilities (loaded as .js files):**
-- **PanelUtils** - Common operations (loading states, messaging, error handling)
-- **TableUtils** - Complete table functionality (sorting, filtering, row actions, context menus)  
-- **EnvironmentSelectorUtils** - Multi-instance environment selector management
-
-### Critical Requirements
-
-**For Table Implementation:**
-```javascript
-// Data objects MUST have 'id' property for row actions
-const tableData = items.map(item => ({
-    id: item.primaryKey,     // Required for TableUtils
-    status: calculateStatus(item),  // Can contain HTML badges
-    ...item
-}));
-
-// Initialize with action handlers
-TableUtils.initializeTable('tableId', {
-    onRowAction: handleRowAction  // (actionId, rowData) => void
-});
-```
-
-**State Management:**
-- Use StateService for UI state persistence (not data caching)
-- Always make fresh API calls, only cache UI preferences
-- Save panel state: selected environment, sort settings, view config
-
-## API Guidelines
-
-**OData Query Best Practices:**
-- Use `$select` to limit fields and improve performance
-- Apply `$top` for pagination, `$orderby` for sorting
-- Use `$expand` judiciously for related entities
-- Dataverse API filtering preferred over in-memory filtering
-
-**Authentication:**
-- All API calls go through AuthenticationService
-- Never create alternate authentication patterns
-- Use proper token management with environment-specific tokens
-
-## Development Guidelines
-
-**File Organization:**
-- Keep files small and single-purpose
-- Follow established patterns in existing panels
-- Use composition over inheritance
-- Maintain consistent naming conventions
-
-**Error Handling:**
-- Implement comprehensive try/catch in message handlers
-- Provide user-friendly error messages
-- Use PanelUtils.showError() for consistent error display
-
-**Testing:**
-- Test with multiple environments and authentication methods
-- Verify table functionality with row actions and context menus
-- Test error scenarios and edge cases
-
-## Webpack Bundling
-
-Extension uses webpack for production optimization:
-- Single bundled output: `dist/extension.js`  
-- 92% size reduction (127KB vs 1.64MB)
-- All dependencies bundled except VS Code API
-- Source maps for debugging support
-
-## Change Management Process
-
-**Always Required for Changes:**
-1. Update `CHANGELOG.md` under `[Unreleased]` section using Keep a Changelog format
-2. Use semantic categories: Added, Changed, Fixed, Deprecated, Removed, Security, Technical
-3. Run build verification: `npm run package`
-4. Test extension functionality in Extension Development Host (F5)
-
-**Verification Checklist Before Completion:**
-- [ ] Build completes successfully (`npm run package`)
-- [ ] TypeScript compilation passes (verified by webpack build)
-- [ ] Extension loads without errors in Development Host
-- [ ] CHANGELOG.md updated with changes
-- [ ] All modified functionality tested
-
-## Workflow Guidelines
-
-**Making Code Changes:**
-- Make minimal, well-scoped changes that preserve existing APIs
-- Follow established patterns in existing files
-- Test changes in Extension Development Host (F5) before completion
-- Report build status and list modified files when done
-
-**Communication Style:**
-- Provide brief plan, execute changes, report results
-- Keep responses concise and focused
-- Include build/test status in completion reports
-
-## Quick Reference - Do's and Don'ts
-
-**DO:**
-- ✅ Use ComponentFactory for ALL HTML generation in getHtmlContent()
-- ✅ Check existing panels for patterns before creating new ones
-- ✅ Extend ComponentFactory when you need new components
-- ✅ Use TableUtils, PanelUtils, EnvironmentSelectorUtils in webviews
-- ✅ Follow the Extension Host vs Webview separation strictly
-
-**DON'T:**
 - ❌ Try to use ComponentFactory in webview JavaScript
-- ❌ Build HTML strings manually when ComponentFactory can do it
+- ❌ Use `updateWebview()` for component data updates
 - ❌ Mix Extension Host and Webview contexts
-- ❌ Create new patterns when existing ones work
-- ❌ Access TypeScript classes from webview code
+- ❌ Transform data in Service or Component layers
+- ❌ Skip `panel-content` wrapper in custom layouts
+- ❌ Add custom body/container styles that override base layout
+- ❌ Use custom header classes instead of `panel-controls`
+- ❌ Hardcode colors (breaks theme compatibility)
+
+## Component Behavior Pattern
+
+All webview behavior scripts MUST follow this pattern:
+
+```javascript
+class ComponentBehavior {
+    static instances = new Map();
+
+    static initialize(componentId, config, element) {
+        if (!componentId || !element) return null;
+        if (this.instances.has(componentId)) return this.instances.get(componentId);
+
+        const instance = { id: componentId, config, element };
+        this.instances.set(componentId, instance);
+        return instance;
+    }
+
+    static handleMessage(message) {
+        if (!message?.componentId) return;
+        // Handle Extension Host messages
+    }
+}
+
+// Global registration
+if (typeof window !== 'undefined') {
+    window.ComponentBehavior = ComponentBehavior;
+    if (window.ComponentUtils?.registerBehavior) {
+        window.ComponentUtils.registerBehavior('ComponentType', ComponentBehavior);
+    }
+}
+```
+
+## Documentation Reference
+
+- `docs/README.md` - Complete documentation index and navigation
+- `docs/EXECUTION_CONTEXTS.md` - Extension Host vs Webview deep dive
+- `docs/PANEL_LAYOUT_GUIDE.md` - Complete panel structure patterns
+- `docs/MESSAGE_CONVENTIONS.md` - Message naming and structure standards
+- `docs/ERROR_HANDLING_PATTERNS.md` - Error handling and notification patterns
+- `docs/ARCHITECTURE_GUIDE.md` - High-level architecture and SOLID principles
+- `docs/COMPONENT_PATTERNS.md` - Component design patterns and lifecycle
+- `docs/STYLING_PATTERNS.md` - CSS semantic tokens and styling patterns
+- `docs/DEVELOPMENT_GUIDE.md` - Practical development workflow and debugging

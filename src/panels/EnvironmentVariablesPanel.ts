@@ -1,94 +1,479 @@
+import * as fs from 'fs';
+
 import * as vscode from 'vscode';
-import { BasePanel } from './base/BasePanel';
+
 import { ServiceFactory } from '../services/ServiceFactory';
-import { ComponentFactory } from '../components/ComponentFactory';
 import { WebviewMessage } from '../types';
+import { ComponentFactory } from '../factories/ComponentFactory';
+import { PanelComposer } from '../factories/PanelComposer';
+import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
+import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
+import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
+import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
+import { Solution } from '../components/base/ComponentInterface';
+import {
+    EnvironmentVariableData,
+    EnvironmentVariableDefinition,
+    EnvironmentVariableValue
+} from '../services/EnvironmentVariablesService';
+
+import { BasePanel } from './base/BasePanel';
+
+// UI-specific type for table display
+interface EnvironmentVariableTableRow {
+    id: string;
+    displayName: string;
+    schemaName: string;
+    type: string;
+    defaultValue: string;
+    currentValue: string;
+    isManaged: string;
+    modifiedOn: string;
+    modifiedBy: string;
+}
 
 export class EnvironmentVariablesPanel extends BasePanel {
     public static readonly viewType = 'environmentVariables';
+    private static currentPanel: EnvironmentVariablesPanel | undefined;
 
-    private _selectedEnvironmentId: string | undefined;
-    private _environmentVariablesService: any;
+    private environmentSelectorComponent?: EnvironmentSelectorComponent;
+    private solutionSelectorComponent?: SolutionSelectorComponent;
+    private actionBarComponent?: ActionBarComponent;
+    private dataTableComponent?: DataTableComponent;
+    private currentEnvironmentVariablesData?: EnvironmentVariableData; // Store original service data for deployment settings
+    private currentSolutionId?: string; // Track current solution for "Open in Maker"
+    private componentFactory: ComponentFactory;
 
-    public static createOrShow(extensionUri: vscode.Uri) {
-        const existing = BasePanel.focusExisting(EnvironmentVariablesPanel.viewType);
-        if (existing) return;
-        EnvironmentVariablesPanel.createNew(extensionUri);
-    }
+    public static createOrShow(extensionUri: vscode.Uri): void {
+        const column = vscode.window.activeTextEditor?.viewColumn;
 
-    public static createNew(extensionUri: vscode.Uri) {
+        if (EnvironmentVariablesPanel.currentPanel) {
+            EnvironmentVariablesPanel.currentPanel.panel.reveal(column);
+            return;
+        }
+
         const panel = BasePanel.createWebviewPanel({
             viewType: EnvironmentVariablesPanel.viewType,
-            title: 'Environment Variables Manager',
+            title: 'Environment Variables',
             enableScripts: true,
             retainContextWhenHidden: true,
-            enableFindWidget: true
-        });
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+        }, column);
 
-        new EnvironmentVariablesPanel(panel, extensionUri);
+        EnvironmentVariablesPanel.currentPanel = new EnvironmentVariablesPanel(panel, extensionUri);
+    }
+
+    public static createNew(extensionUri: vscode.Uri): void {
+        this.createOrShow(extensionUri);
     }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
         super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: EnvironmentVariablesPanel.viewType,
-            title: 'Environment Variables Manager'
+            title: 'Environment Variables'
         });
 
-        this._environmentVariablesService = ServiceFactory.getEnvironmentVariablesService();
+        this.panel.onDidDispose(() => {
+            EnvironmentVariablesPanel.currentPanel = undefined;
+        });
+
+        this.componentLogger.debug('Constructor starting');
+
+        // Create per-panel ComponentFactory instance to avoid ID collisions
+        this.componentFactory = new ComponentFactory();
+
+        this.initializeComponents();
+
+        // Set up event bridges for component communication using BasePanel method
+        this.setupComponentEventBridges([
+            this.environmentSelectorComponent,
+            this.solutionSelectorComponent,
+            this.actionBarComponent,
+            this.dataTableComponent
+        ]);
+
+        // Initialize the panel (this calls updateWebview which calls getHtmlContent)
         this.initialize();
+
+        // Load environments after initialization
+        this.loadEnvironments();
+
+        this.componentLogger.info('Panel initialized successfully');
     }
 
-    protected async handleMessage(message: WebviewMessage): Promise<void> {
-        switch (message.action) {
-            case 'loadEnvironments':
-                await this.handleLoadEnvironments();
-                break;
+    private initializeComponents(): void {
+        this.componentLogger.debug('Initializing components');
+        try {
+            this.componentLogger.trace('Creating EnvironmentSelectorComponent');
+            // Environment Selector Component
+            this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
+                id: 'envVars-envSelector',
+                label: 'Environment',
+                placeholder: 'Choose an environment to view variables...',
+                environments: [],
+                showRefreshButton: true,
+                className: 'environment-variables-env-selector',
+                onChange: (environmentId: string) => {
+                    this.componentLogger.debug('Environment onChange triggered', { environmentId });
+                    this.handleEnvironmentSelection(environmentId);
+                }
+            });
+            this.componentLogger.trace('EnvironmentSelectorComponent created successfully');
 
-            case 'loadSolutions':
-                await this.handleLoadSolutions(message.environmentId);
-                break;
+            this.componentLogger.trace('Creating SolutionSelectorComponent');
+            // Solution Selector Component
+            // Note: Callback handles programmatic selection, component-event handles user selection
+            this.solutionSelectorComponent = this.componentFactory.createSolutionSelector({
+                id: 'envVars-solutionSelector',
+                label: 'Solution',
+                placeholder: 'All Solutions',
+                required: false,
+                solutions: [],
+                className: 'environment-variables-solution-selector',
+                onSelectionChange: (selectedSolutions: Solution[]) => {
+                    const solutionId = selectedSolutions.length > 0 ? selectedSolutions[0].id : '';
+                    this.componentLogger.debug('Solution onSelectionChange callback triggered (programmatic)', { solutionId });
+                    this.currentSolutionId = solutionId || undefined; // Store for "Open in Maker"
+                    this.handleSolutionSelection(solutionId);
+                }
+            });
+            this.componentLogger.trace('SolutionSelectorComponent created successfully');
 
-            case 'loadEnvironmentVariables':
-                await this.handleLoadEnvironmentVariables(message.environmentId, message.solutionId);
-                break;
+            this.componentLogger.trace('Creating ActionBarComponent');
+            // Action Bar Component
+            this.actionBarComponent = this.componentFactory.createActionBar({
+                id: 'envVars-actions',
+                actions: [
+                    {
+                        id: 'openInMakerBtn',
+                        label: 'Open in Maker',
+                        variant: 'primary',
+                        disabled: false
+                    },
+                    {
+                        id: 'refresh',
+                        label: 'Refresh',
+                        icon: 'refresh',
+                        variant: 'secondary',
+                        disabled: false
+                    },
+                    {
+                        id: 'syncDeploymentBtn',
+                        label: 'Sync Deployment Settings',
+                        icon: 'sync',
+                        variant: 'primary',
+                        disabled: true
+                    }
+                ],
+                layout: 'horizontal',
+                className: 'environment-variables-actions'
+            });
+            this.componentLogger.trace('ActionBarComponent created successfully');
 
-            case 'syncDeploymentSettings':
-                await this.handleSyncDeploymentSettings(message.environmentVariablesData, message.solutionUniqueName);
-                break;
+            this.componentLogger.trace('Creating DataTableComponent');
+            // Data Table Component
+            this.dataTableComponent = this.componentFactory.createDataTable({
+                id: 'envVars-table',
+                columns: [
+                    {
+                        id: 'displayName',
+                        label: 'Display Name',
+                        field: 'displayName',
+                        sortable: true,
+                        filterable: true,
+                        width: '200px'
+                    },
+                    {
+                        id: 'schemaName',
+                        label: 'Schema Name',
+                        field: 'schemaName',
+                        sortable: true,
+                        filterable: true,
+                        width: '200px',
+                        align: 'left'
+                    },
+                    {
+                        id: 'type',
+                        label: 'Type',
+                        field: 'type',
+                        sortable: true,
+                        filterable: true,
+                        width: '100px',
+                        align: 'center'
+                    },
+                    {
+                        id: 'currentValue',
+                        label: 'Current Value',
+                        field: 'currentValue',
+                        sortable: false,
+                        filterable: false,
+                        width: '250px'
+                    }
+                ],
+                data: [],
+                sortable: true,
+                defaultSort: [{ column: 'displayName', direction: 'asc' }],
+                searchable: true,
+                showFooter: true,
+                className: 'environment-variables-table'
+            });
+            this.componentLogger.trace('DataTableComponent created successfully');
+            this.componentLogger.debug('All components initialized successfully');
 
-            case 'openInMaker':
-                await this.handleOpenInMaker(message.environmentId, message.solutionId, message.entityType);
-                break;
-
-            default:
-                console.log('Unknown action:', message.action);
+        } catch (error) {
+            this.componentLogger.error('Error initializing components', error as Error);
+            vscode.window.showErrorMessage('Failed to initialize Environment Variables panel');
         }
     }
 
-    private async handleLoadEnvironments(): Promise<void> {
+    protected async handleMessage(message: WebviewMessage): Promise<void> {
         try {
-            const environments = await this._authService.getEnvironments();
+            // Ignore empty/malformed messages (happens during webview initialization)
+            if (!message || !message.command) {
+                this.componentLogger.trace('Received message without command, ignoring', { message });
+                return;
+            }
 
-            const cachedState = await this._stateService.getPanelState(EnvironmentVariablesPanel.viewType);
-            const selectedEnvironmentId = this._selectedEnvironmentId || cachedState?.selectedEnvironmentId || environments[0]?.id;
+            switch (message.command) {
+                case 'environment-changed':
+                    // Only sync component state - onChange callback will handle data loading
+                    if (this.environmentSelectorComponent && message.data?.environmentId) {
+                        this.environmentSelectorComponent.setSelectedEnvironment(message.data.environmentId);
+                    }
+                    break;
 
-            this._panel.webview.postMessage({
-                action: 'environmentsLoaded',
-                data: environments,
-                selectedEnvironmentId: selectedEnvironmentId
-            });
+                case 'solution-selected':
+                    await this.handleSolutionSelection(message.data?.solutionId);
+                    break;
+
+                case 'load-solutions':
+                    await this.handleLoadSolutions(message.data?.environmentId);
+                    break;
+
+                case 'load-environment-variables':
+                    await this.handleLoadEnvironmentVariables(message.data?.environmentId, message.data?.solutionId);
+                    break;
+
+                case 'sync-deployment-settings':
+                    await this.handleSyncDeploymentSettings(message.data?.environmentVariablesData, message.data?.solutionUniqueName);
+                    break;
+
+                case 'open-in-maker':
+                    await this.handleOpenInMaker(message.data?.environmentId, message.data?.solutionId, message.data?.entityType);
+                    break;
+
+                case 'refresh-data':
+                    await this.refreshEnvironmentVariables();
+                    break;
+
+                case 'panel-ready':
+                    this.componentLogger.debug('Panel ready event received');
+                    // Panel is ready, no action needed
+                    break;
+
+                case 'component-event':
+                    this.componentLogger.debug('Component event received', { data: message.data });
+                    await this.handleComponentEvent(message);
+                    break;
+
+                case 'table-search':
+                    if (message.tableId && this.dataTableComponent) {
+                        this.dataTableComponent.search(message.searchQuery || '');
+                    }
+                    break;
+
+                default:
+                    this.componentLogger.warn('Unknown message command', { command: message.command });
+            }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to load environments';
-            this._panel.webview.postMessage({
+            this.componentLogger.error('Error handling message', error as Error, { command: message.command });
+            this.postMessage({
+                command: 'error',
                 action: 'error',
-                message: errorMessage
+                message: 'An error occurred while processing your request'
             });
+        }
+    }
+
+    private async handleComponentEvent(message: WebviewMessage): Promise<void> {
+        try {
+            // ComponentUtils.sendMessage puts everything in message.data
+            const { componentId, eventType, data } = message.data || {};
+
+            // Log based on event significance
+            if (eventType === 'selectionChanged') {
+                // Business event - INFO level
+                const solutionName = data?.selectedSolutions?.[0]?.displayName;
+                const solutionId = data?.selectedSolutions?.[0]?.id;
+                if (solutionName) {
+                    this.componentLogger.info(`Solution selected: ${solutionName}`, { solutionId });
+                } else {
+                    this.componentLogger.info('Solution selection cleared');
+                }
+            } else if (eventType === 'actionClicked') {
+                // User action - INFO level
+                this.componentLogger.info(`Action clicked: ${data?.actionId}`, { componentId });
+            } else {
+                // Other events - DEBUG level
+                this.componentLogger.debug('Component event received', { componentId, eventType });
+            }
+
+            // Handle solution selector events
+            if (componentId === 'envVars-solutionSelector' && eventType === 'selectionChanged') {
+                const { selectedSolutions } = data;
+
+                // Note: Don't call setSelectedSolutions() here as it would trigger the callback
+                // and cause duplicate data loading. The webview already has the correct selection.
+                // We just store the solution ID for "Open in Maker" and handle selection once.
+
+                if (selectedSolutions && selectedSolutions.length > 0) {
+                    const selectedSolution = selectedSolutions[0];
+                    this.currentSolutionId = selectedSolution.id; // Store for "Open in Maker"
+                    await this.handleSolutionSelection(selectedSolution.id);
+                } else {
+                    this.currentSolutionId = undefined;
+                    await this.handleSolutionSelection('');
+                }
+                return;
+            }
+
+            // Handle action bar events
+            if (componentId === 'envVars-actions' && eventType === 'actionClicked') {
+                const { actionId } = data;
+
+                switch (actionId) {
+                    case 'refresh':
+                        await this.refreshEnvironmentVariables();
+                        break;
+                    case 'syncDeploymentBtn': {
+                        // Use original service data for deployment settings sync
+                        if (!this.currentEnvironmentVariablesData) {
+                            this.postMessage({ action: 'error', message: 'No environment variables data available for sync' });
+                            break;
+                        }
+                        const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
+
+                        await this.handleSyncDeploymentSettings(
+                            this.currentEnvironmentVariablesData,
+                            selectedSolution?.uniqueName
+                        );
+                        break;
+                    }
+                    case 'openInMakerBtn': {
+                        const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
+                        const solId = this.currentSolutionId; // Use tracked solution ID
+
+                        if (envId && solId) {
+                            await this.handleOpenInMaker(envId, solId, 'environment%20variables');
+                        } else {
+                            vscode.window.showWarningMessage('Please select an environment and solution first');
+                        }
+                        break;
+                    }
+                    default:
+                        this.componentLogger.warn('Unknown action ID', { actionId });
+                }
+                return;
+            }
+
+            // Handle other component events as needed
+            this.componentLogger.trace('Component event not handled', { componentId, eventType });
+
+        } catch (error) {
+            this.componentLogger.error('Error handling component event', error as Error, {
+                componentId: message.componentId,
+                eventType: message.eventType
+            });
+        }
+    }
+
+    protected getHtmlContent(): string {
+        this.componentLogger.trace('Generating HTML content');
+        try {
+            if (!this.environmentSelectorComponent || !this.solutionSelectorComponent ||
+                !this.actionBarComponent || !this.dataTableComponent) {
+                this.componentLogger.warn('Components not initialized when generating HTML');
+                return this.getErrorHtml('Environment Variables', 'Failed to initialize components');
+            }
+
+            this.componentLogger.trace('Using simple PanelComposer.compose() as specified in architecture');
+
+            // Use simple composition method as specified in architecture guide
+            return PanelComposer.compose([
+                this.actionBarComponent,
+                this.solutionSelectorComponent,
+                this.environmentSelectorComponent,
+                this.dataTableComponent
+            ], this.getCommonWebviewResources(), 'Environment Variables');
+
+        } catch (error) {
+            this.componentLogger.error('Error generating HTML content', error as Error);
+            return this.getErrorHtml('Environment Variables', 'Failed to generate panel content: ' + error);
+        }
+    }
+
+    private async loadEnvironments(): Promise<void> {
+        if (this.environmentSelectorComponent) {
+            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger, EnvironmentVariablesPanel.viewType);
+        }
+    }
+
+    private async handleEnvironmentSelection(environmentId: string): Promise<void> {
+        if (!environmentId) {
+            this.componentLogger.debug('Environment selection cleared');
+            return;
+        }
+
+        try {
+            this.componentLogger.info('Environment selected', { environmentId });
+
+            // Load solutions for this environment
+            await this.handleLoadSolutions(environmentId);
+
+        } catch (error) {
+            this.componentLogger.error('Error handling environment selection', error as Error, { environmentId });
+            vscode.window.showErrorMessage('Failed to load environment configuration');
+        }
+    }
+
+    private async handleSolutionSelection(solutionId: string): Promise<void> {
+        if (!solutionId) {
+            this.componentLogger.debug('Solution selection cleared');
+            return;
+        }
+
+        try {
+            this.componentLogger.info('Solution selected', { solutionId });
+
+            // Clear table and show loading state immediately for visual feedback
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setData([]);
+                this.dataTableComponent.setLoading(true, 'Loading environment variables...');
+            }
+
+            // Disable sync button while loading
+            if (this.actionBarComponent) {
+                this.actionBarComponent.setActionDisabled('syncDeploymentBtn', true);
+            }
+
+            // Get current environment ID
+            const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
+            if (selectedEnvironment) {
+                await this.handleLoadEnvironmentVariables(selectedEnvironment.id, solutionId);
+            }
+
+        } catch (error) {
+            this.componentLogger.error('Error handling solution selection', error as Error, { solutionId });
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setLoading(false);
+            }
+            vscode.window.showErrorMessage('Failed to load solution configuration');
         }
     }
 
     private async handleLoadSolutions(environmentId: string): Promise<void> {
         if (!environmentId) {
-            this._panel.webview.postMessage({ action: 'error', message: 'Environment id required' });
+            this.postMessage({ action: 'error', message: 'Environment id required' });
             return;
         }
 
@@ -96,21 +481,35 @@ export class EnvironmentVariablesPanel extends BasePanel {
             const solutionService = ServiceFactory.getSolutionService();
             const solutions = await solutionService.getSolutions(environmentId);
 
-            this._panel.webview.postMessage({ 
-                action: 'solutionsLoaded', 
+            // Update solution selector component if available
+            if (this.solutionSelectorComponent) {
+                // Use solutions directly from service - no transformation needed
+                this.solutionSelectorComponent.setSolutions(solutions);
+
+                // Auto-select Default solution if available
+                const defaultSolution = solutions.find(s => s.uniqueName === 'Default');
+                if (defaultSolution) {
+                    this.solutionSelectorComponent.setSelectedSolutions([defaultSolution]);
+                    // Note: setSelectedSolutions will automatically trigger onSelectionChange handler
+                    // which calls handleSolutionSelection -> handleLoadEnvironmentVariables
+                    // So we don't need to manually call it here to avoid duplicate execution
+                }
+            }
+
+            this.postMessage({
+                action: 'solutionsLoaded',
                 data: solutions,
                 selectedSolutionId: solutions.find(s => s.uniqueName === 'Default')?.solutionId
             });
-        } catch (err: any) {
-            this._panel.webview.postMessage({ action: 'error', message: err?.message || 'Failed to load solutions' });
+        } catch (error) {
+            this.componentLogger.error('Error loading solutions', error as Error, { environmentId });
+            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to load solutions' });
         }
     }
 
     private async handleLoadEnvironmentVariables(environmentId: string, solutionId?: string): Promise<void> {
-        console.log('handleLoadEnvironmentVariables called with environmentId:', environmentId, 'solutionId:', solutionId);
-
         if (!environmentId) {
-            this._panel.webview.postMessage({
+            this.postMessage({
                 action: 'error',
                 message: 'Environment ID is required'
             });
@@ -118,8 +517,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
         }
 
         try {
-            this._selectedEnvironmentId = environmentId;
-            console.log('Selected environment ID set to:', this._selectedEnvironmentId);
+            this.componentLogger.info('Loading environment variables', { environmentId, solutionId });
 
             // Save state
             await this._stateService.savePanelState(EnvironmentVariablesPanel.viewType, {
@@ -127,39 +525,123 @@ export class EnvironmentVariablesPanel extends BasePanel {
             });
 
             // Fetch environment variables data with optional solution filtering
-            const environmentVariablesData = await this._environmentVariablesService.getEnvironmentVariables(environmentId, solutionId);
+            const environmentVariablesService = ServiceFactory.getEnvironmentVariablesService();
+            const environmentVariablesData = await environmentVariablesService.getEnvironmentVariables(environmentId, solutionId);
 
-            this._panel.webview.postMessage({
-                action: 'environmentVariablesLoaded',
-                data: environmentVariablesData
+            // Store original service data for deployment settings
+            this.currentEnvironmentVariablesData = environmentVariablesData;
+
+            // Transform data for table display
+            const tableData = this.transformEnvironmentVariablesData(environmentVariablesData);
+
+            // Update the data table component directly (matches ConnectionReferencesPanel pattern)
+            if (this.dataTableComponent) {
+                this.componentLogger.info('Updating DataTableComponent with environment variables data', {
+                    rowCount: tableData.length
+                });
+
+                // Clear loading state BEFORE setting data to ensure proper state in update event
+                this.dataTableComponent.setLoading(false);
+                this.dataTableComponent.setData(tableData);
+                // Note: setData() already calls notifyUpdate() to update the table in webview
+            }
+
+            // Enable sync deployment settings button if we have data
+            if (this.actionBarComponent && tableData.length > 0) {
+                this.componentLogger.info('Enabling sync deployment settings button', {
+                    hasActionBar: !!this.actionBarComponent,
+                    dataCount: tableData.length
+                });
+                const result = this.actionBarComponent.setActionDisabled('syncDeploymentBtn', false);
+                this.componentLogger.info('Sync button enable result', { success: result });
+            } else {
+                this.componentLogger.warn('Not enabling sync button', {
+                    hasActionBar: !!this.actionBarComponent,
+                    dataCount: tableData.length
+                });
+            }
+
+            this.componentLogger.info('Environment variables loaded successfully', {
+                environmentId,
+                solutionId: solutionId || 'all',
+                variablesCount: tableData.length
             });
-        } catch (error: any) {
-            console.error('Error loading environment variables:', error);
-            this._panel.webview.postMessage({
+        } catch (error) {
+            this.componentLogger.error('Error loading environment variables', error as Error, { environmentId, solutionId });
+
+            // Clear loading state on error to prevent stuck spinner
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setLoading(false);
+            }
+
+            this.postMessage({
                 action: 'error',
-                message: `Failed to load environment variables: ${error.message}`
+                message: `Failed to load environment variables: ${(error as Error).message}`
             });
         }
     }
 
-    private async handleSyncDeploymentSettings(environmentVariablesData: any, solutionUniqueName?: string): Promise<void> {
+    private transformEnvironmentVariablesData(data: EnvironmentVariableData): EnvironmentVariableTableRow[] {
+        const definitions = data.definitions || [];
+        const values = data.values || [];
+
+        // Create a map of environment variable values by definition ID
+        const valuesMap = new Map<string, EnvironmentVariableValue>();
+        values.forEach((value: EnvironmentVariableValue) => {
+            valuesMap.set(value.environmentvariabledefinitionid, value);
+        });
+
+        // Transform definitions to include values and formatting for table display
+        return definitions.map((def: EnvironmentVariableDefinition): EnvironmentVariableTableRow => {
+            const value = valuesMap.get(def.environmentvariabledefinitionid);
+            return {
+                id: def.environmentvariabledefinitionid,
+                displayName: def.displayname || '',
+                schemaName: def.schemaname || '',
+                type: this.getTypeDisplayName(def.type),
+                defaultValue: def.defaultvalue || '<em>No default</em>',
+                currentValue: value ? value.value : '<em>No value set</em>',
+                isManaged: def.ismanaged ? 'Yes' : 'No',
+                modifiedOn: this.formatDate(value ? value.modifiedon : def.modifiedon),
+                modifiedBy: (value ? value.modifiedby : def.modifiedby) || ''
+            };
+        });
+    }
+
+    private getTypeDisplayName(type: number): string {
+        switch (type) {
+            case 100000000: return 'String';
+            case 100000001: return 'Number';
+            case 100000002: return 'Boolean';
+            case 100000003: return 'JSON';
+            case 100000004: return 'Data Source';
+            default: return 'Unknown';
+        }
+    }
+
+    private formatDate(dateString: string): string {
+        if (!dateString) return '';
+        return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
+    }
+
+    private async handleSyncDeploymentSettings(environmentVariablesData: EnvironmentVariableData, solutionUniqueName?: string): Promise<void> {
         try {
             const deploymentSettingsService = ServiceFactory.getDeploymentSettingsService();
-            
+
             // Prompt user to select or create deployment settings file
             const filePath = await deploymentSettingsService.selectDeploymentSettingsFile(solutionUniqueName);
             if (!filePath) {
                 return; // User cancelled
             }
 
-            const isNewFile = !require('fs').existsSync(filePath);
-            
+            const isNewFile = !fs.existsSync(filePath);
+
             // Sync environment variables with the file
             const result = await deploymentSettingsService.syncEnvironmentVariables(filePath, environmentVariablesData, isNewFile);
-            
+
             // Send success message back to UI
-            this._panel.webview.postMessage({ 
-                action: 'deploymentSettingsSynced', 
+            this.postMessage({
+                action: 'deploymentSettingsSynced',
                 data: {
                     filePath: result.filePath,
                     added: result.added,
@@ -168,330 +650,87 @@ export class EnvironmentVariablesPanel extends BasePanel {
                     isNewFile
                 }
             });
-        } catch (err: any) {
-            this._panel.webview.postMessage({ action: 'error', message: err?.message || 'Failed to sync deployment settings' });
+        } catch (error) {
+            this.componentLogger.error('Error syncing deployment settings', error as Error);
+            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to sync deployment settings' });
         }
     }
 
     private async handleOpenInMaker(environmentId: string, solutionId: string, entityType: string): Promise<void> {
         if (!environmentId || !solutionId) {
-            this._panel.webview.postMessage({ action: 'error', message: 'Environment and solution are required' });
+            this.postMessage({ action: 'error', message: 'Environment and solution are required' });
             return;
         }
 
         try {
             const environments = await this._authService.getEnvironments();
             const environment = environments.find(env => env.id === environmentId);
-            
+
             if (!environment) {
-                this._panel.webview.postMessage({ action: 'error', message: 'Environment not found' });
+                this.postMessage({ action: 'error', message: 'Environment not found' });
                 return;
             }
 
             // Use the actual environment GUID from the environment connection
             const envGuid = environment.environmentId || environmentId;
             const makerUrl = `https://make.powerapps.com/environments/${envGuid}/solutions/${solutionId}/objects/${entityType}`;
-            
-            console.log('Opening Maker URL:', makerUrl);
-            
+
+            this.componentLogger.info('Opening Maker URL', { url: makerUrl });
+
             // Open in external browser
             vscode.env.openExternal(vscode.Uri.parse(makerUrl));
-            
-        } catch (err: any) {
-            this._panel.webview.postMessage({ action: 'error', message: err?.message || 'Failed to open in Maker' });
+
+        } catch (error) {
+            this.componentLogger.error('Error opening in Maker', error as Error);
+            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to open in Maker' });
         }
     }
 
-    protected getHtmlContent(): string {
-        const { tableUtilsScript, tableStylesSheet, panelStylesSheet, panelUtilsScript } = this.getCommonWebviewResources();
+    private async refreshEnvironmentVariables(): Promise<void> {
+        try {
+            this.componentLogger.debug('Refreshing environment variables and environments');
 
-        const envSelectorUtilsScript = this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'environment-selector-utils.js')
-        );
-        const solutionSelectorUtilsScript = this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'solution-selector-utils.js')
-        );
+            // First refresh the environment list
+            await this.loadEnvironments();
 
-        return `<!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Environment Variables Manager</title>
-            <link rel="stylesheet" href="${panelStylesSheet}">
-            <link rel="stylesheet" href="${tableStylesSheet}">
-        </head>
-        <body>
-            <!-- Environment Selector -->
-            <div class="environment-selector">
-                <span class="environment-label">Environment:</span>
-                <select id="environmentSelect" class="environment-dropdown">
-                    <option value="">Loading environments...</option>
-                </select>
-                <span id="environmentStatus" class="environment-status environment-disconnected">Disconnected</span>
-            </div>
+            // Get current selections
+            const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
+            const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
 
-            ${ComponentFactory.createSolutionSelector({
-                id: 'solutionSelect',
-                label: 'Solution:',
-                placeholder: 'Loading solutions...'
-            })}
-            
-            <div class="header">
-                <h1 class="title">Environment Variables Manager</h1>
-                <div class="header-actions">
-                    <button class="btn btn-secondary" id="syncDeploymentBtn" disabled>Sync Deployment Settings</button>
-                    <button class="btn btn-primary" onclick="openInMaker()">Open in Maker</button>
-                    <button class="btn" onclick="refreshEnvironmentVariables()">Refresh</button>
-                </div>
-            </div>
-            
-            <div id="content">
-                <div class="loading">
-                    <p>Select an environment to manage environment variables...</p>
-                </div>
-            </div>
-
-            <!-- Hidden template for environment variables table -->
-            <script type="text/template" id="environmentVariablesTableTemplate">
-                ${ComponentFactory.createDataTable({
-                    id: 'environmentVariablesTable',
-                    columns: [
-                        { key: 'displayname', label: 'Display Name', sortable: true },
-                        { key: 'schemaname', label: 'Name', sortable: true },
-                        { key: 'typeDisplay', label: 'Type', sortable: true },
-                        { key: 'defaultValue', label: 'Default Value', sortable: false },
-                        { key: 'currentValue', label: 'Current Value', sortable: false },
-                        { key: 'ismanaged', label: 'Managed', sortable: true },
-                        { key: 'modifiedon', label: 'Modified On', sortable: true },
-                        { key: 'modifiedby', label: 'Modified By', sortable: true }
-                    ],
-                    defaultSort: { column: 'displayname', direction: 'asc' },
-                    stickyHeader: true,
-                    stickyFirstColumn: false,
-                    filterable: true,
-                    showFooter: true
-                })}
-            </script>
-
-            <script src="${envSelectorUtilsScript}"></script>
-            <script src="${solutionSelectorUtilsScript}"></script>
-            <script src="${panelUtilsScript}"></script>
-            <script src="${tableUtilsScript}"></script>
-            <script>
-                const vscode = acquireVsCodeApi();
-                let currentEnvironmentId = '';
-                let currentSolutionId = '';
-                let currentEnvironmentVariablesData = null;
-                let currentSolutionUniqueName = '';
-                let currentSolutionsData = [];
-                
-                const panelUtils = PanelUtils.initializePanel({
-                    environmentSelectorId: 'environmentSelect',
-                    onEnvironmentChange: 'onEnvironmentChange',
-                    clearMessage: 'Select an environment to manage environment variables...'
-                });
-                
-                document.addEventListener('DOMContentLoaded', () => {
-                    panelUtils.loadEnvironments();
-                    
-                    // Initialize solution selector
-                    SolutionSelectorUtils.initializeSelector('solutionSelect', {
-                        onSelectionChange: 'onSolutionChange'
-                    });
-                });
-                
-                function onEnvironmentChange(selectorId, environmentId, previousEnvironmentId) {
-                    currentEnvironmentId = environmentId;
-                    if (environmentId) {
-                        // Load solutions for the new environment
-                        loadSolutions(environmentId);
-                    } else {
-                        // Clear solution selector and content
-                        SolutionSelectorUtils.clearSelector('solutionSelect', 'Select an environment first...');
-                        currentSolutionId = '';
-                        panelUtils.clearContent('Select an environment to manage environment variables...');
-                    }
+            if (selectedEnvironment) {
+                // Clear table and show loading state for visual feedback
+                if (this.dataTableComponent) {
+                    this.dataTableComponent.setData([]);
+                    this.dataTableComponent.setLoading(true, 'Refreshing environment variables...');
                 }
 
-                function onSolutionChange(selectorId, solutionId, previousSolutionId) {
-                    currentSolutionId = solutionId;
-                    // Update the solution unique name when solution changes
-                    const selectedSolution = currentSolutionsData.find(s => s.solutionId === solutionId);
-                    currentSolutionUniqueName = selectedSolution?.uniqueName || '';
-                    
-                    if (solutionId && currentEnvironmentId) {
-                        loadEnvironmentVariables(currentEnvironmentId, solutionId);
-                    } else {
-                        panelUtils.clearContent('Select a solution to view environment variables...');
-                    }
+                // Disable sync button while refreshing
+                if (this.actionBarComponent) {
+                    this.actionBarComponent.setActionDisabled('syncDeploymentBtn', true);
                 }
 
-                function loadSolutions(environmentId) {
-                    if (!environmentId) return;
-                    SolutionSelectorUtils.setLoadingState('solutionSelect', true);
-                    PanelUtils.sendMessage('loadSolutions', { environmentId });
-                }
-                
-                function loadEnvironmentVariables(environmentId, solutionId) {
-                    if (environmentId) {
-                        panelUtils.showLoading('Loading environment variables...');
-                        PanelUtils.sendMessage('loadEnvironmentVariables', { 
-                            environmentId: environmentId,
-                            solutionId: solutionId
-                        });
-                    }
-                }
+                await this.handleLoadEnvironmentVariables(selectedEnvironment.id, selectedSolution?.id);
+                vscode.window.showInformationMessage('Environment Variables refreshed');
+            } else {
+                vscode.window.showWarningMessage('Please select an environment first');
+            }
+        } catch (error) {
+            this.componentLogger.error('Error refreshing environment variables', error as Error);
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setLoading(false);
+            }
+            vscode.window.showErrorMessage('Failed to refresh environment variables');
+        }
+    }
 
-                function refreshEnvironmentVariables() {
-                    if (currentEnvironmentId && currentSolutionId) {
-                        loadEnvironmentVariables(currentEnvironmentId, currentSolutionId);
-                    }
-                }
+    public dispose(): void {
+        EnvironmentVariablesPanel.currentPanel = undefined;
 
-                function openInMaker() {
-                    if (!currentEnvironmentId || !currentSolutionId) {
-                        PanelUtils.sendMessage('error', { message: 'Please select an environment and solution first' });
-                        return;
-                    }
-                    
-                    PanelUtils.sendMessage('openInMaker', { 
-                        environmentId: currentEnvironmentId, 
-                        solutionId: currentSolutionId,
-                        entityType: 'environment%20variables'
-                    });
-                }
+        this.environmentSelectorComponent?.dispose();
+        this.solutionSelectorComponent?.dispose();
+        this.actionBarComponent?.dispose();
+        this.dataTableComponent?.dispose();
 
-                // Setup message handlers
-                PanelUtils.setupMessageHandler({
-                    'environmentsLoaded': (message) => {
-                        EnvironmentSelectorUtils.loadEnvironments('environmentSelect', message.data);
-                        if (message.selectedEnvironmentId) {
-                            EnvironmentSelectorUtils.setSelectedEnvironment('environmentSelect', message.selectedEnvironmentId);
-                            currentEnvironmentId = message.selectedEnvironmentId;
-                            loadSolutions(message.selectedEnvironmentId);
-                        }
-                    },
-
-                    'solutionsLoaded': (message) => {
-                        SolutionSelectorUtils.setLoadingState('solutionSelect', false);
-                        SolutionSelectorUtils.loadSolutions('solutionSelect', message.data, message.selectedSolutionId);
-                        // Store solutions data for later reference
-                        currentSolutionsData = message.data;
-                        if (message.selectedSolutionId) {
-                            currentSolutionId = message.selectedSolutionId;
-                            // Store solution unique name for deployment settings
-                            const selectedSolution = message.data.find(s => s.solutionId === message.selectedSolutionId);
-                            currentSolutionUniqueName = selectedSolution?.uniqueName || '';
-                            loadEnvironmentVariables(currentEnvironmentId, message.selectedSolutionId);
-                        }
-                    },
-
-                    'environmentVariablesLoaded': (message) => {
-                        currentEnvironmentVariablesData = message.data; // Store for deployment settings sync
-                        populateEnvironmentVariables(message.data);
-                    },
-
-                    'deploymentSettingsSynced': (message) => {
-                        const result = message.data;
-                        const actionText = result.isNewFile ? 'created' : 'updated';
-                        const summary = 'Deployment settings file ' + actionText + ': ' + result.added + ' added, ' + result.removed + ' removed';
-                        
-                        // Show success message with file path
-                        panelUtils.showSuccess(summary + '\\nFile: ' + result.filePath);
-                    }
-                });
-
-                function populateEnvironmentVariables(data) {
-                    const definitions = data.definitions || [];
-                    const values = data.values || [];
-
-                    // Enable sync button if we have data
-                    const syncBtn = document.getElementById('syncDeploymentBtn');
-                    if (syncBtn) {
-                        if (definitions.length > 0) {
-                            syncBtn.disabled = false;
-                            syncBtn.onclick = () => syncDeploymentSettings();
-                        } else {
-                            syncBtn.disabled = true;
-                        }
-                    }
-
-                    // Create a map of environment variable values by definition ID
-                    const valuesMap = new Map();
-                    values.forEach(value => {
-                        valuesMap.set(value.environmentvariabledefinitionid, value);
-                    });
-
-                    // Transform definitions to include values and formatting
-                    const tableData = definitions.map(def => {
-                        const value = valuesMap.get(def.environmentvariabledefinitionid);
-                        return {
-                            id: def.environmentvariabledefinitionid,
-                            displayname: def.displayname || '',
-                            schemaname: def.schemaname || '',
-                            typeDisplay: getTypeDisplayName(def.type),
-                            defaultValue: def.defaultvalue || '<em>No default</em>',
-                            currentValue: value ? value.value : '<em>No value set</em>',
-                            ismanaged: def.ismanaged ? 'Yes' : 'No',
-                            modifiedon: formatDate(value ? value.modifiedon : def.modifiedon),
-                            modifiedby: value ? value.modifiedby : def.modifiedby || ''
-                        };
-                    });
-
-                    // Use ComponentFactory template and TableUtils for display
-                    const content = document.getElementById('content');
-                    const template = document.getElementById('environmentVariablesTableTemplate');
-                    content.innerHTML = template.innerHTML;
-
-                    // Initialize table
-                    TableUtils.initializeTable('environmentVariablesTable', {
-                        onRowClick: handleRowClick,
-                        onRowAction: handleRowAction
-                    });
-
-                    // Load data and apply default sorting
-                    TableUtils.loadTableData('environmentVariablesTable', tableData);
-                    TableUtils.sortTable('environmentVariablesTable', 'displayname', 'asc');
-                }
-
-                function getTypeDisplayName(type) {
-                    switch (type) {
-                        case 100000000: return 'String';
-                        case 100000001: return 'Number';
-                        case 100000002: return 'Boolean';
-                        case 100000003: return 'JSON';
-                        case 100000004: return 'Data Source';
-                        default: return 'Unknown';
-                    }
-                }
-
-                function formatDate(dateString) {
-                    if (!dateString) return '';
-                    return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
-                }
-
-                function handleRowClick(rowData, rowElement) {
-                    console.log('Environment variable clicked:', rowData);
-                }
-
-                function handleRowAction(actionId, rowData) {
-                    console.log('Environment variable action:', actionId, rowData);
-                }
-
-                function syncDeploymentSettings() {
-                    if (!currentEnvironmentVariablesData || !currentSolutionUniqueName) {
-                        PanelUtils.sendMessage('error', { message: 'No environment variable data available to sync' });
-                        return;
-                    }
-                    
-                    PanelUtils.sendMessage('syncDeploymentSettings', {
-                        environmentVariablesData: currentEnvironmentVariablesData,
-                        solutionUniqueName: currentSolutionUniqueName
-                    });
-                }
-            </script>
-        </body>
-        </html>`;
+        super.dispose();
     }
 }

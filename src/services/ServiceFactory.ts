@@ -1,4 +1,8 @@
 import * as vscode from 'vscode';
+
+import { ComponentFactory } from '../factories/ComponentFactory';
+import { PanelComposer } from '../factories/PanelComposer';
+
 import { AuthenticationService } from './AuthenticationService';
 import { StateService } from './StateService';
 import { SolutionService } from './SolutionService';
@@ -11,6 +15,9 @@ import { PluginTraceService } from './PluginTraceService';
 import { MetadataService } from './MetadataService';
 import { DataverseQueryService } from './DataverseQueryService';
 import { DataverseMetadataService } from './DataverseMetadataService';
+import { LoggerService } from './LoggerService';
+import { ImportJobService } from './ImportJobService';
+import { XmlFormatterService } from './XmlFormatterService';
 
 export class ServiceFactory {
     private static authService: AuthenticationService;
@@ -24,6 +31,11 @@ export class ServiceFactory {
     private static metadataService: MetadataService;
     private static dataverseQueryService: DataverseQueryService;
     private static dataverseMetadataService: DataverseMetadataService;
+    private static loggerService: LoggerService;
+    private static importJobService: ImportJobService;
+    private static xmlFormatterService: XmlFormatterService;
+    private static componentFactory: ComponentFactory;
+    private static panelComposers: Map<string, PanelComposer> = new Map();
     private static initialized = false;
     
     static initialize(context: vscode.ExtensionContext): void {
@@ -31,10 +43,14 @@ export class ServiceFactory {
             return;
         }
         
+        // Initialize LoggerService FIRST to avoid circular dependency issues
+        ServiceFactory.loggerService = LoggerService.getInstance();
+        
+        // Now initialize all other services
         ServiceFactory.authService = AuthenticationService.getInstance(context);
         ServiceFactory.stateService = StateService.getInstance(context);
-    ServiceFactory.solutionService = new SolutionService(ServiceFactory.authService);
-    ServiceFactory.connectionReferencesService = new ConnectionReferencesService(ServiceFactory.authService);
+        ServiceFactory.solutionService = new SolutionService(ServiceFactory.authService);
+        ServiceFactory.connectionReferencesService = new ConnectionReferencesService(ServiceFactory.authService);
         ServiceFactory.deploymentSettingsService = new DeploymentSettingsService();
         ServiceFactory.environmentVariablesService = new EnvironmentVariablesService(ServiceFactory.authService);
         ServiceFactory.solutionComponentService = new SolutionComponentService(ServiceFactory.authService);
@@ -42,8 +58,13 @@ export class ServiceFactory {
         ServiceFactory.metadataService = new MetadataService(ServiceFactory.authService);
         ServiceFactory.dataverseQueryService = new DataverseQueryService(ServiceFactory.authService);
         ServiceFactory.dataverseMetadataService = new DataverseMetadataService(ServiceFactory.authService);
+        ServiceFactory.xmlFormatterService = new XmlFormatterService();
+        ServiceFactory.importJobService = new ImportJobService(ServiceFactory.authService, ServiceFactory.xmlFormatterService);
+
         ServiceFactory.initialized = true;
-        console.log('ServiceFactory initialized successfully');
+        
+        // Use logger service instead of console.log
+        ServiceFactory.loggerService.info('ServiceFactory', 'All services initialized successfully');
     }
     
     static getAuthService(): AuthenticationService {
@@ -123,10 +144,47 @@ export class ServiceFactory {
         return ServiceFactory.dataverseMetadataService;
     }
     
+    static getLoggerService(): LoggerService {
+        // For LoggerService, we allow access during initialization to prevent circular deps
+        if (!ServiceFactory.loggerService) {
+            ServiceFactory.loggerService = LoggerService.getInstance();
+        }
+        return ServiceFactory.loggerService;
+    }
+    
     static getUrlBuilderService(): typeof UrlBuilderService {
         return UrlBuilderService;
     }
-    
+
+    static getImportJobService(): ImportJobService {
+        if (!ServiceFactory.initialized) {
+            throw new Error('ServiceFactory not initialized. Call initialize() first.');
+        }
+        return ServiceFactory.importJobService;
+    }
+
+    static getXmlFormatterService(): XmlFormatterService {
+        if (!ServiceFactory.initialized) {
+            throw new Error('ServiceFactory not initialized. Call initialize() first.');
+        }
+        return ServiceFactory.xmlFormatterService;
+    }
+
+    static getComponentFactory(): ComponentFactory {
+        if (!ServiceFactory.componentFactory) {
+            ServiceFactory.componentFactory = new ComponentFactory();
+        }
+        return ServiceFactory.componentFactory;
+    }
+
+    static getPanelComposer(extensionUri: vscode.Uri): PanelComposer {
+        const uriKey = extensionUri.toString();
+        if (!ServiceFactory.panelComposers.has(uriKey)) {
+            ServiceFactory.panelComposers.set(uriKey, new PanelComposer(extensionUri));
+        }
+        return ServiceFactory.panelComposers.get(uriKey)!;
+    }
+
     static isInitialized(): boolean {
         return ServiceFactory.initialized;
     }

@@ -1,4 +1,5 @@
 import { AuthenticationService } from './AuthenticationService';
+import { ServiceFactory } from './ServiceFactory';
 
 export interface EntityDefinition {
     MetadataId: string;
@@ -16,6 +17,15 @@ export interface SolutionComponent {
 }
 
 export class SolutionComponentService {
+    private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+    
+    private get logger(): ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']> {
+        if (!this._logger) {
+            this._logger = ServiceFactory.getLoggerService().createComponentLogger('SolutionComponentService');
+        }
+        return this._logger;
+    }
+
     constructor(private authService: AuthenticationService) { }
 
     /**
@@ -54,7 +64,7 @@ export class SolutionComponentService {
         const entities = data.value as EntityDefinition[];
 
         if (entities.length === 0) {
-            console.warn(`Entity '${entityLogicalName}' not found`);
+            this.logger.warn('Entity not found', { entityLogicalName });
             return null;
         }
 
@@ -109,7 +119,7 @@ export class SolutionComponentService {
         const objectTypeCode = await this.getEntityObjectTypeCode(environmentId, entityLogicalName);
 
         if (objectTypeCode === null) {
-            console.warn(`Could not find ObjectTypeCode for entity '${entityLogicalName}'`);
+            this.logger.warn('Could not find ObjectTypeCode for entity', { entityLogicalName });
             return [];
         }
 

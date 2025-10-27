@@ -14,5 +14,11 @@
         "skipLibCheck": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true
-    }
+    },
+    "exclude": [
+        "node_modules",
+        "out",
+        "dist",
+        "Old/**/*"
+    ]
 }

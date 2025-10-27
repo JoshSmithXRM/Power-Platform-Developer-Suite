@@ -1,6 +1,8 @@
-import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+
+import * as vscode from 'vscode';
+
 import { RelationshipResult } from './ConnectionReferencesService';
 import { EnvironmentVariableData } from './EnvironmentVariablesService';
 
@@ -75,7 +77,10 @@ export class DeploymentSettingsService {
     async selectDeploymentSettingsFile(solutionUniqueName?: string): Promise<string | undefined> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
-            vscode.window.showErrorMessage('No workspace folder is open');
+            vscode.window.showErrorMessage(
+                'Please open a folder or workspace to sync deployment settings. ' +
+                'Deployment settings files must be saved within your project folder.'
+            );
             return undefined;
         }
 
@@ -173,7 +178,8 @@ export class DeploymentSettingsService {
         const existingSettings = await this.readDeploymentSettings(filePath);
         const solutionConnectionRefs = relationshipData.connectionReferences || [];
         
-        let added = 0, removed = 0, updated = 0;
+        let added = 0, removed = 0;
+        const updated = 0;
         
         if (isNewFile) {
             // For new files, create complete entries with all three properties
@@ -238,7 +244,8 @@ export class DeploymentSettingsService {
         const existingSettings = await this.readDeploymentSettings(filePath);
         const solutionEnvVars = envVarData.definitions || [];
         
-        let added = 0, removed = 0, updated = 0;
+        let added = 0, removed = 0;
+        const updated = 0;
         
         if (isNewFile) {
             // For new files, create complete entries

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+
 import { ToolItem } from './EnvironmentsProvider';
 
 export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
