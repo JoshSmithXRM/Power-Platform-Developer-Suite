@@ -73,7 +73,56 @@ class MetadataBrowserBehavior {
         // Setup keyboard shortcuts
         MetadataBrowserBehavior.setupKeyboardShortcuts();
 
+        // Setup data-action event delegation
+        MetadataBrowserBehavior.setupActionHandlers();
+
         console.log('MetadataBrowserBehavior initialized');
+    }
+
+    /**
+     * Setup event delegation for data-action attributes
+     */
+    static setupActionHandlers() {
+        document.addEventListener('click', (event) => {
+            const target = event.target.closest('[data-action]');
+            if (!target) return;
+
+            const action = target.dataset.action;
+
+            switch (action) {
+                case 'toggle-left-panel':
+                    MetadataBrowserBehavior.toggleLeftPanel();
+                    break;
+
+                case 'toggle-section': {
+                    const sectionId = target.dataset.section || target.closest('[data-section]')?.dataset.section;
+                    if (sectionId) {
+                        window.toggleSection(sectionId);
+                    }
+                    break;
+                }
+
+                case 'close-detail-panel':
+                    MetadataBrowserBehavior.closeDetailPanel();
+                    break;
+
+                case 'switch-detail-tab': {
+                    const tabName = target.dataset.tab;
+                    if (tabName) {
+                        MetadataBrowserBehavior.switchDetailTab(tabName);
+                    }
+                    break;
+                }
+            }
+        });
+
+        // Handle input events for filter
+        document.addEventListener('input', (event) => {
+            const target = event.target;
+            if (target.dataset.action === 'filter-entity-tree') {
+                MetadataBrowserBehavior.filterTree(target.value);
+            }
+        });
     }
 
     /**

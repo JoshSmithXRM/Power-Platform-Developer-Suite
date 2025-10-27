@@ -587,7 +587,7 @@ export class MetadataBrowserPanel extends BasePanel {
 
         <div class="panel-content">
             <div class="metadata-container">
-        <button class="panel-collapse-btn" id="left-panel-collapse" onclick="toggleLeftPanel()" title="Collapse sidebar" aria-label="Collapse sidebar">
+        <button class="panel-collapse-btn" id="left-panel-collapse" data-action="toggle-left-panel" title="Collapse sidebar" aria-label="Collapse sidebar">
             ◀
         </button>
 
@@ -599,7 +599,7 @@ export class MetadataBrowserPanel extends BasePanel {
                     class="entity-search"
                     id="entity-search"
                     placeholder="Search tables and choices..."
-                    oninput="filterEntityTree(this.value)"
+                    data-action="filter-entity-tree"
                 />
             </div>
             <div class="entity-tree-container">
@@ -628,7 +628,7 @@ export class MetadataBrowserPanel extends BasePanel {
             <div class="metadata-sections ${isEntitySelected ? 'entity-mode' : ''} ${isChoiceSelected ? 'choice-mode' : ''}">
     <!-- Attributes Section (Entity Only) -->
     <div class="section entity-only ${isAttributesExpanded ? 'expanded' : ''}" data-section="attributes">
-        <div class="section-header" onclick="toggleSection('attributes')">
+        <div class="section-header" data-action="toggle-section" data-section="attributes">
             <span class="section-icon">▶</span>
             <span class="section-title">Attributes</span>
             <span class="section-count" id="attributes-count">0</span>
@@ -640,7 +640,7 @@ export class MetadataBrowserPanel extends BasePanel {
 
     <!-- Keys Section (Entity Only) -->
     <div class="section entity-only ${isKeysExpanded ? 'expanded' : ''}" data-section="keys">
-        <div class="section-header" onclick="toggleSection('keys')">
+        <div class="section-header" data-action="toggle-section" data-section="keys">
             <span class="section-icon">▶</span>
             <span class="section-title">Keys</span>
             <span class="section-count" id="keys-count">0</span>
@@ -652,7 +652,7 @@ export class MetadataBrowserPanel extends BasePanel {
 
     <!-- Relationships Section (Entity Only) -->
     <div class="section entity-only ${isRelationshipsExpanded ? 'expanded' : ''}" data-section="relationships">
-        <div class="section-header" onclick="toggleSection('relationships')">
+        <div class="section-header" data-action="toggle-section" data-section="relationships">
             <span class="section-icon">▶</span>
             <span class="section-title">Relationships</span>
             <span class="section-count" id="relationships-count">0</span>
@@ -664,7 +664,7 @@ export class MetadataBrowserPanel extends BasePanel {
 
     <!-- Privileges Section (Entity Only) -->
     <div class="section entity-only ${isPrivilegesExpanded ? 'expanded' : ''}" data-section="privileges">
-        <div class="section-header" onclick="toggleSection('privileges')">
+        <div class="section-header" data-action="toggle-section" data-section="privileges">
             <span class="section-icon">▶</span>
             <span class="section-title">Privileges</span>
             <span class="section-count" id="privileges-count">0</span>
@@ -676,7 +676,7 @@ export class MetadataBrowserPanel extends BasePanel {
 
     <!-- Choice Values Section (Choice Only) -->
     <div class="section choice-only ${isChoicesExpanded ? 'expanded' : ''}" data-section="choices">
-        <div class="section-header" onclick="toggleSection('choices')">
+        <div class="section-header" data-action="toggle-section" data-section="choices">
             <span class="section-icon">▶</span>
             <span class="section-title">Choice Values</span>
             <span class="section-count" id="choices-count">0</span>
@@ -692,15 +692,15 @@ export class MetadataBrowserPanel extends BasePanel {
         <div class="detail-panel hidden" id="detail-panel">
             <div class="detail-panel-header">
                 <span class="detail-panel-title" id="detail-panel-title">Details</span>
-                <button class="detail-panel-close" onclick="closeDetailPanel()" title="Close" aria-label="Close">
+                <button class="detail-panel-close" data-action="close-detail-panel" title="Close" aria-label="Close">
                     ×
                 </button>
             </div>
         <div class="detail-panel-tabs">
-            <button class="detail-panel-tab active" data-tab="properties" onclick="switchDetailTab('properties')">
+            <button class="detail-panel-tab active" data-tab="properties" data-action="switch-detail-tab">
                 Properties
             </button>
-            <button class="detail-panel-tab" data-tab="json" onclick="switchDetailTab('json')">
+            <button class="detail-panel-tab" data-tab="json" data-action="switch-detail-tab">
                 Raw Data
             </button>
         </div>

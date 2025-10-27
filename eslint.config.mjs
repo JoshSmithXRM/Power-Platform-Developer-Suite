@@ -154,7 +154,7 @@ export default tseslint.config(
   },
   {
     // View classes, config files, and panels are allowed to transform data for UI rendering purposes
-    files: ['src/components/**/*View.ts', 'src/components/**/*Config.ts', 'src/factories/**/*.ts', 'src/panels/**/*Panel.ts'],
+    files: ['src/components/**/*View.ts', 'src/components/**/*Config.ts', 'src/factories/**/*.ts', '!src/factories/PanelComposer.ts', 'src/panels/**/*Panel.ts', '!src/panels/base/**'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -179,20 +179,6 @@ export default tseslint.config(
           message: '❌ No inline <script> blocks in HTML templates. Move JavaScript to webview behavior files in resources/webview/js/. See: docs/EXECUTION_CONTEXTS.md'
         }
         // Note: Data transformation (map) is ALLOWED in View classes and Factories for UI rendering
-      ]
-    }
-  },
-  {
-    // Special allowance for BasePanel - both updateWebview and data transformation allowed
-    files: ['src/panels/BasePanel.ts', 'src/panels/base/BasePanel.ts'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "CallExpression[callee.object.name='console']",
-          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
-        }
-        // Note: Both updateWebview() and data transformation (map) are ALLOWED in BasePanel
       ]
     }
   },
@@ -269,6 +255,39 @@ export default tseslint.config(
           selector: "SwitchCase > Literal[value='environmentChanged']",
           message: "❌ Use kebab-case 'environment-changed' not camelCase 'environmentChanged'. Already handled by 'environment-changed' case. See: docs/MESSAGE_CONVENTIONS.md"
         }
+      ]
+    }
+  },
+  {
+    // FINAL OVERRIDE: BasePanel exemption - must be last to override all previous rules
+    // BasePanel is allowed to use updateWebview() during initialization and for full UI refresh
+    files: ['src/panels/base/BasePanel.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.object.name='console']",
+          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
+        }
+        // Note: updateWebview() IS ALLOWED in BasePanel for initialization
+        // Note: Data transformation (map) IS ALLOWED in BasePanel
+      ]
+    }
+  },
+  {
+    // FINAL OVERRIDE: PanelComposer exemption - bootstrap scripts are necessary infrastructure
+    // Must be last to override all previous script block restrictions
+    files: ['src/factories/PanelComposer.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.object.name='console']",
+          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
+        }
+        // Note: Inline <script> blocks ARE ALLOWED in PanelComposer (bootstrap code for vscode API)
+        // Note: onclick handlers NOT allowed (use data-action instead)
+        // Note: updateWebview() calls NOT allowed
       ]
     }
   }

@@ -371,27 +371,26 @@ export class PluginTraceViewerPanel extends BasePanel {
                     await this.handleDropdownItemClicked(message);
                     break;
 
-                case 'loadEnvironments':
+                case 'load-environments':
                     await this.handleLoadEnvironments();
                     break;
 
-                case 'environment-changed':
-                case 'environmentChanged': {
-                    // Handle both hyphenated and camelCase for compatibility
+                case 'environment-selected':
+                case 'environment-changed': {
                     const envId = message.data?.environmentId || message.environmentId;
                     await this.handleEnvironmentChanged(envId);
                     break;
                 }
 
-                case 'loadTraces':
+                case 'load-traces':
                     await this.handleLoadTraces(message.environmentId, message.filterOptions);
                     break;
 
-                case 'traceLevelChanged':
+                case 'trace-level-changed':
                     await this.handleSetTraceLevel(message.environmentId, message.level);
                     break;
 
-                case 'filtersApplied': {
+                case 'filters-applied': {
                     // Convert objects to arrays if needed (happens when data is serialized/deserialized)
                     const quickFilters = message.data?.quickFilters;
                     const advancedFilters = message.data?.advancedFilters;
@@ -405,15 +404,15 @@ export class PluginTraceViewerPanel extends BasePanel {
                     break;
                 }
 
-                case 'traceSelected':
+                case 'trace-selected':
                     await this.handleTraceSelected(message.traceId);
                     break;
 
-                case 'contextMenuAction':
+                case 'context-menu-action':
                     await this.handleContextMenuAction(message.actionId, message.rowId);
                     break;
 
-                case 'autoRefreshChanged':
+                case 'auto-refresh-changed':
                     await this.handleAutoRefreshChange(message.interval);
                     break;
 
@@ -454,17 +453,17 @@ export class PluginTraceViewerPanel extends BasePanel {
                     }
                     break;
 
-                case 'splitRatioChanged':
+                case 'split-ratio-changed':
                     this.componentLogger.info('✅ Split ratio changed', { splitRatio: message.data?.splitRatio });
                     await this.updateState({ splitRatio: message.data?.splitRatio });
                     break;
 
-                case 'rightPanelOpened':
+                case 'right-panel-opened':
                     this.componentLogger.info('✅ Right panel opened');
                     await this.updateState({ rightPanelVisible: true });
                     break;
 
-                case 'rightPanelClosed':
+                case 'right-panel-closed':
                     this.componentLogger.info('✅ Right panel closed');
                     await this.updateState({ rightPanelVisible: false });
                     break;
@@ -1818,7 +1817,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                         <div class="related-traces-list">
                             \${relatedTraces.map(trace => \`
                                 <div class="related-trace-item \${trace.plugintracelogid === currentTraceId ? 'current' : ''}"
-                                     onclick="vscode.postMessage({ action: 'traceSelected', traceId: '\${trace.plugintracelogid}' })">
+                                     onclick="vscode.postMessage({ action: 'trace-selected', traceId: '\${trace.plugintracelogid}' })">
                                     <div class="related-trace-title">
                                         <span class="status-indicator \${trace.exceptiondetails ? 'exception' : 'success'}"></span>
                                         \${trace.pluginname || 'Unknown Plugin'}

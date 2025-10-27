@@ -173,4 +173,30 @@ if (typeof window !== 'undefined') {
     if (window.ComponentUtils?.registerBehavior) {
         window.ComponentUtils.registerBehavior('JsonViewer', JsonViewerBehavior);
     }
+
+    // Event delegation for JsonViewer interactions
+    document.addEventListener('click', (event) => {
+        const target = event.target;
+        const action = target?.dataset?.action;
+
+        if (!action) {
+            return;
+        }
+
+        // Handle toggle collapse
+        if (action === 'toggle-collapse') {
+            JsonViewerBehavior.toggleCollapse(target);
+            event.preventDefault();
+            return;
+        }
+
+        // Handle copy JSON
+        if (action === 'copy-json') {
+            const viewerId = target.dataset.viewerId;
+            if (viewerId) {
+                JsonViewerBehavior.copyJson(viewerId);
+                event.preventDefault();
+            }
+        }
+    });
 }

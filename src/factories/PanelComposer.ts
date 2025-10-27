@@ -431,7 +431,7 @@ export class PanelComposer {
                     <br>
                     <small>${errorMessage}</small>
                 </div>
-                <button type="button" class="error-retry" onclick="window.retryComponent('${componentId}')">
+                <button type="button" class="error-retry" data-action="retry-component" data-component-id="${componentId}">
                     Retry
                 </button>
             </div>

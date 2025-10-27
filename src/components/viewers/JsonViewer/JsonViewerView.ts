@@ -30,7 +30,8 @@ export class JsonViewerView {
             <div class="json-viewer-toolbar">
                 <button
                     class="json-copy-button"
-                    onclick="window.JsonViewerBehavior?.copyJson('${id}')"
+                    data-action="copy-json"
+                    data-viewer-id="${id}"
                     title="Copy JSON to clipboard"
                 >
                     <span class="codicon codicon-copy"></span>
@@ -95,7 +96,7 @@ export class JsonViewerView {
         const collapsibleClass = config.collapsible ? ' collapsible' : '';
         const collapsedClass = isCollapsed ? ' collapsed' : '';
         const toggleButton = config.collapsible
-            ? `<span class="json-toggle" onclick="window.JsonViewerBehavior?.toggleCollapse(this)">▼</span>`
+            ? `<span class="json-toggle" data-action="toggle-collapse">▼</span>`
             : '';
 
         const lines = keys.map((key, index) => {
@@ -129,7 +130,7 @@ export class JsonViewerView {
         const collapsibleClass = config.collapsible ? ' collapsible' : '';
         const collapsedClass = isCollapsed ? ' collapsed' : '';
         const toggleButton = config.collapsible
-            ? `<span class="json-toggle" onclick="window.JsonViewerBehavior?.toggleCollapse(this)">▼</span>`
+            ? `<span class="json-toggle" data-action="toggle-collapse">▼</span>`
             : '';
 
         const lines = arr.map((item, index) => {
