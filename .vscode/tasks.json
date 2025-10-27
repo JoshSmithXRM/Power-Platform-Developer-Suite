@@ -19,7 +19,7 @@
 				"focus": false,
 				"panel": "shared"
 			},
-			"problemMatcher": "$tsc"
+			"problemMatcher": []
 		},
 		{
 			"label": "Watch",
@@ -37,7 +37,7 @@
 				"focus": false,
 				"panel": "shared"
 			},
-			"problemMatcher": "$tsc-watch"
+			"problemMatcher": []
 		},
 		{
 			"label": "Package Extension",
