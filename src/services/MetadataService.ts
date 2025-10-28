@@ -506,24 +506,113 @@ export class MetadataService {
         if (!environment) throw new Error('Environment not found');
 
         const token = await this.authService.getAccessToken(environment.id);
+        const baseUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')`;
 
-        const url = `${environment.settings.dataverseUrl}/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes?$orderby=LogicalName`;
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'OData-MaxVersion': '4.0',
+            'OData-Version': '4.0'
+        };
 
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'OData-MaxVersion': '4.0',
-                'OData-Version': '4.0'
-            }
-        });
+        // Parallel fetch: normal attributes + all OptionSet-based attribute types with expanded data
+        const [
+            normalResponse,
+            picklistResponse,
+            stateResponse,
+            statusResponse,
+            booleanResponse,
+            multiSelectResponse
+        ] = await Promise.all([
+            // Query 1: Get all attributes (includes Lookup.Targets by default)
+            fetch(`${baseUrl}/Attributes?$orderby=LogicalName`, { headers }),
 
-        if (!response.ok) {
-            throw new Error(`Failed to fetch entity attributes: ${response.statusText}`);
+            // Query 2: PicklistAttributeMetadata with OptionSet expanded
+            fetch(`${baseUrl}/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$expand=OptionSet,GlobalOptionSet&$orderby=LogicalName`, { headers }),
+
+            // Query 3: StateAttributeMetadata with OptionSet expanded
+            fetch(`${baseUrl}/Attributes/Microsoft.Dynamics.CRM.StateAttributeMetadata?$expand=OptionSet&$orderby=LogicalName`, { headers }),
+
+            // Query 4: StatusAttributeMetadata with OptionSet expanded
+            fetch(`${baseUrl}/Attributes/Microsoft.Dynamics.CRM.StatusAttributeMetadata?$expand=OptionSet&$orderby=LogicalName`, { headers }),
+
+            // Query 5: BooleanAttributeMetadata with OptionSet expanded
+            fetch(`${baseUrl}/Attributes/Microsoft.Dynamics.CRM.BooleanAttributeMetadata?$expand=OptionSet&$orderby=LogicalName`, { headers }),
+
+            // Query 6: MultiSelectPicklistAttributeMetadata with OptionSet expanded
+            fetch(`${baseUrl}/Attributes/Microsoft.Dynamics.CRM.MultiSelectPicklistAttributeMetadata?$expand=OptionSet,GlobalOptionSet&$orderby=LogicalName`, { headers })
+        ]);
+
+        if (!normalResponse.ok) {
+            throw new Error(`Failed to fetch entity attributes: ${normalResponse.statusText}`);
         }
 
-        const data = await response.json();
-        const attributes = data.value || [];
+        const normalData = await normalResponse.json();
+        const attributes = normalData.value || [];
+
+        // Helper function to merge OptionSet data from typed queries
+        const mergeOptionSetData = async (
+            response: Response,
+            typeName: string
+        ): Promise<{ merged: number; total: number }> => {
+            if (!response.ok) {
+                this.logger.warn(`Failed to fetch ${typeName}, continuing without OptionSet data`, {
+                    entityLogicalName,
+                    status: response.status,
+                    statusText: response.statusText
+                });
+                return { merged: 0, total: 0 };
+            }
+
+            const data = await response.json();
+            const typedAttributes = data.value || [];
+
+            // Create a map of typed attributes by MetadataId for fast lookup
+            const typedMap = new Map<string, AttributeMetadata>(
+                typedAttributes.map((attr: AttributeMetadata) => [attr.MetadataId, attr])
+            );
+
+            // Merge OptionSet and GlobalOptionSet data into the main attributes array
+            let mergedCount = 0;
+            attributes.forEach((attr: AttributeMetadata) => {
+                const typedAttr = typedMap.get(attr.MetadataId);
+                if (typedAttr) {
+                    attr.OptionSet = typedAttr.OptionSet;
+                    attr.GlobalOptionSet = typedAttr.GlobalOptionSet;
+                    mergedCount++;
+                }
+            });
+
+            return { merged: mergedCount, total: typedAttributes.length };
+        };
+
+        // Merge OptionSet data from all typed queries (run sequentially for logging)
+        const mergeResults = {
+            picklist: await mergeOptionSetData(picklistResponse, 'PicklistAttributeMetadata'),
+            state: await mergeOptionSetData(stateResponse, 'StateAttributeMetadata'),
+            status: await mergeOptionSetData(statusResponse, 'StatusAttributeMetadata'),
+            boolean: await mergeOptionSetData(booleanResponse, 'BooleanAttributeMetadata'),
+            multiSelect: await mergeOptionSetData(multiSelectResponse, 'MultiSelectPicklistAttributeMetadata')
+        };
+
+        const totalMerged = mergeResults.picklist.merged +
+                           mergeResults.state.merged +
+                           mergeResults.status.merged +
+                           mergeResults.boolean.merged +
+                           mergeResults.multiSelect.merged;
+
+        this.logger.info('Entity attributes loaded with OptionSet data', {
+            entityLogicalName,
+            totalAttributes: attributes.length,
+            mergedBreakdown: {
+                picklist: `${mergeResults.picklist.merged}/${mergeResults.picklist.total}`,
+                state: `${mergeResults.state.merged}/${mergeResults.state.total}`,
+                status: `${mergeResults.status.merged}/${mergeResults.status.total}`,
+                boolean: `${mergeResults.boolean.merged}/${mergeResults.boolean.total}`,
+                multiSelect: `${mergeResults.multiSelect.merged}/${mergeResults.multiSelect.total}`
+            },
+            totalMerged
+        });
 
         this.setCache(cacheKey, attributes);
         return attributes;
@@ -878,5 +967,314 @@ export class MetadataService {
 
     clearCache(): void {
         this.cache.clear();
+    }
+
+    /**
+     * TEST METHOD: Compare attribute retrieval with and without type casting
+     * This logs JSON output to help determine if we need type-specific queries for all attribute types
+     */
+    async testAttributeTypeCasting(environmentId: string, entityLogicalName: string): Promise<void> {
+        const environments = await this.authService.getEnvironments();
+        const environment = environments.find(env => env.id === environmentId);
+        if (!environment) throw new Error('Environment not found');
+
+        const token = await this.authService.getAccessToken(environment.id);
+        const baseUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')`;
+
+        this.logger.info('='.repeat(80));
+        this.logger.info('ATTRIBUTE TYPE CASTING TEST');
+        this.logger.info('='.repeat(80));
+
+        try {
+            // Query 1: Normal attributes (no type casting)
+            this.logger.info('Query 1: Normal Attributes (no type casting)');
+            const normalUrl = `${baseUrl}/Attributes?$orderby=LogicalName`;
+            this.logger.info(`URL: ${normalUrl}`);
+
+            const normalResponse = await fetch(normalUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0'
+                }
+            });
+
+            if (normalResponse.ok) {
+                const normalData = await normalResponse.json();
+                const normalAttributes = normalData.value || [];
+                this.logger.info(`Found ${normalAttributes.length} attributes`);
+
+                // Log first picklist attribute found
+                const firstPicklist = normalAttributes.find((attr: AttributeMetadata) =>
+                    attr.AttributeType === 'Picklist' || attr.AttributeTypeName?.Value === 'PicklistType'
+                );
+                if (firstPicklist) {
+                    this.logger.info('Sample Picklist Attribute (normal query):');
+                    this.logger.info(JSON.stringify({
+                        LogicalName: firstPicklist.LogicalName,
+                        AttributeType: firstPicklist.AttributeType,
+                        AttributeTypeName: firstPicklist.AttributeTypeName,
+                        HasOptionSet: !!firstPicklist.OptionSet,
+                        HasGlobalOptionSet: !!firstPicklist.GlobalOptionSet,
+                        OptionSetValue: firstPicklist.OptionSet || firstPicklist.GlobalOptionSet || 'NOT PRESENT'
+                    }, null, 2));
+                }
+
+                // Log first lookup attribute found
+                const firstLookup = normalAttributes.find((attr: AttributeMetadata) =>
+                    attr.AttributeType === 'Lookup' || attr.AttributeTypeName?.Value === 'LookupType'
+                );
+                if (firstLookup) {
+                    this.logger.info('Sample Lookup Attribute (normal query):');
+                    this.logger.info(JSON.stringify({
+                        LogicalName: firstLookup.LogicalName,
+                        AttributeType: firstLookup.AttributeType,
+                        AttributeTypeName: firstLookup.AttributeTypeName,
+                        HasTargets: !!firstLookup.Targets,
+                        TargetsValue: firstLookup.Targets || 'NOT PRESENT'
+                    }, null, 2));
+                }
+            }
+
+            // Query 2: PicklistAttributeMetadata with OptionSet expansion
+            this.logger.info('-'.repeat(80));
+            this.logger.info('Query 2: PicklistAttributeMetadata (with type casting + $expand)');
+            const picklistUrl = `${baseUrl}/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$expand=OptionSet,GlobalOptionSet&$orderby=LogicalName`;
+            this.logger.info(`URL: ${picklistUrl}`);
+
+            const picklistResponse = await fetch(picklistUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0'
+                }
+            });
+
+            if (picklistResponse.ok) {
+                const picklistData = await picklistResponse.json();
+                const picklistAttributes = picklistData.value || [];
+                this.logger.info(`Found ${picklistAttributes.length} picklist attributes`);
+
+                if (picklistAttributes.length > 0) {
+                    const firstAttr = picklistAttributes[0];
+                    this.logger.info('Sample Picklist Attribute (typed query):');
+                    this.logger.info(JSON.stringify({
+                        LogicalName: firstAttr.LogicalName,
+                        AttributeType: firstAttr.AttributeType,
+                        AttributeTypeName: firstAttr.AttributeTypeName,
+                        HasOptionSet: !!firstAttr.OptionSet,
+                        HasGlobalOptionSet: !!firstAttr.GlobalOptionSet,
+                        OptionSet: firstAttr.OptionSet ? {
+                            Name: firstAttr.OptionSet.Name,
+                            IsGlobal: firstAttr.OptionSet.IsGlobal,
+                            OptionsCount: firstAttr.OptionSet.Options?.length || 0,
+                            SampleOptions: firstAttr.OptionSet.Options?.slice(0, 3)
+                        } : 'NULL',
+                        GlobalOptionSet: firstAttr.GlobalOptionSet ? {
+                            Name: firstAttr.GlobalOptionSet.Name,
+                            IsGlobal: firstAttr.GlobalOptionSet.IsGlobal,
+                            OptionsCount: firstAttr.GlobalOptionSet.Options?.length || 0
+                        } : 'NULL'
+                    }, null, 2));
+                }
+            } else {
+                this.logger.error('Failed to fetch PicklistAttributeMetadata', new Error(`${picklistResponse.status} ${picklistResponse.statusText}`));
+            }
+
+            // Query 3: LookupAttributeMetadata (no $expand needed, Targets is included by default)
+            this.logger.info('-'.repeat(80));
+            this.logger.info('Query 3: LookupAttributeMetadata (with type casting)');
+            const lookupUrl = `${baseUrl}/Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata?$orderby=LogicalName`;
+            this.logger.info(`URL: ${lookupUrl}`);
+
+            const lookupResponse = await fetch(lookupUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0'
+                }
+            });
+
+            if (lookupResponse.ok) {
+                const lookupData = await lookupResponse.json();
+                const lookupAttributes = lookupData.value || [];
+                this.logger.info(`Found ${lookupAttributes.length} lookup attributes`);
+
+                if (lookupAttributes.length > 0) {
+                    const firstAttr = lookupAttributes[0];
+                    this.logger.info('Sample Lookup Attribute (typed query):');
+                    this.logger.info(JSON.stringify({
+                        LogicalName: firstAttr.LogicalName,
+                        AttributeType: firstAttr.AttributeType,
+                        AttributeTypeName: firstAttr.AttributeTypeName,
+                        HasTargets: !!firstAttr.Targets,
+                        Targets: firstAttr.Targets || 'NOT PRESENT'
+                    }, null, 2));
+                }
+            } else {
+                this.logger.error('Failed to fetch LookupAttributeMetadata', new Error(`${lookupResponse.status} ${lookupResponse.statusText}`));
+            }
+
+            // Query 4: StateAttributeMetadata (State picklists - might need OptionSet)
+            this.logger.info('-'.repeat(80));
+            this.logger.info('Query 4: StateAttributeMetadata (with type casting + $expand)');
+            const stateUrl = `${baseUrl}/Attributes/Microsoft.Dynamics.CRM.StateAttributeMetadata?$expand=OptionSet&$orderby=LogicalName`;
+            this.logger.info(`URL: ${stateUrl}`);
+
+            const stateResponse = await fetch(stateUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0'
+                }
+            });
+
+            if (stateResponse.ok) {
+                const stateData = await stateResponse.json();
+                const stateAttributes = stateData.value || [];
+                this.logger.info(`Found ${stateAttributes.length} state attributes`);
+
+                if (stateAttributes.length > 0) {
+                    const firstAttr = stateAttributes[0];
+                    this.logger.info('Sample State Attribute (typed query):');
+                    this.logger.info(JSON.stringify({
+                        LogicalName: firstAttr.LogicalName,
+                        AttributeType: firstAttr.AttributeType,
+                        HasOptionSet: !!firstAttr.OptionSet,
+                        OptionSet: firstAttr.OptionSet ? {
+                            Name: firstAttr.OptionSet.Name,
+                            OptionsCount: firstAttr.OptionSet.Options?.length || 0
+                        } : 'NULL'
+                    }, null, 2));
+                }
+            } else {
+                this.logger.error('Failed to fetch StateAttributeMetadata', new Error(`${stateResponse.status} ${stateResponse.statusText}`));
+            }
+
+            // Query 5: StatusAttributeMetadata (Status Reason picklists)
+            this.logger.info('-'.repeat(80));
+            this.logger.info('Query 5: StatusAttributeMetadata (with type casting + $expand)');
+            const statusUrl = `${baseUrl}/Attributes/Microsoft.Dynamics.CRM.StatusAttributeMetadata?$expand=OptionSet&$orderby=LogicalName`;
+            this.logger.info(`URL: ${statusUrl}`);
+
+            const statusResponse = await fetch(statusUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0'
+                }
+            });
+
+            if (statusResponse.ok) {
+                const statusData = await statusResponse.json();
+                const statusAttributes = statusData.value || [];
+                this.logger.info(`Found ${statusAttributes.length} status attributes`);
+
+                if (statusAttributes.length > 0) {
+                    const firstAttr = statusAttributes[0];
+                    this.logger.info('Sample Status Attribute (typed query):');
+                    this.logger.info(JSON.stringify({
+                        LogicalName: firstAttr.LogicalName,
+                        AttributeType: firstAttr.AttributeType,
+                        HasOptionSet: !!firstAttr.OptionSet,
+                        OptionSet: firstAttr.OptionSet ? {
+                            Name: firstAttr.OptionSet.Name,
+                            OptionsCount: firstAttr.OptionSet.Options?.length || 0
+                        } : 'NULL'
+                    }, null, 2));
+                }
+            } else {
+                this.logger.error('Failed to fetch StatusAttributeMetadata', new Error(`${statusResponse.status} ${statusResponse.statusText}`));
+            }
+
+            // Query 6: BooleanAttributeMetadata (TwoOption/Yes-No)
+            this.logger.info('-'.repeat(80));
+            this.logger.info('Query 6: BooleanAttributeMetadata (with type casting + $expand)');
+            const booleanUrl = `${baseUrl}/Attributes/Microsoft.Dynamics.CRM.BooleanAttributeMetadata?$expand=OptionSet&$orderby=LogicalName`;
+            this.logger.info(`URL: ${booleanUrl}`);
+
+            const booleanResponse = await fetch(booleanUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0'
+                }
+            });
+
+            if (booleanResponse.ok) {
+                const booleanData = await booleanResponse.json();
+                const booleanAttributes = booleanData.value || [];
+                this.logger.info(`Found ${booleanAttributes.length} boolean attributes`);
+
+                if (booleanAttributes.length > 0) {
+                    const firstAttr = booleanAttributes[0];
+                    this.logger.info('Sample Boolean Attribute (typed query):');
+                    this.logger.info(JSON.stringify({
+                        LogicalName: firstAttr.LogicalName,
+                        AttributeType: firstAttr.AttributeType,
+                        HasOptionSet: !!firstAttr.OptionSet,
+                        OptionSet: firstAttr.OptionSet ? {
+                            Name: firstAttr.OptionSet.Name,
+                            TrueOption: firstAttr.OptionSet.TrueOption,
+                            FalseOption: firstAttr.OptionSet.FalseOption
+                        } : 'NULL'
+                    }, null, 2));
+                }
+            } else {
+                this.logger.error('Failed to fetch BooleanAttributeMetadata', new Error(`${booleanResponse.status} ${booleanResponse.statusText}`));
+            }
+
+            // Query 7: MultiSelectPicklistAttributeMetadata
+            this.logger.info('-'.repeat(80));
+            this.logger.info('Query 7: MultiSelectPicklistAttributeMetadata (with type casting + $expand)');
+            const multiSelectUrl = `${baseUrl}/Attributes/Microsoft.Dynamics.CRM.MultiSelectPicklistAttributeMetadata?$expand=OptionSet,GlobalOptionSet&$orderby=LogicalName`;
+            this.logger.info(`URL: ${multiSelectUrl}`);
+
+            const multiSelectResponse = await fetch(multiSelectUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0'
+                }
+            });
+
+            if (multiSelectResponse.ok) {
+                const multiSelectData = await multiSelectResponse.json();
+                const multiSelectAttributes = multiSelectData.value || [];
+                this.logger.info(`Found ${multiSelectAttributes.length} multi-select picklist attributes`);
+
+                if (multiSelectAttributes.length > 0) {
+                    const firstAttr = multiSelectAttributes[0];
+                    this.logger.info('Sample MultiSelectPicklist Attribute (typed query):');
+                    this.logger.info(JSON.stringify({
+                        LogicalName: firstAttr.LogicalName,
+                        AttributeType: firstAttr.AttributeType,
+                        HasOptionSet: !!firstAttr.OptionSet,
+                        HasGlobalOptionSet: !!firstAttr.GlobalOptionSet,
+                        OptionSet: firstAttr.OptionSet ? {
+                            Name: firstAttr.OptionSet.Name,
+                            IsGlobal: firstAttr.OptionSet.IsGlobal,
+                            OptionsCount: firstAttr.OptionSet.Options?.length || 0
+                        } : 'NULL'
+                    }, null, 2));
+                }
+            } else {
+                this.logger.error('Failed to fetch MultiSelectPicklistAttributeMetadata', new Error(`${multiSelectResponse.status} ${multiSelectResponse.statusText}`));
+            }
+
+        } catch (error) {
+            this.logger.error('Test failed', error as Error);
+        }
+
+        this.logger.info('='.repeat(80));
+        this.logger.info('TEST COMPLETE');
+        this.logger.info('='.repeat(80));
     }
 }
