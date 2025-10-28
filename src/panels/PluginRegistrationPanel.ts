@@ -397,11 +397,7 @@ export class PluginRegistrationPanel extends BasePanel {
                 }
                 break;
 
-            case 'node-expanded':
-                if (message.data?.node) {
-                    await this.handleNodeExpanded(message.data.node);
-                }
-                break;
+            // node-expanded handler removed - complete tree built upfront, no lazy loading needed
 
             case 'close-details':
                 this.closeDetailsPanel();
@@ -501,11 +497,16 @@ export class PluginRegistrationPanel extends BasePanel {
 
             this.componentLogger.info('Lookup maps built', { durationMs: Date.now() - startMapBuild });
 
-            // Build tree structure (root level only - lazy load children on expand)
-            this.treeViewComponent!.setLoading(true, 'Building tree nodes...');
+            // Build complete tree structure (all levels) for comprehensive search
+            this.treeViewComponent!.setLoading(true, 'Building tree structure...');
             const startTreeBuild = Date.now();
-            const treeNodes = this.buildRootNodes(assemblies);
-            this.componentLogger.info('Tree nodes built', { durationMs: Date.now() - startTreeBuild, nodeCount: treeNodes.length });
+            const treeNodes = this.buildCompleteTree(
+                assemblies,
+                this.typesByAssembly,
+                this.stepsByType,
+                this.imagesByStep
+            );
+            this.componentLogger.info('Complete tree built', { durationMs: Date.now() - startTreeBuild, nodeCount: treeNodes.length });
 
             // Update tree view
             this.treeViewComponent!.setLoading(false);
@@ -520,6 +521,7 @@ export class PluginRegistrationPanel extends BasePanel {
 
     /**
      * Build only root nodes (assemblies) - children loaded on expand
+     * DEPRECATED: Now using buildCompleteTree() for comprehensive search support
      */
     private buildRootNodes(assemblies: PluginAssembly[]): TreeNode[] {
         return assemblies.map(assembly => {
@@ -541,6 +543,7 @@ export class PluginRegistrationPanel extends BasePanel {
 
     /**
      * Handle node expansion - load children dynamically from in-memory data
+     * DEPRECATED: No longer needed - complete tree built upfront by buildCompleteTree()
      */
     private async handleNodeExpanded(node: TreeNode): Promise<void> {
         // Check if children already loaded
@@ -618,16 +621,16 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     /**
-     * Build tree structure from in-memory lookup maps (fast!)
-     * DEPRECATED: Now using lazy rendering with buildRootNodes + handleNodeExpanded
+     * Build complete tree structure from in-memory lookup maps
+     * Builds ALL levels upfront for comprehensive search support
      */
-    private buildTreeFromMaps(
+    private buildCompleteTree(
         assemblies: PluginAssembly[],
         typesByAssembly: Map<string, PluginType[]>,
         stepsByType: Map<string, PluginStep[]>,
         imagesByStep: Map<string, PluginImage[]>
     ): TreeNode[] {
-        // Build tree from bottom up
+        // Build tree from bottom up, including all children recursively
         return assemblies.map(assembly => {
             const types = typesByAssembly.get(assembly.pluginassemblyid) || [];
 
@@ -649,11 +652,17 @@ export class PluginRegistrationPanel extends BasePanel {
                         data: step,
                         children: imageNodes
                     };
-                });
+                })
+                // Sort steps by name (case-insensitive)
+                .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+
+                // Determine label: name > typename > friendlyname > plugintypeid as fallback
+                // Matches XRM Toolbox behavior: uses 'name' field first
+                const label = type.name || type.typename || type.friendlyname || type.plugintypeid;
 
                 return {
                     id: `plugintype-${type.plugintypeid}`,
-                    label: type.friendlyname || type.typename,
+                    label,
                     icon: '🔌',
                     type: 'plugintype',
                     expanded: false,
@@ -662,7 +671,9 @@ export class PluginRegistrationPanel extends BasePanel {
                     data: type,
                     children: stepNodes
                 };
-            });
+            })
+            // Sort plugin types by display label (case-insensitive)
+            .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
 
             return {
                 id: `assembly-${assembly.pluginassemblyid}`,

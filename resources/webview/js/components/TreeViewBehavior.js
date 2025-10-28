@@ -79,10 +79,28 @@ class TreeViewBehavior extends BaseBehavior {
         instance.boundHandlers.treeClick = (e) => this.handleTreeClick(instance, e);
         element.addEventListener('click', instance.boundHandlers.treeClick);
 
-        // Search input
+        // Search input with debouncing (like DataTable)
         if (searchInput) {
-            instance.boundHandlers.searchInput = (e) => this.handleSearch(instance, e);
+            let searchTimeoutId;
+
+            // Debounced input handler (300ms delay)
+            instance.boundHandlers.searchInput = () => {
+                clearTimeout(searchTimeoutId);
+                searchTimeoutId = setTimeout(() => {
+                    this.handleSearch(instance, searchInput.value);
+                }, 300);
+            };
+
+            // Enter key handler for immediate search
+            instance.boundHandlers.searchKeypress = (event) => {
+                if (event.key === 'Enter') {
+                    clearTimeout(searchTimeoutId);
+                    this.handleSearch(instance, searchInput.value);
+                }
+            };
+
             searchInput.addEventListener('input', instance.boundHandlers.searchInput);
+            searchInput.addEventListener('keypress', instance.boundHandlers.searchKeypress);
         }
 
         // Context menu (right-click)
@@ -286,44 +304,93 @@ class TreeViewBehavior extends BaseBehavior {
     }
 
     /**
-     * Handle search input
+     * Apply search filter to nodes using proper tree search algorithm
+     * Shows: matches + ancestors of matches + descendants of matches
      */
-    static handleSearch(instance, event) {
-        const query = event.target.value.toLowerCase().trim();
-        instance.searchQuery = query;
-
-        if (!instance.treeRoot) return;
-
-        const allNodes = instance.treeRoot.querySelectorAll('.tree-node');
-
-        if (query === '') {
-            // Show all nodes when search is cleared
-            allNodes.forEach(node => {
+    static applySearchFilter(nodes, query) {
+        if (!query || query === '') {
+            // Clear search - show all
+            nodes.forEach(node => {
                 node.style.display = '';
                 node.classList.remove('tree-node--search-match');
             });
             return;
         }
 
-        // Filter nodes by search query
-        allNodes.forEach(node => {
+        // Three-pass algorithm for proper tree search:
+        // 1. Find all nodes that match the query
+        // 2. For each match, collect it + ancestors + descendants
+        // 3. Show collected nodes, hide others, highlight actual matches
+
+        const queryLower = query.toLowerCase();
+
+        // Pass 1: Find all nodes that directly match the search query
+        const matchingNodes = new Set();
+        nodes.forEach(node => {
             const label = node.querySelector('.tree-node-label');
             if (!label) return;
 
             const labelText = label.textContent.toLowerCase();
-            const matches = labelText.includes(query);
+            if (labelText.includes(queryLower)) {
+                matchingNodes.add(node);
+            }
+        });
 
-            if (matches) {
+        // Pass 2: Build set of all nodes to show (matches + ancestors + descendants)
+        const nodesToShow = new Set();
+
+        matchingNodes.forEach(matchNode => {
+            // Add the matching node itself
+            nodesToShow.add(matchNode);
+
+            // Add all ancestors (walk up the tree so we can see the path to the match)
+            let parent = matchNode.parentElement;
+            while (parent) {
+                const parentNode = parent.closest('.tree-node');
+                if (parentNode) {
+                    nodesToShow.add(parentNode);
+                    parent = parentNode.parentElement;
+                } else {
+                    break;
+                }
+            }
+
+            // Add all descendants (walk down the tree so we can see children of the match)
+            const descendants = matchNode.querySelectorAll('.tree-node');
+            descendants.forEach(desc => nodesToShow.add(desc));
+        });
+
+        // Pass 3: Apply visibility and highlighting
+        nodes.forEach(node => {
+            if (nodesToShow.has(node)) {
                 node.style.display = '';
-                node.classList.add('tree-node--search-match');
 
-                // Expand parents to make visible
-                this.expandParents(node);
+                // Only highlight actual matches, not ancestors/descendants
+                if (matchingNodes.has(node)) {
+                    node.classList.add('tree-node--search-match');
+                    // Expand parents to make the match visible
+                    this.expandParents(node);
+                } else {
+                    node.classList.remove('tree-node--search-match');
+                }
             } else {
                 node.style.display = 'none';
                 node.classList.remove('tree-node--search-match');
             }
         });
+    }
+
+    /**
+     * Handle search input
+     */
+    static handleSearch(instance, queryValue) {
+        const query = queryValue.toLowerCase().trim();
+        instance.searchQuery = query;
+
+        if (!instance.treeRoot) return;
+
+        const allNodes = instance.treeRoot.querySelectorAll('.tree-node');
+        this.applySearchFilter(allNodes, query);
     }
 
     /**
@@ -419,6 +486,12 @@ class TreeViewBehavior extends BaseBehavior {
             }
         });
 
+        // Re-apply search filter if search is active
+        if (instance.searchQuery && instance.searchQuery !== '') {
+            const allNodes = instance.treeRoot.querySelectorAll('.tree-node');
+            this.applySearchFilter(allNodes, instance.searchQuery);
+        }
+
         console.log('TreeViewBehavior: Nodes updated successfully');
     }
 
@@ -461,7 +534,7 @@ class TreeViewBehavior extends BaseBehavior {
         }
 
         // Label
-        html += `<span class="tree-label">${this.escapeHtml(node.label)}</span>`;
+        html += `<span class="tree-node-label">${this.escapeHtml(node.label)}</span>`;
 
         html += `</div>`;
 
@@ -500,6 +573,12 @@ class TreeViewBehavior extends BaseBehavior {
 
         // Render and insert children
         childrenContainer.innerHTML = this.renderNodes(children, level + 1);
+
+        // Re-apply search filter to newly inserted children if search is active
+        if (instance.searchQuery && instance.searchQuery !== '') {
+            const newNodes = childrenContainer.querySelectorAll('.tree-node');
+            this.applySearchFilter(newNodes, instance.searchQuery);
+        }
 
         // Update hasChildren class
         if (children.length > 0) {
@@ -545,8 +624,13 @@ class TreeViewBehavior extends BaseBehavior {
             instance.element.removeEventListener('click', instance.boundHandlers.treeClick);
         }
 
-        if (instance.searchInput && instance.boundHandlers.searchInput) {
-            instance.searchInput.removeEventListener('input', instance.boundHandlers.searchInput);
+        if (instance.searchInput) {
+            if (instance.boundHandlers.searchInput) {
+                instance.searchInput.removeEventListener('input', instance.boundHandlers.searchInput);
+            }
+            if (instance.boundHandlers.searchKeypress) {
+                instance.searchInput.removeEventListener('keypress', instance.boundHandlers.searchKeypress);
+            }
         }
 
         if (instance.element && instance.boundHandlers.contextMenu) {

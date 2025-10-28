@@ -169,7 +169,7 @@
     font-size: 16px;
 }
 
-.tree-label {
+.tree-node-label {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -178,7 +178,7 @@
     color: var(--vscode-foreground);
 }
 
-.tree-node--selected > .tree-node-content .tree-label {
+.tree-node--selected > .tree-node-content .tree-node-label {
     color: var(--vscode-list-activeSelectionForeground);
 }
 
@@ -188,7 +188,7 @@
 
 /* Search match styling - bold text only, no background */
 
-.tree-node--search-match > .tree-node-content .tree-label {
+.tree-node--search-match > .tree-node-content .tree-node-label {
     font-weight: 600;
 }
 
