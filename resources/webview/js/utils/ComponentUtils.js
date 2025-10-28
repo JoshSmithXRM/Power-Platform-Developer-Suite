@@ -4,6 +4,11 @@
  * for all components including initialization, messaging, and lifecycle management.
  */
 
+// CRITICAL: Save stub's pending registrations before class definition replaces window.ComponentUtils
+const savedStubRegistrations = window.ComponentUtils?.pendingBehaviorRegistrations || [];
+console.log(`ComponentUtils.js: Saved ${savedStubRegistrations.length} pending registrations from stub:`,
+    savedStubRegistrations.map(r => r.name));
+
 class ComponentUtils {
     static components = new Map();
     static messageHandlers = new Map();
@@ -21,9 +26,9 @@ class ComponentUtils {
     static registerBehavior(name, behaviorClass) {
         console.log(`ComponentUtils: Registering behavior ${name}`);
         this.registeredBehaviors.set(name, behaviorClass);
-        
-        // Check if we can initialize now
-        this.checkReadyToInitialize();
+
+        // Don't auto-check readiness here - let initialize() control the flow
+        // This prevents reactive triggers and recursion issues
     }
 
     /**
@@ -55,12 +60,10 @@ class ComponentUtils {
      * Process pending behavior registrations from stub or deferred registrations
      */
     static processPendingRegistrations() {
-        // Check if there's a pre-existing ComponentUtils with pending registrations (from stub)
-        const existingPending = window.ComponentUtils?.pendingBehaviorRegistrations || [];
-        
-        console.log(`ComponentUtils: Processing ${existingPending.length} pending registrations from stub`);
-        
-        existingPending.forEach(({ name, behaviorClass }) => {
+        // Use savedStubRegistrations captured before class replaced window.ComponentUtils
+        console.log(`ComponentUtils: Processing ${savedStubRegistrations.length} pending registrations from stub`);
+
+        savedStubRegistrations.forEach(({ name, behaviorClass }) => {
             console.log(`ComponentUtils: Registering pending behavior ${name}`);
             this.registerBehavior(name, behaviorClass);
         });
@@ -95,13 +98,12 @@ class ComponentUtils {
         
         console.log('ComponentUtils: Needed behaviors:', Array.from(neededBehaviors));
         console.log('ComponentUtils: Registered behaviors:', Array.from(this.registeredBehaviors.keys()));
-        
-        // Check if all needed behaviors are registered
+
+        // Check if all needed behaviors are in the REGISTRY (single source of truth)
         let allReady = true;
         neededBehaviors.forEach(behaviorType => {
-            const behaviorName = `${behaviorType}Behavior`;
-            if (!window[behaviorName]) {
-                console.log(`ComponentUtils: Still waiting for ${behaviorName}`);
+            if (!this.registeredBehaviors.has(behaviorType)) {
+                console.log(`ComponentUtils: Still waiting for ${behaviorType}`);
                 allReady = false;
             }
         });
@@ -147,7 +149,7 @@ class ComponentUtils {
     }
 
     /**
-     * Complete initialization after VS Code API is available
+     * Complete initialization after all behaviors are registered
      */
     static completeInitialization() {
         // Setup global message handler
@@ -795,12 +797,13 @@ class ComponentUtils {
     }
 }
 
+// CRITICAL: Replace stub with real ComponentUtils class BEFORE initialization
+// This ensures any behaviors that load after this point register to the real class, not the stub
+window.ComponentUtils = ComponentUtils;
+
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => ComponentUtils.initialize());
 } else {
     ComponentUtils.initialize();
 }
-
-// Make available globally (replacing any stub)
-window.ComponentUtils = ComponentUtils;
