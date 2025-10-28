@@ -138,6 +138,12 @@ class TreeViewBehavior extends BaseBehavior {
                 }
                 break;
 
+            case 'updateNodeChildren':
+                if (message.nodeId && message.children) {
+                    this.updateNodeChildren(instance, message.nodeId, message.children);
+                }
+                break;
+
             case 'expandAll':
                 const allNodes = instance.element.querySelectorAll('.tree-node--has-children');
                 allNodes.forEach(node => {
@@ -371,8 +377,15 @@ class TreeViewBehavior extends BaseBehavior {
                     <div class="loading-indicator-message">${message}</div>
                 </div>
             `;
+        } else {
+            // Clear loading and recreate tree-view-root if it doesn't exist
+            const existingRoot = content.querySelector('.tree-view-root');
+            if (!existingRoot) {
+                content.innerHTML = '<ul class="tree-view-root"></ul>';
+                // Re-cache the treeRoot element
+                instance.treeRoot = content.querySelector('.tree-view-root');
+            }
         }
-        // If not loading, nodes will be rendered by updateNodes call
     }
 
     /**
@@ -459,6 +472,56 @@ class TreeViewBehavior extends BaseBehavior {
         html += `</div>`;
 
         return html;
+    }
+
+    /**
+     * Update children for a node (lazy loading)
+     */
+    static updateNodeChildren(instance, nodeId, children) {
+        const nodeElement = instance.element.querySelector(`[data-node-id="${nodeId}"]`);
+        if (!nodeElement) {
+            console.warn('TreeViewBehavior: Node not found for updateNodeChildren', nodeId);
+            return;
+        }
+
+        // Get current node level
+        const level = Math.floor(parseInt(nodeElement.style.paddingLeft || '0') / 20);
+
+        // Find or create children container
+        let childrenContainer = nodeElement.querySelector('.tree-children');
+        if (!childrenContainer) {
+            childrenContainer = document.createElement('div');
+            childrenContainer.className = 'tree-children';
+            nodeElement.appendChild(childrenContainer);
+        }
+
+        // Render and insert children
+        childrenContainer.innerHTML = this.renderNodes(children, level + 1);
+
+        // Update hasChildren class
+        if (children.length > 0) {
+            nodeElement.classList.add('tree-node--has-children');
+
+            // Add toggle button if it doesn't exist
+            let toggle = nodeElement.querySelector('.tree-toggle');
+            if (!toggle) {
+                toggle = document.createElement('span');
+                toggle.className = 'tree-toggle';
+                toggle.setAttribute('data-action', 'toggle');
+                toggle.setAttribute('aria-label', 'Toggle');
+                toggle.textContent = '›';
+                const content = nodeElement.querySelector('.tree-node-content');
+                if (content) {
+                    content.insertBefore(toggle, content.firstChild);
+                }
+            } else if (toggle.classList.contains('tree-toggle--spacer')) {
+                // Replace spacer with actual toggle
+                toggle.classList.remove('tree-toggle--spacer');
+                toggle.setAttribute('data-action', 'toggle');
+                toggle.setAttribute('aria-label', 'Toggle');
+                toggle.textContent = '›';
+            }
+        }
     }
 
     /**

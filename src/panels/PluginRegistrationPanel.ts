@@ -27,6 +27,11 @@ export class PluginRegistrationPanel extends BasePanel {
     protected _selectedEnvironmentId?: string;
     private selectedNode?: TreeNode;
 
+    // In-memory data for lazy rendering
+    private typesByAssembly = new Map<string, PluginType[]>();
+    private stepsByType = new Map<string, PluginStep[]>();
+    private imagesByStep = new Map<string, PluginImage[]>();
+
     public static createOrShow(extensionUri: vscode.Uri): void {
         BasePanel.handlePanelCreation(
             {
@@ -426,7 +431,9 @@ export class PluginRegistrationPanel extends BasePanel {
                 break;
 
             case 'node-expanded':
-                // No longer needed - all data loaded upfront
+                if (message.data?.node) {
+                    await this.handleNodeExpanded(message.data.node);
+                }
                 break;
 
             case 'close-details':
@@ -488,35 +495,50 @@ export class PluginRegistrationPanel extends BasePanel {
                 return;
             }
 
-            // Build lookup maps for fast in-memory joining
-            this.treeViewComponent!.setLoading(true, 'Building tree structure...');
+            // Build lookup maps for fast in-memory joining (optimized)
+            this.treeViewComponent!.setLoading(true, 'Building lookup maps...');
+            const startMapBuild = Date.now();
 
-            // Group types by assembly
-            const typesByAssembly = new Map<string, PluginType[]>();
-            allTypes.forEach(type => {
-                const assemblyTypes = typesByAssembly.get(type.pluginassemblyid) || [];
+            // Group types by assembly (optimized - single lookup per item)
+            this.typesByAssembly.clear();
+            for (const type of allTypes) {
+                let assemblyTypes = this.typesByAssembly.get(type.pluginassemblyid);
+                if (!assemblyTypes) {
+                    assemblyTypes = [];
+                    this.typesByAssembly.set(type.pluginassemblyid, assemblyTypes);
+                }
                 assemblyTypes.push(type);
-                typesByAssembly.set(type.pluginassemblyid, assemblyTypes);
-            });
+            }
 
-            // Group steps by type
-            const stepsByType = new Map<string, PluginStep[]>();
-            allSteps.forEach(step => {
-                const typeSteps = stepsByType.get(step.plugintypeid) || [];
+            // Group steps by type (optimized - single lookup per item)
+            this.stepsByType.clear();
+            for (const step of allSteps) {
+                let typeSteps = this.stepsByType.get(step.plugintypeid);
+                if (!typeSteps) {
+                    typeSteps = [];
+                    this.stepsByType.set(step.plugintypeid, typeSteps);
+                }
                 typeSteps.push(step);
-                stepsByType.set(step.plugintypeid, typeSteps);
-            });
+            }
 
-            // Group images by step
-            const imagesByStep = new Map<string, PluginImage[]>();
-            allImages.forEach(image => {
-                const stepImages = imagesByStep.get(image.sdkmessageprocessingstepid) || [];
+            // Group images by step (optimized - single lookup per item)
+            this.imagesByStep.clear();
+            for (const image of allImages) {
+                let stepImages = this.imagesByStep.get(image.sdkmessageprocessingstepid);
+                if (!stepImages) {
+                    stepImages = [];
+                    this.imagesByStep.set(image.sdkmessageprocessingstepid, stepImages);
+                }
                 stepImages.push(image);
-                imagesByStep.set(image.sdkmessageprocessingstepid, stepImages);
-            });
+            }
 
-            // Build tree structure
-            const treeNodes = this.buildTreeFromMaps(assemblies, typesByAssembly, stepsByType, imagesByStep);
+            this.componentLogger.info('Lookup maps built', { durationMs: Date.now() - startMapBuild });
+
+            // Build tree structure (root level only - lazy load children on expand)
+            this.treeViewComponent!.setLoading(true, 'Building tree nodes...');
+            const startTreeBuild = Date.now();
+            const treeNodes = this.buildRootNodes(assemblies);
+            this.componentLogger.info('Tree nodes built', { durationMs: Date.now() - startTreeBuild, nodeCount: treeNodes.length });
 
             // Update tree view
             this.treeViewComponent!.setLoading(false);
@@ -530,7 +552,98 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     /**
+     * Build only root nodes (assemblies) - children loaded on expand
+     */
+    private buildRootNodes(assemblies: PluginAssembly[]): TreeNode[] {
+        return assemblies.map(assembly => {
+            const types = this.typesByAssembly.get(assembly.pluginassemblyid) || [];
+
+            return {
+                id: `assembly-${assembly.pluginassemblyid}`,
+                label: `${assembly.name} v${assembly.version}`,
+                icon: '📦',
+                type: 'assembly',
+                expanded: false,
+                selectable: true,
+                hasChildren: types.length > 0,
+                data: assembly
+                // No children - loaded on expand
+            };
+        });
+    }
+
+    /**
+     * Handle node expansion - load children dynamically from in-memory data
+     */
+    private async handleNodeExpanded(node: TreeNode): Promise<void> {
+        // Check if children already loaded
+        if (node.children && node.children.length > 0) {
+            return; // Already loaded
+        }
+
+        let children: TreeNode[] = [];
+
+        switch (node.type) {
+            case 'assembly': {
+                // Load plugin types for this assembly
+                const assembly = node.data as PluginAssembly;
+                const types = this.typesByAssembly.get(assembly.pluginassemblyid) || [];
+                children = types.map(type => {
+                    const steps = this.stepsByType.get(type.plugintypeid) || [];
+                    return {
+                        id: `plugintype-${type.plugintypeid}`,
+                        label: type.friendlyname || type.typename,
+                        icon: '🔌',
+                        type: 'plugintype',
+                        expanded: false,
+                        selectable: true,
+                        hasChildren: steps.length > 0,
+                        data: type
+                        // No children - loaded on expand
+                    };
+                });
+                break;
+            }
+
+            case 'plugintype': {
+                // Load steps for this plugin type
+                const type = node.data as PluginType;
+                const steps = this.stepsByType.get(type.plugintypeid) || [];
+                children = steps.map(step => {
+                    const images = this.imagesByStep.get(step.sdkmessageprocessingstepid) || [];
+                    return {
+                        id: `step-${step.sdkmessageprocessingstepid}`,
+                        label: step.name,
+                        icon: step.statecode === 0 ? '⚡' : '⚫',
+                        type: 'step',
+                        expanded: false,
+                        selectable: true,
+                        hasChildren: images.length > 0,
+                        data: step
+                        // No children - loaded on expand
+                    };
+                });
+                break;
+            }
+
+            case 'step': {
+                // Load images for this step
+                const step = node.data as PluginStep;
+                const images = this.imagesByStep.get(step.sdkmessageprocessingstepid) || [];
+                children = this.transformImagesToTreeNodes(images);
+                break;
+            }
+        }
+
+        // Update the node with children
+        if (children.length > 0) {
+            this.treeViewComponent?.updateNodeChildren(node.id, children);
+        }
+    }
+
+    /**
      * Build tree structure from in-memory lookup maps (fast!)
+     * DEPRECATED: Now using lazy rendering with buildRootNodes + handleNodeExpanded
      */
     private buildTreeFromMaps(
         assemblies: PluginAssembly[],

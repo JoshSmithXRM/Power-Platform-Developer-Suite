@@ -175,6 +175,23 @@ export class TreeViewComponent extends BaseDataComponent<TreeViewData> {
     }
 
     /**
+     * Update children for a specific node (for lazy loading)
+     */
+    public updateNodeChildren(nodeId: string, children: TreeNode[]): void {
+        const node = this.findNodeById(nodeId, this.nodes);
+        if (node) {
+            node.children = children;
+            node.hasChildren = children.length > 0;
+
+            this.notifyStateChange({
+                action: 'updateNodeChildren',
+                nodeId: nodeId,
+                children: children
+            });
+        }
+    }
+
+    /**
      * Select a node by ID
      */
     public selectNode(nodeId: string): void {
