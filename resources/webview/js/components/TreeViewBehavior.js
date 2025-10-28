@@ -3,23 +3,33 @@
  * Handles node expansion, collapse, selection, and search
  */
 
-class TreeViewBehavior {
-    static instances = new Map();
+class TreeViewBehavior extends BaseBehavior {
+    /**
+     * Get component type identifier
+     */
+    static getComponentType() {
+        return 'TreeView';
+    }
 
     /**
-     * Initialize a TreeView component instance
+     * Handle component data updates from Extension Host
+     * REQUIRED by BaseBehavior - called when event bridge sends updated data
      */
-    static initialize(componentId, config, element) {
-        if (!componentId || !element) {
-            console.error('TreeViewBehavior: componentId and element are required');
-            return null;
+    static onComponentUpdate(instance, data) {
+        if (data && data.nodes) {
+            console.log(`TreeViewBehavior: componentUpdate received`, {
+                componentId: instance.id,
+                nodeCount: data.nodes.length
+            });
+            this.updateNodes(instance, data.nodes);
         }
+    }
 
-        if (this.instances.has(componentId)) {
-            return this.instances.get(componentId);
-        }
-
-        const instance = {
+    /**
+     * Create the instance object structure
+     */
+    static createInstance(componentId, config, element) {
+        return {
             id: componentId,
             config: { ...config },
             element: element,
@@ -36,24 +46,6 @@ class TreeViewBehavior {
             // Event handlers
             boundHandlers: {}
         };
-
-        try {
-            // Find DOM elements
-            this.findDOMElements(instance);
-
-            // Setup event listeners
-            this.setupEventListeners(instance);
-
-            // Register instance
-            this.instances.set(componentId, instance);
-
-            console.log(`TreeViewBehavior: Initialized ${componentId}`);
-            return instance;
-
-        } catch (error) {
-            console.error(`TreeViewBehavior: Failed to initialize ${componentId}:`, error);
-            return null;
-        }
     }
 
     /**
@@ -85,6 +77,76 @@ class TreeViewBehavior {
         // Context menu (right-click)
         instance.boundHandlers.contextMenu = (e) => this.handleContextMenu(instance, e);
         element.addEventListener('contextmenu', instance.boundHandlers.contextMenu);
+    }
+
+    /**
+     * Handle custom actions beyond componentUpdate
+     */
+    static handleCustomAction(instance, message) {
+        switch (message.action) {
+            case 'setNodes':
+                // Tree will be re-rendered by Extension Host
+                // Just clear selection
+                instance.selectedNodeId = null;
+                break;
+
+            case 'expandNode':
+                if (message.nodeId) {
+                    const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
+                    if (nodeElement && !nodeElement.classList.contains('tree-node--expanded')) {
+                        this.toggleNode(instance, nodeElement);
+                    }
+                }
+                break;
+
+            case 'collapseNode':
+                if (message.nodeId) {
+                    const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
+                    if (nodeElement && nodeElement.classList.contains('tree-node--expanded')) {
+                        this.toggleNode(instance, nodeElement);
+                    }
+                }
+                break;
+
+            case 'selectNode':
+                if (message.nodeId) {
+                    const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
+                    if (nodeElement) {
+                        this.selectNode(instance, nodeElement);
+                    }
+                }
+                break;
+
+            case 'clearSelection':
+                if (instance.selectedNodeId) {
+                    const selectedElement = instance.element.querySelector(`[data-node-id="${instance.selectedNodeId}"]`);
+                    if (selectedElement) {
+                        selectedElement.classList.remove('tree-node--selected');
+                    }
+                    instance.selectedNodeId = null;
+                }
+                break;
+
+            case 'expandAll':
+                const allNodes = instance.element.querySelectorAll('.tree-node--has-children');
+                allNodes.forEach(node => {
+                    if (!node.classList.contains('tree-node--expanded')) {
+                        this.toggleNode(instance, node);
+                    }
+                });
+                break;
+
+            case 'collapseAll':
+                const expandedNodes = instance.element.querySelectorAll('.tree-node--expanded');
+                expandedNodes.forEach(node => {
+                    this.toggleNode(instance, node);
+                });
+                break;
+
+            default:
+                console.warn(`TreeViewBehavior: Unhandled action '${message.action}'`);
+                break;
+        }
     }
 
     /**
@@ -258,106 +320,6 @@ class TreeViewBehavior {
     }
 
     /**
-     * Send message to Extension Host
-     */
-    static sendMessage(instance, action, data) {
-        if (typeof window.ComponentUtils !== 'undefined' && window.ComponentUtils.sendMessage) {
-            window.ComponentUtils.sendMessage(action, {
-                componentId: instance.id,
-                componentType: 'TreeView',
-                ...data
-            });
-        }
-    }
-
-    /**
-     * Handle messages from Extension Host
-     */
-    static handleMessage(message) {
-        if (!message?.componentId || message.componentType !== 'TreeView') {
-            return;
-        }
-
-        const instance = this.instances.get(message.componentId);
-        if (!instance) {
-            console.warn(`TreeViewBehavior: Instance ${message.componentId} not found`);
-            return;
-        }
-
-        switch (message.action) {
-            case 'componentUpdate':
-                // Handle event bridge updates
-                if (message.data && message.data.nodes) {
-                    console.log(`TreeViewBehavior: componentUpdate received`, {
-                        componentId: message.componentId,
-                        nodeCount: message.data.nodes.length
-                    });
-                    this.updateNodes(instance, message.data.nodes);
-                }
-                break;
-
-            case 'setNodes':
-                // Tree will be re-rendered by Extension Host
-                // Just clear selection
-                instance.selectedNodeId = null;
-                break;
-
-            case 'expandNode':
-                if (message.nodeId) {
-                    const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
-                    if (nodeElement && !nodeElement.classList.contains('tree-node--expanded')) {
-                        this.toggleNode(instance, nodeElement);
-                    }
-                }
-                break;
-
-            case 'collapseNode':
-                if (message.nodeId) {
-                    const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
-                    if (nodeElement && nodeElement.classList.contains('tree-node--expanded')) {
-                        this.toggleNode(instance, nodeElement);
-                    }
-                }
-                break;
-
-            case 'selectNode':
-                if (message.nodeId) {
-                    const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
-                    if (nodeElement) {
-                        this.selectNode(instance, nodeElement);
-                    }
-                }
-                break;
-
-            case 'clearSelection':
-                if (instance.selectedNodeId) {
-                    const selectedElement = instance.element.querySelector(`[data-node-id="${instance.selectedNodeId}"]`);
-                    if (selectedElement) {
-                        selectedElement.classList.remove('tree-node--selected');
-                    }
-                    instance.selectedNodeId = null;
-                }
-                break;
-
-            case 'expandAll':
-                const allNodes = instance.element.querySelectorAll('.tree-node--has-children');
-                allNodes.forEach(node => {
-                    if (!node.classList.contains('tree-node--expanded')) {
-                        this.toggleNode(instance, node);
-                    }
-                });
-                break;
-
-            case 'collapseAll':
-                const expandedNodes = instance.element.querySelectorAll('.tree-node--expanded');
-                expandedNodes.forEach(node => {
-                    this.toggleNode(instance, node);
-                });
-                break;
-        }
-    }
-
-    /**
      * Update tree nodes (called from componentUpdate event bridge)
      */
     static updateNodes(instance, nodes) {
@@ -449,12 +411,9 @@ class TreeViewBehavior {
     }
 
     /**
-     * Cleanup instance
+     * Cleanup instance resources
      */
-    static cleanup(componentId) {
-        const instance = this.instances.get(componentId);
-        if (!instance) return;
-
+    static cleanupInstance(instance) {
         // Remove event listeners
         if (instance.element && instance.boundHandlers.treeClick) {
             instance.element.removeEventListener('click', instance.boundHandlers.treeClick);
@@ -467,18 +426,8 @@ class TreeViewBehavior {
         if (instance.element && instance.boundHandlers.contextMenu) {
             instance.element.removeEventListener('contextmenu', instance.boundHandlers.contextMenu);
         }
-
-        // Remove from instances
-        this.instances.delete(componentId);
     }
 }
 
-// Global registration for webview context
-if (typeof window !== 'undefined') {
-    window.TreeViewBehavior = TreeViewBehavior;
-
-    // Register with ComponentUtils if available
-    if (window.ComponentUtils?.registerBehavior) {
-        window.ComponentUtils.registerBehavior('TreeView', TreeViewBehavior);
-    }
-}
+// Register behavior
+TreeViewBehavior.register();

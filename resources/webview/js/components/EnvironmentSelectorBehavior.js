@@ -3,64 +3,52 @@
  * Handles all user interactions and DOM manipulation in the browser context
  */
 
-class EnvironmentSelectorBehavior {
-    static instances = new Map();
+class EnvironmentSelectorBehavior extends BaseBehavior {
+    /**
+     * Get component type identifier
+     */
+    static getComponentType() {
+        return 'EnvironmentSelector';
+    }
 
     /**
-     * Initialize an EnvironmentSelector component instance
+     * Handle component data updates from Extension Host
+     * REQUIRED by BaseBehavior - called when event bridge sends updated data
      */
-    static initialize(componentId, config, element) {
-        if (!componentId || !element) {
-            console.error('EnvironmentSelectorBehavior: componentId and element are required');
-            return null;
+    static onComponentUpdate(instance, data) {
+        if (data && data.environments) {
+            this.loadEnvironments(instance.id, data.environments);
         }
-
-        if (this.instances.has(componentId)) {
-            return this.instances.get(componentId);
+        if (data && data.selectedEnvironmentId) {
+            this.setSelectedEnvironment(instance.id, data.selectedEnvironmentId);
         }
+    }
 
-        const instance = {
+    /**
+     * Create the instance object structure
+     */
+    static createInstance(componentId, config, element) {
+        return {
             id: componentId,
             config: { ...config },
             element: element,
-            
+
             // DOM elements
             selector: null,
             statusElement: null,
             refreshButton: null,
             loadingContainer: null,
             errorContainer: null,
-            
+
             // State
             environments: [],
             selectedEnvironmentId: null,
             loading: false,
             connectionStatus: 'disconnected',
-            
+
             // Event handlers
             boundHandlers: {}
         };
-
-        try {
-            // Find DOM elements
-            this.findDOMElements(instance);
-            
-            // Setup event listeners
-            this.setupEventListeners(instance);
-            
-            // Initialize state
-            this.initializeState(instance);
-            
-            // Register instance
-            this.instances.set(componentId, instance);
-            
-            console.log(`EnvironmentSelectorBehavior: Initialized ${componentId}`);
-            return instance;
-            
-        } catch (error) {
-            console.error(`EnvironmentSelectorBehavior: Failed to initialize ${componentId}:`, error);
-            return null;
-        }
     }
 
     /**
@@ -68,19 +56,19 @@ class EnvironmentSelectorBehavior {
      */
     static findDOMElements(instance) {
         const { element, id } = instance;
-        
-        instance.selector = element.querySelector(`#${id}_select`) || 
+
+        instance.selector = element.querySelector(`#${id}_select`) ||
                            element.querySelector('[data-component-element="selector"]');
-        
+
         instance.statusElement = element.querySelector('[data-component-element="status"]');
-        
-        instance.refreshButton = element.querySelector(`#${id}_refresh`) || 
+
+        instance.refreshButton = element.querySelector(`#${id}_refresh`) ||
                                 element.querySelector('[data-component-element="refresh"]');
-        
+
         instance.loadingContainer = element.querySelector('[data-component-element="loading"]');
-        
+
         instance.errorContainer = element.querySelector('[data-component-element="error"]');
-        
+
         if (!instance.selector) {
             throw new Error('Selector element not found');
         }
@@ -91,29 +79,28 @@ class EnvironmentSelectorBehavior {
      */
     static setupEventListeners(instance) {
         const { selector, refreshButton } = instance;
-        
+
         // Selector change event
         if (selector) {
             instance.boundHandlers.selectorChange = (e) => this.handleSelectorChange(instance, e);
             selector.addEventListener('change', instance.boundHandlers.selectorChange);
-            
+
             // Focus/blur events for auto-refresh
             if (instance.config.autoRefreshOnFocus) {
                 instance.boundHandlers.selectorFocus = (e) => this.handleSelectorFocus(instance, e);
                 selector.addEventListener('focus', instance.boundHandlers.selectorFocus);
             }
         }
-        
+
         // Refresh button click
         if (refreshButton) {
             instance.boundHandlers.refreshClick = (e) => this.handleRefreshClick(instance, e);
             refreshButton.addEventListener('click', instance.boundHandlers.refreshClick);
         }
-        
+
         // Keyboard shortcuts
         instance.boundHandlers.keyDown = (e) => this.handleKeyDown(instance, e);
         instance.element.addEventListener('keydown', instance.boundHandlers.keyDown);
-        
     }
 
     /**
@@ -121,19 +108,67 @@ class EnvironmentSelectorBehavior {
      */
     static initializeState(instance) {
         const { selector, config } = instance;
-        
+
         if (selector) {
             // Get initial selected value
             instance.selectedEnvironmentId = selector.value || null;
-            
+
             // Parse environments from options
             instance.environments = this.parseEnvironmentsFromOptions(selector);
-            
+
             // Set initial connection status
             instance.connectionStatus = instance.selectedEnvironmentId ? 'connected' : 'disconnected';
-            
+
             // Update status display
             this.updateStatusDisplay(instance);
+        }
+    }
+
+    /**
+     * Handle custom actions beyond componentUpdate
+     */
+    static handleCustomAction(instance, message) {
+        const { action, data } = message;
+
+        switch (action) {
+            case 'environmentsLoaded':
+                if (data && data.environments) {
+                    this.loadEnvironments(message.componentId, data.environments);
+                }
+                if (data && data.selectedEnvironmentId) {
+                    this.setSelectedEnvironment(message.componentId, data.selectedEnvironmentId);
+                }
+                break;
+
+            case 'componentStateChange':
+                // Handle state change messages from Extension Host
+                if (data && typeof data === 'object') {
+                    // Update internal state without triggering events
+                    Object.assign(instance, data);
+                    this.updateStatusDisplay(instance);
+                }
+                break;
+
+            case 'environmentSelected':
+                if (data && data.environmentId) {
+                    this.setSelectedEnvironment(message.componentId, data.environmentId);
+                }
+                break;
+
+            case 'loadingStateChanged':
+                this.setLoading(message.componentId, data.loading, data.message);
+                break;
+
+            case 'errorOccurred':
+                this.showError(message.componentId, data.error, data.context);
+                break;
+
+            case 'clearError':
+                this.clearError(instance);
+                break;
+
+            default:
+                console.warn(`EnvironmentSelectorBehavior: Unknown message action: ${action}`);
         }
     }
 
@@ -143,21 +178,20 @@ class EnvironmentSelectorBehavior {
     static handleSelectorChange(instance, event) {
         const newEnvironmentId = event.target.value;
         const oldEnvironmentId = instance.selectedEnvironmentId;
-        
-        
+
         // Update instance state
         instance.selectedEnvironmentId = newEnvironmentId || null;
         instance.connectionStatus = newEnvironmentId ? 'connected' : 'disconnected';
-        
+
         // Update visual status
         this.updateStatusDisplay(instance);
-        
+
         // Clear any existing errors
         this.clearError(instance);
-        
+
         // Find the selected environment object
         const selectedEnvironment = instance.environments.find(env => env.id === newEnvironmentId) || null;
-        
+
         // Send message to Extension Host
         ComponentUtils.sendMessage('environment-changed', {
             componentId: instance.id,
@@ -165,13 +199,13 @@ class EnvironmentSelectorBehavior {
             environment: selectedEnvironment,
             previousEnvironmentId: oldEnvironmentId
         });
-        
+
         // Update component state in ComponentUtils
         ComponentUtils.updateComponentState(instance.id, {
             selectedEnvironmentId: instance.selectedEnvironmentId,
             connectionStatus: instance.connectionStatus
         });
-        
+
         // Trigger validation if component is required
         if (instance.config.required) {
             this.validateSelection(instance);
@@ -183,10 +217,10 @@ class EnvironmentSelectorBehavior {
      */
     static handleRefreshClick(instance, event) {
         event.preventDefault();
-        
+
         // Set loading state
         this.setLoading(instance, true, 'Refreshing environments...');
-        
+
         // Send refresh message to Extension Host
         ComponentUtils.sendMessage('refresh-environments', {
             componentId: instance.id,
@@ -199,7 +233,6 @@ class EnvironmentSelectorBehavior {
      */
     static handleSelectorFocus(instance, event) {
         if (instance.config.autoRefreshOnFocus && !instance.loading) {
-            
             // Send refresh message to Extension Host
             ComponentUtils.sendMessage('refresh-environments', {
                 componentId: instance.id,
@@ -219,7 +252,7 @@ class EnvironmentSelectorBehavior {
                 this.handleRefreshClick(instance, event);
             }
         }
-        
+
         // Escape - Clear selection
         if (event.key === 'Escape') {
             if (instance.selector && instance.selectedEnvironmentId) {
@@ -239,17 +272,16 @@ class EnvironmentSelectorBehavior {
             return;
         }
 
-        
         // Store environments in instance
         instance.environments = environments || [];
-        
+
         // Clear existing options except placeholder
         const placeholder = instance.selector.options[0];
         instance.selector.innerHTML = '';
         if (placeholder) {
             instance.selector.appendChild(placeholder);
         }
-        
+
         // Add environment options
         environments.forEach(env => {
             const option = document.createElement('option');
@@ -258,13 +290,13 @@ class EnvironmentSelectorBehavior {
             option.title = env.settings?.dataverseUrl || '';
             instance.selector.appendChild(option);
         });
-        
+
         // Auto-select first environment if configured
         if (instance.config.autoSelectFirst && environments.length > 0 && !instance.selectedEnvironmentId) {
             instance.selector.value = environments[0].id;
             this.handleSelectorChange(instance, { target: instance.selector });
         }
-        
+
         // Clear loading state
         this.setLoading(instance, false);
     }
@@ -279,17 +311,16 @@ class EnvironmentSelectorBehavior {
             return;
         }
 
-        
         // Update selector value
         instance.selector.value = environmentId || '';
-        
+
         // Update instance state
         instance.selectedEnvironmentId = environmentId || null;
         instance.connectionStatus = environmentId ? 'connected' : 'disconnected';
-        
+
         // Update status display
         this.updateStatusDisplay(instance);
-        
+
         // Update component state
         ComponentUtils.updateComponentState(componentId, {
             selectedEnvironmentId: instance.selectedEnvironmentId,
@@ -307,20 +338,20 @@ class EnvironmentSelectorBehavior {
         }
 
         instance.loading = loading;
-        
+
         // Update element class
         if (loading) {
             instance.element.classList.add('component-loading');
         } else {
             instance.element.classList.remove('component-loading');
         }
-        
+
         // Update loading container
         if (instance.loadingContainer) {
             instance.loadingContainer.textContent = message;
             instance.loadingContainer.style.display = loading ? 'block' : 'none';
         }
-        
+
         // Disable/enable controls
         if (instance.selector) {
             instance.selector.disabled = loading;
@@ -329,7 +360,7 @@ class EnvironmentSelectorBehavior {
             instance.refreshButton.disabled = loading;
             instance.refreshButton.innerHTML = loading ? '⏳' : '🔄';
         }
-        
+
         // Update status if loading
         if (loading && instance.statusElement) {
             instance.statusElement.innerHTML = '⏳ Loading...';
@@ -337,7 +368,6 @@ class EnvironmentSelectorBehavior {
         } else if (!loading) {
             this.updateStatusDisplay(instance);
         }
-        
     }
 
     /**
@@ -350,10 +380,10 @@ class EnvironmentSelectorBehavior {
         }
 
         console.error(`EnvironmentSelectorBehavior: Error for ${componentId}:`, error);
-        
+
         // Update element class
         instance.element.classList.add('component-error');
-        
+
         // Show error container
         if (instance.errorContainer) {
             const errorMessage = instance.errorContainer.querySelector('[data-component-element="error-message"]');
@@ -364,11 +394,11 @@ class EnvironmentSelectorBehavior {
             }
             instance.errorContainer.style.display = 'block';
         }
-        
+
         // Update status to error
         instance.connectionStatus = 'error';
         this.updateStatusDisplay(instance);
-        
+
         // Clear loading state
         this.setLoading(componentId, false);
     }
@@ -383,7 +413,7 @@ class EnvironmentSelectorBehavior {
 
         // Remove error class
         instance.element.classList.remove('component-error');
-        
+
         // Hide error container
         if (instance.errorContainer) {
             instance.errorContainer.style.display = 'none';
@@ -399,11 +429,11 @@ class EnvironmentSelectorBehavior {
         }
 
         const { connectionStatus } = instance;
-        
+
         // Update status text and icon
         let statusText = connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1);
         let statusIcon = '🔴';
-        
+
         switch (connectionStatus) {
             case 'connected':
                 statusIcon = '🟢';
@@ -416,9 +446,9 @@ class EnvironmentSelectorBehavior {
                 statusText = 'Error';
                 break;
         }
-        
+
         instance.statusElement.innerHTML = `${statusIcon} ${statusText}`;
-        
+
         // Update status classes
         instance.statusElement.className = `component-status environment-status environment-${connectionStatus}`;
     }
@@ -433,13 +463,13 @@ class EnvironmentSelectorBehavior {
 
         const isValid = !instance.config.required || !!instance.selectedEnvironmentId;
         const error = !isValid ? 'Environment selection is required' : null;
-        
+
         if (error) {
             this.showError(instance.id, error, 'validation');
         } else {
             this.clearError(instance);
         }
-        
+
         return { isValid, error };
     }
 
@@ -448,7 +478,7 @@ class EnvironmentSelectorBehavior {
      */
     static parseEnvironmentsFromOptions(selector) {
         const environments = [];
-        
+
         Array.from(selector.options).forEach(option => {
             if (option.value) {
                 environments.push({
@@ -461,69 +491,8 @@ class EnvironmentSelectorBehavior {
                 });
             }
         });
-        
-        return environments;
-    }
 
-    /**
-     * Handle messages from Extension Host (for ComponentUtils routing)
-     */
-    static handleMessage(message) {
-        if (!message || !message.componentId) {
-            console.warn('EnvironmentSelector handleMessage: Invalid message format', message);
-            return;
-        }
-        
-        // Get the initialized instance instead of searching DOM
-        const instance = this.instances.get(message.componentId);
-        if (!instance) {
-            console.warn(`EnvironmentSelector instance not found: ${message.componentId}`);
-            return;
-        }
-        
-        const { action, data } = message;
-        
-        switch (action) {
-            case 'componentUpdate':
-            case 'environmentsLoaded':
-                if (data && data.environments) {
-                    this.loadEnvironments(message.componentId, data.environments);
-                }
-                if (data && data.selectedEnvironmentId) {
-                    this.setSelectedEnvironment(message.componentId, data.selectedEnvironmentId);
-                }
-                break;
-                
-            case 'componentStateChange':
-                // Handle state change messages from Extension Host
-                if (data && typeof data === 'object') {
-                    // Update internal state without triggering events
-                    Object.assign(instance, data);
-                    this.updateStatusDisplay(instance);
-                }
-                break;
-                
-            case 'environmentSelected':
-                if (data && data.environmentId) {
-                    this.setSelectedEnvironment(message.componentId, data.environmentId);
-                }
-                break;
-                
-            case 'loadingStateChanged':
-                this.setLoading(message.componentId, data.loading, data.message);
-                break;
-                
-            case 'errorOccurred':
-                this.showError(message.componentId, data.error, data.context);
-                break;
-                
-            case 'clearError':
-                this.clearError(instance);
-                break;
-                
-            default:
-                console.warn(`EnvironmentSelectorBehavior: Unknown message action: ${action}`);
-        }
+        return environments;
     }
 
     /**
@@ -545,27 +514,19 @@ class EnvironmentSelectorBehavior {
     }
 
     /**
-     * Dispose of component instance
+     * Cleanup instance resources
      */
-    static dispose(componentId) {
-        const instance = this.instances.get(componentId);
-        if (!instance) {
-            return;
-        }
-
+    static cleanupInstance(instance) {
         // Remove event listeners
         Object.entries(instance.boundHandlers).forEach(([event, handler]) => {
             const element = event === 'selectorChange' || event === 'selectorFocus' ? instance.selector :
                            event === 'refreshClick' ? instance.refreshButton :
                            instance.element;
-            
+
             if (element && handler) {
                 element.removeEventListener(event.replace(/[A-Z]/g, m => m.toLowerCase()), handler);
             }
         });
-
-        // Clear references
-        this.instances.delete(componentId);
     }
 
     /**
@@ -589,18 +550,5 @@ class EnvironmentSelectorBehavior {
     }
 }
 
-// Auto-register with ComponentUtils
-if (typeof ComponentUtils !== 'undefined') {
-    ComponentUtils.registerComponent = ComponentUtils.registerComponent || function() {};
-}
-
-// Make available globally
-window.EnvironmentSelectorBehavior = EnvironmentSelectorBehavior;
-
-// Register with ComponentUtils if available
-if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
-    window.ComponentUtils.registerBehavior('EnvironmentSelector', EnvironmentSelectorBehavior);
-    console.log('EnvironmentSelectorBehavior registered with ComponentUtils');
-} else {
-    console.log('EnvironmentSelectorBehavior loaded, ComponentUtils not available yet');
-}
+// Register behavior
+EnvironmentSelectorBehavior.register();

@@ -96,42 +96,121 @@ export class DataTableView {
   - Update DOM efficiently
   - Communicate with Extension Host
 
+### BaseBehavior Pattern (MANDATORY)
+
+**All webview behaviors MUST extend `BaseBehavior` base class. No exceptions.**
+
+#### Why BaseBehavior Exists
+
+**Problem**: Before BaseBehavior, developers had to manually implement `componentUpdate` handlers:
+- Missing `case 'componentUpdate'` caused silent failures (data sent, never displayed)
+- Hardcoded switch statements in ComponentUtils required manual updates for every new component
+- No enforcement - easy to forget required methods
+
+**Solution**: BaseBehavior enforces the pattern through:
+1. **Abstract method `onComponentUpdate(instance, data)`** - MUST be implemented
+2. **Registry pattern** - Behaviors auto-register via `.register()`, no hardcoded switches
+3. **Consistent initialization** - Common lifecycle managed by base class
+
+#### Required Methods
+
+| Method | Required? | Purpose |
+|--------|-----------|---------|
+| `getComponentType()` | **YES** | Return component type identifier |
+| `onComponentUpdate(instance, data)` | **YES** | Handle data updates from Extension Host |
+| `createInstance(componentId, config, element)` | Optional | Customize instance structure |
+| `findDOMElements(instance)` | Optional | Cache DOM element references |
+| `setupEventListeners(instance)` | Optional | Attach event handlers |
+| `handleCustomAction(instance, message)` | Optional | Handle non-update actions |
+| `cleanupInstance(instance)` | Optional | Clean up resources on disposal |
+
+#### What BaseBehavior Provides Automatically
+
+- Instance tracking via `static instances = new Map()`
+- Common initialization flow: `initialize()` → `createInstance()` → `findDOMElements()` → `setupEventListeners()`
+- Message routing: `handleMessage()` routes to `onComponentUpdate()` or `handleCustomAction()`
+- Cleanup management: `cleanup()` with `cleanupInstance()` hook
+- Auto-registration: `.register()` adds to ComponentUtils registry
+
 ```javascript
-class DataTableBehavior {
-    static instances = new Map();
-
-    static initialize(componentId, config, element) {
-        if (!componentId || !element) return null;
-        if (this.instances.has(componentId)) return this.instances.get(componentId);
-
-        const instance = {
-            id: componentId,
-            config: { ...config },
-            element: element,
-            tbody: element.querySelector('tbody')
-        };
-
-        this.setupEventListeners(instance);
-        this.instances.set(componentId, instance);
-        return instance;
+/**
+ * DataTableBehavior - Webview behavior for DataTable component
+ * Extends BaseBehavior for enforced componentUpdate pattern
+ */
+class DataTableBehavior extends BaseBehavior {
+    /**
+     * Get component type identifier (REQUIRED)
+     */
+    static getComponentType() {
+        return 'DataTable';
     }
 
-    static handleMessage(message) {
-        if (!message?.componentId) return;
-
-        switch (message.action) {
-            case 'setData':
-                this.updateTableData(message.componentId, message.data);
-                break;
-            case 'setColumns':
-                this.updateTableColumns(message.componentId, message.data);
-                break;
+    /**
+     * Handle component data updates from Extension Host (REQUIRED)
+     * Called automatically when event bridge sends updated data
+     */
+    static onComponentUpdate(instance, data) {
+        if (data && Array.isArray(data)) {
+            this.updateTableData(instance, data);
         }
     }
 
-    static updateTableData(componentId, data) {
-        const instance = this.instances.get(componentId);
-        if (!instance) return;
+    /**
+     * Create instance structure (OPTIONAL override)
+     */
+    static createInstance(componentId, config, element) {
+        return {
+            id: componentId,
+            config: { ...config },
+            element: element,
+            tbody: null,
+            boundHandlers: {}
+        };
+    }
+
+    /**
+     * Find DOM elements (OPTIONAL override)
+     */
+    static findDOMElements(instance) {
+        instance.tbody = instance.element.querySelector('tbody');
+    }
+
+    /**
+     * Setup event listeners (OPTIONAL override)
+     */
+    static setupEventListeners(instance) {
+        instance.boundHandlers.rowClick = (e) => this.handleRowClick(instance, e);
+        instance.tbody.addEventListener('click', instance.boundHandlers.rowClick);
+    }
+
+    /**
+     * Handle custom actions beyond componentUpdate (OPTIONAL override)
+     */
+    static handleCustomAction(instance, message) {
+        switch (message.action) {
+            case 'setColumns':
+                this.updateTableColumns(instance, message.data);
+                break;
+            case 'selectRow':
+                this.selectRow(instance, message.rowId);
+                break;
+            default:
+                console.warn(`DataTableBehavior: Unhandled action '${message.action}'`);
+        }
+    }
+
+    /**
+     * Cleanup resources (OPTIONAL override)
+     */
+    static cleanupInstance(instance) {
+        if (instance.tbody && instance.boundHandlers.rowClick) {
+            instance.tbody.removeEventListener('click', instance.boundHandlers.rowClick);
+        }
+    }
+
+    // Component-specific helper methods
+    static updateTableData(instance, data) {
+        if (!instance.tbody) return;
 
         // Efficient DOM update without full regeneration
         instance.tbody.innerHTML = '';
@@ -140,13 +219,18 @@ class DataTableBehavior {
             instance.tbody.appendChild(tr);
         });
     }
+
+    static handleRowClick(instance, event) {
+        // Implementation...
+    }
+
+    static createTableRow(row, config) {
+        // Implementation...
+    }
 }
 
-// Required: Global registration
-window.DataTableBehavior = DataTableBehavior;
-if (window.ComponentUtils?.registerBehavior) {
-    window.ComponentUtils.registerBehavior('DataTable', DataTableBehavior);
-}
+// Auto-register with ComponentUtils (REQUIRED)
+DataTableBehavior.register();
 ```
 
 ## Configuration Pattern
@@ -784,46 +868,105 @@ const targetEnvSelector = ComponentFactory.createEnvironmentSelector({
 
 ### Behavior Instance Tracking
 
-Behavior scripts must track multiple instances:
+Behavior scripts automatically track multiple instances through `BaseBehavior`:
 
 ```javascript
-class EnvironmentSelectorBehavior {
-    static instances = new Map();
+/**
+ * EnvironmentSelectorBehavior - Webview behavior for EnvironmentSelector component
+ * Extends BaseBehavior for enforced componentUpdate pattern
+ */
+class EnvironmentSelectorBehavior extends BaseBehavior {
+    /**
+     * Get component type identifier (REQUIRED)
+     */
+    static getComponentType() {
+        return 'EnvironmentSelector';
+    }
 
-    static initialize(componentId, config, element) {
-        // Prevent duplicate initialization
-        if (this.instances.has(componentId)) {
-            return this.instances.get(componentId);
+    /**
+     * Handle component data updates from Extension Host (REQUIRED)
+     * Called when environments list is updated
+     */
+    static onComponentUpdate(instance, data) {
+        if (data && data.environments) {
+            this.updateEnvironmentOptions(instance, data.environments);
         }
+        if (data && data.selectedEnvironmentId !== undefined) {
+            this.selectEnvironment(instance, data.selectedEnvironmentId);
+        }
+    }
 
-        const instance = {
+    /**
+     * Create instance structure (OPTIONAL override)
+     */
+    static createInstance(componentId, config, element) {
+        return {
             id: componentId,
             config: { ...config },
             element: element,
-            dropdown: element.querySelector('select'),
-            statusElement: element.querySelector('.status')
+            dropdown: null,
+            statusElement: null,
+            boundHandlers: {}
         };
-
-        this.setupInstanceEventListeners(instance);
-        this.instances.set(componentId, instance);
-        return instance;
     }
 
-    static handleMessage(message) {
-        // Route to specific instance
-        const instance = this.instances.get(message.componentId);
-        if (!instance) return;
+    /**
+     * Find DOM elements (OPTIONAL override)
+     */
+    static findDOMElements(instance) {
+        instance.dropdown = instance.element.querySelector('select');
+        instance.statusElement = instance.element.querySelector('.status');
+    }
 
+    /**
+     * Setup event listeners (OPTIONAL override)
+     */
+    static setupEventListeners(instance) {
+        instance.boundHandlers.change = (e) => this.handleEnvironmentChange(instance, e);
+        instance.dropdown.addEventListener('change', instance.boundHandlers.change);
+    }
+
+    /**
+     * Handle custom actions beyond componentUpdate (OPTIONAL override)
+     */
+    static handleCustomAction(instance, message) {
         switch (message.action) {
-            case 'environmentsLoaded':
-                this.updateEnvironmentOptions(instance, message.data);
-                break;
-            case 'environmentSelected':
+            case 'selectEnvironment':
                 this.selectEnvironment(instance, message.data.environmentId);
                 break;
+            case 'clearSelection':
+                this.clearSelection(instance);
+                break;
+            default:
+                console.warn(`EnvironmentSelectorBehavior: Unhandled action '${message.action}'`);
         }
     }
+
+    /**
+     * Cleanup resources (OPTIONAL override)
+     */
+    static cleanupInstance(instance) {
+        if (instance.dropdown && instance.boundHandlers.change) {
+            instance.dropdown.removeEventListener('change', instance.boundHandlers.change);
+        }
+    }
+
+    // Component-specific helper methods
+    static updateEnvironmentOptions(instance, environments) {
+        // Implementation...
+    }
+
+    static selectEnvironment(instance, environmentId) {
+        // Implementation...
+    }
+
+    static handleEnvironmentChange(instance, event) {
+        // Implementation...
+    }
 }
+
+// Auto-register with ComponentUtils (REQUIRED)
+EnvironmentSelectorBehavior.register();
 ```
 
 ## State Management Patterns
@@ -902,9 +1045,25 @@ export class BaseComponent extends EventEmitter {
 ### Webview Error Display
 
 ```javascript
-class ComponentBehavior {
+/**
+ * MyComponentBehavior - Example showing error handling pattern
+ */
+class MyComponentBehavior extends BaseBehavior {
+    static getComponentType() {
+        return 'MyComponent';
+    }
+
+    static onComponentUpdate(instance, data) {
+        if (data.error) {
+            this.showError(instance, data.error);
+        } else {
+            this.clearError(instance);
+            // Update component with data
+        }
+    }
+
     static showError(instance, error, context) {
-        const errorElement = instance.element.querySelector('.error-display') || 
+        const errorElement = instance.element.querySelector('.error-display') ||
             this.createErrorElement(instance);
 
         errorElement.innerHTML = `
@@ -924,8 +1083,249 @@ class ComponentBehavior {
             errorElement.style.display = 'none';
         }
     }
+
+    static createErrorElement(instance) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-display';
+        instance.element.appendChild(errorDiv);
+        return errorDiv;
+    }
+}
+
+MyComponentBehavior.register();
+```
+
+## Migration from Legacy Behavior Patterns
+
+### Identifying Legacy Behaviors
+
+**Old Pattern (Pre-BaseBehavior)**:
+```javascript
+// ❌ OLD - Manual instance management, easy to forget componentUpdate
+class OldBehavior {
+    static instances = new Map();
+
+    static initialize(componentId, config, element) {
+        if (this.instances.has(componentId)) {
+            return this.instances.get(componentId);
+        }
+
+        const instance = { id: componentId, config, element };
+        this.instances.set(componentId, instance);
+        return instance;
+    }
+
+    static handleMessage(message) {
+        const instance = this.instances.get(message.componentId);
+        if (!instance) return;
+
+        switch (message.action) {
+            case 'componentUpdate':  // Easy to forget this case!
+                this.updateData(instance, message.data);
+                break;
+            case 'customAction':
+                this.handleCustomAction(instance, message.data);
+                break;
+        }
+    }
+}
+
+// Manual registration - easy to forget
+window.OldBehavior = OldBehavior;
+if (window.ComponentUtils?.registerBehavior) {
+    window.ComponentUtils.registerBehavior('OldComponent', OldBehavior);
 }
 ```
+
+**Problems with Old Pattern**:
+- Missing `case 'componentUpdate'` causes silent failures
+- Manual instance tracking is error-prone
+- Hardcoded switch in ComponentUtils for every new component
+- No enforcement of required methods
+- Easy to forget registration
+
+### Migration Steps
+
+1. **Extend BaseBehavior**:
+```javascript
+// Change from plain class to extending BaseBehavior
+class NewBehavior extends BaseBehavior {
+```
+
+2. **Add getComponentType()**:
+```javascript
+static getComponentType() {
+    return 'MyComponent';  // Must match Extension Host component type
+}
+```
+
+3. **Extract componentUpdate logic to onComponentUpdate()**:
+```javascript
+// Move logic from handleMessage's 'componentUpdate' case
+static onComponentUpdate(instance, data) {
+    // Previous logic from case 'componentUpdate':
+    this.updateData(instance, data);
+}
+```
+
+4. **Move other actions to handleCustomAction()**:
+```javascript
+// Move non-update actions here
+static handleCustomAction(instance, message) {
+    switch (message.action) {
+        case 'customAction':
+            this.handleCustomAction(instance, message.data);
+            break;
+    }
+}
+```
+
+5. **Replace manual initialization with lifecycle hooks**:
+```javascript
+// Instead of manual initialize, use lifecycle hooks
+static createInstance(componentId, config, element) {
+    return {
+        id: componentId,
+        config: { ...config },
+        element: element,
+        boundHandlers: {}
+    };
+}
+
+static findDOMElements(instance) {
+    instance.dropdown = instance.element.querySelector('select');
+}
+
+static setupEventListeners(instance) {
+    instance.boundHandlers.click = (e) => this.handleClick(instance, e);
+    instance.element.addEventListener('click', instance.boundHandlers.click);
+}
+```
+
+6. **Replace manual registration with .register()**:
+```javascript
+// Remove:
+// window.MyBehavior = MyBehavior;
+// if (window.ComponentUtils?.registerBehavior) {
+//     window.ComponentUtils.registerBehavior('MyComponent', MyBehavior);
+// }
+
+// Replace with:
+MyBehavior.register();
+```
+
+### Complete Migration Example
+
+**Before (Old Pattern)**:
+```javascript
+class PluginTraceBehavior {
+    static instances = new Map();
+
+    static initialize(componentId, config, element) {
+        if (this.instances.has(componentId)) {
+            return this.instances.get(componentId);
+        }
+
+        const instance = {
+            id: componentId,
+            config: { ...config },
+            element: element,
+            tableBody: element.querySelector('tbody')
+        };
+
+        element.addEventListener('click', (e) => this.handleClick(instance, e));
+        this.instances.set(componentId, instance);
+        return instance;
+    }
+
+    static handleMessage(message) {
+        const instance = this.instances.get(message.componentId);
+        if (!instance) return;
+
+        switch (message.action) {
+            case 'componentUpdate':  // Easy to forget!
+                this.updateTraces(instance, message.data);
+                break;
+            case 'deleteTrace':
+                this.deleteTrace(instance, message.traceId);
+                break;
+        }
+    }
+
+    static updateTraces(instance, traces) {
+        // Implementation...
+    }
+}
+
+window.PluginTraceBehavior = PluginTraceBehavior;
+if (window.ComponentUtils?.registerBehavior) {
+    window.ComponentUtils.registerBehavior('PluginTrace', PluginTraceBehavior);
+}
+```
+
+**After (BaseBehavior Pattern)**:
+```javascript
+class PluginTraceBehavior extends BaseBehavior {
+    static getComponentType() {
+        return 'PluginTrace';
+    }
+
+    // REQUIRED - Can't forget this!
+    static onComponentUpdate(instance, data) {
+        this.updateTraces(instance, data);
+    }
+
+    static createInstance(componentId, config, element) {
+        return {
+            id: componentId,
+            config: { ...config },
+            element: element,
+            tableBody: null,
+            boundHandlers: {}
+        };
+    }
+
+    static findDOMElements(instance) {
+        instance.tableBody = instance.element.querySelector('tbody');
+    }
+
+    static setupEventListeners(instance) {
+        instance.boundHandlers.click = (e) => this.handleClick(instance, e);
+        instance.element.addEventListener('click', instance.boundHandlers.click);
+    }
+
+    static handleCustomAction(instance, message) {
+        switch (message.action) {
+            case 'deleteTrace':
+                this.deleteTrace(instance, message.traceId);
+                break;
+        }
+    }
+
+    static cleanupInstance(instance) {
+        if (instance.element && instance.boundHandlers.click) {
+            instance.element.removeEventListener('click', instance.boundHandlers.click);
+        }
+    }
+
+    static updateTraces(instance, traces) {
+        // Implementation...
+    }
+
+    static deleteTrace(instance, traceId) {
+        // Implementation...
+    }
+}
+
+PluginTraceBehavior.register();
+```
+
+**Benefits of Migration**:
+- `onComponentUpdate()` is enforced - can't be forgotten
+- Registry pattern - no hardcoded switches
+- Cleaner lifecycle management
+- Proper cleanup support
+- Consistent pattern across all behaviors
 
 ## Testing Patterns
 

@@ -1,9 +1,9 @@
 /**
  * SolutionSelectorBehavior.js
- * 
+ *
  * Webview-side behavior for SolutionSelectorComponent
  * Handles DOM interactions, events, and UI state management
- * 
+ *
  * This file runs in the webview context and provides:
  * - Dropdown open/close behavior
  * - Search functionality with debouncing
@@ -13,40 +13,86 @@
  * - Group expand/collapse
  */
 
-class SolutionSelectorBehavior {
-    constructor() {
-        this.instances = new Map();
-        this.searchTimers = new Map();
-        this.SEARCH_DEBOUNCE_DELAY = 300;
-        this.init();
+class SolutionSelectorBehavior extends BaseBehavior {
+    static instances = new Map();
+    static searchTimers = new Map();
+    static SEARCH_DEBOUNCE_DELAY = 300;
+
+    /**
+     * Get the component type this behavior handles
+     */
+    static getComponentType() {
+        return 'SolutionSelector';
     }
 
-    init() {
-        // Initialize all solution selectors on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            this.initializeAllSelectors();
+    /**
+     * Handle component data updates from Extension Host
+     */
+    static onComponentUpdate(instance, data) {
+        console.log('SolutionSelector: Received componentUpdate with data:', {
+            componentId: instance.id,
+            hasData: !!data,
+            hasSolutions: !!data.solutions,
+            solutionsCount: data.solutions?.length || 0,
+            hasDefaultSolution: data.solutions?.find(s => s.uniqueName === 'Default'),
+            sampleSolutions: data.solutions?.slice(0, 3)?.map(s => s.displayName) || [],
+            requiresHtmlUpdate: !!data.requiresHtmlUpdate,
+            hasHtml: !!data.html
         });
 
-        // Handle dynamic selectors added after page load
-        this.observeNewSelectors();
-    }
+        // Check if this update requires HTML replacement (for components with dynamic content)
+        if (data.requiresHtmlUpdate && data.html) {
+            console.log('SolutionSelector: Performing HTML replacement for component');
+            if (instance && instance.element) {
+                // Replace the entire component HTML
+                instance.element.outerHTML = data.html;
 
-    initializeAllSelectors() {
-        const selectors = document.querySelectorAll('.solution-selector');
-        selectors.forEach(selector => {
-            this.initializeSelector(selector);
-        });
-    }
-
-    initializeSelector(selectorElement) {
-        const componentId = selectorElement.getAttribute('data-component-id');
-        if (!componentId || this.instances.has(componentId)) {
-            return; // Already initialized or no ID
+                // Re-find the element (since outerHTML replaced it)
+                const newElement = document.querySelector(`[data-component-id="${instance.id}"]`);
+                if (newElement) {
+                    instance.element = newElement;
+                    // Re-find DOM elements and re-bind events for the new element
+                    this.findDOMElements(instance);
+                    this.setupEventListeners(instance);
+                    console.log('SolutionSelector: Component HTML updated and events re-bound');
+                } else {
+                    console.error('SolutionSelector: Could not find component element after HTML update');
+                }
+            } else {
+                console.warn('SolutionSelector: Instance not found for HTML update');
+            }
         }
+        // Handle standard data-only updates
+        else if (data.solutions && data.solutions.length > 0) {
+            console.log('SolutionSelector: Calling loadSolutions with', data.solutions.length, 'solutions');
+            this.loadSolutions(instance.id, data.solutions);
+        } else {
+            console.warn('SolutionSelector: No solutions data to load', data);
+        }
+    }
 
-        const instance = {
+    /**
+     * Handle custom actions beyond componentUpdate
+     */
+    static handleCustomAction(instance, message) {
+        // Handle direct solutions loaded (legacy)
+        if (message.action === 'solutionsLoaded' && message.data) {
+            console.log('SolutionSelector: Received legacy solutionsLoaded');
+            this.loadSolutions(instance.id, message.data);
+        } else {
+            super.handleCustomAction(instance, message);
+        }
+    }
+
+    /**
+     * Create the instance object structure
+     */
+    static createInstance(componentId, config, element) {
+        return {
             id: componentId,
-            element: selectorElement,
+            config: { ...config },
+            element: element,
+            boundHandlers: {},
             isOpen: false,
             selectedSolutions: [],
             searchQuery: '',
@@ -57,78 +103,163 @@ class SolutionSelectorBehavior {
             },
             focusedIndex: -1
         };
-
-        this.instances.set(componentId, instance);
-        this.bindEvents(instance);
-        this.updateDisplay(instance);
     }
 
-    bindEvents(instance) {
-        const { element, id } = instance;
-        
+    /**
+     * Find and cache DOM elements
+     */
+    static findDOMElements(instance) {
+        instance.trigger = instance.element.querySelector('.solution-selector-trigger');
+        instance.searchInput = instance.element.querySelector('.solution-selector-search-input');
+        instance.searchClear = instance.element.querySelector('.solution-selector-search-clear');
+        instance.dropdown = instance.element.querySelector('.solution-selector-dropdown');
+    }
+
+    /**
+     * Setup event listeners
+     */
+    static setupEventListeners(instance) {
         // Dropdown trigger
-        const trigger = element.querySelector('.solution-selector-trigger');
-        if (trigger) {
-            trigger.addEventListener('click', (e) => this.toggleDropdown(id, e));
-            trigger.addEventListener('keydown', (e) => this.handleTriggerKeyDown(id, e));
+        if (instance.trigger) {
+            instance.boundHandlers.triggerClick = (e) => this.toggleDropdown(instance.id, e);
+            instance.boundHandlers.triggerKeyDown = (e) => this.handleTriggerKeyDown(instance.id, e);
+            instance.trigger.addEventListener('click', instance.boundHandlers.triggerClick);
+            instance.trigger.addEventListener('keydown', instance.boundHandlers.triggerKeyDown);
         }
 
         // Search input
-        const searchInput = element.querySelector('.solution-selector-search-input');
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => this.handleSearch(id, e));
-            searchInput.addEventListener('keydown', (e) => this.handleSearchKeyDown(id, e));
+        if (instance.searchInput) {
+            instance.boundHandlers.searchInput = (e) => this.handleSearch(instance.id, e);
+            instance.boundHandlers.searchKeyDown = (e) => this.handleSearchKeyDown(instance.id, e);
+            instance.searchInput.addEventListener('input', instance.boundHandlers.searchInput);
+            instance.searchInput.addEventListener('keydown', instance.boundHandlers.searchKeyDown);
         }
 
         // Search clear button
-        const searchClear = element.querySelector('.solution-selector-search-clear');
-        if (searchClear) {
-            searchClear.addEventListener('click', () => this.clearSearch(id));
+        if (instance.searchClear) {
+            instance.boundHandlers.searchClear = () => this.clearSearch(instance.id);
+            instance.searchClear.addEventListener('click', instance.boundHandlers.searchClear);
         }
 
         // Quick filter buttons
-        const filterButtons = element.querySelectorAll('.solution-selector-filter-button');
+        const filterButtons = instance.element.querySelectorAll('.solution-selector-filter-button');
         filterButtons.forEach(button => {
-            button.addEventListener('click', (e) => this.handleQuickFilter(id, e));
+            const handler = (e) => this.handleQuickFilter(instance.id, e);
+            button.addEventListener('click', handler);
+            if (!instance.boundHandlers.filterButtons) {
+                instance.boundHandlers.filterButtons = [];
+            }
+            instance.boundHandlers.filterButtons.push({ button, handler });
         });
 
         // Solution options
         this.bindOptionEvents(instance);
 
         // Group headers (for collapsing)
-        const groupHeaders = element.querySelectorAll('.solution-selector-group-header');
+        const groupHeaders = instance.element.querySelectorAll('.solution-selector-group-header');
         groupHeaders.forEach(header => {
-            header.addEventListener('click', (e) => this.toggleGroup(id, e));
+            const handler = (e) => this.toggleGroup(instance.id, e);
+            header.addEventListener('click', handler);
+            if (!instance.boundHandlers.groupHeaders) {
+                instance.boundHandlers.groupHeaders = [];
+            }
+            instance.boundHandlers.groupHeaders.push({ header, handler });
         });
 
         // Selection tag remove buttons (multi-select)
-        const tagRemoveButtons = element.querySelectorAll('.solution-selector-tag-remove');
+        const tagRemoveButtons = instance.element.querySelectorAll('.solution-selector-tag-remove');
         tagRemoveButtons.forEach(button => {
-            button.addEventListener('click', (e) => this.removeSelection(id, e));
+            const handler = (e) => this.removeSelection(instance.id, e);
+            button.addEventListener('click', handler);
+            if (!instance.boundHandlers.tagRemoveButtons) {
+                instance.boundHandlers.tagRemoveButtons = [];
+            }
+            instance.boundHandlers.tagRemoveButtons.push({ button, handler });
         });
 
         // Click outside to close
-        document.addEventListener('click', (e) => this.handleOutsideClick(id, e));
+        instance.boundHandlers.outsideClick = (e) => this.handleOutsideClick(instance.id, e);
+        document.addEventListener('click', instance.boundHandlers.outsideClick);
 
         // Escape key to close
-        document.addEventListener('keydown', (e) => {
+        instance.boundHandlers.escapeKey = (e) => {
             if (e.key === 'Escape' && instance.isOpen) {
-                this.closeDropdown(id);
+                this.closeDropdown(instance.id);
             }
-        });
+        };
+        document.addEventListener('keydown', instance.boundHandlers.escapeKey);
     }
 
-    bindOptionEvents(instance) {
-        const { element } = instance;
-        const options = element.querySelectorAll('.solution-selector-option');
-        
+    /**
+     * Cleanup instance resources
+     */
+    static cleanupInstance(instance) {
+        // Remove event listeners
+        if (instance.trigger) {
+            if (instance.boundHandlers.triggerClick) {
+                instance.trigger.removeEventListener('click', instance.boundHandlers.triggerClick);
+            }
+            if (instance.boundHandlers.triggerKeyDown) {
+                instance.trigger.removeEventListener('keydown', instance.boundHandlers.triggerKeyDown);
+            }
+        }
+
+        if (instance.searchInput) {
+            if (instance.boundHandlers.searchInput) {
+                instance.searchInput.removeEventListener('input', instance.boundHandlers.searchInput);
+            }
+            if (instance.boundHandlers.searchKeyDown) {
+                instance.searchInput.removeEventListener('keydown', instance.boundHandlers.searchKeyDown);
+            }
+        }
+
+        if (instance.searchClear && instance.boundHandlers.searchClear) {
+            instance.searchClear.removeEventListener('click', instance.boundHandlers.searchClear);
+        }
+
+        if (instance.boundHandlers.filterButtons) {
+            instance.boundHandlers.filterButtons.forEach(({ button, handler }) => {
+                button.removeEventListener('click', handler);
+            });
+        }
+
+        if (instance.boundHandlers.groupHeaders) {
+            instance.boundHandlers.groupHeaders.forEach(({ header, handler }) => {
+                header.removeEventListener('click', handler);
+            });
+        }
+
+        if (instance.boundHandlers.tagRemoveButtons) {
+            instance.boundHandlers.tagRemoveButtons.forEach(({ button, handler }) => {
+                button.removeEventListener('click', handler);
+            });
+        }
+
+        if (instance.boundHandlers.outsideClick) {
+            document.removeEventListener('click', instance.boundHandlers.outsideClick);
+        }
+
+        if (instance.boundHandlers.escapeKey) {
+            document.removeEventListener('keydown', instance.boundHandlers.escapeKey);
+        }
+
+        // Clear any pending search timers
+        if (this.searchTimers.has(instance.id)) {
+            clearTimeout(this.searchTimers.get(instance.id));
+            this.searchTimers.delete(instance.id);
+        }
+    }
+
+    static bindOptionEvents(instance) {
+        const options = instance.element.querySelectorAll('.solution-selector-option');
+
         options.forEach((option, index) => {
             // Click selection
             option.addEventListener('click', (e) => this.handleOptionClick(instance.id, e));
-            
+
             // Keyboard navigation
             option.addEventListener('keydown', (e) => this.handleOptionKeyDown(instance.id, e));
-            
+
             // Mouse hover for focus
             option.addEventListener('mouseenter', () => {
                 this.setFocusedOption(instance.id, index);
@@ -136,7 +267,7 @@ class SolutionSelectorBehavior {
         });
     }
 
-    toggleDropdown(componentId, event) {
+    static toggleDropdown(componentId, event) {
         event?.stopPropagation();
         const instance = this.instances.get(componentId);
         if (!instance) return;
@@ -148,7 +279,7 @@ class SolutionSelectorBehavior {
         }
     }
 
-    openDropdown(componentId) {
+    static openDropdown(componentId) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -157,11 +288,10 @@ class SolutionSelectorBehavior {
 
         instance.isOpen = true;
         instance.element.classList.add('solution-selector-dropdown--open');
-        
+
         // Focus search input if available
-        const searchInput = instance.element.querySelector('.solution-selector-search-input');
-        if (searchInput) {
-            setTimeout(() => searchInput.focus(), 100);
+        if (instance.searchInput) {
+            setTimeout(() => instance.searchInput.focus(), 100);
         }
 
         // Reset focused option
@@ -172,7 +302,7 @@ class SolutionSelectorBehavior {
         this.emitEvent(componentId, 'dropdownOpened', {});
     }
 
-    closeDropdown(componentId) {
+    static closeDropdown(componentId) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -185,7 +315,7 @@ class SolutionSelectorBehavior {
         this.emitEvent(componentId, 'dropdownClosed', {});
     }
 
-    closeAllDropdowns() {
+    static closeAllDropdowns() {
         this.instances.forEach((instance, id) => {
             if (instance.isOpen) {
                 this.closeDropdown(id);
@@ -193,7 +323,7 @@ class SolutionSelectorBehavior {
         });
     }
 
-    handleSearch(componentId, event) {
+    static handleSearch(componentId, event) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -217,37 +347,37 @@ class SolutionSelectorBehavior {
         this.updateSearchClearButton(instance);
     }
 
-    performSearch(componentId, query) {
+    static performSearch(componentId, query) {
         console.log(`SolutionSelector: Performing search for "${query}"`);
-        
+
         const instance = this.instances.get(componentId);
         if (!instance) return;
-        
+
         // Filter options based on search query
         this.filterOptions(instance, query);
-        
+
         // Emit search event to Extension Host
         this.emitEvent(componentId, 'search', { query });
     }
-    
-    filterOptions(instance, query) {
+
+    static filterOptions(instance, query) {
         const options = instance.element.querySelectorAll('.solution-selector-option');
         const lowerQuery = query.toLowerCase().trim();
         let visibleCount = 0;
-        
+
         options.forEach(option => {
             const displayName = option.getAttribute('data-solution-display-name')?.toLowerCase() || '';
             const uniqueName = option.getAttribute('data-solution-unique-name')?.toLowerCase() || '';
             const friendlyName = option.getAttribute('data-solution-friendly-name')?.toLowerCase() || '';
             const publisherName = option.getAttribute('data-solution-publisher-name')?.toLowerCase() || '';
-            
+
             // Check if any of the solution attributes match the query
-            const matches = !lowerQuery || 
+            const matches = !lowerQuery ||
                            displayName.includes(lowerQuery) ||
                            uniqueName.includes(lowerQuery) ||
                            friendlyName.includes(lowerQuery) ||
                            publisherName.includes(lowerQuery);
-            
+
             if (matches) {
                 option.style.display = 'block';
                 visibleCount++;
@@ -255,22 +385,22 @@ class SolutionSelectorBehavior {
                 option.style.display = 'none';
             }
         });
-        
+
         // Update groups visibility based on whether they have visible options
         this.updateGroupVisibility(instance);
-        
+
         // Show/hide no results message
         this.updateNoResultsMessage(instance, visibleCount, query);
-        
+
         console.log(`SolutionSelector: Filtered to ${visibleCount} visible options for query "${query}"`);
     }
-    
-    updateGroupVisibility(instance) {
+
+    static updateGroupVisibility(instance) {
         const groups = instance.element.querySelectorAll('.solution-selector-group');
-        
+
         groups.forEach(group => {
             const visibleOptions = group.querySelectorAll('.solution-selector-option[style*="display: block"], .solution-selector-option:not([style*="display: none"])');
-            
+
             if (visibleOptions.length === 0) {
                 group.style.display = 'none';
             } else {
@@ -278,10 +408,10 @@ class SolutionSelectorBehavior {
             }
         });
     }
-    
-    updateNoResultsMessage(instance, visibleCount, query) {
+
+    static updateNoResultsMessage(instance, visibleCount, query) {
         let noResultsMessage = instance.element.querySelector('.solution-selector-no-results');
-        
+
         if (visibleCount === 0 && query.trim()) {
             // Create no results message if it doesn't exist
             if (!noResultsMessage) {
@@ -292,11 +422,11 @@ class SolutionSelectorBehavior {
                         <span class="solution-selector-no-results-text">No solutions found matching "${query}"</span>
                     </div>
                 `;
-                
+
                 // Insert after search container or at beginning of dropdown
                 const searchContainer = instance.element.querySelector('.solution-selector-search');
                 const dropdown = instance.element.querySelector('.solution-selector-dropdown');
-                
+
                 if (searchContainer && dropdown) {
                     searchContainer.insertAdjacentElement('afterend', noResultsMessage);
                 } else if (dropdown) {
@@ -309,14 +439,14 @@ class SolutionSelectorBehavior {
                     textElement.textContent = `No solutions found matching "${query}"`;
                 }
             }
-            
+
             noResultsMessage.style.display = 'block';
         } else if (noResultsMessage) {
             noResultsMessage.style.display = 'none';
         }
     }
 
-    clearSearch(componentId) {
+    static clearSearch(componentId) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -325,50 +455,50 @@ class SolutionSelectorBehavior {
             searchInput.value = '';
             instance.searchQuery = '';
             this.updateSearchClearButton(instance);
-            
+
             // Reset all options to visible
             const options = instance.element.querySelectorAll('.solution-selector-option');
             options.forEach(option => {
                 option.style.display = 'block';
             });
-            
+
             // Reset all groups to visible
             const groups = instance.element.querySelectorAll('.solution-selector-group');
             groups.forEach(group => {
                 group.style.display = 'block';
             });
-            
+
             // Hide no results message
             const noResultsMessage = instance.element.querySelector('.solution-selector-no-results');
             if (noResultsMessage) {
                 noResultsMessage.style.display = 'none';
             }
-            
+
             // Also emit the search event for consistency
             this.emitEvent(componentId, 'search', { query: '' });
             searchInput.focus();
         }
     }
 
-    updateSearchClearButton(instance) {
+    static updateSearchClearButton(instance) {
         const clearButton = instance.element.querySelector('.solution-selector-search-clear');
         if (clearButton) {
             clearButton.style.display = instance.searchQuery ? 'block' : 'none';
         }
     }
 
-    handleQuickFilter(componentId, event) {
+    static handleQuickFilter(componentId, event) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
         const button = event.target.closest('.solution-selector-filter-button');
         const filterType = button.getAttribute('data-filter');
-        
+
         if (!filterType) return;
 
         // Toggle filter state
         instance.quickFilters[filterType] = !instance.quickFilters[filterType];
-        
+
         // Update button appearance
         button.classList.toggle('solution-selector-filter--active', instance.quickFilters[filterType]);
 
@@ -380,7 +510,7 @@ class SolutionSelectorBehavior {
         });
     }
 
-    handleOptionClick(componentId, event) {
+    static handleOptionClick(componentId, event) {
         event.stopPropagation();
         const instance = this.instances.get(componentId);
         if (!instance) return;
@@ -394,7 +524,7 @@ class SolutionSelectorBehavior {
         if (!solutionId) return;
 
         const isMultiSelect = instance.element.classList.contains('solution-selector--multi-select');
-        
+
         if (isMultiSelect) {
             this.toggleMultiSelection(componentId, solutionId, option);
         } else {
@@ -403,7 +533,7 @@ class SolutionSelectorBehavior {
         }
     }
 
-    selectSingle(componentId, solutionId, optionElement) {
+    static selectSingle(componentId, solutionId, optionElement) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -413,7 +543,7 @@ class SolutionSelectorBehavior {
 
         // Select new option
         optionElement.classList.add('solution-selector-option--selected');
-        
+
         // Update instance state
         const solutionData = this.getSolutionDataFromOption(optionElement);
         instance.selectedSolutions = [solutionData];
@@ -425,13 +555,13 @@ class SolutionSelectorBehavior {
         this.emitSelectionChange(componentId, instance.selectedSolutions, [solutionData], []);
     }
 
-    toggleMultiSelection(componentId, solutionId, optionElement) {
+    static toggleMultiSelection(componentId, solutionId, optionElement) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
         const isSelected = optionElement.classList.contains('solution-selector-option--selected');
         const solutionData = this.getSolutionDataFromOption(optionElement);
-        
+
         let addedSolutions = [];
         let removedSolutions = [];
 
@@ -455,7 +585,7 @@ class SolutionSelectorBehavior {
 
         // Update trigger display
         this.updateTriggerDisplay(instance);
-        
+
         // Update selection tags
         this.updateSelectionTags(instance);
 
@@ -463,14 +593,14 @@ class SolutionSelectorBehavior {
         this.emitSelectionChange(componentId, instance.selectedSolutions, addedSolutions, removedSolutions);
     }
 
-    removeSelection(componentId, event) {
+    static removeSelection(componentId, event) {
         event.stopPropagation();
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
         const tagElement = event.target.closest('.solution-selector-selection-tag');
         const solutionId = tagElement?.getAttribute('data-solution-id');
-        
+
         if (!solutionId) return;
 
         // Remove from selections
@@ -491,7 +621,7 @@ class SolutionSelectorBehavior {
         this.emitSelectionChange(componentId, instance.selectedSolutions, [], [removedSolution]);
     }
 
-    getSolutionDataFromOption(optionElement) {
+    static getSolutionDataFromOption(optionElement) {
         return {
             id: optionElement.getAttribute('data-solution-id'),
             uniqueName: optionElement.getAttribute('data-solution-unique-name'),
@@ -504,10 +634,10 @@ class SolutionSelectorBehavior {
         };
     }
 
-    updateTriggerDisplay(instance) {
+    static updateTriggerDisplay(instance) {
         const trigger = instance.element.querySelector('.solution-selector-trigger');
         const selectedCount = instance.element.querySelector('.solution-selector-selected-count');
-        
+
         if (!trigger) return;
 
         if (instance.selectedSolutions.length === 0) {
@@ -533,7 +663,7 @@ class SolutionSelectorBehavior {
         }
     }
 
-    updateSelectionTags(instance) {
+    static updateSelectionTags(instance) {
         const tagsContainer = instance.element.querySelector('.solution-selector-selection-tags');
         if (!tagsContainer) return;
 
@@ -545,7 +675,7 @@ class SolutionSelectorBehavior {
             const tag = document.createElement('div');
             tag.className = 'solution-selector-selection-tag';
             tag.setAttribute('data-solution-id', solution.id);
-            
+
             tag.innerHTML = `
                 <span class="solution-selector-tag-text">${solution.displayName}</span>
                 <button type="button" class="solution-selector-tag-remove" title="Remove">×</button>
@@ -559,19 +689,19 @@ class SolutionSelectorBehavior {
         });
     }
 
-    showMaxSelectionsWarning(instance, maxSelections) {
+    static showMaxSelectionsWarning(instance, maxSelections) {
         // You could implement a toast notification here
         console.warn(`Maximum ${maxSelections} solutions can be selected`);
-        
+
         // Or emit an event for the Extension Host to handle
-        this.emitEvent(instance.id, 'maxSelectionsReached', { 
+        this.emitEvent(instance.id, 'maxSelectionsReached', {
             maxSelections,
-            currentCount: instance.selectedSolutions.length 
+            currentCount: instance.selectedSolutions.length
         });
     }
 
     // Keyboard Navigation
-    handleTriggerKeyDown(componentId, event) {
+    static handleTriggerKeyDown(componentId, event) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -593,7 +723,7 @@ class SolutionSelectorBehavior {
         }
     }
 
-    handleSearchKeyDown(componentId, event) {
+    static handleSearchKeyDown(componentId, event) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -613,7 +743,7 @@ class SolutionSelectorBehavior {
         }
     }
 
-    handleOptionKeyDown(componentId, event) {
+    static handleOptionKeyDown(componentId, event) {
         switch (event.key) {
             case 'Enter':
             case ' ':
@@ -631,7 +761,7 @@ class SolutionSelectorBehavior {
         }
     }
 
-    focusFirstOption(componentId) {
+    static focusFirstOption(componentId) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -642,7 +772,7 @@ class SolutionSelectorBehavior {
         }
     }
 
-    focusLastOption(componentId) {
+    static focusLastOption(componentId) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -653,7 +783,7 @@ class SolutionSelectorBehavior {
         }
     }
 
-    focusNextOption(componentId) {
+    static focusNextOption(componentId) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -665,7 +795,7 @@ class SolutionSelectorBehavior {
         options[nextIndex].focus();
     }
 
-    focusPreviousOption(componentId) {
+    static focusPreviousOption(componentId) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -677,7 +807,7 @@ class SolutionSelectorBehavior {
         options[prevIndex].focus();
     }
 
-    setFocusedOption(componentId, index) {
+    static setFocusedOption(componentId, index) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
@@ -685,7 +815,7 @@ class SolutionSelectorBehavior {
         this.updateFocusedOption(instance);
     }
 
-    updateFocusedOption(instance) {
+    static updateFocusedOption(instance) {
         // Remove previous focus
         instance.element.querySelectorAll('.solution-selector-option--focused')
             .forEach(el => el.classList.remove('solution-selector-option--focused'));
@@ -697,38 +827,38 @@ class SolutionSelectorBehavior {
         }
     }
 
-    selectFocusedOption(componentId) {
+    static selectFocusedOption(componentId) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
         const options = this.getVisibleOptions(instance);
         if (instance.focusedIndex >= 0 && instance.focusedIndex < options.length) {
             const focusedOption = options[instance.focusedIndex];
-            this.handleOptionClick(componentId, { 
-                target: focusedOption, 
-                stopPropagation: () => {} 
+            this.handleOptionClick(componentId, {
+                target: focusedOption,
+                stopPropagation: () => {}
             });
         }
     }
 
-    getVisibleOptions(instance) {
+    static getVisibleOptions(instance) {
         return Array.from(instance.element.querySelectorAll('.solution-selector-option'))
             .filter(option => option.style.display !== 'none');
     }
 
     // Group Management
-    toggleGroup(componentId, event) {
+    static toggleGroup(componentId, event) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
         const header = event.target.closest('.solution-selector-group-header');
         const group = header.closest('.solution-selector-group');
         const optionsContainer = group.querySelector('.solution-selector-group-options');
-        
+
         if (!optionsContainer) return;
 
         const isCollapsed = group.classList.toggle('solution-selector-group--collapsed');
-        
+
         // Update header icon/indicator
         const indicator = header.querySelector('.solution-selector-group-indicator');
         if (indicator) {
@@ -743,7 +873,7 @@ class SolutionSelectorBehavior {
     }
 
     // Outside Click Handler
-    handleOutsideClick(componentId, event) {
+    static handleOutsideClick(componentId, event) {
         const instance = this.instances.get(componentId);
         if (!instance || !instance.isOpen) return;
 
@@ -753,7 +883,7 @@ class SolutionSelectorBehavior {
     }
 
     // Event Emission
-    emitSelectionChange(componentId, selectedSolutions, addedSolutions, removedSolutions) {
+    static emitSelectionChange(componentId, selectedSolutions, addedSolutions, removedSolutions) {
         this.emitEvent(componentId, 'selectionChanged', {
             selectedSolutions,
             addedSolutions,
@@ -762,7 +892,7 @@ class SolutionSelectorBehavior {
         });
     }
 
-    emitEvent(componentId, eventType, data) {
+    static emitEvent(componentId, eventType, data) {
         if (typeof ComponentUtils !== 'undefined' && ComponentUtils.sendMessage) {
             ComponentUtils.sendMessage('component-event', {
                 componentId: componentId,
@@ -781,162 +911,39 @@ class SolutionSelectorBehavior {
     }
 
     // Public API for external updates
-    updateInstance(componentId, config) {
+    static updateInstance(componentId, config) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
         // Update instance configuration
         Object.assign(instance, config);
-        
+
         // Update display
         this.updateDisplay(instance);
     }
 
-    updateDisplay(instance) {
+    static updateDisplay(instance) {
         this.updateTriggerDisplay(instance);
         this.updateSelectionTags(instance);
         this.updateSearchClearButton(instance);
     }
 
     // Load solutions into a specific selector
-    loadSolutions(componentId, solutions) {
+    static loadSolutions(componentId, solutions) {
         console.log(`SolutionSelector: Loading ${solutions?.length || 0} solutions for ${componentId}`);
         const instance = this.instances.get(componentId);
         if (!instance) {
             console.warn(`SolutionSelector: Cannot load solutions for ${componentId} - instance not found`);
             return;
         }
-        
+
         // Update instance with new solutions
         instance.solutions = solutions || [];
         this.updateDisplay(instance);
-        
+
         console.log(`SolutionSelector: Solutions loaded for ${componentId}`);
     }
-
-    // Observer for dynamically added selectors
-    observeNewSelectors() {
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        // Check if the node itself is a selector
-                        if (node.classList && node.classList.contains('solution-selector')) {
-                            this.initializeSelector(node);
-                        }
-                        
-                        // Check for selectors within the added node
-                        const selectors = node.querySelectorAll && node.querySelectorAll('.solution-selector');
-                        if (selectors) {
-                            selectors.forEach(selector => this.initializeSelector(selector));
-                        }
-                    }
-                });
-            });
-        });
-
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-    }
 }
 
-// Initialize the behavior system
-const solutionSelectorBehavior = new SolutionSelectorBehavior();
-
-// Export for potential external access
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = SolutionSelectorBehavior;
-}
-
-// Make available globally and register with ComponentUtils
-if (typeof window !== 'undefined') {
-    window.SolutionSelectorBehavior = SolutionSelectorBehavior;
-    
-    // Add static initialize method for ComponentUtils compatibility
-    SolutionSelectorBehavior.initialize = function(componentId, config, element) {
-        if (!componentId || !element) {
-            console.error('SolutionSelectorBehavior: componentId and element are required');
-            return null;
-        }
-        
-        // Use existing instance behavior to initialize
-        solutionSelectorBehavior.initializeSelector(element);
-        
-        // Return instance info for ComponentUtils compatibility
-        const instance = solutionSelectorBehavior.instances.get(componentId);
-        return instance || {
-            id: componentId,
-            config: { ...config },
-            element: element
-        };
-    };
-    
-    // Add static handleMessage method for ComponentUtils compatibility
-    SolutionSelectorBehavior.handleMessage = function(message) {
-        
-        if (!message || !message.componentId) {
-            console.warn('SolutionSelector handleMessage: Invalid message format', message);
-            return;
-        }
-        
-        // Handle component updates from event bridge
-        if (message.action === 'componentUpdate' && message.data) {
-            console.log('SolutionSelector: Received componentUpdate with data:', {
-                componentId: message.componentId,
-                hasData: !!message.data,
-                hasSolutions: !!message.data.solutions,
-                solutionsCount: message.data.solutions?.length || 0,
-                hasDefaultSolution: message.data.solutions?.find(s => s.uniqueName === 'Default'),
-                sampleSolutions: message.data.solutions?.slice(0, 3)?.map(s => s.displayName) || [],
-                requiresHtmlUpdate: !!message.data.requiresHtmlUpdate,
-                hasHtml: !!message.data.html
-            });
-            
-            // Check if this update requires HTML replacement (for components with dynamic content)
-            if (message.data.requiresHtmlUpdate && message.data.html) {
-                console.log('SolutionSelector: Performing HTML replacement for component');
-                const instance = solutionSelectorBehavior.instances.get(message.componentId);
-                if (instance && instance.element) {
-                    // Replace the entire component HTML
-                    instance.element.outerHTML = message.data.html;
-                    
-                    // Re-find the element (since outerHTML replaced it)
-                    const newElement = document.querySelector(`[data-component-id="${message.componentId}"]`);
-                    if (newElement) {
-                        instance.element = newElement;
-                        // Re-bind events for the new element
-                        solutionSelectorBehavior.bindEvents(instance);
-                        console.log('SolutionSelector: Component HTML updated and events re-bound');
-                    } else {
-                        console.error('SolutionSelector: Could not find component element after HTML update');
-                    }
-                } else {
-                    console.warn('SolutionSelector: Instance not found for HTML update');
-                }
-            } 
-            // Handle standard data-only updates
-            else if (message.data.solutions && message.data.solutions.length > 0) {
-                console.log('SolutionSelector: Calling loadSolutions with', message.data.solutions.length, 'solutions');
-                solutionSelectorBehavior.loadSolutions(message.componentId, message.data.solutions);
-            } else {
-                console.warn('SolutionSelector: No solutions data to load', message.data);
-            }
-        }
-        
-        // Handle direct solutions loaded (legacy)
-        if (message.action === 'solutionsLoaded' && message.data) {
-            console.log('SolutionSelector: Received legacy solutionsLoaded');
-            solutionSelectorBehavior.loadSolutions(message.componentId, message.data);
-        }
-    };
-    
-    // Register with ComponentUtils if available
-    if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
-        window.ComponentUtils.registerBehavior('SolutionSelector', SolutionSelectorBehavior);
-        console.log('SolutionSelectorBehavior registered with ComponentUtils');
-    } else {
-        console.log('SolutionSelectorBehavior loaded, ComponentUtils not available yet');
-    }
-}
+// Register the behavior with ComponentUtils
+SolutionSelectorBehavior.register();

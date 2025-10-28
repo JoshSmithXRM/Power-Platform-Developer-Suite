@@ -3,33 +3,67 @@
  * Handles all user interactions and DOM manipulation in the browser context
  */
 
-class ActionBarBehavior {
-    static instances = new Map();
+class ActionBarBehavior extends BaseBehavior {
+    /**
+     * Get component type identifier
+     */
+    static getComponentType() {
+        return 'ActionBar';
+    }
 
     /**
-     * Initialize an ActionBar component instance
+     * Handle component data updates from Extension Host
+     * REQUIRED by BaseBehavior - called when event bridge sends updated data
      */
-    static initialize(componentId, config, element) {
-        if (!componentId || !element) {
-            console.error('ActionBarBehavior: componentId and element are required');
-            return null;
-        }
+    static onComponentUpdate(instance, data) {
+        if (data && data.actions && Array.isArray(data.actions)) {
+            console.log(`ActionBar: componentUpdate - updating ${data.actions.length} actions`);
 
-        if (this.instances.has(componentId)) {
-            return this.instances.get(componentId);
-        }
+            // Update each action in the DOM
+            data.actions.forEach(action => {
+                const actionElement = instance.element.querySelector(`[data-action-id="${action.id}"]`);
+                if (actionElement) {
+                    // Update disabled state
+                    if (action.disabled !== undefined) {
+                        actionElement.disabled = action.disabled;
+                        actionElement.classList.toggle('action-bar-button--disabled', action.disabled);
+                    }
 
-        const instance = {
+                    // Update visible state
+                    if (action.visible !== undefined) {
+                        actionElement.style.display = action.visible ? '' : 'none';
+                    }
+
+                    // Update label if provided
+                    if (action.label) {
+                        const labelElement = actionElement.querySelector('.action-label');
+                        if (labelElement) {
+                            labelElement.textContent = action.label;
+                        }
+                    }
+                }
+            });
+
+            // Update instance state
+            instance.actions = data.actions;
+        }
+    }
+
+    /**
+     * Create the instance object structure
+     */
+    static createInstance(componentId, config, element) {
+        return {
             id: componentId,
             config: { ...config },
             element: element,
-            
+
             // DOM elements
             actionsContainer: null,
             loadingContainer: null,
             errorContainer: null,
             overflowContainer: null,
-            
+
             // State
             actions: [],
             groups: [],
@@ -37,55 +71,31 @@ class ActionBarBehavior {
             disabled: false,
             collapsed: false,
             overflowActions: [],
-            
+
             // Responsive state
             isResponsive: false,
             currentBreakpoint: null,
             resizeObserver: null,
-            
+
             // Dropdown state
             openDropdowns: new Set(),
-            
+
             // Event handlers
             boundHandlers: {}
         };
-
-        try {
-            // Find DOM elements
-            this.findDOMElements(instance);
-            
-            // Setup event listeners
-            this.setupEventListeners(instance);
-            
-            // Initialize responsive behavior
-            this.initializeResponsive(instance);
-            
-            // Initialize state
-            this.initializeState(instance);
-            
-            // Register instance
-            this.instances.set(componentId, instance);
-            
-            console.log(`ActionBarBehavior: Initialized ${componentId}`);
-            return instance;
-            
-        } catch (error) {
-            console.error(`ActionBarBehavior: Failed to initialize ${componentId}:`, error);
-            return null;
-        }
     }
 
     /**
      * Find and cache DOM elements
      */
     static findDOMElements(instance) {
-        const { element, id } = instance;
-        
+        const { element } = instance;
+
         instance.actionsContainer = element.querySelector('[data-component-element="actions"]');
         instance.loadingContainer = element.querySelector('[data-component-element="loading"]');
         instance.errorContainer = element.querySelector('[data-component-element="error"]');
         instance.overflowContainer = element.querySelector('[data-component-element="overflow"]');
-        
+
         if (!instance.actionsContainer) {
             throw new Error('Actions container element not found');
         }
@@ -96,30 +106,57 @@ class ActionBarBehavior {
      */
     static setupEventListeners(instance) {
         const { element, actionsContainer } = instance;
-        
+
         // Action button clicks
         instance.boundHandlers.actionClick = (e) => this.handleActionClick(instance, e);
         actionsContainer.addEventListener('click', instance.boundHandlers.actionClick);
-        
+
         // Dropdown toggle clicks
         instance.boundHandlers.dropdownToggle = (e) => this.handleDropdownToggle(instance, e);
         element.addEventListener('click', instance.boundHandlers.dropdownToggle);
-        
+
         // Keyboard navigation
         instance.boundHandlers.keyDown = (e) => this.handleKeyDown(instance, e);
         element.addEventListener('keydown', instance.boundHandlers.keyDown);
-        
+
         // Close dropdowns on outside click
         instance.boundHandlers.documentClick = (e) => this.handleDocumentClick(instance, e);
         document.addEventListener('click', instance.boundHandlers.documentClick);
-        
+
         // Context menu (if enabled)
         if (instance.config.contextMenu) {
             instance.boundHandlers.contextMenu = (e) => this.handleContextMenu(instance, e);
             element.addEventListener('contextmenu', instance.boundHandlers.contextMenu);
         }
-        
+
         console.log(`ActionBarBehavior: Event listeners setup for ${instance.id}`);
+    }
+
+    /**
+     * Initialize component state from DOM
+     */
+    static initializeState(instance) {
+        const { actionsContainer } = instance;
+
+        // Parse actions from DOM elements
+        instance.actions = this.parseActionsFromDOM(actionsContainer);
+
+        // Initialize groups if present
+        instance.groups = this.parseGroupsFromDOM(actionsContainer);
+
+        // Initialize responsive behavior
+        this.initializeResponsive(instance);
+
+        // Check initial responsive state
+        if (instance.isResponsive) {
+            this.checkResponsiveState(instance);
+        }
+
+        console.log(`ActionBarBehavior: State initialized for ${instance.id}`, {
+            actionCount: instance.actions.length,
+            groupCount: instance.groups.length,
+            isResponsive: instance.isResponsive
+        });
     }
 
     /**
@@ -138,7 +175,7 @@ class ActionBarBehavior {
             instance.resizeObserver = new ResizeObserver(entries => {
                 this.handleResize(instance, entries[0]);
             });
-            
+
             instance.resizeObserver.observe(instance.element);
         } else {
             // Fallback to window resize event
@@ -148,27 +185,29 @@ class ActionBarBehavior {
     }
 
     /**
-     * Initialize component state from DOM
+     * Handle custom actions beyond componentUpdate
      */
-    static initializeState(instance) {
-        const { actionsContainer } = instance;
-        
-        // Parse actions from DOM elements
-        instance.actions = this.parseActionsFromDOM(actionsContainer);
-        
-        // Initialize groups if present
-        instance.groups = this.parseGroupsFromDOM(actionsContainer);
-        
-        // Check initial responsive state
-        if (instance.isResponsive) {
-            this.checkResponsiveState(instance);
+    static handleCustomAction(instance, message) {
+        switch (message.action) {
+            case 'actionsUpdated':
+                this.updateActions(instance.id, message.data.actions);
+                break;
+
+            case 'actionUpdated':
+                this.updateSingleAction(instance.id, message.data.actionId, message.data.updates);
+                break;
+
+            case 'loadingStateChanged':
+                this.setActionLoading(instance, message.data.actionId, message.data.loading);
+                break;
+
+            case 'overflowChanged':
+                instance.overflowActions = message.data.overflowActions || [];
+                break;
+
+            default:
+                console.warn(`ActionBarBehavior: Unknown message action: ${message.action}`);
         }
-        
-        console.log(`ActionBarBehavior: State initialized for ${instance.id}`, {
-            actionCount: instance.actions.length,
-            groupCount: instance.groups.length,
-            isResponsive: instance.isResponsive
-        });
     }
 
     /**
@@ -182,7 +221,7 @@ class ActionBarBehavior {
 
         const actionId = actionElement.getAttribute('data-action-id');
         const actionType = actionElement.getAttribute('data-action-type') || 'button';
-        
+
         // Don't handle dropdown toggles here (handled separately)
         if (actionType === 'dropdown' && actionElement.classList.contains('action-bar-dropdown-toggle')) {
             return;
@@ -196,7 +235,7 @@ class ActionBarBehavior {
         }
 
         console.log(`ActionBarBehavior: Action clicked: ${actionId}`);
-        
+
         // Find the action configuration
         const action = instance.actions.find(a => a.id === actionId);
         if (!action) {
@@ -249,13 +288,13 @@ class ActionBarBehavior {
         const actionId = toggleElement.getAttribute('data-action-id');
         const dropdown = toggleElement.closest('.action-bar-dropdown');
         const menu = dropdown.querySelector('.action-bar-dropdown-menu');
-        
+
         if (!menu) {
             return;
         }
 
         const isOpen = instance.openDropdowns.has(actionId);
-        
+
         if (isOpen) {
             this.closeDropdown(instance, actionId);
         } else {
@@ -272,7 +311,7 @@ class ActionBarBehavior {
         const dropdown = instance.element.querySelector(`[data-action-id="${actionId}"].action-bar-dropdown`);
         const toggle = dropdown?.querySelector('.action-bar-dropdown-toggle');
         const menu = dropdown?.querySelector('.action-bar-dropdown-menu');
-        
+
         if (!dropdown || !toggle || !menu) {
             return;
         }
@@ -281,20 +320,20 @@ class ActionBarBehavior {
         dropdown.classList.add('action-bar-dropdown--open');
         toggle.setAttribute('aria-expanded', 'true');
         menu.style.display = 'block';
-        
+
         // Position the menu
         this.positionDropdownMenu(menu);
-        
+
         // Track open state
         instance.openDropdowns.add(actionId);
-        
+
         // Send message to Extension Host
         ComponentUtils.sendMessage('dropdown-opened', {
             componentId: instance.id,
             actionId: actionId,
             timestamp: Date.now()
         });
-        
+
         console.log(`ActionBarBehavior: Dropdown opened: ${actionId}`);
     }
 
@@ -305,7 +344,7 @@ class ActionBarBehavior {
         const dropdown = instance.element.querySelector(`[data-action-id="${actionId}"].action-bar-dropdown`);
         const toggle = dropdown?.querySelector('.action-bar-dropdown-toggle');
         const menu = dropdown?.querySelector('.action-bar-dropdown-menu');
-        
+
         if (!dropdown || !toggle || !menu) {
             return;
         }
@@ -314,17 +353,17 @@ class ActionBarBehavior {
         dropdown.classList.remove('action-bar-dropdown--open');
         toggle.setAttribute('aria-expanded', 'false');
         menu.style.display = 'none';
-        
+
         // Remove from tracking
         instance.openDropdowns.delete(actionId);
-        
+
         // Send message to Extension Host
         ComponentUtils.sendMessage('dropdown-closed', {
             componentId: instance.id,
             actionId: actionId,
             timestamp: Date.now()
         });
-        
+
         console.log(`ActionBarBehavior: Dropdown closed: ${actionId}`);
     }
 
@@ -344,12 +383,12 @@ class ActionBarBehavior {
     static handleDropdownItemClick(instance, actionId, itemId, event) {
         event.preventDefault();
         event.stopPropagation();
-        
+
         console.log(`ActionBarBehavior: Dropdown item clicked: ${actionId}/${itemId}`);
-        
+
         // Close the dropdown
         this.closeDropdown(instance, actionId);
-        
+
         // Send message to Extension Host
         ComponentUtils.sendMessage('dropdown-item-clicked', {
             componentId: instance.id,
@@ -364,12 +403,12 @@ class ActionBarBehavior {
      */
     static handleKeyDown(instance, event) {
         const activeElement = document.activeElement;
-        
+
         switch (event.key) {
             case 'Escape':
                 this.closeAllDropdowns(instance);
                 break;
-                
+
             case 'Enter':
             case ' ':
                 if (activeElement && activeElement.closest('.action-bar-button')) {
@@ -377,7 +416,7 @@ class ActionBarBehavior {
                     activeElement.click();
                 }
                 break;
-                
+
             case 'ArrowDown':
                 if (activeElement && activeElement.classList.contains('action-bar-dropdown-toggle')) {
                     event.preventDefault();
@@ -386,7 +425,7 @@ class ActionBarBehavior {
                     this.focusFirstMenuItem(instance, actionId);
                 }
                 break;
-                
+
             case 'ArrowRight':
             case 'ArrowLeft':
                 this.handleArrowNavigation(instance, event);
@@ -400,22 +439,22 @@ class ActionBarBehavior {
     static handleArrowNavigation(instance, event) {
         const activeElement = document.activeElement;
         const actionButtons = Array.from(instance.actionsContainer.querySelectorAll('.action-bar-button:not([disabled])'));
-        
+
         if (!activeElement || !actionButtons.includes(activeElement)) {
             return;
         }
-        
+
         event.preventDefault();
-        
+
         const currentIndex = actionButtons.indexOf(activeElement);
         let nextIndex;
-        
+
         if (event.key === 'ArrowRight') {
             nextIndex = (currentIndex + 1) % actionButtons.length;
         } else {
             nextIndex = (currentIndex - 1 + actionButtons.length) % actionButtons.length;
         }
-        
+
         actionButtons[nextIndex].focus();
     }
 
@@ -433,10 +472,10 @@ class ActionBarBehavior {
      */
     static handleContextMenu(instance, event) {
         event.preventDefault();
-        
+
         // Create context menu with all visible actions
         const visibleActions = instance.actions.filter(action => action.visible !== false);
-        
+
         ComponentUtils.sendMessage('context-menu-requested', {
             componentId: instance.id,
             actions: visibleActions,
@@ -475,7 +514,7 @@ class ActionBarBehavior {
     static checkResponsiveState(instance, containerWidth) {
         const width = containerWidth || instance.element.offsetWidth;
         const breakpoint = instance.currentBreakpoint;
-        
+
         if (width < breakpoint && !instance.collapsed) {
             this.handleOverflow(instance);
         } else if (width >= breakpoint && instance.collapsed) {
@@ -490,10 +529,10 @@ class ActionBarBehavior {
         const allActions = [...instance.actions];
         const visibleActions = allActions.slice(0, Math.floor(allActions.length / 2));
         const overflowActions = allActions.slice(visibleActions.length);
-        
+
         instance.overflowActions = overflowActions;
         instance.collapsed = true;
-        
+
         // Send message to Extension Host
         ComponentUtils.sendMessage('overflow-changed', {
             componentId: instance.id,
@@ -509,7 +548,7 @@ class ActionBarBehavior {
     static handleNoOverflow(instance) {
         instance.overflowActions = [];
         instance.collapsed = false;
-        
+
         // Send message to Extension Host
         ComponentUtils.sendMessage('overflow-changed', {
             componentId: instance.id,
@@ -531,7 +570,7 @@ class ActionBarBehavior {
         if (loading) {
             actionElement.classList.add('action-bar-button--loading');
             actionElement.disabled = true;
-            
+
             // Store and replace icon with spinner
             const iconElement = actionElement.querySelector('.action-icon');
             if (iconElement) {
@@ -542,7 +581,7 @@ class ActionBarBehavior {
         } else {
             actionElement.classList.remove('action-bar-button--loading');
             actionElement.disabled = false;
-            
+
             // Restore original icon if it was stored
             const iconElement = actionElement.querySelector('.action-icon');
             if (iconElement && actionElement.dataset.originalIcon) {
@@ -563,130 +602,11 @@ class ActionBarBehavior {
         }
 
         console.log(`ActionBarBehavior: Updating ${actions.length} actions for ${componentId}`);
-        
+
         // Store actions in instance
         instance.actions = actions || [];
-        
-        // Regenerate DOM would typically be handled by Extension Host
-        // This method would be used for state updates
-        
+
         console.log(`ActionBarBehavior: Actions updated for ${componentId}`);
-    }
-
-    /**
-     * Position dropdown menu
-     */
-    static positionDropdownMenu(menuElement) {
-        // Reset position
-        menuElement.style.left = '';
-        menuElement.style.right = '';
-        menuElement.style.top = '';
-        
-        const rect = menuElement.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        
-        // Check if menu overflows viewport horizontally
-        if (rect.right > viewportWidth) {
-            menuElement.style.right = '0';
-            menuElement.style.left = 'auto';
-        }
-        
-        // Check if menu overflows viewport vertically
-        if (rect.bottom > viewportHeight) {
-            menuElement.style.top = 'auto';
-            menuElement.style.bottom = '100%';
-        }
-    }
-
-    /**
-     * Focus first menu item in dropdown
-     */
-    static focusFirstMenuItem(instance, actionId) {
-        const dropdown = instance.element.querySelector(`[data-action-id="${actionId}"].action-bar-dropdown`);
-        const firstItem = dropdown?.querySelector('.action-bar-dropdown-item:not([disabled])');
-        
-        if (firstItem) {
-            firstItem.focus();
-        }
-    }
-
-    /**
-     * Parse actions from DOM elements
-     */
-    static parseActionsFromDOM(container) {
-        const actions = [];
-        const actionElements = container.querySelectorAll('[data-action-id]');
-        
-        actionElements.forEach(element => {
-            const actionId = element.getAttribute('data-action-id');
-            const actionType = element.getAttribute('data-action-type') || 'button';
-            const label = element.querySelector('.action-label')?.textContent || '';
-            
-            actions.push({
-                id: actionId,
-                label: label,
-                type: actionType,
-                disabled: element.disabled || element.classList.contains('action-bar-button--disabled'),
-                visible: element.style.display !== 'none'
-            });
-        });
-        
-        return actions;
-    }
-
-    /**
-     * Parse groups from DOM elements
-     */
-    static parseGroupsFromDOM(container) {
-        const groups = [];
-        const groupElements = container.querySelectorAll('.action-bar-group');
-        
-        groupElements.forEach(element => {
-            const groupId = element.getAttribute('data-group-id');
-            const label = element.querySelector('.action-bar-group-label')?.textContent || '';
-            const actionElements = element.querySelectorAll('[data-action-id]');
-            const actionIds = Array.from(actionElements).map(el => el.getAttribute('data-action-id'));
-            
-            groups.push({
-                id: groupId,
-                label: label,
-                actions: actionIds,
-                visible: element.style.display !== 'none',
-                collapsible: element.getAttribute('data-collapsible') === 'true',
-                collapsed: element.getAttribute('data-collapsed') === 'true'
-            });
-        });
-        
-        return groups;
-    }
-
-    /**
-     * Handle messages from Extension Host
-     */
-    static handleMessage(instance, message) {
-        const { action, data } = message;
-        
-        switch (action) {
-            case 'actionsUpdated':
-                this.updateActions(instance.id, data.actions);
-                break;
-                
-            case 'actionUpdated':
-                this.updateSingleAction(instance.id, data.actionId, data.updates);
-                break;
-                
-            case 'loadingStateChanged':
-                this.setActionLoading(instance, data.actionId, data.loading);
-                break;
-                
-            case 'overflowChanged':
-                instance.overflowActions = data.overflowActions || [];
-                break;
-                
-            default:
-                console.warn(`ActionBarBehavior: Unknown message action: ${action}`);
-        }
     }
 
     /**
@@ -710,7 +630,7 @@ class ActionBarBehavior {
                 actionElement.disabled = updates.disabled;
                 actionElement.classList.toggle('action-bar-button--disabled', updates.disabled);
             }
-            
+
             if (updates.visible !== undefined) {
                 actionElement.style.display = updates.visible ? '' : 'none';
             }
@@ -718,34 +638,97 @@ class ActionBarBehavior {
     }
 
     /**
-     * Get instance state
+     * Position dropdown menu
      */
-    static getState(componentId) {
-        const instance = this.instances.get(componentId);
-        if (!instance) {
-            return null;
+    static positionDropdownMenu(menuElement) {
+        // Reset position
+        menuElement.style.left = '';
+        menuElement.style.right = '';
+        menuElement.style.top = '';
+
+        const rect = menuElement.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        // Check if menu overflows viewport horizontally
+        if (rect.right > viewportWidth) {
+            menuElement.style.right = '0';
+            menuElement.style.left = 'auto';
         }
 
-        return {
-            actions: instance.actions,
-            groups: instance.groups,
-            loading: instance.loading,
-            disabled: instance.disabled,
-            collapsed: instance.collapsed,
-            overflowActions: instance.overflowActions,
-            openDropdowns: Array.from(instance.openDropdowns)
-        };
+        // Check if menu overflows viewport vertically
+        if (rect.bottom > viewportHeight) {
+            menuElement.style.top = 'auto';
+            menuElement.style.bottom = '100%';
+        }
     }
 
     /**
-     * Dispose of component instance
+     * Focus first menu item in dropdown
      */
-    static dispose(componentId) {
-        const instance = this.instances.get(componentId);
-        if (!instance) {
-            return;
-        }
+    static focusFirstMenuItem(instance, actionId) {
+        const dropdown = instance.element.querySelector(`[data-action-id="${actionId}"].action-bar-dropdown`);
+        const firstItem = dropdown?.querySelector('.action-bar-dropdown-item:not([disabled])');
 
+        if (firstItem) {
+            firstItem.focus();
+        }
+    }
+
+    /**
+     * Parse actions from DOM elements
+     */
+    static parseActionsFromDOM(container) {
+        const actions = [];
+        const actionElements = container.querySelectorAll('[data-action-id]');
+
+        actionElements.forEach(element => {
+            const actionId = element.getAttribute('data-action-id');
+            const actionType = element.getAttribute('data-action-type') || 'button';
+            const label = element.querySelector('.action-label')?.textContent || '';
+
+            actions.push({
+                id: actionId,
+                label: label,
+                type: actionType,
+                disabled: element.disabled || element.classList.contains('action-bar-button--disabled'),
+                visible: element.style.display !== 'none'
+            });
+        });
+
+        return actions;
+    }
+
+    /**
+     * Parse groups from DOM elements
+     */
+    static parseGroupsFromDOM(container) {
+        const groups = [];
+        const groupElements = container.querySelectorAll('.action-bar-group');
+
+        groupElements.forEach(element => {
+            const groupId = element.getAttribute('data-group-id');
+            const label = element.querySelector('.action-bar-group-label')?.textContent || '';
+            const actionElements = element.querySelectorAll('[data-action-id]');
+            const actionIds = Array.from(actionElements).map(el => el.getAttribute('data-action-id'));
+
+            groups.push({
+                id: groupId,
+                label: label,
+                actions: actionIds,
+                visible: element.style.display !== 'none',
+                collapsible: element.getAttribute('data-collapsible') === 'true',
+                collapsed: element.getAttribute('data-collapsed') === 'true'
+            });
+        });
+
+        return groups;
+    }
+
+    /**
+     * Cleanup instance resources
+     */
+    static cleanupInstance(instance) {
         // Remove event listeners
         Object.entries(instance.boundHandlers).forEach(([event, handler]) => {
             if (event === 'documentClick') {
@@ -767,108 +750,8 @@ class ActionBarBehavior {
 
         // Close any open dropdowns
         this.closeAllDropdowns(instance);
-
-        // Clear references
-        this.instances.delete(componentId);
-        
-        console.log(`ActionBarBehavior: Disposed ${componentId}`);
-    }
-
-    /**
-     * Get debug information
-     */
-    static getDebugInfo(componentId) {
-        const instance = this.instances.get(componentId);
-        if (!instance) {
-            return null;
-        }
-
-        return {
-            id: instance.id,
-            config: instance.config,
-            state: this.getState(componentId),
-            hasActionsContainer: !!instance.actionsContainer,
-            isResponsive: instance.isResponsive,
-            currentBreakpoint: instance.currentBreakpoint,
-            openDropdowns: Array.from(instance.openDropdowns),
-            eventListeners: Object.keys(instance.boundHandlers)
-        };
     }
 }
 
-// Auto-register with ComponentUtils
-if (typeof ComponentUtils !== 'undefined') {
-    ComponentUtils.registerComponent = ComponentUtils.registerComponent || function() {};
-}
-
-// Make available globally
-window.ActionBarBehavior = ActionBarBehavior;
-
-// Static methods are already on the class, no need to reassign
-
-// Add static handleMessage method for ComponentUtils compatibility
-ActionBarBehavior.handleMessage = function(message) {
-    console.log('DEBUG: ActionBarBehavior.handleMessage called with:', message);
-
-    if (!message || !message.componentId) {
-        console.warn('ActionBar handleMessage: Invalid message format', message);
-        return;
-    }
-
-    // Find the instance for this componentId
-    const instance = ActionBarBehavior.instances.get(message.componentId);
-    if (!instance) {
-        console.warn(`ActionBar instance not found: ${message.componentId}`);
-        return;
-    }
-
-    // Route message to instance method (find the actual instance method name)
-    // For now, just handle basic action updates
-    if (message.action === 'componentUpdate' && message.data) {
-        console.log(`ActionBar: Handling component update for ${message.componentId}`, message.data);
-
-        // If data contains actions array, update all actions
-        if (message.data.actions && Array.isArray(message.data.actions)) {
-            console.log(`ActionBar: Updating ${message.data.actions.length} actions`);
-
-            // Update each action in the DOM
-            message.data.actions.forEach(action => {
-                const actionElement = instance.element.querySelector(`[data-action-id="${action.id}"]`);
-                if (actionElement) {
-                    // Update disabled state
-                    if (action.disabled !== undefined) {
-                        actionElement.disabled = action.disabled;
-                        actionElement.classList.toggle('action-bar-button--disabled', action.disabled);
-                        console.log(`ActionBar: Updated action ${action.id} disabled=${action.disabled}`);
-                    }
-
-                    // Update visible state
-                    if (action.visible !== undefined) {
-                        actionElement.style.display = action.visible ? '' : 'none';
-                    }
-
-                    // Update label if provided
-                    if (action.label) {
-                        const labelElement = actionElement.querySelector('.action-label');
-                        if (labelElement) {
-                            labelElement.textContent = action.label;
-                        }
-                    }
-                }
-            });
-
-            // Update instance state
-            instance.actions = message.data.actions;
-        }
-    }
-};
-
-// Already made available globally above at line 805
-
-// Register with ComponentUtils if available
-if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
-    window.ComponentUtils.registerBehavior('ActionBar', ActionBarBehavior);
-    console.log('ActionBarBehavior registered with ComponentUtils');
-} else {
-    console.log('ActionBarBehavior loaded, ComponentUtils not available yet');
-}
+// Register behavior
+ActionBarBehavior.register();

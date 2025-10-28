@@ -2,99 +2,90 @@
  * DataTableBehavior.js - Webview-side behavior for DataTable components
  * Handles user interactions, DOM manipulation, and communication with Extension Host
  * Supports multi-instance tables with independent event handling
- * 
- * ARCHITECTURE_COMPLIANCE: Follows ComponentUtils registry pattern with required static methods
+ *
+ * ARCHITECTURE_COMPLIANCE: Extends BaseBehavior for enforced componentUpdate pattern
  */
 
-class DataTableBehavior {
-    static instances = new Map(); // Track component instances
-    
-    // ✅ REQUIRED: Static initialize method for ComponentUtils compatibility
-    static initialize(componentId, config, element) {
-        if (!componentId || !element) {
-            console.error('DataTableBehavior: componentId and element are required');
+class DataTableBehavior extends BaseBehavior {
+    /**
+     * Get component type identifier
+     */
+    static getComponentType() {
+        return 'DataTable';
+    }
+
+    /**
+     * Handle component data updates from Extension Host
+     * REQUIRED by BaseBehavior - called when event bridge sends updated data
+     */
+    static onComponentUpdate(instance, data) {
+        this.handleComponentUpdate(instance, data);
+    }
+
+    /**
+     * Create instance (returns plain object, not DataTableBehavior instance)
+     */
+    static createInstance(componentId, config, element) {
+        const table = element || document.getElementById(componentId);
+
+        if (!table) {
+            console.error(`DataTable with ID '${componentId}' not found`);
             return null;
         }
-        
-        // Prevent double initialization
-        if (this.instances.has(componentId)) {
-            console.warn(`DataTableBehavior: ${componentId} already initialized`);
-            return this.instances.get(componentId);
-        }
-        
-        // Create and store instance
-        const instance = new DataTableBehavior(componentId, element, config);
-        this.instances.set(componentId, instance);
-        console.log(`DataTableBehavior: Initialized ${componentId}`);
-        return instance;
-    }
-    
-    // ✅ REQUIRED: Static handleMessage method for Extension Host communication
-    static handleMessage(message) {
-        console.log('DEBUG: DataTableBehavior.handleMessage called with:', message);
-        
-        if (!message || !message.componentId) {
-            console.warn('DataTableBehavior handleMessage: Invalid message format', message);
-            return;
-        }
-        
-        const instance = this.instances.get(message.componentId);
-        if (!instance) {
-            console.warn(`DataTableBehavior: No instance found for ${message.componentId}`);
-            return;
-        }
-        
-        // Route to instance method
-        instance.handleMessage(message);
-    }
-    
-    constructor(tableId, element, config = {}) {
-        this.tableId = tableId;
-        this.table = element || document.getElementById(tableId);
-        this.container = this.table?.closest('.data-table');
-        this.config = config;
-        this.initialized = false;
-        this.sortHandlers = new Map();
-        this.filterHandlers = new Map();
-        this.actionHandlers = new Map();
-        
-        if (!this.table) {
-            console.error(`DataTable with ID '${tableId}' not found`);
-            return;
-        }
-        
-        this.init();
-    }
-    
-    /**
-     * Initialize table behavior
-     */
-    init() {
-        if (this.initialized) return;
-        
-        try {
-            this.setupSorting();
-            this.setupSelection();
-            this.setupRowActions();
-            this.setupContextMenu();
-            this.setupPagination();
-            this.setupSearch();
-            this.setupColumnResize();
-            this.setupRowExpansion();
-            this.setupExport();
 
-            this.initialized = true;
-            this.notifyReady();
+        return {
+            id: componentId,
+            tableId: componentId,
+            table: table,
+            container: table.closest('.data-table'),
+            config: config || {},
+            initialized: false,
+            sortHandlers: new Map(),
+            filterHandlers: new Map(),
+            actionHandlers: new Map(),
+            contextMenu: null,
+            currentContextRow: null,
+            activeFilters: new Map(),
+            activeFilterDropdown: null
+        };
+    }
+
+    /**
+     * Setup event listeners - override from BaseBehavior
+     */
+    static setupEventListeners(instance) {
+        if (instance.initialized) return;
+
+        try {
+            this.setupSorting(instance);
+            this.setupSelection(instance);
+            this.setupRowActions(instance);
+            this.setupContextMenu(instance);
+            this.setupPagination(instance);
+            this.setupSearch(instance);
+            this.setupColumnResize(instance);
+            this.setupRowExpansion(instance);
+            this.setupExport(instance);
+
+            instance.initialized = true;
+            this.notifyReady(instance);
         } catch (error) {
-            console.error(`Failed to initialize DataTable '${this.tableId}':`, error);
+            console.error(`Failed to initialize DataTable '${instance.tableId}':`, error);
         }
     }
-    
+
+    /**
+     * Handle custom actions beyond componentUpdate
+     */
+    static handleCustomAction(instance, message) {
+        this.handleCustomMessage(instance, message);
+    }
+
     /**
      * Setup column sorting
      */
-    setupSorting() {
-        const headers = this.table.querySelectorAll('th[data-column-id]');
+    static setupSorting(instance) {
+        const headers = instance.table.querySelectorAll('th[data-column-id]');
 
         headers.forEach(header => {
             const columnId = header.dataset.columnId;
@@ -125,11 +116,11 @@ class DataTableBehavior {
                         newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
                     }
 
-                    this.sort(columnId, newDirection, event.ctrlKey || event.metaKey);
+                    this.sort(instance, columnId, newDirection, event.ctrlKey || event.metaKey);
                 };
 
                 header.addEventListener('click', sortHandler);
-                this.sortHandlers.set(columnId, sortHandler);
+                instance.sortHandlers.set(columnId, sortHandler);
             }
         });
     }
@@ -137,92 +128,92 @@ class DataTableBehavior {
     /**
      * Setup row selection
      */
-    setupSelection() {
+    static setupSelection(instance) {
         // Header checkbox for select all
-        const headerCheckbox = this.table.querySelector('th .select-all-checkbox');
+        const headerCheckbox = instance.table.querySelector('th .select-all-checkbox');
         if (headerCheckbox) {
             headerCheckbox.addEventListener('change', () => {
-                this.selectAll(headerCheckbox.checked);
+                this.selectAll(instance, headerCheckbox.checked);
             });
         }
-        
+
         // Row checkboxes
-        const rowCheckboxes = this.table.querySelectorAll('tbody .row-checkbox');
+        const rowCheckboxes = instance.table.querySelectorAll('tbody .row-checkbox');
         rowCheckboxes.forEach(checkbox => {
             const rowId = checkbox.dataset.rowId;
             if (!rowId) return;
-            
+
             checkbox.addEventListener('change', () => {
-                this.selectRow(rowId, checkbox.checked);
+                this.selectRow(instance, rowId, checkbox.checked);
             });
         });
-        
+
         // Row click selection (if enabled)
-        const selectableRows = this.table.querySelectorAll('tbody tr[data-selectable="true"]');
+        const selectableRows = instance.table.querySelectorAll('tbody tr[data-selectable="true"]');
         selectableRows.forEach(row => {
             const rowId = row.dataset.rowId;
             if (!rowId) return;
-            
+
             row.addEventListener('click', (event) => {
                 // Don't trigger on checkbox, button, or link clicks
                 if (event.target.closest('input, button, a')) return;
-                
+
                 const checkbox = row.querySelector('.row-checkbox');
                 if (checkbox) {
                     checkbox.checked = !checkbox.checked;
-                    this.selectRow(rowId, checkbox.checked);
+                    this.selectRow(instance, rowId, checkbox.checked);
                 }
             });
         });
     }
-    
+
     /**
      * Setup row actions
      */
-    setupRowActions() {
-        const actionButtons = this.table.querySelectorAll('.action-button');
-        
+    static setupRowActions(instance) {
+        const actionButtons = instance.table.querySelectorAll('.action-button');
+
         actionButtons.forEach(button => {
             const actionId = button.dataset.actionId;
             const rowId = button.dataset.rowId;
             if (!actionId || !rowId) return;
-            
+
             const handler = (event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                
+
                 // Check if action requires confirmation
                 const confirmMessage = button.dataset.confirmMessage;
                 if (confirmMessage && !confirm(confirmMessage)) {
                     return;
                 }
-                
-                this.executeAction(actionId, rowId);
+
+                this.executeAction(instance, actionId, rowId);
             };
-            
+
             button.addEventListener('click', handler);
-            this.actionHandlers.set(`${actionId}-${rowId}`, handler);
+            instance.actionHandlers.set(`${actionId}-${rowId}`, handler);
         });
-        
+
         // Setup action dropdown menus
-        const actionDropdowns = this.table.querySelectorAll('.actions-dropdown');
+        const actionDropdowns = instance.table.querySelectorAll('.actions-dropdown');
         actionDropdowns.forEach(dropdown => {
             const trigger = dropdown.querySelector('.dropdown-trigger');
             const menu = dropdown.querySelector('.dropdown-menu');
-            
+
             if (!trigger || !menu) return;
-            
+
             trigger.addEventListener('click', (event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                
+
                 // Close other open dropdowns
-                this.closeAllDropdowns();
-                
+                this.closeAllDropdowns(instance);
+
                 // Toggle this dropdown
                 dropdown.classList.toggle('open');
             });
-            
+
             // Close dropdown when clicking outside
             document.addEventListener('click', (event) => {
                 if (!dropdown.contains(event.target)) {
@@ -231,25 +222,25 @@ class DataTableBehavior {
             });
         });
     }
-    
+
     /**
      * Setup context menu
      */
-    setupContextMenu() {
-        const contextMenu = this.container?.querySelector('.data-table-context-menu');
+    static setupContextMenu(instance) {
+        const contextMenu = instance.container?.querySelector('.data-table-context-menu');
         if (!contextMenu) return;
 
         // Store reference
-        this.contextMenu = contextMenu;
-        this.currentContextRow = null;
+        instance.contextMenu = contextMenu;
+        instance.currentContextRow = null;
 
         // Setup right-click listeners on table rows
-        this.table.addEventListener('contextmenu', (event) => {
+        instance.table.addEventListener('contextmenu', (event) => {
             const row = event.target.closest('tbody tr[data-row-id]');
             if (!row) return;
 
             event.preventDefault();
-            this.showContextMenu(event, row);
+            this.showContextMenu(instance, event, row);
         });
 
         // Setup click listeners on context menu items
@@ -258,58 +249,58 @@ class DataTableBehavior {
             item.addEventListener('click', (event) => {
                 event.stopPropagation();
                 const menuId = item.dataset.menuId;
-                this.handleContextMenuItemClick(menuId);
-                this.hideContextMenu();
+                this.handleContextMenuItemClick(instance, menuId);
+                this.hideContextMenu(instance);
             });
         });
 
         // Close context menu when clicking outside
         document.addEventListener('click', (event) => {
             if (!contextMenu.contains(event.target) && contextMenu.style.display !== 'none') {
-                this.hideContextMenu();
+                this.hideContextMenu(instance);
             }
         });
 
         // Close context menu on scroll
-        this.table.addEventListener('scroll', () => {
+        instance.table.addEventListener('scroll', () => {
             if (contextMenu.style.display !== 'none') {
-                this.hideContextMenu();
+                this.hideContextMenu(instance);
             }
         });
     }
-    
+
     /**
      * Setup pagination controls
      */
-    setupPagination() {
-        const pagination = this.container?.querySelector('.data-table-pagination');
+    static setupPagination(instance) {
+        const pagination = instance.container?.querySelector('.data-table-pagination');
         if (!pagination) return;
-        
+
         // Page size selector
         const pageSizeSelect = pagination.querySelector('.page-size-select');
         if (pageSizeSelect) {
             pageSizeSelect.addEventListener('change', () => {
-                this.setPageSize(parseInt(pageSizeSelect.value));
+                this.setPageSize(instance, parseInt(pageSizeSelect.value));
             });
         }
-        
+
         // Page buttons
         const pageButtons = pagination.querySelectorAll('.page-button');
         pageButtons.forEach(button => {
             const page = button.dataset.page;
             if (!page) return;
-            
+
             button.addEventListener('click', () => {
                 if (page === 'prev') {
-                    this.previousPage();
+                    this.previousPage(instance);
                 } else if (page === 'next') {
-                    this.nextPage();
+                    this.nextPage(instance);
                 } else {
-                    this.setPage(parseInt(page));
+                    this.setPage(instance, parseInt(page));
                 }
             });
         });
-        
+
         // Direct page input
         const pageInput = pagination.querySelector('.page-input');
         if (pageInput) {
@@ -317,25 +308,25 @@ class DataTableBehavior {
                 if (event.key === 'Enter') {
                     const page = parseInt(pageInput.value);
                     if (page && page > 0) {
-                        this.setPage(page);
+                        this.setPage(instance, page);
                     }
                 }
             });
         }
     }
-    
+
     /**
      * Setup search functionality
      */
-    setupSearch() {
-        const searchInput = this.container?.querySelector('.data-table-search-input');
+    static setupSearch(instance) {
+        const searchInput = instance.container?.querySelector('.data-table-search-input');
         if (!searchInput) return;
 
         let timeoutId;
         const handler = () => {
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
-                this.search(searchInput.value);
+                this.search(instance, searchInput.value);
             }, 300);
         };
 
@@ -343,49 +334,49 @@ class DataTableBehavior {
         searchInput.addEventListener('keypress', (event) => {
             if (event.key === 'Enter') {
                 clearTimeout(timeoutId);
-                this.search(searchInput.value);
+                this.search(instance, searchInput.value);
             }
         });
     }
-    
+
     /**
      * Setup column resizing
      */
-    setupColumnResize() {
-        const resizeHandles = this.table.querySelectorAll('.column-resize-handle');
-        
+    static setupColumnResize(instance) {
+        const resizeHandles = instance.table.querySelectorAll('.column-resize-handle');
+
         resizeHandles.forEach(handle => {
             const columnId = handle.dataset.columnId;
             if (!columnId) return;
-            
+
             let isResizing = false;
             let startX = 0;
             let startWidth = 0;
-            
+
             handle.addEventListener('mousedown', (event) => {
                 event.preventDefault();
-                
+
                 isResizing = true;
                 startX = event.clientX;
-                
+
                 const header = handle.closest('th');
                 startWidth = header ? header.offsetWidth : 0;
-                
+
                 document.body.style.cursor = 'col-resize';
                 document.body.style.userSelect = 'none';
             });
-            
+
             document.addEventListener('mousemove', (event) => {
                 if (!isResizing) return;
-                
+
                 const diff = event.clientX - startX;
                 const newWidth = startWidth + diff;
-                
+
                 if (newWidth > 30) { // Minimum column width
-                    this.resizeColumn(columnId, newWidth);
+                    this.resizeColumn(instance, columnId, newWidth);
                 }
             });
-            
+
             document.addEventListener('mouseup', () => {
                 if (isResizing) {
                     isResizing = false;
@@ -395,205 +386,205 @@ class DataTableBehavior {
             });
         });
     }
-    
+
     /**
      * Setup row expansion
      */
-    setupRowExpansion() {
-        const expandButtons = this.table.querySelectorAll('.expand-button');
-        
+    static setupRowExpansion(instance) {
+        const expandButtons = instance.table.querySelectorAll('.expand-button');
+
         expandButtons.forEach(button => {
             const rowId = button.dataset.rowId;
             if (!rowId) return;
-            
+
             button.addEventListener('click', (event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                
-                this.toggleRowExpansion(rowId);
+
+                this.toggleRowExpansion(instance, rowId);
             });
         });
     }
-    
+
     /**
      * Setup export functionality
      */
-    setupExport() {
-        const exportButtons = this.container?.querySelectorAll('.export-button');
+    static setupExport(instance) {
+        const exportButtons = instance.container?.querySelectorAll('.export-button');
         if (!exportButtons) return;
-        
+
         exportButtons.forEach(button => {
             const format = button.dataset.format;
             if (!format) return;
-            
+
             button.addEventListener('click', () => {
-                this.exportData(format);
+                this.exportData(instance, format);
             });
         });
     }
-    
+
     /**
      * Sort table by column
      */
-    sort(columnId, direction, multiSort = false) {
-        console.log(`Sorting table ${this.tableId} by ${columnId} ${direction}`);
-        
+    static sort(instance, columnId, direction, multiSort = false) {
+        console.log(`Sorting table ${instance.tableId} by ${columnId} ${direction}`);
+
         if (direction === null) {
             // Remove sort for this column
-            this.removeSortByColumn(columnId);
+            this.removeSortByColumn(instance, columnId);
         } else {
             // Apply sort for this column
-            this.sortTableByColumn(columnId, direction, multiSort);
+            this.sortTableByColumn(instance, columnId, direction, multiSort);
         }
-        
+
         // Update sort indicators
-        this.updateSortIndicators(this.getCurrentSortConfig());
+        this.updateSortIndicators(instance, this.getCurrentSortConfig(instance));
     }
-    
+
     /**
      * Sort table rows by column value
      */
-    sortTableByColumn(columnId, direction, multiSort = false) {
-        const tbody = this.table.querySelector('tbody');
+    static sortTableByColumn(instance, columnId, direction, multiSort = false) {
+        const tbody = instance.table.querySelector('tbody');
         if (!tbody) {
-            console.warn(`No tbody found in table ${this.tableId}`);
+            console.warn(`No tbody found in table ${instance.tableId}`);
             return;
         }
-        
+
         const rows = Array.from(tbody.querySelectorAll('tr'));
         if (rows.length === 0) {
-            console.log(`No rows to sort in table ${this.tableId}`);
+            console.log(`No rows to sort in table ${instance.tableId}`);
             return;
         }
-        
+
         // Get column index for sorting
-        const header = this.table.querySelector(`th[data-column-id="${columnId}"]`);
+        const header = instance.table.querySelector(`th[data-column-id="${columnId}"]`);
         if (!header) {
             console.warn(`Column header not found: ${columnId}`);
             return;
         }
-        
+
         const columnIndex = Array.from(header.parentElement.children).indexOf(header);
         const columnType = header.dataset.columnType || 'text';
-        
+
         console.log(`Sorting column ${columnId} (index: ${columnIndex}, type: ${columnType}) ${direction}`);
-        
+
         // Sort rows
         rows.sort((a, b) => {
             const cellA = a.children[columnIndex];
             const cellB = b.children[columnIndex];
-            
+
             if (!cellA || !cellB) return 0;
-            
+
             let valueA = this.getCellValue(cellA, columnType);
             let valueB = this.getCellValue(cellB, columnType);
-            
+
             // Handle null/undefined values
             if (valueA === null || valueA === undefined) valueA = '';
             if (valueB === null || valueB === undefined) valueB = '';
-            
+
             let comparison = this.compareValues(valueA, valueB, columnType);
-            
+
             // Apply direction
             if (direction === 'desc') {
                 comparison = -comparison;
             }
-            
+
             return comparison;
         });
-        
+
         // Re-append sorted rows to tbody
         rows.forEach(row => tbody.appendChild(row));
-        
+
         // Update header sort state
         if (!multiSort) {
             // Clear other sort indicators
-            this.table.querySelectorAll('th.sortable').forEach(th => {
+            instance.table.querySelectorAll('th.sortable').forEach(th => {
                 if (th !== header) {
                     th.removeAttribute('data-sort-direction');
                     th.classList.remove('sorted-asc', 'sorted-desc');
                 }
             });
         }
-        
+
         // Set current header sort state
         header.setAttribute('data-sort-direction', direction);
         header.classList.remove('sorted-asc', 'sorted-desc');
         header.classList.add(`sorted-${direction}`);
-        
-        console.log(`Table ${this.tableId} sorted by ${columnId} ${direction}`);
+
+        console.log(`Table ${instance.tableId} sorted by ${columnId} ${direction}`);
     }
-    
+
     /**
      * Remove sort for a specific column
      */
-    removeSortByColumn(columnId) {
-        const header = this.table.querySelector(`th[data-column-id="${columnId}"]`);
+    static removeSortByColumn(instance, columnId) {
+        const header = instance.table.querySelector(`th[data-column-id="${columnId}"]`);
         if (header) {
             header.removeAttribute('data-sort-direction');
             header.classList.remove('sorted-asc', 'sorted-desc');
             console.log(`Removed sort for column ${columnId}`);
         }
     }
-    
+
     /**
      * Get cell value for sorting
      */
-    getCellValue(cell, columnType) {
+    static getCellValue(cell, columnType) {
         if (!cell) return '';
-        
+
         // Try to get value from data attribute first
         if (cell.dataset.sortValue !== undefined) {
             return cell.dataset.sortValue;
         }
-        
+
         // Get text content and convert based on type
         const textContent = cell.textContent.trim();
-        
+
         switch (columnType) {
             case 'number':
                 const num = parseFloat(textContent.replace(/[^0-9.-]/g, ''));
                 return isNaN(num) ? 0 : num;
-                
+
             case 'date':
                 const date = new Date(textContent);
                 return isNaN(date.getTime()) ? new Date(0) : date;
-                
+
             case 'boolean':
                 return textContent.toLowerCase() === 'true' || textContent === '1';
-                
+
             default:
                 return textContent.toLowerCase();
         }
     }
-    
+
     /**
      * Compare two values based on type
      */
-    compareValues(a, b, columnType) {
+    static compareValues(a, b, columnType) {
         switch (columnType) {
             case 'number':
                 return a - b;
-                
+
             case 'date':
                 return a.getTime() - b.getTime();
-                
+
             case 'boolean':
                 if (a === b) return 0;
                 return a ? 1 : -1;
-                
+
             default:
                 return a.localeCompare(b);
         }
     }
-    
+
     /**
      * Get current sort configuration
      */
-    getCurrentSortConfig() {
+    static getCurrentSortConfig(instance) {
         const sortConfig = [];
-        const sortableHeaders = this.table.querySelectorAll('th.sortable[data-sort-direction]');
-        
+        const sortableHeaders = instance.table.querySelectorAll('th.sortable[data-sort-direction]');
+
         sortableHeaders.forEach(header => {
             const columnId = header.dataset.columnId;
             const direction = header.dataset.sortDirection;
@@ -601,49 +592,49 @@ class DataTableBehavior {
                 sortConfig.push({ column: columnId, direction });
             }
         });
-        
+
         return sortConfig;
     }
-    
+
     /**
      * Filter table by column
      */
-    filter(columnId, value) {
-        console.log(`Filtering table ${this.tableId} column ${columnId} with value: "${value}"`);
-        
+    static filter(instance, columnId, value) {
+        console.log(`Filtering table ${instance.tableId} column ${columnId} with value: "${value}"`);
+
         // Apply filter directly in webview
-        this.filterTableByColumn(columnId, value);
-        
+        this.filterTableByColumn(instance, columnId, value);
+
         // Update filter state
-        this.updateFilterState(columnId, value);
+        this.updateFilterState(instance, columnId, value);
     }
-    
+
     /**
      * Filter table rows by column value
      */
-    filterTableByColumn(columnId, filterValue) {
-        const tbody = this.table.querySelector('tbody');
+    static filterTableByColumn(instance, columnId, filterValue) {
+        const tbody = instance.table.querySelector('tbody');
         if (!tbody) {
-            console.warn(`No tbody found in table ${this.tableId}`);
+            console.warn(`No tbody found in table ${instance.tableId}`);
             return;
         }
-        
+
         const rows = tbody.querySelectorAll('tr');
         if (rows.length === 0) {
-            console.log(`No rows to filter in table ${this.tableId}`);
+            console.log(`No rows to filter in table ${instance.tableId}`);
             return;
         }
-        
+
         // Get column index for filtering
-        const header = this.table.querySelector(`th[data-column-id="${columnId}"]`);
+        const header = instance.table.querySelector(`th[data-column-id="${columnId}"]`);
         if (!header) {
             console.warn(`Column header not found: ${columnId}`);
             return;
         }
-        
+
         const columnIndex = Array.from(header.parentElement.children).indexOf(header);
         const filterType = header.dataset.filterType || 'text';
-        
+
         console.log(`Filtering column ${columnId} (index: ${columnIndex}, type: ${filterType}) with value: "${filterValue}"`);
 
         let visibleRowCount = 0;
@@ -667,58 +658,58 @@ class DataTableBehavior {
 
         // Update footer count
         const isFiltered = filterValue && filterValue.toString().trim() !== '';
-        this.updateSearchCount(visibleRowCount, totalRowCount, isFiltered);
+        this.updateSearchCount(instance, visibleRowCount, totalRowCount, isFiltered);
 
         // Update empty state if no rows are visible
-        this.updateEmptyStateVisibility(visibleRowCount === 0);
+        this.updateEmptyStateVisibility(instance, visibleRowCount === 0);
     }
-    
+
     /**
      * Get cell value for filtering
      */
-    getCellFilterValue(cell, filterType) {
+    static getCellFilterValue(cell, filterType) {
         if (!cell) return '';
-        
+
         // Try to get value from data attribute first
         if (cell.dataset.filterValue !== undefined) {
             return cell.dataset.filterValue;
         }
-        
+
         // Get text content
         const textContent = cell.textContent.trim();
-        
+
         switch (filterType) {
             case 'number':
                 const num = parseFloat(textContent.replace(/[^0-9.-]/g, ''));
                 return isNaN(num) ? 0 : num;
-                
+
             case 'date':
                 return new Date(textContent);
-                
+
             case 'boolean':
                 return textContent.toLowerCase() === 'true' || textContent === '1';
-                
+
             default:
                 return textContent.toLowerCase();
         }
     }
-    
+
     /**
      * Check if cell value matches filter
      */
-    matchesFilter(cellValue, filterValue, filterType) {
+    static matchesFilter(cellValue, filterValue, filterType) {
         // Empty filter shows all rows
         if (!filterValue || filterValue.trim() === '') {
             return true;
         }
-        
+
         const filter = filterValue.toLowerCase().trim();
-        
+
         switch (filterType) {
             case 'number':
                 const numFilter = parseFloat(filter);
                 return !isNaN(numFilter) && cellValue === numFilter;
-                
+
             case 'date':
                 // Simple date filtering - could be enhanced for date ranges
                 const dateFilter = new Date(filter);
@@ -727,44 +718,44 @@ class DataTableBehavior {
                     return cellValue.toString().toLowerCase().includes(filter);
                 }
                 return cellValue.toDateString() === dateFilter.toDateString();
-                
+
             case 'boolean':
                 const boolFilter = filter === 'true' || filter === '1';
                 return cellValue === boolFilter;
-                
+
             case 'select':
             case 'multiselect':
                 // Exact match for select filters
                 return cellValue.toString().toLowerCase() === filter;
-                
+
             default:
                 // Text filtering - contains match
                 return cellValue.toString().toLowerCase().includes(filter);
         }
     }
-    
+
     /**
      * Update filter state tracking
      */
-    updateFilterState(columnId, value) {
-        if (!this.activeFilters) {
-            this.activeFilters = new Map();
+    static updateFilterState(instance, columnId, value) {
+        if (!instance.activeFilters) {
+            instance.activeFilters = new Map();
         }
-        
+
         if (value && value.trim() !== '') {
-            this.activeFilters.set(columnId, value);
+            instance.activeFilters.set(columnId, value);
         } else {
-            this.activeFilters.delete(columnId);
+            instance.activeFilters.delete(columnId);
         }
-        
-        console.log(`Active filters:`, Array.from(this.activeFilters.entries()));
+
+        console.log(`Active filters:`, Array.from(instance.activeFilters.entries()));
     }
-    
+
     /**
      * Update empty state visibility based on filtered results
      */
-    updateEmptyStateVisibility(isEmpty) {
-        const table = this.container || this.table.closest('.data-table');
+    static updateEmptyStateVisibility(instance, isEmpty) {
+        const table = instance.container || instance.table.closest('.data-table');
         if (!table) return;
 
         const emptyState = table.querySelector('.data-table-empty-state');
@@ -783,8 +774,8 @@ class DataTableBehavior {
     /**
      * Update footer count after client-side search/filter
      */
-    updateSearchCount(visibleCount, totalCount, isFiltered) {
-        const pageInfo = this.container?.querySelector('.page-info') || this.container?.querySelector('.data-table-page-info');
+    static updateSearchCount(instance, visibleCount, totalCount, isFiltered) {
+        const pageInfo = instance.container?.querySelector('.page-info') || instance.container?.querySelector('.data-table-page-info');
         if (!pageInfo) return;
 
         const newText = isFiltered
@@ -797,12 +788,12 @@ class DataTableBehavior {
     /**
      * Show Power Platform-style filter dropdown
      */
-    showFilterDropdown(columnId, event) {
+    static showFilterDropdown(instance, columnId, event) {
         console.log(`Showing filter dropdown for column ${columnId}`);
-        
+
         // Close any existing dropdowns
-        this.closeAllFilterDropdowns();
-        
+        this.closeAllFilterDropdowns(instance);
+
         // Create dropdown element
         const dropdown = document.createElement('div');
         dropdown.className = 'filter-dropdown';
@@ -812,7 +803,7 @@ class DataTableBehavior {
                     <span>Filter by</span>
                     <button class="filter-dropdown-close">×</button>
                 </div>
-                
+
                 <div class="filter-dropdown-body">
                     <div class="filter-operator-section">
                         <label>Filter by operator</label>
@@ -824,12 +815,12 @@ class DataTableBehavior {
                             <option value="ends_with">Ends with</option>
                         </select>
                     </div>
-                    
+
                     <div class="filter-value-section">
                         <label>Filter by value</label>
                         <input type="text" class="filter-value-input" placeholder="Enter value...">
                     </div>
-                    
+
                     <div class="filter-actions">
                         <button class="filter-apply-btn">Apply</button>
                         <button class="filter-clear-btn">Clear</button>
@@ -837,59 +828,59 @@ class DataTableBehavior {
                 </div>
             </div>
         `;
-        
+
         // Position dropdown
         const rect = event.target.closest('th').getBoundingClientRect();
         dropdown.style.position = 'absolute';
         dropdown.style.top = `${rect.bottom + window.scrollY}px`;
         dropdown.style.left = `${rect.left + window.scrollX}px`;
         dropdown.style.zIndex = '1000';
-        
+
         // Add to page
         document.body.appendChild(dropdown);
-        
+
         // Setup event handlers
-        this.setupFilterDropdownHandlers(dropdown, columnId);
-        
+        this.setupFilterDropdownHandlers(instance, dropdown, columnId);
+
         // Auto-focus the text input
         const valueInput = dropdown.querySelector('.filter-value-input');
         if (valueInput) {
             setTimeout(() => valueInput.focus(), 0);
         }
-        
+
         // Store reference
-        this.activeFilterDropdown = { dropdown, columnId };
+        instance.activeFilterDropdown = { dropdown, columnId };
     }
-    
+
     /**
      * Setup filter dropdown event handlers
      */
-    setupFilterDropdownHandlers(dropdown, columnId) {
+    static setupFilterDropdownHandlers(instance, dropdown, columnId) {
         const closeBtn = dropdown.querySelector('.filter-dropdown-close');
         const applyBtn = dropdown.querySelector('.filter-apply-btn');
         const clearBtn = dropdown.querySelector('.filter-clear-btn');
         const operatorSelect = dropdown.querySelector('.filter-operator-select');
         const valueInput = dropdown.querySelector('.filter-value-input');
-        
+
         // Close dropdown
         closeBtn.addEventListener('click', () => {
-            this.closeAllFilterDropdowns();
+            this.closeAllFilterDropdowns(instance);
         });
-        
+
         // Apply filter function
         const applyFilter = () => {
             const operator = operatorSelect.value;
             const value = valueInput.value.trim();
-            
+
             if (value) {
-                this.applyColumnFilter(columnId, operator, value);
+                this.applyColumnFilter(instance, columnId, operator, value);
             }
-            this.closeAllFilterDropdowns();
+            this.closeAllFilterDropdowns(instance);
         };
-        
+
         // Apply filter on button click
         applyBtn.addEventListener('click', applyFilter);
-        
+
         // Apply filter on Enter key press
         valueInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -897,100 +888,100 @@ class DataTableBehavior {
                 applyFilter();
             }
         });
-        
+
         // Clear filter
         clearBtn.addEventListener('click', () => {
-            this.clearColumnFilter(columnId);
-            this.closeAllFilterDropdowns();
+            this.clearColumnFilter(instance, columnId);
+            this.closeAllFilterDropdowns(instance);
         });
-        
+
         // Prevent dropdown from closing when clicking inside
         dropdown.addEventListener('click', (e) => {
             e.stopPropagation();
         });
-        
+
         // Close on outside click
         setTimeout(() => {
             document.addEventListener('click', (e) => {
                 if (!dropdown.contains(e.target)) {
-                    this.closeAllFilterDropdowns();
+                    this.closeAllFilterDropdowns(instance);
                 }
             });
         }, 0);
     }
-    
+
     /**
      * Close all filter dropdowns
      */
-    closeAllFilterDropdowns() {
+    static closeAllFilterDropdowns(instance) {
         const dropdowns = document.querySelectorAll('.filter-dropdown');
         dropdowns.forEach(dropdown => dropdown.remove());
-        this.activeFilterDropdown = null;
+        instance.activeFilterDropdown = null;
     }
-    
+
     /**
      * Apply column filter with operator
      */
-    applyColumnFilter(columnId, operator, value) {
+    static applyColumnFilter(instance, columnId, operator, value) {
         console.log(`Applying filter: ${columnId} ${operator} "${value}"`);
-        
+
         // Store filter state
-        if (!this.activeFilters) {
-            this.activeFilters = new Map();
+        if (!instance.activeFilters) {
+            instance.activeFilters = new Map();
         }
-        this.activeFilters.set(columnId, { operator, value });
-        
+        instance.activeFilters.set(columnId, { operator, value });
+
         // Apply filter logic
-        this.filterTableByColumn(columnId, value);
-        
+        this.filterTableByColumn(instance, columnId, value);
+
         // Update filter state
-        this.updateFilterState(columnId, value);
+        this.updateFilterState(instance, columnId, value);
     }
-    
+
     /**
      * Clear column filter
      */
-    clearColumnFilter(columnId) {
+    static clearColumnFilter(instance, columnId) {
         console.log(`Clearing filter for column ${columnId}`);
-        
-        if (this.activeFilters) {
-            this.activeFilters.delete(columnId);
+
+        if (instance.activeFilters) {
+            instance.activeFilters.delete(columnId);
         }
-        
+
         // Show all rows and reapply other filters
-        this.reapplyAllFilters();
+        this.reapplyAllFilters(instance);
     }
-    
+
     /**
      * Reapply all active filters
      */
-    reapplyAllFilters() {
-        const tbody = this.table.querySelector('tbody');
+    static reapplyAllFilters(instance) {
+        const tbody = instance.table.querySelector('tbody');
         if (!tbody) return;
-        
+
         const rows = tbody.querySelectorAll('tr');
-        
+
         // First show all rows
         rows.forEach(row => {
             row.style.display = '';
         });
-        
+
         // Then apply each active filter
-        if (this.activeFilters && this.activeFilters.size > 0) {
-            this.activeFilters.forEach((filterData, columnId) => {
-                this.filterTableByColumn(columnId, filterData.value);
+        if (instance.activeFilters && instance.activeFilters.size > 0) {
+            instance.activeFilters.forEach((filterData, columnId) => {
+                this.filterTableByColumn(instance, columnId, filterData.value);
             });
         }
     }
-    
+
     /**
      * Clear all filters
      */
-    clearAllFilters() {
-        console.log(`Clearing all filters for table ${this.tableId}`);
+    static clearAllFilters(instance) {
+        console.log(`Clearing all filters for table ${instance.tableId}`);
 
         // Show all rows
-        const tbody = this.table.querySelector('tbody');
+        const tbody = instance.table.querySelector('tbody');
         if (tbody) {
             const rows = tbody.querySelectorAll('tr');
             const totalRowCount = rows.length;
@@ -999,42 +990,42 @@ class DataTableBehavior {
             });
 
             // Update footer count
-            this.updateSearchCount(totalRowCount, totalRowCount, false);
+            this.updateSearchCount(instance, totalRowCount, totalRowCount, false);
         }
 
         // Clear filter state
-        if (this.activeFilters) {
-            this.activeFilters.clear();
+        if (instance.activeFilters) {
+            instance.activeFilters.clear();
         }
 
         // Hide empty state
-        this.updateEmptyStateVisibility(false);
+        this.updateEmptyStateVisibility(instance, false);
 
-        console.log(`All filters cleared for table ${this.tableId}`);
+        console.log(`All filters cleared for table ${instance.tableId}`);
     }
-    
+
     /**
      * Search table across all columns
      */
-    search(query) {
-        console.log(`Searching table ${this.tableId} with query: "${query}"`);
+    static search(instance, query) {
+        console.log(`Searching table ${instance.tableId} with query: "${query}"`);
 
         // Notify Extension Host so search is persisted across data refreshes
-        this.postMessage({
+        this.postMessage(instance, {
             command: 'table-search',
-            tableId: this.tableId,
+            tableId: instance.tableId,
             searchQuery: query || ''
         });
 
-        const tbody = this.table.querySelector('tbody');
+        const tbody = instance.table.querySelector('tbody');
         if (!tbody) {
-            console.warn(`No tbody found in table ${this.tableId}`);
+            console.warn(`No tbody found in table ${instance.tableId}`);
             return;
         }
 
         const rows = tbody.querySelectorAll('tr');
         if (rows.length === 0) {
-            console.log(`No rows to search in table ${this.tableId}`);
+            console.log(`No rows to search in table ${instance.tableId}`);
             return;
         }
 
@@ -1047,8 +1038,8 @@ class DataTableBehavior {
             rows.forEach(row => {
                 row.style.display = '';
             });
-            this.updateEmptyStateVisibility(false);
-            this.updateSearchCount(totalRowCount, totalRowCount, false);
+            this.updateEmptyStateVisibility(instance, false);
+            this.updateSearchCount(instance, totalRowCount, totalRowCount, false);
             console.log(`Search cleared: all ${rows.length} rows visible`);
             return;
         }
@@ -1074,179 +1065,179 @@ class DataTableBehavior {
         console.log(`Search applied: ${visibleRowCount} of ${rows.length} rows visible`);
 
         // Update footer count
-        this.updateSearchCount(visibleRowCount, totalRowCount, true);
+        this.updateSearchCount(instance, visibleRowCount, totalRowCount, true);
 
         // Update empty state if no rows are visible
-        this.updateEmptyStateVisibility(visibleRowCount === 0);
+        this.updateEmptyStateVisibility(instance, visibleRowCount === 0);
     }
-    
+
     /**
      * Select/deselect row
      */
-    selectRow(rowId, selected) {
-        this.postMessage({
+    static selectRow(instance, rowId, selected) {
+        this.postMessage(instance, {
             type: 'dataTable.selectRow',
-            tableId: this.tableId,
+            tableId: instance.tableId,
             rowId,
             selected
         });
     }
-    
+
     /**
      * Select all rows
      */
-    selectAll(selected) {
-        this.postMessage({
+    static selectAll(instance, selected) {
+        this.postMessage(instance, {
             type: 'dataTable.selectAll',
-            tableId: this.tableId,
+            tableId: instance.tableId,
             selected
         });
     }
-    
+
     /**
      * Execute row action
      */
-    executeAction(actionId, rowId) {
-        this.postMessage({
+    static executeAction(instance, actionId, rowId) {
+        this.postMessage(instance, {
             type: 'dataTable.action',
-            tableId: this.tableId,
+            tableId: instance.tableId,
             actionId,
             rowId
         });
     }
-    
+
     /**
      * Set current page
      */
-    setPage(page) {
-        this.postMessage({
+    static setPage(instance, page) {
+        this.postMessage(instance, {
             type: 'dataTable.setPage',
-            tableId: this.tableId,
+            tableId: instance.tableId,
             page
         });
     }
-    
+
     /**
      * Go to previous page
      */
-    previousPage() {
-        this.postMessage({
+    static previousPage(instance) {
+        this.postMessage(instance, {
             type: 'dataTable.previousPage',
-            tableId: this.tableId
+            tableId: instance.tableId
         });
     }
-    
+
     /**
      * Go to next page
      */
-    nextPage() {
-        this.postMessage({
+    static nextPage(instance) {
+        this.postMessage(instance, {
             type: 'dataTable.nextPage',
-            tableId: this.tableId
+            tableId: instance.tableId
         });
     }
-    
+
     /**
      * Set page size
      */
-    setPageSize(size) {
-        this.postMessage({
+    static setPageSize(instance, size) {
+        this.postMessage(instance, {
             type: 'dataTable.setPageSize',
-            tableId: this.tableId,
+            tableId: instance.tableId,
             size
         });
     }
-    
+
     /**
      * Toggle row expansion
      */
-    toggleRowExpansion(rowId) {
-        this.postMessage({
+    static toggleRowExpansion(instance, rowId) {
+        this.postMessage(instance, {
             type: 'dataTable.toggleExpansion',
-            tableId: this.tableId,
+            tableId: instance.tableId,
             rowId
         });
     }
-    
+
     /**
      * Resize column
      */
-    resizeColumn(columnId, width) {
+    static resizeColumn(instance, columnId, width) {
         // Update column width immediately for smooth UX
-        const header = this.table.querySelector(`th[data-column-id="${columnId}"]`);
+        const header = instance.table.querySelector(`th[data-column-id="${columnId}"]`);
         if (header) {
             header.style.width = `${width}px`;
         }
-        
+
         // Notify extension host
-        this.postMessage({
+        this.postMessage(instance, {
             type: 'dataTable.resizeColumn',
-            tableId: this.tableId,
+            tableId: instance.tableId,
             columnId,
             width
         });
     }
-    
+
     /**
      * Show context menu
      */
-    showContextMenu(event, row) {
-        if (!this.contextMenu || !row) return;
+    static showContextMenu(instance, event, row) {
+        if (!instance.contextMenu || !row) return;
 
         // Store current row for later use
-        this.currentContextRow = row;
+        instance.currentContextRow = row;
 
         // Position the context menu at mouse location
-        this.contextMenu.style.display = 'block';
-        this.contextMenu.style.left = `${event.clientX}px`;
-        this.contextMenu.style.top = `${event.clientY}px`;
+        instance.contextMenu.style.display = 'block';
+        instance.contextMenu.style.left = `${event.clientX}px`;
+        instance.contextMenu.style.top = `${event.clientY}px`;
 
         // Adjust if menu would go off-screen
-        const menuRect = this.contextMenu.getBoundingClientRect();
+        const menuRect = instance.contextMenu.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
 
         if (menuRect.right > viewportWidth) {
-            this.contextMenu.style.left = `${viewportWidth - menuRect.width - 10}px`;
+            instance.contextMenu.style.left = `${viewportWidth - menuRect.width - 10}px`;
         }
 
         if (menuRect.bottom > viewportHeight) {
-            this.contextMenu.style.top = `${viewportHeight - menuRect.height - 10}px`;
+            instance.contextMenu.style.top = `${viewportHeight - menuRect.height - 10}px`;
         }
     }
 
     /**
      * Hide context menu
      */
-    hideContextMenu() {
-        if (!this.contextMenu) return;
+    static hideContextMenu(instance) {
+        if (!instance.contextMenu) return;
 
-        this.contextMenu.style.display = 'none';
-        this.currentContextRow = null;
+        instance.contextMenu.style.display = 'none';
+        instance.currentContextRow = null;
     }
 
     /**
      * Handle context menu item click
      */
-    handleContextMenuItemClick(itemId) {
-        if (!this.currentContextRow) return;
+    static handleContextMenuItemClick(instance, itemId) {
+        if (!instance.currentContextRow) return;
 
-        const rowId = this.currentContextRow.dataset.rowId;
-        const rowData = this.getRowData(rowId);
+        const rowId = instance.currentContextRow.dataset.rowId;
+        const rowData = this.getRowData(instance, rowId);
 
         // Send component event to Extension Host using ComponentUtils
         if (typeof ComponentUtils !== 'undefined') {
-            ComponentUtils.emitComponentEvent(this.tableId, 'contextMenuItemClicked', {
+            ComponentUtils.emitComponentEvent(instance.tableId, 'contextMenuItemClicked', {
                 itemId: itemId,
                 rowId: rowId,
                 rowData: rowData
             });
         } else {
             // Fallback to direct postMessage if ComponentUtils not available
-            this.postMessage({
+            this.postMessage(instance, {
                 command: 'component-event',
                 data: {
-                    componentId: this.tableId,
+                    componentId: instance.tableId,
                     eventType: 'contextMenuItemClicked',
                     data: {
                         itemId: itemId,
@@ -1261,8 +1252,8 @@ class DataTableBehavior {
     /**
      * Get row data by row ID
      */
-    getRowData(rowId) {
-        const row = this.table.querySelector(`tr[data-row-id="${rowId}"]`);
+    static getRowData(instance, rowId) {
+        const row = instance.table.querySelector(`tr[data-row-id="${rowId}"]`);
         if (!row) return null;
 
         const rowData = { id: rowId };
@@ -1278,102 +1269,102 @@ class DataTableBehavior {
 
         return rowData;
     }
-    
+
     /**
      * Export data
      */
-    exportData(format) {
-        this.postMessage({
+    static exportData(instance, format) {
+        this.postMessage(instance, {
             type: 'dataTable.export',
-            tableId: this.tableId,
+            tableId: instance.tableId,
             format
         });
     }
-    
+
     /**
      * Close all dropdown menus
      */
-    closeAllDropdowns() {
-        const openDropdowns = this.table.querySelectorAll('.actions-dropdown.open');
+    static closeAllDropdowns(instance) {
+        const openDropdowns = instance.table.querySelectorAll('.actions-dropdown.open');
         openDropdowns.forEach(dropdown => {
             dropdown.classList.remove('open');
         });
     }
-    
+
     /**
      * Update table state from extension host
      */
-    updateState(state) {
+    static updateState(instance, state) {
         try {
-            this.updateSelection(state.selectedRows || []);
-            this.updateSortIndicators(state.sortConfig || []);
-            this.updatePagination(state);
-            this.updateLoadingState(state.loading, state.loadingMessage);
-            this.updateErrorState(state.error);
+            this.updateSelection(instance, state.selectedRows || []);
+            this.updateSortIndicators(instance, state.sortConfig || []);
+            this.updatePagination(instance, state);
+            this.updateLoadingState(instance, state.loading, state.loadingMessage);
+            this.updateErrorState(instance, state.error);
         } catch (error) {
             console.error('Failed to update DataTable state:', error);
         }
     }
-    
+
     /**
      * Update row selection state
      */
-    updateSelection(selectedRows) {
-        const checkboxes = this.table.querySelectorAll('.row-checkbox');
+    static updateSelection(instance, selectedRows) {
+        const checkboxes = instance.table.querySelectorAll('.row-checkbox');
         checkboxes.forEach(checkbox => {
             const rowId = checkbox.dataset.rowId;
             checkbox.checked = selectedRows.includes(rowId);
-            
+
             const row = checkbox.closest('tr');
             if (row) {
                 row.classList.toggle('selected', checkbox.checked);
             }
         });
-        
+
         // Update select all checkbox
-        const selectAllCheckbox = this.table.querySelector('.select-all-checkbox');
+        const selectAllCheckbox = instance.table.querySelector('.select-all-checkbox');
         if (selectAllCheckbox) {
             const totalCheckboxes = checkboxes.length;
             const selectedCheckboxes = Array.from(checkboxes).filter(cb => cb.checked).length;
-            
+
             selectAllCheckbox.checked = selectedCheckboxes === totalCheckboxes && totalCheckboxes > 0;
             selectAllCheckbox.indeterminate = selectedCheckboxes > 0 && selectedCheckboxes < totalCheckboxes;
         }
     }
-    
+
     /**
      * Update sort indicators
      */
-    updateSortIndicators(sortConfig) {
+    static updateSortIndicators(instance, sortConfig) {
         console.log('Updating sort indicators:', sortConfig);
-        
+
         // Clear all sort indicators and remove existing ones
-        const sortableHeaders = this.table.querySelectorAll('th.sortable');
+        const sortableHeaders = instance.table.querySelectorAll('th.sortable');
         sortableHeaders.forEach(header => {
             header.classList.remove('sorted-asc', 'sorted-desc');
             header.removeAttribute('data-sort-direction');
-            
+
             // Remove existing sort indicators
             const existingIndicator = header.querySelector('.sort-indicator');
             if (existingIndicator) {
                 existingIndicator.remove();
             }
         });
-        
+
         // Apply current sort indicators by creating new elements
         sortConfig.forEach((sort, index) => {
-            const header = this.table.querySelector(`th[data-column-id="${sort.column}"]`);
+            const header = instance.table.querySelector(`th[data-column-id="${sort.column}"]`);
             if (!header) return;
-            
+
             header.classList.add(`sorted-${sort.direction}`);
             header.setAttribute('data-sort-direction', sort.direction);
-            
+
             // Create and insert sort indicator
             const sortIndicator = document.createElement('span');
             sortIndicator.className = `sort-indicator sort-indicator--${sort.direction}`;
             sortIndicator.title = `Sorted ${sort.direction}ending`;
             sortIndicator.textContent = sort.direction === 'asc' ? '▲' : '▼';
-            
+
             // Insert the indicator after the header label
             const headerContent = header.querySelector('.data-table-header-content');
             const headerLabel = header.querySelector('.data-table-header-label');
@@ -1382,17 +1373,17 @@ class DataTableBehavior {
             }
         });
     }
-    
+
     /**
      * Update pagination display
      */
-    updatePagination(state) {
-        const pagination = this.container?.querySelector('.data-table-pagination');
+    static updatePagination(instance, state) {
+        const pagination = instance.container?.querySelector('.data-table-pagination');
         if (!pagination || !state.paginated) return;
-        
+
         const { currentPage, pageSize, totalRows } = state;
         const totalPages = Math.ceil(totalRows / pageSize);
-        
+
         // Update page info
         const pageInfo = pagination.querySelector('.page-info');
         if (pageInfo) {
@@ -1400,18 +1391,18 @@ class DataTableBehavior {
             const end = Math.min(currentPage * pageSize, totalRows);
             pageInfo.textContent = `Showing ${start}-${end} of ${totalRows} rows`;
         }
-        
+
         // Update page buttons
         const prevButton = pagination.querySelector('.page-button[data-page="prev"]');
         if (prevButton) {
             prevButton.disabled = currentPage <= 1;
         }
-        
+
         const nextButton = pagination.querySelector('.page-button[data-page="next"]');
         if (nextButton) {
             nextButton.disabled = currentPage >= totalPages;
         }
-        
+
         // Update page input
         const pageInput = pagination.querySelector('.page-input');
         if (pageInput) {
@@ -1419,16 +1410,16 @@ class DataTableBehavior {
             pageInput.max = totalPages;
         }
     }
-    
+
     /**
      * Update loading state
      */
-    updateLoadingState(loading, message = 'Loading...') {
-        const loadingOverlay = this.container?.querySelector('.loading-overlay');
+    static updateLoadingState(instance, loading, message = 'Loading...') {
+        const loadingOverlay = instance.container?.querySelector('.loading-overlay');
 
         if (loading) {
             if (!loadingOverlay) {
-                this.showLoadingOverlay(message);
+                this.showLoadingOverlay(instance, message);
             } else {
                 loadingOverlay.classList.add('visible');
                 const loadingText = loadingOverlay.querySelector('.loading-text');
@@ -1442,18 +1433,18 @@ class DataTableBehavior {
             }
         }
 
-        this.container?.classList.toggle('loading', loading);
+        instance.container?.classList.toggle('loading', loading);
     }
-    
+
     /**
      * Update error state
      */
-    updateErrorState(error) {
-        const errorOverlay = this.container?.querySelector('.error-overlay');
-        
+    static updateErrorState(instance, error) {
+        const errorOverlay = instance.container?.querySelector('.error-overlay');
+
         if (error) {
             if (!errorOverlay) {
-                this.showErrorOverlay(error);
+                this.showErrorOverlay(instance, error);
             } else {
                 const errorText = errorOverlay.querySelector('.error-text');
                 if (errorText) {
@@ -1465,18 +1456,18 @@ class DataTableBehavior {
                 errorOverlay.remove();
             }
         }
-        
-        this.container?.classList.toggle('error', !!error);
+
+        instance.container?.classList.toggle('error', !!error);
     }
-    
+
     /**
      * Show loading overlay
      */
-    showLoadingOverlay(message) {
-        if (!this.container) return;
+    static showLoadingOverlay(instance, message) {
+        if (!instance.container) return;
 
         // Remove any existing overlay first
-        const existingOverlay = this.container.querySelector('.loading-overlay');
+        const existingOverlay = instance.container.querySelector('.loading-overlay');
         if (existingOverlay) {
             existingOverlay.remove();
         }
@@ -1488,15 +1479,15 @@ class DataTableBehavior {
             <div class="loading-text">${message}</div>
         `;
 
-        this.container.appendChild(overlay);
+        instance.container.appendChild(overlay);
     }
-    
+
     /**
      * Show error overlay
      */
-    showErrorOverlay(error) {
-        if (!this.container) return;
-        
+    static showErrorOverlay(instance, error) {
+        if (!instance.container) return;
+
         const overlay = document.createElement('div');
         overlay.className = 'error-overlay';
         overlay.innerHTML = `
@@ -1504,117 +1495,123 @@ class DataTableBehavior {
             <div class="error-text">${error}</div>
             <button class="retry-button" onclick="this.parentElement.remove()">Retry</button>
         `;
-        
-        this.container.appendChild(overlay);
+
+        instance.container.appendChild(overlay);
     }
-    
+
     /**
      * Post message to extension host
      */
-    postMessage(message) {
+    static postMessage(instance, message) {
         if (typeof vscode !== 'undefined' && vscode.postMessage) {
             vscode.postMessage(message);
         } else {
             console.warn('vscode.postMessage not available');
         }
     }
-    
+
     /**
      * Notify that table is ready
      */
-    notifyReady() {
-        this.postMessage({
+    static notifyReady(instance) {
+        this.postMessage(instance, {
             type: 'dataTable.ready',
-            tableId: this.tableId
+            tableId: instance.tableId
         });
     }
-    
+
     /**
-     * Instance method to handle messages from Extension Host
+     * Handle component update from event bridge
+     * Called by BaseBehavior.onComponentUpdate()
      */
-    handleMessage(message) {
-        console.log(`DataTableBehavior: Handling message for ${this.tableId}:`, message);
-        
+    static handleComponentUpdate(instance, data) {
+        console.log(`DataTableBehavior: handleComponentUpdate for ${instance.tableId}:`, data);
+
+        if (data && Array.isArray(data)) {
+            // Legacy format: just an array
+            this.updateTableData(instance, data);
+        } else if (data && typeof data === 'object') {
+            // New format: object with data, loading, error, etc.
+            console.log(`DataTableBehavior: componentUpdate with state:`, {
+                hasData: !!data.data,
+                dataLength: data.data?.length,
+                loading: data.loading,
+                loadingMessage: data.loadingMessage
+            });
+
+            // Handle loading state
+            if (data.loading !== undefined) {
+                this.toggleLoadingState(instance, data.loading, data.loadingMessage);
+            }
+
+            // Handle error state
+            if (data.error) {
+                this.showErrorOverlay(instance, data.error);
+            } else if (data.error === null && !data.loading) {
+                this.hideErrorOverlay(instance);
+            }
+
+            // Update table data if provided
+            if (data.data && Array.isArray(data.data)) {
+                this.updateTableData(instance, data.data, data);
+            }
+        } else {
+            console.log(`DataTableBehavior: componentUpdate received unexpected format:`, data);
+        }
+    }
+
+    /**
+     * Handle custom messages beyond componentUpdate
+     * Called by BaseBehavior.handleCustomAction()
+     */
+    static handleCustomMessage(instance, message) {
+        console.log(`DataTableBehavior: handleCustomMessage for ${instance.tableId}:`, message);
+
         if (!message || !message.action) {
             console.warn('DataTableBehavior: Invalid message format', message);
             return;
         }
-        
-        // Handle different message actions
+
         const { action, data } = message;
-        
+
         switch (action) {
-            case 'componentUpdate':
-                if (data && Array.isArray(data)) {
-                    // Legacy format: just an array
-                    this.updateTableData(data);
-                } else if (data && typeof data === 'object') {
-                    // New format: object with data, loading, error, etc.
-                    console.log(`DataTableBehavior: componentUpdate with state:`, {
-                        hasData: !!data.data,
-                        dataLength: data.data?.length,
-                        loading: data.loading,
-                        loadingMessage: data.loadingMessage
-                    });
-
-                    // Handle loading state
-                    if (data.loading !== undefined) {
-                        this.toggleLoadingState(data.loading, data.loadingMessage);
-                    }
-
-                    // Handle error state
-                    if (data.error) {
-                        this.showErrorOverlay(data.error);
-                    } else if (data.error === null && !data.loading) {
-                        this.hideErrorOverlay();
-                    }
-
-                    // Update table data if provided
-                    if (data.data && Array.isArray(data.data)) {
-                        this.updateTableData(data.data, data);
-                    }
-                } else {
-                    console.log(`DataTableBehavior: componentUpdate received unexpected format:`, data);
-                }
-                break;
-                
             case 'setData':
                 if (data && Array.isArray(data)) {
-                    this.updateTableData(data);
+                    this.updateTableData(instance, data);
                 }
                 break;
-                
+
             case 'setLoading':
-                this.toggleLoadingState(data?.loading, data?.message);
+                this.toggleLoadingState(instance, data?.loading, data?.message);
                 break;
-                
+
             case 'setError':
-                this.showErrorOverlay(data?.error || 'An error occurred');
+                this.showErrorOverlay(instance, data?.error || 'An error occurred');
                 break;
-                
+
             case 'clearError':
-                this.hideErrorOverlay();
+                this.hideErrorOverlay(instance);
                 break;
-                
+
             default:
                 console.warn(`DataTableBehavior: Unknown action: ${action}`);
         }
     }
-    
+
     /**
      * Update table data efficiently without full HTML regeneration
      */
-    updateTableData(data, componentData = {}) {
-        console.log(`DataTableBehavior: Updating table ${this.tableId} with ${data.length} rows`);
-        
-        const tbody = this.table.querySelector('tbody');
+    static updateTableData(instance, data, componentData = {}) {
+        console.log(`DataTableBehavior: Updating table ${instance.tableId} with ${data.length} rows`);
+
+        const tbody = instance.table.querySelector('tbody');
         if (!tbody) {
-            console.warn(`DataTableBehavior: No tbody found in table ${this.tableId}`);
+            console.warn(`DataTableBehavior: No tbody found in table ${instance.tableId}`);
             return;
         }
-        
+
         // Analyze header structure
-        const headers = this.table.querySelectorAll('th[data-column-id]');
+        const headers = instance.table.querySelectorAll('th[data-column-id]');
         const headerInfo = Array.from(headers).map(h => ({
             columnId: h.getAttribute('data-column-id'),
             text: h.textContent.trim(),
@@ -1625,14 +1622,14 @@ class DataTableBehavior {
 
         // Add new rows
         data.forEach(rowData => {
-            const tr = this.createTableRow(rowData);
+            const tr = this.createTableRow(instance, rowData);
             tbody.appendChild(tr);
         });
 
         // Update footer with row counts
         const visibleCount = data.length; // Filtered/visible rows
         const totalCount = componentData.totalRows !== undefined ? componentData.totalRows : data.length; // Total unfiltered rows
-        const pageInfo = this.container?.querySelector('.page-info') || this.container?.querySelector('.data-table-page-info');
+        const pageInfo = instance.container?.querySelector('.page-info') || instance.container?.querySelector('.data-table-page-info');
         if (pageInfo) {
             const hasFilters = componentData.filters && Object.keys(componentData.filters).some(key => componentData.filters[key]);
             const searchActive = componentData.searchQuery && componentData.searchQuery.trim() !== '';
@@ -1647,24 +1644,24 @@ class DataTableBehavior {
         }
 
     }
-    
+
     /**
      * Create a table row from data
      */
-    createTableRow(rowData) {
+    static createTableRow(instance, rowData) {
         const tr = document.createElement('tr');
         tr.setAttribute('data-row-id', rowData.id);
         tr.className = 'data-table-body-row';
-        
+
         // Get all header cells in the exact order they appear in the table
-        const headerRow = this.table.querySelector('thead tr');
+        const headerRow = instance.table.querySelector('thead tr');
         if (!headerRow) {
             console.error('DataTableBehavior: No header row found');
             return tr;
         }
-        
+
         const headerCells = headerRow.querySelectorAll('th[data-column-id]');
-        
+
         Array.from(headerCells).forEach((header, index) => {
             const columnId = header.getAttribute('data-column-id');
             const columnType = header.getAttribute('data-column-type'); // Get column type
@@ -1688,65 +1685,54 @@ class DataTableBehavior {
         });
         return tr;
     }
-    
+
     /**
      * Toggle loading state
      */
-    toggleLoadingState(loading, message) {
-        console.log(`DataTableBehavior ${this.tableId}: toggleLoadingState(${loading}, "${message}")`);
+    static toggleLoadingState(instance, loading, message) {
+        console.log(`DataTableBehavior ${instance.tableId}: toggleLoadingState(${loading}, "${message}")`);
         if (loading) {
-            this.showLoadingOverlay(message || 'Loading...');
+            this.showLoadingOverlay(instance, message || 'Loading...');
         } else {
-            this.hideLoadingOverlay();
+            this.hideLoadingOverlay(instance);
         }
     }
-    
+
     /**
      * Hide loading overlay
      */
-    hideLoadingOverlay() {
-        if (!this.container) return;
-        
-        const overlay = this.container.querySelector('.loading-overlay');
+    static hideLoadingOverlay(instance) {
+        if (!instance.container) return;
+
+        const overlay = instance.container.querySelector('.loading-overlay');
         if (overlay) {
             overlay.remove();
         }
     }
-    
+
     /**
      * Hide error overlay
      */
-    hideErrorOverlay() {
-        if (!this.container) return;
-        
-        const overlay = this.container.querySelector('.error-overlay');
+    static hideErrorOverlay(instance) {
+        if (!instance.container) return;
+
+        const overlay = instance.container.querySelector('.error-overlay');
         if (overlay) {
             overlay.remove();
         }
     }
-    
+
     /**
-     * Cleanup event listeners
+     * Cleanup instance resources
      */
-    destroy() {
-        this.sortHandlers.clear();
-        this.filterHandlers.clear();
-        this.actionHandlers.clear();
-        this.initialized = false;
+    static cleanupInstance(instance) {
+        instance.sortHandlers.clear();
+        instance.filterHandlers.clear();
+        instance.actionHandlers.clear();
+        instance.initialized = false;
     }
 }
 
 
-// ✅ REQUIRED: Component Registry Pattern for ComponentUtils integration
-if (typeof window !== 'undefined') {
-    // Make behavior available globally
-    window.DataTableBehavior = DataTableBehavior;
-    
-    // ✅ CRITICAL: Register with ComponentUtils (stub or real) following ARCHITECTURE_GUIDE.md pattern
-    if (window.ComponentUtils && window.ComponentUtils.registerBehavior) {
-        window.ComponentUtils.registerBehavior('DataTable', DataTableBehavior);
-        console.log('DataTableBehavior registered with ComponentUtils');
-    } else {
-        console.log('DataTableBehavior loaded, ComponentUtils not available yet');
-    }
-}
+// Register behavior
+DataTableBehavior.register();

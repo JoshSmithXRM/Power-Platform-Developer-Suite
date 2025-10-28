@@ -97,23 +97,51 @@ class MyPanel extends BasePanel {
 **Responsibility**: Message passing between Extension Host and Webview
 
 **Pattern**: Event-driven communication using observer pattern
+
+**Extension Host Side**:
 ```typescript
 // Extension Host emits events
 component.on('update', (event) => {
     this.postMessage({
         command: 'component-event',
         componentId: event.componentId,
+        action: 'componentUpdate',
         data: component.getData()
     });
 });
+```
 
-// Webview handles events
-static handleMessage(message) {
-    if (message.command === 'component-event') {
-        this.updateComponent(message.componentId, message.data);
+**Webview Side (Using BaseBehavior)**:
+```javascript
+// Webview behaviors extend BaseBehavior for enforced patterns
+class MyComponentBehavior extends BaseBehavior {
+    static getComponentType() {
+        return 'MyComponent';
+    }
+
+    // REQUIRED: Automatically handles 'componentUpdate' action
+    static onComponentUpdate(instance, data) {
+        this.updateComponent(instance, data);
+    }
+
+    // OPTIONAL: Handle other custom actions
+    static handleCustomAction(instance, message) {
+        switch (message.action) {
+            case 'customAction':
+                this.handleCustom(instance, message.data);
+                break;
+        }
     }
 }
+
+MyComponentBehavior.register();
 ```
+
+**Key Benefits**:
+- **Type safety**: Extension Host uses TypeScript with full IDE support
+- **Enforced patterns**: BaseBehavior ensures `componentUpdate` is never forgotten
+- **Registry-based routing**: No hardcoded message switches
+- **Separation of concerns**: Business logic (Extension Host) vs UI updates (Webview)
 
 ## Design Patterns
 
@@ -231,11 +259,24 @@ class MyService {
 **Webview Context**:
 ```javascript
 // Browser console for webview behaviors
-class MyBehavior {
-    static handleMessage(message) {
-        console.log('Processing message:', message);
+/**
+ * MyBehavior - Webview behavior extending BaseBehavior
+ */
+class MyBehavior extends BaseBehavior {
+    static getComponentType() {
+        return 'MyComponent';
+    }
+
+    static onComponentUpdate(instance, data) {
+        console.log('Processing component update:', data);
+    }
+
+    static handleCustomAction(instance, message) {
+        console.log('Processing custom action:', message.action);
     }
 }
+
+MyBehavior.register();
 ```
 
 ### **Error Handling Strategy**

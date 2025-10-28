@@ -3,24 +3,76 @@
  * Handles all user interactions, dynamic filter building, and DOM manipulation
  */
 
-class FilterPanelBehavior {
-    static instances = new Map();
+class FilterPanelBehavior extends BaseBehavior {
     static conditionCounter = 0;
 
     /**
-     * Initialize a FilterPanel component instance
+     * Get component type identifier
      */
-    static initialize(componentId, config, element) {
-        if (!componentId || !element) {
-            console.error('FilterPanelBehavior: componentId and element are required');
-            return null;
+    static getComponentType() {
+        return 'FilterPanel';
+    }
+
+    /**
+     * Handle component data updates from Extension Host
+     * REQUIRED by BaseBehavior - called when event bridge sends updated data
+     */
+    static onComponentUpdate(instance, data) {
+        if (!data) return;
+
+        console.log('FilterPanelBehavior: onComponentUpdate received', data);
+
+        // Handle quick filters update
+        if (data.activeQuickFilters !== undefined) {
+            const filterIds = data.activeQuickFilters;
+            console.log('FilterPanelBehavior: onComponentUpdate quick filters', filterIds);
+            instance.activeQuickFilters = new Set(filterIds);
+            // Update checkboxes
+            const checkboxes = instance.element.querySelectorAll('.quick-filter-checkbox');
+            console.log('FilterPanelBehavior: onComponentUpdate found', checkboxes.length, 'checkboxes');
+            checkboxes.forEach(cb => {
+                const shouldBeChecked = instance.activeQuickFilters.has(cb.dataset.filterId);
+                console.log(`FilterPanelBehavior: onComponentUpdate checkbox ${cb.dataset.filterId} - should be checked: ${shouldBeChecked}`);
+                cb.checked = shouldBeChecked;
+            });
         }
 
-        if (this.instances.has(componentId)) {
-            return this.instances.get(componentId);
+        // Handle advanced filters update
+        if (data.advancedFilterConditions !== undefined) {
+            const conditions = data.advancedFilterConditions;
+            // Clear existing
+            instance.conditionsList.innerHTML = '';
+            instance.filterConditions = [];
+
+            // Add conditions
+            conditions.forEach(condition => {
+                this.addCondition(instance, condition);
+            });
         }
 
-        const instance = {
+        // Handle collapsed state
+        if (data.collapsed !== undefined) {
+            instance.collapsed = data.collapsed;
+            if (instance.content) {
+                instance.content.style.display = instance.collapsed ? 'none' : 'block';
+            }
+            const toggleIcon = instance.header?.querySelector('.filter-panel-toggle');
+            if (toggleIcon) {
+                toggleIcon.textContent = instance.collapsed ? '▶' : '▼';
+            }
+        }
+
+        // Handle clear
+        if (data.cleared) {
+            this.clearAllFilters(instance);
+        }
+    }
+
+    /**
+     * Create the instance object structure
+     */
+    static createInstance(componentId, config, element) {
+        return {
             id: componentId,
             config: { ...config },
             element: element,
@@ -46,29 +98,30 @@ class FilterPanelBehavior {
             // Event handlers
             boundHandlers: {}
         };
+    }
 
-        try {
-            // Load field configs from JSON script tag
-            this.loadFieldConfigs(instance);
+    /**
+     * Find and cache DOM elements
+     */
+    static findDOMElements(instance) {
+        const { element } = instance;
 
-            // Find DOM elements
-            this.findDOMElements(instance);
+        // Load field configs from JSON script tag
+        this.loadFieldConfigs(instance);
 
-            // Setup event listeners
-            this.setupEventListeners(instance);
+        instance.header = element.querySelector('.filter-panel-header');
+        instance.content = element.querySelector('.filter-panel-content');
+        instance.filterCountElement = element.querySelector('[data-filter-count]');
+        instance.quickFiltersContainer = element.querySelector('.quick-filters');
+        instance.conditionsContainer = element.querySelector('.filter-conditions-container');
+        instance.conditionsList = element.querySelector('.filter-conditions-list');
+        instance.addConditionBtn = element.querySelector('[data-action="addCondition"]');
+        instance.applyBtn = element.querySelector('[data-action="applyFilters"]');
+        instance.clearBtn = element.querySelector('[data-action="clearFilters"]');
+        instance.previewCount = element.querySelector('[data-preview-count]');
 
-            // Initialize state
-            this.initializeState(instance);
-
-            // Register instance
-            this.instances.set(componentId, instance);
-
-            console.log(`FilterPanelBehavior: Initialized ${componentId}`);
-            return instance;
-
-        } catch (error) {
-            console.error(`FilterPanelBehavior: Failed to initialize ${componentId}:`, error);
-            return null;
+        if (!instance.conditionsList) {
+            throw new Error('Filter conditions list element not found');
         }
     }
 
@@ -84,28 +137,6 @@ class FilterPanelBehavior {
                 console.error('FilterPanelBehavior: Failed to parse field configs:', error);
                 instance.fieldConfigs = [];
             }
-        }
-    }
-
-    /**
-     * Find and cache DOM elements
-     */
-    static findDOMElements(instance) {
-        const { element } = instance;
-
-        instance.header = element.querySelector('.filter-panel-header');
-        instance.content = element.querySelector('.filter-panel-content');
-        instance.filterCountElement = element.querySelector('[data-filter-count]');
-        instance.quickFiltersContainer = element.querySelector('.quick-filters');
-        instance.conditionsContainer = element.querySelector('.filter-conditions-container');
-        instance.conditionsList = element.querySelector('.filter-conditions-list');
-        instance.addConditionBtn = element.querySelector('[data-action="addCondition"]');
-        instance.applyBtn = element.querySelector('[data-action="applyFilters"]');
-        instance.clearBtn = element.querySelector('[data-action="clearFilters"]');
-        instance.previewCount = element.querySelector('[data-preview-count]');
-
-        if (!instance.conditionsList) {
-            throw new Error('Filter conditions list element not found');
         }
     }
 
@@ -163,6 +194,9 @@ class FilterPanelBehavior {
                 this.removeCondition(instance, btn);
             }
         });
+
+        // Initialize state
+        this.initializeState(instance);
     }
 
     /**
@@ -175,6 +209,64 @@ class FilterPanelBehavior {
 
         // Initialize filter count display
         this.updateFilterCount(instance);
+    }
+
+    /**
+     * Handle custom actions beyond componentUpdate
+     */
+    static handleCustomAction(instance, message) {
+        switch (message.action) {
+            case 'componentStateChange':
+                console.log('FilterPanelBehavior: componentStateChange received', message.state);
+                // This is the old action - delegate to onComponentUpdate
+                if (message.state) {
+                    this.onComponentUpdate(instance, message.state);
+                }
+                break;
+
+            case 'setPreviewCount':
+                if (instance.previewCount) {
+                    const count = message.count;
+                    instance.previewCount.textContent = count !== undefined
+                        ? `(${count} ${count === 1 ? 'item' : 'items'} match)`
+                        : '';
+                }
+                break;
+
+            case 'setQuickFilters':
+                if (Array.isArray(message.filterIds)) {
+                    instance.activeQuickFilters = new Set(message.filterIds);
+                    // Update checkboxes
+                    const checkboxes = instance.element.querySelectorAll('.quick-filter-checkbox');
+                    checkboxes.forEach(cb => {
+                        const shouldBeChecked = instance.activeQuickFilters.has(cb.dataset.filterId);
+                        cb.checked = shouldBeChecked;
+                    });
+                    this.updateFilterCount(instance);
+                }
+                break;
+
+            case 'setAdvancedFilters':
+                if (Array.isArray(message.conditions)) {
+                    // Clear existing
+                    instance.conditionsList.innerHTML = '';
+                    instance.filterConditions = [];
+
+                    // Add conditions (updateFilterCount is called inside addCondition)
+                    message.conditions.forEach(condition => {
+                        this.addCondition(instance, condition);
+                    });
+                }
+                break;
+
+            case 'clearFilters':
+                this.clearAllFilters(instance);
+                break;
+
+            default:
+                console.warn(`FilterPanelBehavior: Unhandled action '${message.action}'`);
+                break;
+        }
     }
 
     /**
@@ -634,150 +726,27 @@ class FilterPanelBehavior {
     }
 
     /**
-     * Send message to Extension Host
+     * Cleanup instance resources
      */
-    static sendMessage(instance, action, data) {
-        if (typeof window.ComponentUtils !== 'undefined' && window.ComponentUtils.sendMessage) {
-            window.ComponentUtils.sendMessage(action, {
-                componentId: instance.id,
-                componentType: 'FilterPanel',
-                ...data
-            });
-        }
-    }
-
-    /**
-     * Handle messages from Extension Host
-     */
-    static handleMessage(message) {
-        if (!message?.componentId) {
-            return;
-        }
-
-        const instance = this.instances.get(message.componentId);
-        if (!instance) {
-            console.warn(`FilterPanelBehavior: Instance ${message.componentId} not found`);
-            return;
-        }
-
-        switch (message.action) {
-            case 'componentStateChange':
-                console.log('FilterPanelBehavior: componentStateChange received', message.state);
-                // Handle state changes from component methods like setActiveQuickFilters()
-                if (message.state) {
-                    // Handle quick filters update
-                    if (message.state.activeQuickFilters !== undefined) {
-                        const filterIds = message.state.activeQuickFilters;
-                        console.log('FilterPanelBehavior: componentStateChange quick filters', filterIds);
-                        instance.activeQuickFilters = new Set(filterIds);
-                        // Update checkboxes
-                        const checkboxes = instance.element.querySelectorAll('.quick-filter-checkbox');
-                        console.log('FilterPanelBehavior: componentStateChange found', checkboxes.length, 'checkboxes');
-                        checkboxes.forEach(cb => {
-                            const shouldBeChecked = instance.activeQuickFilters.has(cb.dataset.filterId);
-                            console.log(`FilterPanelBehavior: componentStateChange checkbox ${cb.dataset.filterId} - should be checked: ${shouldBeChecked}`);
-                            cb.checked = shouldBeChecked;
-                        });
-                    }
-
-                    // Handle advanced filters update
-                    if (message.state.advancedFilterConditions !== undefined) {
-                        const conditions = message.state.advancedFilterConditions;
-                        // Clear existing
-                        instance.conditionsList.innerHTML = '';
-                        instance.filterConditions = [];
-
-                        // Add conditions
-                        conditions.forEach(condition => {
-                            this.addCondition(instance, condition);
-                        });
-                    }
-
-                    // Handle collapsed state
-                    if (message.state.collapsed !== undefined) {
-                        instance.collapsed = message.state.collapsed;
-                        if (instance.content) {
-                            instance.content.style.display = instance.collapsed ? 'none' : 'block';
-                        }
-                        const toggleIcon = instance.header?.querySelector('.filter-panel-toggle');
-                        if (toggleIcon) {
-                            toggleIcon.textContent = instance.collapsed ? '▶' : '▼';
-                        }
-                    }
-
-                    // Handle clear
-                    if (message.state.cleared) {
-                        this.clearAllFilters(instance);
-                    }
-                }
-                break;
-
-            case 'setPreviewCount':
-                if (instance.previewCount) {
-                    const count = message.count;
-                    instance.previewCount.textContent = count !== undefined
-                        ? `(${count} ${count === 1 ? 'item' : 'items'} match)`
-                        : '';
-                }
-                break;
-
-            case 'setQuickFilters':
-                if (Array.isArray(message.filterIds)) {
-                    instance.activeQuickFilters = new Set(message.filterIds);
-                    // Update checkboxes
-                    const checkboxes = instance.element.querySelectorAll('.quick-filter-checkbox');
-                    checkboxes.forEach(cb => {
-                        const shouldBeChecked = instance.activeQuickFilters.has(cb.dataset.filterId);
-                        cb.checked = shouldBeChecked;
-                    });
-                    this.updateFilterCount(instance);
-                }
-                break;
-
-            case 'setAdvancedFilters':
-                if (Array.isArray(message.conditions)) {
-                    // Clear existing
-                    instance.conditionsList.innerHTML = '';
-                    instance.filterConditions = [];
-
-                    // Add conditions (updateFilterCount is called inside addCondition)
-                    message.conditions.forEach(condition => {
-                        this.addCondition(instance, condition);
-                    });
-                }
-                break;
-
-            case 'clearFilters':
-                this.clearAllFilters(instance);
-                break;
-        }
-    }
-
-    /**
-     * Cleanup instance
-     */
-    static cleanup(componentId) {
-        const instance = this.instances.get(componentId);
-        if (!instance) return;
-
+    static cleanupInstance(instance) {
         // Remove event listeners
-        Object.values(instance.boundHandlers).forEach(handler => {
-            if (handler && handler.element && handler.listener) {
-                handler.element.removeEventListener(handler.event, handler.listener);
-            }
-        });
+        if (instance.header && instance.boundHandlers.headerClick) {
+            instance.header.removeEventListener('click', instance.boundHandlers.headerClick);
+        }
 
-        // Remove from instances
-        this.instances.delete(componentId);
+        if (instance.addConditionBtn && instance.boundHandlers.addCondition) {
+            instance.addConditionBtn.removeEventListener('click', instance.boundHandlers.addCondition);
+        }
+
+        if (instance.applyBtn && instance.boundHandlers.applyFilters) {
+            instance.applyBtn.removeEventListener('click', instance.boundHandlers.applyFilters);
+        }
+
+        if (instance.clearBtn && instance.boundHandlers.clearFilters) {
+            instance.clearBtn.removeEventListener('click', instance.boundHandlers.clearFilters);
+        }
     }
 }
 
-// Global registration for webview context
-if (typeof window !== 'undefined') {
-    window.FilterPanelBehavior = FilterPanelBehavior;
-
-    // Register with ComponentUtils if available
-    if (window.ComponentUtils?.registerBehavior) {
-        window.ComponentUtils.registerBehavior('FilterPanel', FilterPanelBehavior);
-    }
-}
+// Register behavior
+FilterPanelBehavior.register();

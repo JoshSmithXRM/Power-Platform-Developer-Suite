@@ -85,41 +85,110 @@ private async loadData(environmentId: string): Promise<void> {
 - Initialize component behaviors
 - Manage UI state
 
+### BaseBehavior Pattern (MANDATORY for Webview Behaviors)
+
+**All webview behaviors MUST extend `BaseBehavior`** to ensure:
+- **Enforced `onComponentUpdate()` implementation** - Can't forget to handle data updates
+- **Registry-based message routing** - No hardcoded switches
+- **Consistent lifecycle management** - Initialization, event setup, cleanup
+
+**Required**:
+1. Extend `BaseBehavior`
+2. Implement `getComponentType()` - Return component type string
+3. Implement `onComponentUpdate(instance, data)` - Handle event bridge data updates
+4. Call `.register()` at end of file
+
 **Example - Correct Usage**:
 ```javascript
 // In DataTableBehavior.js - Webview context
-class DataTableBehavior {
-    static instances = new Map();
-
-    static initialize(componentId, config, element) {
-        // ✅ CORRECT: Direct DOM manipulation
-        const table = document.getElementById(componentId);
-        table.addEventListener('click', this.handleRowClick);
-
-        this.instances.set(componentId, { element, config });
-        return this.instances.get(componentId);
+/**
+ * DataTableBehavior - Webview behavior for DataTable component
+ * Extends BaseBehavior for enforced componentUpdate pattern
+ */
+class DataTableBehavior extends BaseBehavior {
+    /**
+     * Get component type identifier (REQUIRED)
+     */
+    static getComponentType() {
+        return 'DataTable';
     }
 
-    static handleMessage(message) {
-        // ✅ CORRECT: Receive updates from Extension Host
-        if (message.action === 'setData') {
-            this.updateTable(message.componentId, message.data);
+    /**
+     * Handle component data updates from Extension Host (REQUIRED)
+     * Called automatically when event bridge sends updated data
+     */
+    static onComponentUpdate(instance, data) {
+        // ✅ CORRECT: Receive updates from Extension Host via event bridge
+        if (data && Array.isArray(data)) {
+            this.updateTable(instance, data);
         }
     }
 
-    static updateTable(componentId, data) {
-        const instance = this.instances.get(componentId);
-        const tbody = instance.element.querySelector('tbody');
+    /**
+     * Create instance structure (OPTIONAL override)
+     */
+    static createInstance(componentId, config, element) {
+        return {
+            id: componentId,
+            config: { ...config },
+            element: element,
+            tbody: null,
+            boundHandlers: {}
+        };
+    }
+
+    /**
+     * Find DOM elements (OPTIONAL override)
+     */
+    static findDOMElements(instance) {
+        instance.tbody = instance.element.querySelector('tbody');
+    }
+
+    /**
+     * Setup event listeners (OPTIONAL override)
+     */
+    static setupEventListeners(instance) {
+        // ✅ CORRECT: Direct DOM manipulation
+        instance.boundHandlers.rowClick = (e) => this.handleRowClick(instance, e);
+        instance.element.addEventListener('click', instance.boundHandlers.rowClick);
+    }
+
+    /**
+     * Handle custom actions beyond componentUpdate (OPTIONAL override)
+     */
+    static handleCustomAction(instance, message) {
+        switch (message.action) {
+            case 'selectRow':
+                this.selectRow(instance, message.rowId);
+                break;
+        }
+    }
+
+    /**
+     * Cleanup resources (OPTIONAL override)
+     */
+    static cleanupInstance(instance) {
+        if (instance.element && instance.boundHandlers.rowClick) {
+            instance.element.removeEventListener('click', instance.boundHandlers.rowClick);
+        }
+    }
+
+    static updateTable(instance, data) {
+        if (!instance.tbody) return;
 
         // ✅ CORRECT: Update DOM with new data
-        tbody.innerHTML = data.map(row =>
+        instance.tbody.innerHTML = data.map(row =>
             `<tr>${row.cells.map(cell => `<td>${cell}</td>`).join('')}</tr>`
         ).join('');
     }
+
+    static handleRowClick(instance, event) {
+        // Implementation...
+    }
 }
 
-// ✅ CORRECT: Register globally for ComponentUtils
-window.DataTableBehavior = DataTableBehavior;
+// ✅ CORRECT: Auto-register with ComponentUtils (REQUIRED)
+DataTableBehavior.register();
 ```
 
 ## Critical Pattern: Never Mix Contexts
@@ -409,16 +478,35 @@ class MyService {
 
 ```javascript
 // In Webview JavaScript - LoggerService not available
-class MyBehavior {
-    static handleMessage(message) {
-        // ✅ Use console.log
-        console.log('Handling message in webview:', message);
+/**
+ * MyBehavior - Example webview behavior
+ */
+class MyBehavior extends BaseBehavior {
+    static getComponentType() {
+        return 'MyComponent';
     }
 
-    static initialize(componentId, config) {
+    static onComponentUpdate(instance, data) {
+        // ✅ Use console.log
+        console.log('Handling component update in webview:', data);
+    }
+
+    static handleCustomAction(instance, message) {
+        console.log('Handling custom action:', message.action);
+    }
+
+    static createInstance(componentId, config, element) {
         console.debug('Initializing component:', componentId);
+        return {
+            id: componentId,
+            config: { ...config },
+            element: element,
+            boundHandlers: {}
+        };
     }
 }
+
+MyBehavior.register();
 ```
 
 ## Security Implications

@@ -486,37 +486,185 @@ npm run lint             # Standalone lint - compile already includes this
 - ❌ Create todos that encourage mechanical repetition across files
 - ❌ Duplicate code blocks - stop at 2nd instance and consider abstraction
 
-## Component Behavior Pattern
+## Component Behavior Pattern (MANDATORY - ENFORCED BY BASEBEHAVIOR)
 
-All webview behavior scripts MUST follow this pattern:
+**All webview behaviors MUST extend `BaseBehavior` base class. No exceptions.**
+
+### Why BaseBehavior Exists
+
+**Problem**: Before BaseBehavior, developers had to manually implement `componentUpdate` handlers. This was error-prone:
+- Missing `case 'componentUpdate'` caused silent failures (data sent, never displayed)
+- Hardcoded switch statements in ComponentUtils required manual updates for every new component
+- No enforcement - easy to forget required methods
+
+**Solution**: BaseBehavior enforces the pattern through:
+1. **Abstract method `onComponentUpdate(instance, data)`** - MUST be implemented or class won't compile
+2. **Registry pattern** - Behaviors auto-register via `.register()`, no hardcoded switches
+3. **Consistent initialization** - Common lifecycle managed by base class
+
+### Required Pattern for ALL New Behaviors:
 
 ```javascript
-class ComponentBehavior {
+/**
+ * MyComponentBehavior - Webview behavior for MyComponent
+ * Extends BaseBehavior for enforced componentUpdate pattern
+ */
+class MyComponentBehavior extends BaseBehavior {
+    /**
+     * Get component type identifier (REQUIRED)
+     */
+    static getComponentType() {
+        return 'MyComponent';  // Must match component type in Extension Host
+    }
+
+    /**
+     * Handle component data updates from Extension Host (REQUIRED)
+     * This is called automatically when event bridge sends updated data
+     * CANNOT be forgotten - BaseBehavior enforces implementation
+     */
+    static onComponentUpdate(instance, data) {
+        // Handle the data update here
+        // Example: Update DOM, refresh display, etc.
+        if (data && data.items) {
+            this.updateItems(instance, data.items);
+        }
+    }
+
+    /**
+     * Create instance structure (OPTIONAL override)
+     */
+    static createInstance(componentId, config, element) {
+        return {
+            id: componentId,
+            config: { ...config },
+            element: element,
+
+            // Component-specific DOM elements
+            itemsList: null,
+
+            // Component-specific state
+            items: [],
+
+            // Event handlers
+            boundHandlers: {}
+        };
+    }
+
+    /**
+     * Find DOM elements (OPTIONAL override)
+     */
+    static findDOMElements(instance) {
+        instance.itemsList = instance.element.querySelector('.items-list');
+    }
+
+    /**
+     * Setup event listeners (OPTIONAL override)
+     */
+    static setupEventListeners(instance) {
+        instance.boundHandlers.itemClick = (e) => this.handleItemClick(instance, e);
+        instance.itemsList.addEventListener('click', instance.boundHandlers.itemClick);
+    }
+
+    /**
+     * Handle custom actions beyond componentUpdate (OPTIONAL override)
+     */
+    static handleCustomAction(instance, message) {
+        switch (message.action) {
+            case 'selectItem':
+                this.selectItem(instance, message.itemId);
+                break;
+            case 'clearSelection':
+                this.clearSelection(instance);
+                break;
+            default:
+                console.warn(`MyComponentBehavior: Unhandled action '${message.action}'`);
+        }
+    }
+
+    /**
+     * Cleanup resources (OPTIONAL override)
+     */
+    static cleanupInstance(instance) {
+        if (instance.itemsList && instance.boundHandlers.itemClick) {
+            instance.itemsList.removeEventListener('click', instance.boundHandlers.itemClick);
+        }
+    }
+
+    // Component-specific helper methods
+    static updateItems(instance, items) {
+        // Implementation...
+    }
+
+    static handleItemClick(instance, event) {
+        // Implementation...
+    }
+}
+
+// Auto-register with ComponentUtils (REQUIRED - DO NOT FORGET)
+MyComponentBehavior.register();
+```
+
+### What BaseBehavior Provides Automatically:
+
+✅ **Enforced `onComponentUpdate()` implementation** - Abstract method must be implemented
+✅ **Registry-based routing** - No hardcoded switches in ComponentUtils
+✅ **Common initialization flow** - `initialize()`, `createInstance()`, `findDOMElements()`, `setupEventListeners()`
+✅ **Message routing** - `handleMessage()` routes to `onComponentUpdate()` or `handleCustomAction()`
+✅ **Cleanup management** - `cleanup()` with `cleanupInstance()` hook
+✅ **Auto-registration** - `.register()` adds to ComponentUtils registry
+
+### CRITICAL: What You MUST Do:
+
+1. ✅ **Extend BaseBehavior** - `class MyBehavior extends BaseBehavior`
+2. ✅ **Implement `getComponentType()`** - Return string matching Extension Host component type
+3. ✅ **Implement `onComponentUpdate()`** - Handle event bridge data updates
+4. ✅ **Call `.register()` at end of file** - Registers behavior with ComponentUtils
+
+### What Happens If You Forget:
+
+❌ **Forget to extend BaseBehavior** → Manual implementation, high risk of silent failures
+❌ **Forget `getComponentType()`** → Runtime error when calling `.register()`
+❌ **Forget `onComponentUpdate()`** → TypeScript compilation error (good! fails fast)
+❌ **Forget `.register()`** → Behavior not registered, messages not routed, component doesn't work
+
+### Migration from Old Pattern:
+
+If you find old behaviors not extending BaseBehavior:
+
+```javascript
+// ❌ OLD PATTERN (pre-BaseBehavior)
+class OldBehavior {
     static instances = new Map();
 
     static initialize(componentId, config, element) {
-        if (!componentId || !element) return null;
-        if (this.instances.has(componentId)) return this.instances.get(componentId);
-
-        const instance = { id: componentId, config, element };
-        this.instances.set(componentId, instance);
-        return instance;
+        // Manual implementation
     }
 
     static handleMessage(message) {
-        if (!message?.componentId) return;
-        // Handle Extension Host messages
+        switch (message.action) {
+            case 'componentUpdate':  // Easy to forget this case!
+                // Handle update
+                break;
+        }
     }
 }
 
-// Global registration
-if (typeof window !== 'undefined') {
-    window.ComponentBehavior = ComponentBehavior;
-    if (window.ComponentUtils?.registerBehavior) {
-        window.ComponentUtils.registerBehavior('ComponentType', ComponentBehavior);
+// ✅ NEW PATTERN (with BaseBehavior)
+class NewBehavior extends BaseBehavior {
+    static getComponentType() { return 'NewComponent'; }
+
+    static onComponentUpdate(instance, data) {
+        // MUST implement - enforced by abstract method
+    }
+
+    static handleCustomAction(instance, message) {
+        // Handle other actions here
     }
 }
+NewBehavior.register();
 ```
+
+**Refactor priority**: High - Old patterns are fragile and cause silent failures
 
 ## Documentation Reference
 

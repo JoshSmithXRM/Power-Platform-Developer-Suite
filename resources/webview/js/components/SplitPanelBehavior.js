@@ -3,23 +3,30 @@
  * Handles resizable divider drag, panel show/hide, and size management
  */
 
-class SplitPanelBehavior {
-    static instances = new Map();
+class SplitPanelBehavior extends BaseBehavior {
+    /**
+     * Get component type identifier
+     */
+    static getComponentType() {
+        return 'SplitPanel';
+    }
 
     /**
-     * Initialize a SplitPanel component instance
+     * Handle component data updates from Extension Host
+     * REQUIRED by BaseBehavior - called when event bridge sends updated data
      */
-    static initialize(componentId, config, element) {
-        if (!componentId || !element) {
-            console.error('SplitPanelBehavior: componentId and element are required');
-            return null;
-        }
+    static onComponentUpdate(instance, data) {
+        // SplitPanel doesn't typically receive data updates via componentUpdate
+        // It primarily handles action-based messages (setSplitRatio, showRightPanel, etc.)
+        // This method is here to satisfy BaseBehavior requirements
+        console.log('SplitPanelBehavior: onComponentUpdate received', data);
+    }
 
-        if (this.instances.has(componentId)) {
-            return this.instances.get(componentId);
-        }
-
-        const instance = {
+    /**
+     * Create the instance object structure
+     */
+    static createInstance(componentId, config, element) {
+        return {
             id: componentId,
             config: { ...config },
             element: element,
@@ -43,27 +50,6 @@ class SplitPanelBehavior {
             // Event handlers
             boundHandlers: {}
         };
-
-        try {
-            // Find DOM elements
-            this.findDOMElements(instance);
-
-            // Setup event listeners
-            this.setupEventListeners(instance);
-
-            // Initialize state
-            this.initializeState(instance);
-
-            // Register instance
-            this.instances.set(componentId, instance);
-
-            console.log(`SplitPanelBehavior: Initialized ${componentId}`);
-            return instance;
-
-        } catch (error) {
-            console.error(`SplitPanelBehavior: Failed to initialize ${componentId}:`, error);
-            return null;
-        }
     }
 
     /**
@@ -128,6 +114,9 @@ class SplitPanelBehavior {
         // Window resize
         instance.boundHandlers.windowResize = () => this.handleWindowResize(instance);
         window.addEventListener('resize', instance.boundHandlers.windowResize);
+
+        // Initialize state
+        this.initializeState(instance);
     }
 
     /**
@@ -147,6 +136,39 @@ class SplitPanelBehavior {
 
         // Ensure valid sizes
         this.enforcePanelSizes(instance);
+    }
+
+    /**
+     * Handle custom actions beyond componentUpdate
+     */
+    static handleCustomAction(instance, message) {
+        switch (message.action) {
+            case 'setSplitRatio':
+                if (typeof message.ratio === 'number') {
+                    this.setSplitRatio(instance, message.ratio);
+                }
+                break;
+
+            case 'showRightPanel':
+                this.showRightPanel(instance);
+                break;
+
+            case 'hideRightPanel':
+                this.closeRightPanel(instance);
+                break;
+
+            case 'toggleRightPanel':
+                if (instance.rightPanelVisible) {
+                    this.closeRightPanel(instance);
+                } else {
+                    this.showRightPanel(instance);
+                }
+                break;
+
+            default:
+                console.warn(`SplitPanelBehavior: Unhandled action '${message.action}'`);
+                break;
+        }
     }
 
     /**
@@ -393,64 +415,9 @@ class SplitPanelBehavior {
     }
 
     /**
-     * Send message to Extension Host
+     * Cleanup instance resources
      */
-    static sendMessage(instance, action, data) {
-        if (typeof window.ComponentUtils !== 'undefined' && window.ComponentUtils.sendMessage) {
-            window.ComponentUtils.sendMessage(action, {
-                componentId: instance.id,
-                componentType: 'SplitPanel',
-                ...data
-            });
-        }
-    }
-
-    /**
-     * Handle messages from Extension Host
-     */
-    static handleMessage(message) {
-        if (!message?.componentId || message.componentType !== 'SplitPanel') {
-            return;
-        }
-
-        const instance = this.instances.get(message.componentId);
-        if (!instance) {
-            console.warn(`SplitPanelBehavior: Instance ${message.componentId} not found`);
-            return;
-        }
-
-        switch (message.action) {
-            case 'setSplitRatio':
-                if (typeof message.ratio === 'number') {
-                    this.setSplitRatio(instance, message.ratio);
-                }
-                break;
-
-            case 'showRightPanel':
-                this.showRightPanel(instance);
-                break;
-
-            case 'hideRightPanel':
-                this.closeRightPanel(instance);
-                break;
-
-            case 'toggleRightPanel':
-                if (instance.rightPanelVisible) {
-                    this.closeRightPanel(instance);
-                } else {
-                    this.showRightPanel(instance);
-                }
-                break;
-        }
-    }
-
-    /**
-     * Cleanup instance
-     */
-    static cleanup(componentId) {
-        const instance = this.instances.get(componentId);
-        if (!instance) return;
-
+    static cleanupInstance(instance) {
         // Remove event listeners
         if (instance.divider && instance.boundHandlers.mouseDown) {
             instance.divider.removeEventListener('mousedown', instance.boundHandlers.mouseDown);
@@ -464,17 +431,16 @@ class SplitPanelBehavior {
             window.removeEventListener('resize', instance.boundHandlers.windowResize);
         }
 
-        // Remove from instances
-        this.instances.delete(componentId);
+        // Remove global mouse listeners if still attached
+        if (instance.boundHandlers.mouseMove) {
+            document.removeEventListener('mousemove', instance.boundHandlers.mouseMove);
+        }
+
+        if (instance.boundHandlers.mouseUp) {
+            document.removeEventListener('mouseup', instance.boundHandlers.mouseUp);
+        }
     }
 }
 
-// Global registration for webview context
-if (typeof window !== 'undefined') {
-    window.SplitPanelBehavior = SplitPanelBehavior;
-
-    // Register with ComponentUtils if available
-    if (window.ComponentUtils?.registerBehavior) {
-        window.ComponentUtils.registerBehavior('SplitPanel', SplitPanelBehavior);
-    }
-}
+// Register behavior
+SplitPanelBehavior.register();

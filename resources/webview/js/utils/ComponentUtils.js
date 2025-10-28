@@ -482,68 +482,22 @@ class ComponentUtils {
                           this.inferComponentTypeFromElement(element);
         }
 
-        
-        // Route to appropriate behavior handler
-        switch (componentType) {
-            case 'DataTable':
-                if (window.DataTableBehaviorStatic) {
-                    window.DataTableBehaviorStatic.handleMessage(message);
-                } else {
-                    console.warn('DataTableBehaviorStatic not available');
-                }
-                break;
-                
-            case 'EnvironmentSelector':
-                if (window.EnvironmentSelectorBehavior) {
-                    window.EnvironmentSelectorBehavior.handleMessage(message);
-                } else {
-                    console.warn('EnvironmentSelectorBehavior not available');
-                }
-                break;
-                
-            case 'SolutionSelector':
-                if (window.SolutionSelectorBehavior) {
-                    window.SolutionSelectorBehavior.handleMessage(message);
-                } else {
-                    console.warn('SolutionSelectorBehavior not available');
-                }
-                break;
-                
-            case 'ActionBar':
-                if (window.ActionBarBehavior) {
-                    window.ActionBarBehavior.handleMessage(message);
-                } else {
-                    console.warn('ActionBarBehavior not available');
-                }
-                break;
 
-            case 'FilterPanel':
-                if (window.FilterPanelBehavior) {
-                    window.FilterPanelBehavior.handleMessage(message);
-                } else {
-                    console.warn('FilterPanelBehavior not available');
-                }
-                break;
+        // Route to appropriate behavior handler using registry pattern
+        // This replaces the hardcoded switch statement with dynamic lookup
+        const behaviorClass = this.registeredBehaviors.get(componentType);
 
-            case 'SplitPanel':
-                if (window.SplitPanelBehavior) {
-                    window.SplitPanelBehavior.handleMessage(message);
-                } else {
-                    console.warn('SplitPanelBehavior not available');
-                }
-                break;
-
-            case 'TreeView':
-                if (window.TreeViewBehavior) {
-                    window.TreeViewBehavior.handleMessage(message);
-                } else {
-                    console.warn('TreeViewBehavior not available');
-                }
-                break;
-
-            default:
-                // Fallback: try to find behavior based on componentId pattern
-                this.routeByIdPattern(message);
+        if (behaviorClass && behaviorClass.handleMessage) {
+            console.log(`ComponentUtils: Routing ${message.action} to ${componentType} behavior`);
+            behaviorClass.handleMessage(message);
+        } else if (componentType) {
+            console.warn(`ComponentUtils: No behavior registered for component type '${componentType}'`);
+            // Fallback: try to find behavior based on componentId pattern
+            this.routeByIdPattern(message);
+        } else {
+            console.warn('ComponentUtils: Cannot determine component type for message:', message);
+            // Fallback: try to find behavior based on componentId pattern
+            this.routeByIdPattern(message);
         }
     }
 
