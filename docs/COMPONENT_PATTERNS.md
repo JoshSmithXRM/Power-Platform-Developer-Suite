@@ -1468,6 +1468,139 @@ See these panels for working examples:
 - `metadataBrowserBehavior.js` - Entity details panel integration
 - `pluginTraceViewerBehavior.js` - Trace details panel
 
+## Properties / Raw Data Tab Pattern
+
+### **Shared Abstraction for Detail Panels**
+
+Many panels display detailed information about selected items with two views:
+- **Properties Tab**: Clean, user-friendly view with friendly field names
+- **Raw Data Tab**: Complete JSON with syntax highlighting
+
+**This pattern is now abstracted and reusable.**
+
+### Shared Resources
+
+**CSS**: `css/components/detail-panel-tabs.css`
+- Tab styling (`.detail-panel-tabs`, `.detail-panel-tab`)
+- JSON syntax highlighting (`.json-key`, `.json-string`, `.json-number`, etc.)
+
+**JavaScript**: `js/utils/jsonRenderer.js`
+- `JSONRenderer.renderJSON(obj, depth)` - Renders JSON with syntax highlighting
+- `JSONRenderer.renderJSONWithWrapper(obj)` - Includes `<pre>` wrapper
+- `JSONRenderer.escapeHtml(text)` - XSS protection
+- Available globally via `window.JSONRenderer`
+
+### Implementation Pattern
+
+#### Extension Host (TypeScript)
+
+```typescript
+protected getHtmlContent(): string {
+    return PanelComposer.composeWithCustomHTML(
+        customHTML,
+        components,
+        [
+            'css/panels/your-panel.css',
+            'css/components/detail-panel-tabs.css'  // Add shared tab CSS
+        ],
+        [
+            'js/utils/jsonRenderer.js',  // Add BEFORE your behavior script
+            'js/panels/yourPanelBehavior.js'
+        ],
+        this.getCommonWebviewResources()
+    );
+}
+
+private generateDetailsHTML(node: TreeNode): string {
+    const propertiesHTML = this.generatePropertiesContent(node);
+
+    return `
+        <div class="detail-panel-tabs">
+            <button class="detail-panel-tab active" data-tab="properties" data-action="switch-detail-tab">
+                Properties
+            </button>
+            <button class="detail-panel-tab" data-tab="json" data-action="switch-detail-tab">
+                Raw Data
+            </button>
+        </div>
+        <div class="detail-panel-content">
+            <div id="detail-properties-content" style="display: block;">
+                ${propertiesHTML}
+            </div>
+            <div id="detail-json-content" style="display: none;">
+                <!-- JSON will be rendered by JSONRenderer in webview -->
+            </div>
+        </div>
+    `;
+}
+
+// Send raw data to webview for JSON rendering
+this.postMessage({
+    command: 'show-details',
+    data: {
+        html: detailsHTML,
+        rawData: node.data  // JSONRenderer will handle this in webview
+    }
+});
+```
+
+#### Webview Behavior (JavaScript)
+
+```javascript
+static showDetails(data) {
+    // Update properties HTML
+    const detailContent = document.getElementById('detail-panel-content');
+    if (detailContent) {
+        detailContent.innerHTML = data.html;
+    }
+
+    // Render JSON with syntax highlighting using shared JSONRenderer
+    if (data.rawData && window.JSONRenderer) {
+        const jsonContent = document.getElementById('detail-json-content');
+        if (jsonContent) {
+            jsonContent.innerHTML = window.JSONRenderer.renderJSONWithWrapper(data.rawData);
+        }
+    }
+}
+
+static switchDetailTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.detail-panel-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.getAttribute('data-tab') === tabName);
+    });
+
+    // Update content visibility
+    const propertiesContent = document.getElementById('detail-properties-content');
+    const jsonContent = document.getElementById('detail-json-content');
+
+    if (propertiesContent) {
+        propertiesContent.style.display = tabName === 'properties' ? 'block' : 'none';
+    }
+    if (jsonContent) {
+        jsonContent.style.display = tabName === 'json' ? 'block' : 'none';
+    }
+}
+```
+
+### ❌ Don't Create Duplicate Implementations
+
+**Before abstraction**, each panel had:
+- Duplicate `renderJSON()` methods (identical code in 3 files)
+- Duplicate tab CSS (identical styles in 3 CSS files)
+- No consistency in JSON rendering across panels
+
+**After abstraction**:
+- Single `JSONRenderer` utility used by all panels
+- Single `detail-panel-tabs.css` for consistent styling
+- Easy to enhance JSON rendering (add collapsing, copy button, etc.) in one place
+
+### Reference Implementations
+
+See these panels for working examples:
+- `PluginRegistrationPanel` - Plugin properties with Raw Data tab
+- `MetadataBrowserPanel` - Entity/attribute metadata with Raw Data tab
+- `PluginTraceViewerPanel` - Trace details with Raw Data tab
+
 ## Pattern Enforcement
 
 ### **Automated Compliance**

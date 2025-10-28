@@ -207,8 +207,8 @@ export class PluginRegistrationPanel extends BasePanel {
         return PanelComposer.composeWithCustomHTML(
             customHTML,
             [this.environmentSelectorComponent!, this.actionBarComponent!, this.treeViewComponent!],
-            ['css/panels/plugin-registration.css', 'css/components/split-panel.css'],
-            ['js/panels/pluginRegistrationBehavior.js', 'js/components/SplitPanelBehavior.js'],
+            ['css/panels/plugin-registration.css', 'css/components/split-panel.css', 'css/components/detail-panel-tabs.css'],
+            ['js/utils/jsonRenderer.js', 'js/panels/pluginRegistrationBehavior.js', 'js/components/SplitPanelBehavior.js'],
             this.getCommonWebviewResources(),
             'Plugin Registration'
         );
@@ -223,6 +223,29 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     private generateDetailsHTML(node: TreeNode): string {
+        const propertiesHTML = this.generatePropertiesContent(node);
+
+        return `
+            <div class="detail-panel-tabs">
+                <button class="detail-panel-tab active" data-tab="properties" data-action="switch-detail-tab">
+                    Properties
+                </button>
+                <button class="detail-panel-tab" data-tab="json" data-action="switch-detail-tab">
+                    Raw Data
+                </button>
+            </div>
+            <div class="detail-panel-content">
+                <div id="detail-properties-content" style="display: block;">
+                    ${propertiesHTML}
+                </div>
+                <div id="detail-json-content" style="display: none;">
+                    <!-- JSON will be rendered by JSONRenderer in webview behavior -->
+                </div>
+            </div>
+        `;
+    }
+
+    private generatePropertiesContent(node: TreeNode): string {
         switch (node.type) {
             case 'assembly':
                 return this.generateAssemblyDetailsHTML(node.data as PluginAssembly);
@@ -238,10 +261,54 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     /**
-     * Generate property rows for ALL properties in an object (dev tool - show everything)
+     * Convert camelCase/PascalCase field names to friendly Title Case with spaces
+     */
+    private toFriendlyName(fieldName: string): string {
+        // Handle specific mappings first
+        const mappings: Record<string, string> = {
+            'pluginassemblyid': 'Plugin Assembly ID',
+            'plugintypeid': 'Plugin Type ID',
+            'sdkmessageprocessingstepid': 'Step ID',
+            'sdkmessageprocessingstepimageid': 'Image ID',
+            'sdkmessageid': 'SDK Message ID',
+            'ismanaged': 'Is Managed',
+            'isolationmode': 'Isolation Mode',
+            'sourcetype': 'Source Type',
+            'publickeytoken': 'Public Key Token',
+            'typename': 'Type Name',
+            'friendlyname': 'Friendly Name',
+            'statecode': 'State',
+            'filteringattributes': 'Filtering Attributes',
+            'entityalias': 'Entity Alias',
+            'imagetype': 'Image Type',
+            'createdon': 'Created On',
+            'modifiedon': 'Modified On'
+        };
+
+        const lower = fieldName.toLowerCase();
+        if (mappings[lower]) {
+            return mappings[lower];
+        }
+
+        // Split on capital letters and underscores, then title case
+        return fieldName
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/_/g, ' ')
+            .trim()
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+    }
+
+    /**
+     * Generate property rows with friendly names, hiding OData metadata
      */
     private generateAllPropertiesHTML(data: Record<string, unknown>, title: string, icon: string): string {
         const rows = Object.entries(data)
+            // Filter out OData metadata and lookup value fields
+            .filter(([key]) => {
+                return !key.startsWith('@odata') && !key.startsWith('_') && !key.endsWith('_value');
+            })
             .sort(([keyA], [keyB]) => keyA.localeCompare(keyB)) // Sort alphabetically
             .map(([key, value]) => {
                 // Format the value appropriately
@@ -260,9 +327,12 @@ export class PluginRegistrationPanel extends BasePanel {
                 const isGuid = typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
                 const valueClass = isGuid ? 'property-value property-id' : 'property-value';
 
+                // Get friendly name
+                const friendlyName = this.toFriendlyName(key);
+
                 return `
                     <div class="property-row">
-                        <span class="property-label">${this.escapeHtml(key)}:</span>
+                        <span class="property-label">${this.escapeHtml(friendlyName)}:</span>
                         <span class="${valueClass}">${displayValue}</span>
                     </div>
                 `;
@@ -678,7 +748,8 @@ export class PluginRegistrationPanel extends BasePanel {
             data: {
                 html: detailsHTML,
                 nodeType: node.type,
-                nodeId: node.id
+                nodeId: node.id,
+                rawData: node.data // Send raw data for JSONRenderer to render in webview
             }
         });
         this.componentLogger.info('Sent show-node-details message');

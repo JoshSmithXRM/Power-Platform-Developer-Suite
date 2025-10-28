@@ -830,9 +830,11 @@ export class MetadataBrowserPanel extends BasePanel {
                 ],
                 [
                     'css/panels/metadata-browser.css',
-                    'css/components/split-panel.css'
+                    'css/components/split-panel.css',
+                    'css/components/detail-panel-tabs.css'
                 ],  // Additional panel-specific CSS
                 [
+                    'js/utils/jsonRenderer.js',
                     'js/panels/metadataBrowserBehavior.js',
                     'js/components/SplitPanelBehavior.js'
                 ],  // Additional panel-specific behavior scripts

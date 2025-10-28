@@ -487,10 +487,10 @@ class MetadataBrowserBehavior {
             title.textContent = data.title || 'Metadata Details';
         }
 
-        // Render JSON in the JSON tab content
+        // Render JSON in the JSON tab content using shared JSONRenderer
         const jsonContent = document.getElementById('detail-json-content');
-        if (jsonContent) {
-            jsonContent.innerHTML = `<pre class="json-display">${this.renderJSON(data.metadata, 0)}</pre>`;
+        if (jsonContent && window.JSONRenderer) {
+            jsonContent.innerHTML = window.JSONRenderer.renderJSONWithWrapper(data.metadata);
         }
 
         // Render properties in the Properties tab
@@ -677,51 +677,7 @@ class MetadataBrowserBehavior {
         `;
     }
 
-    /**
-     * Render JSON with syntax highlighting
-     */
-    static renderJSON(obj, depth = 0) {
-        if (obj === null) return '<span class="json-null">null</span>';
-        if (obj === undefined) return '<span class="json-undefined">undefined</span>';
-
-        const indent = '  '.repeat(depth);
-        const type = typeof obj;
-
-        if (type === 'boolean') {
-            return `<span class="json-boolean">${obj}</span>`;
-        }
-
-        if (type === 'number') {
-            return `<span class="json-number">${obj}</span>`;
-        }
-
-        if (type === 'string') {
-            return `<span class="json-string">"${this.escapeHtml(obj)}"</span>`;
-        }
-
-        if (Array.isArray(obj)) {
-            if (obj.length === 0) return '[]';
-
-            const items = obj.map(item =>
-                `${indent}  ${this.renderJSON(item, depth + 1)}`
-            ).join(',\n');
-
-            return `[\n${items}\n${indent}]`;
-        }
-
-        if (type === 'object') {
-            const keys = Object.keys(obj);
-            if (keys.length === 0) return '{}';
-
-            const items = keys.map(key =>
-                `${indent}  <span class="json-key">"${this.escapeHtml(key)}"</span>: ${this.renderJSON(obj[key], depth + 1)}`
-            ).join(',\n');
-
-            return `{\n${items}\n${indent}}`;
-        }
-
-        return String(obj);
-    }
+    // renderJSON removed - now using shared JSONRenderer from js/utils/jsonRenderer.js
 
     /**
      * Escape HTML special characters

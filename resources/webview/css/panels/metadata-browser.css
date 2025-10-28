@@ -323,32 +323,7 @@
     background: var(--vscode-toolbar-hoverBackground);
 }
 
-.detail-panel-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--vscode-panel-border);
-    background: var(--vscode-editorGroupHeader-tabsBackground);
-    flex-shrink: 0;
-}
-
-.detail-panel-tab {
-    padding: 10px 20px;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--vscode-tab-inactiveForeground);
-    cursor: pointer;
-    font-size: 13px;
-    transition: all 0.1s;
-}
-
-.detail-panel-tab:hover {
-    color: var(--vscode-tab-activeForeground);
-}
-
-.detail-panel-tab.active {
-    color: var(--vscode-tab-activeForeground);
-    border-bottom-color: var(--vscode-tab-activeBorderTop);
-}
+/* Tab and JSON display styles moved to shared css/components/detail-panel-tabs.css */
 
 .detail-panel-content {
     flex: 1;
@@ -367,45 +342,6 @@
     font-style: italic;
     text-align: center;
     padding: 40px 20px;
-}
-
-/* JSON Display Styling */
-.json-display {
-    font-family: var(--vscode-editor-font-family);
-    font-size: 12px;
-    line-height: 1.6;
-    margin: 0;
-    padding: 12px;
-    background: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 4px;
-    overflow-x: auto;
-}
-
-.json-display .json-key {
-    color: var(--vscode-symbolIcon-propertyForeground);
-}
-
-.json-display .json-string {
-    color: var(--vscode-debugTokenExpression-string);
-}
-
-.json-display .json-number {
-    color: var(--vscode-debugTokenExpression-number);
-}
-
-.json-display .json-boolean {
-    color: var(--vscode-debugTokenExpression-boolean);
-}
-
-.json-display .json-null {
-    color: var(--vscode-debugTokenExpression-error);
-    font-style: italic;
-}
-
-.json-display .json-undefined {
-    color: var(--vscode-descriptionForeground);
-    font-style: italic;
 }
 
 /* Properties Table Styling */

@@ -1638,9 +1638,10 @@ export class PluginTraceViewerPanel extends BasePanel {
                 'css/panels/plugin-trace-viewer.css',
                 'css/components/timeline.css',
                 'css/components/split-panel.css',
-                'css/components/viewers/json-viewer.css'
+                'css/components/detail-panel-tabs.css'
             ],
             [
+                'js/utils/jsonRenderer.js',
                 'js/utils/ExportUtils.js',
                 'js/components/TimelineBehavior.js',
                 'js/components/SplitPanelBehavior.js',

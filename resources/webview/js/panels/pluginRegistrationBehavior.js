@@ -50,6 +50,14 @@ class PluginRegistrationBehavior {
                 case 'closeRightPanel':
                     PluginRegistrationBehavior.closeDetailPanel();
                     break;
+
+                case 'switch-detail-tab': {
+                    const tabName = target.getAttribute('data-tab') || target.closest('[data-tab]')?.getAttribute('data-tab');
+                    if (tabName) {
+                        PluginRegistrationBehavior.switchDetailTab(tabName);
+                    }
+                    break;
+                }
             }
         });
     }
@@ -81,6 +89,15 @@ class PluginRegistrationBehavior {
         console.log('PluginRegistrationBehavior: Setting innerHTML...');
         detailContent.innerHTML = data.html;
         console.log('PluginRegistrationBehavior: innerHTML set. New content:', detailContent.innerHTML.substring(0, 100));
+
+        // Render JSON in the Raw Data tab using shared JSONRenderer
+        if (data.rawData && window.JSONRenderer) {
+            const jsonContent = document.getElementById('detail-json-content');
+            if (jsonContent) {
+                jsonContent.innerHTML = window.JSONRenderer.renderJSONWithWrapper(data.rawData);
+                console.log('PluginRegistrationBehavior: Rendered JSON with syntax highlighting');
+            }
+        }
 
         // Show panel using SplitPanelBehavior public API
         if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('pluginRegistration-splitPanel')) {
@@ -115,6 +132,30 @@ class PluginRegistrationBehavior {
         vscode.postMessage({
             command: 'close-details'
         });
+    }
+
+    /**
+     * Switch detail panel tab between Properties and Raw Data
+     */
+    static switchDetailTab(tabName) {
+        console.log('PluginRegistrationBehavior: Switching to tab:', tabName);
+
+        // Update tab buttons
+        document.querySelectorAll('.detail-panel-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.getAttribute('data-tab') === tabName);
+        });
+
+        // Update content visibility
+        const propertiesContent = document.getElementById('detail-properties-content');
+        const jsonContent = document.getElementById('detail-json-content');
+
+        if (propertiesContent) {
+            propertiesContent.style.display = tabName === 'properties' ? 'block' : 'none';
+        }
+
+        if (jsonContent) {
+            jsonContent.style.display = tabName === 'json' ? 'block' : 'none';
+        }
     }
 }
 
