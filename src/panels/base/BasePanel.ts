@@ -317,6 +317,67 @@ export abstract class BasePanel implements IPanelBase {
     }
 
     /**
+     * Helper to handle createOrShow and createNew patterns with singleton management
+     * Eliminates code duplication across all panel classes
+     *
+     * @param config Panel configuration (viewType, title, localResourceRoots)
+     * @param extensionUri Extension URI for resource loading
+     * @param createPanelInstance Factory function to create panel instance
+     * @param getCurrentPanel Callback to get current singleton instance
+     * @param setCurrentPanel Callback to set current singleton instance
+     * @param forceNew If true, always create new panel; if false, reveal existing or create new
+     *
+     * @example
+     * // In MetadataBrowserPanel
+     * public static createOrShow(extensionUri: vscode.Uri): void {
+     *     BasePanel.handlePanelCreation(
+     *         {
+     *             viewType: MetadataBrowserPanel.viewType,
+     *             title: 'Metadata Browser',
+     *             localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+     *         },
+     *         extensionUri,
+     *         (panel, uri) => new MetadataBrowserPanel(panel, uri),
+     *         () => MetadataBrowserPanel.currentPanel,
+     *         (panel) => { MetadataBrowserPanel.currentPanel = panel; },
+     *         false // createOrShow behavior
+     *     );
+     * }
+     */
+    protected static handlePanelCreation<T extends BasePanel>(
+        config: {
+            viewType: string;
+            title: string;
+            localResourceRoots: vscode.Uri[];
+        },
+        extensionUri: vscode.Uri,
+        createPanelInstance: (panel: vscode.WebviewPanel, uri: vscode.Uri) => T,
+        getCurrentPanel: () => T | undefined,
+        setCurrentPanel: (panel: T) => void,
+        forceNew: boolean = false
+    ): void {
+        const column = vscode.window.activeTextEditor?.viewColumn;
+
+        // If not forcing new and a panel exists, reveal it
+        if (!forceNew && getCurrentPanel()) {
+            getCurrentPanel()!.panel.reveal(column);
+            return;
+        }
+
+        // Create new panel
+        const panel = BasePanel.createWebviewPanel({
+            viewType: config.viewType,
+            title: config.title,
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            localResourceRoots: config.localResourceRoots
+        }, column);
+
+        // Create new instance using factory function and store it
+        setCurrentPanel(createPanelInstance(panel, extensionUri));
+    }
+
+    /**
      * Standardized environment loading with optional auto-selection
      * Common pattern used by multiple panels
      */

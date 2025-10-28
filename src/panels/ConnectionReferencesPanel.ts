@@ -45,29 +45,36 @@ export class ConnectionReferencesPanel extends BasePanel {
     private componentFactory: ComponentFactory; // Per-panel instance to avoid component ID collisions
 
     public static createOrShow(extensionUri: vscode.Uri): void {
-        const column = vscode.window.activeTextEditor?.viewColumn;
-
-        if (ConnectionReferencesPanel.currentPanel) {
-            ConnectionReferencesPanel.currentPanel.panel.reveal(column);
-            return;
-        }
-
-        const panel = BasePanel.createWebviewPanel({
-            viewType: ConnectionReferencesPanel.viewType,
-            title: 'Connection References',
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-        }, column);
-
-        ConnectionReferencesPanel.currentPanel = new ConnectionReferencesPanel(panel, extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: ConnectionReferencesPanel.viewType,
+                title: 'Connection References',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new ConnectionReferencesPanel(panel, uri),
+            () => ConnectionReferencesPanel.currentPanel,
+            (panel) => { ConnectionReferencesPanel.currentPanel = panel; },
+            false
+        );
     }
 
     public static createNew(extensionUri: vscode.Uri): void {
-        this.createOrShow(extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: ConnectionReferencesPanel.viewType,
+                title: 'Connection References',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new ConnectionReferencesPanel(panel, uri),
+            () => ConnectionReferencesPanel.currentPanel,
+            (panel) => { ConnectionReferencesPanel.currentPanel = panel; },
+            true
+        );
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
         super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: ConnectionReferencesPanel.viewType,
             title: 'Connection References'

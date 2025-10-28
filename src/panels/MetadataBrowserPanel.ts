@@ -93,29 +93,36 @@ export class MetadataBrowserPanel extends BasePanel {
     private collapsedSections: Set<string> = new Set(['keys', 'relationships', 'privileges', 'choices']);
 
     public static createOrShow(extensionUri: vscode.Uri): void {
-        const column = vscode.window.activeTextEditor?.viewColumn;
-
-        if (MetadataBrowserPanel.currentPanel) {
-            MetadataBrowserPanel.currentPanel.panel.reveal(column);
-            return;
-        }
-
-        const panel = BasePanel.createWebviewPanel({
-            viewType: MetadataBrowserPanel.viewType,
-            title: 'Metadata Browser',
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-        }, column);
-
-        MetadataBrowserPanel.currentPanel = new MetadataBrowserPanel(panel, extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: MetadataBrowserPanel.viewType,
+                title: 'Metadata Browser',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new MetadataBrowserPanel(panel, uri),
+            () => MetadataBrowserPanel.currentPanel,
+            (panel) => { MetadataBrowserPanel.currentPanel = panel; },
+            false
+        );
     }
 
     public static createNew(extensionUri: vscode.Uri): void {
-        this.createOrShow(extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: MetadataBrowserPanel.viewType,
+                title: 'Metadata Browser',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new MetadataBrowserPanel(panel, uri),
+            () => MetadataBrowserPanel.currentPanel,
+            (panel) => { MetadataBrowserPanel.currentPanel = panel; },
+            true
+        );
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
         super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: MetadataBrowserPanel.viewType,
             title: 'Metadata Browser'

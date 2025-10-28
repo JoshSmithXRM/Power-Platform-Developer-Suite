@@ -216,7 +216,10 @@ export default tseslint.config(
   {
     // PHASE 2: MESSAGE CONVENTIONS & ERROR HANDLING
     // Stricter rules for panels to enforce message naming and error handling standards
-    files: ['src/panels/**/*Panel.ts', '!src/panels/base/**'],
+    files: [
+      'src/panels/**/*Panel.ts',
+      '!src/panels/base/**'
+    ],
     rules: {
       // Enforce kebab-case in case statement strings (common message patterns)
       'no-restricted-syntax': [
@@ -228,6 +231,12 @@ export default tseslint.config(
         {
           selector: "CallExpression[callee.object.name='console']",
           message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
+        },
+        {
+          // Only enforce on panels that use singleton pattern (have static currentPanel field)
+          // This selector checks: class has currentPanel AND method doesn't call handlePanelCreation
+          selector: "ClassDeclaration:has(PropertyDefinition[static=true][key.name='currentPanel']) MethodDefinition[key.name=/^(createOrShow|createNew)$/][static=true]:not(:has(BlockStatement CallExpression[callee.object.name='BasePanel'][callee.property.name='handlePanelCreation']))",
+          message: '❌ Panel createOrShow() and createNew() methods must use BasePanel.handlePanelCreation() helper to eliminate code duplication. See: CLAUDE.md#refactoring-principles'
         },
         {
           selector: "TemplateLiteral TemplateElement[value.raw=/onclick\\s*=/]",

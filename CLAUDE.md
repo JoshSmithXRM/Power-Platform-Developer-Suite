@@ -172,6 +172,38 @@ npm run package          # Production build with webpack
 npm run test-release     # Build, package, and install locally
 ```
 
+## Refactoring Principles
+
+**Three Strikes Rule**: If you're fixing/changing the same code in 3+ places, STOP and create an abstraction.
+
+**Before duplicating code:**
+1. Stop after the 2nd duplication
+2. Ask: "Will this pattern repeat in more places?"
+3. If yes: Create abstraction first, then apply everywhere
+4. If no: Duplication is acceptable for 2 instances
+
+**Opportunistic Refactoring**: When you touch code and see clear duplication, fix it immediately while context is fresh. Don't schedule for "later" (it never happens).
+
+**Red Flags for Missing Abstractions:**
+- Fixing same bug in N files (N ≥ 3)
+- Copy-pasting code blocks between files
+- "Do this for all panels" type tasks
+- Creating multiple sequential todos for identical changes
+
+**Task Structuring for Architectural Thinking:**
+```
+❌ BAD (encourages mechanical repetition):
+- Fix createNew() in MetadataBrowserPanel
+- Fix createNew() in SolutionExplorerPanel
+- Fix createNew() in PluginTraceViewerPanel
+...
+
+✅ GOOD (encourages analysis):
+- Analyze createNew() duplication pattern across all panels
+- Design abstraction to eliminate duplication
+- Implement fix across all panels
+```
+
 ## Quick Reference - DO's
 
 - ✅ Use ComponentFactory for ALL component creation
@@ -193,6 +225,9 @@ npm run test-release     # Build, package, and install locally
 - ❌ Add custom body/container styles that override base layout
 - ❌ Use custom header classes instead of `panel-controls`
 - ❌ Hardcode colors (breaks theme compatibility)
+- ❌ Fix the same bug in 3+ files without questioning the pattern
+- ❌ Create todos that encourage mechanical repetition across files
+- ❌ Duplicate code blocks - stop at 2nd instance and consider abstraction
 
 ## Component Behavior Pattern
 

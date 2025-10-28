@@ -35,29 +35,36 @@ export class ImportJobViewerPanel extends BasePanel {
     private componentFactory: ComponentFactory;
 
     public static createOrShow(extensionUri: vscode.Uri): void {
-        const column = vscode.window.activeTextEditor?.viewColumn;
-
-        if (ImportJobViewerPanel.currentPanel) {
-            ImportJobViewerPanel.currentPanel.panel.reveal(column);
-            return;
-        }
-
-        const panel = BasePanel.createWebviewPanel({
-            viewType: ImportJobViewerPanel.viewType,
-            title: 'Import Job Viewer',
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-        }, column);
-
-        ImportJobViewerPanel.currentPanel = new ImportJobViewerPanel(panel, extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: ImportJobViewerPanel.viewType,
+                title: 'Import Job Viewer',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new ImportJobViewerPanel(panel, uri),
+            () => ImportJobViewerPanel.currentPanel,
+            (panel) => { ImportJobViewerPanel.currentPanel = panel; },
+            false
+        );
     }
 
     public static createNew(extensionUri: vscode.Uri): void {
-        this.createOrShow(extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: ImportJobViewerPanel.viewType,
+                title: 'Import Job Viewer',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new ImportJobViewerPanel(panel, uri),
+            () => ImportJobViewerPanel.currentPanel,
+            (panel) => { ImportJobViewerPanel.currentPanel = panel; },
+            true
+        );
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
         super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: ImportJobViewerPanel.viewType,
             title: 'Import Job Viewer'

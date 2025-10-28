@@ -33,29 +33,36 @@ export class SolutionExplorerPanel extends BasePanel {
     private componentFactory: ComponentFactory;
 
     public static createOrShow(extensionUri: vscode.Uri): void {
-        const column = vscode.window.activeTextEditor?.viewColumn;
-
-        if (SolutionExplorerPanel.currentPanel) {
-            SolutionExplorerPanel.currentPanel.panel.reveal(column);
-            return;
-        }
-
-        const panel = BasePanel.createWebviewPanel({
-            viewType: SolutionExplorerPanel.viewType,
-            title: 'Solution Explorer',
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-        }, column);
-
-        SolutionExplorerPanel.currentPanel = new SolutionExplorerPanel(panel, extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: SolutionExplorerPanel.viewType,
+                title: 'Solution Explorer',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new SolutionExplorerPanel(panel, uri),
+            () => SolutionExplorerPanel.currentPanel,
+            (panel) => { SolutionExplorerPanel.currentPanel = panel; },
+            false
+        );
     }
 
     public static createNew(extensionUri: vscode.Uri): void {
-        this.createOrShow(extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: SolutionExplorerPanel.viewType,
+                title: 'Solution Explorer',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new SolutionExplorerPanel(panel, uri),
+            () => SolutionExplorerPanel.currentPanel,
+            (panel) => { SolutionExplorerPanel.currentPanel = panel; },
+            true
+        );
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
         super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: SolutionExplorerPanel.viewType,
             title: 'Solution Explorer'
