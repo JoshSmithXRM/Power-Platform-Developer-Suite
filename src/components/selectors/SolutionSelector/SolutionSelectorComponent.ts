@@ -5,11 +5,21 @@ import { SolutionSelectorConfig, SolutionSelectorSelectionEvent, SolutionSelecto
 import { SolutionSelectorView, SolutionSelectorViewState } from './SolutionSelectorView';
 
 /**
+ * Type-safe data structure returned by SolutionSelectorComponent.getData()
+ */
+export interface SolutionSelectorData {
+    solutions: Solution[];
+    filteredSolutions: Solution[];
+    selectedSolutions: Solution[];
+    hasData: boolean;
+}
+
+/**
  * SolutionSelectorComponent - Power Platform solution selector with advanced filtering
  * Provides comprehensive solution selection with search, filtering, and grouping capabilities
  * Supports both single and multi-selection modes with rich solution metadata display
  */
-export class SolutionSelectorComponent extends BaseComponent {
+export class SolutionSelectorComponent extends BaseComponent<SolutionSelectorData> {
     protected config: SolutionSelectorConfig;
     
     // Component state

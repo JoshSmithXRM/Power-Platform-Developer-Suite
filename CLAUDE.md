@@ -3,6 +3,161 @@
 Quick reference for AI assistants working with this VS Code extension codebase.
 **For detailed examples and explanations, see the `docs/` folder.**
 
+## 🏗️ ARCHITECTURAL PRINCIPLES (NON-NEGOTIABLE)
+
+**These principles MUST be followed. No exceptions. No shortcuts.**
+
+### 1. Type Safety First
+- ❌ **NEVER use `any`** - Use proper types or `unknown` with narrowing
+- ❌ **NEVER use `unknown` for component data** - Use generics for type-safe data contracts
+- ❌ **NEVER use optional chaining to hide missing methods** - Implement required interfaces
+- ✅ **ALWAYS leverage TypeScript's type system** - If it compiles with strict mode, it's safer
+- ✅ **ALWAYS use generics for reusable components** - `BaseComponent<TData>` not `BaseComponent`
+
+**Why**: Type safety catches bugs at compile time, not runtime. Each `any` or `unknown` creates a blind spot where bugs hide.
+
+### 2. No Technical Debt Without Explicit Discussion
+- ❌ **NEVER add `eslint-disable` comments** without explicit user permission (see Code Quality Rules below)
+- ❌ **NEVER use workarounds** when proper solution is available
+- ❌ **NEVER say "this works for now"** - either do it right or discuss tradeoffs explicitly
+- ✅ **ALWAYS discuss architectural tradeoffs** with pros/cons/risks before implementing
+- ✅ **ALWAYS choose the architecturally sound solution** even if it takes longer initially
+
+**Why**: Technical debt compounds. Each shortcut makes the next one easier to justify. This leads to unmaintainable codebases.
+
+### 3. Consistency Over Convenience
+- ❌ **NEVER create one-off patterns** - follow existing patterns or refactor them
+- ❌ **NEVER duplicate code** - abstract common patterns (DRY principle)
+- ✅ **ALWAYS enforce patterns through TypeScript** - use abstract classes/interfaces
+- ✅ **ALWAYS refactor when you see duplication** - don't add to technical debt
+
+**Why**: Inconsistent patterns increase cognitive load and make maintenance expensive.
+
+### 4. Fail Fast, Fail Loud
+- ❌ **NEVER fail silently** - `getData?.() || null` hides missing implementations
+- ❌ **NEVER use default values to paper over problems** - fix the root cause
+- ✅ **ALWAYS make missing implementations compilation errors** - use `abstract` or required interfaces
+- ✅ **ALWAYS validate at boundaries** - check inputs at API/component boundaries
+
+**Why**: Silent failures are the hardest bugs to debug. Loud failures are easy to fix.
+
+### 5. Code for the Team, Not Just Yourself
+- ❌ **NEVER write "clever" code** - write obvious code
+- ❌ **NEVER skip documentation** for non-obvious patterns
+- ✅ **ALWAYS prioritize readability** - code is read 10x more than written
+- ✅ **ALWAYS consider onboarding** - new developers should understand the pattern
+
+**Why**: Code is a team asset. Optimize for team productivity, not individual convenience.
+
+## 🎯 SOLID DESIGN PRINCIPLES (MANDATORY)
+
+**All code MUST follow SOLID principles. Use Interface Segregation Principle instead of `any`.**
+
+### Single Responsibility Principle (SRP)
+- ✅ **DO**: Each class has ONE reason to change
+  - `EnvironmentSelectorComponent` - manages environment selection only
+  - `DataTableComponent` - manages table display only
+  - `PanelComposer` - composes HTML only (doesn't fetch data)
+- ❌ **DON'T**: Mix concerns in one class
+  - Don't put business logic in components
+  - Don't put rendering logic in services
+
+### Open/Closed Principle (OCP)
+- ✅ **DO**: Extend behavior without modifying existing code
+  - Use `BaseComponent<TData>` generic to add new component types
+  - Use `PanelComposer.composeWithCustomHTML()` for custom layouts
+- ❌ **DON'T**: Modify base classes for specific use cases
+  - Don't add component-specific logic to `BaseComponent`
+
+### Liskov Substitution Principle (LSP)
+- ✅ **DO**: Derived classes must be substitutable for base classes
+  - All `BaseComponent<TData>` implementations must have `getData()`
+  - All components work with `PanelComposer.compose()`
+- ❌ **DON'T**: Override base behavior in incompatible ways
+  - Don't make `getData()` throw exceptions in some implementations
+
+### Interface Segregation Principle (ISP) ⭐ **CRITICAL**
+- ✅ **DO**: Create focused interfaces for specific needs
+  - **Example**: `IRenderable` interface for rendering concerns
+  - **Why**: PanelComposer only needs `generateHTML()`, `getCSSFile()`, `getBehaviorScript()`
+  - **Pattern**: `PanelComposer.compose(components: IRenderable[])`
+
+- ❌ **DON'T**: Use `any` when you should use interface segregation
+  ```typescript
+  // ❌ WRONG - This is a shortcut that defeats type safety
+  compose(components: BaseComponent<any>[]) { }
+
+  // ✅ CORRECT - Segregate interface for rendering concerns
+  interface IRenderable {
+      generateHTML(): string;
+      getCSSFile(): string;
+      getBehaviorScript(): string;
+  }
+  compose(components: IRenderable[]) { }
+  ```
+
+**Real Example from This Codebase**:
+```typescript
+// PanelComposer doesn't care about TData, only rendering methods
+export interface IRenderable {
+    getId(): string;
+    getType(): string;
+    generateHTML(): string;
+    getCSSFile(): string;
+    getBehaviorScript(): string;
+}
+
+// BaseComponent implements IRenderable + adds type-safe getData()
+export abstract class BaseComponent<TData> implements IRenderable {
+    abstract getData(): TData;  // Type-safe, specific to component
+    // ... IRenderable methods
+}
+
+// PanelComposer depends on IRenderable, not BaseComponent<any>
+class PanelComposer {
+    static compose(components: IRenderable[], ...) { }
+}
+```
+
+### Dependency Inversion Principle (DIP)
+- ✅ **DO**: Depend on abstractions, not concrete implementations
+  - `BasePanel` depends on `IRenderable`, not specific component classes
+  - Services use interfaces, not concrete implementations
+- ❌ **DON'T**: Hard-code dependencies on concrete classes
+  - Don't check `instanceof SpecificComponent` in base classes
+
+## 🚫 Code Quality Rules
+
+### When `any` IS Acceptable (RARE):
+1. **EventEmitter signatures**: Matching Node.js EventEmitter interface
+   ```typescript
+   // ✅ OK - matching standard library signature
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   on(event: string, listener: (...args: any[]) => void): this;
+   ```
+   **MUST include**: Comment explaining why + eslint-disable
+2. **Dynamic template variables**: True catch-all objects
+   ```typescript
+   // ✅ OK - dynamic values from user configuration
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   variables?: Record<string, any>;
+   ```
+
+### When `any` is NOT Acceptable:
+- ❌ **Component arrays**: Use `IRenderable[]` not `BaseComponent<any>[]`
+- ❌ **Working around generics**: Create proper interfaces instead
+- ❌ **"I don't know the type"**: Use `unknown` then narrow, or create interface
+- ❌ **Convenience/laziness**: Never acceptable
+
+### Process When You Think You Need `any`:
+1. **STOP** - Don't write it yet
+2. **ANALYZE** - What methods/properties do you actually use?
+3. **SEGREGATE** - Create an interface with only those methods (ISP)
+4. **IMPLEMENT** - Make base class implement the interface
+5. **VERIFY** - Compile with no warnings
+
+**If you wrote `any` without this process, you cut a corner. Delete it and do it right.**
+
 ## CRITICAL: Execution Contexts
 
 **Two separate environments** - NEVER mix them:
@@ -230,12 +385,21 @@ this.initialize();
 
 ## Development Commands
 
+**IMPORTANT**: Always use `npm run compile` to prepare builds for testing.
+
 ```bash
-npm run compile          # Development build
-npm run watch            # Watch mode for development
-npm run package          # Production build with webpack
-npm run test-release     # Build, package, and install locally
+npm run compile          # Development build - USE THIS FOR TESTING
+npm run watch            # Watch mode for continuous development
 ```
+
+**DO NOT run these commands unless explicitly instructed by the user:**
+```bash
+npm run package          # Production build - user runs this
+npm run test-release     # Package + install - user runs this
+npm run lint             # Standalone lint - compile already includes this
+```
+
+**Why**: `npm run compile` runs lint + webpack with dev settings, catching all errors and preparing the extension for testing in VS Code. The packaging commands require additional tools (vsce) and are for release preparation, not development testing.
 
 ## Refactoring Principles
 

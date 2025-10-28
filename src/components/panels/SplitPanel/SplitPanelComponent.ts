@@ -4,6 +4,14 @@ import { SplitPanelConfig, DEFAULT_SPLIT_PANEL_CONFIG } from './SplitPanelConfig
 import { SplitPanelView } from './SplitPanelView';
 
 /**
+ * Type-safe data structure returned by SplitPanelComponent.getData()
+ */
+export interface SplitPanelData {
+    splitRatio: number;
+    rightPanelVisible: boolean;
+}
+
+/**
  * Persisted state structure for SplitPanelComponent
  */
 interface SplitPanelState {
@@ -17,7 +25,7 @@ interface SplitPanelState {
  * Provides horizontal or vertical split layout with draggable divider
  * Used by panels that need side-by-side or top-bottom views
  */
-export class SplitPanelComponent extends BaseComponent {
+export class SplitPanelComponent extends BaseComponent<SplitPanelData> {
     protected config: SplitPanelConfig;
     private splitRatio: number; // Current split ratio (0-100)
     private rightPanelVisible: boolean;
@@ -64,6 +72,16 @@ export class SplitPanelComponent extends BaseComponent {
      */
     public getType(): string {
         return 'SplitPanel';
+    }
+
+    /**
+     * Get component data for event bridge updates
+     */
+    public getData(): { splitRatio: number; rightPanelVisible: boolean } {
+        return {
+            splitRatio: this.splitRatio,
+            rightPanelVisible: this.rightPanelVisible
+        };
     }
 
     /**

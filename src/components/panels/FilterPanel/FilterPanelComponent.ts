@@ -4,6 +4,15 @@ import { FilterPanelConfig, FilterCondition, FilterFieldConfig, QuickFilterConfi
 import { FilterPanelView } from './FilterPanelView';
 
 /**
+ * Type-safe data structure returned by FilterPanelComponent.getData()
+ */
+export interface FilterPanelData {
+    activeQuickFilters: string[];
+    advancedFilterConditions: FilterCondition[];
+    collapsed: boolean;
+}
+
+/**
  * Persisted state structure for FilterPanelComponent
  */
 interface FilterPanelState {
@@ -18,7 +27,7 @@ interface FilterPanelState {
  * Provides quick filters and advanced filter builder functionality
  * Used by panels that need complex filtering capabilities
  */
-export class FilterPanelComponent extends BaseComponent {
+export class FilterPanelComponent extends BaseComponent<FilterPanelData> {
     protected config: FilterPanelConfig;
     private activeQuickFilters: Set<string> = new Set();
     private advancedFilterConditions: FilterCondition[] = [];
@@ -64,6 +73,17 @@ export class FilterPanelComponent extends BaseComponent {
      */
     public getType(): string {
         return 'FilterPanel';
+    }
+
+    /**
+     * Get component data for event bridge updates
+     */
+    public getData(): { activeQuickFilters: string[]; advancedFilterConditions: FilterCondition[]; collapsed: boolean } {
+        return {
+            activeQuickFilters: Array.from(this.activeQuickFilters),
+            advancedFilterConditions: this.advancedFilterConditions,
+            collapsed: this.collapsed
+        };
     }
 
     /**

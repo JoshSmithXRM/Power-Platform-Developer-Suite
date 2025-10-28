@@ -12,7 +12,7 @@ import { StatusBadgeView } from './StatusBadgeView';
  * - In panels: Create instance and call generateHTML()
  * - In tables: Use generateBadgeHTML() static method for inline badges
  */
-export class StatusBadgeComponent extends BaseComponent {
+export class StatusBadgeComponent extends BaseComponent<StatusBadgeConfig> {
     private view: StatusBadgeView;
 
     constructor(config: StatusBadgeConfig) {
@@ -25,6 +25,13 @@ export class StatusBadgeComponent extends BaseComponent {
      */
     public getType(): string {
         return 'StatusBadge';
+    }
+
+    /**
+     * Get component data for event bridge updates
+     */
+    public getData(): StatusBadgeConfig {
+        return this.config as StatusBadgeConfig;
     }
 
     /**

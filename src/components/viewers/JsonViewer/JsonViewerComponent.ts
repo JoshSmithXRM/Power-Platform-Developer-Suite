@@ -3,7 +3,7 @@ import { BaseComponent } from '../../base/BaseComponent';
 import { JsonViewerConfig, DEFAULT_JSON_VIEWER_CONFIG } from './JsonViewerConfig';
 import { JsonViewerView } from './JsonViewerView';
 
-export class JsonViewerComponent extends BaseComponent {
+export class JsonViewerComponent extends BaseComponent<unknown> {
     protected config: JsonViewerConfig;
     private data: unknown = null;
 

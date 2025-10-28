@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-import { BaseComponent } from '../components/base/BaseComponent';
+import { IRenderable } from '../components/base/BaseComponent';
 import { ServiceFactory } from '../services/ServiceFactory';
 
 /**
@@ -19,7 +19,7 @@ export interface WebviewResources {
  */
 
 export interface ComponentDefinition {
-    component: BaseComponent;
+    component: IRenderable;
     placeholder?: string; // Where to place the component in the template
     order?: number; // Rendering order
 }
@@ -38,7 +38,7 @@ export interface ComposedPanel {
     html: string;
     cssFiles: string[];
     jsFiles: string[];
-    components: BaseComponent[];
+    components: IRenderable[];
 }
 
 export interface PanelComposerConfig {
@@ -90,7 +90,7 @@ export class PanelComposer {
      * @param panelTitle Optional panel title
      */
     public static compose(
-        components: BaseComponent[], 
+        components: IRenderable[], 
         webviewResources: WebviewResources,
         panelTitle?: string
     ): string {
@@ -128,7 +128,7 @@ export class PanelComposer {
      */
     public static composeWithCustomHTML(
         customHTML: string,
-        components: BaseComponent[],
+        components: IRenderable[],
         additionalCSSFiles: string[],
         additionalScripts: string[],
         webviewResources: WebviewResources,
@@ -179,7 +179,7 @@ export class PanelComposer {
      * Generate a simple panel with a single component
      */
     public composeSimple(
-        component: BaseComponent, 
+        component: IRenderable, 
         title: string, 
         webview: vscode.Webview,
         additionalCSS?: string[],
@@ -200,7 +200,7 @@ export class PanelComposer {
      * Generate a multi-component panel with automatic layout
      */
     public composeMultiple(
-        components: BaseComponent[], 
+        components: IRenderable[], 
         title: string, 
         webview: vscode.Webview,
         layout: 'vertical' | 'horizontal' | 'grid' = 'vertical'
@@ -455,9 +455,9 @@ export class PanelComposer {
      */
     public static createStandardTemplate(
         title: string,
-        headerComponents: BaseComponent[] = [],
-        bodyComponents: BaseComponent[] = [],
-        footerComponents: BaseComponent[] = []
+        headerComponents: IRenderable[] = [],
+        bodyComponents: IRenderable[] = [],
+        footerComponents: IRenderable[] = []
     ): PanelTemplate {
         const components: ComponentDefinition[] = [];
         let componentIndex = 0;
@@ -524,7 +524,7 @@ export class PanelComposer {
      */
     public static createDashboardTemplate(
         title: string,
-        widgets: BaseComponent[],
+        widgets: IRenderable[],
         columns: number = 2
     ): PanelTemplate {
         const components: ComponentDefinition[] = widgets.map((component, index) => ({
@@ -558,8 +558,8 @@ export class PanelComposer {
      */
     public static createMasterDetailTemplate(
         title: string,
-        masterComponent: BaseComponent,
-        detailComponent: BaseComponent
+        masterComponent: IRenderable,
+        detailComponent: IRenderable
     ): PanelTemplate {
         const template = `
             <div class="panel-container master-detail">
@@ -644,7 +644,7 @@ export class PanelComposer {
      * 
      * Note: Panel-specific CSS is not supported per component-based architecture
      */
-    private static collectCSSFiles(components: BaseComponent[]): string[] {
+    private static collectCSSFiles(components: IRenderable[]): string[] {
         const cssFiles = new Set<string>();
         
         // 1. Add base CSS files (foundation styles)
@@ -671,7 +671,7 @@ export class PanelComposer {
         return Array.from(cssFiles);
     }
 
-    private static collectBehaviorScripts(components: BaseComponent[]): string[] {
+    private static collectBehaviorScripts(components: IRenderable[]): string[] {
         const scripts: string[] = [];
         
         // IMPORTANT: Load PanelUtils first (has no dependencies)

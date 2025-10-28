@@ -4,11 +4,27 @@ import { DataTableConfig, DataTableRow, DataTableSortEvent, DataTableFilterEvent
 import { DataTableView, DataTableViewState } from './DataTableView';
 
 /**
+ * Type-safe data structure returned by DataTableComponent.getData()
+ */
+export interface DataTableData {
+    data: DataTableRow[];
+    loading: boolean;
+    loadingMessage: string;
+    error: string | null;
+    totalRows: number;
+    currentPage: number;
+    pageSize: number;
+    hasLoadedData: boolean;
+    filters: Record<string, unknown>;
+    searchQuery: string;
+}
+
+/**
  * DataTableComponent - Comprehensive data table with sorting, filtering, and pagination
  * Used throughout the extension for displaying tabular data with rich interactions
  * Supports multi-instance usage with independent state management
  */
-export class DataTableComponent extends BaseComponent {
+export class DataTableComponent extends BaseComponent<DataTableData> {
     protected config: DataTableConfig;
     private data: DataTableRow[] = [];
     private processedData: DataTableRow[] = [];

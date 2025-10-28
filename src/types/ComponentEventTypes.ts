@@ -16,10 +16,7 @@ export interface ComponentStateChangeEvent {
     timestamp: number;
 }
 
-export interface ComponentWithEvents extends BaseComponent {
+export interface ComponentWithEvents extends BaseComponent<unknown> {
     on(event: 'update', listener: (event: ComponentUpdateEvent) => void): this;
     on(event: 'stateChange', listener: (event: ComponentStateChangeEvent) => void): this;
-    getData?(): unknown;
-    getType(): string;
-    generateHTML(): string;
 }

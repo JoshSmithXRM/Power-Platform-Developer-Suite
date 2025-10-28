@@ -14,7 +14,7 @@ import { SplitPanelComponent } from '../components/panels/SplitPanel/SplitPanelC
 import { SplitPanelConfig } from '../components/panels/SplitPanel/SplitPanelConfig';
 import { TreeViewComponent } from '../components/trees/TreeView/TreeViewComponent';
 import { TreeViewConfig } from '../components/trees/TreeView/TreeViewConfig';
-import { BaseComponent } from '../components/base/BaseComponent';
+import { IRenderable } from '../components/base/BaseComponent';
 import { ServiceFactory } from '../services/ServiceFactory';
 
 /**
@@ -28,7 +28,7 @@ import { ServiceFactory } from '../services/ServiceFactory';
 export interface ComponentInstance {
     id: string;
     type: string;
-    component: BaseComponent;
+    component: IRenderable;
     created: Date;
     lastUpdated: Date;
     isActive: boolean;
@@ -288,7 +288,7 @@ export class ComponentFactory {
     /**
      * Track a component instance
      */
-    private trackInstance(id: string, type: string, component: BaseComponent): void {
+    private trackInstance(id: string, type: string, component: IRenderable): void {
         if (!this.config.enableInstanceTracking) {
             return;
         }

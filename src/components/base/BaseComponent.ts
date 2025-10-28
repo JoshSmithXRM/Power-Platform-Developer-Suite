@@ -8,10 +8,39 @@ export interface BaseComponentConfig {
 }
 
 /**
+ * Interface for components that can be rendered.
+ * Uses Interface Segregation Principle to separate rendering concerns from data concerns.
+ * PanelComposer and ComponentFactory depend on this interface, not on BaseComponent<any>.
+ *
+ * This allows factories to work with components without caring about their specific TData type,
+ * while still maintaining type safety for getData() in the concrete implementations.
+ */
+export interface IRenderable {
+    getId(): string;
+    getType(): string;
+    getClassName(): string;
+    generateHTML(): string;
+    getCSSFile(): string;
+    getBehaviorScript(): string;
+    dispose(): void;
+
+    // EventEmitter methods used by ComponentFactory
+    // Note: any is required here to match EventEmitter's signature - this is standard practice
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    on(event: string | symbol, listener: (...args: any[]) => void): this;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    once(event: string | symbol, listener: (...args: any[]) => void): this;
+}
+
+/**
  * Base component class that all UI components extend.
  * Provides common functionality for component lifecycle, state management, and events.
+ *
+ * Implements IRenderable to provide rendering capabilities without exposing TData type.
+ *
+ * @template TData - The type of data returned by getData() for type-safe event bridge updates
  */
-export abstract class BaseComponent extends EventEmitter {
+export abstract class BaseComponent<TData = Record<string, never>> extends EventEmitter implements IRenderable {
     protected config: BaseComponentConfig;
     protected isInitialized: boolean = false;
     private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
@@ -46,6 +75,13 @@ export abstract class BaseComponent extends EventEmitter {
      * Used for event routing and debugging
      */
     public abstract getType(): string;
+
+    /**
+     * Get component data for event bridge updates
+     * Must return the current state/data that should be sent to the webview
+     * The return type is enforced by the generic parameter TData
+     */
+    public abstract getData(): TData;
 
     /**
      * Get the component's CSS class name

@@ -4,11 +4,19 @@ import { ActionBarConfig, ActionBarAction, ActionBarGroup, DEFAULT_ACTION_BAR_CO
 import { ActionBarView } from './ActionBarView';
 
 /**
+ * Type-safe data structure returned by ActionBarComponent.getData()
+ */
+export interface ActionBarData {
+    actions: ActionBarAction[];
+    groups: ActionBarGroup[];
+}
+
+/**
  * ActionBarComponent - Reusable action bar with buttons, dropdowns, and groups
  * Used by panels that need action buttons, toolbars, or button groups
  * Supports responsive design, overflow handling, and multi-instance usage
  */
-export class ActionBarComponent extends BaseComponent {
+export class ActionBarComponent extends BaseComponent<ActionBarData> {
     protected config: ActionBarConfig;
     private actions: ActionBarAction[] = [];
     private groups: ActionBarGroup[] = [];
@@ -105,7 +113,7 @@ export class ActionBarComponent extends BaseComponent {
     /**
      * Get component data for event bridge (used by BasePanel to send updates to webview)
      */
-    public getData(): { actions: ActionBarAction[]; groups: ActionBarGroup[] } {
+    public getData(): ActionBarData {
         return {
             actions: this.getActions(),
             groups: [...this.groups]

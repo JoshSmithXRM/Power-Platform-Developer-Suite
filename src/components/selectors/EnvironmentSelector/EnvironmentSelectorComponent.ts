@@ -5,11 +5,19 @@ import { DEFAULT_ENVIRONMENT_SELECTOR_CONFIG, mergeConfig } from '../../base/Com
 import { EnvironmentSelectorView } from './EnvironmentSelectorView';
 
 /**
+ * Type-safe data structure returned by EnvironmentSelectorComponent.getData()
+ */
+export interface EnvironmentSelectorData {
+    environments: Environment[];
+    selectedEnvironmentId: string | null;
+}
+
+/**
  * EnvironmentSelectorComponent - Reusable environment selector
  * Used by all panels that need environment selection functionality
  * Supports multi-instance usage with independent state management
  */
-export class EnvironmentSelectorComponent extends BaseComponent {
+export class EnvironmentSelectorComponent extends BaseComponent<EnvironmentSelectorData> {
     protected config: EnvironmentSelectorConfig;
     private environments: Environment[] = [];
     private selectedEnvironmentId: string | null = null;
@@ -100,6 +108,16 @@ export class EnvironmentSelectorComponent extends BaseComponent {
      */
     public getEnvironments(): Environment[] {
         return [...this.environments];
+    }
+
+    /**
+     * Get component data for event bridge updates
+     */
+    public getData(): EnvironmentSelectorData {
+        return {
+            environments: this.environments,
+            selectedEnvironmentId: this.selectedEnvironmentId
+        };
     }
 
     /**

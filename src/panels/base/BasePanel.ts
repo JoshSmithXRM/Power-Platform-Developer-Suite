@@ -535,7 +535,7 @@ export abstract class BasePanel implements IPanelBase {
                 });
 
                 // Get component data for update
-                const componentData = component.getData?.() || null;
+                const componentData = component.getData();
                 const componentType = component.getType();
 
                 const dataLength = Array.isArray(componentData) ? componentData.length :

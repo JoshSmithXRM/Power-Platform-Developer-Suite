@@ -4,6 +4,15 @@ import { TreeViewConfig, TreeNode, DEFAULT_TREE_VIEW_CONFIG } from './TreeViewCo
 import { TreeViewView } from './TreeViewView';
 
 /**
+ * Type-safe data structure returned by TreeViewComponent.getData()
+ */
+export interface TreeViewData {
+    nodes: TreeNode[];
+    selectedNodeId?: string;
+    expandedNodes: string[];
+}
+
+/**
  * Persisted state structure for TreeViewComponent
  */
 interface TreeViewState {
@@ -17,7 +26,7 @@ interface TreeViewState {
  * Provides expand/collapse, selection, and lazy loading
  * Generic component usable for plugins, solutions, or any hierarchical data
  */
-export class TreeViewComponent extends BaseComponent {
+export class TreeViewComponent extends BaseComponent<TreeViewData> {
     protected config: TreeViewConfig;
     private nodes: TreeNode[];
     private expandedNodes: Set<string>; // Track expanded node IDs
@@ -65,6 +74,17 @@ export class TreeViewComponent extends BaseComponent {
      */
     public getType(): string {
         return 'TreeView';
+    }
+
+    /**
+     * Get component data for event bridge updates
+     */
+    public getData(): TreeViewData {
+        return {
+            nodes: this.nodes,
+            selectedNodeId: this.selectedNodeId,
+            expandedNodes: Array.from(this.expandedNodes)
+        };
     }
 
     /**
