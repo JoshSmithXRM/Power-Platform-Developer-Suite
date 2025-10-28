@@ -11,6 +11,7 @@ export interface TreeNode {
     children?: TreeNode[];
     expanded: boolean;
     selectable: boolean;
+    hasChildren?: boolean; // For lazy loading - indicates node can have children even if not loaded yet
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data?: any; // Original business object - can be any entity type
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

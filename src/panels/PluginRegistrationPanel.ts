@@ -124,9 +124,8 @@ export class PluginRegistrationPanel extends BasePanel {
             nodes: [],
             searchEnabled: true,
             multiSelect: false,
-            lazyLoad: true,
-            onNodeSelect: (node) => this.handleNodeSelected(node),
-            onNodeExpand: (node) => this.handleNodeExpanded(node)
+            lazyLoad: false, // Load all data upfront
+            onNodeSelect: (node) => this.handleNodeSelected(node)
         });
 
         // Note: SplitPanel is NOT created as a component - it's just HTML with SplitPanelBehavior
@@ -427,9 +426,7 @@ export class PluginRegistrationPanel extends BasePanel {
                 break;
 
             case 'node-expanded':
-                if (message.data?.nodeId) {
-                    await this.loadNodeChildren(message.data.nodeId);
-                }
+                // No longer needed - all data loaded upfront
                 break;
 
             case 'close-details':
@@ -456,106 +453,182 @@ export class PluginRegistrationPanel extends BasePanel {
         }
     }
 
+    /**
+     * Load all plugin data in parallel (assemblies, types, steps, images)
+     * Builds complete tree structure without lazy loading
+     */
     private async loadAssemblies(): Promise<void> {
         if (!this._selectedEnvironmentId) {
             return;
         }
 
         try {
-            this.componentLogger.info('Loading assemblies');
+            // Show loading indicator
+            this.treeViewComponent!.setLoading(true, 'Loading plugin assemblies...');
+            this.componentLogger.info('Loading all plugin data in parallel');
 
-            // Fetch assemblies
+            // 1. Load all assemblies
             this.assemblies = await this.pluginService.getAssemblies(this._selectedEnvironmentId);
-
             this.componentLogger.info('Assemblies loaded', { count: this.assemblies.length });
 
-            // Transform to tree nodes
-            const treeNodes = this.transformAssembliesToTreeNodes(this.assemblies);
-            this.componentLogger.info('Tree nodes transformed', { nodeCount: treeNodes.length });
-
-            // Update tree
-            this.componentLogger.info('Calling setNodes on tree view');
-            this.treeViewComponent!.setNodes(treeNodes);
-            this.componentLogger.info('setNodes call completed');
-
-        } catch (error) {
-            this.componentLogger.error('Failed to load assemblies', error instanceof Error ? error : new Error(String(error)));
-            vscode.window.showErrorMessage(`Failed to load plugin assemblies: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    }
-
-    private transformAssembliesToTreeNodes(assemblies: PluginAssembly[]): TreeNode[] {
-        return assemblies.map(assembly => ({
-            id: `assembly-${assembly.pluginassemblyid}`,
-            label: `${assembly.name} v${assembly.version}`,
-            icon: '📦',
-            type: 'assembly',
-            expanded: false,
-            selectable: true,
-            data: assembly,
-            children: [] // Will be loaded lazily
-        }));
-    }
-
-    private async loadNodeChildren(nodeId: string): Promise<void> {
-        this.componentLogger.info('Loading node children', { nodeId });
-
-        if (!this._selectedEnvironmentId) {
-            return;
-        }
-
-        try {
-            const [nodeType, id] = nodeId.split('-', 2);
-
-            if (nodeType === 'assembly') {
-                // Load plugin types
-                const pluginTypes = await this.pluginService.getPluginTypes(this._selectedEnvironmentId, id);
-                const childNodes = this.transformPluginTypesToTreeNodes(pluginTypes);
-                this.treeViewComponent!.addChildren(nodeId, childNodes);
-
-            } else if (nodeType === 'plugintype') {
-                // Load steps
-                const steps = await this.pluginService.getSteps(this._selectedEnvironmentId, id);
-                const childNodes = this.transformStepsToTreeNodes(steps);
-                this.treeViewComponent!.addChildren(nodeId, childNodes);
-
-            } else if (nodeType === 'step') {
-                // Load images
-                const images = await this.pluginService.getImages(this._selectedEnvironmentId, id);
-                const childNodes = this.transformImagesToTreeNodes(images);
-                this.treeViewComponent!.addChildren(nodeId, childNodes);
+            if (this.assemblies.length === 0) {
+                this.treeViewComponent!.setLoading(false);
+                this.treeViewComponent!.setNodes([]);
+                return;
             }
 
+            // 2. Load plugin types for ALL assemblies in parallel
+            this.treeViewComponent!.setLoading(true, `Loading plugin types for ${this.assemblies.length} assemblies...`);
+            const assemblyTypePromises = this.assemblies.map(async (assembly) => {
+                try {
+                    const types = await this.pluginService.getPluginTypes(this._selectedEnvironmentId!, assembly.pluginassemblyid);
+                    return { assembly, types };
+                } catch (error) {
+                    this.componentLogger.error('Failed to load types for assembly', error instanceof Error ? error : new Error(String(error)), { assemblyId: assembly.pluginassemblyid });
+                    return { assembly, types: [] };
+                }
+            });
+            const assemblyTypesData = await Promise.all(assemblyTypePromises);
+
+            const totalTypes = assemblyTypesData.reduce((sum, data) => sum + data.types.length, 0);
+            this.componentLogger.info('Plugin types loaded', { totalTypes });
+
+            // 3. Load steps for ALL plugin types in parallel
+            this.treeViewComponent!.setLoading(true, `Loading steps for ${totalTypes} plugin types...`);
+            const typeStepsPromises: Promise<{ assemblyId: string; typeId: string; steps: PluginStep[] }>[] = [];
+            assemblyTypesData.forEach(({ assembly, types }) => {
+                types.forEach(type => {
+                    typeStepsPromises.push(
+                        this.pluginService.getSteps(this._selectedEnvironmentId!, type.plugintypeid)
+                            .then(steps => ({ assemblyId: assembly.pluginassemblyid, typeId: type.plugintypeid, steps }))
+                            .catch(error => {
+                                this.componentLogger.error('Failed to load steps for type', error instanceof Error ? error : new Error(String(error)), { typeId: type.plugintypeid });
+                                return { assemblyId: assembly.pluginassemblyid, typeId: type.plugintypeid, steps: [] };
+                            })
+                    );
+                });
+            });
+            const typeStepsData = await Promise.all(typeStepsPromises);
+
+            const totalSteps = typeStepsData.reduce((sum, data) => sum + data.steps.length, 0);
+            this.componentLogger.info('Steps loaded', { totalSteps });
+
+            // 4. Load images for ALL steps in parallel
+            this.treeViewComponent!.setLoading(true, `Loading images for ${totalSteps} steps...`);
+            const stepImagesPromises: Promise<{ stepId: string; images: PluginImage[] }>[] = [];
+            typeStepsData.forEach(({ steps }) => {
+                steps.forEach(step => {
+                    stepImagesPromises.push(
+                        this.pluginService.getImages(this._selectedEnvironmentId!, step.sdkmessageprocessingstepid)
+                            .then(images => ({ stepId: step.sdkmessageprocessingstepid, images }))
+                            .catch(error => {
+                                this.componentLogger.error('Failed to load images for step', error instanceof Error ? error : new Error(String(error)), { stepId: step.sdkmessageprocessingstepid });
+                                return { stepId: step.sdkmessageprocessingstepid, images: [] };
+                            })
+                    );
+                });
+            });
+            const stepImagesData = await Promise.all(stepImagesPromises);
+
+            const totalImages = stepImagesData.reduce((sum, data) => sum + data.images.length, 0);
+            this.componentLogger.info('Images loaded', { totalImages });
+
+            // 5. Build complete tree structure
+            this.treeViewComponent!.setLoading(true, 'Building tree structure...');
+            const treeNodes = this.buildCompleteTree(assemblyTypesData, typeStepsData, stepImagesData);
+
+            // 6. Update tree view
+            this.treeViewComponent!.setLoading(false);
+            this.treeViewComponent!.setNodes(treeNodes);
+
+            this.componentLogger.info('Plugin data loaded successfully', {
+                assemblies: this.assemblies.length,
+                types: totalTypes,
+                steps: totalSteps,
+                images: totalImages
+            });
+
         } catch (error) {
-            this.componentLogger.error('Failed to load node children', error instanceof Error ? error : new Error(String(error)));
-            vscode.window.showErrorMessage(`Failed to load child items: ${error instanceof Error ? error.message : String(error)}`);
+            this.componentLogger.error('Failed to load plugin data', error instanceof Error ? error : new Error(String(error)));
+            this.treeViewComponent!.setLoading(false);
+            vscode.window.showErrorMessage(`Failed to load plugin data: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
-    private transformPluginTypesToTreeNodes(pluginTypes: PluginType[]): TreeNode[] {
-        return pluginTypes.map(pluginType => ({
-            id: `plugintype-${pluginType.plugintypeid}`,
-            label: pluginType.friendlyname || pluginType.typename,
-            icon: '🔌',
-            type: 'plugintype',
-            expanded: false,
-            selectable: true,
-            data: pluginType,
-            children: []
-        }));
-    }
+    /**
+     * Build complete tree with all children populated
+     */
+    private buildCompleteTree(
+        assemblyTypesData: Array<{ assembly: PluginAssembly; types: PluginType[] }>,
+        typeStepsData: Array<{ assemblyId: string; typeId: string; steps: PluginStep[] }>,
+        stepImagesData: Array<{ stepId: string; images: PluginImage[] }>
+    ): TreeNode[] {
+        // Create lookup maps for fast access
+        const typesByAssembly = new Map<string, PluginType[]>();
+        const stepsByType = new Map<string, PluginStep[]>();
+        const imagesByStep = new Map<string, PluginImage[]>();
 
-    private transformStepsToTreeNodes(steps: PluginStep[]): TreeNode[] {
-        return steps.map(step => ({
-            id: `step-${step.sdkmessageprocessingstepid}`,
-            label: step.name,
-            icon: step.statecode === 0 ? '⚡' : '⚫',
-            type: 'step',
-            expanded: false,
-            selectable: true,
-            data: step,
-            children: []
-        }));
+        assemblyTypesData.forEach(({ assembly, types }) => {
+            typesByAssembly.set(assembly.pluginassemblyid, types);
+        });
+
+        typeStepsData.forEach(({ typeId, steps }) => {
+            stepsByType.set(typeId, steps);
+        });
+
+        stepImagesData.forEach(({ stepId, images }) => {
+            imagesByStep.set(stepId, images);
+        });
+
+        // Build tree from bottom up
+        return assemblyTypesData.map(({ assembly }) => {
+            const types = typesByAssembly.get(assembly.pluginassemblyid) || [];
+
+            const typeNodes: TreeNode[] = types.map(type => {
+                const steps = stepsByType.get(type.plugintypeid) || [];
+
+                const stepNodes: TreeNode[] = steps.map(step => {
+                    const images = imagesByStep.get(step.sdkmessageprocessingstepid) || [];
+                    const imageNodes = this.transformImagesToTreeNodes(images);
+
+                    return {
+                        id: `step-${step.sdkmessageprocessingstepid}`,
+                        label: step.name,
+                        icon: step.statecode === 0 ? '⚡' : '⚫',
+                        type: 'step',
+                        expanded: false,
+                        selectable: true,
+                        hasChildren: imageNodes.length > 0,
+                        data: step,
+                        children: imageNodes
+                    };
+                });
+
+                return {
+                    id: `plugintype-${type.plugintypeid}`,
+                    label: type.friendlyname || type.typename,
+                    icon: '🔌',
+                    type: 'plugintype',
+                    expanded: false,
+                    selectable: true,
+                    hasChildren: stepNodes.length > 0,
+                    data: type,
+                    children: stepNodes
+                };
+            });
+
+            return {
+                id: `assembly-${assembly.pluginassemblyid}`,
+                label: `${assembly.name} v${assembly.version}`,
+                icon: '📦',
+                type: 'assembly',
+                expanded: false,
+                selectable: true,
+                hasChildren: typeNodes.length > 0,
+                data: assembly,
+                children: typeNodes
+            };
+        });
     }
 
     private transformImagesToTreeNodes(images: PluginImage[]): TreeNode[] {
@@ -566,6 +639,7 @@ export class PluginRegistrationPanel extends BasePanel {
             type: 'image',
             expanded: false,
             selectable: true,
+            hasChildren: false, // Images are leaf nodes
             data: image
         }));
     }
@@ -610,14 +684,5 @@ export class PluginRegistrationPanel extends BasePanel {
         this.componentLogger.info('Closing details panel');
         this.selectedNode = undefined;
         // Extension Host just clears state - webview already closed panel
-    }
-
-    private async handleNodeExpanded(node: TreeNode): Promise<void> {
-        this.componentLogger.info('Node expanded', { nodeId: node.id, nodeType: node.type });
-
-        // Load children if not already loaded
-        if (!node.children || node.children.length === 0) {
-            await this.loadNodeChildren(node.id);
-        }
     }
 }

@@ -1,5 +1,6 @@
 import { CSS_CLASSES } from '../../base/ComponentConfig';
 import { escapeHtml } from '../../base/HtmlUtils';
+import { LoadingIndicatorView } from '../../base/LoadingIndicatorView';
 
 import { TreeViewConfig, TreeNode } from './TreeViewConfig';
 
@@ -11,7 +12,7 @@ export class TreeViewView {
     /**
      * Generate the complete HTML for the TreeView component
      */
-    public static generateHTML(config: TreeViewConfig, nodes: TreeNode[]): string {
+    public static generateHTML(config: TreeViewConfig, nodes: TreeNode[], loading: boolean = false, loadingMessage: string = 'Loading...'): string {
         const {
             id,
             searchEnabled = true,
@@ -28,7 +29,7 @@ export class TreeViewView {
             <div id="${escapeHtml(id)}" class="${containerClass}" data-component-id="${escapeHtml(id)}" data-component-type="TreeView">
                 ${searchEnabled ? this.generateSearchBox(id) : ''}
                 <div class="tree-view-content">
-                    ${this.generateTree(id, nodes)}
+                    ${loading ? this.generateLoadingIndicator(loadingMessage) : this.generateTree(id, nodes)}
                 </div>
             </div>
         `;
@@ -53,6 +54,13 @@ export class TreeViewView {
     }
 
     /**
+     * Generate loading indicator HTML
+     */
+    private static generateLoadingIndicator(message: string): string {
+        return LoadingIndicatorView.generate(message);
+    }
+
+    /**
      * Generate tree HTML
      */
     private static generateTree(componentId: string, nodes: TreeNode[]): string {
@@ -74,8 +82,7 @@ export class TreeViewView {
      * Generate a single tree node
      */
     private static generateNode(componentId: string, node: TreeNode): string {
-        const hasChildren = node.children && node.children.length > 0;
-        const expandIcon = hasChildren ? (node.expanded ? '▼' : '▶') : '';
+        const hasChildren = (node.children && node.children.length > 0) || (node.hasChildren === true);
         const nodeClass = [
             'tree-node',
             hasChildren ? 'tree-node--has-children' : 'tree-node--leaf',
@@ -84,14 +91,14 @@ export class TreeViewView {
             `tree-node--type-${escapeHtml(node.type)}`
         ].filter(Boolean).join(' ');
 
-        const childrenHtml = hasChildren && node.expanded
+        const childrenHtml = hasChildren && node.expanded && node.children && node.children.length > 0
             ? `<ul class="tree-children">${this.generateNodeList(componentId, node.children!)}</ul>`
             : '';
 
         return `
             <li class="${nodeClass}" data-node-id="${escapeHtml(node.id)}" data-node-type="${escapeHtml(node.type)}">
                 <div class="tree-node-content">
-                    ${hasChildren ? `<span class="tree-toggle" data-action="toggle">${expandIcon}</span>` : '<span class="tree-toggle tree-toggle--spacer"></span>'}
+                    ${hasChildren ? `<span class="tree-toggle" data-action="toggle">›</span>` : '<span class="tree-toggle tree-toggle--spacer"></span>'}
                     <span class="tree-icon">${escapeHtml(node.icon)}</span>
                     <span class="tree-label" title="${escapeHtml(node.label)}">${escapeHtml(node.label)}</span>
                 </div>

@@ -1,4 +1,4 @@
-import { BaseComponent } from '../../base/BaseComponent';
+import { BaseDataComponent } from '../../base/BaseDataComponent';
 
 import { DataTableConfig, DataTableRow, DataTableSortEvent, DataTableFilterEvent, DataTablePageEvent, DEFAULT_DATA_TABLE_CONFIG, DATA_TABLE_VALIDATION, DataTableConfigValidator } from './DataTableConfig';
 import { DataTableView, DataTableViewState } from './DataTableView';
@@ -23,8 +23,10 @@ export interface DataTableData {
  * DataTableComponent - Comprehensive data table with sorting, filtering, and pagination
  * Used throughout the extension for displaying tabular data with rich interactions
  * Supports multi-instance usage with independent state management
+ *
+ * Extends BaseDataComponent to inherit loading state management
  */
-export class DataTableComponent extends BaseComponent<DataTableData> {
+export class DataTableComponent extends BaseDataComponent<DataTableData> {
     protected config: DataTableConfig;
     private data: DataTableRow[] = [];
     private processedData: DataTableRow[] = [];
@@ -34,8 +36,6 @@ export class DataTableComponent extends BaseComponent<DataTableData> {
     private currentPage: number = 1;
     private pageSize: number = 50;
     private searchQuery: string = '';
-    private loading: boolean = false;
-    private loadingMessage: string = 'Loading...';
     private error: string | null = null;
     private expandedRows: Set<string | number> = new Set();
     private columnVisibility: Map<string, boolean> = new Map();
@@ -220,10 +220,11 @@ export class DataTableComponent extends BaseComponent<DataTableData> {
         filters: Record<string, any>; // Dynamic filter values by column - any is appropriate here
         searchQuery: string;
     } {
+        const loadingState = this.getLoadingState();
         return {
             data: [...this.processedData],
-            loading: this.loading,
-            loadingMessage: this.loadingMessage,
+            loading: loadingState.loading,
+            loadingMessage: loadingState.loadingMessage,
             error: this.error,
             totalRows: this.data.length,
             currentPage: this.currentPage,
@@ -588,19 +589,16 @@ export class DataTableComponent extends BaseComponent<DataTableData> {
 
     /**
      * Set loading state
+     * Overrides BaseDataComponent to also track hasLoadedData flag
      */
     public setLoading(loading: boolean, message?: string): void {
-        this.loading = loading;
-        if (message) {
-            this.loadingMessage = message;
-        }
+        // Call parent to handle loading state
+        super.setLoading(loading, message);
 
-        // Mark data as loaded when loading completes
+        // Mark data as loaded when loading completes (DataTable-specific behavior)
         if (!loading) {
             this.hasLoadedData = true;
         }
-
-        this.notifyUpdate();
     }
 
     /**

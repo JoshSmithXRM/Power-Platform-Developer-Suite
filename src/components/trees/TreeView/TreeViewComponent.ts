@@ -1,4 +1,4 @@
-import { BaseComponent } from '../../base/BaseComponent';
+import { BaseDataComponent } from '../../base/BaseDataComponent';
 
 import { TreeViewConfig, TreeNode, DEFAULT_TREE_VIEW_CONFIG } from './TreeViewConfig';
 import { TreeViewView } from './TreeViewView';
@@ -10,6 +10,8 @@ export interface TreeViewData {
     nodes: TreeNode[];
     selectedNodeId?: string;
     expandedNodes: string[];
+    loading: boolean;
+    loadingMessage: string;
 }
 
 /**
@@ -25,8 +27,10 @@ interface TreeViewState {
  * TreeViewComponent - Reusable hierarchical tree view
  * Provides expand/collapse, selection, and lazy loading
  * Generic component usable for plugins, solutions, or any hierarchical data
+ *
+ * Extends BaseDataComponent to inherit loading state management
  */
-export class TreeViewComponent extends BaseComponent<TreeViewData> {
+export class TreeViewComponent extends BaseDataComponent<TreeViewData> {
     protected config: TreeViewConfig;
     private nodes: TreeNode[];
     private expandedNodes: Set<string>; // Track expanded node IDs
@@ -45,7 +49,7 @@ export class TreeViewComponent extends BaseComponent<TreeViewData> {
      * Generate HTML for this component (Extension Host context)
      */
     public generateHTML(): string {
-        return TreeViewView.generateHTML(this.config, this.nodes);
+        return TreeViewView.generateHTML(this.config, this.nodes, this.loading, this.loadingMessage);
     }
 
     /**
@@ -80,10 +84,13 @@ export class TreeViewComponent extends BaseComponent<TreeViewData> {
      * Get component data for event bridge updates
      */
     public getData(): TreeViewData {
+        const loadingState = this.getLoadingState();
         return {
             nodes: this.nodes,
             selectedNodeId: this.selectedNodeId,
-            expandedNodes: Array.from(this.expandedNodes)
+            expandedNodes: Array.from(this.expandedNodes),
+            loading: loadingState.loading,
+            loadingMessage: loadingState.loadingMessage
         };
     }
 

@@ -1422,7 +1422,7 @@ class DataTableBehavior extends BaseBehavior {
                 this.showLoadingOverlay(instance, message);
             } else {
                 loadingOverlay.classList.add('visible');
-                const loadingText = loadingOverlay.querySelector('.loading-text');
+                const loadingText = loadingOverlay.querySelector('.component-loading-message');
                 if (loadingText) {
                     loadingText.textContent = message;
                 }
@@ -1474,9 +1474,12 @@ class DataTableBehavior extends BaseBehavior {
 
         const overlay = document.createElement('div');
         overlay.className = 'loading-overlay visible'; // Add 'visible' class
+        // Use shared loading indicator HTML structure (matches LoadingIndicatorView.generate())
         overlay.innerHTML = `
-            <div class="loading-spinner"></div>
-            <div class="loading-text">${message}</div>
+            <div class="component-loading">
+                <div class="component-loading-spinner"></div>
+                <div class="component-loading-message">${message}</div>
+            </div>
         `;
 
         instance.container.appendChild(overlay);

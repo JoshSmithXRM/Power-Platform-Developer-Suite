@@ -646,12 +646,19 @@ export class PanelComposer {
      */
     private static collectCSSFiles(components: IRenderable[]): string[] {
         const cssFiles = new Set<string>();
-        
+
         // 1. Add base CSS files (foundation styles)
+        // NOTE: These must include 'css/' prefix as they bypass component normalization
         cssFiles.add('css/base/component-base.css');
+
+        // 2. Add shared component styles (must load BEFORE panel-base.css for proper cascade)
+        // NOTE: @import in CSS doesn't work reliably in VS Code webviews, so load explicitly
+        cssFiles.add('css/components/shared-loading.css');
+
+        // 3. Add panel-base.css (may import shared styles, but we load them explicitly above)
         cssFiles.add('css/base/panel-base.css');
-        
-        // 2. Collect component-specific CSS files
+
+        // 4. Collect component-specific CSS files
         components.forEach(component => {
             try {
                 const componentCSSFile = component.getCSSFile();
@@ -772,6 +779,7 @@ export class PanelComposer {
         // Extract the base URI pattern from existing resources and construct proper paths
         const baseUri = params.webviewResources.panelStylesSheet.toString().replace('/css/panel-base.css', '');
 
+        // Generate CSS link tags (already ordered by collectCSSFiles: shared → base → components)
         const cssLinks = params.cssFiles.map(css =>
             `<link rel="stylesheet" href="${baseUri}/${css}">`
         ).join('\n    ');

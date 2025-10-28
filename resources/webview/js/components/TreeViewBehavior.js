@@ -16,12 +16,22 @@ class TreeViewBehavior extends BaseBehavior {
      * REQUIRED by BaseBehavior - called when event bridge sends updated data
      */
     static onComponentUpdate(instance, data) {
-        if (data && data.nodes) {
+        if (data) {
             console.log(`TreeViewBehavior: componentUpdate received`, {
                 componentId: instance.id,
-                nodeCount: data.nodes.length
+                loading: data.loading,
+                nodeCount: data.nodes?.length
             });
-            this.updateNodes(instance, data.nodes);
+
+            // Handle loading state
+            if (data.loading !== undefined) {
+                this.updateLoadingState(instance, data.loading, data.loadingMessage || 'Loading...');
+            }
+
+            // Update nodes if provided and not loading
+            if (!data.loading && data.nodes) {
+                this.updateNodes(instance, data.nodes);
+            }
         }
     }
 
@@ -185,13 +195,11 @@ class TreeViewBehavior extends BaseBehavior {
         if (!nodeId) return;
 
         const isExpanded = nodeElement.classList.contains('tree-node--expanded');
-        const toggleIcon = nodeElement.querySelector('.tree-toggle');
 
         if (isExpanded) {
             // Collapse
             nodeElement.classList.remove('tree-node--expanded');
             nodeElement.classList.add('tree-node--collapsed');
-            if (toggleIcon) toggleIcon.textContent = '▶';
             instance.expandedNodes.delete(nodeId);
 
             // Notify Extension Host
@@ -201,7 +209,6 @@ class TreeViewBehavior extends BaseBehavior {
             // Expand
             nodeElement.classList.remove('tree-node--collapsed');
             nodeElement.classList.add('tree-node--expanded');
-            if (toggleIcon) toggleIcon.textContent = '▼';
             instance.expandedNodes.add(nodeId);
 
             // Notify Extension Host
@@ -350,6 +357,25 @@ class TreeViewBehavior extends BaseBehavior {
     }
 
     /**
+     * Update loading state
+     */
+    static updateLoadingState(instance, loading, message) {
+        const content = instance.element.querySelector('.tree-view-content');
+        if (!content) return;
+
+        if (loading) {
+            // Use shared loading indicator HTML structure (matches LoadingIndicatorView.generate())
+            content.innerHTML = `
+                <div class="component-loading">
+                    <div class="component-loading-spinner"></div>
+                    <div class="component-loading-message">${message}</div>
+                </div>
+            `;
+        }
+        // If not loading, nodes will be rendered by updateNodes call
+    }
+
+    /**
      * Update tree nodes (called from componentUpdate event bridge)
      */
     static updateNodes(instance, nodes) {
@@ -395,7 +421,8 @@ class TreeViewBehavior extends BaseBehavior {
      * Render a single node to HTML
      */
     static renderNode(node, level = 0) {
-        const hasChildren = node.children && node.children.length > 0;
+        // Check if node has children OR if it's marked as having children (for lazy loading)
+        const hasChildren = (node.children && node.children.length > 0) || (node.hasChildren === true);
         const indent = level * 20;
 
         let html = `
@@ -405,26 +432,26 @@ class TreeViewBehavior extends BaseBehavior {
                  style="padding-left: ${indent}px">
                 <div class="tree-node-content">`;
 
-        // Toggle button for nodes with children
+        // Toggle button for nodes with children - using chevron that rotates via CSS
         if (hasChildren) {
-            html += `<button class="tree-node-toggle" data-action="toggle" aria-label="Toggle">▶</button>`;
+            html += `<span class="tree-toggle" data-action="toggle" aria-label="Toggle">›</span>`;
         } else {
-            html += `<span class="tree-node-spacer"></span>`;
+            html += `<span class="tree-toggle tree-toggle--spacer"></span>`;
         }
 
         // Icon
         if (node.icon) {
-            html += `<span class="tree-node-icon">${node.icon}</span>`;
+            html += `<span class="tree-icon">${node.icon}</span>`;
         }
 
         // Label
-        html += `<span class="tree-node-label">${this.escapeHtml(node.label)}</span>`;
+        html += `<span class="tree-label">${this.escapeHtml(node.label)}</span>`;
 
         html += `</div>`;
 
         // Children (if any)
         if (hasChildren) {
-            html += `<div class="tree-node-children">`;
+            html += `<div class="tree-children">`;
             html += this.renderNodes(node.children, level + 1);
             html += `</div>`;
         }

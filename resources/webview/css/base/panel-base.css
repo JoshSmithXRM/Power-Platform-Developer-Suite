@@ -1,5 +1,7 @@
 /* Base Panel Styles - Shared across all panels */
 
+/* NOTE: shared-loading.css is loaded explicitly by PanelComposer before this file */
+
 /* Body and Layout */
 body {
     margin: 0;

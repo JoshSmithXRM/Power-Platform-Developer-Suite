@@ -654,45 +654,24 @@
     opacity: 0.5;
 }
 
-/* Loading overlay */
+/* Loading indicator uses shared styles from shared-loading.css (imported via panel-base.css) */
+
+/* Loading overlay - fullscreen overlay for table loading state */
 .loading-overlay {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.1);
-    display: none; /* Hidden by default - only shown when loading */
-    flex-direction: column;
+    background: rgba(0, 0, 0, 0.05);
+    display: none;
     align-items: center;
     justify-content: center;
     z-index: 100;
-    gap: 12px;
 }
 
-/* Only block pointer events when actually visible */
 .loading-overlay.visible {
     display: flex;
-    pointer-events: all;
-}
-
-.loading-spinner {
-    width: 24px;
-    height: 24px;
-    border: 2px solid var(--vscode-progressBar-background);
-    border-top: 2px solid var(--vscode-charts-blue);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-.loading-text {
-    color: var(--vscode-foreground);
-    font-size: 14px;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
 }
 
 /* Error overlay */

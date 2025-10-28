@@ -103,10 +103,11 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 8px;
+    padding: 2px 8px;
+    min-height: 22px;
     cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.1s ease;
+    border-radius: 3px;
+    transition: background-color 0.05s ease;
 }
 
 .tree-node-content:hover {
@@ -137,15 +138,20 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
     cursor: pointer;
-    color: var(--vscode-foreground);
-    opacity: 0.8;
-    transition: transform 0.1s ease;
+    color: var(--vscode-icon-foreground);
+    opacity: 0.9;
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 11px;
 }
 
 .tree-toggle:hover {
     opacity: 1;
+    color: var(--vscode-foreground);
+}
+
+.tree-node--expanded > .tree-node-content > .tree-toggle {
+    transform: rotate(90deg);
 }
 
 .tree-toggle--spacer {
@@ -210,11 +216,7 @@
    Loading & Error States
    ============================================================================= */
 
-.tree-view-loading {
-    padding: 16px;
-    text-align: center;
-    color: var(--vscode-descriptionForeground);
-}
+/* Loading indicator uses shared styles from shared-loading.css */
 
 .tree-view-error {
     padding: 16px;
