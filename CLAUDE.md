@@ -197,8 +197,21 @@ export class MyPanel extends BasePanel {
     private dataTable: DataTableComponent;
 
     private initializeComponents(): void {
-        this.environmentSelector = ComponentFactory.createEnvironmentSelector({...});
-        this.dataTable = ComponentFactory.createDataTable({...});
+        // ⚠️ CRITICAL: EnvironmentSelector MUST have onChange callback
+        // Without it, panel won't load data on initial open (auto-selection won't trigger data load)
+        this.environmentSelector = ComponentFactory.createEnvironmentSelector({
+            id: 'myPanel-envSelector',
+            label: 'Environment',
+            onChange: (environmentId: string) => {
+                this.handleEnvironmentSelection(environmentId);
+            }
+        });
+
+        this.dataTable = ComponentFactory.createDataTable({
+            id: 'myPanel-dataTable',
+            columns: [...],
+            data: []
+        });
     }
 
     protected getHtmlContent(): string {
@@ -207,8 +220,22 @@ export class MyPanel extends BasePanel {
             this.dataTable
         ], this.getCommonWebviewResources());
     }
+
+    private handleEnvironmentSelection(environmentId: string): void {
+        // Load your panel's data here
+        // This fires on BOTH: initial auto-select AND manual user change
+        this.loadData(environmentId);
+    }
 }
 ```
+
+**Why onChange is mandatory for EnvironmentSelector:**
+- BasePanel auto-selects first environment on initial panel load
+- `setSelectedEnvironment()` internally triggers the onChange callback
+- Same callback fires when user manually changes environment dropdown
+- **Without onChange**: Auto-selection happens but your panel never loads data → empty panel on open
+
+📖 **See**: `docs/COMPONENT_PATTERNS.md` - Environment Selection Lifecycle for full details
 
 ## Custom Layouts (Advanced Only)
 

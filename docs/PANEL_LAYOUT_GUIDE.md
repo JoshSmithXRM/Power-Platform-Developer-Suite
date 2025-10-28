@@ -403,11 +403,27 @@ For panels narrower than minimum:
 
 ```typescript
 private initializeComponents(): void {
-    this.environmentSelector = ComponentFactory.createEnvironmentSelector({...});
-    this.actionBar = ComponentFactory.createActionBar({...});
-    this.dataTable = ComponentFactory.createDataTable({...});
+    // ⚠️ EnvironmentSelector requires onChange callback
+    this.environmentSelector = ComponentFactory.createEnvironmentSelector({
+        id: 'panel-envSelector',
+        label: 'Environment',
+        onChange: (envId: string) => this.handleEnvironmentSelection(envId)
+    });
+
+    this.actionBar = ComponentFactory.createActionBar({
+        id: 'panel-actionBar',
+        actions: [...]
+    });
+
+    this.dataTable = ComponentFactory.createDataTable({
+        id: 'panel-dataTable',
+        columns: [...],
+        data: []
+    });
 }
 ```
+
+📖 **See**: `docs/COMPONENT_PATTERNS.md` - Environment Selection Lifecycle for why onChange is mandatory
 
 ### 2. HTML Generation
 
@@ -461,6 +477,17 @@ export class MyPanel extends BasePanel {
     private actionBar: ActionBarComponent;
     private environmentSelector: EnvironmentSelectorComponent;
     private dataTable: DataTableComponent;
+
+    private initializeComponents(): void {
+        this.environmentSelector = ComponentFactory.createEnvironmentSelector({
+            id: 'myPanel-envSelector',
+            label: 'Environment',
+            onChange: (envId: string) => this.loadData(envId) // ⚠️ REQUIRED
+        });
+
+        this.actionBar = ComponentFactory.createActionBar({...});
+        this.dataTable = ComponentFactory.createDataTable({...});
+    }
 
     protected getHtmlContent(): string {
         return PanelComposer.compose([

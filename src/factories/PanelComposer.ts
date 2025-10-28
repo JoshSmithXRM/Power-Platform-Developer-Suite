@@ -713,7 +713,7 @@ export class PanelComposer {
 
     /**
      * Organize components into flexible layout structure
-     * Separates control components (selectors, action bars) from table components
+     * Separates control components (selectors, action bars) from content components (tables, tree views)
      * and arranges them in the proper flex layout for optimal space usage
      */
     private static organizeComponentsForFlexibleLayout(componentHTML: string): string {
@@ -728,12 +728,13 @@ export class PanelComposer {
         let isInTableComponent = false;
         
         for (const line of lines) {
-            // Detect start of table components
-            if (line.includes('data-table') || line.includes('class="data-table') || 
-                line.includes('connection-references-table')) {
+            // Detect start of content components (tables, tree views, etc.)
+            if (line.includes('data-table') || line.includes('class="data-table') ||
+                line.includes('connection-references-table') ||
+                line.includes('tree-view') || line.includes('class="tree-view')) {
                 isInTableComponent = true;
             }
-            
+
             // Collect the HTML
             if (isInTableComponent) {
                 tablesHTML += line + '\n';

@@ -92,12 +92,15 @@ export class PluginRegistrationPanel extends BasePanel {
     private initializeComponents(): void {
         this.componentLogger.debug('Initializing components');
 
-        // Environment Selector
+        // Environment Selector - onChange handles both auto-selection and manual changes
         this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
             id: 'pluginRegistration-environmentSelector',
             variant: 'default',
             label: 'Environment:',
-            showRefreshButton: true
+            showRefreshButton: true,
+            onChange: (environmentId: string) => {
+                this.handleEnvironmentSelection(environmentId);
+            }
         });
 
         // Action Bar
@@ -128,6 +131,24 @@ export class PluginRegistrationPanel extends BasePanel {
         this.componentLogger.debug('Components initialized');
     }
 
+    /**
+     * Handles environment selection from BOTH:
+     * - Initial auto-selection by BasePanel
+     * - Manual user selection via dropdown
+     */
+    private handleEnvironmentSelection(environmentId: string): void {
+        this.componentLogger.debug('Environment selected', { environmentId });
+
+        if (!environmentId) {
+            this._selectedEnvironmentId = undefined;
+            this.treeViewComponent?.setNodes([]);
+            return;
+        }
+
+        this._selectedEnvironmentId = environmentId;
+        this.loadAssemblies();
+    }
+
     protected getHtmlContent(): string {
         return PanelComposer.compose([
             this.environmentSelectorComponent!,
@@ -140,11 +161,7 @@ export class PluginRegistrationPanel extends BasePanel {
         this.componentLogger.debug('Handling message', { command: message.command });
 
         switch (message.command) {
-            case 'environment-changed': {
-                const envId = message.data?.environmentId || message.environmentId;
-                await this.handleEnvironmentChanged(envId);
-                break;
-            }
+            // environment-changed is now handled by onChange callback - no need to handle here
 
             case 'action-clicked':
                 if (message.data?.buttonId === 'refresh') {
@@ -162,20 +179,6 @@ export class PluginRegistrationPanel extends BasePanel {
                 }
                 break;
         }
-    }
-
-    private async handleEnvironmentChanged(environmentId: string): Promise<void> {
-        this.componentLogger.debug('Environment changed', { environmentId });
-
-        if (!environmentId) {
-            this.treeViewComponent!.setNodes([]);
-            return;
-        }
-
-        this._selectedEnvironmentId = environmentId;
-
-        // Load assemblies
-        await this.loadAssemblies();
     }
 
     private async handleRefresh(): Promise<void> {

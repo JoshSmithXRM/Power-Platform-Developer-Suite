@@ -196,6 +196,184 @@ export class DataTableComponent extends BaseComponent {
 }
 ```
 
+## Environment Selection Lifecycle (MANDATORY PATTERN)
+
+### ⚠️ Critical: onChange Callback Required
+
+**Every panel using EnvironmentSelector MUST provide an onChange callback. Without it, the panel will not load data on initial open.**
+
+### The Problem
+
+BasePanel auto-selects the first environment when a panel opens. However, programmatically setting a dropdown value (`selector.value = envId`) **does not trigger DOM change events**. Therefore, the panel never receives notification that an environment was selected, and data never loads.
+
+### The Solution
+
+The EnvironmentSelectorComponent internally triggers the `onChange` callback when `setSelectedEnvironment()` is called. This works for **both** scenarios:
+1. **Initial load**: BasePanel calls `setSelectedEnvironment()` → onChange fires → panel loads data
+2. **User change**: User changes dropdown → onChange fires → panel loads data
+
+### Pattern Implementation
+
+```typescript
+export class MyPanel extends BasePanel {
+    private environmentSelectorComponent?: EnvironmentSelectorComponent;
+    private myService: MyService;
+
+    private initializeComponents(): void {
+        // ✅ CORRECT: With onChange callback
+        this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
+            id: 'myPanel-envSelector',
+            label: 'Environment',
+            placeholder: 'Select an environment...',
+            showRefreshButton: true,
+            onChange: (environmentId: string) => {
+                this.handleEnvironmentSelection(environmentId);
+            }
+        });
+    }
+
+    /**
+     * Handles environment selection from BOTH:
+     * - Initial auto-selection by BasePanel
+     * - Manual user selection via dropdown
+     */
+    private handleEnvironmentSelection(environmentId: string): void {
+        this.componentLogger.debug('Environment selected', { environmentId });
+
+        if (!environmentId) {
+            // Clear data when environment is deselected
+            this.clearData();
+            return;
+        }
+
+        // Load panel-specific data
+        this.loadData(environmentId);
+    }
+
+    private async loadData(environmentId: string): Promise<void> {
+        try {
+            const data = await this.myService.getData(environmentId);
+            // Update your components with data
+            this.dataTableComponent?.setData(data);
+        } catch (error) {
+            this.componentLogger.error('Failed to load data', error as Error);
+            vscode.window.showErrorMessage('Failed to load data: ' + (error as Error).message);
+        }
+    }
+}
+```
+
+### ❌ Common Mistake
+
+```typescript
+// ❌ WRONG: No onChange callback
+this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
+    id: 'myPanel-envSelector',
+    label: 'Environment'
+    // Missing onChange!
+});
+
+// Panel opens → environment auto-selected → onChange not called → data never loads → EMPTY PANEL
+```
+
+### How BasePanel Auto-Selection Works
+
+```typescript
+// BasePanel.ts - loadEnvironmentsWithAutoSelect()
+protected async loadEnvironmentsWithAutoSelect(): Promise<void> {
+    const environments = await this.authService.getEnvironments();
+
+    // Set environments in component
+    environmentSelectorComponent.setEnvironments(environments);
+
+    // Auto-select first environment (or restore from cache)
+    const selectedEnvironmentId = environments[0]?.id;
+    if (selectedEnvironmentId) {
+        // This triggers the onChange callback internally ↓
+        environmentSelectorComponent.setSelectedEnvironment(selectedEnvironmentId);
+    }
+}
+```
+
+```typescript
+// EnvironmentSelectorComponent.ts - setSelectedEnvironment()
+public setSelectedEnvironment(environmentId: string | null): void {
+    this.selectedEnvironmentId = environmentId;
+
+    // Update webview dropdown value
+    this.notifyUpdate();
+
+    // ✅ Trigger onChange callback (if provided)
+    if (this.config.onChange) {
+        this.config.onChange(environmentId || '');
+    }
+}
+```
+
+### Multiple Environment Selectors
+
+When a panel needs multiple environment selectors (e.g., source/target for comparison):
+
+```typescript
+private initializeComponents(): void {
+    this.sourceEnvSelector = this.componentFactory.createEnvironmentSelector({
+        id: 'source-env',
+        label: 'Source Environment:',
+        onChange: (envId: string) => {
+            this.sourceEnvironmentId = envId;
+            this.compareEnvironments();
+        }
+    });
+
+    this.targetEnvSelector = this.componentFactory.createEnvironmentSelector({
+        id: 'target-env',
+        label: 'Target Environment:',
+        onChange: (envId: string) => {
+            this.targetEnvironmentId = envId;
+            this.compareEnvironments();
+        }
+    });
+}
+```
+
+### When to Handle 'environment-changed' Message
+
+**You typically do NOT need to handle the `environment-changed` message if you use onChange.**
+
+The `environment-changed` message is sent from the webview when the user manually changes the dropdown. However, if you provide `onChange`, that callback handles both auto-selection and manual changes.
+
+```typescript
+// ❌ REDUNDANT: Don't do both
+protected async handleMessage(message: WebviewMessage): Promise<void> {
+    switch (message.command) {
+        case 'environment-changed':
+            // This is already handled by onChange callback
+            // No need to handle it here too!
+            break;
+    }
+}
+```
+
+**Exception**: Only handle `environment-changed` if you need to sync state between multiple selectors or have special validation logic.
+
+### Debugging Checklist
+
+If your panel is not loading data on initial open:
+
+- [ ] Does EnvironmentSelector have `onChange` callback?
+- [ ] Does the callback actually call your data loading method?
+- [ ] Is `this` bound correctly? (Use arrow function or `.bind(this)`)
+- [ ] Are you checking logs to confirm callback is firing?
+- [ ] Is BasePanel actually auto-selecting? (Check `loadEnvironments()` was called)
+
+```typescript
+// ✅ Good debugging approach
+onChange: (environmentId: string) => {
+    this.componentLogger.info('🔄 Environment onChange fired', { environmentId }); // Log it!
+    this.handleEnvironmentSelection(environmentId);
+}
+```
+
 ## Event Communication Pattern
 
 ### Observer Pattern Implementation
@@ -601,6 +779,8 @@ const targetEnvSelector = ComponentFactory.createEnvironmentSelector({
     onChange: this.handleTargetEnvChange.bind(this)
 });
 ```
+
+**Note**: See [Environment Selection Lifecycle](#environment-selection-lifecycle-mandatory-pattern) for why `onChange` is mandatory for EnvironmentSelector.
 
 ### Behavior Instance Tracking
 
