@@ -14,6 +14,8 @@ import { SplitPanelComponent } from '../components/panels/SplitPanel/SplitPanelC
 import { SplitPanelConfig } from '../components/panels/SplitPanel/SplitPanelConfig';
 import { TreeViewComponent } from '../components/trees/TreeView/TreeViewComponent';
 import { TreeViewConfig } from '../components/trees/TreeView/TreeViewConfig';
+import { SearchInputComponent } from '../components/inputs/SearchInput/SearchInputComponent';
+import { SearchInputConfig } from '../components/inputs/SearchInput/SearchInputConfig';
 import { IRenderable } from '../components/base/BaseComponent';
 import { ServiceFactory } from '../services/ServiceFactory';
 
@@ -168,6 +170,18 @@ export class ComponentFactory {
 
         const component = new TreeViewComponent(config);
         this.trackInstance(config.id, 'TreeView', component);
+
+        return component;
+    }
+
+    /**
+     * Create a SearchInputComponent
+     */
+    public createSearchInput(config: SearchInputConfig): SearchInputComponent {
+        this.validateComponentConfig(config, 'SearchInput');
+
+        const component = new SearchInputComponent(config);
+        this.trackInstance(config.id, 'SearchInput', component);
 
         return component;
     }

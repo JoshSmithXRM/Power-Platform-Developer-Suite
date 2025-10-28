@@ -603,6 +603,86 @@
 }
 
 /* =============================================================================
+   Base Search Input - Reusable search/filter input component
+   ============================================================================= */
+
+.base-search-input-container {
+    position: relative;
+    width: 100%;
+}
+
+.base-search-input {
+    width: 100%;
+    padding: 6px 12px;
+    border: 1px solid var(--vscode-input-border);
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    font-size: 13px;
+    border-radius: 2px;
+    outline: none;
+    box-sizing: border-box; /* CRITICAL: Fixes overflow bug */
+    transition: border-color 0.15s ease;
+    font-family: var(--vscode-font-family);
+}
+
+.base-search-input:focus {
+    border-color: var(--vscode-focusBorder);
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.base-search-input::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+    opacity: 1;
+}
+
+.base-search-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Icon variants */
+.base-search-input--with-icon-left {
+    padding-left: 32px;
+}
+
+.base-search-input--with-icon-right {
+    padding-right: 32px;
+}
+
+.base-search-input-icon {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--vscode-input-placeholderForeground);
+    font-size: 14px;
+}
+
+.base-search-input-icon--left {
+    left: 10px;
+}
+
+.base-search-input-icon--right {
+    right: 10px;
+}
+
+/* Size variants */
+.base-search-input--compact {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.base-search-input--compact.base-search-input--with-icon-left {
+    padding-left: 28px;
+}
+
+.base-search-input--compact.base-search-input--with-icon-right {
+    padding-right: 28px;
+}
+
+/* =============================================================================
    Accessibility
    ============================================================================= */
 
