@@ -485,6 +485,8 @@ npm run lint             # Standalone lint - compile already includes this
 
 **Why**: Before BaseBehavior, missing `case 'componentUpdate'` caused silent failures (data sent, never displayed). BaseBehavior enforces implementation via abstract method.
 
+**CRITICAL**: BaseBehavior uses Template Method Pattern - base class ALWAYS calls ALL lifecycle hooks (no if checks). See `resources/webview/js/utils/BaseBehavior.js` header comment for complete lifecycle documentation.
+
 ### Required Pattern:
 
 ```javascript

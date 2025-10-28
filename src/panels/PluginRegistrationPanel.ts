@@ -113,13 +113,7 @@ export class PluginRegistrationPanel extends BasePanel {
         this.actionBarComponent = this.componentFactory.createActionBar({
             id: 'pluginRegistration-actionBar',
             actions: [
-                {
-                    id: 'refresh',
-                    label: 'Refresh',
-                    icon: '🔄',
-                    tooltip: 'Refresh plugin list',
-                    variant: 'secondary'
-                }
+                this.getStandardRefreshAction()
             ]
         });
 
@@ -382,12 +376,6 @@ export class PluginRegistrationPanel extends BasePanel {
         switch (message.command) {
             // environment-changed is now handled by onChange callback - no need to handle here
 
-            case 'action-clicked':
-                if (message.data?.buttonId === 'refresh') {
-                    await this.handleRefresh();
-                }
-                break;
-
             case 'node-selected':
                 this.componentLogger.info('node-selected message data:', message.data);
                 if (message.data?.node) {
@@ -403,19 +391,36 @@ export class PluginRegistrationPanel extends BasePanel {
                 this.closeDetailsPanel();
                 break;
 
-            case 'component-event':
+            case 'component-event': {
+                const { componentId, eventType, data } = message.data || {};
+
+                // Handle action bar events
+                if (componentId === 'pluginRegistration-actionBar' && eventType === 'actionClicked') {
+                    const { actionId } = data;
+
+                    // Try standard actions first
+                    const handled = await this.handleStandardActions(actionId);
+                    if (handled) {
+                        return;
+                    }
+
+                    // No other panel-specific actions in plugin registration
+                    this.componentLogger.warn('Unknown action ID', { actionId });
+                    return;
+                }
+
                 // Handle SplitPanel events
-                if (message.data?.componentId === 'pluginRegistration-splitPanel') {
-                    const eventType = message.data.eventType;
+                if (componentId === 'pluginRegistration-splitPanel') {
                     if (eventType === 'rightPanelClosed') {
                         this.selectedNode = undefined;
                     }
                 }
                 break;
+            }
         }
     }
 
-    private async handleRefresh(): Promise<void> {
+    protected async handleRefresh(): Promise<void> {
         this.componentLogger.info('Refresh clicked');
 
         if (this._selectedEnvironmentId) {

@@ -181,13 +181,7 @@ export class MetadataBrowserPanel extends BasePanel {
                         variant: 'primary',
                         disabled: false
                     },
-                    {
-                        id: 'refresh',
-                        label: 'Refresh',
-                        icon: 'refresh',
-                        variant: 'secondary',
-                        disabled: false
-                    }
+                    this.getStandardRefreshAction()
                 ],
                 layout: 'horizontal',
                 className: 'metadata-actions'
@@ -553,26 +547,14 @@ export class MetadataBrowserPanel extends BasePanel {
             if (componentId === 'metadata-actions' && eventType === 'actionClicked') {
                 const { actionId } = data;
 
+                // Try standard actions first
+                const handled = await this.handleStandardActions(actionId);
+                if (handled) {
+                    return;
+                }
+
+                // Handle panel-specific actions
                 switch (actionId) {
-                    case 'refresh':
-                        // Clear all tables first
-                        if (this.attributesTableComponent) this.attributesTableComponent.setData([]);
-                        if (this.keysTableComponent) this.keysTableComponent.setData([]);
-                        if (this.relationshipsTableComponent) this.relationshipsTableComponent.setData([]);
-                        if (this.privilegesTableComponent) this.privilegesTableComponent.setData([]);
-                        if (this.choiceValuesTableComponent) this.choiceValuesTableComponent.setData([]);
-
-                        // Show loading state
-                        this.setAllTablesLoading(true, 'Refreshing metadata...');
-
-                        this.actionBarComponent?.setActionLoading('refresh', true);
-                        try {
-                            await this.refreshCurrentMetadata();
-                        } finally {
-                            this.actionBarComponent?.setActionLoading('refresh', false);
-                            this.setAllTablesLoading(false);
-                        }
-                        break;
                     case 'openInMaker':
                         await this.handleOpenInMaker();
                         break;
@@ -1393,6 +1375,26 @@ export class MetadataBrowserPanel extends BasePanel {
         // No updateWebview() needed - webview behavior handles visual toggle optimistically
         // State is tracked here for persistence when getHtmlContent() is called again
         this.componentLogger.debug('Section toggled', { sectionId, isExpanded: !this.collapsedSections.has(sectionId) });
+    }
+
+    protected async handleRefresh(): Promise<void> {
+        // Clear all tables first
+        if (this.attributesTableComponent) this.attributesTableComponent.setData([]);
+        if (this.keysTableComponent) this.keysTableComponent.setData([]);
+        if (this.relationshipsTableComponent) this.relationshipsTableComponent.setData([]);
+        if (this.privilegesTableComponent) this.privilegesTableComponent.setData([]);
+        if (this.choiceValuesTableComponent) this.choiceValuesTableComponent.setData([]);
+
+        // Show loading state
+        this.setAllTablesLoading(true, 'Refreshing metadata...');
+
+        this.actionBarComponent?.setActionLoading('refresh', true);
+        try {
+            await this.refreshCurrentMetadata();
+        } finally {
+            this.actionBarComponent?.setActionLoading('refresh', false);
+            this.setAllTablesLoading(false);
+        }
     }
 
     private async refreshCurrentMetadata(): Promise<void> {

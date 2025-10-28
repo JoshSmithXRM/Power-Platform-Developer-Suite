@@ -230,7 +230,7 @@ export class PluginTraceViewerPanel extends BasePanel {
         this.actionBarComponent = this.componentFactory.createActionBar({
             id: 'pluginTrace-actionBar',
             actions: [
-                { id: 'refresh', label: 'Refresh', icon: 'refresh' },
+                this.getStandardRefreshAction(),
                 {
                     id: 'export',
                     label: 'Export',
@@ -817,6 +817,25 @@ export class PluginTraceViewerPanel extends BasePanel {
         });
     }
 
+    protected async handleRefresh(): Promise<void> {
+        this.componentLogger.info('🔄 Refresh action triggered');
+        if (this.selectedEnvironmentId) {
+            // Clear table immediately
+            if (this.dataTableComponent) {
+                this.dataTableComponent.setData([]);
+            }
+
+            this.actionBarComponent?.setActionLoading('refresh', true);
+            try {
+                await this.handleLoadTraces(this.selectedEnvironmentId);
+            } finally {
+                this.actionBarComponent?.setActionLoading('refresh', false);
+            }
+        } else {
+            this.componentLogger.warn('⚠️ No environment selected for refresh');
+        }
+    }
+
     private async handleActionBarClick(actionId: string, itemId?: string): Promise<void> {
         this.componentLogger.info('🎬 ACTION BAR CLICK HANDLER', {
             actionId,
@@ -824,25 +843,14 @@ export class PluginTraceViewerPanel extends BasePanel {
             selectedEnvironmentId: this.selectedEnvironmentId
         });
 
-        switch (actionId) {
-            case 'refresh':
-                this.componentLogger.info('🔄 Refresh action triggered');
-                if (this.selectedEnvironmentId) {
-                    // Clear table immediately
-                    if (this.dataTableComponent) {
-                        this.dataTableComponent.setData([]);
-                    }
+        // Try standard actions first
+        const handled = await this.handleStandardActions(actionId);
+        if (handled) {
+            return;
+        }
 
-                    this.actionBarComponent?.setActionLoading('refresh', true);
-                    try {
-                        await this.handleLoadTraces(this.selectedEnvironmentId);
-                    } finally {
-                        this.actionBarComponent?.setActionLoading('refresh', false);
-                    }
-                } else {
-                    this.componentLogger.warn('⚠️ No environment selected for refresh');
-                }
-                break;
+        // Handle panel-specific actions
+        switch (actionId) {
 
             case 'export':
                 this.componentLogger.info('💾 Export action triggered', { itemId });

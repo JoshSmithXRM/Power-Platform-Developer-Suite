@@ -99,6 +99,11 @@ class ActionBarBehavior extends BaseBehavior {
         if (!instance.actionsContainer) {
             throw new Error('Actions container element not found');
         }
+
+        console.log(`ActionBarBehavior: DOM elements found for ${instance.id}`, {
+            actionsContainerHTML: instance.actionsContainer.innerHTML.substring(0, 200),
+            actionElements: instance.actionsContainer.querySelectorAll('[data-action-id]').length
+        });
     }
 
     /**
@@ -234,12 +239,19 @@ class ActionBarBehavior extends BaseBehavior {
             return;
         }
 
-        console.log(`ActionBarBehavior: Action clicked: ${actionId}`);
+        console.log(`ActionBarBehavior: Action clicked: ${actionId}`, {
+            availableActions: instance.actions ? instance.actions.map(a => a.id) : 'no actions',
+            instanceId: instance.id
+        });
 
         // Find the action configuration
         const action = instance.actions.find(a => a.id === actionId);
         if (!action) {
-            console.warn(`ActionBarBehavior: Action ${actionId} not found`);
+            console.error(`ActionBarBehavior: Action ${actionId} not found`, {
+                availableActions: instance.actions ? instance.actions.map(a => a.id) : 'no actions array',
+                instanceId: instance.id,
+                actionsCount: instance.actions ? instance.actions.length : 0
+            });
             return;
         }
 
@@ -682,10 +694,14 @@ class ActionBarBehavior extends BaseBehavior {
         const actions = [];
         const actionElements = container.querySelectorAll('[data-action-id]');
 
+        console.log(`ActionBarBehavior: Parsing ${actionElements.length} actions from DOM`);
+
         actionElements.forEach(element => {
             const actionId = element.getAttribute('data-action-id');
             const actionType = element.getAttribute('data-action-type') || 'button';
             const label = element.querySelector('.action-label')?.textContent || '';
+
+            console.log(`ActionBarBehavior: Parsed action: ${actionId} (${label})`);
 
             actions.push({
                 id: actionId,
@@ -696,6 +712,7 @@ class ActionBarBehavior extends BaseBehavior {
             });
         });
 
+        console.log(`ActionBarBehavior: Total actions parsed:`, actions.map(a => a.id));
         return actions;
     }
 

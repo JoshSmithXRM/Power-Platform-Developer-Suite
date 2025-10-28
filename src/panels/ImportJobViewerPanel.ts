@@ -119,13 +119,7 @@ export class ImportJobViewerPanel extends BasePanel {
                         variant: 'primary',
                         disabled: true
                     },
-                    {
-                        id: 'refresh',
-                        label: 'Refresh',
-                        icon: 'refresh',
-                        variant: 'secondary',
-                        disabled: false
-                    }
+                    this.getStandardRefreshAction()
                 ],
                 layout: 'horizontal',
                 className: 'import-jobs-actions'
@@ -244,7 +238,7 @@ export class ImportJobViewerPanel extends BasePanel {
                     break;
 
                 case 'refresh-data':
-                    await this.refreshImportJobs();
+                    await this.handleRefresh();
                     break;
 
                 case 'panel-ready':
@@ -292,10 +286,14 @@ export class ImportJobViewerPanel extends BasePanel {
             if (componentId === 'importJobs-actions' && eventType === 'actionClicked') {
                 const { actionId } = data;
 
+                // Try standard actions first
+                const handled = await this.handleStandardActions(actionId);
+                if (handled) {
+                    return;
+                }
+
+                // Handle panel-specific actions
                 switch (actionId) {
-                    case 'refresh':
-                        await this.refreshImportJobs();
-                        break;
                     case 'openSolutionHistory': {
                         const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
                         if (envId) {
@@ -552,7 +550,7 @@ export class ImportJobViewerPanel extends BasePanel {
         }
     }
 
-    private async refreshImportJobs(): Promise<void> {
+    protected async handleRefresh(): Promise<void> {
         try {
             this.componentLogger.debug('Refreshing import jobs and environments');
 

@@ -598,4 +598,57 @@ export abstract class BasePanel implements IPanelBase {
             bridgeCount: validComponents.length
         });
     }
+
+    /**
+     * Get standardized refresh button action configuration
+     * All panels should use this for consistent refresh button styling
+     * Matches Solution Explorer pattern: icon='refresh', variant='secondary'
+     */
+    protected getStandardRefreshAction(): {
+        id: string;
+        label: string;
+        icon: string;
+        variant: 'secondary';
+        disabled: boolean;
+    } {
+        return {
+            id: 'refresh',
+            label: 'Refresh',
+            icon: 'refresh',
+            variant: 'secondary' as const,
+            disabled: false
+        };
+    }
+
+    /**
+     * Handle standard action bar actions (refresh, etc.)
+     * Returns true if action was handled, false otherwise
+     * Call this from child class handleMessage() when receiving 'action-clicked'
+     *
+     * @example
+     * case 'action-clicked':
+     *     const handled = await this.handleStandardActions(message.data?.buttonId);
+     *     if (!handled) {
+     *         // Handle panel-specific actions
+     *     }
+     *     break;
+     */
+    protected async handleStandardActions(buttonId: string): Promise<boolean> {
+        switch (buttonId) {
+            case 'refresh':
+                await this.handleRefresh();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Handle refresh action
+     * Child panels should override this to implement refresh logic
+     * Default implementation throws error to catch missing implementations
+     */
+    protected async handleRefresh(): Promise<void> {
+        throw new Error(`handleRefresh() not implemented in ${this.constructor.name}`);
+    }
 }

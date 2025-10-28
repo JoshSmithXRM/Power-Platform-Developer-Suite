@@ -117,13 +117,7 @@ export class SolutionExplorerPanel extends BasePanel {
                         variant: 'primary',
                         disabled: true
                     },
-                    {
-                        id: 'refresh',
-                        label: 'Refresh',
-                        icon: 'refresh',
-                        variant: 'secondary',
-                        disabled: false
-                    }
+                    this.getStandardRefreshAction()
                 ],
                 layout: 'horizontal',
                 className: 'solutions-actions'
@@ -231,7 +225,7 @@ export class SolutionExplorerPanel extends BasePanel {
                     break;
 
                 case 'refresh-data':
-                    await this.refreshSolutions();
+                    await this.handleRefresh();
                     break;
 
                 case 'panel-ready':
@@ -279,6 +273,13 @@ export class SolutionExplorerPanel extends BasePanel {
             if (componentId === 'solutions-actions' && eventType === 'actionClicked') {
                 const { actionId } = data;
 
+                // Try standard actions first
+                const handled = await this.handleStandardActions(actionId);
+                if (handled) {
+                    return;
+                }
+
+                // Handle panel-specific actions
                 switch (actionId) {
                     case 'openInMaker': {
                         const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
@@ -289,9 +290,6 @@ export class SolutionExplorerPanel extends BasePanel {
                         }
                         break;
                     }
-                    case 'refresh':
-                        await this.refreshSolutions();
-                        break;
                     default:
                         this.componentLogger.warn('Unknown action ID', { actionId });
                 }
@@ -541,7 +539,7 @@ export class SolutionExplorerPanel extends BasePanel {
         }
     }
 
-    private async refreshSolutions(): Promise<void> {
+    protected async handleRefresh(): Promise<void> {
         try {
             this.componentLogger.debug('Refreshing solutions and environments');
 

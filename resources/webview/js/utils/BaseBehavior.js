@@ -1,18 +1,77 @@
 /**
- * BaseBehavior - Abstract base class for all webview component behaviors
+ * BaseBehavior - Base class for all webview component behaviors
  *
- * PURPOSE:
- * - Enforces componentUpdate pattern (prevents silent failures)
- * - Provides consistent initialization and cleanup
- * - Enables registry-based routing (no hardcoded switches)
- * - Validates required method implementations at runtime
+ * ARCHITECTURE PATTERN: Template Method Pattern
+ * - Base class defines and orchestrates the complete lifecycle
+ * - Child classes override specific hooks to customize behavior
+ * - All hooks have default implementations (no-op or error)
+ * - Base class ALWAYS calls ALL hooks (no conditional logic)
+ *
+ * LIFECYCLE HOOKS - All defined in base class with defaults:
+ * ┌──────────────────────────────────────────────────────────────────────────┐
+ * │ 1. createInstance(componentId, config, element)                          │
+ * │    → Returns: Instance object structure                                  │
+ * │    → Default: Basic instance with id, config, element, boundHandlers     │
+ * │    → Override: If you need custom instance structure                     │
+ * │                                                                           │
+ * │ 2. findDOMElements(instance)                                             │
+ * │    → Returns: void                                                        │
+ * │    → Default: No-op                                                       │
+ * │    → Override: Query and cache DOM element references on instance        │
+ * │                                                                           │
+ * │ 3. setupEventListeners(instance)                                         │
+ * │    → Returns: void                                                        │
+ * │    → Default: No-op                                                       │
+ * │    → Override: Attach event handlers using cached DOM references         │
+ * │                                                                           │
+ * │ 4. initializeState(instance)                                             │
+ * │    → Returns: void                                                        │
+ * │    → Default: No-op                                                       │
+ * │    → Override: Parse initial state from DOM attributes/structure         │
+ * │    → Example: ActionBar parses button configs from DOM                   │
+ * │                                                                           │
+ * │ 5. onComponentUpdate(instance, data)                                     │
+ * │    → Returns: void                                                        │
+ * │    → Default: Throws error (MUST implement)                              │
+ * │    → Override: REQUIRED - Handle data updates from Extension Host        │
+ * │                                                                           │
+ * │ 6. cleanupInstance(instance)                                             │
+ * │    → Returns: void                                                        │
+ * │    → Default: No-op                                                       │
+ * │    → Override: Remove event listeners, clear timers, etc.                │
+ * └──────────────────────────────────────────────────────────────────────────┘
+ *
+ * INITIALIZATION FLOW (Template Method):
+ * initialize()
+ *   ├─→ createInstance()        [has default, usually override]
+ *   ├─→ findDOMElements()       [no-op default, override if needed]
+ *   ├─→ setupEventListeners()   [no-op default, override if needed]
+ *   ├─→ initializeState()       [no-op default, override if needed]
+ *   └─→ instances.set()         [automatic]
+ *
+ * CRITICAL: Base class ALWAYS calls ALL hooks. Never conditional.
+ * This prevents bugs where forgetting to call a hook causes silent failures.
  *
  * USAGE:
- * class MyComponentBehavior extends BaseBehavior {
- *     static getComponentType() { return 'MyComponent'; }
+ * class ActionBarBehavior extends BaseBehavior {
+ *     static getComponentType() { return 'ActionBar'; }
+ *
+ *     static findDOMElements(instance) {
+ *         instance.actionsContainer = instance.element.querySelector('[data-component-element="actions"]');
+ *     }
+ *
+ *     static setupEventListeners(instance) {
+ *         instance.actionsContainer.addEventListener('click', (e) => this.handleClick(instance, e));
+ *     }
+ *
+ *     static initializeState(instance) {
+ *         // Parse actions from DOM buttons
+ *         instance.actions = this.parseActionsFromDOM(instance.actionsContainer);
+ *     }
  *
  *     static onComponentUpdate(instance, data) {
- *         // Handle component data updates from Extension Host
+ *         // REQUIRED - Update actions from Extension Host data
+ *         if (data.actions) instance.actions = data.actions;
  *     }
  * }
  */
@@ -54,11 +113,10 @@ class BaseBehavior {
         try {
             const instance = this.createInstance(componentId, config, element);
 
-            // Find DOM elements
+            // Call lifecycle hooks in order (all hooks have default implementations)
             this.findDOMElements(instance);
-
-            // Setup event listeners
             this.setupEventListeners(instance);
+            this.initializeState(instance);
 
             // Register instance
             this.instances.set(componentId, instance);
@@ -99,6 +157,22 @@ class BaseBehavior {
      */
     static setupEventListeners(instance) {
         // Override in subclass
+    }
+
+    /**
+     * Initialize component state from DOM
+     * Subclasses should override to parse initial state from DOM elements
+     *
+     * Examples:
+     * - ActionBar: Parse action buttons from DOM to build actions array
+     * - DataTable: Parse column headers and initial row data
+     * - TreeView: Parse initial tree structure from nested elements
+     *
+     * Default: No-op (most components receive state via componentUpdate)
+     */
+    static initializeState(instance) {
+        // Override in subclass if you need to parse DOM state
+        // This is called automatically by initialize() - never call manually
     }
 
     /**

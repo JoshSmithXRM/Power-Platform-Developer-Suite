@@ -133,3 +133,65 @@ const stepNode = {
 - Filtering attributes search already implemented (2025-10-28)
 - This follows same pattern: add to searchText without cluttering label
 - Should use same approach for entity search
+
+---
+
+## Issue: Metadata Browser Action Buttons Disabled on Initial Load
+
+**Date**: 2025-10-28
+**Severity**: Medium (UI/UX issue)
+**Status**: Documented, needs fix
+
+### Description
+
+In the Metadata Browser panel, the "Open in Maker" and "Refresh" buttons in the action bar are greyed out (disabled) when the panel initially loads, even though an environment is selected and metadata is loaded.
+
+### Steps to Reproduce
+
+1. Open Metadata Browser panel
+2. Environment auto-selects and metadata loads successfully
+3. **Bug**: Action bar buttons remain disabled despite data being loaded
+
+### Expected Behavior
+
+- Once environment is selected and metadata loads, action buttons should be enabled
+- Refresh button should always be enabled when environment is selected
+- Open in Maker button should be enabled when environment is selected
+
+### Current State
+
+Both buttons appear to be initialized as disabled and never get re-enabled after successful data load.
+
+### Impact
+
+- Users cannot refresh metadata without reopening panel
+- Users cannot quickly open current entity in Maker portal
+- Confusing UX - buttons appear broken
+
+### Files Likely Affected
+
+- `src/panels/MetadataBrowserPanel.ts` (button state management)
+- Action bar initialization in `initializeComponents()`
+- Missing calls to `actionBarComponent.setActionEnabled()` after data loads
+
+### Potential Solution
+
+```typescript
+// After successful metadata load:
+this.actionBarComponent?.setActionEnabled('refresh', true);
+this.actionBarComponent?.setActionEnabled('openInMaker', true);
+
+// Or initialize as enabled if environment is selected:
+{
+    id: 'openInMaker',
+    label: 'Open in Maker',
+    variant: 'primary',
+    disabled: false  // Should be false when env selected
+}
+```
+
+### Notes
+
+- This issue was discovered during refresh button abstraction work
+- Other panels (Solution Explorer, Import Jobs) have buttons enabled correctly
+- Quick fix - just need to update disabled state after data loads or set initial state correctly

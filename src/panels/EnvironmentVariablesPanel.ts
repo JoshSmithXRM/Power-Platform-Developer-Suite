@@ -152,13 +152,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
                         variant: 'primary',
                         disabled: false
                     },
-                    {
-                        id: 'refresh',
-                        label: 'Refresh',
-                        icon: 'refresh',
-                        variant: 'secondary',
-                        disabled: false
-                    },
+                    this.getStandardRefreshAction(),
                     {
                         id: 'syncDeploymentBtn',
                         label: 'Sync Deployment Settings',
@@ -265,7 +259,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
                     break;
 
                 case 'refresh-data':
-                    await this.refreshEnvironmentVariables();
+                    await this.handleRefresh();
                     break;
 
                 case 'panel-ready':
@@ -343,10 +337,14 @@ export class EnvironmentVariablesPanel extends BasePanel {
             if (componentId === 'envVars-actions' && eventType === 'actionClicked') {
                 const { actionId } = data;
 
+                // Try standard actions first
+                const handled = await this.handleStandardActions(actionId);
+                if (handled) {
+                    return;
+                }
+
+                // Handle panel-specific actions
                 switch (actionId) {
-                    case 'refresh':
-                        await this.refreshEnvironmentVariables();
-                        break;
                     case 'syncDeploymentBtn': {
                         // Use original service data for deployment settings sync
                         if (!this.currentEnvironmentVariablesData) {
@@ -682,7 +680,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
         }
     }
 
-    private async refreshEnvironmentVariables(): Promise<void> {
+    protected async handleRefresh(): Promise<void> {
         try {
             this.componentLogger.debug('Refreshing environment variables and environments');
 

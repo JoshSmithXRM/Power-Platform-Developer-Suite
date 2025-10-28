@@ -155,13 +155,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                         variant: 'primary',
                         disabled: false
                     },
-                    {
-                        id: 'refreshBtn',
-                        label: 'Refresh',
-                        icon: 'refresh',
-                        variant: 'secondary',
-                        disabled: false
-                    },
+                    this.getStandardRefreshAction(),
                     {
                         id: 'syncDeploymentBtn',
                         label: 'Sync Deployment Settings',
@@ -296,7 +290,7 @@ export class ConnectionReferencesPanel extends BasePanel {
                     break;
 
                 case 'refresh-data':
-                    await this.refreshConnectionReferences();
+                    await this.handleRefresh();
                     break;
 
                 case 'sync-deployment-settings':
@@ -372,10 +366,14 @@ export class ConnectionReferencesPanel extends BasePanel {
             if (componentId === 'connectionRefs-actions' && eventType === 'actionClicked') {
                 const { actionId } = data;
 
+                // Try standard actions first
+                const handled = await this.handleStandardActions(actionId);
+                if (handled) {
+                    return;
+                }
+
+                // Handle panel-specific actions
                 switch (actionId) {
-                    case 'refreshBtn':
-                        await this.refreshConnectionReferences();
-                        break;
                     case 'syncDeploymentBtn': {
                         // Use original service data for deployment settings sync
                         if (!this.currentRelationshipData) {
@@ -709,7 +707,7 @@ export class ConnectionReferencesPanel extends BasePanel {
         }
     }
 
-    private async refreshConnectionReferences(): Promise<void> {
+    protected async handleRefresh(): Promise<void> {
         try {
             this.componentLogger.debug('Refreshing connection references and environments');
 
