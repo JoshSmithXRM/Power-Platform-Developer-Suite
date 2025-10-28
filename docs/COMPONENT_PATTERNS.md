@@ -1396,6 +1396,78 @@ describe('DataTableBehavior', () => {
 });
 ```
 
+## Working with Layout Components
+
+### SplitPanel Integration Pattern
+
+**SplitPanel is a layout-only component** (no TypeScript API) that uses **BOTH CSS classes AND inline styles** to control visibility. Panel-specific behaviors must account for both when showing/hiding panels.
+
+#### How SplitPanelBehavior Hides Panels
+
+When hiding the right panel, SplitPanelBehavior applies:
+1. CSS class: `split-panel-right-hidden` on container
+2. Inline style: `display: none` on right panel element
+
+**Why this matters**: Inline styles override CSS classes due to CSS specificity rules. Removing the CSS class alone won't make the panel visible.
+
+#### Correct Pattern: Use SplitPanelBehavior Public API
+
+**✅ CORRECT** - Use the behavior's public API methods:
+
+```javascript
+// Panel-specific behavior (e.g., pluginRegistrationBehavior.js)
+static showNodeDetails(data) {
+    // Step 1: Update content
+    const detailContent = document.getElementById('detail-panel-content');
+    detailContent.innerHTML = data.html;
+
+    // Step 2: Show panel using public API
+    if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('my-splitPanel')) {
+        const instance = window.SplitPanelBehavior.instances.get('my-splitPanel');
+        window.SplitPanelBehavior.showRightPanel(instance);
+    }
+}
+
+static closeDetailPanel() {
+    // Close panel using public API
+    if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('my-splitPanel')) {
+        const instance = window.SplitPanelBehavior.instances.get('my-splitPanel');
+        window.SplitPanelBehavior.closeRightPanel(instance);
+    }
+}
+```
+
+**Why use the API?**
+- Handles BOTH CSS classes AND inline styles correctly
+- Manages split ratio reset automatically
+- Maintains state consistency
+- Future-proof against implementation changes
+
+#### Common Mistake: Manual DOM Manipulation
+
+```javascript
+// ❌ WRONG - Manually manipulating DOM (bypassing behavior API)
+splitPanel.classList.remove('split-panel-right-hidden');
+rightPanel.style.display = '';  // Easy to forget!
+leftPanel.style.width = '60%';
+rightPanel.style.width = '40%';
+
+// ✅ CORRECT - Use the public API
+const instance = window.SplitPanelBehavior.instances.get('my-splitPanel');
+window.SplitPanelBehavior.showRightPanel(instance);
+```
+
+#### Why Not Just Use CSS?
+
+The inline `display: none` ensures immediate hiding without CSS load/paint delays and provides a reliable way to check panel state in JavaScript. This is intentional behavior, not a bug.
+
+#### Reference Implementations
+
+See these panels for working examples:
+- `pluginRegistrationBehavior.js` - Shows/hides detail panel
+- `metadataBrowserBehavior.js` - Entity details panel integration
+- `pluginTraceViewerBehavior.js` - Trace details panel
+
 ## Pattern Enforcement
 
 ### **Automated Compliance**
@@ -1404,7 +1476,7 @@ Component patterns are reinforced through development tooling:
 
 **ESLint Integration**:
 - Factory pattern usage verification
-- Base class extension requirements  
+- Base class extension requirements
 - Component communication pattern enforcement
 
 **Development Guidelines**:

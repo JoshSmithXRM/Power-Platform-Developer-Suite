@@ -49,82 +49,55 @@ Quick reference for AI assistants working with this VS Code extension codebase.
 
 **Why**: Code is a team asset. Optimize for team productivity, not individual convenience.
 
+## 🚨 TOP VIOLATIONS (READ THIS FIRST)
+
+**Most common mistakes to avoid:**
+
+1. **Using `any` instead of Interface Segregation** → Use `IRenderable[]` not `BaseComponent<any>[]`
+2. **Adding eslint-disable comments** → Fix root cause, don't bypass linting
+3. **Calling updateWebview() for updates** → Use event bridges (this.component.setData())
+4. **Missing onChange in EnvironmentSelector** → Panel won't load data on initial open
+5. **Not extending BaseBehavior** → Causes silent failures in webview behaviors
+6. **Extension Host controlling UI visibility** → Webview owns layout, Extension Host sends data only
+7. **Skipping panel-content wrapper** → Breaks layout alignment
+
 ## 🎯 SOLID DESIGN PRINCIPLES (MANDATORY)
 
 **All code MUST follow SOLID principles. Use Interface Segregation Principle instead of `any`.**
 
-### Single Responsibility Principle (SRP)
-- ✅ **DO**: Each class has ONE reason to change
-  - `EnvironmentSelectorComponent` - manages environment selection only
-  - `DataTableComponent` - manages table display only
-  - `PanelComposer` - composes HTML only (doesn't fetch data)
-- ❌ **DON'T**: Mix concerns in one class
-  - Don't put business logic in components
-  - Don't put rendering logic in services
+- **SRP**: One class, one responsibility (EnvironmentSelectorComponent = selection only, DataTableComponent = display only)
+- **OCP**: Extend without modifying (Use `BaseComponent<TData>` generics, don't modify base classes)
+- **LSP**: Derived classes fully substitutable (All BaseComponent impls must have `getData()`)
+- **ISP** ⭐ **CRITICAL**: Create focused interfaces, NEVER use `any` as shortcut
+- **DIP**: Depend on abstractions (IRenderable), not concrete classes
 
-### Open/Closed Principle (OCP)
-- ✅ **DO**: Extend behavior without modifying existing code
-  - Use `BaseComponent<TData>` generic to add new component types
-  - Use `PanelComposer.composeWithCustomHTML()` for custom layouts
-- ❌ **DON'T**: Modify base classes for specific use cases
-  - Don't add component-specific logic to `BaseComponent`
+### Interface Segregation Principle (ISP) ⭐ **MOST VIOLATED**
 
-### Liskov Substitution Principle (LSP)
-- ✅ **DO**: Derived classes must be substitutable for base classes
-  - All `BaseComponent<TData>` implementations must have `getData()`
-  - All components work with `PanelComposer.compose()`
-- ❌ **DON'T**: Override base behavior in incompatible ways
-  - Don't make `getData()` throw exceptions in some implementations
-
-### Interface Segregation Principle (ISP) ⭐ **CRITICAL**
-- ✅ **DO**: Create focused interfaces for specific needs
-  - **Example**: `IRenderable` interface for rendering concerns
-  - **Why**: PanelComposer only needs `generateHTML()`, `getCSSFile()`, `getBehaviorScript()`
-  - **Pattern**: `PanelComposer.compose(components: IRenderable[])`
-
-- ❌ **DON'T**: Use `any` when you should use interface segregation
-  ```typescript
-  // ❌ WRONG - This is a shortcut that defeats type safety
-  compose(components: BaseComponent<any>[]) { }
-
-  // ✅ CORRECT - Segregate interface for rendering concerns
-  interface IRenderable {
-      generateHTML(): string;
-      getCSSFile(): string;
-      getBehaviorScript(): string;
-  }
-  compose(components: IRenderable[]) { }
-  ```
-
-**Real Example from This Codebase**:
+**Problem**: Using `any` instead of interface segregation
 ```typescript
-// PanelComposer doesn't care about TData, only rendering methods
-export interface IRenderable {
-    getId(): string;
-    getType(): string;
+// ❌ WRONG - defeats type safety
+compose(components: BaseComponent<any>[]) { }
+
+// ✅ CORRECT - segregate interface
+interface IRenderable {
     generateHTML(): string;
     getCSSFile(): string;
     getBehaviorScript(): string;
 }
-
-// BaseComponent implements IRenderable + adds type-safe getData()
-export abstract class BaseComponent<TData> implements IRenderable {
-    abstract getData(): TData;  // Type-safe, specific to component
-    // ... IRenderable methods
-}
-
-// PanelComposer depends on IRenderable, not BaseComponent<any>
-class PanelComposer {
-    static compose(components: IRenderable[], ...) { }
-}
+compose(components: IRenderable[]) { }
 ```
 
-### Dependency Inversion Principle (DIP)
-- ✅ **DO**: Depend on abstractions, not concrete implementations
-  - `BasePanel` depends on `IRenderable`, not specific component classes
-  - Services use interfaces, not concrete implementations
-- ❌ **DON'T**: Hard-code dependencies on concrete classes
-  - Don't check `instanceof SpecificComponent` in base classes
+**This codebase pattern**:
+```typescript
+// PanelComposer depends on IRenderable, not BaseComponent<any>
+export interface IRenderable { getId(); getType(); generateHTML(); getCSSFile(); getBehaviorScript(); }
+export abstract class BaseComponent<TData> implements IRenderable {
+    abstract getData(): TData;  // Type-safe, component-specific
+}
+class PanelComposer { static compose(components: IRenderable[]) { } }
+```
+
+📖 **Full SOLID examples**: `docs/ARCHITECTURE_GUIDE.md`
 
 ## 🚫 Code Quality Rules
 
@@ -269,6 +242,64 @@ protected getHtmlContent(): string {
 
 📖 **See**: `docs/PANEL_LAYOUT_GUIDE.md` for custom layout patterns
 
+## Layout Components vs Data Components
+
+**CRITICAL DISTINCTION**: Two types of components with different patterns:
+
+### Data Components (Have TypeScript API)
+**Examples:** TreeView, ActionBar, DataTable, EnvironmentSelector
+
+```typescript
+// Extension Host - create instance, register for updates, send data
+this.tree = factory.createTreeView({...});
+this.setupComponentEventBridges([this.tree]);
+this.tree.setNodes(newData);  // Clean API
+```
+
+### Layout Components (HTML Only)
+**Examples:** SplitPanel
+
+```typescript
+// Extension Host - just HTML, NO instance, NO event bridge
+protected getHtmlContent(): string {
+    return `<div data-component-type="SplitPanel" data-component-id="split">
+        <div data-panel="left">${content}</div>
+        <div data-panel="right">${details}</div>
+    </div>`;
+}
+```
+
+### Who Controls What?
+
+**Extension Host:** ✅ Business data/logic | ❌ UI visibility/state
+**Webview:** ✅ UI layout/interactions | ❌ Business data/logic
+
+**❌ WRONG** - Extension Host controls layout:
+```typescript
+handleNodeSelected(node) {
+    this.postMessage({ action: 'update-content', data: {...} });
+    this.postMessage({ action: 'showPanel', componentId: 'split' }); // WRONG
+}
+```
+
+**✅ CORRECT** - Webview owns layout:
+```typescript
+// Extension Host - DATA only
+handleNodeSelected(node) {
+    this.postMessage({ command: 'show-node-details', data: {...} });
+}
+
+// Webview - handles BOTH data AND layout
+static showNodeDetails(data) {
+    document.getElementById('content').innerHTML = data.html;
+    document.getElementById('splitPanel').classList.remove('split-panel-right-hidden');
+}
+```
+
+**Why**: Separation of concerns (data vs UI), no round trips, simpler messages, correct layering
+
+📖 **See**: MetadataBrowserPanel, PluginRegistrationPanel for reference
+
 ## Panel Initialization Pattern
 
 **MANDATORY**: ALL panels MUST follow this initialization pattern:
@@ -373,42 +404,22 @@ console.log('Handling message:', message);
 
 ## Code Quality Rules (NON-NEGOTIABLE)
 
-### ESLint Disable Comments
-
 **NEVER add `eslint-disable` comments without explicit permission. NO EXCEPTIONS.**
 
-When you encounter a linting error:
+When you encounter a linting error: **STOP** → **ANALYZE** why rule exists → **FIX ROOT CAUSE** → **ASK** if you believe rule is wrong
 
-1. **STOP** - Do not add disable comments
-2. **ANALYZE** - Understand why the rule exists
-3. **FIX THE ROOT CAUSE** - Refactor code to comply with the rule
-4. **ASK** - If you believe the rule is wrong, discuss with the user first
-
-**Examples:**
-
-❌ **FORBIDDEN** (bypassing code quality):
 ```typescript
+// ❌ FORBIDDEN - bypassing code quality
 // eslint-disable-next-line no-restricted-syntax
 this.updateWebview();
-```
 
-✅ **CORRECT** (fix the actual problem):
-```typescript
-// Use the proper pattern that follows architecture
+// ✅ CORRECT - fix the actual problem
 this.initialize();
 ```
 
-**Why This Matters:**
-- Lint rules enforce architectural patterns
-- Disable comments hide code smells
-- Bypassing rules degrades codebase quality over time
-- Each disable comment is technical debt
+**Why**: Lint rules enforce architecture. Disable comments hide code smells and create technical debt.
 
-**If A Rule Is Genuinely Wrong:**
-- Explain why the rule is incorrect
-- Propose updating `.eslintrc.json`
-- Get explicit approval BEFORE disabling
-- Document the reasoning in the eslint config
+**If rule is genuinely wrong**: Explain why, propose updating `.eslintrc.json`, get approval BEFORE disabling
 
 ## Development Commands
 
@@ -430,35 +441,17 @@ npm run lint             # Standalone lint - compile already includes this
 
 ## Refactoring Principles
 
-**Three Strikes Rule**: If you're fixing/changing the same code in 3+ places, STOP and create an abstraction.
+**Three Strikes Rule**: Fixing same code in 3+ places? STOP and create abstraction.
 
-**Before duplicating code:**
-1. Stop after the 2nd duplication
-2. Ask: "Will this pattern repeat in more places?"
-3. If yes: Create abstraction first, then apply everywhere
-4. If no: Duplication is acceptable for 2 instances
+**Red Flags**: Fixing same bug in N≥3 files, copy-pasting code, "do this for all panels" tasks, sequential todos for identical changes
 
-**Opportunistic Refactoring**: When you touch code and see clear duplication, fix it immediately while context is fresh. Don't schedule for "later" (it never happens).
-
-**Red Flags for Missing Abstractions:**
-- Fixing same bug in N files (N ≥ 3)
-- Copy-pasting code blocks between files
-- "Do this for all panels" type tasks
-- Creating multiple sequential todos for identical changes
-
-**Task Structuring for Architectural Thinking:**
+**Task Structuring**:
 ```
-❌ BAD (encourages mechanical repetition):
-- Fix createNew() in MetadataBrowserPanel
-- Fix createNew() in SolutionExplorerPanel
-- Fix createNew() in PluginTraceViewerPanel
-...
-
-✅ GOOD (encourages analysis):
-- Analyze createNew() duplication pattern across all panels
-- Design abstraction to eliminate duplication
-- Implement fix across all panels
+❌ BAD: Fix createNew() in MetadataBrowserPanel, Fix createNew() in SolutionExplorerPanel, ...
+✅ GOOD: Analyze createNew() duplication → Design abstraction → Implement across all panels
 ```
+
+**Opportunistic Refactoring**: See duplication? Fix it now while context is fresh, not "later"
 
 ## Quick Reference - DO's
 
@@ -486,185 +479,51 @@ npm run lint             # Standalone lint - compile already includes this
 - ❌ Create todos that encourage mechanical repetition across files
 - ❌ Duplicate code blocks - stop at 2nd instance and consider abstraction
 
-## Component Behavior Pattern (MANDATORY - ENFORCED BY BASEBEHAVIOR)
+## Component Behavior Pattern (MANDATORY)
 
-**All webview behaviors MUST extend `BaseBehavior` base class. No exceptions.**
+**All webview behaviors MUST extend `BaseBehavior`. No exceptions.**
 
-### Why BaseBehavior Exists
+**Why**: Before BaseBehavior, missing `case 'componentUpdate'` caused silent failures (data sent, never displayed). BaseBehavior enforces implementation via abstract method.
 
-**Problem**: Before BaseBehavior, developers had to manually implement `componentUpdate` handlers. This was error-prone:
-- Missing `case 'componentUpdate'` caused silent failures (data sent, never displayed)
-- Hardcoded switch statements in ComponentUtils required manual updates for every new component
-- No enforcement - easy to forget required methods
-
-**Solution**: BaseBehavior enforces the pattern through:
-1. **Abstract method `onComponentUpdate(instance, data)`** - MUST be implemented or class won't compile
-2. **Registry pattern** - Behaviors auto-register via `.register()`, no hardcoded switches
-3. **Consistent initialization** - Common lifecycle managed by base class
-
-### Required Pattern for ALL New Behaviors:
+### Required Pattern:
 
 ```javascript
-/**
- * MyComponentBehavior - Webview behavior for MyComponent
- * Extends BaseBehavior for enforced componentUpdate pattern
- */
 class MyComponentBehavior extends BaseBehavior {
-    /**
-     * Get component type identifier (REQUIRED)
-     */
-    static getComponentType() {
-        return 'MyComponent';  // Must match component type in Extension Host
-    }
+    // REQUIRED: Component type (must match Extension Host)
+    static getComponentType() { return 'MyComponent'; }
 
-    /**
-     * Handle component data updates from Extension Host (REQUIRED)
-     * This is called automatically when event bridge sends updated data
-     * CANNOT be forgotten - BaseBehavior enforces implementation
-     */
+    // REQUIRED: Handle data updates (enforced by abstract method)
     static onComponentUpdate(instance, data) {
-        // Handle the data update here
-        // Example: Update DOM, refresh display, etc.
-        if (data && data.items) {
-            this.updateItems(instance, data.items);
-        }
+        if (data?.items) this.updateItems(instance, data.items);
     }
 
-    /**
-     * Create instance structure (OPTIONAL override)
-     */
-    static createInstance(componentId, config, element) {
-        return {
-            id: componentId,
-            config: { ...config },
-            element: element,
-
-            // Component-specific DOM elements
-            itemsList: null,
-
-            // Component-specific state
-            items: [],
-
-            // Event handlers
-            boundHandlers: {}
-        };
-    }
-
-    /**
-     * Find DOM elements (OPTIONAL override)
-     */
-    static findDOMElements(instance) {
-        instance.itemsList = instance.element.querySelector('.items-list');
-    }
-
-    /**
-     * Setup event listeners (OPTIONAL override)
-     */
-    static setupEventListeners(instance) {
-        instance.boundHandlers.itemClick = (e) => this.handleItemClick(instance, e);
-        instance.itemsList.addEventListener('click', instance.boundHandlers.itemClick);
-    }
-
-    /**
-     * Handle custom actions beyond componentUpdate (OPTIONAL override)
-     */
+    // OPTIONAL: Custom actions beyond componentUpdate
     static handleCustomAction(instance, message) {
         switch (message.action) {
-            case 'selectItem':
-                this.selectItem(instance, message.itemId);
-                break;
-            case 'clearSelection':
-                this.clearSelection(instance);
-                break;
-            default:
-                console.warn(`MyComponentBehavior: Unhandled action '${message.action}'`);
+            case 'selectItem': this.selectItem(instance, message.itemId); break;
         }
     }
 
-    /**
-     * Cleanup resources (OPTIONAL override)
-     */
-    static cleanupInstance(instance) {
-        if (instance.itemsList && instance.boundHandlers.itemClick) {
-            instance.itemsList.removeEventListener('click', instance.boundHandlers.itemClick);
-        }
-    }
-
-    // Component-specific helper methods
-    static updateItems(instance, items) {
-        // Implementation...
-    }
-
-    static handleItemClick(instance, event) {
-        // Implementation...
-    }
+    // OPTIONAL: Override createInstance, findDOMElements, setupEventListeners, cleanupInstance
 }
-
-// Auto-register with ComponentUtils (REQUIRED - DO NOT FORGET)
-MyComponentBehavior.register();
+MyComponentBehavior.register(); // REQUIRED - DO NOT FORGET
 ```
 
-### What BaseBehavior Provides Automatically:
+### What You MUST Do:
 
-✅ **Enforced `onComponentUpdate()` implementation** - Abstract method must be implemented
-✅ **Registry-based routing** - No hardcoded switches in ComponentUtils
-✅ **Common initialization flow** - `initialize()`, `createInstance()`, `findDOMElements()`, `setupEventListeners()`
-✅ **Message routing** - `handleMessage()` routes to `onComponentUpdate()` or `handleCustomAction()`
-✅ **Cleanup management** - `cleanup()` with `cleanupInstance()` hook
-✅ **Auto-registration** - `.register()` adds to ComponentUtils registry
-
-### CRITICAL: What You MUST Do:
-
-1. ✅ **Extend BaseBehavior** - `class MyBehavior extends BaseBehavior`
-2. ✅ **Implement `getComponentType()`** - Return string matching Extension Host component type
-3. ✅ **Implement `onComponentUpdate()`** - Handle event bridge data updates
-4. ✅ **Call `.register()` at end of file** - Registers behavior with ComponentUtils
+1. ✅ Extend BaseBehavior
+2. ✅ Implement `getComponentType()`
+3. ✅ Implement `onComponentUpdate()` (enforced at compile time)
+4. ✅ Call `.register()` at end of file
 
 ### What Happens If You Forget:
 
-❌ **Forget to extend BaseBehavior** → Manual implementation, high risk of silent failures
-❌ **Forget `getComponentType()`** → Runtime error when calling `.register()`
-❌ **Forget `onComponentUpdate()`** → TypeScript compilation error (good! fails fast)
-❌ **Forget `.register()`** → Behavior not registered, messages not routed, component doesn't work
+❌ No BaseBehavior → Silent failures
+❌ No `getComponentType()` → Runtime error
+❌ No `onComponentUpdate()` → Compilation error (good!)
+❌ No `.register()` → Component doesn't work
 
-### Migration from Old Pattern:
-
-If you find old behaviors not extending BaseBehavior:
-
-```javascript
-// ❌ OLD PATTERN (pre-BaseBehavior)
-class OldBehavior {
-    static instances = new Map();
-
-    static initialize(componentId, config, element) {
-        // Manual implementation
-    }
-
-    static handleMessage(message) {
-        switch (message.action) {
-            case 'componentUpdate':  // Easy to forget this case!
-                // Handle update
-                break;
-        }
-    }
-}
-
-// ✅ NEW PATTERN (with BaseBehavior)
-class NewBehavior extends BaseBehavior {
-    static getComponentType() { return 'NewComponent'; }
-
-    static onComponentUpdate(instance, data) {
-        // MUST implement - enforced by abstract method
-    }
-
-    static handleCustomAction(instance, message) {
-        // Handle other actions here
-    }
-}
-NewBehavior.register();
-```
-
-**Refactor priority**: High - Old patterns are fragile and cause silent failures
+📖 **Full pattern with all optional hooks**: `docs/COMPONENT_PATTERNS.md`
 
 ## Documentation Reference
 

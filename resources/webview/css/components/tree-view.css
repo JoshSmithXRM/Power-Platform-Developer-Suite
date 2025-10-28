@@ -180,9 +180,7 @@
    Search Highlighting
    ============================================================================= */
 
-.tree-node--search-match > .tree-node-content {
-    background: var(--vscode-list-highlightForeground, rgba(255, 255, 0, 0.1));
-}
+/* Search match styling - bold text only, no background */
 
 .tree-node--search-match > .tree-node-content .tree-label {
     font-weight: 600;

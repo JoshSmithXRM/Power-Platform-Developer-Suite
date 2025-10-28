@@ -133,34 +133,11 @@ export default tseslint.config(
       'no-console': 'off',
       'no-restricted-syntax': [
         'error',
-        // Detect camelCase in sendMessage calls (2nd argument is the action/command name)
+        // NOTE: console.log IS ALLOWED in webview context - don't add console restriction here!
+        // Detect ANY camelCase in sendMessage calls using regex
         {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='filtersApplied']",
-          message: "❌ Use kebab-case 'filters-applied' not camelCase 'filtersApplied' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='filtersCleared']",
-          message: "❌ Use kebab-case 'filters-cleared' not camelCase 'filtersCleared' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='filterPanelCollapsed']",
-          message: "❌ Use kebab-case 'filter-panel-collapsed' not camelCase 'filterPanelCollapsed' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='loadEnvironments']",
-          message: "❌ Use kebab-case 'load-environments' not camelCase 'loadEnvironments' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='environmentChanged']",
-          message: "❌ Use kebab-case 'environment-changed' not camelCase 'environmentChanged' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='traceSelected']",
-          message: "❌ Use kebab-case 'trace-selected' not camelCase 'traceSelected' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='splitRatioChanged']",
-          message: "❌ Use kebab-case 'split-ratio-changed' not camelCase 'splitRatioChanged' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
+          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value=/[a-z][A-Z]/]",
+          message: "❌ Use kebab-case in sendMessage() message names (detected camelCase). Example: 'nodeSelected' should be 'node-selected'. See: docs/MESSAGE_CONVENTIONS.md"
         }
       ]
     }
@@ -250,62 +227,11 @@ export default tseslint.config(
           selector: "TemplateLiteral TemplateElement[value.raw=/<script[^>]*>/]",
           message: '❌ No inline <script> blocks in HTML templates. Move JavaScript to webview behavior files. See: docs/EXECUTION_CONTEXTS.md'
         },
-        // Detect common camelCase patterns in case statements
+        // Detect ANY camelCase in message handler switch statements using regex
+        // Only matches switches on message.command or message.action
         {
-          selector: "SwitchCase > Literal[value='loadTraces']",
-          message: "❌ Use kebab-case 'load-traces' not camelCase 'loadTraces'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='loadEnvironments']",
-          message: "❌ Use kebab-case 'load-environments' not camelCase 'loadEnvironments'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='traceLevelChanged']",
-          message: "❌ Use kebab-case 'trace-level-changed' not camelCase 'traceLevelChanged'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='filtersApplied']",
-          message: "❌ Use kebab-case 'filters-applied' not camelCase 'filtersApplied'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='traceSelected']",
-          message: "❌ Use kebab-case 'trace-selected' not camelCase 'traceSelected'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='contextMenuAction']",
-          message: "❌ Use kebab-case 'context-menu-action' not camelCase 'contextMenuAction'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='autoRefreshChanged']",
-          message: "❌ Use kebab-case 'auto-refresh-changed' not camelCase 'autoRefreshChanged'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='splitRatioChanged']",
-          message: "❌ Use kebab-case 'split-ratio-changed' not camelCase 'splitRatioChanged'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='rightPanelOpened']",
-          message: "❌ Use kebab-case 'right-panel-opened' not camelCase 'rightPanelOpened'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='rightPanelClosed']",
-          message: "❌ Use kebab-case 'right-panel-closed' not camelCase 'rightPanelClosed'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='environmentChanged']",
-          message: "❌ Use kebab-case 'environment-changed' not camelCase 'environmentChanged'. Already handled by 'environment-changed' case. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='environment-selected']",
-          message: "❌ Remove 'environment-selected' case - it is never sent. Only 'environment-changed' is emitted by EnvironmentSelectorBehavior. See: resources/webview/js/components/EnvironmentSelectorBehavior.js:162"
-        },
-        {
-          selector: "SwitchCase > Literal[value='filtersCleared']",
-          message: "❌ Use kebab-case 'filters-cleared' not camelCase 'filtersCleared'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='filterPanelCollapsed']",
-          message: "❌ Use kebab-case 'filter-panel-collapsed' not camelCase 'filterPanelCollapsed'. See: docs/MESSAGE_CONVENTIONS.md"
+          selector: "SwitchStatement[discriminant.property.name=/^(command|action)$/] > SwitchCase > Literal[value=/[a-z][A-Z]/]",
+          message: "❌ Use kebab-case in message handler case statements (detected camelCase). Example: case 'nodeSelected' should be case 'node-selected'. See: docs/MESSAGE_CONVENTIONS.md"
         }
       ]
     }

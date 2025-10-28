@@ -319,6 +319,7 @@
         "package:no-lint": "webpack --mode production --devtool hidden-source-map",
         "lint": "eslint src",
         "lint:fix": "eslint src --fix",
+        "lint:webview": "eslint resources/webview/js",
         "lint:architecture": "eslint src",
         "vsce-package": "vsce package",
         "test-release": "npm run package && npm run vsce-package && npm run install-local",

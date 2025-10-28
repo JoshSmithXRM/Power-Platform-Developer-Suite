@@ -25,6 +25,7 @@ export class PluginRegistrationPanel extends BasePanel {
     // State
     private assemblies: PluginAssembly[] = [];
     protected _selectedEnvironmentId?: string;
+    private selectedNode?: TreeNode;
 
     public static createOrShow(extensionUri: vscode.Uri): void {
         BasePanel.handlePanelCreation(
@@ -128,6 +129,9 @@ export class PluginRegistrationPanel extends BasePanel {
             onNodeExpand: (node) => this.handleNodeExpanded(node)
         });
 
+        // Note: SplitPanel is NOT created as a component - it's just HTML with SplitPanelBehavior
+        // The behavior automatically picks up elements with data-component-type="SplitPanel"
+
         this.componentLogger.info('Components initialized');
     }
 
@@ -150,11 +154,255 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     protected getHtmlContent(): string {
-        return PanelComposer.compose([
-            this.environmentSelectorComponent!,
-            this.actionBarComponent!,
-            this.treeViewComponent!
-        ], this.getCommonWebviewResources());
+        const detailsHTML = this.selectedNode ? this.generateDetailsHTML(this.selectedNode) : this.generateEmptyDetailsHTML();
+
+        const customHTML = `
+    <div class="panel-container">
+        <div class="panel-controls">
+            ${this.actionBarComponent!.generateHTML()}
+            ${this.environmentSelectorComponent!.generateHTML()}
+        </div>
+
+        <div class="panel-content">
+            <!-- Split Panel: Tree + Details -->
+            <div id="pluginRegistrationSplitPanel" class="split-panel split-panel-horizontal split-panel-resizable split-panel-right-hidden"
+                 data-component-type="SplitPanel"
+                 data-component-id="pluginRegistration-splitPanel"
+                 data-orientation="horizontal"
+                 data-min-size="250"
+                 data-resizable="true"
+                 data-split-ratio="60">
+
+                <!-- Left: Tree View -->
+                <div class="split-panel-left" data-panel="left">
+                    ${this.treeViewComponent!.generateHTML()}
+                </div>
+
+                <!-- Divider -->
+                <div class="split-panel-divider" data-divider>
+                    <div class="split-panel-divider-handle"></div>
+                </div>
+
+                <!-- Right: Details Panel -->
+                <div class="split-panel-right detail-panel" data-panel="right">
+                    <div class="detail-panel-header">
+                        <span class="detail-panel-title">Properties</span>
+                        <button class="detail-panel-close" data-action="closeRightPanel" title="Close" aria-label="Close">
+                            ×
+                        </button>
+                    </div>
+                    <div class="detail-panel-content" id="detail-panel-content">
+                        ${detailsHTML}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+        `;
+
+        return PanelComposer.composeWithCustomHTML(
+            customHTML,
+            [this.environmentSelectorComponent!, this.actionBarComponent!, this.treeViewComponent!],
+            ['css/panels/plugin-registration.css', 'css/components/split-panel.css'],
+            ['js/panels/pluginRegistrationBehavior.js', 'js/components/SplitPanelBehavior.js'],
+            this.getCommonWebviewResources(),
+            'Plugin Registration'
+        );
+    }
+
+    private generateEmptyDetailsHTML(): string {
+        return `
+            <div class="empty-details">
+                <p>Select an assembly, plugin type, step, or image to view its properties</p>
+            </div>
+        `;
+    }
+
+    private generateDetailsHTML(node: TreeNode): string {
+        switch (node.type) {
+            case 'assembly':
+                return this.generateAssemblyDetailsHTML(node.data as PluginAssembly);
+            case 'plugintype':
+                return this.generatePluginTypeDetailsHTML(node.data as PluginType);
+            case 'step':
+                return this.generateStepDetailsHTML(node.data as PluginStep);
+            case 'image':
+                return this.generateImageDetailsHTML(node.data as PluginImage);
+            default:
+                return this.generateEmptyDetailsHTML();
+        }
+    }
+
+    private generateAssemblyDetailsHTML(assembly: PluginAssembly): string {
+        const isolationMode = assembly.isolationmode === 1 ? 'None' : assembly.isolationmode === 2 ? 'Sandbox' : 'Unknown';
+        const sourceType = ['Database', 'Disk', 'GAC', 'NuGet'][assembly.sourcetype] || 'Unknown';
+
+        return `
+            <div class="property-section">
+                <h4>📦 Assembly Information</h4>
+                <div class="property-grid">
+                    <div class="property-row">
+                        <span class="property-label">Name:</span>
+                        <span class="property-value">${this.escapeHtml(assembly.name)}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Version:</span>
+                        <span class="property-value">${this.escapeHtml(assembly.version)}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Culture:</span>
+                        <span class="property-value">${this.escapeHtml(assembly.culture)}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Public Key Token:</span>
+                        <span class="property-value">${this.escapeHtml(assembly.publickeytoken)}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Isolation Mode:</span>
+                        <span class="property-value">${isolationMode}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Source Type:</span>
+                        <span class="property-value">${sourceType}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Managed:</span>
+                        <span class="property-value">${assembly.ismanaged ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Assembly ID:</span>
+                        <span class="property-value property-id">${assembly.pluginassemblyid}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    private generatePluginTypeDetailsHTML(pluginType: PluginType): string {
+        return `
+            <div class="property-section">
+                <h4>🔌 Plugin Type Information</h4>
+                <div class="property-grid">
+                    <div class="property-row">
+                        <span class="property-label">Type Name:</span>
+                        <span class="property-value">${this.escapeHtml(pluginType.typename)}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Friendly Name:</span>
+                        <span class="property-value">${this.escapeHtml(pluginType.friendlyname || 'N/A')}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Name:</span>
+                        <span class="property-value">${this.escapeHtml(pluginType.name)}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Plugin Type ID:</span>
+                        <span class="property-value property-id">${pluginType.plugintypeid}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Assembly ID:</span>
+                        <span class="property-value property-id">${pluginType.pluginassemblyid}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    private generateStepDetailsHTML(step: PluginStep): string {
+        const stageLabel = step.stage === 10 ? 'PreValidation' : step.stage === 20 ? 'PreOperation' : step.stage === 40 ? 'PostOperation' : `Unknown (${step.stage})`;
+        const modeLabel = step.mode === 0 ? 'Synchronous' : step.mode === 1 ? 'Asynchronous' : `Unknown (${step.mode})`;
+        const stateLabel = step.statecode === 0 ? 'Enabled ⚡' : step.statecode === 1 ? 'Disabled ⚫' : `Unknown (${step.statecode})`;
+
+        return `
+            <div class="property-section">
+                <h4>⚡ SDK Message Processing Step</h4>
+                <div class="property-grid">
+                    <div class="property-row">
+                        <span class="property-label">Name:</span>
+                        <span class="property-value">${this.escapeHtml(step.name)}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Stage:</span>
+                        <span class="property-value">${stageLabel}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Execution Mode:</span>
+                        <span class="property-value">${modeLabel}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">State:</span>
+                        <span class="property-value">${stateLabel}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Execution Order (Rank):</span>
+                        <span class="property-value">${step.rank}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Filtering Attributes:</span>
+                        <span class="property-value">${step.filteringattributes ? this.escapeHtml(step.filteringattributes) : 'All attributes'}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Step ID:</span>
+                        <span class="property-value property-id">${step.sdkmessageprocessingstepid}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Plugin Type ID:</span>
+                        <span class="property-value property-id">${step.plugintypeid}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">SDK Message ID:</span>
+                        <span class="property-value property-id">${step.sdkmessageid}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    private generateImageDetailsHTML(image: PluginImage): string {
+        const imageTypeLabel = this.getImageTypeLabel(image.imagetype);
+
+        return `
+            <div class="property-section">
+                <h4>🖼️ Entity Image</h4>
+                <div class="property-grid">
+                    <div class="property-row">
+                        <span class="property-label">Name:</span>
+                        <span class="property-value">${this.escapeHtml(image.name)}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Entity Alias:</span>
+                        <span class="property-value">${this.escapeHtml(image.entityalias)}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Image Type:</span>
+                        <span class="property-value">${imageTypeLabel}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Attributes:</span>
+                        <span class="property-value">${image.attributes ? this.escapeHtml(image.attributes) : 'All attributes'}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Image ID:</span>
+                        <span class="property-value property-id">${image.sdkmessageprocessingstepimageid}</span>
+                    </div>
+                    <div class="property-row">
+                        <span class="property-label">Step ID:</span>
+                        <span class="property-value property-id">${image.sdkmessageprocessingstepid}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    private escapeHtml(text: string): string {
+        const map: Record<string, string> = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, (m) => map[m]);
     }
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
@@ -169,13 +417,32 @@ export class PluginRegistrationPanel extends BasePanel {
                 }
                 break;
 
-            case 'nodeSelected':
-                // Handle node selection from webview
+            case 'node-selected':
+                this.componentLogger.info('node-selected message data:', message.data);
+                if (message.data?.node) {
+                    this.handleNodeSelected(message.data.node as TreeNode);
+                } else {
+                    this.componentLogger.warn('node-selected received but no node data', message);
+                }
                 break;
 
-            case 'nodeExpanded':
+            case 'node-expanded':
                 if (message.data?.nodeId) {
                     await this.loadNodeChildren(message.data.nodeId);
+                }
+                break;
+
+            case 'close-details':
+                this.closeDetailsPanel();
+                break;
+
+            case 'component-event':
+                // Handle SplitPanel events
+                if (message.data?.componentId === 'pluginRegistration-splitPanel') {
+                    const eventType = message.data.eventType;
+                    if (eventType === 'rightPanelClosed') {
+                        this.selectedNode = undefined;
+                    }
                 }
                 break;
         }
@@ -317,8 +584,32 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     private handleNodeSelected(node: TreeNode): void {
-        this.componentLogger.info('Node selected', { nodeId: node.id, nodeType: node.type });
-        // Future: Show node details in a split panel
+        this.componentLogger.info('handleNodeSelected called', { nodeId: node.id, nodeType: node.type, hasData: !!node.data });
+
+        // Update selected node state
+        this.selectedNode = node;
+
+        // Generate details HTML
+        const detailsHTML = this.generateDetailsHTML(node);
+        this.componentLogger.info('Generated HTML', { htmlLength: detailsHTML.length });
+
+        // Send data to webview - webview behavior handles BOTH content AND visibility
+        this.postMessage({
+            command: 'show-node-details',
+            action: 'show-node-details',
+            data: {
+                html: detailsHTML,
+                nodeType: node.type,
+                nodeId: node.id
+            }
+        });
+        this.componentLogger.info('Sent show-node-details message');
+    }
+
+    private closeDetailsPanel(): void {
+        this.componentLogger.info('Closing details panel');
+        this.selectedNode = undefined;
+        // Extension Host just clears state - webview already closed panel
     }
 
     private async handleNodeExpanded(node: TreeNode): Promise<void> {

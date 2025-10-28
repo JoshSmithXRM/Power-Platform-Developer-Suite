@@ -5,20 +5,22 @@
 
 ---
 
-## Phase 1: Foundation - Read-Only Tree View
+## Phase 1: Foundation - Read-Only Tree View ✅ COMPLETE
 
 **Deliverables:**
-- TreeViewComponent (generic, reusable)
-- PluginRegistrationService (read-only API methods)
-- PluginRegistrationPanel with tree display
-- Assembly → PluginType → Step → Image hierarchy
+- ✅ TreeViewComponent (generic, reusable) with built-in search
+- ✅ PluginRegistrationService (read-only API methods)
+- ✅ PluginRegistrationPanel with tree display
+- ✅ Assembly → PluginType → Step → Image hierarchy
+- ✅ Lazy loading for children nodes
+- ✅ Tree search functionality
 
 ### TreeViewComponent (New Component)
 Four-file structure following architecture:
 - `TreeViewComponent.ts` - Component logic
 - `TreeViewConfig.ts` - Configuration interface
 - `TreeViewView.ts` - HTML generation
-- `TreeViewBehavior.js` - Webview interactions
+- `TreeViewBehavior.js` - Webview interactions with search support
 
 ### PluginRegistrationService
 Read-only methods:
@@ -37,12 +39,19 @@ Panel composition following architecture patterns:
 
 ---
 
-## Phase 2: Details Panel
+## Phase 2: Details Panel ✅ COMPLETE
 
 **Deliverables:**
-- SplitPanelComponent integration
-- Property display for each node type
-- Selection state management
+- ✅ SplitPanel layout integration (resizable, closeable)
+- ✅ Property display for each node type (Assembly, PluginType, Step, Image)
+- ✅ Selection state management
+- ✅ Panel-specific behavior for show/hide details
+- ✅ Close button integration
+
+**Implementation Notes:**
+- SplitPanel uses BOTH CSS classes and inline styles for visibility control
+- Panel-specific behavior handles content updates AND layout visibility
+- See `docs/COMPONENT_PATTERNS.md` > "Working with Layout Components" for integration pattern
 
 ---
 
@@ -78,8 +87,10 @@ Panel composition following architecture patterns:
 **Deliverables:**
 - Enable/Disable steps
 - Filters (Managed/Unmanaged, Hide Microsoft)
-- Tree search
-- Context menus
+- Context menus with actions
+- Bulk operations
+
+**Note:** Tree search was delivered in Phase 1 as built-in TreeViewComponent functionality
 
 ---
 

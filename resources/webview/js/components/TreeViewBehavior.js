@@ -39,6 +39,7 @@ class TreeViewBehavior extends BaseBehavior {
             treeRoot: null,
 
             // State
+            nodes: [], // Store node data for lookups
             selectedNodeId: null,
             expandedNodes: new Set(),
             searchQuery: '',
@@ -204,7 +205,7 @@ class TreeViewBehavior extends BaseBehavior {
             instance.expandedNodes.add(nodeId);
 
             // Notify Extension Host
-            this.sendMessage(instance, 'nodeExpanded', { nodeId });
+            this.sendMessage(instance, 'node-expanded', { nodeId });
         }
     }
 
@@ -232,11 +233,40 @@ class TreeViewBehavior extends BaseBehavior {
         nodeElement.classList.add('tree-node--selected');
         instance.selectedNodeId = nodeId;
 
-        // Notify Extension Host
-        this.sendMessage(instance, 'nodeSelected', {
+        // Find the full node data from instance.nodes
+        const node = this.findNodeById(instance, nodeId);
+
+        // Notify Extension Host with full node data
+        this.sendMessage(instance, 'node-selected', {
+            node: node,
             nodeId,
             nodeType: nodeElement.dataset.nodeType
         });
+    }
+
+    /**
+     * Recursively find a node by ID in the tree structure
+     */
+    static findNodeById(instance, nodeId) {
+        if (!instance.nodes || !Array.isArray(instance.nodes)) {
+            console.warn('TreeViewBehavior: No nodes available for lookup');
+            return null;
+        }
+
+        const searchNode = (nodes, targetId) => {
+            for (const node of nodes) {
+                if (node.id === targetId) {
+                    return node;
+                }
+                if (node.children && node.children.length > 0) {
+                    const found = searchNode(node.children, targetId);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+
+        return searchNode(instance.nodes, nodeId);
     }
 
     /**
@@ -261,7 +291,7 @@ class TreeViewBehavior extends BaseBehavior {
 
         // Filter nodes by search query
         allNodes.forEach(node => {
-            const label = node.querySelector('.tree-label');
+            const label = node.querySelector('.tree-node-label');
             if (!label) return;
 
             const labelText = label.textContent.toLowerCase();
@@ -329,6 +359,9 @@ class TreeViewBehavior extends BaseBehavior {
         }
 
         console.log(`TreeViewBehavior: Updating ${nodes.length} nodes`);
+
+        // Store nodes in instance for lookups
+        instance.nodes = nodes;
 
         // Generate HTML for all nodes
         const html = this.renderNodes(nodes);
