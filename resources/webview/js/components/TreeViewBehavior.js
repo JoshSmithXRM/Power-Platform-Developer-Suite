@@ -366,9 +366,9 @@ class TreeViewBehavior extends BaseBehavior {
         if (loading) {
             // Use shared loading indicator HTML structure (matches LoadingIndicatorView.generate())
             content.innerHTML = `
-                <div class="component-loading">
-                    <div class="component-loading-spinner"></div>
-                    <div class="component-loading-message">${message}</div>
+                <div class="loading-indicator">
+                    <div class="loading-indicator-spinner"></div>
+                    <div class="loading-indicator-message">${message}</div>
                 </div>
             `;
         }

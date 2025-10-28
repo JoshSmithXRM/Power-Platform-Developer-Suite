@@ -14,9 +14,9 @@ export class LoadingIndicatorView {
      */
     public static generate(message: string = 'Loading...'): string {
         return `
-            <div class="component-loading">
-                <div class="component-loading-spinner"></div>
-                <div class="component-loading-message">${escapeHtml(message)}</div>
+            <div class="loading-indicator">
+                <div class="loading-indicator-spinner"></div>
+                <div class="loading-indicator-message">${escapeHtml(message)}</div>
             </div>
         `;
     }
