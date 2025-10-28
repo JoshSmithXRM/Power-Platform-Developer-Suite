@@ -62,7 +62,6 @@
     overflow-y: auto;
     overflow-x: hidden;
     padding: 8px 0;
-    position: relative; /* For loading indicator positioning */
 }
 
 .tree-view-empty {

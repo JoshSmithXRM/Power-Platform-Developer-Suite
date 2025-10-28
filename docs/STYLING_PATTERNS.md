@@ -29,6 +29,7 @@ resources/webview/css/
 │   ├── component-base.css      # Semantic tokens + flexible layout foundation
 │   └── panel-base.css          # Panel-specific layout patterns
 └── components/
+    ├── shared-loading.css      # Shared loading indicator (used by all data components)
     ├── environment-selector.css # Component-specific styles
     ├── data-table.css          # Table styling patterns
     └── action-bar.css          # Action bar styling
@@ -36,8 +37,11 @@ resources/webview/css/
 
 **Loading Order**:
 1. `component-base.css` - Establishes semantic tokens and flexible layout system
-2. `panel-base.css` - Panel container and layout patterns
-3. Component-specific CSS files - Individual component styling
+2. `shared-loading.css` - Shared loading indicator styles (loaded before panel-base to avoid @import issues)
+3. `panel-base.css` - Panel container and layout patterns
+4. Component-specific CSS files - Individual component styling
+
+**Note**: `shared-loading.css` is loaded explicitly by `PanelComposer.collectCSSFiles()` because `@import` statements in CSS files don't work reliably in VS Code webviews.
 
 ## Semantic Design Tokens
 
@@ -280,6 +284,68 @@ The semantic tokens work with the flexible panel layout system:
     cursor: not-allowed;
 }
 ```
+
+#### **Shared Loading Indicator Pattern**
+
+**IMPORTANT**: Uses `loading-indicator` class prefix to avoid collision with `.component-loading` in `component-base.css` (which applies opacity dimming to components in loading state).
+
+**Location**: `resources/webview/css/components/shared-loading.css`
+
+**Usage**: TreeView, DataTable, and other data components
+
+```css
+/* Shared loading indicator - used by LoadingIndicatorView.generate() */
+.loading-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+    gap: 12px;
+    /* No background - DataTable's .loading-overlay provides dark background */
+}
+
+.loading-indicator-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--vscode-progressBar-background);
+    border-top: 3px solid var(--vscode-charts-blue); /* Animated blue segment */
+    border-radius: 50%;
+    animation: loading-indicator-spin 1s linear infinite;
+}
+
+@keyframes loading-indicator-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-indicator-message {
+    color: var(--vscode-foreground);
+    font-size: 14px;
+}
+```
+
+**TypeScript Usage**:
+```typescript
+// Extension Host - generates HTML
+import { LoadingIndicatorView } from './base/LoadingIndicatorView';
+
+const loadingHtml = LoadingIndicatorView.generate('Loading data...');
+// Returns: <div class="loading-indicator">...</div>
+```
+
+**Webview Behavior Usage**:
+```javascript
+// TreeViewBehavior.js or DataTableBehavior.js
+content.innerHTML = `
+    <div class="loading-indicator">
+        <div class="loading-indicator-spinner"></div>
+        <div class="loading-indicator-message">${message}</div>
+    </div>
+`;
+```
+
+**Class Name Collision Warning**: Do NOT use `.component-loading` for loading indicators. That class is reserved in `component-base.css` for applying opacity dimming to components that are in a loading state.
 
 ## Anti-Patterns to Avoid
 
