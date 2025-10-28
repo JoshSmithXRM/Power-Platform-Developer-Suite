@@ -12,6 +12,7 @@ export interface TreeNode {
     expanded: boolean;
     selectable: boolean;
     hasChildren?: boolean; // For lazy loading - indicates node can have children even if not loaded yet
+    searchText?: string; // Additional searchable text (not displayed, but included in search) - e.g., filtering attributes
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data?: any; // Original business object - can be any entity type
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -83,12 +83,12 @@ class TreeViewBehavior extends BaseBehavior {
         if (searchInput) {
             let searchTimeoutId;
 
-            // Debounced input handler (300ms delay)
+            // Debounced input handler (500ms delay for performance with large trees)
             instance.boundHandlers.searchInput = () => {
                 clearTimeout(searchTimeoutId);
                 searchTimeoutId = setTimeout(() => {
                     this.handleSearch(instance, searchInput.value);
-                }, 300);
+                }, 500);
             };
 
             // Enter key handler for immediate search
@@ -327,11 +327,11 @@ class TreeViewBehavior extends BaseBehavior {
         // Pass 1: Find all nodes that directly match the search query
         const matchingNodes = new Set();
         nodes.forEach(node => {
-            const label = node.querySelector('.tree-node-label');
-            if (!label) return;
+            // Check data-search-text attribute (includes label + searchText)
+            const searchText = node.getAttribute('data-search-text');
+            if (!searchText) return;
 
-            const labelText = label.textContent.toLowerCase();
-            if (labelText.includes(queryLower)) {
+            if (searchText.includes(queryLower)) {
                 matchingNodes.add(node);
             }
         });
@@ -390,6 +390,17 @@ class TreeViewBehavior extends BaseBehavior {
         if (!instance.treeRoot) return;
 
         const allNodes = instance.treeRoot.querySelectorAll('.tree-node');
+
+        // Minimum character requirement to prevent lag with short queries
+        if (query.length > 0 && query.length < 3) {
+            // Show all nodes but don't apply filter yet (avoids matching too much)
+            allNodes.forEach(node => {
+                node.style.display = '';
+                node.classList.remove('tree-node--search-match');
+            });
+            return;
+        }
+
         this.applySearchFilter(allNodes, query);
     }
 
@@ -514,10 +525,14 @@ class TreeViewBehavior extends BaseBehavior {
         const hasChildren = (node.children && node.children.length > 0) || (node.hasChildren === true);
         const indent = level * 20;
 
+        // Combine label + searchText for comprehensive search
+        const searchText = node.searchText ? `${node.label} ${node.searchText}` : node.label;
+
         let html = `
             <div class="tree-node ${hasChildren ? 'tree-node--has-children' : ''}"
                  data-node-id="${node.id}"
                  data-node-type="${node.type || ''}"
+                 data-search-text="${this.escapeHtml(searchText.toLowerCase())}"
                  style="padding-left: ${indent}px">
                 <div class="tree-node-content">`;
 

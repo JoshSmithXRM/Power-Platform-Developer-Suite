@@ -641,6 +641,9 @@ export class PluginRegistrationPanel extends BasePanel {
                     const images = imagesByStep.get(step.sdkmessageprocessingstepid) || [];
                     const imageNodes = this.transformImagesToTreeNodes(images);
 
+                    // Include filtering attributes in searchText for comprehensive search
+                    const searchText = step.filteringattributes ? step.filteringattributes : undefined;
+
                     return {
                         id: `step-${step.sdkmessageprocessingstepid}`,
                         label: step.name,
@@ -649,6 +652,7 @@ export class PluginRegistrationPanel extends BasePanel {
                         expanded: false,
                         selectable: true,
                         hasChildren: imageNodes.length > 0,
+                        searchText: searchText,
                         data: step,
                         children: imageNodes
                     };
@@ -691,7 +695,7 @@ export class PluginRegistrationPanel extends BasePanel {
 
     private transformImagesToTreeNodes(images: PluginImage[]): TreeNode[] {
         return images.map(image => {
-            // Format attributes list (truncate if too long)
+            // Format attributes list (truncate if too long for display)
             const attrs = image.attributes || '';
             const attrDisplay = attrs.length > 80 ? `${attrs.substring(0, 77)}...` : attrs;
 
@@ -701,6 +705,9 @@ export class PluginRegistrationPanel extends BasePanel {
             // Format: {name} ({attributes}) - {context}
             const label = `${image.name} (${attrDisplay}) - ${contextLabel}`;
 
+            // Include FULL attributes in searchText (not truncated) for comprehensive search
+            const searchText = attrs ? attrs : undefined;
+
             return {
                 id: `image-${image.sdkmessageprocessingstepimageid}`,
                 label,
@@ -709,6 +716,7 @@ export class PluginRegistrationPanel extends BasePanel {
                 expanded: false,
                 selectable: true,
                 hasChildren: false, // Images are leaf nodes
+                searchText: searchText,
                 data: image
             };
         })
