@@ -454,8 +454,8 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     /**
-     * Load all plugin data in parallel (assemblies, types, steps, images)
-     * Builds complete tree structure without lazy loading
+     * Load all plugin data using bulk queries and in-memory joining
+     * Much faster than individual queries per assembly/type/step
      */
     private async loadAssemblies(): Promise<void> {
         if (!this._selectedEnvironmentId) {
@@ -463,90 +463,64 @@ export class PluginRegistrationPanel extends BasePanel {
         }
 
         try {
-            // Show loading indicator
-            this.treeViewComponent!.setLoading(true, 'Loading plugin assemblies...');
-            this.componentLogger.info('Loading all plugin data in parallel');
+            this.componentLogger.info('Loading plugin data with bulk queries');
 
-            // 1. Load all assemblies
-            this.assemblies = await this.pluginService.getAssemblies(this._selectedEnvironmentId);
-            this.componentLogger.info('Assemblies loaded', { count: this.assemblies.length });
+            // Load all data in parallel (4 queries total)
+            this.treeViewComponent!.setLoading(true, 'Loading plugin data...');
+            const [assemblies, allTypes, allSteps, allImages] = await Promise.all([
+                this.pluginService.getAssemblies(this._selectedEnvironmentId),
+                this.pluginService.getAllPluginTypes(this._selectedEnvironmentId),
+                this.pluginService.getAllSteps(this._selectedEnvironmentId),
+                this.pluginService.getAllImages(this._selectedEnvironmentId)
+            ]);
 
-            if (this.assemblies.length === 0) {
+            this.assemblies = assemblies;
+            this.componentLogger.info('Plugin data loaded successfully', {
+                assemblies: assemblies.length,
+                types: allTypes.length,
+                steps: allSteps.length,
+                images: allImages.length
+            });
+
+            if (assemblies.length === 0) {
                 this.treeViewComponent!.setLoading(false);
                 this.treeViewComponent!.setNodes([]);
                 return;
             }
 
-            // 2. Load plugin types for ALL assemblies in parallel
-            this.treeViewComponent!.setLoading(true, `Loading plugin types for ${this.assemblies.length} assemblies...`);
-            const assemblyTypePromises = this.assemblies.map(async (assembly) => {
-                try {
-                    const types = await this.pluginService.getPluginTypes(this._selectedEnvironmentId!, assembly.pluginassemblyid);
-                    return { assembly, types };
-                } catch (error) {
-                    this.componentLogger.error('Failed to load types for assembly', error instanceof Error ? error : new Error(String(error)), { assemblyId: assembly.pluginassemblyid });
-                    return { assembly, types: [] };
-                }
-            });
-            const assemblyTypesData = await Promise.all(assemblyTypePromises);
-
-            const totalTypes = assemblyTypesData.reduce((sum, data) => sum + data.types.length, 0);
-            this.componentLogger.info('Plugin types loaded', { totalTypes });
-
-            // 3. Load steps for ALL plugin types in parallel
-            this.treeViewComponent!.setLoading(true, `Loading steps for ${totalTypes} plugin types...`);
-            const typeStepsPromises: Promise<{ assemblyId: string; typeId: string; steps: PluginStep[] }>[] = [];
-            assemblyTypesData.forEach(({ assembly, types }) => {
-                types.forEach(type => {
-                    typeStepsPromises.push(
-                        this.pluginService.getSteps(this._selectedEnvironmentId!, type.plugintypeid)
-                            .then(steps => ({ assemblyId: assembly.pluginassemblyid, typeId: type.plugintypeid, steps }))
-                            .catch(error => {
-                                this.componentLogger.error('Failed to load steps for type', error instanceof Error ? error : new Error(String(error)), { typeId: type.plugintypeid });
-                                return { assemblyId: assembly.pluginassemblyid, typeId: type.plugintypeid, steps: [] };
-                            })
-                    );
-                });
-            });
-            const typeStepsData = await Promise.all(typeStepsPromises);
-
-            const totalSteps = typeStepsData.reduce((sum, data) => sum + data.steps.length, 0);
-            this.componentLogger.info('Steps loaded', { totalSteps });
-
-            // 4. Load images for ALL steps in parallel
-            this.treeViewComponent!.setLoading(true, `Loading images for ${totalSteps} steps...`);
-            const stepImagesPromises: Promise<{ stepId: string; images: PluginImage[] }>[] = [];
-            typeStepsData.forEach(({ steps }) => {
-                steps.forEach(step => {
-                    stepImagesPromises.push(
-                        this.pluginService.getImages(this._selectedEnvironmentId!, step.sdkmessageprocessingstepid)
-                            .then(images => ({ stepId: step.sdkmessageprocessingstepid, images }))
-                            .catch(error => {
-                                this.componentLogger.error('Failed to load images for step', error instanceof Error ? error : new Error(String(error)), { stepId: step.sdkmessageprocessingstepid });
-                                return { stepId: step.sdkmessageprocessingstepid, images: [] };
-                            })
-                    );
-                });
-            });
-            const stepImagesData = await Promise.all(stepImagesPromises);
-
-            const totalImages = stepImagesData.reduce((sum, data) => sum + data.images.length, 0);
-            this.componentLogger.info('Images loaded', { totalImages });
-
-            // 5. Build complete tree structure
+            // Build lookup maps for fast in-memory joining
             this.treeViewComponent!.setLoading(true, 'Building tree structure...');
-            const treeNodes = this.buildCompleteTree(assemblyTypesData, typeStepsData, stepImagesData);
 
-            // 6. Update tree view
+            // Group types by assembly
+            const typesByAssembly = new Map<string, PluginType[]>();
+            allTypes.forEach(type => {
+                const assemblyTypes = typesByAssembly.get(type.pluginassemblyid) || [];
+                assemblyTypes.push(type);
+                typesByAssembly.set(type.pluginassemblyid, assemblyTypes);
+            });
+
+            // Group steps by type
+            const stepsByType = new Map<string, PluginStep[]>();
+            allSteps.forEach(step => {
+                const typeSteps = stepsByType.get(step.plugintypeid) || [];
+                typeSteps.push(step);
+                stepsByType.set(step.plugintypeid, typeSteps);
+            });
+
+            // Group images by step
+            const imagesByStep = new Map<string, PluginImage[]>();
+            allImages.forEach(image => {
+                const stepImages = imagesByStep.get(image.sdkmessageprocessingstepid) || [];
+                stepImages.push(image);
+                imagesByStep.set(image.sdkmessageprocessingstepid, stepImages);
+            });
+
+            // Build tree structure
+            const treeNodes = this.buildTreeFromMaps(assemblies, typesByAssembly, stepsByType, imagesByStep);
+
+            // Update tree view
             this.treeViewComponent!.setLoading(false);
             this.treeViewComponent!.setNodes(treeNodes);
-
-            this.componentLogger.info('Plugin data loaded successfully', {
-                assemblies: this.assemblies.length,
-                types: totalTypes,
-                steps: totalSteps,
-                images: totalImages
-            });
 
         } catch (error) {
             this.componentLogger.error('Failed to load plugin data', error instanceof Error ? error : new Error(String(error)));
@@ -556,32 +530,16 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     /**
-     * Build complete tree with all children populated
+     * Build tree structure from in-memory lookup maps (fast!)
      */
-    private buildCompleteTree(
-        assemblyTypesData: Array<{ assembly: PluginAssembly; types: PluginType[] }>,
-        typeStepsData: Array<{ assemblyId: string; typeId: string; steps: PluginStep[] }>,
-        stepImagesData: Array<{ stepId: string; images: PluginImage[] }>
+    private buildTreeFromMaps(
+        assemblies: PluginAssembly[],
+        typesByAssembly: Map<string, PluginType[]>,
+        stepsByType: Map<string, PluginStep[]>,
+        imagesByStep: Map<string, PluginImage[]>
     ): TreeNode[] {
-        // Create lookup maps for fast access
-        const typesByAssembly = new Map<string, PluginType[]>();
-        const stepsByType = new Map<string, PluginStep[]>();
-        const imagesByStep = new Map<string, PluginImage[]>();
-
-        assemblyTypesData.forEach(({ assembly, types }) => {
-            typesByAssembly.set(assembly.pluginassemblyid, types);
-        });
-
-        typeStepsData.forEach(({ typeId, steps }) => {
-            stepsByType.set(typeId, steps);
-        });
-
-        stepImagesData.forEach(({ stepId, images }) => {
-            imagesByStep.set(stepId, images);
-        });
-
         // Build tree from bottom up
-        return assemblyTypesData.map(({ assembly }) => {
+        return assemblies.map(assembly => {
             const types = typesByAssembly.get(assembly.pluginassemblyid) || [];
 
             const typeNodes: TreeNode[] = types.map(type => {

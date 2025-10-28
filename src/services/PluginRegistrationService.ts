@@ -63,6 +63,43 @@ export class PluginRegistrationService {
     constructor(private authService: AuthenticationService) {}
 
     /**
+     * Fetch all pages from OData query (handles pagination)
+     */
+    private async fetchAllPages<T>(
+        initialUrl: string,
+        token: string
+    ): Promise<T[]> {
+        const results: T[] = [];
+        let nextUrl: string | undefined = initialUrl;
+
+        while (nextUrl) {
+            const response: Response = await fetch(nextUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0'
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                this.logger.error('Fetch page error', new Error(errorText), { url: nextUrl });
+                throw new Error(`Failed to fetch data: ${response.statusText}`);
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const data: { value: T[]; '@odata.nextLink'?: string } = await response.json() as any;
+            results.push(...data.value);
+
+            // Check for next page
+            nextUrl = data['@odata.nextLink'];
+        }
+
+        return results;
+    }
+
+    /**
      * Get all plugin assemblies
      */
     async getAssemblies(environmentId: string): Promise<PluginAssembly[]> {
@@ -107,7 +144,7 @@ export class PluginRegistrationService {
         }
         const baseUrl = environment.settings.dataverseUrl;
 
-        const queryUrl = `${baseUrl}/api/data/v9.2/plugintypes?$select=plugintypeid,typename,friendlyname,name,pluginassemblyid&$filter=pluginassemblyid eq ${assemblyId}&$orderby=typename asc`;
+        const queryUrl = `${baseUrl}/api/data/v9.2/plugintypes?$select=plugintypeid,typename,friendlyname,name,pluginassemblyid&$filter=_pluginassemblyid_value eq ${assemblyId}&$orderby=typename asc`;
 
         this.logger.debug('Fetching plugin types', { assemblyId, queryUrl });
 
@@ -141,7 +178,7 @@ export class PluginRegistrationService {
         }
         const baseUrl = environment.settings.dataverseUrl;
 
-        const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,plugintypeid,sdkmessageid,stage,mode,rank,filteringattributes,statecode&$filter=plugintypeid eq ${pluginTypeId}&$orderby=rank asc`;
+        const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,plugintypeid,sdkmessageid,stage,mode,rank,filteringattributes,statecode&$filter=_plugintypeid_value eq ${pluginTypeId}&$orderby=rank asc`;
 
         this.logger.debug('Fetching plugin steps', { pluginTypeId, queryUrl });
 
@@ -175,7 +212,7 @@ export class PluginRegistrationService {
         }
         const baseUrl = environment.settings.dataverseUrl;
 
-        const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingstepimages?$select=sdkmessageprocessingstepimageid,name,entityalias,imagetype,attributes,sdkmessageprocessingstepid&$filter=sdkmessageprocessingstepid eq ${stepId}&$orderby=name asc`;
+        const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingstepimages?$select=sdkmessageprocessingstepimageid,name,entityalias,imagetype,attributes,sdkmessageprocessingstepid&$filter=_sdkmessageprocessingstepid_value eq ${stepId}&$orderby=name asc`;
 
         this.logger.debug('Fetching plugin images', { stepId, queryUrl });
 
@@ -196,5 +233,82 @@ export class PluginRegistrationService {
 
         const data = await response.json();
         return data.value;
+    }
+
+    /**
+     * BULK OPERATIONS - Get all records without filters for in-memory joining
+     * These methods are much faster than individual filtered queries
+     */
+
+    /**
+     * Get ALL plugin types across all assemblies (bulk fetch)
+     */
+    async getAllPluginTypes(environmentId: string): Promise<PluginType[]> {
+        const token = await this.authService.getAccessToken(environmentId);
+        const environment = await this.authService.getEnvironment(environmentId);
+        if (!environment) {
+            throw new Error('Environment not found');
+        }
+        const baseUrl = environment.settings.dataverseUrl;
+
+        const queryUrl = `${baseUrl}/api/data/v9.2/plugintypes?$select=plugintypeid,typename,friendlyname,name,_pluginassemblyid_value&$orderby=typename asc`;
+
+        this.logger.debug('Bulk fetching all plugin types', { queryUrl });
+
+        const results = await this.fetchAllPages<PluginType & { _pluginassemblyid_value: string }>(queryUrl, token);
+
+        // Map the lookup field to the standard property name
+        return results.map(type => ({
+            ...type,
+            pluginassemblyid: type._pluginassemblyid_value
+        }));
+    }
+
+    /**
+     * Get ALL plugin steps across all types (bulk fetch)
+     */
+    async getAllSteps(environmentId: string): Promise<PluginStep[]> {
+        const token = await this.authService.getAccessToken(environmentId);
+        const environment = await this.authService.getEnvironment(environmentId);
+        if (!environment) {
+            throw new Error('Environment not found');
+        }
+        const baseUrl = environment.settings.dataverseUrl;
+
+        const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,_plugintypeid_value,sdkmessageid,stage,mode,rank,filteringattributes,statecode&$orderby=rank asc`;
+
+        this.logger.debug('Bulk fetching all plugin steps', { queryUrl });
+
+        const results = await this.fetchAllPages<PluginStep & { _plugintypeid_value: string }>(queryUrl, token);
+
+        // Map the lookup field to the standard property name
+        return results.map(step => ({
+            ...step,
+            plugintypeid: step._plugintypeid_value
+        }));
+    }
+
+    /**
+     * Get ALL plugin images across all steps (bulk fetch)
+     */
+    async getAllImages(environmentId: string): Promise<PluginImage[]> {
+        const token = await this.authService.getAccessToken(environmentId);
+        const environment = await this.authService.getEnvironment(environmentId);
+        if (!environment) {
+            throw new Error('Environment not found');
+        }
+        const baseUrl = environment.settings.dataverseUrl;
+
+        const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingstepimages?$select=sdkmessageprocessingstepimageid,name,entityalias,imagetype,attributes,_sdkmessageprocessingstepid_value&$orderby=name asc`;
+
+        this.logger.debug('Bulk fetching all plugin images', { queryUrl });
+
+        const results = await this.fetchAllPages<PluginImage & { _sdkmessageprocessingstepid_value: string }>(queryUrl, token);
+
+        // Map the lookup field to the standard property name
+        return results.map(image => ({
+            ...image,
+            sdkmessageprocessingstepid: image._sdkmessageprocessingstepid_value
+        }));
     }
 }
