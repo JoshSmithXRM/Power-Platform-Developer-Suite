@@ -82,13 +82,20 @@ Building panels and features:
 
 ### 🔧 Standards & Quality
 
-Code quality and linting:
+Code quality and maintenance:
 
 10. **[LINT_RECOMMENDATIONS.md](LINT_RECOMMENDATIONS.md)** - ESLint rules
     - Code quality violations found
     - Recommended ESLint rules
     - Compliance scores
     - Remediation strategies
+
+11. **[CODE_MAINTENANCE_GUIDE.md](CODE_MAINTENANCE_GUIDE.md)** ⭐ **NEW**
+    - Dead code detection methods
+    - Automated tooling strategies (4 tiers)
+    - Preventative architecture patterns
+    - CI/CD integration
+    - Maintenance schedule
 
 ---
 
