@@ -54,3 +54,82 @@ Likely a missing abstraction in how environment selector state is managed:
 - This issue may already be addressed by missing abstraction work in progress
 - Document here to ensure it's not missed during implementation
 - Test with multiple panel instances after any environment selector refactoring
+
+---
+
+## Issue: Plugin Registration Missing Entity Information
+
+**Date**: 2025-10-28
+**Severity**: Medium (Missing useful feature)
+**Status**: Documented, needs implementation
+
+### Description
+
+Plugin registration steps are missing entity information. We should retrieve and display which entity (table) each step is registered to, and include it in the search functionality.
+
+### Current State
+
+- Steps are loaded from `sdkmessageprocessingsteps` table
+- We get: `name`, `stage`, `mode`, `rank`, `filteringattributes`, `statecode`
+- **Missing**: Entity/table name that the step is registered to
+
+### Desired State
+
+- Retrieve entity information for each step
+- Display entity in step label or properties
+- Include entity name in `searchText` for comprehensive search
+- Example: Search "contact" finds all steps registered to the contact entity
+
+### Use Case
+
+**Problem**: Developer needs to find all plugin steps registered to a specific entity (e.g., "opportunity")
+
+**Current workaround**:
+- Manually expand every assembly → plugin type → step
+- Check properties panel for each step
+- Slow and tedious
+
+**With entity search**:
+- Search "opportunity"
+- Instantly see all steps registered to opportunity entity
+- Massive productivity improvement
+
+### Implementation Notes
+
+**OData Query Update**:
+```typescript
+// Current query for steps
+const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingsteps?
+    $select=sdkmessageprocessingstepid,name,plugintypeid,sdkmessageid,stage,mode,rank,filteringattributes,statecode`;
+
+// Need to expand sdkmessagefilter to get entity name
+const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingsteps?
+    $select=sdkmessageprocessingstepid,name,plugintypeid,sdkmessageid,stage,mode,rank,filteringattributes,statecode
+    &$expand=sdkmessagefilterid($select=primaryobjecttypecode)`;
+```
+
+**Tree Node Update**:
+```typescript
+// Add entity to searchText
+const stepNode = {
+    label: step.name,
+    searchText: `${step.filteringattributes} ${entityName}`,  // Include entity in search
+    // ...
+};
+```
+
+**Properties Panel**:
+- Add "Entity" field to step properties display
+- Show friendly entity name (e.g., "Contact" not "contact")
+
+### Files Likely Affected
+
+- `src/services/PluginRegistrationService.ts` (OData query update)
+- `src/panels/PluginRegistrationPanel.ts` (`buildCompleteTree()`, `generateStepDetailsHTML()`)
+- Properties panel rendering for steps
+
+### Related
+
+- Filtering attributes search already implemented (2025-10-28)
+- This follows same pattern: add to searchText without cluttering label
+- Should use same approach for entity search
