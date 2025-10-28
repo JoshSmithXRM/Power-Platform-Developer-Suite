@@ -237,165 +237,62 @@ export class PluginRegistrationPanel extends BasePanel {
         }
     }
 
-    private generateAssemblyDetailsHTML(assembly: PluginAssembly): string {
-        const isolationMode = assembly.isolationmode === 1 ? 'None' : assembly.isolationmode === 2 ? 'Sandbox' : 'Unknown';
-        const sourceType = ['Database', 'Disk', 'GAC', 'NuGet'][assembly.sourcetype] || 'Unknown';
+    /**
+     * Generate property rows for ALL properties in an object (dev tool - show everything)
+     */
+    private generateAllPropertiesHTML(data: Record<string, unknown>, title: string, icon: string): string {
+        const rows = Object.entries(data)
+            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB)) // Sort alphabetically
+            .map(([key, value]) => {
+                // Format the value appropriately
+                let displayValue: string;
+                if (value === null || value === undefined) {
+                    displayValue = '<span class="property-null">null</span>';
+                } else if (typeof value === 'boolean') {
+                    displayValue = value ? 'Yes' : 'No';
+                } else if (typeof value === 'object') {
+                    displayValue = `<code>${this.escapeHtml(JSON.stringify(value))}</code>`;
+                } else {
+                    displayValue = this.escapeHtml(String(value));
+                }
+
+                // Style GUID-like values
+                const isGuid = typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+                const valueClass = isGuid ? 'property-value property-id' : 'property-value';
+
+                return `
+                    <div class="property-row">
+                        <span class="property-label">${this.escapeHtml(key)}:</span>
+                        <span class="${valueClass}">${displayValue}</span>
+                    </div>
+                `;
+            })
+            .join('');
 
         return `
             <div class="property-section">
-                <h4>📦 Assembly Information</h4>
+                <h4>${icon} ${this.escapeHtml(title)}</h4>
                 <div class="property-grid">
-                    <div class="property-row">
-                        <span class="property-label">Name:</span>
-                        <span class="property-value">${this.escapeHtml(assembly.name)}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Version:</span>
-                        <span class="property-value">${this.escapeHtml(assembly.version)}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Culture:</span>
-                        <span class="property-value">${this.escapeHtml(assembly.culture)}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Public Key Token:</span>
-                        <span class="property-value">${this.escapeHtml(assembly.publickeytoken)}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Isolation Mode:</span>
-                        <span class="property-value">${isolationMode}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Source Type:</span>
-                        <span class="property-value">${sourceType}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Managed:</span>
-                        <span class="property-value">${assembly.ismanaged ? 'Yes' : 'No'}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Assembly ID:</span>
-                        <span class="property-value property-id">${assembly.pluginassemblyid}</span>
-                    </div>
+                    ${rows}
                 </div>
             </div>
         `;
+    }
+
+    private generateAssemblyDetailsHTML(assembly: PluginAssembly): string {
+        return this.generateAllPropertiesHTML(assembly as unknown as Record<string, unknown>, 'Assembly Information', '📦');
     }
 
     private generatePluginTypeDetailsHTML(pluginType: PluginType): string {
-        return `
-            <div class="property-section">
-                <h4>🔌 Plugin Type Information</h4>
-                <div class="property-grid">
-                    <div class="property-row">
-                        <span class="property-label">Type Name:</span>
-                        <span class="property-value">${this.escapeHtml(pluginType.typename)}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Friendly Name:</span>
-                        <span class="property-value">${this.escapeHtml(pluginType.friendlyname || 'N/A')}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Name:</span>
-                        <span class="property-value">${this.escapeHtml(pluginType.name)}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Plugin Type ID:</span>
-                        <span class="property-value property-id">${pluginType.plugintypeid}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Assembly ID:</span>
-                        <span class="property-value property-id">${pluginType.pluginassemblyid}</span>
-                    </div>
-                </div>
-            </div>
-        `;
+        return this.generateAllPropertiesHTML(pluginType as unknown as Record<string, unknown>, 'Plugin Type Information', '🔌');
     }
 
     private generateStepDetailsHTML(step: PluginStep): string {
-        const stageLabel = step.stage === 10 ? 'PreValidation' : step.stage === 20 ? 'PreOperation' : step.stage === 40 ? 'PostOperation' : `Unknown (${step.stage})`;
-        const modeLabel = step.mode === 0 ? 'Synchronous' : step.mode === 1 ? 'Asynchronous' : `Unknown (${step.mode})`;
-        const stateLabel = step.statecode === 0 ? 'Enabled ⚡' : step.statecode === 1 ? 'Disabled ⚫' : `Unknown (${step.statecode})`;
-
-        return `
-            <div class="property-section">
-                <h4>⚡ SDK Message Processing Step</h4>
-                <div class="property-grid">
-                    <div class="property-row">
-                        <span class="property-label">Name:</span>
-                        <span class="property-value">${this.escapeHtml(step.name)}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Stage:</span>
-                        <span class="property-value">${stageLabel}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Execution Mode:</span>
-                        <span class="property-value">${modeLabel}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">State:</span>
-                        <span class="property-value">${stateLabel}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Execution Order (Rank):</span>
-                        <span class="property-value">${step.rank}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Filtering Attributes:</span>
-                        <span class="property-value">${step.filteringattributes ? this.escapeHtml(step.filteringattributes) : 'All attributes'}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Step ID:</span>
-                        <span class="property-value property-id">${step.sdkmessageprocessingstepid}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Plugin Type ID:</span>
-                        <span class="property-value property-id">${step.plugintypeid}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">SDK Message ID:</span>
-                        <span class="property-value property-id">${step.sdkmessageid}</span>
-                    </div>
-                </div>
-            </div>
-        `;
+        return this.generateAllPropertiesHTML(step as unknown as Record<string, unknown>, 'SDK Message Processing Step', '⚡');
     }
 
     private generateImageDetailsHTML(image: PluginImage): string {
-        const imageTypeLabel = this.getImageTypeLabel(image.imagetype);
-
-        return `
-            <div class="property-section">
-                <h4>🖼️ Entity Image</h4>
-                <div class="property-grid">
-                    <div class="property-row">
-                        <span class="property-label">Name:</span>
-                        <span class="property-value">${this.escapeHtml(image.name)}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Entity Alias:</span>
-                        <span class="property-value">${this.escapeHtml(image.entityalias)}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Image Type:</span>
-                        <span class="property-value">${imageTypeLabel}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Attributes:</span>
-                        <span class="property-value">${image.attributes ? this.escapeHtml(image.attributes) : 'All attributes'}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Image ID:</span>
-                        <span class="property-value property-id">${image.sdkmessageprocessingstepimageid}</span>
-                    </div>
-                    <div class="property-row">
-                        <span class="property-label">Step ID:</span>
-                        <span class="property-value property-id">${image.sdkmessageprocessingstepid}</span>
-                    </div>
-                </div>
-            </div>
-        `;
+        return this.generateAllPropertiesHTML(image as unknown as Record<string, unknown>, 'Entity Image', '🖼️');
     }
 
     private escapeHtml(text: string): string {
@@ -606,7 +503,9 @@ export class PluginRegistrationPanel extends BasePanel {
                         data: type
                         // No children - loaded on expand
                     };
-                });
+                })
+                // Sort by display label (case-insensitive)
+                .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
                 break;
             }
 
@@ -627,7 +526,9 @@ export class PluginRegistrationPanel extends BasePanel {
                         data: step
                         // No children - loaded on expand
                     };
-                });
+                })
+                // Sort by step name (case-insensitive)
+                .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
                 break;
             }
 
@@ -729,7 +630,9 @@ export class PluginRegistrationPanel extends BasePanel {
                 hasChildren: false, // Images are leaf nodes
                 data: image
             };
-        });
+        })
+        // Sort by image name (case-insensitive)
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
     }
 
     private getImageContextLabel(imageType: number): string {
