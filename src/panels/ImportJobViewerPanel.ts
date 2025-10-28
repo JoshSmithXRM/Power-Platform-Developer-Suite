@@ -237,10 +237,6 @@ export class ImportJobViewerPanel extends BasePanel {
                     await this.handleOpenSolutionHistory(message.data?.environmentId);
                     break;
 
-                case 'refresh-data':
-                    await this.handleRefresh();
-                    break;
-
                 case 'panel-ready':
                     this.componentLogger.debug('Panel ready event received');
                     break;

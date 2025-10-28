@@ -436,26 +436,6 @@ export class MetadataBrowserPanel extends BasePanel {
                     this.toggleSection(message.data?.sectionId);
                     break;
 
-                case 'refresh-data':
-                    // Clear all tables first
-                    if (this.attributesTableComponent) this.attributesTableComponent.setData([]);
-                    if (this.keysTableComponent) this.keysTableComponent.setData([]);
-                    if (this.relationshipsTableComponent) this.relationshipsTableComponent.setData([]);
-                    if (this.privilegesTableComponent) this.privilegesTableComponent.setData([]);
-                    if (this.choiceValuesTableComponent) this.choiceValuesTableComponent.setData([]);
-
-                    // Show loading state
-                    this.setAllTablesLoading(true, 'Refreshing metadata...');
-
-                    this.actionBarComponent?.setActionLoading('refresh', true);
-                    try {
-                        await this.refreshCurrentMetadata();
-                    } finally {
-                        this.actionBarComponent?.setActionLoading('refresh', false);
-                        this.setAllTablesLoading(false);
-                    }
-                    break;
-
                 case 'select-entity':
                     if (message.data) {
                         await this.handleEntitySelection(message.data);

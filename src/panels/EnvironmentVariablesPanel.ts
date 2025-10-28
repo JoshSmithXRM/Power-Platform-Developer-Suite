@@ -258,10 +258,6 @@ export class EnvironmentVariablesPanel extends BasePanel {
                     await this.handleOpenInMaker(message.data?.environmentId, message.data?.solutionId, message.data?.entityType);
                     break;
 
-                case 'refresh-data':
-                    await this.handleRefresh();
-                    break;
-
                 case 'panel-ready':
                     this.componentLogger.debug('Panel ready event received');
                     // Panel is ready, no action needed

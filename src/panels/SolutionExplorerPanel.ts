@@ -224,10 +224,6 @@ export class SolutionExplorerPanel extends BasePanel {
                     await this.handleOpenSolutionInClassic(message.data?.environmentId, message.data?.solutionId);
                     break;
 
-                case 'refresh-data':
-                    await this.handleRefresh();
-                    break;
-
                 case 'panel-ready':
                     this.componentLogger.debug('Panel ready event received');
                     break;

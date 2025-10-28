@@ -289,10 +289,6 @@ export class ConnectionReferencesPanel extends BasePanel {
                     }
                     break;
 
-                case 'refresh-data':
-                    await this.handleRefresh();
-                    break;
-
                 case 'sync-deployment-settings':
                     await this.handleSyncDeploymentSettings(message.data?.relationships, message.data?.solutionUniqueName);
                     break;
