@@ -73,7 +73,7 @@ export class PluginRegistrationService {
         }
         const baseUrl = environment.settings.dataverseUrl;
 
-        const queryUrl = `${baseUrl}/api/data/v9.2/pluginassemblies?$select=pluginassemblyid,name,version,culture,publickeytoken,isolationmode,sourcetype,ismanaged,packageid,solutionid&$orderby=name asc`;
+        const queryUrl = `${baseUrl}/api/data/v9.2/pluginassemblies?$select=pluginassemblyid,name,version,culture,publickeytoken,isolationmode,sourcetype,ismanaged&$orderby=name asc`;
 
         this.logger.debug('Fetching plugin assemblies', { queryUrl });
 

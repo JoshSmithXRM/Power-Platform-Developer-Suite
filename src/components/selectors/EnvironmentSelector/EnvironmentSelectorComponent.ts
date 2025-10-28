@@ -149,12 +149,24 @@ export class EnvironmentSelectorComponent extends BaseComponent<EnvironmentSelec
         });
 
         // Trigger onChange callback if provided
+        this.componentLogger.info('setSelectedEnvironment - checking onChange callback', {
+            hasOnChange: !!this.config.onChange,
+            environmentId,
+            configKeys: Object.keys(this.config)
+        });
+
         if (this.config.onChange) {
+            this.componentLogger.info('setSelectedEnvironment - calling onChange callback', { environmentId });
             try {
                 this.config.onChange(environmentId || '', environment || undefined);
             } catch (error) {
                 this.notifyError(error as Error, 'onChange callback');
             }
+        } else {
+            this.componentLogger.warn('setSelectedEnvironment - NO onChange callback found!', {
+                componentId: this.getId(),
+                environmentId
+            });
         }
 
         this.notifyUpdate();

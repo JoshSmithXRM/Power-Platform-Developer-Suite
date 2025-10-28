@@ -453,7 +453,18 @@ export abstract class BasePanel implements IPanelBase {
 
             // Set the selected environment
             if (selectedEnvironmentId) {
+                logger.info('Calling setSelectedEnvironment', {
+                    selectedEnvironmentId,
+                    componentId: environmentSelectorComponent.getId()
+                });
                 environmentSelectorComponent.setSelectedEnvironment(selectedEnvironmentId);
+                logger.info('setSelectedEnvironment call completed');
+            } else {
+                logger.info('No environment to select', {
+                    selectedEnvironmentId,
+                    autoSelect,
+                    environmentCount: environments.length
+                });
             }
 
             // Component will handle its own update through event bridges

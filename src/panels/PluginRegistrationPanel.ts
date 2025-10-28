@@ -90,7 +90,7 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     private initializeComponents(): void {
-        this.componentLogger.debug('Initializing components');
+        this.componentLogger.info('Initializing components');
 
         // Environment Selector - onChange handles both auto-selection and manual changes
         this.environmentSelectorComponent = this.componentFactory.createEnvironmentSelector({
@@ -128,7 +128,7 @@ export class PluginRegistrationPanel extends BasePanel {
             onNodeExpand: (node) => this.handleNodeExpanded(node)
         });
 
-        this.componentLogger.debug('Components initialized');
+        this.componentLogger.info('Components initialized');
     }
 
     /**
@@ -137,7 +137,7 @@ export class PluginRegistrationPanel extends BasePanel {
      * - Manual user selection via dropdown
      */
     private handleEnvironmentSelection(environmentId: string): void {
-        this.componentLogger.debug('Environment selected', { environmentId });
+        this.componentLogger.info('Environment selected', { environmentId });
 
         if (!environmentId) {
             this._selectedEnvironmentId = undefined;
@@ -158,7 +158,7 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
-        this.componentLogger.debug('Handling message', { command: message.command });
+        this.componentLogger.info('Handling message', { command: message.command });
 
         switch (message.command) {
             // environment-changed is now handled by onChange callback - no need to handle here
@@ -182,7 +182,7 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     private async handleRefresh(): Promise<void> {
-        this.componentLogger.debug('Refresh clicked');
+        this.componentLogger.info('Refresh clicked');
 
         if (this._selectedEnvironmentId) {
             await this.loadAssemblies();
@@ -195,18 +195,21 @@ export class PluginRegistrationPanel extends BasePanel {
         }
 
         try {
-            this.componentLogger.debug('Loading assemblies');
+            this.componentLogger.info('Loading assemblies');
 
             // Fetch assemblies
             this.assemblies = await this.pluginService.getAssemblies(this._selectedEnvironmentId);
 
-            this.componentLogger.debug('Assemblies loaded', { count: this.assemblies.length });
+            this.componentLogger.info('Assemblies loaded', { count: this.assemblies.length });
 
             // Transform to tree nodes
             const treeNodes = this.transformAssembliesToTreeNodes(this.assemblies);
+            this.componentLogger.info('Tree nodes transformed', { nodeCount: treeNodes.length });
 
             // Update tree
+            this.componentLogger.info('Calling setNodes on tree view');
             this.treeViewComponent!.setNodes(treeNodes);
+            this.componentLogger.info('setNodes call completed');
 
         } catch (error) {
             this.componentLogger.error('Failed to load assemblies', error instanceof Error ? error : new Error(String(error)));
@@ -228,7 +231,7 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     private async loadNodeChildren(nodeId: string): Promise<void> {
-        this.componentLogger.debug('Loading node children', { nodeId });
+        this.componentLogger.info('Loading node children', { nodeId });
 
         if (!this._selectedEnvironmentId) {
             return;
@@ -314,12 +317,12 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     private handleNodeSelected(node: TreeNode): void {
-        this.componentLogger.debug('Node selected', { nodeId: node.id, nodeType: node.type });
+        this.componentLogger.info('Node selected', { nodeId: node.id, nodeType: node.type });
         // Future: Show node details in a split panel
     }
 
     private async handleNodeExpanded(node: TreeNode): Promise<void> {
-        this.componentLogger.debug('Node expanded', { nodeId: node.id, nodeType: node.type });
+        this.componentLogger.info('Node expanded', { nodeId: node.id, nodeType: node.type });
 
         // Load children if not already loaded
         if (!node.children || node.children.length === 0) {
