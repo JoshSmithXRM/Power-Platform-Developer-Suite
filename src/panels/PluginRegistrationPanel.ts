@@ -590,9 +590,14 @@ export class PluginRegistrationPanel extends BasePanel {
                 const types = this.typesByAssembly.get(assembly.pluginassemblyid) || [];
                 children = types.map(type => {
                     const steps = this.stepsByType.get(type.plugintypeid) || [];
+
+                    // Determine label: name > typename > friendlyname > plugintypeid as fallback
+                    // Matches XRM Toolbox behavior: uses 'name' field first
+                    const label = type.name || type.typename || type.friendlyname || type.plugintypeid;
+
                     return {
                         id: `plugintype-${type.plugintypeid}`,
-                        label: type.friendlyname || type.typename,
+                        label,
                         icon: '🔌',
                         type: 'plugintype',
                         expanded: false,
@@ -703,16 +708,41 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     private transformImagesToTreeNodes(images: PluginImage[]): TreeNode[] {
-        return images.map(image => ({
-            id: `image-${image.sdkmessageprocessingstepimageid}`,
-            label: `${image.name} (${this.getImageTypeLabel(image.imagetype)})`,
-            icon: '🖼️',
-            type: 'image',
-            expanded: false,
-            selectable: true,
-            hasChildren: false, // Images are leaf nodes
-            data: image
-        }));
+        return images.map(image => {
+            // Format attributes list (truncate if too long)
+            const attrs = image.attributes || '';
+            const attrDisplay = attrs.length > 80 ? `${attrs.substring(0, 77)}...` : attrs;
+
+            // Get image type context label
+            const contextLabel = this.getImageContextLabel(image.imagetype);
+
+            // Format: {name} ({attributes}) - {context}
+            const label = `${image.name} (${attrDisplay}) - ${contextLabel}`;
+
+            return {
+                id: `image-${image.sdkmessageprocessingstepimageid}`,
+                label,
+                icon: '🖼️',
+                type: 'image',
+                expanded: false,
+                selectable: true,
+                hasChildren: false, // Images are leaf nodes
+                data: image
+            };
+        });
+    }
+
+    private getImageContextLabel(imageType: number): string {
+        switch (imageType) {
+            case 0:
+                return 'Pre Entity Image';
+            case 1:
+                return 'Post Entity Image';
+            case 2:
+                return 'Pre and Post Entity Image';
+            default:
+                return 'Unknown';
+        }
     }
 
     private getImageTypeLabel(imageType: number): string {

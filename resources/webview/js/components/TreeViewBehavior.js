@@ -217,8 +217,11 @@ class TreeViewBehavior extends BaseBehavior {
             nodeElement.classList.add('tree-node--expanded');
             instance.expandedNodes.add(nodeId);
 
-            // Notify Extension Host
-            this.sendMessage(instance, 'node-expanded', { nodeId });
+            // Find the node data in instance.nodes
+            const node = this.findNodeById(instance, nodeId);
+
+            // Notify Extension Host with full node data
+            this.sendMessage(instance, 'node-expanded', { node });
         }
     }
 
