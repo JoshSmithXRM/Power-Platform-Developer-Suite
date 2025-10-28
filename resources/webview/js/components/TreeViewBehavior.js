@@ -1,0 +1,382 @@
+/**
+ * TreeViewBehavior - Webview behavior for TreeView component
+ * Handles node expansion, collapse, selection, and search
+ */
+
+class TreeViewBehavior {
+    static instances = new Map();
+
+    /**
+     * Initialize a TreeView component instance
+     */
+    static initialize(componentId, config, element) {
+        if (!componentId || !element) {
+            console.error('TreeViewBehavior: componentId and element are required');
+            return null;
+        }
+
+        if (this.instances.has(componentId)) {
+            return this.instances.get(componentId);
+        }
+
+        const instance = {
+            id: componentId,
+            config: { ...config },
+            element: element,
+
+            // DOM elements
+            searchInput: null,
+            treeRoot: null,
+
+            // State
+            selectedNodeId: null,
+            expandedNodes: new Set(),
+            searchQuery: '',
+
+            // Event handlers
+            boundHandlers: {}
+        };
+
+        try {
+            // Find DOM elements
+            this.findDOMElements(instance);
+
+            // Setup event listeners
+            this.setupEventListeners(instance);
+
+            // Register instance
+            this.instances.set(componentId, instance);
+
+            console.log(`TreeViewBehavior: Initialized ${componentId}`);
+            return instance;
+
+        } catch (error) {
+            console.error(`TreeViewBehavior: Failed to initialize ${componentId}:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Find and cache DOM elements
+     */
+    static findDOMElements(instance) {
+        const { element } = instance;
+
+        instance.searchInput = element.querySelector('.tree-view-search-input');
+        instance.treeRoot = element.querySelector('.tree-view-root');
+    }
+
+    /**
+     * Setup event listeners
+     */
+    static setupEventListeners(instance) {
+        const { element, searchInput } = instance;
+
+        // Tree node clicks (event delegation)
+        instance.boundHandlers.treeClick = (e) => this.handleTreeClick(instance, e);
+        element.addEventListener('click', instance.boundHandlers.treeClick);
+
+        // Search input
+        if (searchInput) {
+            instance.boundHandlers.searchInput = (e) => this.handleSearch(instance, e);
+            searchInput.addEventListener('input', instance.boundHandlers.searchInput);
+        }
+
+        // Context menu (right-click)
+        instance.boundHandlers.contextMenu = (e) => this.handleContextMenu(instance, e);
+        element.addEventListener('contextmenu', instance.boundHandlers.contextMenu);
+    }
+
+    /**
+     * Handle tree click events
+     */
+    static handleTreeClick(instance, event) {
+        const target = event.target;
+
+        // Toggle button click
+        if (target.closest('[data-action="toggle"]')) {
+            event.stopPropagation();
+            const nodeElement = target.closest('.tree-node');
+            if (nodeElement) {
+                this.toggleNode(instance, nodeElement);
+            }
+            return;
+        }
+
+        // Node content click (selection)
+        const nodeContent = target.closest('.tree-node-content');
+        if (nodeContent) {
+            const nodeElement = nodeContent.closest('.tree-node');
+            if (nodeElement) {
+                this.selectNode(instance, nodeElement);
+            }
+            return;
+        }
+    }
+
+    /**
+     * Toggle node expansion
+     */
+    static toggleNode(instance, nodeElement) {
+        const nodeId = nodeElement.dataset.nodeId;
+        if (!nodeId) return;
+
+        const isExpanded = nodeElement.classList.contains('tree-node--expanded');
+        const toggleIcon = nodeElement.querySelector('.tree-toggle');
+
+        if (isExpanded) {
+            // Collapse
+            nodeElement.classList.remove('tree-node--expanded');
+            nodeElement.classList.add('tree-node--collapsed');
+            if (toggleIcon) toggleIcon.textContent = '▶';
+            instance.expandedNodes.delete(nodeId);
+
+            // Notify Extension Host
+            this.sendMessage(instance, 'nodeCollapsed', { nodeId });
+
+        } else {
+            // Expand
+            nodeElement.classList.remove('tree-node--collapsed');
+            nodeElement.classList.add('tree-node--expanded');
+            if (toggleIcon) toggleIcon.textContent = '▼';
+            instance.expandedNodes.add(nodeId);
+
+            // Notify Extension Host
+            this.sendMessage(instance, 'nodeExpanded', { nodeId });
+        }
+    }
+
+    /**
+     * Select a node
+     */
+    static selectNode(instance, nodeElement) {
+        const nodeId = nodeElement.dataset.nodeId;
+        if (!nodeId) return;
+
+        // Check if node is selectable
+        if (nodeElement.classList.contains('tree-node--not-selectable')) {
+            return;
+        }
+
+        // Remove previous selection
+        if (instance.selectedNodeId) {
+            const previouslySelected = instance.element.querySelector(`[data-node-id="${instance.selectedNodeId}"]`);
+            if (previouslySelected) {
+                previouslySelected.classList.remove('tree-node--selected');
+            }
+        }
+
+        // Add new selection
+        nodeElement.classList.add('tree-node--selected');
+        instance.selectedNodeId = nodeId;
+
+        // Notify Extension Host
+        this.sendMessage(instance, 'nodeSelected', {
+            nodeId,
+            nodeType: nodeElement.dataset.nodeType
+        });
+    }
+
+    /**
+     * Handle search input
+     */
+    static handleSearch(instance, event) {
+        const query = event.target.value.toLowerCase().trim();
+        instance.searchQuery = query;
+
+        if (!instance.treeRoot) return;
+
+        const allNodes = instance.treeRoot.querySelectorAll('.tree-node');
+
+        if (query === '') {
+            // Show all nodes when search is cleared
+            allNodes.forEach(node => {
+                node.style.display = '';
+                node.classList.remove('tree-node--search-match');
+            });
+            return;
+        }
+
+        // Filter nodes by search query
+        allNodes.forEach(node => {
+            const label = node.querySelector('.tree-label');
+            if (!label) return;
+
+            const labelText = label.textContent.toLowerCase();
+            const matches = labelText.includes(query);
+
+            if (matches) {
+                node.style.display = '';
+                node.classList.add('tree-node--search-match');
+
+                // Expand parents to make visible
+                this.expandParents(node);
+            } else {
+                node.style.display = 'none';
+                node.classList.remove('tree-node--search-match');
+            }
+        });
+    }
+
+    /**
+     * Expand parent nodes
+     */
+    static expandParents(nodeElement) {
+        let parent = nodeElement.parentElement;
+
+        while (parent && parent.classList.contains('tree-children')) {
+            const parentNode = parent.closest('.tree-node');
+            if (parentNode && !parentNode.classList.contains('tree-node--expanded')) {
+                const toggleBtn = parentNode.querySelector('.tree-toggle');
+                if (toggleBtn && toggleBtn.dataset.action === 'toggle') {
+                    // Simulate toggle to expand
+                    this.toggleNode(this.instances.get(nodeElement.closest('.tree-view-container').dataset.componentId), parentNode);
+                }
+            }
+            parent = parent.parentElement;
+        }
+    }
+
+    /**
+     * Handle context menu
+     */
+    static handleContextMenu(instance, event) {
+        const nodeElement = event.target.closest('.tree-node');
+        if (nodeElement) {
+            event.preventDefault();
+            const nodeId = nodeElement.dataset.nodeId;
+            const nodeType = nodeElement.dataset.nodeType;
+
+            // Notify Extension Host
+            this.sendMessage(instance, 'nodeContextMenu', {
+                nodeId,
+                nodeType,
+                x: event.clientX,
+                y: event.clientY
+            });
+        }
+    }
+
+    /**
+     * Send message to Extension Host
+     */
+    static sendMessage(instance, action, data) {
+        if (typeof window.ComponentUtils !== 'undefined' && window.ComponentUtils.sendMessage) {
+            window.ComponentUtils.sendMessage(action, {
+                componentId: instance.id,
+                componentType: 'TreeView',
+                ...data
+            });
+        }
+    }
+
+    /**
+     * Handle messages from Extension Host
+     */
+    static handleMessage(message) {
+        if (!message?.componentId || message.componentType !== 'TreeView') {
+            return;
+        }
+
+        const instance = this.instances.get(message.componentId);
+        if (!instance) {
+            console.warn(`TreeViewBehavior: Instance ${message.componentId} not found`);
+            return;
+        }
+
+        switch (message.action) {
+            case 'setNodes':
+                // Tree will be re-rendered by Extension Host
+                // Just clear selection
+                instance.selectedNodeId = null;
+                break;
+
+            case 'expandNode':
+                if (message.nodeId) {
+                    const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
+                    if (nodeElement && !nodeElement.classList.contains('tree-node--expanded')) {
+                        this.toggleNode(instance, nodeElement);
+                    }
+                }
+                break;
+
+            case 'collapseNode':
+                if (message.nodeId) {
+                    const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
+                    if (nodeElement && nodeElement.classList.contains('tree-node--expanded')) {
+                        this.toggleNode(instance, nodeElement);
+                    }
+                }
+                break;
+
+            case 'selectNode':
+                if (message.nodeId) {
+                    const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
+                    if (nodeElement) {
+                        this.selectNode(instance, nodeElement);
+                    }
+                }
+                break;
+
+            case 'clearSelection':
+                if (instance.selectedNodeId) {
+                    const selectedElement = instance.element.querySelector(`[data-node-id="${instance.selectedNodeId}"]`);
+                    if (selectedElement) {
+                        selectedElement.classList.remove('tree-node--selected');
+                    }
+                    instance.selectedNodeId = null;
+                }
+                break;
+
+            case 'expandAll':
+                const allNodes = instance.element.querySelectorAll('.tree-node--has-children');
+                allNodes.forEach(node => {
+                    if (!node.classList.contains('tree-node--expanded')) {
+                        this.toggleNode(instance, node);
+                    }
+                });
+                break;
+
+            case 'collapseAll':
+                const expandedNodes = instance.element.querySelectorAll('.tree-node--expanded');
+                expandedNodes.forEach(node => {
+                    this.toggleNode(instance, node);
+                });
+                break;
+        }
+    }
+
+    /**
+     * Cleanup instance
+     */
+    static cleanup(componentId) {
+        const instance = this.instances.get(componentId);
+        if (!instance) return;
+
+        // Remove event listeners
+        if (instance.element && instance.boundHandlers.treeClick) {
+            instance.element.removeEventListener('click', instance.boundHandlers.treeClick);
+        }
+
+        if (instance.searchInput && instance.boundHandlers.searchInput) {
+            instance.searchInput.removeEventListener('input', instance.boundHandlers.searchInput);
+        }
+
+        if (instance.element && instance.boundHandlers.contextMenu) {
+            instance.element.removeEventListener('contextmenu', instance.boundHandlers.contextMenu);
+        }
+
+        // Remove from instances
+        this.instances.delete(componentId);
+    }
+}
+
+// Global registration for webview context
+if (typeof window !== 'undefined') {
+    window.TreeViewBehavior = TreeViewBehavior;
+
+    // Register with ComponentUtils if available
+    if (window.ComponentUtils?.registerBehavior) {
+        window.ComponentUtils.registerBehavior('TreeView', TreeViewBehavior);
+    }
+}

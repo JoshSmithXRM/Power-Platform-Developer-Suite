@@ -1,0 +1,249 @@
+/**
+ * TreeView Component Styles
+ * Generic hierarchical tree view component
+ */
+
+/* =============================================================================
+   TreeView Container
+   ============================================================================= */
+
+.tree-view-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: transparent;
+}
+
+/* =============================================================================
+   Search Box
+   ============================================================================= */
+
+.tree-view-search {
+    position: relative;
+    padding: 8px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
+}
+
+.tree-view-search-input {
+    width: 100%;
+    padding: 6px 30px 6px 10px;
+    border: 1px solid var(--vscode-input-border);
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    font-size: 13px;
+    border-radius: 4px;
+    outline: none;
+}
+
+.tree-view-search-input:focus {
+    border-color: var(--vscode-focusBorder);
+}
+
+.tree-view-search-input::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+.tree-view-search-icon {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* =============================================================================
+   Tree Content
+   ============================================================================= */
+
+.tree-view-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px 0;
+}
+
+.tree-view-empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
+/* =============================================================================
+   Tree Structure
+   ============================================================================= */
+
+.tree-view-root,
+.tree-children {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tree-children {
+    padding-left: 20px;
+    display: none;
+}
+
+.tree-node--expanded > .tree-children {
+    display: block;
+}
+
+/* =============================================================================
+   Tree Node
+   ============================================================================= */
+
+.tree-node {
+    user-select: none;
+}
+
+.tree-node-content {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.1s ease;
+}
+
+.tree-node-content:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.tree-node--selected > .tree-node-content {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.tree-node--not-selectable > .tree-node-content {
+    cursor: default;
+}
+
+.tree-node--not-selectable > .tree-node-content:hover {
+    background: transparent;
+}
+
+/* =============================================================================
+   Tree Node Elements
+   ============================================================================= */
+
+.tree-toggle {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    cursor: pointer;
+    color: var(--vscode-foreground);
+    opacity: 0.8;
+    transition: transform 0.1s ease;
+}
+
+.tree-toggle:hover {
+    opacity: 1;
+}
+
+.tree-toggle--spacer {
+    cursor: default;
+    opacity: 0;
+}
+
+.tree-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.tree-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    color: var(--vscode-foreground);
+}
+
+.tree-node--selected > .tree-node-content .tree-label {
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+/* =============================================================================
+   Search Highlighting
+   ============================================================================= */
+
+.tree-node--search-match > .tree-node-content {
+    background: var(--vscode-list-highlightForeground, rgba(255, 255, 0, 0.1));
+}
+
+.tree-node--search-match > .tree-node-content .tree-label {
+    font-weight: 600;
+}
+
+/* =============================================================================
+   Node Types (Custom Styling)
+   ============================================================================= */
+
+.tree-node--type-assembly .tree-icon {
+    /* Assembly nodes can have custom styling */
+}
+
+.tree-node--type-plugintype .tree-icon {
+    /* Plugin type nodes can have custom styling */
+}
+
+.tree-node--type-step .tree-icon {
+    /* Step nodes can have custom styling */
+}
+
+.tree-node--type-image .tree-icon {
+    /* Image nodes can have custom styling */
+}
+
+/* =============================================================================
+   Loading & Error States
+   ============================================================================= */
+
+.tree-view-loading {
+    padding: 16px;
+    text-align: center;
+    color: var(--vscode-descriptionForeground);
+}
+
+.tree-view-error {
+    padding: 16px;
+    color: var(--vscode-errorForeground);
+    background: var(--vscode-inputValidation-errorBackground);
+    border: 1px solid var(--vscode-inputValidation-errorBorder);
+    border-radius: 4px;
+    margin: 8px;
+}
+
+/* =============================================================================
+   Scrollbar Styling
+   ============================================================================= */
+
+.tree-view-content::-webkit-scrollbar {
+    width: 10px;
+}
+
+.tree-view-content::-webkit-scrollbar-track {
+    background: var(--vscode-scrollbarSlider-background);
+}
+
+.tree-view-content::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-hoverBackground);
+    border-radius: 5px;
+}
+
+.tree-view-content::-webkit-scrollbar-thumb:hover {
+    background: var(--vscode-scrollbarSlider-activeBackground);
+}

@@ -8,6 +8,7 @@ import { ImportJobViewerPanel } from '../panels/ImportJobViewerPanel';
 import { ConnectionReferencesPanel } from '../panels/ConnectionReferencesPanel';
 import { EnvironmentVariablesPanel } from '../panels/EnvironmentVariablesPanel';
 import { PluginTraceViewerPanel } from '../panels/PluginTraceViewerPanel';
+import { PluginRegistrationPanel } from '../panels/PluginRegistrationPanel';
 
 /**
  * Panel-related commands
@@ -48,6 +49,10 @@ export class PanelCommands {
                 PluginTraceViewerPanel.createOrShow(this.context.extensionUri);
             }),
 
+            vscode.commands.registerCommand('power-platform-dev-suite.pluginRegistration', () => {
+                PluginRegistrationPanel.createOrShow(this.context.extensionUri);
+            }),
+
             vscode.commands.registerCommand('power-platform-dev-suite.dataExplorerNew', () => {
                 DataExplorerPanel.createNew(this.context.extensionUri);
             }),
@@ -70,6 +75,10 @@ export class PanelCommands {
 
             vscode.commands.registerCommand('power-platform-dev-suite.pluginTraceViewerNew', () => {
                 PluginTraceViewerPanel.createNew(this.context.extensionUri);
+            }),
+
+            vscode.commands.registerCommand('power-platform-dev-suite.pluginRegistrationNew', () => {
+                PluginRegistrationPanel.createNew(this.context.extensionUri);
             }),
 
             // Note: 'power-platform-dev-suite.refreshEnvironments' is registered by EnvironmentCommands

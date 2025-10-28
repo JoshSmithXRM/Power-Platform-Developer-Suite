@@ -74,6 +74,13 @@ export class ToolsProvider implements vscode.TreeDataProvider<ToolItem> {
                 'power-platform-dev-suite.pluginTraceViewer',
                 'pluginTraceViewer'
             ),
+            new ToolItem(
+                'Plugin Registration',
+                'Register and manage plugin assemblies, steps, and images',
+                vscode.TreeItemCollapsibleState.None,
+                'power-platform-dev-suite.pluginRegistration',
+                'pluginRegistration'
+            ),
         ];
     }
 }

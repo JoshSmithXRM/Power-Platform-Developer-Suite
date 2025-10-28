@@ -30,7 +30,7 @@ class ComponentUtils {
      * Auto-register behaviors that are available in global scope
      */
     static registerAvailableBehaviors() {
-        const behaviorTypes = ['EnvironmentSelector', 'SolutionSelector', 'ActionBar', 'DataTable', 'SearchForm', 'EntitySelector', 'FilterPanel', 'SplitPanel'];
+        const behaviorTypes = ['EnvironmentSelector', 'SolutionSelector', 'ActionBar', 'DataTable', 'SearchForm', 'EntitySelector', 'FilterPanel', 'SplitPanel', 'TreeView'];
 
         console.log('ComponentUtils: registerAvailableBehaviors() called');
         console.log('ComponentUtils: window object keys:', Object.keys(window).filter(k => k.includes('Behavior')));

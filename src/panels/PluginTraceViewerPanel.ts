@@ -4,7 +4,6 @@ import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
 import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
-import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { FilterPanelComponent } from '../components/panels/FilterPanel/FilterPanelComponent';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
@@ -36,7 +35,6 @@ export class PluginTraceViewerPanel extends BasePanel {
     private static currentPanel: PluginTraceViewerPanel | undefined;
 
     // Components
-    private environmentSelectorComponent?: EnvironmentSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
     private filterPanelComponent?: FilterPanelComponent;
     private dataTableComponent?: DataTableComponent;

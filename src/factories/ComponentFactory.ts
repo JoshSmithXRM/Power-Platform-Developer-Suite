@@ -12,6 +12,8 @@ import { FilterPanelComponent } from '../components/panels/FilterPanel/FilterPan
 import { FilterPanelConfig } from '../components/panels/FilterPanel/FilterPanelConfig';
 import { SplitPanelComponent } from '../components/panels/SplitPanel/SplitPanelComponent';
 import { SplitPanelConfig } from '../components/panels/SplitPanel/SplitPanelConfig';
+import { TreeViewComponent } from '../components/trees/TreeView/TreeViewComponent';
+import { TreeViewConfig } from '../components/trees/TreeView/TreeViewConfig';
 import { BaseComponent } from '../components/base/BaseComponent';
 import { ServiceFactory } from '../services/ServiceFactory';
 
@@ -154,6 +156,18 @@ export class ComponentFactory {
 
         const component = new SplitPanelComponent(config);
         this.trackInstance(config.id, 'SplitPanel', component);
+
+        return component;
+    }
+
+    /**
+     * Create a TreeViewComponent
+     */
+    public createTreeView(config: TreeViewConfig): TreeViewComponent {
+        this.validateComponentConfig(config, 'TreeView');
+
+        const component = new TreeViewComponent(config);
+        this.trackInstance(config.id, 'TreeView', component);
 
         return component;
     }

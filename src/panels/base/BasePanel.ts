@@ -21,6 +21,9 @@ export abstract class BasePanel implements IPanelBase {
     protected currentState: PanelState = {};
     protected readonly _panelId: string;
     private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+
+    // Common component reference - child panels can set this if they use EnvironmentSelector
+    protected environmentSelectorComponent?: EnvironmentSelectorComponent;
     
     protected get componentLogger(): ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']> {
         if (!this._logger) {
@@ -78,9 +81,13 @@ export abstract class BasePanel implements IPanelBase {
         this.componentLogger.debug('Panel initialization starting', { viewType: this.viewType });
         // Restore state first
         await this.restoreState();
-        
+
         // Then initialize UI
         this.updateWebview();
+
+        // Load environments if panel has an environment selector
+        await this.loadEnvironments();
+
         this.componentLogger.info('Panel initialization completed', { viewType: this.viewType });
     }
 
@@ -375,6 +382,20 @@ export abstract class BasePanel implements IPanelBase {
 
         // Create new instance using factory function and store it
         setCurrentPanel(createPanelInstance(panel, extensionUri));
+    }
+
+    /**
+     * Load environments if panel has an environment selector component
+     * Called automatically from initialize() - can also be called manually for refresh
+     */
+    protected async loadEnvironments(): Promise<void> {
+        if (this.environmentSelectorComponent) {
+            await this.loadEnvironmentsWithAutoSelect(
+                this.environmentSelectorComponent,
+                this.componentLogger,
+                this.viewType
+            );
+        }
     }
 
     /**

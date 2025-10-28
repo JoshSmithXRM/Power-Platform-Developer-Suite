@@ -4,7 +4,6 @@ import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
 import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
-import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
 import { Solution } from '../services/SolutionService';
@@ -27,7 +26,6 @@ export class SolutionExplorerPanel extends BasePanel {
     public static readonly viewType = 'solutionExplorer';
     private static currentPanel: SolutionExplorerPanel | undefined;
 
-    private environmentSelectorComponent?: EnvironmentSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
     private dataTableComponent?: DataTableComponent;
     private componentFactory: ComponentFactory;
@@ -88,9 +86,6 @@ export class SolutionExplorerPanel extends BasePanel {
 
         // Initialize the panel
         this.initialize();
-
-        // Load environments after initialization
-        this.loadEnvironments();
 
         this.componentLogger.info('Panel initialized successfully');
     }
@@ -351,12 +346,6 @@ export class SolutionExplorerPanel extends BasePanel {
         } catch (error) {
             this.componentLogger.error('Error generating HTML content', error as Error);
             return this.getErrorHtml('Solution Explorer', 'Failed to generate panel content: ' + error);
-        }
-    }
-
-    private async loadEnvironments(): Promise<void> {
-        if (this.environmentSelectorComponent) {
-            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger, SolutionExplorerPanel.viewType);
         }
     }
 

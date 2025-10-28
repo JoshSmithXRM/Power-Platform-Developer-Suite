@@ -87,6 +87,31 @@ protected getHtmlContent(): string {
 
 📖 **See**: `docs/PANEL_LAYOUT_GUIDE.md` for custom layout patterns
 
+## Panel Initialization Pattern
+
+**MANDATORY**: ALL panels MUST follow this initialization pattern:
+
+```typescript
+constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    super(panel, extensionUri, ...);
+
+    // 1. Initialize component factory
+    this.componentFactory = new ComponentFactory();
+
+    // 2. Create component instances
+    this.initializeComponents();
+
+    // 3. Set up event bridges
+    this.setupComponentEventBridges([...components]);
+
+    // 4. Initialize panel (renders initial HTML)
+    this.initialize(); // ← This calls updateWebview() internally
+}
+```
+
+❌ **NEVER call** `updateWebview()` **directly in constructor**
+✅ **ALWAYS call** `initialize()` which handles state restoration + initial render
+
 ## Component Updates
 
 ✅ **Use event bridges** - efficient, no UI flash:
@@ -95,6 +120,7 @@ this.dataTable.setData(newData);  // Triggers event bridge automatically
 ```
 
 ❌ **DON'T use** `updateWebview()` - causes full HTML regeneration
+⚠️ **EXCEPTION**: `updateWebview()` is only called by `BasePanel.initialize()` for initial render
 
 ## Message Naming Convention
 
@@ -163,6 +189,45 @@ console.log('Handling message:', message);
 - **USE** VS Code SecretStorage for sensitive data
 - **VALIDATE** all user inputs before API calls
 
+## Code Quality Rules (NON-NEGOTIABLE)
+
+### ESLint Disable Comments
+
+**NEVER add `eslint-disable` comments without explicit permission. NO EXCEPTIONS.**
+
+When you encounter a linting error:
+
+1. **STOP** - Do not add disable comments
+2. **ANALYZE** - Understand why the rule exists
+3. **FIX THE ROOT CAUSE** - Refactor code to comply with the rule
+4. **ASK** - If you believe the rule is wrong, discuss with the user first
+
+**Examples:**
+
+❌ **FORBIDDEN** (bypassing code quality):
+```typescript
+// eslint-disable-next-line no-restricted-syntax
+this.updateWebview();
+```
+
+✅ **CORRECT** (fix the actual problem):
+```typescript
+// Use the proper pattern that follows architecture
+this.initialize();
+```
+
+**Why This Matters:**
+- Lint rules enforce architectural patterns
+- Disable comments hide code smells
+- Bypassing rules degrades codebase quality over time
+- Each disable comment is technical debt
+
+**If A Rule Is Genuinely Wrong:**
+- Explain why the rule is incorrect
+- Propose updating `.eslintrc.json`
+- Get explicit approval BEFORE disabling
+- Document the reasoning in the eslint config
+
 ## Development Commands
 
 ```bash
@@ -217,6 +282,7 @@ npm run test-release     # Build, package, and install locally
 
 ## Quick Reference - DON'Ts
 
+- ❌ **Add eslint-disable comments without explicit permission - NO EXCEPTIONS**
 - ❌ Try to use ComponentFactory in webview JavaScript
 - ❌ Use `updateWebview()` for component data updates
 - ❌ Mix Extension Host and Webview contexts

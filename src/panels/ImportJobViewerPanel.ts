@@ -4,7 +4,6 @@ import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
 import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
-import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
 import { ImportJob } from '../services/ImportJobService';
@@ -29,7 +28,6 @@ export class ImportJobViewerPanel extends BasePanel {
     public static readonly viewType = 'importJobViewer';
     private static currentPanel: ImportJobViewerPanel | undefined;
 
-    private environmentSelectorComponent?: EnvironmentSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
     private dataTableComponent?: DataTableComponent;
     private componentFactory: ComponentFactory;
@@ -90,9 +88,6 @@ export class ImportJobViewerPanel extends BasePanel {
 
         // Initialize the panel
         this.initialize();
-
-        // Load environments after initialization
-        this.loadEnvironments();
 
         this.componentLogger.info('Panel initialized successfully');
     }
@@ -361,12 +356,6 @@ export class ImportJobViewerPanel extends BasePanel {
         } catch (error) {
             this.componentLogger.error('Error generating HTML content', error as Error);
             return this.getErrorHtml('Import Job Viewer', 'Failed to generate panel content: ' + error);
-        }
-    }
-
-    private async loadEnvironments(): Promise<void> {
-        if (this.environmentSelectorComponent) {
-            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger, ImportJobViewerPanel.viewType);
         }
     }
 

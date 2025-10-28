@@ -6,7 +6,6 @@ import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
 import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
-import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
@@ -36,7 +35,6 @@ export class ConnectionReferencesPanel extends BasePanel {
     public static readonly viewType = 'connectionReferences';
     private static currentPanel: ConnectionReferencesPanel | undefined;
 
-    private environmentSelectorComponent?: EnvironmentSelectorComponent;
     private solutionSelectorComponent?: SolutionSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
     private dataTableComponent?: DataTableComponent;
@@ -101,9 +99,6 @@ export class ConnectionReferencesPanel extends BasePanel {
 
         // Initialize the panel (this calls updateWebview which calls getHtmlContent)
         this.initialize();
-
-        // Load environments after initialization
-        this.loadEnvironments();
 
         this.componentLogger.info('Panel initialized successfully');
     }
@@ -773,12 +768,6 @@ export class ConnectionReferencesPanel extends BasePanel {
         } catch (error) {
             this.componentLogger.error('Error generating HTML content', error as Error);
             return this.getErrorHtml('Connection References', 'Failed to generate panel content: ' + error);
-        }
-    }
-
-    private async loadEnvironments(): Promise<void> {
-        if (this.environmentSelectorComponent) {
-            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger, ConnectionReferencesPanel.viewType);
         }
     }
 

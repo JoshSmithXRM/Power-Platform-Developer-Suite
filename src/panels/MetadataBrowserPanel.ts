@@ -4,7 +4,6 @@ import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
 import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
-import { EnvironmentSelectorComponent } from '../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
 import {
@@ -73,7 +72,6 @@ export class MetadataBrowserPanel extends BasePanel {
     public static readonly viewType = 'metadataBrowser';
     private static currentPanel: MetadataBrowserPanel | undefined;
 
-    private environmentSelectorComponent?: EnvironmentSelectorComponent;
     private actionBarComponent?: ActionBarComponent;
     private attributesTableComponent?: DataTableComponent;
     private keysTableComponent?: DataTableComponent;
@@ -152,9 +150,6 @@ export class MetadataBrowserPanel extends BasePanel {
 
         // Initialize the panel
         this.initialize();
-
-        // Load environments after initialization
-        this.loadEnvironments();
 
         this.componentLogger.info('Panel initialized successfully');
     }
@@ -848,12 +843,6 @@ export class MetadataBrowserPanel extends BasePanel {
         } catch (error) {
             this.componentLogger.error('Error generating HTML content', error as Error);
             return this.getErrorHtml('Metadata Browser', 'Failed to generate panel content: ' + error);
-        }
-    }
-
-    private async loadEnvironments(): Promise<void> {
-        if (this.environmentSelectorComponent) {
-            await this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent, this.componentLogger, MetadataBrowserPanel.viewType);
         }
     }
 
