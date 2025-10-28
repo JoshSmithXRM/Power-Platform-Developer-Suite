@@ -285,6 +285,17 @@ class TreeViewBehavior {
         }
 
         switch (message.action) {
+            case 'componentUpdate':
+                // Handle event bridge updates
+                if (message.data && message.data.nodes) {
+                    console.log(`TreeViewBehavior: componentUpdate received`, {
+                        componentId: message.componentId,
+                        nodeCount: message.data.nodes.length
+                    });
+                    this.updateNodes(instance, message.data.nodes);
+                }
+                break;
+
             case 'setNodes':
                 // Tree will be re-rendered by Extension Host
                 // Just clear selection
@@ -344,6 +355,97 @@ class TreeViewBehavior {
                 });
                 break;
         }
+    }
+
+    /**
+     * Update tree nodes (called from componentUpdate event bridge)
+     */
+    static updateNodes(instance, nodes) {
+        if (!instance || !instance.treeRoot) {
+            console.warn('TreeViewBehavior: Cannot update nodes - missing instance or treeRoot');
+            return;
+        }
+
+        console.log(`TreeViewBehavior: Updating ${nodes.length} nodes`);
+
+        // Generate HTML for all nodes
+        const html = this.renderNodes(nodes);
+
+        // Update DOM
+        instance.treeRoot.innerHTML = html;
+
+        // Restore expanded state if any
+        instance.expandedNodes.forEach(nodeId => {
+            const nodeElement = instance.element.querySelector(`[data-node-id="${nodeId}"]`);
+            if (nodeElement && nodeElement.classList.contains('tree-node--has-children')) {
+                nodeElement.classList.add('tree-node--expanded');
+            }
+        });
+
+        console.log('TreeViewBehavior: Nodes updated successfully');
+    }
+
+    /**
+     * Render nodes to HTML
+     */
+    static renderNodes(nodes, level = 0) {
+        if (!nodes || nodes.length === 0) {
+            return '';
+        }
+
+        return nodes.map(node => this.renderNode(node, level)).join('');
+    }
+
+    /**
+     * Render a single node to HTML
+     */
+    static renderNode(node, level = 0) {
+        const hasChildren = node.children && node.children.length > 0;
+        const indent = level * 20;
+
+        let html = `
+            <div class="tree-node ${hasChildren ? 'tree-node--has-children' : ''}"
+                 data-node-id="${node.id}"
+                 data-node-type="${node.type || ''}"
+                 style="padding-left: ${indent}px">
+                <div class="tree-node-content">`;
+
+        // Toggle button for nodes with children
+        if (hasChildren) {
+            html += `<button class="tree-node-toggle" data-action="toggle" aria-label="Toggle">▶</button>`;
+        } else {
+            html += `<span class="tree-node-spacer"></span>`;
+        }
+
+        // Icon
+        if (node.icon) {
+            html += `<span class="tree-node-icon">${node.icon}</span>`;
+        }
+
+        // Label
+        html += `<span class="tree-node-label">${this.escapeHtml(node.label)}</span>`;
+
+        html += `</div>`;
+
+        // Children (if any)
+        if (hasChildren) {
+            html += `<div class="tree-node-children">`;
+            html += this.renderNodes(node.children, level + 1);
+            html += `</div>`;
+        }
+
+        html += `</div>`;
+
+        return html;
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    static escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     /**

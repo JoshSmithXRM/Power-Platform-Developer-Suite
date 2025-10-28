@@ -533,6 +533,14 @@ class ComponentUtils {
                 }
                 break;
 
+            case 'TreeView':
+                if (window.TreeViewBehavior) {
+                    window.TreeViewBehavior.handleMessage(message);
+                } else {
+                    console.warn('TreeViewBehavior not available');
+                }
+                break;
+
             default:
                 // Fallback: try to find behavior based on componentId pattern
                 this.routeByIdPattern(message);

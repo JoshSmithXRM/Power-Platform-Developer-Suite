@@ -114,7 +114,11 @@ export abstract class BaseComponent<TData = Record<string, never>> extends Event
      * Notify that the component needs to be updated
      */
     protected notifyUpdate(): void {
-        this.emit('update', { 
+        this.componentLogger.info('notifyUpdate called', {
+            componentId: this.config.id,
+            componentType: this.getType()
+        });
+        this.emit('update', {
             componentId: this.config.id,
             timestamp: Date.now()
         });
@@ -122,13 +126,18 @@ export abstract class BaseComponent<TData = Record<string, never>> extends Event
 
     /**
      * Notify that the component's state has changed
+     * Automatically triggers event bridge update via notifyUpdate()
      */
     protected notifyStateChange(state: unknown): void {
-        this.emit('stateChange', { 
+        this.emit('stateChange', {
             componentId: this.config.id,
             state,
             timestamp: Date.now()
         });
+
+        // Automatically trigger event bridge update
+        // Every state change should update the UI in the webview
+        this.notifyUpdate();
     }
 
     /**

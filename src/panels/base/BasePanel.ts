@@ -551,9 +551,10 @@ export abstract class BasePanel implements IPanelBase {
 
                 const dataLength = Array.isArray(componentData) ? componentData.length :
                                   (componentData && typeof componentData === 'object' && 'solutions' in componentData && Array.isArray((componentData as { solutions: unknown[] }).solutions)) ? (componentData as { solutions: unknown[] }).solutions.length :
+                                  (componentData && typeof componentData === 'object' && 'nodes' in componentData && Array.isArray((componentData as { nodes: unknown[] }).nodes)) ? (componentData as { nodes: unknown[] }).nodes.length :
                                   (componentData && typeof componentData === 'object') ? Object.keys(componentData).length : 0;
 
-                this.componentLogger.debug('Event bridge forwarding component update to webview', {
+                this.componentLogger.info('Event bridge forwarding component update to webview', {
                     componentId: event.componentId,
                     componentType: componentType,
                     dataLength: dataLength

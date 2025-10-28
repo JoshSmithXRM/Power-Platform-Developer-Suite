@@ -57,7 +57,7 @@ export class TreeViewView {
      */
     private static generateTree(componentId: string, nodes: TreeNode[]): string {
         if (!nodes || nodes.length === 0) {
-            return `<div class="tree-view-empty">No items to display</div>`;
+            return `<ul class="tree-view-root"><div class="tree-view-empty">No items to display</div></ul>`;
         }
 
         return `<ul class="tree-view-root">${this.generateNodeList(componentId, nodes)}</ul>`;

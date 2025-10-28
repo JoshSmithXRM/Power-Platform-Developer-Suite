@@ -99,8 +99,7 @@ export class EnvironmentSelectorComponent extends BaseComponent<EnvironmentSelec
             oldEnvironments,
             selectedEnvironmentId: this.selectedEnvironmentId
         });
-
-        this.notifyUpdate();
+        // notifyUpdate() called automatically by notifyStateChange()
     }
 
     /**
@@ -168,8 +167,7 @@ export class EnvironmentSelectorComponent extends BaseComponent<EnvironmentSelec
                 environmentId
             });
         }
-
-        this.notifyUpdate();
+        // notifyUpdate() called automatically by notifyStateChange()
     }
 
     /**
@@ -208,8 +206,7 @@ export class EnvironmentSelectorComponent extends BaseComponent<EnvironmentSelec
             oldLoading,
             loadingMessage
         });
-
-        this.notifyUpdate();
+        // notifyUpdate() called automatically by notifyStateChange()
     }
 
     /**
@@ -230,8 +227,7 @@ export class EnvironmentSelectorComponent extends BaseComponent<EnvironmentSelec
             connectionStatus: status,
             oldConnectionStatus: oldStatus
         });
-
-        this.notifyUpdate();
+        // notifyUpdate() called automatically by notifyStateChange()
     }
 
     /**
@@ -252,8 +248,7 @@ export class EnvironmentSelectorComponent extends BaseComponent<EnvironmentSelec
             componentId: this.getId(),
             timestamp: Date.now()
         });
-
-        this.notifyUpdate();
+        // notifyUpdate() already called by setLoading() → notifyStateChange()
     }
 
     /**

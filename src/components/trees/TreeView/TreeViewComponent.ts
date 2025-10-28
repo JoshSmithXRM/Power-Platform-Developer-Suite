@@ -106,9 +106,7 @@ export class TreeViewComponent extends BaseComponent<TreeViewData> {
             action: 'setNodes',
             nodes: this.nodes
         });
-
-        // Trigger event bridge update
-        this.notifyUpdate();
+        // notifyUpdate() called automatically by notifyStateChange()
     }
 
     /**
@@ -232,9 +230,7 @@ export class TreeViewComponent extends BaseComponent<TreeViewData> {
                 nodeId: nodeId,
                 children: children
             });
-
-            // Trigger event bridge update
-            this.notifyUpdate();
+            // notifyUpdate() called automatically by notifyStateChange()
         }
     }
 
