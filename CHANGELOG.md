@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2025-10-27
+
+### Fixed
+
+#### **All Panels - "Open New" Command Not Working** 🔧
+- **Fixed:** "Open New" commands in command palette and right-click context menu always focused existing panel instead of creating new instance
+  - **Root Cause:** Panel `createNew()` methods were incorrectly calling `createOrShow()`, which reveals existing panels instead of creating new ones
+  - **Affected Panels:** Metadata Browser, Solution Explorer, Plugin Trace Viewer, Import Job Viewer, Connection References, Environment Variables, Data Explorer
+  - **Solution:** Fixed `createNew()` to always create new panel instances regardless of existing panels
+  - **Results:**
+    - ✅ Command palette "Open New" commands now correctly create new panel instances
+    - ✅ Right-click "Open New" in Tools panel creates new instances
+    - ✅ Left-click in Tools panel still reveals existing panel or creates new if none exists
+  - **Files Changed:** All panel implementation files
+
+#### **Metadata Browser - OptionSet Data Missing** 🔧
+- **Fixed:** Local optionset values not displayed for picklist, state, status, and boolean attributes
+  - **Root Cause:** Dataverse Web API requires type casting to retrieve OptionSet data. Normal attribute queries do not include the `OptionSet` property for picklist-based attribute types.
+  - **Solution:** Implemented parallel query strategy with 6 simultaneous API calls:
+    1. Normal query - Returns all 460+ attributes (includes Lookup.Targets by default)
+    2. PicklistAttributeMetadata - Returns picklist attributes with `$expand=OptionSet,GlobalOptionSet`
+    3. StateAttributeMetadata - Returns state attributes (Active/Inactive) with `$expand=OptionSet`
+    4. StatusAttributeMetadata - Returns status reason attributes with `$expand=OptionSet`
+    5. BooleanAttributeMetadata - Returns boolean/TwoOption attributes with `$expand=OptionSet`
+    6. MultiSelectPicklistAttributeMetadata - Returns multi-select picklists with `$expand=OptionSet,GlobalOptionSet`
+  - **Results:**
+    - ✅ 88 attributes per entity now include complete OptionSet data (for typical entities)
+    - ✅ 5 attribute types covered with full option values and multi-language labels
+    - ✅ Zero performance impact - all queries execute in parallel (~1 second total)
+    - ✅ Graceful degradation if any typed query fails
+  - **Files Changed:** `src/services/MetadataService.ts:499-621`
+
+#### **Metadata Browser - Choice Values Not Displayed** 🔧
+- **Fixed:** Choice values section remained hidden when selecting a choice from the left sidebar
+  - **Root Cause:** Race condition in mode-setting logic. The panel sent two messages when a choice was selected:
+    - `set-mode` (mode: 'choice') - correctly set choice-mode
+    - `update-selection` (with counts) - overwrote the mode based on data counts
+    - When counts.choices === 0, the mode would be removed, hiding the choice values section
+  - **Solution:** Removed mode-determination logic from `updateSelection()` method. The `set-mode` message is now the sole authority for setting panel modes. The `updateSelection()` method only:
+    - Updates the selection display text
+    - Updates section counts
+    - Auto-expands appropriate sections based on data availability
+    - Does NOT change mode classes
+  - **Results:**
+    - ✅ Choice values section displays correctly when a choice is selected
+    - ✅ Works regardless of whether the choice has 0 or more values
+    - ✅ No more race conditions between `set-mode` and `update-selection` messages
+    - ✅ Entity mode and choice mode remain stable during navigation
+  - **Files Changed:** `resources/webview/js/panels/metadataBrowserBehavior.js:383-415`
+
 ## [0.1.0] - 2025-10-27
 
 ### 🎉 Major Architectural Refactor

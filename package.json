@@ -186,6 +186,11 @@
                 "command": "power-platform-dev-suite.pluginTraceViewerNew",
                 "title": "Open New Plugin Trace Viewer",
                 "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.testAttributeTypeCasting",
+                "title": "TEST: Attribute Type Casting",
+                "category": "Power Platform Developer Suite"
             }
         ],
         "viewsContainers": {

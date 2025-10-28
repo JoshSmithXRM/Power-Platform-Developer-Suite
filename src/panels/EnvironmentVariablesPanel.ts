@@ -45,29 +45,36 @@ export class EnvironmentVariablesPanel extends BasePanel {
     private componentFactory: ComponentFactory;
 
     public static createOrShow(extensionUri: vscode.Uri): void {
-        const column = vscode.window.activeTextEditor?.viewColumn;
-
-        if (EnvironmentVariablesPanel.currentPanel) {
-            EnvironmentVariablesPanel.currentPanel.panel.reveal(column);
-            return;
-        }
-
-        const panel = BasePanel.createWebviewPanel({
-            viewType: EnvironmentVariablesPanel.viewType,
-            title: 'Environment Variables',
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-        }, column);
-
-        EnvironmentVariablesPanel.currentPanel = new EnvironmentVariablesPanel(panel, extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: EnvironmentVariablesPanel.viewType,
+                title: 'Environment Variables',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new EnvironmentVariablesPanel(panel, uri),
+            () => EnvironmentVariablesPanel.currentPanel,
+            (panel) => { EnvironmentVariablesPanel.currentPanel = panel; },
+            false
+        );
     }
 
     public static createNew(extensionUri: vscode.Uri): void {
-        this.createOrShow(extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: EnvironmentVariablesPanel.viewType,
+                title: 'Environment Variables',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new EnvironmentVariablesPanel(panel, uri),
+            () => EnvironmentVariablesPanel.currentPanel,
+            (panel) => { EnvironmentVariablesPanel.currentPanel = panel; },
+            true
+        );
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
         super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: EnvironmentVariablesPanel.viewType,
             title: 'Environment Variables'

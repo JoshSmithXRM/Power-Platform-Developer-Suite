@@ -56,29 +56,36 @@ export class PluginTraceViewerPanel extends BasePanel {
     private pendingFilterRestoration?: { quick: string[]; advanced: FilterCondition[] };
 
     public static createOrShow(extensionUri: vscode.Uri): void {
-        const column = vscode.window.activeTextEditor?.viewColumn;
-
-        if (PluginTraceViewerPanel.currentPanel) {
-            PluginTraceViewerPanel.currentPanel.panel.reveal(column);
-            return;
-        }
-
-        const panel = BasePanel.createWebviewPanel({
-            viewType: PluginTraceViewerPanel.viewType,
-            title: 'Plugin Trace Viewer',
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
-        }, column);
-
-        PluginTraceViewerPanel.currentPanel = new PluginTraceViewerPanel(panel, extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: PluginTraceViewerPanel.viewType,
+                title: 'Plugin Trace Viewer',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new PluginTraceViewerPanel(panel, uri),
+            () => PluginTraceViewerPanel.currentPanel,
+            (panel) => { PluginTraceViewerPanel.currentPanel = panel; },
+            false
+        );
     }
 
     public static createNew(extensionUri: vscode.Uri): void {
-        this.createOrShow(extensionUri);
+        BasePanel.handlePanelCreation(
+            {
+                viewType: PluginTraceViewerPanel.viewType,
+                title: 'Plugin Trace Viewer',
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+            },
+            extensionUri,
+            (panel, uri) => new PluginTraceViewerPanel(panel, uri),
+            () => PluginTraceViewerPanel.currentPanel,
+            (panel) => { PluginTraceViewerPanel.currentPanel = panel; },
+            true
+        );
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
         super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
             viewType: PluginTraceViewerPanel.viewType,
             title: 'Plugin Trace Viewer'

@@ -389,42 +389,28 @@ class MetadataBrowserBehavior {
         // Close detail panel when switching entities/choices
         this.closeDetailPanel();
 
-        // Update mode classes based on what was selected
-        const metadataSections = document.querySelector('.metadata-sections');
-        if (metadataSections) {
-            // Determine mode based on counts
-            const hasEntityData = data.counts && (
-                data.counts.attributes > 0 ||
-                data.counts.keys > 0 ||
-                data.counts.relationships > 0 ||
-                data.counts.privileges > 0
-            );
-            const hasChoiceData = data.counts && data.counts.choices > 0;
+        // Update counts if provided
+        if (data.counts) {
+            MetadataBrowserBehavior.updateCounts(data.counts);
+        }
 
-            // Remove all mode classes first
-            metadataSections.classList.remove('entity-mode', 'choice-mode');
-
-            // Add appropriate mode class
-            if (hasEntityData) {
-                metadataSections.classList.add('entity-mode');
+        // Auto-expand sections based on what data is available
+        if (data.counts) {
+            if (data.counts.attributes > 0) {
                 // Auto-expand attributes section for entities
                 const attributesSection = document.querySelector('[data-section="attributes"]');
                 if (attributesSection) {
                     attributesSection.classList.add('expanded');
                 }
-            } else if (hasChoiceData) {
-                metadataSections.classList.add('choice-mode');
-                // Auto-expand choices section since it's the only one
+            }
+
+            if (data.counts.choices > 0) {
+                // Auto-expand choices section when there are choice values
                 const choicesSection = document.querySelector('[data-section="choices"]');
                 if (choicesSection) {
                     choicesSection.classList.add('expanded');
                 }
             }
-        }
-
-        // Update counts if provided
-        if (data.counts) {
-            MetadataBrowserBehavior.updateCounts(data.counts);
         }
     }
 
