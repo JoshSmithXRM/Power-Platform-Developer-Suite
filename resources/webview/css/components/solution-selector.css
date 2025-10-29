@@ -445,88 +445,11 @@
     opacity: 0.7;
 }
 
-/* Search functionality */
+/* Search wrapper
+   Note: SolutionSelector uses SearchInputComponent - base styles in component-base.css
+   Wrapper provides layout spacing only */
 .solution-selector-search {
     margin-bottom: 8px;
-    position: relative;
-}
-
-.solution-selector-search-input {
-    width: 100%;
-    background: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border);
-    color: var(--vscode-input-foreground);
-    padding: 6px 32px 6px 10px;
-    border-radius: 3px;
-    font-size: 13px;
-    transition: border-color 0.15s ease;
-}
-
-.solution-selector-search-input:focus {
-    outline: none;
-    border-color: var(--vscode-focusBorder);
-    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
-}
-
-.solution-selector-search-input::placeholder {
-    color: var(--vscode-input-placeholderForeground);
-}
-
-.solution-selector-search-icon {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
-    opacity: 0.6;
-    pointer-events: none;
-}
-
-.solution-selector-search-clear {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: var(--vscode-icon-foreground);
-    cursor: pointer;
-    padding: 2px;
-    border-radius: 2px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.solution-selector-search-clear:hover {
-    background: var(--vscode-toolbar-hoverBackground);
-}
-
-/* Legacy search functionality */
-.solution-search {
-    margin-bottom: 8px;
-}
-
-.solution-search-input {
-    width: 100%;
-    background: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border);
-    color: var(--vscode-input-foreground);
-    padding: 6px 10px;
-    border-radius: 3px;
-    font-size: 13px;
-    transition: border-color 0.15s ease;
-}
-
-.solution-search-input:focus {
-    outline: none;
-    border-color: var(--vscode-focusBorder);
-    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
-}
-
-.solution-search-input::placeholder {
-    color: var(--vscode-input-placeholderForeground);
 }
 
 /* Quick filter controls */

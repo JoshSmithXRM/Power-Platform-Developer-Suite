@@ -1,6 +1,7 @@
 import { Solution } from '../../../services/SolutionService'; // Use standardized Solution interface
 import { CSS_CLASSES, ICONS } from '../../base/ComponentConfig';
 import { escapeHtml } from '../../base/HtmlUtils';
+import { SearchInputComponent } from '../../inputs/SearchInput/SearchInputComponent';
 
 import { SolutionSelectorConfig, SOLUTION_SELECTOR_CSS } from './SolutionSelectorConfig';
 
@@ -29,7 +30,7 @@ export class SolutionSelectorView {
     /**
      * Main render method - generates complete HTML for the selector
      */
-    static render(config: SolutionSelectorConfig, state: SolutionSelectorViewState): string {
+    static render(config: SolutionSelectorConfig, state: SolutionSelectorViewState, searchInput?: SearchInputComponent): string {
         const {
             id,
             className = '',
@@ -59,7 +60,7 @@ export class SolutionSelectorView {
                 <div class="${CSS_CLASSES.COMPONENT_ROW}">
                     ${label ? this.renderLabel(config, state) : ''}
                     <div class="${SOLUTION_SELECTOR_CSS.CONTAINER}">
-                        ${this.renderSelector(config, state)}
+                        ${this.renderSelector(config, state, searchInput)}
                         ${state.error ? this.renderError(state.error) : ''}
                     </div>
                 </div>
@@ -86,7 +87,7 @@ export class SolutionSelectorView {
     /**
      * Render main selector component
      */
-    private static renderSelector(config: SolutionSelectorConfig, state: SolutionSelectorViewState): string {
+    private static renderSelector(config: SolutionSelectorConfig, state: SolutionSelectorViewState, searchInput?: SearchInputComponent): string {
         const {
             allowMultiSelect = false
         } = config;
@@ -95,10 +96,10 @@ export class SolutionSelectorView {
             <div class="${SOLUTION_SELECTOR_CSS.WRAPPER}">
                 <div class="${SOLUTION_SELECTOR_CSS.DROPDOWN} ${state.isOpen ? SOLUTION_SELECTOR_CSS.DROPDOWN_OPEN : ''}">
                     ${this.renderTrigger(config, state)}
-                    ${this.renderDropdownMenu(config, state)}
+                    ${this.renderDropdownMenu(config, state, searchInput)}
                 </div>
-                
-                ${allowMultiSelect && state.selectedSolutions.length > 0 ? 
+
+                ${allowMultiSelect && state.selectedSolutions.length > 0 ?
                     this.renderSelectionTags(config, state) : ''}
             </div>
         `;
@@ -151,25 +152,59 @@ export class SolutionSelectorView {
     /**
      * Render dropdown menu
      */
-    private static renderDropdownMenu(config: SolutionSelectorConfig, state: SolutionSelectorViewState): string {
+    private static renderDropdownMenu(config: SolutionSelectorConfig, state: SolutionSelectorViewState, searchInput?: SearchInputComponent): string {
         const { searchable, quickFilters } = config;
-        
+
         return `
-            <div class="${SOLUTION_SELECTOR_CSS.DROPDOWN_MENU}" 
+            <div class="${SOLUTION_SELECTOR_CSS.DROPDOWN_MENU}"
                  role="listbox"
                  ${config.allowMultiSelect ? 'aria-multiselectable="true"' : ''}
                  data-component-element="menu">
-                
-                ${searchable ? this.renderSearch(config, state) : ''}
+
+                ${searchable && searchInput ? `<div class="solution-selector-search">${searchInput.generateHTML()}</div>` : ''}
                 ${quickFilters ? this.renderQuickFilters(config, state) : ''}
-                
+
                 <div class="solution-selector-options-container">
-                    ${state.loading ? this.renderLoadingState(config) : 
+                    ${state.loading ? this.renderLoadingState(config) :
                       state.filteredSolutions.length === 0 ? this.renderEmptyState(config) :
                       this.renderSolutions(config, state)}
                 </div>
             </div>
         `;
+    }
+
+    /**
+     * Render just the options container content (for dynamic updates)
+     * This allows updating dropdown options without destroying the entire component
+     * Follows DataTable pattern: targeted container updates, not full HTML replacement
+     */
+    public static renderOptionsContainer(
+        solutions: Solution[],
+        config: SolutionSelectorConfig,
+        selectedSolutions: Solution[] = [],
+        loading: boolean = false
+    ): string {
+        const state: SolutionSelectorViewState = {
+            solutions,
+            filteredSolutions: solutions,
+            selectedSolutions,
+            isOpen: false,
+            loading,
+            error: null,
+            searchQuery: '',
+            focusedIndex: -1,
+            quickFilters: { managed: true, unmanaged: true, hasComponents: false }
+        };
+
+        if (loading) {
+            return this.renderLoadingState(config);
+        }
+
+        if (solutions.length === 0) {
+            return this.renderEmptyState(config);
+        }
+
+        return this.renderSolutions(config, state);
     }
 
     /**

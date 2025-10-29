@@ -35,7 +35,7 @@ class ComponentUtils {
      * Auto-register behaviors that are available in global scope
      */
     static registerAvailableBehaviors() {
-        const behaviorTypes = ['EnvironmentSelector', 'SolutionSelector', 'ActionBar', 'DataTable', 'SearchForm', 'EntitySelector', 'FilterPanel', 'SplitPanel', 'TreeView'];
+        const behaviorTypes = ['EnvironmentSelector', 'SolutionSelector', 'ActionBar', 'DataTable', 'SearchForm', 'EntitySelector', 'FilterPanel', 'SplitPanel', 'TreeView', 'SearchInput'];
 
         console.log('ComponentUtils: registerAvailableBehaviors() called');
         console.log('ComponentUtils: window object keys:', Object.keys(window).filter(k => k.includes('Behavior')));
@@ -238,7 +238,7 @@ class ComponentUtils {
         // Remove from registry
         this.components.delete(componentId);
         console.log(`Unregistered component: ${componentId}`);
-        
+
         return true;
     }
 
@@ -455,7 +455,7 @@ class ComponentUtils {
                 handler(message);
             } else {
                 // Only warn about truly unexpected actions (not informational messages)
-                const informationalActions = ['traceLevelLoaded', 'tracesLoaded', 'solutionsLoaded', 'jobsLoaded', 'exportTraces', 'show-node-details'];
+                const informationalActions = ['traceLevelLoaded', 'tracesLoaded', 'jobsLoaded', 'exportTraces', 'show-node-details'];
                 if (!informationalActions.includes(message.action)) {
                     console.warn(`No handler found for action: ${message.action}`);
                 }

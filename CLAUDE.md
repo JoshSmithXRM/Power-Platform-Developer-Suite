@@ -20,10 +20,13 @@ Quick reference for AI assistants working with this VS Code extension codebase.
 - ❌ **NEVER add `eslint-disable` comments** without explicit user permission (see Code Quality Rules below)
 - ❌ **NEVER use workarounds** when proper solution is available
 - ❌ **NEVER say "this works for now"** - either do it right or discuss tradeoffs explicitly
+- ❌ **NEVER propose quick fixes or band-aids** - always implement the proper architectural solution
+- ❌ **NEVER offer "Option 1: Quick fix / Option 2: Proper fix"** - only offer the proper fix
 - ✅ **ALWAYS discuss architectural tradeoffs** with pros/cons/risks before implementing
 - ✅ **ALWAYS choose the architecturally sound solution** even if it takes longer initially
+- ✅ **ALWAYS think through the full architectural impact** before writing code
 
-**Why**: Technical debt compounds. Each shortcut makes the next one easier to justify. This leads to unmaintainable codebases.
+**Why**: Technical debt compounds. Each shortcut makes the next one easier to justify. Quick fixes lead to more quick fixes, creating unmaintainable codebases. Build it right the first time, even if it takes more upfront work.
 
 ### 3. Consistency Over Convenience
 - ❌ **NEVER create one-off patterns** - follow existing patterns or refactor them

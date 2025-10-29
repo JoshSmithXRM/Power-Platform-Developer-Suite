@@ -1,5 +1,6 @@
-import { BaseComponent } from '../../base/BaseComponent';
+import { BaseComponent, IRenderable } from '../../base/BaseComponent';
 import { Solution } from '../../../services/SolutionService'; // Use standardized Solution interface
+import { SearchInputComponent } from '../../inputs/SearchInput/SearchInputComponent';
 
 import { SolutionSelectorConfig, SolutionSelectorSelectionEvent, SolutionSelectorLoadEvent, DEFAULT_SOLUTION_SELECTOR_CONFIG, SolutionSelectorConfigValidator } from './SolutionSelectorConfig';
 import { SolutionSelectorView, SolutionSelectorViewState } from './SolutionSelectorView';
@@ -21,7 +22,7 @@ export interface SolutionSelectorData {
  */
 export class SolutionSelectorComponent extends BaseComponent<SolutionSelectorData> {
     protected config: SolutionSelectorConfig;
-    
+
     // Component state
     private solutions: Solution[] = [];
     private filteredSolutions: Solution[] = [];
@@ -31,22 +32,35 @@ export class SolutionSelectorComponent extends BaseComponent<SolutionSelectorDat
     private loading: boolean = false;
     private error: string | null = null;
     private focusedIndex: number = -1;
-    
+
     // Quick filters state
     private quickFilters = {
         managed: true,
         unmanaged: true,
         hasComponents: false
     };
-    
-    // Search debounce timer
-    private searchTimer: NodeJS.Timeout | null = null;
+
+    // SearchInputComponent for search functionality
+    private searchInput?: SearchInputComponent;
 
     constructor(config: SolutionSelectorConfig) {
         const mergedConfig = { ...DEFAULT_SOLUTION_SELECTOR_CONFIG, ...config } as SolutionSelectorConfig;
         super(mergedConfig);
-        
+
         this.config = mergedConfig;
+
+        // Create SearchInputComponent for search functionality
+        if (this.config.searchable) {
+            this.searchInput = new SearchInputComponent({
+                id: `${this.config.id}-search`,
+                placeholder: 'Search solutions...',
+                debounceMs: 300,
+                minChars: 0,
+                iconPosition: 'left',
+                ariaLabel: 'Search solutions'
+            });
+        }
+
         this.validateConfig();
         this.initializeState();
     }
@@ -87,9 +101,9 @@ export class SolutionSelectorComponent extends BaseComponent<SolutionSelectorDat
             focusedIndex: this.focusedIndex,
             quickFilters: this.quickFilters
         };
-        
-        
-        return SolutionSelectorView.render(this.config, viewState);
+
+
+        return SolutionSelectorView.render(this.config, viewState, this.searchInput);
     }
 
     /**
@@ -118,6 +132,14 @@ export class SolutionSelectorComponent extends BaseComponent<SolutionSelectorDat
      */
     public getType(): string {
         return 'SolutionSelector';
+    }
+
+    /**
+     * Get child components for recursive resource collection
+     * SolutionSelector embeds SearchInputComponent when searchable is enabled
+     */
+    public getChildComponents(): IRenderable[] {
+        return this.searchInput ? [this.searchInput] : [];
     }
 
     /**
@@ -263,22 +285,16 @@ export class SolutionSelectorComponent extends BaseComponent<SolutionSelectorDat
     public setSearchQuery(query: string): void {
         const oldQuery = this.searchQuery;
         this.searchQuery = query;
-        
-        // Debounce search
-        if (this.searchTimer) {
-            clearTimeout(this.searchTimer);
+
+        // SearchInputComponent handles debouncing - apply filters immediately
+        this.applyFiltersAndSort();
+
+        if (this.config.onSearch) {
+            this.config.onSearch(query);
         }
-        
-        this.searchTimer = setTimeout(() => {
-            this.applyFiltersAndSort();
-            
-            if (this.config.onSearch) {
-                this.config.onSearch(query);
-            }
-            
-            this.notifyStateChange({ searchQuery: query, oldSearchQuery: oldQuery });
-            this.notifyUpdate();
-        }, 300);
+
+        this.notifyStateChange({ searchQuery: query, oldSearchQuery: oldQuery });
+        this.notifyUpdate();
     }
 
     /**
@@ -467,6 +483,13 @@ export class SolutionSelectorComponent extends BaseComponent<SolutionSelectorDat
             selectedSolutions: this.selectedSolutions,
             hasData: this.solutions.length > 0
         };
+    }
+
+    /**
+     * Get component configuration (needed by BasePanel for options rendering)
+     */
+    public getConfig(): SolutionSelectorConfig {
+        return this.config;
     }
 
     /**
@@ -672,11 +695,7 @@ export class SolutionSelectorComponent extends BaseComponent<SolutionSelectorDat
      * Cleanup resources
      */
     public dispose(): void {
-        if (this.searchTimer) {
-            clearTimeout(this.searchTimer);
-            this.searchTimer = null;
-        }
-        
+        // SearchInputComponent handles its own cleanup
         super.dispose();
     }
 }

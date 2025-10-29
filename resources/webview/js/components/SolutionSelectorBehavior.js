@@ -6,7 +6,7 @@
  *
  * This file runs in the webview context and provides:
  * - Dropdown open/close behavior
- * - Search functionality with debouncing
+ * - Search filtering (search input handled by SearchInputComponent)
  * - Solution selection and multi-selection
  * - Keyboard navigation
  * - Quick filters
@@ -15,8 +15,6 @@
 
 class SolutionSelectorBehavior extends BaseBehavior {
     static instances = new Map();
-    static searchTimers = new Map();
-    static SEARCH_DEBOUNCE_DELAY = 300;
 
     /**
      * Get the component type this behavior handles
@@ -27,62 +25,67 @@ class SolutionSelectorBehavior extends BaseBehavior {
 
     /**
      * Handle component data updates from Extension Host
+     * Uses targeted container updates to avoid destroying child components (SearchInput)
      */
     static onComponentUpdate(instance, data) {
         console.log('SolutionSelector: Received componentUpdate with data:', {
             componentId: instance.id,
             hasData: !!data,
-            hasSolutions: !!data.solutions,
-            solutionsCount: data.solutions?.length || 0,
-            hasDefaultSolution: data.solutions?.find(s => s.uniqueName === 'Default'),
-            sampleSolutions: data.solutions?.slice(0, 3)?.map(s => s.displayName) || [],
-            requiresHtmlUpdate: !!data.requiresHtmlUpdate,
-            hasHtml: !!data.html
+            hasOptionsHtml: !!data.optionsHtml
         });
 
-        // Check if this update requires HTML replacement (for components with dynamic content)
-        if (data.requiresHtmlUpdate && data.html) {
-            console.log('SolutionSelector: Performing HTML replacement for component');
-            if (instance && instance.element) {
-                // Replace the entire component HTML
-                instance.element.outerHTML = data.html;
-
-                // Re-find the element (since outerHTML replaced it)
-                const newElement = document.querySelector(`[data-component-id="${instance.id}"]`);
-                if (newElement) {
-                    instance.element = newElement;
-                    // Re-find DOM elements and re-bind events for the new element
-                    this.findDOMElements(instance);
-                    this.setupEventListeners(instance);
-                    console.log('SolutionSelector: Component HTML updated and events re-bound');
-                } else {
-                    console.error('SolutionSelector: Could not find component element after HTML update');
-                }
-            } else {
-                console.warn('SolutionSelector: Instance not found for HTML update');
-            }
-        }
-        // Handle standard data-only updates
-        else if (data.solutions && data.solutions.length > 0) {
-            console.log('SolutionSelector: Calling loadSolutions with', data.solutions.length, 'solutions');
-            this.loadSolutions(instance.id, data.solutions);
+        if (data.optionsHtml) {
+            this.updateOptionsContainer(instance, data.optionsHtml);
         } else {
-            console.warn('SolutionSelector: No solutions data to load', data);
+            console.warn('SolutionSelector: No optionsHtml in componentUpdate', data);
         }
     }
 
     /**
-     * Handle custom actions beyond componentUpdate
+     * Update options container with new HTML (targeted update, doesn't destroy SearchInput)
+     * Follows DataTable's updateTableData pattern - updates content only, not structure
      */
-    static handleCustomAction(instance, message) {
-        // Handle direct solutions loaded (legacy)
-        if (message.action === 'solutionsLoaded' && message.data) {
-            console.log('SolutionSelector: Received legacy solutionsLoaded');
-            this.loadSolutions(instance.id, message.data);
-        } else {
-            super.handleCustomAction(instance, message);
+    static updateOptionsContainer(instance, optionsHtml) {
+        const container = instance.element.querySelector('.solution-selector-options-container');
+        if (!container) {
+            console.warn('SolutionSelector: Options container not found');
+            return;
         }
+
+        // Update only the options container, leaving SearchInput and other parts intact
+        container.innerHTML = optionsHtml;
+
+        // Re-bind event handlers on new option elements
+        this.bindOptionHandlers(instance);
+
+        console.log('SolutionSelector: Options container updated');
     }
+
+    /**
+     * Bind click handlers to option elements after container update
+     */
+    static bindOptionHandlers(instance) {
+        const options = instance.element.querySelectorAll('.solution-selector-option');
+
+        options.forEach(option => {
+            // Remove old listeners if any
+            const oldHandler = option._clickHandler;
+            if (oldHandler) {
+                option.removeEventListener('click', oldHandler);
+            }
+
+            // Add new listener
+            const handler = (e) => {
+                e.stopPropagation();
+                if (!option.classList.contains('solution-selector-option--disabled')) {
+                    this.handleOptionClick(instance.id, option, e);
+                }
+            };
+            option._clickHandler = handler;
+            option.addEventListener('click', handler);
+        });
+    }
+
 
     /**
      * Create the instance object structure
@@ -110,8 +113,7 @@ class SolutionSelectorBehavior extends BaseBehavior {
      */
     static findDOMElements(instance) {
         instance.trigger = instance.element.querySelector('.solution-selector-trigger');
-        instance.searchInput = instance.element.querySelector('.solution-selector-search-input');
-        instance.searchClear = instance.element.querySelector('.solution-selector-search-clear');
+        instance.searchContainer = instance.element.querySelector('.solution-selector-search');
         instance.dropdown = instance.element.querySelector('.solution-selector-dropdown');
     }
 
@@ -127,19 +129,13 @@ class SolutionSelectorBehavior extends BaseBehavior {
             instance.trigger.addEventListener('keydown', instance.boundHandlers.triggerKeyDown);
         }
 
-        // Search input
-        if (instance.searchInput) {
-            instance.boundHandlers.searchInput = (e) => this.handleSearch(instance.id, e);
-            instance.boundHandlers.searchKeyDown = (e) => this.handleSearchKeyDown(instance.id, e);
-            instance.searchInput.addEventListener('input', instance.boundHandlers.searchInput);
-            instance.searchInput.addEventListener('keydown', instance.boundHandlers.searchKeyDown);
-        }
-
-        // Search clear button
-        if (instance.searchClear) {
-            instance.boundHandlers.searchClear = () => this.clearSearch(instance.id);
-            instance.searchClear.addEventListener('click', instance.boundHandlers.searchClear);
-        }
+        // Listen for SearchInput component events (DOM CustomEvents)
+        instance.boundHandlers.searchMessage = (e) => {
+            if (e.detail?.command === 'search' && e.detail?.data?.componentId === `${instance.id}-search`) {
+                this.handleSearchFromComponent(instance.id, e.detail.data.query);
+            }
+        };
+        window.addEventListener('component-message', instance.boundHandlers.searchMessage);
 
         // Quick filter buttons
         const filterButtons = instance.element.querySelectorAll('.solution-selector-filter-button');
@@ -204,17 +200,9 @@ class SolutionSelectorBehavior extends BaseBehavior {
             }
         }
 
-        if (instance.searchInput) {
-            if (instance.boundHandlers.searchInput) {
-                instance.searchInput.removeEventListener('input', instance.boundHandlers.searchInput);
-            }
-            if (instance.boundHandlers.searchKeyDown) {
-                instance.searchInput.removeEventListener('keydown', instance.boundHandlers.searchKeyDown);
-            }
-        }
-
-        if (instance.searchClear && instance.boundHandlers.searchClear) {
-            instance.searchClear.removeEventListener('click', instance.boundHandlers.searchClear);
+        // Remove SearchInput component event listener
+        if (instance.boundHandlers.searchMessage) {
+            window.removeEventListener('component-message', instance.boundHandlers.searchMessage);
         }
 
         if (instance.boundHandlers.filterButtons) {
@@ -289,9 +277,10 @@ class SolutionSelectorBehavior extends BaseBehavior {
         instance.isOpen = true;
         instance.element.classList.add('solution-selector-dropdown--open');
 
-        // Focus search input if available
-        if (instance.searchInput) {
-            setTimeout(() => instance.searchInput.focus(), 100);
+        // Focus search input if available (SearchInputComponent)
+        const searchInput = instance.element.querySelector('.base-search-input');
+        if (searchInput) {
+            setTimeout(() => searchInput.focus(), 100);
         }
 
         // Reset focused option
@@ -323,28 +312,15 @@ class SolutionSelectorBehavior extends BaseBehavior {
         });
     }
 
-    static handleSearch(componentId, event) {
+    /**
+     * Handle search from SearchInputComponent (already debounced)
+     */
+    static handleSearchFromComponent(componentId, query) {
         const instance = this.instances.get(componentId);
         if (!instance) return;
 
-        const query = event.target.value;
         instance.searchQuery = query;
-
-        // Clear existing timer
-        if (this.searchTimers.has(componentId)) {
-            clearTimeout(this.searchTimers.get(componentId));
-        }
-
-        // Set new debounced search
-        const timer = setTimeout(() => {
-            this.performSearch(componentId, query);
-            this.searchTimers.delete(componentId);
-        }, this.SEARCH_DEBOUNCE_DELAY);
-
-        this.searchTimers.set(componentId, timer);
-
-        // Update clear button visibility
-        this.updateSearchClearButton(instance);
+        this.performSearch(componentId, query);
     }
 
     static performSearch(componentId, query) {
@@ -446,46 +422,8 @@ class SolutionSelectorBehavior extends BaseBehavior {
         }
     }
 
-    static clearSearch(componentId) {
-        const instance = this.instances.get(componentId);
-        if (!instance) return;
-
-        const searchInput = instance.element.querySelector('.solution-selector-search-input');
-        if (searchInput) {
-            searchInput.value = '';
-            instance.searchQuery = '';
-            this.updateSearchClearButton(instance);
-
-            // Reset all options to visible
-            const options = instance.element.querySelectorAll('.solution-selector-option');
-            options.forEach(option => {
-                option.style.display = 'block';
-            });
-
-            // Reset all groups to visible
-            const groups = instance.element.querySelectorAll('.solution-selector-group');
-            groups.forEach(group => {
-                group.style.display = 'block';
-            });
-
-            // Hide no results message
-            const noResultsMessage = instance.element.querySelector('.solution-selector-no-results');
-            if (noResultsMessage) {
-                noResultsMessage.style.display = 'none';
-            }
-
-            // Also emit the search event for consistency
-            this.emitEvent(componentId, 'search', { query: '' });
-            searchInput.focus();
-        }
-    }
-
-    static updateSearchClearButton(instance) {
-        const clearButton = instance.element.querySelector('.solution-selector-search-clear');
-        if (clearButton) {
-            clearButton.style.display = instance.searchQuery ? 'block' : 'none';
-        }
-    }
+    // clearSearch() removed - SearchInputComponent handles clearing via Escape key
+    // updateSearchClearButton() removed - SearchInputComponent handles its own UI
 
     static handleQuickFilter(componentId, event) {
         const instance = this.instances.get(componentId);
@@ -723,25 +661,7 @@ class SolutionSelectorBehavior extends BaseBehavior {
         }
     }
 
-    static handleSearchKeyDown(componentId, event) {
-        const instance = this.instances.get(componentId);
-        if (!instance) return;
-
-        switch (event.key) {
-            case 'ArrowDown':
-                event.preventDefault();
-                this.focusFirstOption(componentId);
-                break;
-            case 'ArrowUp':
-                event.preventDefault();
-                this.focusLastOption(componentId);
-                break;
-            case 'Enter':
-                event.preventDefault();
-                this.selectFocusedOption(componentId);
-                break;
-        }
-    }
+    // handleSearchKeyDown() removed - SearchInputComponent handles all keyboard events
 
     static handleOptionKeyDown(componentId, event) {
         switch (event.key) {
@@ -910,39 +830,6 @@ class SolutionSelectorBehavior extends BaseBehavior {
         }
     }
 
-    // Public API for external updates
-    static updateInstance(componentId, config) {
-        const instance = this.instances.get(componentId);
-        if (!instance) return;
-
-        // Update instance configuration
-        Object.assign(instance, config);
-
-        // Update display
-        this.updateDisplay(instance);
-    }
-
-    static updateDisplay(instance) {
-        this.updateTriggerDisplay(instance);
-        this.updateSelectionTags(instance);
-        this.updateSearchClearButton(instance);
-    }
-
-    // Load solutions into a specific selector
-    static loadSolutions(componentId, solutions) {
-        console.log(`SolutionSelector: Loading ${solutions?.length || 0} solutions for ${componentId}`);
-        const instance = this.instances.get(componentId);
-        if (!instance) {
-            console.warn(`SolutionSelector: Cannot load solutions for ${componentId} - instance not found`);
-            return;
-        }
-
-        // Update instance with new solutions
-        instance.solutions = solutions || [];
-        this.updateDisplay(instance);
-
-        console.log(`SolutionSelector: Solutions loaded for ${componentId}`);
-    }
 }
 
 // Register the behavior with ComponentUtils

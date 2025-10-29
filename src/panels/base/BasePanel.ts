@@ -7,6 +7,9 @@ import { ServiceFactory } from '../../services/ServiceFactory';
 import { Environment } from '../../components/base/ComponentInterface';
 import { EnvironmentConnection } from '../../models/PowerPlatformSettings';
 import { EnvironmentSelectorComponent } from '../../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
+import { SolutionSelectorComponent } from '../../components/selectors/SolutionSelector/SolutionSelectorComponent';
+import { SolutionSelectorView } from '../../components/selectors/SolutionSelector/SolutionSelectorView';
+import { Solution } from '../../services/SolutionService';
 import { ComponentUpdateEvent, ComponentStateChangeEvent, ComponentWithEvents } from '../../types/ComponentEventTypes';
 
 /**
@@ -560,14 +563,22 @@ export abstract class BasePanel implements IPanelBase {
                     dataLength: dataLength
                 });
 
-                // For components that need HTML regeneration (like SolutionSelector)
+                // For SolutionSelector, generate options HTML for targeted container update
                 let messageData = componentData;
                 if (componentType === 'SolutionSelector' && componentData && typeof componentData === 'object' && 'solutions' in componentData) {
-                    const componentHtml = component.generateHTML();
+                    const solutionComponent = component as SolutionSelectorComponent;
+                    const solutionData = componentData as { solutions: Solution[]; selectedSolutions: Solution[] };
+                    const componentState = solutionComponent.getState();
+
+                    const optionsHtml = SolutionSelectorView.renderOptionsContainer(
+                        solutionData.solutions,
+                        solutionComponent.getConfig(),
+                        solutionData.selectedSolutions,
+                        componentState.loading
+                    );
                     messageData = {
                         ...componentData,
-                        html: componentHtml,
-                        requiresHtmlUpdate: true
+                        optionsHtml: optionsHtml
                     };
                 }
 
