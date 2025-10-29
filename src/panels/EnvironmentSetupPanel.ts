@@ -39,7 +39,7 @@ export class EnvironmentSetupPanel extends BasePanel {
         extensionUri: vscode.Uri,
         private initialEnvironment?: EnvironmentConnection
     ) {
-        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), {
             viewType: EnvironmentSetupPanel.viewType,
             title: 'Environment Setup'
         });

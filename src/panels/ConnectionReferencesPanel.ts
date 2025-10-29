@@ -12,7 +12,15 @@ import { DataTableComponent } from '../components/tables/DataTable/DataTableComp
 import { Solution } from '../components/base/ComponentInterface';
 import { RelationshipResult, FlowConnectionRelationship } from '../services/ConnectionReferencesService';
 
-import { BasePanel } from './base/BasePanel';
+import { BasePanel, DefaultInstanceState } from './base/BasePanel';
+
+interface ConnectionReferencesInstanceState extends DefaultInstanceState {
+    selectedEnvironmentId: string;
+}
+
+interface ConnectionReferencesPreferences {
+    [key: string]: unknown;
+}
 
 // UI-specific types for table display
 interface ConnectionReferencesTableRow {
@@ -31,7 +39,7 @@ interface ConnectionReferencesSyncMetadata {
     relationshipTypes: string[];
 }
 
-export class ConnectionReferencesPanel extends BasePanel {
+export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesInstanceState, ConnectionReferencesPreferences> {
     public static readonly viewType = 'connectionReferences';
     private static currentPanel: ConnectionReferencesPanel | undefined;
 
@@ -73,7 +81,7 @@ export class ConnectionReferencesPanel extends BasePanel {
     }
 
     protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), {
             viewType: ConnectionReferencesPanel.viewType,
             title: 'Connection References'
         });
@@ -115,9 +123,9 @@ export class ConnectionReferencesPanel extends BasePanel {
                 environments: [],
                 showRefreshButton: true,
                 className: 'connection-references-env-selector',
-                onChange: (environmentId: string) => {
+                onChange: async (environmentId: string) => {
                     this.componentLogger.debug('Environment onChange triggered', { environmentId });
-                    this.handleEnvironmentSelection(environmentId);
+                    await this.processEnvironmentSelection(environmentId);
                 }
             });
             this.componentLogger.trace('EnvironmentSelectorComponent created successfully');
@@ -412,14 +420,14 @@ export class ConnectionReferencesPanel extends BasePanel {
         }
     }
 
-    private async handleEnvironmentSelection(environmentId: string): Promise<void> {
+    protected async onEnvironmentChanged(environmentId: string): Promise<void> {
         if (!environmentId) {
-            this.componentLogger.debug('Environment selection cleared');
+            this.componentLogger.debug('Environment change cleared');
             return;
         }
 
         try {
-            this.componentLogger.info('Environment selected', { environmentId });
+            this.componentLogger.info('Environment changed', { environmentId });
 
             // Load solutions for this environment
             this.componentLogger.debug('About to call handleLoadSolutions', { environmentId });
@@ -427,7 +435,7 @@ export class ConnectionReferencesPanel extends BasePanel {
             this.componentLogger.debug('handleLoadSolutions completed', { environmentId });
 
         } catch (error) {
-            this.componentLogger.error('Error handling environment selection', error as Error, { environmentId });
+            this.componentLogger.error('Error handling environment change', error as Error, { environmentId });
             vscode.window.showErrorMessage('Failed to load environment configuration');
         }
     }

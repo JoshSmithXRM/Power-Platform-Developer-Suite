@@ -16,7 +16,15 @@ import {
     EnvironmentVariableValue
 } from '../services/EnvironmentVariablesService';
 
-import { BasePanel } from './base/BasePanel';
+import { BasePanel, DefaultInstanceState } from './base/BasePanel';
+
+interface EnvironmentVariablesInstanceState extends DefaultInstanceState {
+    selectedEnvironmentId: string;
+}
+
+interface EnvironmentVariablesPreferences {
+    [key: string]: unknown;
+}
 
 // UI-specific type for table display
 interface EnvironmentVariableTableRow {
@@ -31,7 +39,7 @@ interface EnvironmentVariableTableRow {
     modifiedBy: string;
 }
 
-export class EnvironmentVariablesPanel extends BasePanel {
+export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesInstanceState, EnvironmentVariablesPreferences> {
     public static readonly viewType = 'environmentVariables';
     private static currentPanel: EnvironmentVariablesPanel | undefined;
 
@@ -73,7 +81,7 @@ export class EnvironmentVariablesPanel extends BasePanel {
     }
 
     protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), {
             viewType: EnvironmentVariablesPanel.viewType,
             title: 'Environment Variables'
         });
@@ -115,9 +123,9 @@ export class EnvironmentVariablesPanel extends BasePanel {
                 environments: [],
                 showRefreshButton: true,
                 className: 'environment-variables-env-selector',
-                onChange: (environmentId: string) => {
+                onChange: async (environmentId: string) => {
                     this.componentLogger.debug('Environment onChange triggered', { environmentId });
-                    this.handleEnvironmentSelection(environmentId);
+                    await this.processEnvironmentSelection(environmentId);
                 }
             });
             this.componentLogger.trace('EnvironmentSelectorComponent created successfully');
@@ -408,20 +416,20 @@ export class EnvironmentVariablesPanel extends BasePanel {
         }
     }
 
-    private async handleEnvironmentSelection(environmentId: string): Promise<void> {
+    protected async onEnvironmentChanged(environmentId: string): Promise<void> {
         if (!environmentId) {
-            this.componentLogger.debug('Environment selection cleared');
+            this.componentLogger.debug('Environment change cleared');
             return;
         }
 
         try {
-            this.componentLogger.info('Environment selected', { environmentId });
+            this.componentLogger.info('Environment changed', { environmentId });
 
             // Load solutions for this environment
             await this.handleLoadSolutions(environmentId);
 
         } catch (error) {
-            this.componentLogger.error('Error handling environment selection', error as Error, { environmentId });
+            this.componentLogger.error('Error handling environment change', error as Error, { environmentId });
             vscode.window.showErrorMessage('Failed to load environment configuration');
         }
     }
@@ -508,11 +516,6 @@ export class EnvironmentVariablesPanel extends BasePanel {
 
         try {
             this.componentLogger.info('Loading environment variables', { environmentId, solutionId });
-
-            // Save state
-            await this._stateService.savePanelState(EnvironmentVariablesPanel.viewType, {
-                selectedEnvironmentId: environmentId
-            });
 
             // Fetch environment variables data with optional solution filtering
             const environmentVariablesService = ServiceFactory.getEnvironmentVariablesService();

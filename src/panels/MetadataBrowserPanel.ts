@@ -17,7 +17,27 @@ import {
 } from '../services/MetadataService';
 import { METADATA_CONTEXT_MENU_ITEMS } from '../config/TableActions';
 
-import { BasePanel } from './base/BasePanel';
+import { BasePanel, DefaultInstanceState } from './base/BasePanel';
+
+/**
+ * Instance state for MetadataBrowserPanel
+ * Tracks which environment this specific panel instance is viewing
+ */
+interface MetadataBrowserInstanceState extends DefaultInstanceState {
+    selectedEnvironmentId: string;
+}
+
+/**
+ * Persistent preferences for Metadata Browser in a specific environment
+ * These preferences follow the environment, not the panel instance
+ */
+interface MetadataBrowserPreferences {
+    selectedEntityLogicalName?: string;
+    selectedEntityMetadataId?: string;
+    collapsedSections?: string[];
+    // Future: search filters, view mode, etc.
+    [key: string]: unknown;
+}
 
 // UI-specific types for table display
 interface AttributeTableRow {
@@ -68,7 +88,7 @@ interface QuickPickItemWithMetadata extends vscode.QuickPickItem {
     };
 }
 
-export class MetadataBrowserPanel extends BasePanel {
+export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState, MetadataBrowserPreferences> {
     public static readonly viewType = 'metadataBrowser';
     private static currentPanel: MetadataBrowserPanel | undefined;
 
@@ -121,7 +141,7 @@ export class MetadataBrowserPanel extends BasePanel {
     }
 
     protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), {
             viewType: MetadataBrowserPanel.viewType,
             title: 'Metadata Browser'
         });
@@ -165,9 +185,9 @@ export class MetadataBrowserPanel extends BasePanel {
                 environments: [],
                 showRefreshButton: true,
                 className: 'metadata-env-selector',
-                onChange: (environmentId: string) => {
+                onChange: async (environmentId: string) => {
                     this.componentLogger.debug('Environment onChange triggered', { environmentId });
-                    this.handleEnvironmentSelection(environmentId);
+                    await this.processEnvironmentSelection(environmentId);
                 }
             });
 
@@ -810,14 +830,18 @@ export class MetadataBrowserPanel extends BasePanel {
         }
     }
 
-    private async handleEnvironmentSelection(environmentId: string): Promise<void> {
+    /**
+     * Hook called when environment changes
+     * State is automatically managed by BasePanel - just load data here
+     */
+    protected async onEnvironmentChanged(environmentId: string): Promise<void> {
         if (!environmentId) {
             this.componentLogger.debug('Environment selection cleared');
             return;
         }
 
         try {
-            this.componentLogger.info('Environment selected', { environmentId });
+            this.componentLogger.info('Environment changed', { environmentId });
 
             // Load entities and choices for the tree
             await this.loadEntityChoiceTree(environmentId);
@@ -825,14 +849,9 @@ export class MetadataBrowserPanel extends BasePanel {
             // Keep action buttons disabled until an entity/choice is selected
             this.updateActionBar(false, false);
 
-            // Save state
-            await this._stateService.savePanelState(MetadataBrowserPanel.viewType, {
-                selectedEnvironmentId: environmentId
-            });
-
         } catch (error) {
-            this.componentLogger.error('Error handling environment selection', error as Error, { environmentId });
-            vscode.window.showErrorMessage('Failed to load environment configuration');
+            this.componentLogger.error('Error handling environment change', error as Error, { environmentId });
+            vscode.window.showErrorMessage('Failed to load environment data');
         }
     }
 

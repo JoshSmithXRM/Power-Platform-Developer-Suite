@@ -10,7 +10,7 @@ import { ImportJob } from '../services/ImportJobService';
 import { StatusBadgeComponent } from '../components/badges/StatusBadge/StatusBadgeComponent';
 import { IMPORT_JOB_CONTEXT_MENU_ITEMS } from '../config/TableActions';
 
-import { BasePanel } from './base/BasePanel';
+import { BasePanel, DefaultInstanceState } from './base/BasePanel';
 
 // UI-specific type for table display
 interface ImportJobTableRow {
@@ -24,7 +24,25 @@ interface ImportJobTableRow {
     operationcontext: string;
 }
 
-export class ImportJobViewerPanel extends BasePanel {
+/**
+ * Instance state for ImportJobViewerPanel
+ * Tracks which environment this specific panel instance is viewing
+ */
+interface ImportJobInstanceState extends DefaultInstanceState {
+    selectedEnvironmentId: string;
+}
+
+/**
+ * Persistent preferences for viewing Import Jobs in a specific environment
+ * These preferences follow the environment, not the panel instance
+ */
+interface ImportJobPreferences {
+    // Future: Add sort preferences, filter preferences, auto-refresh settings, etc.
+    // For now, use Record to allow any preferences (satisfies linter)
+    [key: string]: unknown;
+}
+
+export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, ImportJobPreferences> {
     public static readonly viewType = 'importJobViewer';
     private static currentPanel: ImportJobViewerPanel | undefined;
 
@@ -63,7 +81,7 @@ export class ImportJobViewerPanel extends BasePanel {
     }
 
     protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), {
             viewType: ImportJobViewerPanel.viewType,
             title: 'Import Job Viewer'
         });
@@ -103,9 +121,10 @@ export class ImportJobViewerPanel extends BasePanel {
                 environments: [],
                 showRefreshButton: true,
                 className: 'import-jobs-env-selector',
-                onChange: (environmentId: string) => {
+                onChange: async (environmentId: string) => {
                     this.componentLogger.debug('Environment onChange triggered', { environmentId });
-                    this.handleEnvironmentSelection(environmentId);
+                    // Use BasePanel's processEnvironmentSelection which manages state automatically
+                    await this.processEnvironmentSelection(environmentId);
                 }
             });
 
@@ -360,14 +379,18 @@ export class ImportJobViewerPanel extends BasePanel {
         }
     }
 
-    private async handleEnvironmentSelection(environmentId: string): Promise<void> {
+    /**
+     * Hook called when environment changes
+     * State is automatically managed by BasePanel - just load data here
+     */
+    protected async onEnvironmentChanged(environmentId: string): Promise<void> {
         if (!environmentId) {
             this.componentLogger.debug('Environment selection cleared');
             return;
         }
 
         try {
-            this.componentLogger.info('Environment selected', { environmentId });
+            this.componentLogger.info('Environment changed', { environmentId });
 
             // Enable "Open in Maker" button
             if (this.actionBarComponent) {
@@ -378,8 +401,8 @@ export class ImportJobViewerPanel extends BasePanel {
             await this.handleLoadImportJobs(environmentId);
 
         } catch (error) {
-            this.componentLogger.error('Error handling environment selection', error as Error, { environmentId });
-            vscode.window.showErrorMessage('Failed to load environment configuration');
+            this.componentLogger.error('Error handling environment change', error as Error, { environmentId });
+            vscode.window.showErrorMessage('Failed to load environment data');
         }
     }
 
@@ -400,11 +423,6 @@ export class ImportJobViewerPanel extends BasePanel {
                 this.dataTableComponent.setData([]);
                 this.dataTableComponent.setLoading(true, 'Loading import jobs...');
             }
-
-            // Save state
-            await this._stateService.savePanelState(ImportJobViewerPanel.viewType, {
-                selectedEnvironmentId: environmentId
-            });
 
             // Fetch import jobs data
             const importJobService = ServiceFactory.getImportJobService();

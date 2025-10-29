@@ -11,7 +11,19 @@ import { PluginTraceService, PluginTraceLog, PluginTraceLevel } from '../service
 import { PLUGIN_TRACE_CONTEXT_MENU_ITEMS } from '../config/TableActions';
 import { FilterCondition } from '../components/panels/FilterPanel/FilterPanelConfig';
 
-import { BasePanel } from './base/BasePanel';
+import { BasePanel, DefaultInstanceState } from './base/BasePanel';
+
+interface PluginTraceViewerInstanceState extends DefaultInstanceState {
+    selectedEnvironmentId: string;
+}
+
+interface PluginTraceViewerPreferences {
+    splitRatio?: number;
+    rightPanelVisible?: boolean;
+    filterPanelCollapsed?: boolean;
+    filters?: { quick: string[]; advanced: FilterCondition[] };
+    autoRefreshIntervalSeconds?: number;
+}
 
 // UI-specific type for table display
 interface PluginTraceTableRow {
@@ -30,7 +42,7 @@ interface PluginTraceTableRow {
     hasException: boolean;
 }
 
-export class PluginTraceViewerPanel extends BasePanel {
+export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceState, PluginTraceViewerPreferences> {
     public static readonly viewType = 'pluginTraceViewer';
     private static currentPanel: PluginTraceViewerPanel | undefined;
 
@@ -84,7 +96,7 @@ export class PluginTraceViewerPanel extends BasePanel {
     }
 
     protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), {
             viewType: PluginTraceViewerPanel.viewType,
             title: 'Plugin Trace Viewer'
         });
@@ -123,27 +135,27 @@ export class PluginTraceViewerPanel extends BasePanel {
                 this.selectedEnvironmentId = selectedEnv.id;
                 this.componentLogger.info('Selected environment ID set', { environmentId: this.selectedEnvironmentId });
 
-                // Restore state from cache
-                const cachedState = await this._stateService.getPanelState(PluginTraceViewerPanel.viewType);
+                // Restore preferences from state manager
+                const prefs = await this.stateManager.getCurrentPreferences();
 
-                this.componentLogger.debug('📦 Loaded cached state', {
-                    hasState: !!cachedState,
-                    hasFilters: !!cachedState?.filters
+                this.componentLogger.debug('📦 Loaded preferences', {
+                    hasPrefs: !!prefs,
+                    hasFilters: !!prefs?.filters
                 });
 
-                // Restore auto-refresh interval from cached state
-                if (cachedState?.autoRefreshIntervalSeconds) {
-                    this.autoRefreshIntervalSeconds = cachedState.autoRefreshIntervalSeconds;
-                    this.componentLogger.info('Restored auto-refresh interval from cache', {
+                // Restore auto-refresh interval from preferences
+                if (prefs?.autoRefreshIntervalSeconds) {
+                    this.autoRefreshIntervalSeconds = prefs.autoRefreshIntervalSeconds;
+                    this.componentLogger.info('Restored auto-refresh interval from preferences', {
                         intervalSeconds: this.autoRefreshIntervalSeconds
                     });
                     this.updateAutoRefreshButton(this.autoRefreshIntervalSeconds);
                 }
 
-                // Restore filters from cached state
-                if (cachedState?.filters) {
+                // Restore filters from preferences
+                if (prefs?.filters) {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const savedFilters = cachedState.filters as any;
+                    const savedFilters = prefs.filters as any;
 
                     this.componentLogger.debug('Raw saved filters from state', {
                         savedFilters,
@@ -182,9 +194,9 @@ export class PluginTraceViewerPanel extends BasePanel {
                 }
 
                 // Restore filter panel collapsed state
-                if (typeof cachedState?.filterPanelCollapsed === 'boolean') {
+                if (typeof prefs?.filterPanelCollapsed === 'boolean') {
                     this.componentLogger.info('Restoring filter panel collapsed state', {
-                        collapsed: cachedState.filterPanelCollapsed
+                        collapsed: prefs.filterPanelCollapsed
                     });
                     // Send message to webview after panel-ready
                     setTimeout(() => {
@@ -192,7 +204,7 @@ export class PluginTraceViewerPanel extends BasePanel {
                             action: 'componentStateChange',
                             componentId: 'pluginTrace-filterPanel',
                             state: {
-                                collapsed: cachedState.filterPanelCollapsed
+                                collapsed: prefs.filterPanelCollapsed
                             }
                         });
                     }, 100);
@@ -223,7 +235,11 @@ export class PluginTraceViewerPanel extends BasePanel {
             id: 'pluginTrace-envSelector',
             label: 'Environment',
             placeholder: 'Choose an environment to view plugin traces...',
-            showRefreshButton: true
+            showRefreshButton: true,
+            onChange: async (environmentId: string) => {
+                this.componentLogger.debug('Environment onChange triggered', { environmentId });
+                await this.processEnvironmentSelection(environmentId);
+            }
         });
 
         // 2. Action Bar
@@ -383,7 +399,7 @@ export class PluginTraceViewerPanel extends BasePanel {
 
                 case 'environment-changed': {
                     const envId = message.data?.environmentId || message.environmentId;
-                    await this.handleEnvironmentChanged(envId);
+                    await this.onEnvironmentChanged(envId);
                     break;
                 }
 
@@ -466,22 +482,22 @@ export class PluginTraceViewerPanel extends BasePanel {
 
                 case 'split-ratio-changed':
                     this.componentLogger.info('✅ Split ratio changed', { splitRatio: message.data?.splitRatio });
-                    await this.updateState({ splitRatio: message.data?.splitRatio });
+                    await this.stateManager.updateCurrentPreferences({ splitRatio: message.data?.splitRatio });
                     break;
 
                 case 'right-panel-opened':
                     this.componentLogger.info('✅ Right panel opened');
-                    await this.updateState({ rightPanelVisible: true });
+                    await this.stateManager.updateCurrentPreferences({ rightPanelVisible: true });
                     break;
 
                 case 'right-panel-closed':
                     this.componentLogger.info('✅ Right panel closed');
-                    await this.updateState({ rightPanelVisible: false });
+                    await this.stateManager.updateCurrentPreferences({ rightPanelVisible: false });
                     break;
 
                 case 'filter-panel-collapsed':
                     this.componentLogger.info('✅ Filter panel collapsed state changed', { collapsed: message.data?.collapsed });
-                    await this.updateState({ filterPanelCollapsed: message.data?.collapsed });
+                    await this.stateManager.updateCurrentPreferences({ filterPanelCollapsed: message.data?.collapsed });
                     break;
 
                 default:
@@ -526,12 +542,12 @@ export class PluginTraceViewerPanel extends BasePanel {
             else if (componentId === 'plugin-trace-split-panel' && eventType === 'splitRatioChanged') {
                 const { splitRatio } = data;
                 this.componentLogger.info('✅ Split ratio changed', { splitRatio });
-                await this.updateState({ splitRatio });
+                await this.stateManager.updateCurrentPreferences({ splitRatio });
             }
             else if (componentId === 'plugin-trace-split-panel' && (eventType === 'rightPanelOpened' || eventType === 'rightPanelClosed')) {
                 const { rightPanelVisible } = data;
                 this.componentLogger.info('✅ Split panel visibility changed', { rightPanelVisible });
-                await this.updateState({ rightPanelVisible });
+                await this.stateManager.updateCurrentPreferences({ rightPanelVisible });
             }
             else if (eventType !== 'initialized') {
                 // Only log non-initialization events that we don't handle
@@ -569,13 +585,14 @@ export class PluginTraceViewerPanel extends BasePanel {
         try {
             const environments = await this._authService.getEnvironments();
 
-            const cachedState = await this._stateService.getPanelState(PluginTraceViewerPanel.viewType);
-            const selectedEnvironmentId = this.selectedEnvironmentId || cachedState?.selectedEnvironmentId || environments[0]?.id;
+            const instanceState = await this.stateManager.getInstanceState();
+            const prefs = await this.stateManager.getCurrentPreferences();
+            const selectedEnvironmentId = this.selectedEnvironmentId || instanceState?.selectedEnvironmentId || environments[0]?.id;
 
-            // Restore auto-refresh interval from cached state
-            if (cachedState?.autoRefreshIntervalSeconds) {
-                this.autoRefreshIntervalSeconds = cachedState.autoRefreshIntervalSeconds;
-                this.componentLogger.info('Restored auto-refresh interval from cache', {
+            // Restore auto-refresh interval from preferences
+            if (prefs?.autoRefreshIntervalSeconds) {
+                this.autoRefreshIntervalSeconds = prefs.autoRefreshIntervalSeconds;
+                this.componentLogger.info('Restored auto-refresh interval from preferences', {
                     intervalSeconds: this.autoRefreshIntervalSeconds
                 });
                 this.updateAutoRefreshButton(this.autoRefreshIntervalSeconds);
@@ -607,8 +624,8 @@ export class PluginTraceViewerPanel extends BasePanel {
         }
     }
 
-    private async handleEnvironmentChanged(environmentId: string): Promise<void> {
-        this.componentLogger.info('🔄 Environment changed', {
+    protected async onEnvironmentChanged(environmentId: string): Promise<void> {
+        this.componentLogger.info('🔄 Environment change', {
             oldEnvironmentId: this.selectedEnvironmentId,
             newEnvironmentId: environmentId,
             currentTraceLevel: this.currentTraceLevel
@@ -648,8 +665,6 @@ export class PluginTraceViewerPanel extends BasePanel {
 
         this.selectedEnvironmentId = environmentId;
 
-        await this.updateState({ selectedEnvironmentId: environmentId });
-
         // Stop auto-refresh when switching environments
         this.stopAutoRefresh();
 
@@ -679,8 +694,6 @@ export class PluginTraceViewerPanel extends BasePanel {
 
         try {
             this.selectedEnvironmentId = environmentId;
-
-            await this.updateState({ selectedEnvironmentId: environmentId });
 
             // Show loading state
             if (this.dataTableComponent) {
@@ -786,8 +799,8 @@ export class PluginTraceViewerPanel extends BasePanel {
 
         this.currentFilters = { quick: quickFilters, advanced: advancedFilters };
 
-        // Save filters to state for persistence
-        await this.updateState({ filters: this.currentFilters });
+        // Save filters to preferences
+        await this.stateManager.updateCurrentPreferences({ filters: this.currentFilters });
 
         if (this.selectedEnvironmentId) {
             await this.handleLoadTraces(this.selectedEnvironmentId, this.currentFilters);
@@ -1255,8 +1268,8 @@ export class PluginTraceViewerPanel extends BasePanel {
 
         this.autoRefreshIntervalSeconds = seconds;
 
-        // Save to panel state
-        await this.updateState({ autoRefreshIntervalSeconds: seconds });
+        // Save to preferences
+        await this.stateManager.updateCurrentPreferences({ autoRefreshIntervalSeconds: seconds });
 
         if (seconds > 0) {
             this.startAutoRefresh();
@@ -1572,8 +1585,10 @@ export class PluginTraceViewerPanel extends BasePanel {
     }
 
     protected getHtmlContent(): string {
-        // Get saved split ratio from state (default to 50)
-        const savedSplitRatio = this.currentState.splitRatio || 50;
+        // Get saved split ratio from preferences (default to 50)
+        // Note: getCurrentPreferences() is async but we can't await here since getHtmlContent is sync
+        // We'll use a default and let the async initialization handle restoring the preference
+        const savedSplitRatio = 50;
 
         // Always start with detail panel hidden (only show when user selects a trace)
         // But we preserve the split ratio so it opens at their preferred size

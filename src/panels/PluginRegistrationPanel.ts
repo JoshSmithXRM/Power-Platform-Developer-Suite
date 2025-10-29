@@ -9,9 +9,17 @@ import { TreeViewComponent } from '../components/trees/TreeView/TreeViewComponen
 import { TreeNode } from '../components/trees/TreeView/TreeViewConfig';
 import { PluginRegistrationService, PluginAssembly, PluginType, PluginStep, PluginImage } from '../services/PluginRegistrationService';
 
-import { BasePanel } from './base/BasePanel';
+import { BasePanel, DefaultInstanceState } from './base/BasePanel';
 
-export class PluginRegistrationPanel extends BasePanel {
+interface PluginRegistrationInstanceState extends DefaultInstanceState {
+    selectedEnvironmentId: string;
+}
+
+interface PluginRegistrationPreferences {
+    [key: string]: unknown;
+}
+
+export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanceState, PluginRegistrationPreferences> {
     public static readonly viewType = 'pluginRegistration';
     private static currentPanel: PluginRegistrationPanel | undefined;
 
@@ -63,7 +71,7 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), {
             viewType: PluginRegistrationPanel.viewType,
             title: 'Plugin Registration'
         });
@@ -104,8 +112,9 @@ export class PluginRegistrationPanel extends BasePanel {
             variant: 'default',
             label: 'Environment:',
             showRefreshButton: true,
-            onChange: (environmentId: string) => {
-                this.handleEnvironmentSelection(environmentId);
+            onChange: async (environmentId: string) => {
+                this.componentLogger.debug('Environment onChange triggered', { environmentId });
+                await this.processEnvironmentSelection(environmentId);
             }
         });
 
@@ -134,12 +143,11 @@ export class PluginRegistrationPanel extends BasePanel {
     }
 
     /**
-     * Handles environment selection from BOTH:
-     * - Initial auto-selection by BasePanel
-     * - Manual user selection via dropdown
+     * Hook called when environment changes
+     * State is automatically managed by BasePanel - just load data here
      */
-    private handleEnvironmentSelection(environmentId: string): void {
-        this.componentLogger.info('Environment selected', { environmentId });
+    protected async onEnvironmentChanged(environmentId: string): Promise<void> {
+        this.componentLogger.info('Environment changed', { environmentId });
 
         if (!environmentId) {
             this._selectedEnvironmentId = undefined;
@@ -148,7 +156,7 @@ export class PluginRegistrationPanel extends BasePanel {
         }
 
         this._selectedEnvironmentId = environmentId;
-        this.loadAssemblies();
+        await this.loadAssemblies();
     }
 
     protected getHtmlContent(): string {

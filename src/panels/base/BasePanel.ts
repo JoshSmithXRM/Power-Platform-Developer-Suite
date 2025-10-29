@@ -1,26 +1,48 @@
 import * as vscode from 'vscode';
 
 import { AuthenticationService } from '../../services/AuthenticationService';
-import { StateService, PanelState } from '../../services/StateService';
 import { PanelConfig, IPanelBase, WebviewMessage } from '../../types';
 import { ServiceFactory } from '../../services/ServiceFactory';
 import { Environment } from '../../components/base/ComponentInterface';
 import { EnvironmentConnection } from '../../models/PowerPlatformSettings';
 import { EnvironmentSelectorComponent } from '../../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { ComponentUpdateEvent, ComponentStateChangeEvent, ComponentWithEvents, ITargetedUpdateRenderer } from '../../types/ComponentEventTypes';
+import { IPanelStateManager, PanelStateManager } from '../../services/state';
+
+/**
+ * Default instance state shape - just tracks selected environment
+ */
+export interface DefaultInstanceState {
+    selectedEnvironmentId: string;
+}
 
 /**
  * Base class for all webview panels providing common functionality
+ *
+ * Generic Parameters:
+ * - TInstance: Shape of volatile instance state (cleared when panel closes)
+ * - TPreferences: Shape of persistent preferences per environment
+ *
+ * Example:
+ * ```typescript
+ * interface MyInstanceState { selectedEnvironmentId: string; }
+ * interface MyPreferences { filters?: {...}; sortOrder?: string; }
+ * class MyPanel extends BasePanel<MyInstanceState, MyPreferences> { }
+ * ```
  */
-export abstract class BasePanel implements IPanelBase {
+export abstract class BasePanel<
+    TInstance extends DefaultInstanceState = DefaultInstanceState,
+    TPreferences = Record<string, never>
+> implements IPanelBase {
     protected readonly _panel: vscode.WebviewPanel;
     protected readonly _extensionUri: vscode.Uri;
     protected readonly _authService: AuthenticationService;
-    protected readonly _stateService: StateService;
     protected _disposables: vscode.Disposable[] = [];
-    protected currentState: PanelState = {};
     protected readonly _panelId: string;
     private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
+
+    // New type-safe state manager
+    protected readonly stateManager: IPanelStateManager<TInstance, TPreferences>;
 
     // Common component reference - child panels can set this if they use EnvironmentSelector
     protected environmentSelectorComponent?: EnvironmentSelectorComponent;
@@ -35,21 +57,28 @@ export abstract class BasePanel implements IPanelBase {
     }
 
     public readonly viewType: string;
-    protected static _activePanels: Map<string, BasePanel[]> = new Map();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    protected static _activePanels: Map<string, BasePanel<any, any>[]> = new Map();
 
     constructor(
         panel: vscode.WebviewPanel,
         extensionUri: vscode.Uri,
         authService: AuthenticationService,
-        stateService: StateService,
         config: PanelConfig
     ) {
         this._panel = panel;
         this._extensionUri = extensionUri;
         this._authService = authService;
-        this._stateService = stateService;
         this.viewType = config.viewType;
         this._panelId = this.generatePanelId();
+
+        // Initialize new state manager
+        this.stateManager = new PanelStateManager<TInstance, TPreferences>(
+            this._panelId,
+            config.viewType,
+            ServiceFactory.getInstanceStateRepository(),
+            ServiceFactory.getPreferencesRepository()
+        );
 
         this._panel.title = config.title;
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -66,7 +95,7 @@ export abstract class BasePanel implements IPanelBase {
             this._disposables
         );
 
-        this.componentLogger.debug('Panel constructor completed', { 
+        this.componentLogger.debug('Panel constructor completed', {
             viewType: config.viewType,
             title: config.title,
             panelId: this._panelId
@@ -79,60 +108,14 @@ export abstract class BasePanel implements IPanelBase {
      */
     protected async initialize(): Promise<void> {
         this.componentLogger.debug('Panel initialization starting', { viewType: this.viewType });
-        // Restore state first
-        await this.restoreState();
 
-        // Then initialize UI
+        // Initialize UI
         this.updateWebview();
 
         // Load environments if panel has an environment selector
         await this.loadEnvironments();
 
         this.componentLogger.info('Panel initialization completed', { viewType: this.viewType });
-    }
-
-    /**
-     * Restore panel state from storage
-     */
-    protected async restoreState(): Promise<void> {
-        try {
-            const savedState = await this._stateService.getPanelState(this.viewType);
-            if (savedState) {
-                this.currentState = savedState;
-                await this.applyRestoredState(savedState);
-            }
-        } catch (error) {
-            this.componentLogger.error('Error restoring panel state', error as Error, { viewType: this.viewType });
-        }
-    }
-
-    /**
-     * Apply restored state - override in child classes
-     */
-    protected async applyRestoredState(state: PanelState): Promise<void> {
-        // Base implementation - child classes should override
-        if (state.selectedEnvironmentId) {
-            // Set environment if available
-        }
-    }
-
-    /**
-     * Save current panel state
-     */
-    protected async saveState(): Promise<void> {
-        try {
-            await this._stateService.savePanelState(this.viewType, this.currentState);
-        } catch (error) {
-            this.componentLogger.error('Error saving panel state', error as Error, { viewType: this.viewType });
-        }
-    }
-
-    /**
-     * Update state and save
-     */
-    protected async updateState(partialState: Partial<PanelState>): Promise<void> {
-        this.currentState = { ...this.currentState, ...partialState };
-        await this.saveState();
     }
 
     /**
@@ -234,7 +217,8 @@ export abstract class BasePanel implements IPanelBase {
         if (!BasePanel._activePanels.has(this.viewType)) {
             BasePanel._activePanels.set(this.viewType, []);
         }
-        BasePanel._activePanels.get(this.viewType)?.push(this);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        BasePanel._activePanels.get(this.viewType)?.push(this as BasePanel<any, any>);
     }
 
     /**
@@ -248,9 +232,14 @@ export abstract class BasePanel implements IPanelBase {
      * Dispose of the panel and clean up resources
      */
     public dispose(): void {
+        // Save final state and clean up state manager
+        this.stateManager.dispose().catch(err => {
+            this.componentLogger.error('Error disposing state manager', err as Error);
+        });
+
         // Remove from active panels map
         this.unregisterPanel();
-        
+
         this._panel.dispose();
         while (this._disposables.length) {
             const x = this._disposables.pop();
@@ -278,7 +267,8 @@ export abstract class BasePanel implements IPanelBase {
      * Focus an existing panel or return null if none exists
      * For multi-instance panels, focuses the first one found
      */
-    protected static focusExisting(viewType: string): BasePanel | null {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    protected static focusExisting(viewType: string): BasePanel<any, any> | null {
         const existingPanels = BasePanel._activePanels.get(viewType);
         if (existingPanels && existingPanels.length > 0) {
             const panel = existingPanels[0];
@@ -291,7 +281,8 @@ export abstract class BasePanel implements IPanelBase {
     /**
      * Get all active panels of a specific type
      */
-    protected static getActivePanels(viewType: string): BasePanel[] {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    protected static getActivePanels(viewType: string): BasePanel<any, any>[] {
         return BasePanel._activePanels.get(viewType) || [];
     }
 
@@ -351,7 +342,8 @@ export abstract class BasePanel implements IPanelBase {
      *     );
      * }
      */
-    protected static handlePanelCreation<T extends BasePanel>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    protected static handlePanelCreation<T extends BasePanel<any, any>>(
         config: {
             viewType: string;
             title: string;
@@ -399,6 +391,52 @@ export abstract class BasePanel implements IPanelBase {
     }
 
     /**
+     * Process environment selection change (new state manager approach)
+     * Automatically saves/loads state and calls onEnvironmentChanged hook
+     *
+     * Use this in your panel's environment selector onChange callback:
+     * ```typescript
+     * this.environmentSelector = ComponentFactory.createEnvironmentSelector({
+     *     onChange: (envId) => this.processEnvironmentSelection(envId)
+     * });
+     * ```
+     */
+    protected async processEnvironmentSelection(environmentId: string): Promise<void> {
+        try {
+            // Switch environment using state manager (auto-saves old prefs, loads new prefs)
+            await this.stateManager.switchEnvironment(environmentId);
+
+            // Call child panel's hook to load data
+            await this.onEnvironmentChanged(environmentId);
+        } catch (error) {
+            this.componentLogger.error('Error handling environment selection', error as Error, {
+                environmentId
+            });
+            vscode.window.showErrorMessage(`Failed to switch environment: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Hook for child panels to respond to environment changes
+     * Override this in child classes to load environment-specific data
+     *
+     * Example:
+     * ```typescript
+     * protected async onEnvironmentChanged(environmentId: string): Promise<void> {
+     *     await this.loadData(environmentId);
+     *     const prefs = await this.stateManager.getCurrentPreferences();
+     *     if (prefs?.filters) {
+     *         this.applyFilters(prefs.filters);
+     *     }
+     * }
+     * ```
+     */
+    protected async onEnvironmentChanged(environmentId: string): Promise<void> {
+        // Default implementation - child panels should override
+        this.componentLogger.debug('Environment changed', { environmentId });
+    }
+
+    /**
      * Standardized environment loading with optional auto-selection
      * Common pattern used by multiple panels
      */
@@ -419,26 +457,29 @@ export abstract class BasePanel implements IPanelBase {
             // Update the environment selector component with loaded environments
             environmentSelectorComponent.setEnvironments(environments);
 
-            // Try to restore previously selected environment from cached state
+            // Restore previously selected environment from instance state
             let selectedEnvironmentId: string | undefined;
 
-            if (viewType) {
-                const cachedState = await this._stateService.getPanelState(viewType);
-                selectedEnvironmentId = cachedState?.selectedEnvironmentId;
+            const instanceState = await this.stateManager.getInstanceState();
+            if (instanceState?.selectedEnvironmentId) {
+                selectedEnvironmentId = instanceState.selectedEnvironmentId;
+                logger.debug('Restored environment from instance state', {
+                    environmentId: selectedEnvironmentId
+                });
+            }
 
-                if (selectedEnvironmentId) {
-                    // Verify the cached environment still exists
-                    const environmentExists = environments.some(env => env.id === selectedEnvironmentId);
-                    if (environmentExists) {
-                        logger.info('Restored environment from cached state', {
-                            environmentId: selectedEnvironmentId
-                        });
-                    } else {
-                        logger.warn('Cached environment no longer exists', {
-                            environmentId: selectedEnvironmentId
-                        });
-                        selectedEnvironmentId = undefined;
-                    }
+            // Verify the cached environment still exists
+            if (selectedEnvironmentId) {
+                const environmentExists = environments.some(env => env.id === selectedEnvironmentId);
+                if (environmentExists) {
+                    logger.info('Restored environment from cached state', {
+                        environmentId: selectedEnvironmentId
+                    });
+                } else {
+                    logger.warn('Cached environment no longer exists', {
+                        environmentId: selectedEnvironmentId
+                    });
+                    selectedEnvironmentId = undefined;
                 }
             }
 

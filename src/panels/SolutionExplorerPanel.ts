@@ -9,7 +9,22 @@ import { DataTableComponent } from '../components/tables/DataTable/DataTableComp
 import { Solution } from '../services/SolutionService';
 import { SOLUTION_CONTEXT_MENU_ITEMS } from '../config/TableActions';
 
-import { BasePanel } from './base/BasePanel';
+import { BasePanel, DefaultInstanceState } from './base/BasePanel';
+
+/**
+ * Instance state for SolutionExplorerPanel
+ */
+interface SolutionExplorerInstanceState extends DefaultInstanceState {
+    selectedEnvironmentId: string;
+}
+
+/**
+ * Persistent preferences for Solution Explorer
+ */
+interface SolutionExplorerPreferences {
+    // Future: sort order, filter preferences, etc.
+    [key: string]: unknown;
+}
 
 // UI-specific type for table display
 interface SolutionTableRow {
@@ -22,7 +37,7 @@ interface SolutionTableRow {
     installedDate: string;
 }
 
-export class SolutionExplorerPanel extends BasePanel {
+export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceState, SolutionExplorerPreferences> {
     public static readonly viewType = 'solutionExplorer';
     private static currentPanel: SolutionExplorerPanel | undefined;
 
@@ -61,7 +76,7 @@ export class SolutionExplorerPanel extends BasePanel {
     }
 
     protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), {
             viewType: SolutionExplorerPanel.viewType,
             title: 'Solution Explorer'
         });
@@ -101,9 +116,9 @@ export class SolutionExplorerPanel extends BasePanel {
                 environments: [],
                 showRefreshButton: true,
                 className: 'solutions-env-selector',
-                onChange: (environmentId: string) => {
+                onChange: async (environmentId: string) => {
                     this.componentLogger.debug('Environment onChange triggered', { environmentId });
-                    this.handleEnvironmentSelection(environmentId);
+                    await this.processEnvironmentSelection(environmentId);
                 }
             });
 
@@ -350,14 +365,18 @@ export class SolutionExplorerPanel extends BasePanel {
         }
     }
 
-    private async handleEnvironmentSelection(environmentId: string): Promise<void> {
+    /**
+     * Hook called when environment changes
+     * State is automatically managed by BasePanel - just load data here
+     */
+    protected async onEnvironmentChanged(environmentId: string): Promise<void> {
         if (!environmentId) {
             this.componentLogger.debug('Environment selection cleared');
             return;
         }
 
         try {
-            this.componentLogger.info('Environment selected', { environmentId });
+            this.componentLogger.info('Environment changed', { environmentId });
 
             // Enable "Open in Maker" button
             if (this.actionBarComponent) {
@@ -368,8 +387,8 @@ export class SolutionExplorerPanel extends BasePanel {
             await this.handleLoadSolutions(environmentId);
 
         } catch (error) {
-            this.componentLogger.error('Error handling environment selection', error as Error, { environmentId });
-            vscode.window.showErrorMessage('Failed to load environment configuration');
+            this.componentLogger.error('Error handling environment change', error as Error, { environmentId });
+            vscode.window.showErrorMessage('Failed to load environment data');
         }
     }
 
@@ -390,11 +409,6 @@ export class SolutionExplorerPanel extends BasePanel {
                 this.dataTableComponent.setData([]);
                 this.dataTableComponent.setLoading(true, 'Loading solutions...');
             }
-
-            // Save state (UI preferences only, NOT data caching)
-            await this._stateService.savePanelState(SolutionExplorerPanel.viewType, {
-                selectedEnvironmentId: environmentId
-            });
 
             // Fetch solutions data (always fresh, no caching per architecture)
             const solutionService = ServiceFactory.getSolutionService();

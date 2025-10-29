@@ -3,10 +3,18 @@ import * as vscode from 'vscode';
 import { ServiceFactory } from '../services/ServiceFactory';
 import { WebviewMessage } from '../types';
 
-import { BasePanel } from './base/BasePanel';
+import { BasePanel, DefaultInstanceState } from './base/BasePanel';
+
+interface DataExplorerInstanceState extends DefaultInstanceState {
+    selectedEnvironmentId: string;
+}
+
+interface DataExplorerPreferences {
+    [key: string]: unknown;
+}
 
 // Placeholder - will be rewritten with component architecture
-export class DataExplorerPanel extends BasePanel {
+export class DataExplorerPanel extends BasePanel<DataExplorerInstanceState, DataExplorerPreferences> {
     public static readonly viewType = 'dataExplorer';
     private static currentPanel: DataExplorerPanel | undefined;
 
@@ -45,7 +53,7 @@ export class DataExplorerPanel extends BasePanel {
     }
 
     protected constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-        super(panel, extensionUri, ServiceFactory.getAuthService(), ServiceFactory.getStateService(), {
+        super(panel, extensionUri, ServiceFactory.getAuthService(), {
             viewType: DataExplorerPanel.viewType,
             title: 'Data Explorer'
         });

@@ -38,7 +38,3 @@ export interface Environment {
 // Re-export commonly used types from other modules
 export { EnvironmentConnection } from '../models/PowerPlatformSettings';
 export { AuthenticationMethod } from '../models/AuthenticationMethod';
-
-// Re-export new types from services and components
-export { PanelState, StateChangedEvent } from '../services/StateService';
-// Component types will be re-exported here once ComponentFactory is implemented
