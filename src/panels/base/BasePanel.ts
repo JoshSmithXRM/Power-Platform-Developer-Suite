@@ -227,12 +227,9 @@ export abstract class BasePanel<
             return;
         }
 
-        // Other component event types can be handled here in the future
-        // (e.g., rowSelected, nodeExpanded, etc.)
-        this.componentLogger.warn('Unhandled component event', {
-            componentId,
-            eventType
-        });
+        // Other component event types (rowSelected, nodeExpanded, etc.)
+        // Delegate to child panel for handling
+        await this.handleOtherComponentEvent(componentId, eventType, data);
     }
 
     /**
@@ -245,6 +242,26 @@ export abstract class BasePanel<
     protected async handlePanelAction(_componentId: string, _actionId: string): Promise<void> {
         // Default: no custom actions
         // Child panels override this to handle their specific actions
+    }
+
+    /**
+     * Handle non-action component events (optional hook for child panels)
+     * Override to handle events like: rowSelected, nodeExpanded, nodeCollapsed, etc.
+     *
+     * Default implementation: warns about unhandled events
+     *
+     * @param componentId - The component that triggered the event
+     * @param eventType - The type of event (e.g., 'rowSelected', 'nodeExpanded')
+     * @param data - The event data payload
+     */
+    protected async handleOtherComponentEvent(componentId: string, eventType: string, data?: unknown): Promise<void> {
+        // Default: log warning for unhandled component events
+        // Child panels can override to handle specific event types (rowSelected, nodeExpanded, etc.)
+        this.componentLogger.warn('Unhandled component event', {
+            componentId,
+            eventType,
+            data
+        });
     }
 
     /**
