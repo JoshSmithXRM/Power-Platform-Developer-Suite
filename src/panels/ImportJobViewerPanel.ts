@@ -252,6 +252,13 @@ export class ImportJobViewerPanel extends BasePanel {
                     }
                     break;
 
+                case 'search':
+                    // Handle SearchInput component messages
+                    if (message.data?.componentId === 'importJobs-table-search' && this.dataTableComponent) {
+                        this.dataTableComponent.search(message.data.query || '');
+                    }
+                    break;
+
                 default:
                     this.componentLogger.warn('Unknown message command', { command: message.command });
             }

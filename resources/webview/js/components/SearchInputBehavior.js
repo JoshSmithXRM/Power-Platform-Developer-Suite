@@ -141,7 +141,21 @@ class SearchInputBehavior extends BaseBehavior {
         // Update current query
         instance.currentQuery = trimmedQuery;
 
-        // Send search event to Extension Host
+        // Dispatch custom event for webview-local components (like TreeView)
+        const searchEvent = new CustomEvent('component-message', {
+            bubbles: true,
+            detail: {
+                source: 'component',
+                command: 'search',
+                data: {
+                    query: trimmedQuery,
+                    componentId: instance.id
+                }
+            }
+        });
+        instance.element.dispatchEvent(searchEvent);
+
+        // Also send to Extension Host for server-side handling (like DataTable)
         this.sendMessage(instance, 'search', {
             query: trimmedQuery,
             componentId: instance.id

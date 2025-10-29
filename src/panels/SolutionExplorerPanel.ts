@@ -239,6 +239,13 @@ export class SolutionExplorerPanel extends BasePanel {
                     }
                     break;
 
+                case 'search':
+                    // Handle SearchInput component messages
+                    if (message.data?.componentId === 'solutions-table-search' && this.dataTableComponent) {
+                        this.dataTableComponent.search(message.data.query || '');
+                    }
+                    break;
+
                 default:
                     this.componentLogger.warn('Unknown message command', { command: message.command });
             }

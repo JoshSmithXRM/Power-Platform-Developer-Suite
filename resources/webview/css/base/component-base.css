@@ -658,6 +658,7 @@
     pointer-events: none;
     color: var(--vscode-input-placeholderForeground);
     font-size: 14px;
+    z-index: 1; /* Ensure icon renders above input text */
 }
 
 .base-search-input-icon--left {

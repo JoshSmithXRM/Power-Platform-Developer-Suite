@@ -326,7 +326,16 @@
         "install-local": "code --install-extension power-platform-developer-suite-${npm_package_version}.vsix --force",
         "uninstall-local": "code --uninstall-extension JoshSmithXRM.power-platform-developer-suite",
         "clean-install": "npm run uninstall-local && npm run test-release",
-        "test-fresh": "npm run clean-install && code --new-window"
+        "test-fresh": "npm run clean-install && code --new-window",
+        "dead-code:check": "ts-prune",
+        "dead-code:deps": "depcheck",
+        "type-coverage": "type-coverage --at-least 95 --ignore-files 'src/**/*.spec.ts'",
+        "comment-audit": "grep -rnw . -e 'TODO\\|FIXME\\|XXX\\|HACK' --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git || true",
+        "call-graph": "madge --circular --extensions ts src/",
+        "call-graph:orphans": "madge --orphans --extensions ts src/",
+        "maintenance:weekly": "npm run dead-code:check && npm run comment-audit && npm run call-graph",
+        "maintenance:monthly": "npm run maintenance:weekly && npm run dead-code:deps && npm run type-coverage",
+        "maintenance:full": "npm run maintenance:monthly"
     },
     "dependencies": {
         "@azure/msal-node": "^2.13.0",

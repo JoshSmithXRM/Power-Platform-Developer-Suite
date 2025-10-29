@@ -635,13 +635,37 @@ export class PanelComposer {
     }
 
     /**
+     * Recursively collect all components including nested children
+     * Handles components that embed other components (like DataTable with SearchInput)
+     */
+    private static collectAllComponents(components: IRenderable[]): IRenderable[] {
+        const all = new Set<IRenderable>();
+        const stack = [...components];
+
+        // Depth-first traversal to collect all components and their children
+        while (stack.length > 0) {
+            const component = stack.pop()!;
+            if (!all.has(component)) {
+                all.add(component);
+                // Add this component's children to stack for processing
+                const children = component.getChildComponents();
+                if (children.length > 0) {
+                    stack.push(...children);
+                }
+            }
+        }
+
+        return Array.from(all);
+    }
+
+    /**
      * Static helper methods for simple composition
-     * 
+     *
      * Collects CSS files in order:
      * 1. Base component styles (applied to all components)
      * 2. Base panel styles (applied to all panels)
      * 3. Component-specific styles (from each component)
-     * 
+     *
      * Note: Panel-specific CSS is not supported per component-based architecture
      */
     private static collectCSSFiles(components: IRenderable[]): string[] {
@@ -658,8 +682,9 @@ export class PanelComposer {
         // 3. Add panel-base.css (may import shared styles, but we load them explicitly above)
         cssFiles.add('css/base/panel-base.css');
 
-        // 4. Collect component-specific CSS files
-        components.forEach(component => {
+        // 4. Collect component-specific CSS files (including nested children)
+        const allComponents = this.collectAllComponents(components);
+        allComponents.forEach(component => {
             try {
                 const componentCSSFile = component.getCSSFile();
                 if (componentCSSFile) {
@@ -690,8 +715,9 @@ export class PanelComposer {
         // Load BaseBehavior BEFORE component behaviors (required base class)
         scripts.push('js/utils/BaseBehavior.js');
 
-        // Then load component-specific behavior scripts BEFORE ComponentUtils
-        components.forEach(component => {
+        // Then load component-specific behavior scripts BEFORE ComponentUtils (including nested children)
+        const allComponents = this.collectAllComponents(components);
+        allComponents.forEach(component => {
             try {
                 const componentScript = component.getBehaviorScript();
                 if (componentScript) {

@@ -1,6 +1,7 @@
 import { CSS_CLASSES, ICONS } from '../../base/ComponentConfig';
 import { escapeHtml } from '../../base/HtmlUtils';
 import { ServiceFactory } from '../../../services/ServiceFactory';
+import { SearchInputComponent } from '../../inputs/SearchInput/SearchInputComponent';
 
 import { DataTableConfig, DataTableColumn, DataTableRow, DataTableContextMenuItem } from './DataTableConfig';
 
@@ -40,7 +41,7 @@ export class DataTableView {
     /**
      * Render the complete HTML for the DataTable component
      */
-    static render(config: DataTableConfig, state: DataTableViewState): string {
+    static render(config: DataTableConfig, state: DataTableViewState, searchInput?: SearchInputComponent): string {
         this.logger.debug('Rendering DataTable HTML', {
             componentId: config.id,
             dataRows: state.data.length,
@@ -86,7 +87,7 @@ export class DataTableView {
                  data-component-type="DataTable"
                  style="${containerStyle}">
                 
-                ${this.renderToolbar(config, state)}
+                ${this.renderToolbar(config, state, searchInput)}
                 
                 <div class="data-table-wrapper">
                     ${this.renderTable(config, state)}
@@ -105,16 +106,16 @@ export class DataTableView {
     /**
      * Render the table toolbar with search and actions
      */
-    private static renderToolbar(config: DataTableConfig, state: DataTableViewState): string {
+    private static renderToolbar(config: DataTableConfig, state: DataTableViewState, searchInput?: SearchInputComponent): string {
         const hasToolbar = config.searchable || config.showColumnChooser;
-        
+
         if (!hasToolbar) {
             return '';
         }
 
         return `
             <div class="data-table-toolbar">
-                ${config.searchable ? this.renderSearch(config) : ''}
+                ${config.searchable && searchInput ? searchInput.generateHTML() : ''}
                 
                 <div class="data-table-toolbar-actions">
                     ${config.showColumnChooser ? this.renderColumnChooser(config, state) : ''}
@@ -124,19 +125,20 @@ export class DataTableView {
     }
 
     /**
-     * Render search box
+     * Render search box (DEPRECATED - now uses SearchInputComponent)
+     * Kept for reference only - remove in future cleanup
      */
-    private static renderSearch(config: DataTableConfig): string {
-        return `
-            <div class="data-table-search">
-                <span class="data-table-search-icon">${ICONS.SEARCH}</span>
-                <input type="text"
-                       class="data-table-search-input"
-                       placeholder="${this.escapeHtml(config.searchPlaceholder || 'Search...')}"
-                       data-component-element="search">
-            </div>
-        `;
-    }
+    // private static renderSearch(config: DataTableConfig): string {
+    //     return `
+    //         <div class="data-table-search">
+    //             <span class="data-table-search-icon">${ICONS.SEARCH}</span>
+    //             <input type="text"
+    //                    class="data-table-search-input"
+    //                    placeholder="${this.escapeHtml(config.searchPlaceholder || 'Search...')}"
+    //                    data-component-element="search">
+    //         </div>
+    //     `;
+    // }
 
     /**
      * Render column chooser dropdown

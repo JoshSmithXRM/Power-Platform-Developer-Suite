@@ -22,6 +22,7 @@ export interface IRenderable {
     generateHTML(): string;
     getCSSFile(): string;
     getBehaviorScript(): string;
+    getChildComponents(): IRenderable[];
     dispose(): void;
 
     // EventEmitter methods used by ComponentFactory
@@ -224,5 +225,14 @@ export abstract class BaseComponent<TData = Record<string, never>> extends Event
         if (this.config.className && typeof this.config.className !== 'string') {
             throw new Error('Component className must be a string');
         }
+    }
+
+    /**
+     * Get child components for recursive resource collection
+     * Components that embed other components (like DataTable with SearchInput) should override this
+     * Default implementation returns empty array (most components have no children)
+     */
+    public getChildComponents(): IRenderable[] {
+        return [];
     }
 }

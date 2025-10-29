@@ -1,4 +1,6 @@
 import { BaseDataComponent } from '../../base/BaseDataComponent';
+import { IRenderable } from '../../base/BaseComponent';
+import { SearchInputComponent } from '../../inputs/SearchInput/SearchInputComponent';
 
 import { DataTableConfig, DataTableRow, DataTableSortEvent, DataTableFilterEvent, DataTablePageEvent, DEFAULT_DATA_TABLE_CONFIG, DATA_TABLE_VALIDATION, DataTableConfigValidator } from './DataTableConfig';
 import { DataTableView, DataTableViewState } from './DataTableView';
@@ -41,12 +43,25 @@ export class DataTableComponent extends BaseDataComponent<DataTableData> {
     private columnVisibility: Map<string, boolean> = new Map();
     private columnOrder: string[] = [];
     private hasLoadedData: boolean = false; // Track if data has been loaded at least once
+    private searchInput?: SearchInputComponent;
 
     constructor(config: DataTableConfig) {
         const mergedConfig = { ...DEFAULT_DATA_TABLE_CONFIG, ...config } as DataTableConfig;
         super(mergedConfig);
-        
+
         this.config = mergedConfig;
+
+        // Create SearchInputComponent if search is enabled
+        if (this.config.searchable) {
+            this.searchInput = new SearchInputComponent({
+                id: `${this.config.id}-search`,
+                placeholder: this.config.searchPlaceholder || 'Search...',
+                debounceMs: 300, // DataTable uses 300ms
+                iconPosition: 'left',
+                ariaLabel: 'Search table'
+            });
+        }
+
         this.validateConfig();
         this.initializeState();
     }
@@ -144,7 +159,7 @@ export class DataTableComponent extends BaseDataComponent<DataTableData> {
             totalRows: viewState.totalRows
         });
         
-        const html = DataTableView.render(this.config, viewState);
+        const html = DataTableView.render(this.config, viewState, this.searchInput);
         
         this.componentLogger.debug('HTML generation complete', {
             componentId: this.config.id,
@@ -751,13 +766,19 @@ export class DataTableComponent extends BaseDataComponent<DataTableData> {
             totalRows: this.processedData.length,
             timestamp: Date.now()
         };
-        
+
         this.emit('page', event);
-        
+
         if (this.config.onPageChange) {
             this.config.onPageChange(this.currentPage, this.pageSize);
         }
     }
 
-
+    /**
+     * Get child components for recursive resource collection
+     * DataTable embeds SearchInputComponent when searchable is enabled
+     */
+    public getChildComponents(): IRenderable[] {
+        return this.searchInput ? [this.searchInput] : [];
+    }
 }

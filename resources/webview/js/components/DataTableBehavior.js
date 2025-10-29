@@ -316,27 +316,28 @@ class DataTableBehavior extends BaseBehavior {
     }
 
     /**
-     * Setup search functionality
+     * Setup search functionality - now listens to SearchInputComponent events
      */
     static setupSearch(instance) {
-        const searchInput = instance.container?.querySelector('.data-table-search-input');
-        if (!searchInput) return;
+        // Find SearchInputComponent if it exists
+        const searchContainer = instance.container?.querySelector('[data-component-type="SearchInput"]');
+        if (!searchContainer) return;
 
-        let timeoutId;
-        const handler = () => {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => {
-                this.search(instance, searchInput.value);
-            }, 300);
+        const searchComponentId = searchContainer.getAttribute('data-component-id');
+        if (!searchComponentId) return;
+
+        // Listen for search events from SearchInputComponent
+        instance.searchMessageHandler = (event) => {
+            if (event.detail &&
+                event.detail.source === 'component' &&
+                event.detail.command === 'search' &&
+                event.detail.data &&
+                event.detail.data.componentId === searchComponentId) {
+                this.search(instance, event.detail.data.query);
+            }
         };
 
-        searchInput.addEventListener('input', handler);
-        searchInput.addEventListener('keypress', (event) => {
-            if (event.key === 'Enter') {
-                clearTimeout(timeoutId);
-                this.search(instance, searchInput.value);
-            }
-        });
+        window.addEventListener('component-message', instance.searchMessageHandler);
     }
 
     /**
@@ -1732,6 +1733,12 @@ class DataTableBehavior extends BaseBehavior {
         instance.sortHandlers.clear();
         instance.filterHandlers.clear();
         instance.actionHandlers.clear();
+
+        // Remove search event listener
+        if (instance.searchMessageHandler) {
+            window.removeEventListener('component-message', instance.searchMessageHandler);
+        }
+
         instance.initialized = false;
     }
 }

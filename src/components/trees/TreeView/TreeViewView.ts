@@ -1,6 +1,7 @@
 import { CSS_CLASSES } from '../../base/ComponentConfig';
 import { escapeHtml } from '../../base/HtmlUtils';
 import { LoadingIndicatorView } from '../../base/LoadingIndicatorView';
+import { SearchInputComponent } from '../../inputs/SearchInput/SearchInputComponent';
 
 import { TreeViewConfig, TreeNode } from './TreeViewConfig';
 
@@ -12,7 +13,13 @@ export class TreeViewView {
     /**
      * Generate the complete HTML for the TreeView component
      */
-    public static generateHTML(config: TreeViewConfig, nodes: TreeNode[], loading: boolean = false, loadingMessage: string = 'Loading...'): string {
+    public static generateHTML(
+        config: TreeViewConfig,
+        nodes: TreeNode[],
+        loading: boolean = false,
+        loadingMessage: string = 'Loading...',
+        searchInput?: SearchInputComponent
+    ): string {
         const {
             id,
             searchEnabled = true,
@@ -27,28 +34,10 @@ export class TreeViewView {
 
         return `
             <div id="${escapeHtml(id)}" class="${containerClass}" data-component-id="${escapeHtml(id)}" data-component-type="TreeView">
-                ${searchEnabled ? this.generateSearchBox(id) : ''}
+                ${searchEnabled && searchInput ? searchInput.generateHTML() : ''}
                 <div class="tree-view-content">
                     ${loading ? this.generateLoadingIndicator(loadingMessage) : this.generateTree(id, nodes)}
                 </div>
-            </div>
-        `;
-    }
-
-    /**
-     * Generate search box HTML
-     */
-    private static generateSearchBox(componentId: string): string {
-        return `
-            <div class="tree-view-search">
-                <input
-                    type="text"
-                    id="${escapeHtml(componentId)}-search"
-                    class="tree-view-search-input"
-                    placeholder="Search..."
-                    aria-label="Search tree"
-                />
-                <span class="tree-view-search-icon">🔍</span>
             </div>
         `;
     }

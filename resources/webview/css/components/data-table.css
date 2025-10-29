@@ -40,45 +40,12 @@
     gap: 8px;
 }
 
-/* Search box styling */
-.data-table-search {
-    position: relative;
+/* Search box styling
+   Note: DataTable now uses SearchInputComponent - base styles in component-base.css
+   These wrapper styles remain for DataTable-specific layout */
+.data-table-toolbar .base-search-input-container {
     flex: 0 1 300px;
     min-width: 200px;
-}
-
-.data-table-search-input {
-    width: 100%;
-    padding: 6px 12px 6px 32px;
-    background: var(--vscode-input-background);
-    color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border, var(--component-border));
-    border-radius: 2px;
-    font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
-    outline: none;
-    transition: border-color 0.15s ease;
-}
-
-.data-table-search-input::placeholder {
-    color: var(--vscode-input-placeholderForeground);
-    opacity: 1;
-}
-
-.data-table-search-input:focus {
-    border-color: var(--vscode-focusBorder);
-    outline: 1px solid var(--vscode-focusBorder);
-    outline-offset: -1px;
-}
-
-.data-table-search-icon {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--vscode-input-placeholderForeground);
-    pointer-events: none;
-    font-size: 14px;
 }
 
 /* Hover effects removed for border consistency */

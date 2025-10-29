@@ -65,7 +65,12 @@ class TreeViewBehavior extends BaseBehavior {
     static findDOMElements(instance) {
         const { element } = instance;
 
-        instance.searchInput = element.querySelector('.tree-view-search-input');
+        // Search input is now a SearchInputComponent - find it by component ID
+        const searchContainer = element.querySelector('[data-component-type="SearchInput"]');
+        if (searchContainer) {
+            instance.searchInput = searchContainer.querySelector('input');
+            instance.searchComponentId = searchContainer.getAttribute('data-component-id');
+        }
         instance.treeRoot = element.querySelector('.tree-view-root');
     }
 
@@ -73,35 +78,24 @@ class TreeViewBehavior extends BaseBehavior {
      * Setup event listeners
      */
     static setupEventListeners(instance) {
-        const { element, searchInput } = instance;
+        const { element } = instance;
 
         // Tree node clicks (event delegation)
         instance.boundHandlers.treeClick = (e) => this.handleTreeClick(instance, e);
         element.addEventListener('click', instance.boundHandlers.treeClick);
 
-        // Search input with debouncing (like DataTable)
-        if (searchInput) {
-            let searchTimeoutId;
-
-            // Debounced input handler (500ms delay for performance with large trees)
-            instance.boundHandlers.searchInput = () => {
-                clearTimeout(searchTimeoutId);
-                searchTimeoutId = setTimeout(() => {
-                    this.handleSearch(instance, searchInput.value);
-                }, 500);
-            };
-
-            // Enter key handler for immediate search
-            instance.boundHandlers.searchKeypress = (event) => {
-                if (event.key === 'Enter') {
-                    clearTimeout(searchTimeoutId);
-                    this.handleSearch(instance, searchInput.value);
-                }
-            };
-
-            searchInput.addEventListener('input', instance.boundHandlers.searchInput);
-            searchInput.addEventListener('keypress', instance.boundHandlers.searchKeypress);
-        }
+        // Listen for search events from SearchInputComponent
+        // SearchInputBehavior will send 'search' messages via component-message
+        instance.boundHandlers.searchMessage = (event) => {
+            if (event.detail &&
+                event.detail.source === 'component' &&
+                event.detail.command === 'search' &&
+                event.detail.data &&
+                event.detail.data.componentId === instance.searchComponentId) {
+                this.handleSearch(instance, event.detail.data.query);
+            }
+        };
+        window.addEventListener('component-message', instance.boundHandlers.searchMessage);
 
         // Context menu (right-click)
         instance.boundHandlers.contextMenu = (e) => this.handleContextMenu(instance, e);
@@ -639,13 +633,8 @@ class TreeViewBehavior extends BaseBehavior {
             instance.element.removeEventListener('click', instance.boundHandlers.treeClick);
         }
 
-        if (instance.searchInput) {
-            if (instance.boundHandlers.searchInput) {
-                instance.searchInput.removeEventListener('input', instance.boundHandlers.searchInput);
-            }
-            if (instance.boundHandlers.searchKeypress) {
-                instance.searchInput.removeEventListener('keypress', instance.boundHandlers.searchKeypress);
-            }
+        if (instance.boundHandlers.searchMessage) {
+            window.removeEventListener('component-message', instance.boundHandlers.searchMessage);
         }
 
         if (instance.element && instance.boundHandlers.contextMenu) {

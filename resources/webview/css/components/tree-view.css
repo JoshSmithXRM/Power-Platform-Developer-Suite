@@ -16,46 +16,14 @@
 
 /* =============================================================================
    Search Box
+   Note: TreeView now uses SearchInputComponent - base styles in component-base.css
+   These wrapper styles remain for TreeView-specific layout
    ============================================================================= */
 
-.tree-view-search {
-    position: relative;
+.tree-view-container .base-search-input-container {
     padding: 8px;
     border-bottom: 1px solid var(--vscode-panel-border);
     background: var(--vscode-editor-background);
-}
-
-.tree-view-search-input {
-    width: 100%;
-    padding: 6px 12px 6px 32px;
-    border: 1px solid var(--vscode-input-border);
-    background: var(--vscode-input-background);
-    color: var(--vscode-input-foreground);
-    font-size: 13px;
-    border-radius: 2px;
-    outline: none;
-    transition: border-color 0.15s ease;
-}
-
-.tree-view-search-input:focus {
-    border-color: var(--vscode-focusBorder);
-    outline: 1px solid var(--vscode-focusBorder);
-    outline-offset: -1px;
-}
-
-.tree-view-search-input::placeholder {
-    color: var(--vscode-input-placeholderForeground);
-    opacity: 1;
-}
-
-.tree-view-search-icon {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
-    color: var(--vscode-input-placeholderForeground);
-    font-size: 14px;
 }
 
 /* =============================================================================
