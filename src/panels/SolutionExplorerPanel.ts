@@ -269,55 +269,45 @@ export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceSta
         }
     }
 
-    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
-        try {
-            const { componentId, eventType, data } = message.data || {};
-
-            // Log based on event significance
-            if (eventType === 'actionClicked') {
-                this.componentLogger.info(`Action clicked: ${data?.actionId}`, { componentId });
-            } else if (eventType === 'contextMenuItemClicked') {
-                this.componentLogger.info(`Context menu item clicked: ${data?.itemId}`, { componentId });
-            } else {
-                this.componentLogger.debug('Component event received', { componentId, eventType });
-            }
-
-            // Let BasePanel handle actionClicked events (calls handleStandardActions + handlePanelAction)
-            if (eventType === 'actionClicked') {
-                await super.handleComponentEvent(message);
-                return;
-            }
-
-            // Handle data table context menu events
-            if (componentId === 'solutions-table' && eventType === 'contextMenuItemClicked') {
-                const { itemId, rowData } = data;
-
-                switch (itemId) {
-                    case 'openMaker':
-                        await this.handleOpenSolutionInMaker(undefined, rowData.id);
-                        break;
-                    case 'openClassic':
-                        await this.handleOpenSolutionInClassic(undefined, rowData.id);
-                        break;
-                    default:
-                        this.componentLogger.warn('Unknown context menu item ID', { itemId });
-                }
-                return;
-            }
-
-            // Other component events
-            this.componentLogger.trace('Component event not handled', { componentId, eventType });
-
-        } catch (error) {
-            this.componentLogger.error('Error handling component event', error as Error, {
-                componentId: message.componentId,
-                eventType: message.eventType
-            });
+    /**
+     * Handle non-action component events (optional hook from BasePanel)
+     * Used for handling context menu clicks on solution table rows
+     */
+    protected async handleOtherComponentEvent(componentId: string, eventType: string, data?: unknown): Promise<void> {
+        // Validate data parameter
+        if (!data || typeof data !== 'object') {
+            this.componentLogger.warn('Invalid component event data', { componentId, eventType });
+            return;
         }
+
+        // Handle data table context menu events
+        if (componentId === 'solutions-table' && eventType === 'contextMenuItemClicked') {
+            const { itemId, rowData } = data as { itemId?: string; rowData?: { id?: string } };
+            this.componentLogger.info(`Context menu item clicked: ${itemId}`, { componentId });
+
+            switch (itemId) {
+                case 'openMaker':
+                    if (rowData?.id) {
+                        await this.handleOpenSolutionInMaker(undefined, rowData.id);
+                    }
+                    break;
+                case 'openClassic':
+                    if (rowData?.id) {
+                        await this.handleOpenSolutionInClassic(undefined, rowData.id);
+                    }
+                    break;
+                default:
+                    this.componentLogger.warn('Unknown context menu item ID', { itemId });
+            }
+            return;
+        }
+
+        // Other component events
+        this.componentLogger.trace('Component event not handled', { componentId, eventType });
     }
 
     /**
-     * Override BasePanel's handlePanelAction to handle solution explorer-specific actions
+     * Handle panel-specific action bar actions (optional hook from BasePanel)
      */
     protected async handlePanelAction(_componentId: string, actionId: string): Promise<void> {
         switch (actionId) {

@@ -80,6 +80,58 @@ export class MyPanel extends BasePanel {
 
 ---
 
+### Panel Message Handling Hooks
+
+BasePanel provides hook methods for handling component events. **DO NOT override `handleComponentEvent()`** - BasePanel routes events automatically.
+
+**Use these hooks instead:**
+
+```typescript
+export class MyPanel extends BasePanel {
+    // Handle panel-specific messages from webview
+    protected async handleMessage(message: WebviewMessage): Promise<void> {
+        switch (message.command) {
+            case 'my-custom-command':
+                await this.handleCustomCommand(message.data);
+                break;
+        }
+    }
+
+    // Handle action bar button clicks (optional hook)
+    protected async handlePanelAction(componentId: string, actionId: string): Promise<void> {
+        if (actionId === 'export') {
+            await this.exportData();
+        }
+    }
+
+    // Handle other component events like rowSelected, nodeExpanded (optional hook)
+    protected async handleOtherComponentEvent(componentId: string, eventType: string, data?: unknown): Promise<void> {
+        if (componentId === 'my-splitPanel' && eventType === 'rightPanelClosed') {
+            this.selectedNode = undefined;
+        }
+    }
+}
+```
+
+**Why hook methods are mandatory:**
+- BasePanel handles common events (environment-changed, component-event) automatically
+- Prevents duplicate routing logic across panels (~20 lines per panel)
+- Template Method Pattern enforces proper event flow
+- Standard actions (refresh) handled by BasePanel
+
+**Event Flow:**
+1. Webview sends message → `handleMessageInternal()`
+2. BasePanel checks `handleCommonMessages()` first
+3. If not common → delegates to child's `handleMessage()`
+4. For component-event messages → routes to hooks automatically
+
+❌ **DON'T override `handleComponentEvent()`** - causes duplicate routing
+✅ **DO use hook methods** - `handlePanelAction()`, `handleOtherComponentEvent()`
+
+📖 See: `src/panels/PluginRegistrationPanel.ts` - Reference implementation
+
+---
+
 ### Webview Behavior Pattern
 
 All webview behaviors MUST extend BaseBehavior:

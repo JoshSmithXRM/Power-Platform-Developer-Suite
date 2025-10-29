@@ -36,7 +36,8 @@ interface MetadataBrowserPreferences {
     selectedEntityLogicalName?: string;
     selectedEntityMetadataId?: string;
     collapsedSections?: string[];
-    // Future: search filters, view mode, etc.
+    splitRatio?: number;
+    rightPanelVisible?: boolean;
     [key: string]: unknown;
 }
 
@@ -537,74 +538,62 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
         }
     }
 
-    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
-        try {
-            const { componentId, eventType, data } = message.data || {};
+    /**
+     * Handle non-action component events (optional hook from BasePanel)
+     * Used for handling context menu clicks and split panel events
+     */
+    protected async handleOtherComponentEvent(componentId: string, eventType: string, data?: unknown): Promise<void> {
+        // Validate data parameter
+        if (!data || typeof data !== 'object') {
+            this.componentLogger.warn('Invalid component event data', { componentId, eventType });
+            return;
+        }
 
-            // Log based on event significance
-            if (eventType === 'actionClicked') {
-                this.componentLogger.info(`Action clicked: ${data?.actionId}`, { componentId });
-            } else if (eventType === 'contextMenuItemClicked') {
-                this.componentLogger.info(`Context menu item clicked: ${data?.itemId}`, { componentId });
-            } else {
-                this.componentLogger.debug('Component event received', { componentId, eventType });
+        // Handle context menu events
+        if (eventType === 'contextMenuItemClicked') {
+            const { itemId, rowData } = data as { itemId?: string; rowData?: unknown };
+            this.componentLogger.info(`Context menu item clicked: ${itemId}`, { componentId });
+
+            switch (itemId) {
+                case 'viewDetails':
+                    await this.handleViewDetails(componentId, rowData);
+                    break;
+                case 'copyLogicalName':
+                    await this.handleCopyLogicalName(rowData);
+                    break;
+                case 'openAttributeInMaker':
+                    await this.handleOpenAttributeInMaker(rowData);
+                    break;
+                case 'openRelatedEntity':
+                    await this.handleOpenRelatedEntity(rowData);
+                    break;
+                default:
+                    this.componentLogger.warn('Unknown context menu item ID', { itemId });
             }
+            return;
+        }
 
-            // Let BasePanel handle actionClicked events (calls handleStandardActions + handlePanelAction)
-            if (eventType === 'actionClicked') {
-                await super.handleComponentEvent(message);
-                return;
-            }
-
-            // Handle panel-specific component events
-            // Handle context menu events
-            if (eventType === 'contextMenuItemClicked') {
-                const { itemId, rowData } = data;
-
-                switch (itemId) {
-                    case 'viewDetails':
-                        await this.handleViewDetails(componentId, rowData);
-                        break;
-                    case 'copyLogicalName':
-                        await this.handleCopyLogicalName(rowData);
-                        break;
-                    case 'openAttributeInMaker':
-                        await this.handleOpenAttributeInMaker(rowData);
-                        break;
-                    case 'openRelatedEntity':
-                        await this.handleOpenRelatedEntity(rowData);
-                        break;
-                    default:
-                        this.componentLogger.warn('Unknown context menu item ID', { itemId });
+        // Handle split panel events using BasePanel abstraction
+        if (componentId === 'metadata-detail-split-panel') {
+            const handled = await this.handleStandardSplitPanelEvents(eventType, data);
+            if (handled) {
+                if (eventType === 'splitRatioChanged') {
+                    const { splitRatio } = data as { splitRatio?: number };
+                    this.componentLogger.debug('Split ratio changed', { splitRatio });
+                } else {
+                    const { rightPanelVisible } = data as { rightPanelVisible?: boolean };
+                    this.componentLogger.debug('Split panel visibility changed', { rightPanelVisible });
                 }
                 return;
             }
-
-            // Handle split panel events
-            if (componentId === 'metadata-detail-split-panel' && eventType === 'splitRatioChanged') {
-                // Could save split ratio to state if needed
-                this.componentLogger.debug('Split ratio changed', { splitRatio: data?.splitRatio });
-                return;
-            }
-
-            if (componentId === 'metadata-detail-split-panel' && (eventType === 'rightPanelOpened' || eventType === 'rightPanelClosed')) {
-                this.componentLogger.debug('Split panel visibility changed', { rightPanelVisible: data?.rightPanelVisible });
-                return;
-            }
-
-            // Other component events
-            this.componentLogger.trace('Component event not handled', { componentId, eventType });
-
-        } catch (error) {
-            this.componentLogger.error('Error handling component event', error as Error, {
-                componentId: message.componentId,
-                eventType: message.eventType
-            });
         }
+
+        // Other component events
+        this.componentLogger.trace('Component event not handled', { componentId, eventType });
     }
 
     /**
-     * Override BasePanel's handlePanelAction to handle metadata browser-specific actions
+     * Handle panel-specific action bar actions (optional hook from BasePanel)
      */
     protected async handlePanelAction(_componentId: string, actionId: string): Promise<void> {
         switch (actionId) {

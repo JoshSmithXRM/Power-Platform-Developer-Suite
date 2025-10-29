@@ -17,6 +17,8 @@ interface PluginRegistrationInstanceState extends DefaultInstanceState {
 }
 
 interface PluginRegistrationPreferences {
+    splitRatio?: number;
+    rightPanelVisible?: boolean;
     [key: string]: unknown;
 }
 
@@ -417,8 +419,6 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
         this.componentLogger.info('Handling message', { command: message.command });
 
         switch (message.command) {
-            // 'environment-changed' is handled by BasePanel.handleCommonMessages()
-
             case 'node-selected':
                 this.componentLogger.info('node-selected message data:', message.data);
                 if (message.data?.node) {
@@ -428,42 +428,36 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
                 }
                 break;
 
-            // node-expanded handler removed - complete tree built upfront, no lazy loading needed
-
             case 'close-details':
                 this.closeDetailsPanel();
                 break;
-
-            // 'component-event' is now handled by BasePanel.handleCommonMessages()
         }
     }
 
     /**
-     * Override BasePanel's handleComponentEvent to handle plugin registration-specific component events
+     * Handle non-action component events (optional hook from BasePanel)
+     * Used for handling SplitPanel-specific events
      */
-    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
-        const { componentId, eventType } = message.data || {};
-
-        // Let BasePanel handle actionClicked events (calls handleStandardActions + handlePanelAction)
-        if (eventType === 'actionClicked') {
-            await super.handleComponentEvent(message);
-            return;
-        }
-
-        // Handle SplitPanel events
+    protected async handleOtherComponentEvent(componentId: string, eventType: string, data?: unknown): Promise<void> {
+        // Handle SplitPanel events using BasePanel abstraction
         if (componentId === 'pluginRegistration-splitPanel') {
+            // Save split panel state to preferences
+            await this.handleStandardSplitPanelEvents(eventType, data);
+
+            // Custom panel logic: clear selection when details panel closes
             if (eventType === 'rightPanelClosed') {
                 this.selectedNode = undefined;
             }
             return;
         }
 
-        // Other component events
+        // Log unhandled events for debugging
         this.componentLogger.trace('Component event not handled', { componentId, eventType });
     }
 
     /**
-     * Override BasePanel's handlePanelAction - no custom actions for plugin registration
+     * Handle panel-specific action bar actions (optional hook from BasePanel)
+     * No custom actions for plugin registration panel
      */
     protected async handlePanelAction(_componentId: string, actionId: string): Promise<void> {
         // No panel-specific actions in plugin registration

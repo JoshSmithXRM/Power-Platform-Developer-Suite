@@ -333,19 +333,9 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                     await this.handleSetTraceLevel(message.environmentId, message.level);
                     break;
 
-                case 'filters-applied': {
-                    // Convert objects to arrays if needed (happens when data is serialized/deserialized)
-                    const quickFilters = message.data?.quickFilters;
-                    const advancedFilters = message.data?.advancedFilters;
-
-                    const quickFiltersArray = Array.isArray(quickFilters) ? quickFilters :
-                        (quickFilters && typeof quickFilters === 'object' ? Object.values(quickFilters) : []);
-                    const advancedFiltersArray = Array.isArray(advancedFilters) ? advancedFilters :
-                        (advancedFilters && typeof advancedFilters === 'object' ? Object.values(advancedFilters) : []);
-
-                    await this.handleFiltersApplied(quickFiltersArray, advancedFiltersArray);
+                case 'filters-applied':
+                    await this.handleFiltersAppliedMessage(message);
                     break;
-                }
 
                 case 'trace-selected':
                     await this.handleTraceSelected(message.traceId);
@@ -366,40 +356,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                     break;
 
                 case 'panel-ready':
-                    this.componentLogger.debug('Panel ready event received');
-                    // Apply pending filter restoration if any
-                    if (this.pendingFilterRestoration) {
-                        this.componentLogger.info('Applying pending filter restoration', {
-                            pendingFilters: this.pendingFilterRestoration,
-                            quickLength: this.pendingFilterRestoration.quick.length,
-                            advancedLength: this.pendingFilterRestoration.advanced.length,
-                            quickIsArray: Array.isArray(this.pendingFilterRestoration.quick),
-                            advancedIsArray: Array.isArray(this.pendingFilterRestoration.advanced)
-                        });
-                        if (this.pendingFilterRestoration.quick.length > 0) {
-                            this.componentLogger.info('Sending setQuickFilters message', {
-                                filterIds: this.pendingFilterRestoration.quick
-                            });
-                            this.postMessage({
-                                action: 'setQuickFilters',
-                                componentId: this.filterPanelComponent!.getId(),
-                                componentType: 'FilterPanel',
-                                filterIds: this.pendingFilterRestoration.quick
-                            });
-                        }
-                        if (this.pendingFilterRestoration.advanced.length > 0) {
-                            this.componentLogger.info('Sending setAdvancedFilters message', {
-                                conditions: this.pendingFilterRestoration.advanced
-                            });
-                            this.postMessage({
-                                action: 'setAdvancedFilters',
-                                componentId: this.filterPanelComponent!.getId(),
-                                componentType: 'FilterPanel',
-                                conditions: this.pendingFilterRestoration.advanced
-                            });
-                        }
-                        this.pendingFilterRestoration = undefined;
-                    }
+                    await this.handlePanelReadyMessage();
                     break;
 
                 // Split panel events are now handled via component-event by overridden handleComponentEvent
@@ -427,55 +384,49 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
     }
 
     /**
-     * Override BasePanel's handleComponentEvent to handle panel-specific component events
-     * Calls super for standard action bar handling, then handles other component types
+     * Handle non-action component events (optional hook from BasePanel)
+     * Used for handling context menu clicks and split panel events
      */
-    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
-        const { componentId, eventType, data } = message.data || {};
+    protected async handleOtherComponentEvent(componentId: string, eventType: string, data?: unknown): Promise<void> {
+        // Validate data parameter
+        if (!data || typeof data !== 'object') {
+            this.componentLogger.warn('Invalid component event data', { componentId, eventType });
+            return;
+        }
 
         this.componentLogger.debug('🔧 Component event', {
             componentId,
             eventType
         });
 
-        // Let BasePanel handle actionClicked events (calls handleStandardActions + handlePanelAction)
-        if (eventType === 'actionClicked') {
-            await super.handleComponentEvent(message);
+        // Handle data table context menu events
+        if (componentId === 'pluginTrace-table' && eventType === 'contextMenuItemClicked') {
+            const { itemId, rowId } = data as { itemId?: string; rowId?: string };
+            this.componentLogger.info('✅ Context menu action clicked', { itemId, rowId });
+            if (itemId && rowId) {
+                await this.handleContextMenuAction(itemId, rowId);
+            }
             return;
         }
 
-        // Handle panel-specific component events
-        try {
-            // Handle data table context menu events
-            if (componentId === 'pluginTrace-table' && eventType === 'contextMenuItemClicked') {
-                const { itemId, rowId } = data;
-                this.componentLogger.info('✅ Context menu action clicked', { itemId, rowId });
-                await this.handleContextMenuAction(itemId, rowId);
+        // Handle split panel events using BasePanel abstraction
+        if (componentId === 'plugin-trace-split-panel') {
+            const handled = await this.handleStandardSplitPanelEvents(eventType, data);
+            if (handled) {
+                if (eventType === 'splitRatioChanged') {
+                    const { splitRatio } = data as { splitRatio?: number };
+                    this.componentLogger.info('✅ Split ratio changed', { splitRatio });
+                } else {
+                    const { rightPanelVisible } = data as { rightPanelVisible?: boolean };
+                    this.componentLogger.info('✅ Split panel visibility changed', { rightPanelVisible });
+                }
                 return;
             }
+        }
 
-            // Handle split panel events
-            if (componentId === 'plugin-trace-split-panel') {
-                if (eventType === 'splitRatioChanged') {
-                    const { splitRatio } = data;
-                    this.componentLogger.info('✅ Split ratio changed', { splitRatio });
-                    await this.stateManager.updateCurrentPreferences({ splitRatio });
-                    return;
-                }
-                if (eventType === 'rightPanelOpened' || eventType === 'rightPanelClosed') {
-                    const { rightPanelVisible } = data;
-                    this.componentLogger.info('✅ Split panel visibility changed', { rightPanelVisible });
-                    await this.stateManager.updateCurrentPreferences({ rightPanelVisible });
-                    return;
-                }
-            }
-
-            // Log unhandled events (except initialization)
-            if (eventType !== 'initialized') {
-                this.componentLogger.debug('Unhandled component event', { componentId, eventType });
-            }
-        } catch (error: unknown) {
-            this.componentLogger.error('❌ Error handling component event', error as Error);
+        // Log unhandled events (except initialization)
+        if (eventType !== 'initialized') {
+            this.componentLogger.debug('Unhandled component event', { componentId, eventType });
         }
     }
 
@@ -500,6 +451,69 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         } catch (error: unknown) {
             this.componentLogger.error('❌ Error handling dropdown item click', error as Error);
         }
+    }
+
+    /**
+     * Handle filters-applied message
+     * Converts filter data to arrays and delegates to handleFiltersApplied
+     */
+    private async handleFiltersAppliedMessage(message: WebviewMessage): Promise<void> {
+        const quickFiltersArray = this.convertToArray<string>(message.data?.quickFilters);
+        const advancedFiltersArray = this.convertToArray<FilterCondition>(message.data?.advancedFilters);
+        await this.handleFiltersApplied(quickFiltersArray, advancedFiltersArray);
+    }
+
+    /**
+     * Handle panel-ready message
+     * Restores pending filters if any
+     */
+    private async handlePanelReadyMessage(): Promise<void> {
+        this.componentLogger.debug('Panel ready event received');
+
+        if (!this.pendingFilterRestoration) {
+            return;
+        }
+
+        this.componentLogger.info('Applying pending filter restoration', {
+            pendingFilters: this.pendingFilterRestoration,
+            quickLength: this.pendingFilterRestoration.quick.length,
+            advancedLength: this.pendingFilterRestoration.advanced.length
+        });
+
+        // Restore quick filters
+        if (this.pendingFilterRestoration.quick.length > 0) {
+            this.postMessage({
+                action: 'setQuickFilters',
+                componentId: this.filterPanelComponent!.getId(),
+                componentType: 'FilterPanel',
+                filterIds: this.pendingFilterRestoration.quick
+            });
+        }
+
+        // Restore advanced filters
+        if (this.pendingFilterRestoration.advanced.length > 0) {
+            this.postMessage({
+                action: 'setAdvancedFilters',
+                componentId: this.filterPanelComponent!.getId(),
+                componentType: 'FilterPanel',
+                conditions: this.pendingFilterRestoration.advanced
+            });
+        }
+
+        this.pendingFilterRestoration = undefined;
+    }
+
+    /**
+     * Convert value to array (handles object-to-array deserialization)
+     */
+    private convertToArray<T>(value: unknown): T[] {
+        if (Array.isArray(value)) {
+            return value;
+        }
+        if (value && typeof value === 'object') {
+            return Object.values(value) as T[];
+        }
+        return [];
     }
 
     private async handleLoadEnvironments(): Promise<void> {

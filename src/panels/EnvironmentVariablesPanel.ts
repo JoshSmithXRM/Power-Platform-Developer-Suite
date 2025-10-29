@@ -290,63 +290,27 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
         }
     }
 
-    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
-        try {
-            // ComponentUtils.sendMessage puts everything in message.data
-            const { componentId, eventType, data } = message.data || {};
-
-            // Log based on event significance
-            if (eventType === 'selectionChanged') {
-                // Business event - INFO level
-                const solutionName = data?.selectedSolutions?.[0]?.displayName;
-                const solutionId = data?.selectedSolutions?.[0]?.id;
-                if (solutionName) {
-                    this.componentLogger.info(`Solution selected: ${solutionName}`, { solutionId });
-                } else {
-                    this.componentLogger.info('Solution selection cleared');
-                }
-            } else if (eventType === 'actionClicked') {
-                // User action - INFO level
-                this.componentLogger.info(`Action clicked: ${data?.actionId}`, { componentId });
-            } else {
-                // Other events - DEBUG level
-                this.componentLogger.debug('Component event received', { componentId, eventType });
-            }
-
-            // Handle solution selector events
-            if (componentId === 'envVars-solutionSelector' && eventType === 'selectionChanged') {
-                const { selectedSolutions } = data;
-
-                // Note: Don't call setSelectedSolutions() here as it would trigger the callback
-                // and cause duplicate data loading. The webview already has the correct selection.
-                // We just store the solution ID for "Open in Maker" and handle selection once.
-
-                if (selectedSolutions && selectedSolutions.length > 0) {
-                    const selectedSolution = selectedSolutions[0];
-                    this.currentSolutionId = selectedSolution.id; // Store for "Open in Maker"
-                    await this.handleSolutionSelection(selectedSolution.id);
-                } else {
-                    this.currentSolutionId = undefined;
-                    await this.handleSolutionSelection('');
-                }
-                return;
-            }
-
-            // Let BasePanel handle actionClicked events (calls handleStandardActions + handlePanelAction)
-            if (eventType === 'actionClicked') {
-                await super.handleComponentEvent(message);
-                return;
-            }
-
-            // Handle other component events as needed
-            this.componentLogger.trace('Component event not handled', { componentId, eventType });
-
-        } catch (error) {
-            this.componentLogger.error('Error handling component event', error as Error, {
-                componentId: message.componentId,
-                eventType: message.eventType
-            });
+    /**
+     * Handle non-action component events (optional hook from BasePanel)
+     * Used for handling solution selector selection changes
+     */
+    protected async handleOtherComponentEvent(componentId: string, eventType: string, data?: unknown): Promise<void> {
+        // Validate data parameter
+        if (!data || typeof data !== 'object') {
+            this.componentLogger.warn('Invalid component event data', { componentId, eventType });
+            return;
         }
+
+        // Handle solution selector events using BasePanel abstraction
+        if (componentId === 'envVars-solutionSelector') {
+            const handled = await this.handleStandardSolutionSelectorEvents(eventType, data);
+            if (handled) {
+                return;
+            }
+        }
+
+        // Handle other component events as needed
+        this.componentLogger.trace('Component event not handled', { componentId, eventType });
     }
 
     protected getHtmlContent(): string {
@@ -445,9 +409,15 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
         await this.handleLoadSolutions(environmentId);
     }
 
-    private async handleSolutionSelection(solutionId: string): Promise<void> {
+    /**
+     * Handle solution selection (override BasePanel hook)
+     * Loads environment variables for the selected solution
+     */
+    protected async handleSolutionSelection(solutionId: string): Promise<void> {
+        // Store for "Open in Maker" action
+        this.currentSolutionId = solutionId || undefined;
+
         if (!solutionId) {
-            this.componentLogger.debug('Solution selection cleared');
             return;
         }
 

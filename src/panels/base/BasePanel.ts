@@ -8,6 +8,7 @@ import { EnvironmentConnection } from '../../models/PowerPlatformSettings';
 import { EnvironmentSelectorComponent } from '../../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
 import { ComponentUpdateEvent, ComponentStateChangeEvent, ComponentWithEvents, ITargetedUpdateRenderer } from '../../types/ComponentEventTypes';
 import { IPanelStateManager, PanelStateManager } from '../../services/state';
+import { SolutionSelectorEventData, SplitPanelEventData } from '../../types/ComponentEventData';
 
 /**
  * Default instance state shape - just tracks selected environment
@@ -245,6 +246,84 @@ export abstract class BasePanel<
      */
     protected async handleOtherComponentEvent(_componentId: string, _eventType: string, _data?: unknown): Promise<void> {
         // No-op by default
+    }
+
+    /**
+     * Handle standard split panel events and save to preferences
+     * Handles: splitRatioChanged, rightPanelOpened, rightPanelClosed
+     *
+     * Child panels can call this method to handle common split panel behavior,
+     * then add custom logic if needed (e.g., clearing selection state).
+     *
+     * @param eventType - The type of event
+     * @param data - The event data payload
+     * @returns true if the event was handled, false otherwise
+     */
+    protected async handleStandardSplitPanelEvents(eventType: string, data: unknown): Promise<boolean> {
+        if (eventType === 'splitRatioChanged') {
+            const { splitRatio } = data as SplitPanelEventData;
+            if (typeof splitRatio === 'number') {
+                await this.stateManager.updateCurrentPreferences({ splitRatio } as unknown as Partial<TPreferences>);
+                return true;
+            }
+        } else if (eventType === 'rightPanelOpened' || eventType === 'rightPanelClosed') {
+            const { rightPanelVisible } = data as SplitPanelEventData;
+            if (typeof rightPanelVisible === 'boolean') {
+                await this.stateManager.updateCurrentPreferences({ rightPanelVisible } as unknown as Partial<TPreferences>);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Handle standard solution selector events
+     * Handles: selectionChanged event from SolutionSelectorComponent
+     *
+     * Child panels can call this method to handle common solution selector behavior.
+     * This method logs the selection change and calls handleSolutionSelection hook.
+     *
+     * @param eventType - The type of event
+     * @param data - The event data payload
+     * @returns true if the event was handled, false otherwise
+     */
+    protected async handleStandardSolutionSelectorEvents(eventType: string, data: unknown): Promise<boolean> {
+        if (eventType !== 'selectionChanged') {
+            return false;
+        }
+
+        if (!data || typeof data !== 'object') {
+            return false;
+        }
+
+        const { selectedSolutions } = data as SolutionSelectorEventData;
+
+        // Log programmatic state change at DEBUG level
+        if (selectedSolutions && selectedSolutions.length > 0) {
+            const solutionName = selectedSolutions[0]?.displayName;
+            const solutionId = selectedSolutions[0]?.id;
+            this.componentLogger.debug(`Solution selected: ${solutionName}`, { solutionId });
+        } else {
+            this.componentLogger.debug('Solution selection cleared');
+        }
+
+        // Call child panel's solution selection handler
+        const solutionId = selectedSolutions && selectedSolutions.length > 0
+            ? selectedSolutions[0].id || ''
+            : '';
+
+        await this.handleSolutionSelection(solutionId);
+        return true;
+    }
+
+    /**
+     * Handle solution selection (optional hook)
+     * Override in child panels that use SolutionSelectorComponent
+     *
+     * @param solutionId - The selected solution ID (empty string if cleared)
+     */
+    protected async handleSolutionSelection(_solutionId: string): Promise<void> {
+        // No-op by default. Override in child panels that use solution selector.
     }
 
     /**

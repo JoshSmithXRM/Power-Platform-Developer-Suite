@@ -159,32 +159,25 @@ export class EnvironmentSetupPanel extends BasePanel {
         }
     }
 
-    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
-        try {
-            const { componentId, eventType, data } = message.data || {};
-
-            if (componentId === 'environmentSetup-actions' && eventType === 'actionClicked') {
-                const { actionId } = data;
-
-                switch (actionId) {
-                    case 'save':
-                        // Handled by save-environment message
-                        break;
-                    case 'test':
-                        // Handled by test-connection message
-                        break;
-                    case 'delete':
-                        // Handled by delete-environment message
-                        break;
-                    case 'new':
-                        this.createNewEnvironment();
-                        break;
-                    default:
-                        this.componentLogger.warn('Unknown action ID', { actionId });
-                }
-            }
-        } catch (error) {
-            this.componentLogger.error('Error handling component event', error as Error);
+    /**
+     * Handle panel-specific action bar actions (optional hook from BasePanel)
+     */
+    protected async handlePanelAction(_componentId: string, actionId: string): Promise<void> {
+        switch (actionId) {
+            case 'save':
+                // Handled by save-environment message
+                break;
+            case 'test':
+                // Handled by test-connection message
+                break;
+            case 'delete':
+                // Handled by delete-environment message
+                break;
+            case 'new':
+                this.createNewEnvironment();
+                break;
+            default:
+                this.componentLogger.warn('Unknown action ID', { actionId });
         }
     }
 

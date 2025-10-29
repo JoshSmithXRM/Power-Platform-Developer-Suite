@@ -31,6 +31,7 @@
 8. **Abstract methods for enforcement** - Make missing implementations compilation errors
 9. **Three-layer separation** - Service → Panel → Component
 10. **Refactor on 2nd duplication** - Don't wait for 3rd
+11. **Hook methods for panel events** - Use `handlePanelAction()` / `handleOtherComponentEvent()`, not `handleComponentEvent()`
 
 ---
 
@@ -89,6 +90,7 @@
 5. Not extending BaseBehavior → Silent failures
 6. Extension Host controlling UI → Webview owns layout
 7. Skipping panel-content wrapper → Breaks alignment
+8. Overriding handleComponentEvent() → Use hook methods instead
 
 ---
 
