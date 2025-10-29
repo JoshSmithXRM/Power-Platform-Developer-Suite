@@ -290,7 +290,7 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
         }
     }
 
-    private async handleComponentEvent(message: WebviewMessage): Promise<void> {
+    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
         try {
             // ComponentUtils.sendMessage puts everything in message.data
             const { componentId, eventType, data } = message.data || {};
@@ -332,46 +332,9 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
                 return;
             }
 
-            // Handle action bar events
-            if (componentId === 'envVars-actions' && eventType === 'actionClicked') {
-                const { actionId } = data;
-
-                // Try standard actions first
-                const handled = await this.handleStandardActions(actionId);
-                if (handled) {
-                    return;
-                }
-
-                // Handle panel-specific actions
-                switch (actionId) {
-                    case 'syncDeploymentBtn': {
-                        // Use original service data for deployment settings sync
-                        if (!this.currentEnvironmentVariablesData) {
-                            this.postMessage({ action: 'error', message: 'No environment variables data available for sync' });
-                            break;
-                        }
-                        const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
-
-                        await this.handleSyncDeploymentSettings(
-                            this.currentEnvironmentVariablesData,
-                            selectedSolution?.uniqueName
-                        );
-                        break;
-                    }
-                    case 'openInMakerBtn': {
-                        const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
-                        const solId = this.currentSolutionId; // Use tracked solution ID
-
-                        if (envId && solId) {
-                            await this.handleOpenInMaker(envId, solId, 'environment%20variables');
-                        } else {
-                            vscode.window.showWarningMessage('Please select an environment and solution first');
-                        }
-                        break;
-                    }
-                    default:
-                        this.componentLogger.warn('Unknown action ID', { actionId });
-                }
+            // Let BasePanel handle actionClicked events (calls handleStandardActions + handlePanelAction)
+            if (eventType === 'actionClicked') {
+                await super.handleComponentEvent(message);
                 return;
             }
 
@@ -408,6 +371,41 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
         } catch (error) {
             this.componentLogger.error('Error generating HTML content', error as Error);
             return this.getErrorHtml('Environment Variables', 'Failed to generate panel content: ' + error);
+        }
+    }
+
+    /**
+     * Override BasePanel's handlePanelAction to handle environment variables-specific actions
+     */
+    protected async handlePanelAction(_componentId: string, actionId: string): Promise<void> {
+        switch (actionId) {
+            case 'syncDeploymentBtn': {
+                // Use original service data for deployment settings sync
+                if (!this.currentEnvironmentVariablesData) {
+                    this.postMessage({ action: 'error', message: 'No environment variables data available for sync' });
+                    break;
+                }
+                const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
+
+                await this.handleSyncDeploymentSettings(
+                    this.currentEnvironmentVariablesData,
+                    selectedSolution?.uniqueName
+                );
+                break;
+            }
+            case 'openInMakerBtn': {
+                const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
+                const solId = this.currentSolutionId; // Use tracked solution ID
+
+                if (envId && solId) {
+                    await this.handleOpenInMaker(envId, solId, 'environment%20variables');
+                } else {
+                    vscode.window.showWarningMessage('Please select an environment and solution first');
+                }
+                break;
+            }
+            default:
+                this.componentLogger.warn('Unknown action ID', { actionId });
         }
     }
 

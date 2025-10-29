@@ -312,10 +312,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             });
 
             switch (action) {
-                case 'component-event':
-                    this.componentLogger.debug('🎯 Handling component-event');
-                    await this.handleComponentEvent(message);
-                    break;
+                // 'component-event' is now handled by BasePanel.handleCommonMessages()
 
                 case 'dropdown-item-clicked':
                     this.componentLogger.info('🎯 Handling dropdown-item-clicked');
@@ -405,20 +402,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                     }
                     break;
 
-                case 'split-ratio-changed':
-                    this.componentLogger.info('✅ Split ratio changed', { splitRatio: message.data?.splitRatio });
-                    await this.stateManager.updateCurrentPreferences({ splitRatio: message.data?.splitRatio });
-                    break;
-
-                case 'right-panel-opened':
-                    this.componentLogger.info('✅ Right panel opened');
-                    await this.stateManager.updateCurrentPreferences({ rightPanelVisible: true });
-                    break;
-
-                case 'right-panel-closed':
-                    this.componentLogger.info('✅ Right panel closed');
-                    await this.stateManager.updateCurrentPreferences({ rightPanelVisible: false });
-                    break;
+                // Split panel events are now handled via component-event by overridden handleComponentEvent
 
                 case 'filter-panel-collapsed':
                     this.componentLogger.info('✅ Filter panel collapsed state changed', { collapsed: message.data?.collapsed });
@@ -442,40 +426,52 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
     }
 
-    private async handleComponentEvent(message: WebviewMessage): Promise<void> {
+    /**
+     * Override BasePanel's handleComponentEvent to handle panel-specific component events
+     * Calls super for standard action bar handling, then handles other component types
+     */
+    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
+        const { componentId, eventType, data } = message.data || {};
+
+        this.componentLogger.debug('🔧 Component event', {
+            componentId,
+            eventType
+        });
+
+        // Let BasePanel handle actionClicked events (calls handleStandardActions + handlePanelAction)
+        if (eventType === 'actionClicked') {
+            await super.handleComponentEvent(message);
+            return;
+        }
+
+        // Handle panel-specific component events
         try {
-            const { componentId, eventType, data } = message.data || {};
-
-            this.componentLogger.debug('🔧 Component event', {
-                componentId,
-                eventType
-            });
-
-            // Handle action bar events
-            if (componentId === 'pluginTrace-actionBar' && eventType === 'actionClicked') {
-                const { actionId } = data;
-                this.componentLogger.info('✅ Action bar button clicked', { actionId });
-                await this.handleActionBarClick(actionId);
-            }
             // Handle data table context menu events
-            else if (componentId === 'pluginTrace-table' && eventType === 'contextMenuItemClicked') {
+            if (componentId === 'pluginTrace-table' && eventType === 'contextMenuItemClicked') {
                 const { itemId, rowId } = data;
                 this.componentLogger.info('✅ Context menu action clicked', { itemId, rowId });
                 await this.handleContextMenuAction(itemId, rowId);
+                return;
             }
+
             // Handle split panel events
-            else if (componentId === 'plugin-trace-split-panel' && eventType === 'splitRatioChanged') {
-                const { splitRatio } = data;
-                this.componentLogger.info('✅ Split ratio changed', { splitRatio });
-                await this.stateManager.updateCurrentPreferences({ splitRatio });
+            if (componentId === 'plugin-trace-split-panel') {
+                if (eventType === 'splitRatioChanged') {
+                    const { splitRatio } = data;
+                    this.componentLogger.info('✅ Split ratio changed', { splitRatio });
+                    await this.stateManager.updateCurrentPreferences({ splitRatio });
+                    return;
+                }
+                if (eventType === 'rightPanelOpened' || eventType === 'rightPanelClosed') {
+                    const { rightPanelVisible } = data;
+                    this.componentLogger.info('✅ Split panel visibility changed', { rightPanelVisible });
+                    await this.stateManager.updateCurrentPreferences({ rightPanelVisible });
+                    return;
+                }
             }
-            else if (componentId === 'plugin-trace-split-panel' && (eventType === 'rightPanelOpened' || eventType === 'rightPanelClosed')) {
-                const { rightPanelVisible } = data;
-                this.componentLogger.info('✅ Split panel visibility changed', { rightPanelVisible });
-                await this.stateManager.updateCurrentPreferences({ rightPanelVisible });
-            }
-            else if (eventType !== 'initialized') {
-                // Only log non-initialization events that we don't handle
+
+            // Log unhandled events (except initialization)
+            if (eventType !== 'initialized') {
                 this.componentLogger.debug('Unhandled component event', { componentId, eventType });
             }
         } catch (error: unknown) {

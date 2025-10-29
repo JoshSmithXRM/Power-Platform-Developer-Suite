@@ -167,9 +167,58 @@ export abstract class BasePanel<
                 return true;
             }
 
+            case 'component-event': {
+                // Route component events through common handler
+                await this.handleComponentEvent(message);
+                return true;
+            }
+
             default:
                 return false; // Not handled by base class
         }
+    }
+
+    /**
+     * Handle component events from webview
+     * Routes ActionBar actionClicked events to handleStandardActions + handlePanelAction
+     * Can be extended to handle other component events in the future
+     */
+    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
+        const { componentId, eventType, data } = message.data || {};
+
+        // Handle ActionBar actionClicked events
+        if (eventType === 'actionClicked') {
+            const { actionId } = data;
+
+            // Try standard actions first (refresh, export, etc.)
+            const handled = await this.handleStandardActions(actionId);
+            if (handled) {
+                return;
+            }
+
+            // Delegate to child panel for panel-specific actions
+            await this.handlePanelAction(componentId, actionId);
+            return;
+        }
+
+        // Other component event types can be handled here in the future
+        // (e.g., rowSelected, nodeExpanded, etc.)
+        this.componentLogger.warn('Unhandled component event', {
+            componentId,
+            eventType
+        });
+    }
+
+    /**
+     * Handle panel-specific action bar actions
+     * Override in child classes to handle custom actions
+     *
+     * @param componentId - The component that triggered the action
+     * @param actionId - The action that was triggered
+     */
+    protected async handlePanelAction(_componentId: string, _actionId: string): Promise<void> {
+        // Default: no custom actions
+        // Child panels override this to handle their specific actions
     }
 
     /**

@@ -159,7 +159,7 @@ export class EnvironmentSetupPanel extends BasePanel {
         }
     }
 
-    private async handleComponentEvent(message: WebviewMessage): Promise<void> {
+    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
         try {
             const { componentId, eventType, data } = message.data || {};
 

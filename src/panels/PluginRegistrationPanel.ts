@@ -434,33 +434,40 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
                 this.closeDetailsPanel();
                 break;
 
-            case 'component-event': {
-                const { componentId, eventType, data } = message.data || {};
-
-                // Handle action bar events
-                if (componentId === 'pluginRegistration-actionBar' && eventType === 'actionClicked') {
-                    const { actionId } = data;
-
-                    // Try standard actions first
-                    const handled = await this.handleStandardActions(actionId);
-                    if (handled) {
-                        return;
-                    }
-
-                    // No other panel-specific actions in plugin registration
-                    this.componentLogger.warn('Unknown action ID', { actionId });
-                    return;
-                }
-
-                // Handle SplitPanel events
-                if (componentId === 'pluginRegistration-splitPanel') {
-                    if (eventType === 'rightPanelClosed') {
-                        this.selectedNode = undefined;
-                    }
-                }
-                break;
-            }
+            // 'component-event' is now handled by BasePanel.handleCommonMessages()
         }
+    }
+
+    /**
+     * Override BasePanel's handleComponentEvent to handle plugin registration-specific component events
+     */
+    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
+        const { componentId, eventType } = message.data || {};
+
+        // Let BasePanel handle actionClicked events (calls handleStandardActions + handlePanelAction)
+        if (eventType === 'actionClicked') {
+            await super.handleComponentEvent(message);
+            return;
+        }
+
+        // Handle SplitPanel events
+        if (componentId === 'pluginRegistration-splitPanel') {
+            if (eventType === 'rightPanelClosed') {
+                this.selectedNode = undefined;
+            }
+            return;
+        }
+
+        // Other component events
+        this.componentLogger.trace('Component event not handled', { componentId, eventType });
+    }
+
+    /**
+     * Override BasePanel's handlePanelAction - no custom actions for plugin registration
+     */
+    protected async handlePanelAction(_componentId: string, actionId: string): Promise<void> {
+        // No panel-specific actions in plugin registration
+        this.componentLogger.warn('Unknown action ID', { actionId });
     }
 
     /**

@@ -286,7 +286,7 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
         }
     }
 
-    private async handleComponentEvent(message: WebviewMessage): Promise<void> {
+    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
         try {
             const { componentId, eventType, data } = message.data || {};
 
@@ -299,30 +299,9 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
                 this.componentLogger.debug('Component event received', { componentId, eventType });
             }
 
-            // Handle action bar events
-            if (componentId === 'importJobs-actions' && eventType === 'actionClicked') {
-                const { actionId } = data;
-
-                // Try standard actions first
-                const handled = await this.handleStandardActions(actionId);
-                if (handled) {
-                    return;
-                }
-
-                // Handle panel-specific actions
-                switch (actionId) {
-                    case 'openSolutionHistory': {
-                        const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
-                        if (envId) {
-                            await this.handleOpenSolutionHistory(envId);
-                        } else {
-                            vscode.window.showWarningMessage('Please select an environment first');
-                        }
-                        break;
-                    }
-                    default:
-                        this.componentLogger.warn('Unknown action ID', { actionId });
-                }
+            // Let BasePanel handle actionClicked events (calls handleStandardActions + handlePanelAction)
+            if (eventType === 'actionClicked') {
+                await super.handleComponentEvent(message);
                 return;
             }
 
@@ -348,6 +327,25 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
                 componentId: message.componentId,
                 eventType: message.eventType
             });
+        }
+    }
+
+    /**
+     * Override BasePanel's handlePanelAction to handle import job viewer-specific actions
+     */
+    protected async handlePanelAction(_componentId: string, actionId: string): Promise<void> {
+        switch (actionId) {
+            case 'openSolutionHistory': {
+                const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
+                if (envId) {
+                    await this.handleOpenSolutionHistory(envId);
+                } else {
+                    vscode.window.showWarningMessage('Please select an environment first');
+                }
+                break;
+            }
+            default:
+                this.componentLogger.warn('Unknown action ID', { actionId });
         }
     }
 

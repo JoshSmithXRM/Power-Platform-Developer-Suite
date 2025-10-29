@@ -12,6 +12,7 @@ console.log(`ComponentUtils.js: Saved ${savedStubRegistrations.length} pending r
 class ComponentUtils {
     static components = new Map();
     static messageHandlers = new Map();
+    static panelHandlers = new Map();  // Panel-level message handlers
     static isInitialized = false;
     static vscode = null;
     static messageQueue = [];
@@ -384,25 +385,70 @@ class ComponentUtils {
     }
 
     /**
+     * Register a panel-level message handler
+     * Panel handlers are invoked BEFORE component routing, allowing panels to:
+     * - Handle panel-specific actions (showTraceDetails, closeDetailPanel, etc.)
+     * - Intercept messages that need special handling
+     * - Pass through component messages by returning false
+     *
+     * @param {string} panelId - Unique identifier for the panel (e.g., 'pluginTraceViewer')
+     * @param {function} handler - Handler function that receives message and returns boolean
+     *                            (true = handled, false = pass through to component routing)
+     */
+    static registerPanelHandler(panelId, handler) {
+        if (!panelId || typeof handler !== 'function') {
+            console.error('Invalid panelId or handler for panel registration');
+            return;
+        }
+
+        this.panelHandlers.set(panelId, handler);
+        console.log(`Registered panel handler: ${panelId}`);
+    }
+
+    /**
+     * Unregister a panel-level message handler
+     */
+    static unregisterPanelHandler(panelId) {
+        if (this.panelHandlers.has(panelId)) {
+            this.panelHandlers.delete(panelId);
+            console.log(`Unregistered panel handler: ${panelId}`);
+        }
+    }
+
+    /**
      * Handle incoming messages from Extension Host
      */
     static handleMessage(event) {
         try {
             const message = event.data;
-            
+
             if (!message || !message.action) {
                 return;
             }
 
+            // First priority: Try panel-level handlers
+            // Panel handlers can intercept messages and return true (handled) or false (pass through)
+            for (const [panelId, handler] of this.panelHandlers) {
+                try {
+                    const handled = handler(message);
+                    if (handled) {
+                        console.log(`Message handled by panel handler: ${panelId}`);
+                        return;
+                    }
+                } catch (error) {
+                    console.error(`Error in panel handler ${panelId}:`, error);
+                    // Continue to next handler on error
+                }
+            }
 
-            // First priority: Try component-specific handlers (new system)
+            // Second priority: Try component-specific handlers (new system)
             if (message.componentId && this.componentHandlers && this.componentHandlers.has(message.componentId)) {
                 const handler = this.componentHandlers.get(message.componentId);
                 handler(message);
                 return;
             }
 
-            // Second priority: Try component-specific behavior handlers (existing system)
+            // Third priority: Try component-specific behavior handlers (existing system)
             if (message.componentId) {
                 const component = this.getComponent(message.componentId);
                 if (component && component.behaviorInstance && component.behaviorInstance.handleMessage) {
@@ -411,7 +457,7 @@ class ComponentUtils {
                 }
             }
 
-            // Third priority: Route to specific behavior static handlers
+            // Fourth priority: Route to specific behavior static handlers
             if (message.action === 'componentUpdate' ||
                 message.action === 'componentStateChange' ||
                 message.action === 'setQuickFilters' ||
@@ -421,7 +467,7 @@ class ComponentUtils {
                 return;
             }
 
-            // Fourth priority: Try global action handlers
+            // Fifth priority: Try global action handlers
             const handler = this.messageHandlers.get(message.action);
             if (handler) {
                 handler(message);

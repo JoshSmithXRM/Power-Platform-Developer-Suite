@@ -39,45 +39,57 @@ class PluginTraceViewerBehavior {
 
     /**
      * Setup message handler for trace detail operations
+     * Registers with ComponentUtils instead of global listener
      */
     static setupMessageHandler() {
-        window.addEventListener('message', (event) => {
-            const message = event.data;
+        // Register panel handler with ComponentUtils
+        // Handler returns true if message was handled, false to pass through
+        if (window.ComponentUtils && window.ComponentUtils.registerPanelHandler) {
+            window.ComponentUtils.registerPanelHandler('pluginTraceViewer', (message) => {
+                console.log('📨 PluginTraceViewerBehavior message received:', message.action);
 
-            console.log('📨 PluginTraceViewerBehavior message received:', message.action);
+                switch (message.action) {
+                    case 'showTraceDetails':
+                        console.log('🎯 Showing trace detail panel', message);
+                        PluginTraceViewerBehavior.showTraceDetailPanel(message.trace, message.relatedTraces);
+                        return true;
 
-            switch (message.action) {
-                case 'showTraceDetails':
-                    console.log('🎯 Showing trace detail panel', message);
-                    this.showTraceDetailPanel(message.trace, message.relatedTraces);
-                    break;
+                    case 'closeDetailPanel':
+                        console.log('🚪 Closing detail panel');
+                        PluginTraceViewerBehavior.closeDetailPanel();
+                        return true;
 
-                case 'closeDetailPanel':
-                    console.log('🚪 Closing detail panel');
-                    this.closeDetailPanel();
-                    break;
+                    case 'exportTraces':
+                        console.log('📤 Export request received', { format: message.format, dataLength: message.data?.length });
+                        PluginTraceViewerBehavior.handleExport(message);
+                        return true;
 
-                case 'exportTraces':
-                    console.log('📤 Export request received', { format: message.format, dataLength: message.data?.length });
-                    this.handleExport(message);
-                    break;
+                    case 'switchToTimelineTab':
+                        const timelineTab = document.querySelector('[data-tab="timeline"]');
+                        if (timelineTab) {
+                            timelineTab.click();
+                        }
+                        return true;
 
-                case 'switchToTimelineTab':
-                    const timelineTab = document.querySelector('[data-tab="timeline"]');
-                    if (timelineTab) {
-                        timelineTab.click();
-                    }
-                    break;
+                    case 'setSplitRatio':
+                        console.log('📏 Setting split ratio:', message.ratio);
+                        if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has(message.componentId)) {
+                            const instance = window.SplitPanelBehavior.instances.get(message.componentId);
+                            window.SplitPanelBehavior.setSplitRatio(instance, message.ratio);
+                            return true;
+                        }
+                        console.warn('SplitPanelBehavior instance not found:', message.componentId);
+                        return false;
 
-                case 'setSplitRatio':
-                    console.log('📏 Setting split ratio:', message.ratio);
-                    if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has(message.componentId)) {
-                        const instance = window.SplitPanelBehavior.instances.get(message.componentId);
-                        window.SplitPanelBehavior.setSplitRatio(instance, message.ratio);
-                    }
-                    break;
-            }
-        });
+                    default:
+                        // Not a panel-specific action, pass through to component routing
+                        return false;
+                }
+            });
+            console.log('✅ PluginTraceViewerBehavior registered with ComponentUtils');
+        } else {
+            console.error('ComponentUtils not available, cannot register panel handler');
+        }
     }
 
     /**

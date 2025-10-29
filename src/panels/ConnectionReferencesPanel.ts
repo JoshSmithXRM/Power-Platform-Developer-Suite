@@ -316,7 +316,7 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
         }
     }
 
-    private async handleComponentEvent(message: WebviewMessage): Promise<void> {
+    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
         try {
             // ComponentUtils.sendMessage puts everything in message.data
             const { componentId, eventType, data } = message.data || {};
@@ -361,49 +361,13 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
                 return;
             }
 
-            // Handle action bar events
-            if (componentId === 'connectionRefs-actions' && eventType === 'actionClicked') {
-                const { actionId } = data;
-
-                // Try standard actions first
-                const handled = await this.handleStandardActions(actionId);
-                if (handled) {
-                    return;
-                }
-
-                // Handle panel-specific actions
-                switch (actionId) {
-                    case 'syncDeploymentBtn': {
-                        // Use original service data for deployment settings sync
-                        if (!this.currentRelationshipData) {
-                            this.postMessage({ action: 'error', message: 'No relationship data available for sync' });
-                            break;
-                        }
-                        const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
-
-                        await this.handleSyncDeploymentSettings(
-                            this.currentRelationshipData,
-                            selectedSolution?.uniqueName
-                        );
-                        break;
-                    }
-                    case 'openInMakerBtn': {
-                        const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
-                        const solId = this.currentSolutionId; // Use tracked solution ID
-
-                        if (envId && solId) {
-                            await this.handleOpenInMaker(envId, solId, 'connectionreferences');
-                        } else {
-                            vscode.window.showWarningMessage('Please select an environment and solution first');
-                        }
-                        break;
-                    }
-                    default:
-                        this.componentLogger.warn('Unknown action ID', { actionId });
-                }
+            // Let BasePanel handle actionClicked events (calls handleStandardActions + handlePanelAction)
+            if (eventType === 'actionClicked') {
+                await super.handleComponentEvent(message);
                 return;
             }
 
+            // Handle panel-specific component events (non-actionClicked)
             // Handle other component events as needed
             this.componentLogger.trace('Component event not handled', { componentId, eventType });
 
@@ -412,6 +376,41 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
                 componentId: message.componentId,
                 eventType: message.eventType
             });
+        }
+    }
+
+    /**
+     * Override BasePanel's handlePanelAction to handle connection references-specific actions
+     */
+    protected async handlePanelAction(_componentId: string, actionId: string): Promise<void> {
+        switch (actionId) {
+            case 'syncDeploymentBtn': {
+                // Use original service data for deployment settings sync
+                if (!this.currentRelationshipData) {
+                    this.postMessage({ action: 'error', message: 'No relationship data available for sync' });
+                    break;
+                }
+                const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
+
+                await this.handleSyncDeploymentSettings(
+                    this.currentRelationshipData,
+                    selectedSolution?.uniqueName
+                );
+                break;
+            }
+            case 'openInMakerBtn': {
+                const envId = this.environmentSelectorComponent?.getSelectedEnvironment()?.id;
+                const solId = this.currentSolutionId; // Use tracked solution ID
+
+                if (envId && solId) {
+                    await this.handleOpenInMaker(envId, solId, 'connectionreferences');
+                } else {
+                    vscode.window.showWarningMessage('Please select an environment and solution first');
+                }
+                break;
+            }
+            default:
+                this.componentLogger.warn('Unknown action ID', { actionId });
         }
     }
 

@@ -537,7 +537,7 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
         }
     }
 
-    private async handleComponentEvent(message: WebviewMessage): Promise<void> {
+    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
         try {
             const { componentId, eventType, data } = message.data || {};
 
@@ -550,27 +550,13 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
                 this.componentLogger.debug('Component event received', { componentId, eventType });
             }
 
-            // Handle action bar events
-            if (componentId === 'metadata-actions' && eventType === 'actionClicked') {
-                const { actionId } = data;
-
-                // Try standard actions first
-                const handled = await this.handleStandardActions(actionId);
-                if (handled) {
-                    return;
-                }
-
-                // Handle panel-specific actions
-                switch (actionId) {
-                    case 'openInMaker':
-                        await this.handleOpenInMaker();
-                        break;
-                    default:
-                        this.componentLogger.warn('Unknown action ID', { actionId });
-                }
+            // Let BasePanel handle actionClicked events (calls handleStandardActions + handlePanelAction)
+            if (eventType === 'actionClicked') {
+                await super.handleComponentEvent(message);
                 return;
             }
 
+            // Handle panel-specific component events
             // Handle context menu events
             if (eventType === 'contextMenuItemClicked') {
                 const { itemId, rowData } = data;
@@ -614,6 +600,19 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
                 componentId: message.componentId,
                 eventType: message.eventType
             });
+        }
+    }
+
+    /**
+     * Override BasePanel's handlePanelAction to handle metadata browser-specific actions
+     */
+    protected async handlePanelAction(_componentId: string, actionId: string): Promise<void> {
+        switch (actionId) {
+            case 'openInMaker':
+                await this.handleOpenInMaker();
+                break;
+            default:
+                this.componentLogger.warn('Unknown action ID', { actionId });
         }
     }
 
