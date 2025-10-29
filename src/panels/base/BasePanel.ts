@@ -248,20 +248,15 @@ export abstract class BasePanel<
      * Handle non-action component events (optional hook for child panels)
      * Override to handle events like: rowSelected, nodeExpanded, nodeCollapsed, etc.
      *
-     * Default implementation: warns about unhandled events
+     * Default implementation: does nothing (override in child panel to handle events)
      *
      * @param componentId - The component that triggered the event
      * @param eventType - The type of event (e.g., 'rowSelected', 'nodeExpanded')
      * @param data - The event data payload
      */
-    protected async handleOtherComponentEvent(componentId: string, eventType: string, data?: unknown): Promise<void> {
-        // Default: log warning for unhandled component events
-        // Child panels can override to handle specific event types (rowSelected, nodeExpanded, etc.)
-        this.componentLogger.warn('Unhandled component event', {
-            componentId,
-            eventType,
-            data
-        });
+    protected async handleOtherComponentEvent(_componentId: string, _eventType: string, _data?: unknown): Promise<void> {
+        // Default: no custom component event handling
+        // Child panels override this to handle their specific event types (rowSelected, nodeExpanded, etc.)
     }
 
     /**
