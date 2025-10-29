@@ -205,6 +205,13 @@ export abstract class BasePanel<
     protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
         const { componentId, eventType, data } = message.data || {};
 
+        // Log component event for debugging
+        this.componentLogger.debug('Component event received', {
+            componentId,
+            eventType,
+            data
+        });
+
         // Handle ActionBar actionClicked events
         if (eventType === 'actionClicked') {
             const { actionId } = data;
