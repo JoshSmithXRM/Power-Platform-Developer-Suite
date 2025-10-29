@@ -85,6 +85,14 @@ export default tseslint.config(
       // 5. General Code Quality
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-var-requires': 'error'
+
+      // 6. Type Safety - Prevent implicit 'any' violations
+      // TODO: Enable these rules and fix 739 violations (see docs/TECHNICAL_DEBT_TYPE_SAFETY.md)
+      // '@typescript-eslint/no-unsafe-return': 'error',
+      // '@typescript-eslint/no-unsafe-assignment': 'error',
+      // '@typescript-eslint/no-unsafe-member-access': 'error',
+      // '@typescript-eslint/no-unsafe-call': 'error',
+      // '@typescript-eslint/no-unsafe-argument': 'error'
     }
   },
   {
