@@ -218,6 +218,15 @@ export class EnvironmentSetupPanel extends BasePanel {
     }
 
     /**
+     * Apply preferences to restore panel state (Template Method Pattern)
+     * Called automatically by BasePanel after environment load/switch
+     */
+    protected async applyPreferences(_prefs: Record<string, never> | null): Promise<void> {
+        // Not applicable - this panel is for configuring environments, doesn't have preferences
+        this.componentLogger.debug('applyPreferences called on setup panel (no-op)');
+    }
+
+    /**
      * Load data for an environment (not applicable to setup panel)
      */
     protected async loadEnvironmentData(_environmentId: string): Promise<void> {

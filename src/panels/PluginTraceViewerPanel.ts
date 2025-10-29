@@ -126,101 +126,21 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             this.jsonViewerComponent
         ]);
 
-        // Initialize the panel (this calls loadEnvironments internally)
+        // Initialize the panel
+        // BasePanel.initialize() will:
+        // 1. Render HTML with defaults
+        // 2. Load environments and auto-select
+        // 3. Automatically call applyPreferences() to restore state
         this.initialize().then(async () => {
-            // Set the selected environment ID after auto-selection
             const selectedEnv = this.environmentSelectorComponent!.getSelectedEnvironment();
-            if (selectedEnv) {
+            if (selectedEnv && this.currentEnvironmentId) {
                 this.componentLogger.info('Environment auto-selected', { environmentId: selectedEnv.id });
 
-                // Restore preferences from state manager
-                const prefs = await this.stateManager.getCurrentPreferences();
-
-                this.componentLogger.debug('📦 Loaded preferences', {
-                    hasPrefs: !!prefs,
-                    hasFilters: !!prefs?.filters
-                });
-
-                // Restore auto-refresh interval from preferences
-                if (prefs?.autoRefreshIntervalSeconds) {
-                    this.autoRefreshIntervalSeconds = prefs.autoRefreshIntervalSeconds;
-                    this.componentLogger.info('Restored auto-refresh interval from preferences', {
-                        intervalSeconds: this.autoRefreshIntervalSeconds
-                    });
-                    this.updateAutoRefreshButton(this.autoRefreshIntervalSeconds);
-                }
-
-                // Restore filters from preferences
-                if (prefs?.filters) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const savedFilters = prefs.filters as any;
-
-                    this.componentLogger.debug('Raw saved filters from state', {
-                        savedFilters,
-                        quickType: Array.isArray(savedFilters.quick) ? 'array' : typeof savedFilters.quick,
-                        advancedType: Array.isArray(savedFilters.advanced) ? 'array' : typeof savedFilters.advanced
-                    });
-
-                    // Convert objects to arrays if needed (happens when data is serialized/deserialized)
-                    const quickFiltersArray = Array.isArray(savedFilters.quick) ? savedFilters.quick :
-                        (savedFilters.quick && typeof savedFilters.quick === 'object' ? Object.values(savedFilters.quick) : []);
-                    const advancedFiltersArray = Array.isArray(savedFilters.advanced) ? savedFilters.advanced :
-                        (savedFilters.advanced && typeof savedFilters.advanced === 'object' ? Object.values(savedFilters.advanced) : []);
-
-                    this.componentLogger.debug('Converted to arrays', {
-                        quickFiltersArray,
-                        advancedFiltersArray,
-                        quickIsArray: Array.isArray(quickFiltersArray),
-                        advancedIsArray: Array.isArray(advancedFiltersArray)
-                    });
-
-                    this.currentFilters = {
-                        quick: quickFiltersArray,
-                        advanced: advancedFiltersArray
-                    };
-                    this.componentLogger.debug('Restored filters from cache', {
-                        quickCount: quickFiltersArray.length,
-                        advancedCount: advancedFiltersArray.length
-                    });
-
-                    // Store filters to apply after webview is ready
-                    // We'll apply them in response to the 'panel-ready' event
-                    this.pendingFilterRestoration = {
-                        quick: quickFiltersArray,
-                        advanced: advancedFiltersArray
-                    };
-                }
-
-                // Restore filter panel collapsed state
-                if (typeof prefs?.filterPanelCollapsed === 'boolean') {
-                    this.componentLogger.info('Restoring filter panel collapsed state', {
-                        collapsed: prefs.filterPanelCollapsed
-                    });
-                    // Send message to webview after panel-ready
-                    setTimeout(() => {
-                        this.postMessage({
-                            action: 'componentStateChange',
-                            componentId: 'pluginTrace-filterPanel',
-                            state: {
-                                collapsed: prefs.filterPanelCollapsed
-                            }
-                        });
-                    }, 100);
-                }
-
                 // Query current trace level from Dynamics
-                if (this.currentEnvironmentId) {
-                    await this.handleGetTraceLevel(this.currentEnvironmentId);
+                await this.handleGetTraceLevel(this.currentEnvironmentId);
 
-                    // Load traces (will use restored filters if any)
-                    await this.handleLoadTraces(this.currentEnvironmentId, this.currentFilters);
-                }
-
-                // Start auto-refresh if it was enabled
-                if (this.autoRefreshIntervalSeconds > 0) {
-                    this.componentLogger.info('Starting auto-refresh from cached state');
-                    this.startAutoRefresh();
-                }
+                // Load traces (will use restored filters from applyPreferences)
+                await this.handleLoadTraces(this.currentEnvironmentId, this.currentFilters);
             }
         });
 
@@ -591,17 +511,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             const environments = await this._authService.getEnvironments();
 
             const instanceState = await this.stateManager.getInstanceState();
-            const prefs = await this.stateManager.getCurrentPreferences();
             const selectedEnvironmentId = this.currentEnvironmentId || instanceState?.selectedEnvironmentId || environments[0]?.id;
-
-            // Restore auto-refresh interval from preferences
-            if (prefs?.autoRefreshIntervalSeconds) {
-                this.autoRefreshIntervalSeconds = prefs.autoRefreshIntervalSeconds;
-                this.componentLogger.info('Restored auto-refresh interval from preferences', {
-                    intervalSeconds: this.autoRefreshIntervalSeconds
-                });
-                this.updateAutoRefreshButton(this.autoRefreshIntervalSeconds);
-            }
 
             this.postMessage({
                 action: 'environmentsLoaded',
@@ -613,12 +523,6 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                 this.currentEnvironmentId = selectedEnvironmentId;
                 await this.handleGetTraceLevel(selectedEnvironmentId);
                 await this.handleLoadTraces(selectedEnvironmentId);
-
-                // Start auto-refresh if it was enabled
-                if (this.autoRefreshIntervalSeconds > 0) {
-                    this.componentLogger.info('Starting auto-refresh from cached state');
-                    this.startAutoRefresh();
-                }
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to load environments';
@@ -686,6 +590,87 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         await this.loadEnvironmentData(environmentId);
 
         this.componentLogger.info('✅ Environment switch complete');
+    }
+
+    /**
+     * Apply preferences to restore panel state (Template Method Pattern)
+     * Called automatically by BasePanel after environment load/switch
+     */
+    protected async applyPreferences(prefs: PluginTraceViewerPreferences | null): Promise<void> {
+        if (!prefs) {
+            this.componentLogger.debug('No preferences to apply');
+            return;
+        }
+
+        this.componentLogger.info('Applying preferences', { prefs });
+
+        // 1. Auto-refresh interval (component + UI state)
+        if (prefs.autoRefreshIntervalSeconds !== undefined) {
+            this.autoRefreshIntervalSeconds = prefs.autoRefreshIntervalSeconds;
+            this.updateAutoRefreshButton(prefs.autoRefreshIntervalSeconds);
+
+            // Start auto-refresh if enabled
+            if (prefs.autoRefreshIntervalSeconds > 0) {
+                this.componentLogger.debug('Starting auto-refresh from preferences');
+                this.startAutoRefresh();
+            }
+        }
+
+        // 2. Split ratio (layout state) - send to webview
+        if (prefs.splitRatio !== undefined) {
+            this.componentLogger.debug('Restoring split ratio', { ratio: prefs.splitRatio });
+            this.postMessage({
+                action: 'setSplitRatio',
+                componentId: 'plugin-trace-split-panel',
+                ratio: prefs.splitRatio
+            });
+        }
+
+        // 3. Filters (component state) - will be applied when panel-ready fires
+        if (prefs.filters) {
+            const filters = prefs.filters as { quick: unknown; advanced: unknown };
+
+            // Convert objects to arrays if needed (serialization issue)
+            const quickFiltersArray = Array.isArray(filters.quick) ? filters.quick :
+                (filters.quick && typeof filters.quick === 'object' ? Object.values(filters.quick) : []);
+            const advancedFiltersArray = Array.isArray(filters.advanced) ? filters.advanced :
+                (filters.advanced && typeof filters.advanced === 'object' ? Object.values(filters.advanced) : []);
+
+            this.currentFilters = {
+                quick: quickFiltersArray as string[],
+                advanced: advancedFiltersArray as FilterCondition[]
+            };
+
+            // Store for application after webview is ready
+            this.pendingFilterRestoration = this.currentFilters;
+
+            this.componentLogger.debug('Filters queued for restoration', {
+                quickCount: quickFiltersArray.length,
+                advancedCount: advancedFiltersArray.length
+            });
+        }
+
+        // 4. Filter panel collapsed state (layout state)
+        if (typeof prefs.filterPanelCollapsed === 'boolean') {
+            this.componentLogger.debug('Restoring filter panel collapsed state', {
+                collapsed: prefs.filterPanelCollapsed
+            });
+            // Send after a short delay to ensure webview is ready
+            setTimeout(() => {
+                this.postMessage({
+                    action: 'componentStateChange',
+                    componentId: 'pluginTrace-filterPanel',
+                    state: {
+                        collapsed: prefs.filterPanelCollapsed
+                    }
+                });
+            }, 100);
+        }
+
+        // Note: rightPanelVisible is NOT restored intentionally
+        // Detail panel should always start hidden until user selects a trace
+
+        this.componentLogger.info('✅ Preferences applied successfully');
     }
 
     /**

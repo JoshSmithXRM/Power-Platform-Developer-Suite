@@ -388,6 +388,16 @@ export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceSta
     }
 
     /**
+     * Apply preferences to restore panel state (Template Method Pattern)
+     * Called automatically by BasePanel after environment load/switch
+     */
+    protected async applyPreferences(prefs: SolutionExplorerPreferences | null): Promise<void> {
+        // No preferences to restore for this panel yet
+        // Future: Could restore sort order, filter preferences, etc.
+        this.componentLogger.debug('applyPreferences called (no preferences defined yet)', { hasPrefs: !!prefs });
+    }
+
+    /**
      * Load data for an environment (PURE data loading, no switching side effects)
      */
     protected async loadEnvironmentData(environmentId: string): Promise<void> {

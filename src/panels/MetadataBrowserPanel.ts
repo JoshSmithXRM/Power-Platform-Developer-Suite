@@ -863,6 +863,50 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
     }
 
     /**
+     * Apply preferences to restore panel state (Template Method Pattern)
+     * Called automatically by BasePanel after environment load/switch
+     */
+    protected async applyPreferences(prefs: MetadataBrowserPreferences | null): Promise<void> {
+        if (!prefs) {
+            this.componentLogger.debug('No preferences to apply');
+            return;
+        }
+
+        this.componentLogger.info('Applying preferences', { prefs });
+
+        // 1. Restore collapsed sections state
+        if (prefs.collapsedSections && Array.isArray(prefs.collapsedSections)) {
+            this.collapsedSections = new Set(prefs.collapsedSections);
+            this.componentLogger.debug('Restored collapsed sections', {
+                sections: Array.from(this.collapsedSections)
+            });
+        }
+
+        // 2. Restore selected entity (if any)
+        if (prefs.selectedEntityLogicalName && this.currentEnvironmentId) {
+            this.componentLogger.debug('Restoring selected entity', {
+                logicalName: prefs.selectedEntityLogicalName
+            });
+
+            try {
+                // Load the entity metadata
+                await this.loadEntityMetadata(
+                    this.currentEnvironmentId,
+                    prefs.selectedEntityLogicalName,
+                    prefs.selectedEntityMetadataId || '',
+                    prefs.selectedEntityLogicalName // Use logical name as fallback for display name
+                );
+                this.componentLogger.info('Successfully restored selected entity');
+            } catch (error) {
+                this.componentLogger.error('Failed to restore selected entity', error as Error);
+                // Don't fail entirely - just log the error and continue
+            }
+        }
+
+        this.componentLogger.info('✅ Preferences applied successfully');
+    }
+
+    /**
      * Load data for an environment (PURE data loading, no switching side effects)
      */
     protected async loadEnvironmentData(environmentId: string): Promise<void> {
@@ -1128,6 +1172,12 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
             this.selectedChoiceName = undefined;
             this.selectedChoiceDisplayName = undefined;
 
+            // Save selected entity to preferences
+            await this.stateManager.updateCurrentPreferences({
+                selectedEntityLogicalName: logicalName,
+                selectedEntityMetadataId: metadataId
+            });
+
             // Transform and update tables
             const attributesData = this.transformAttributesData(metadata.attributes);
             const keysData = this.transformKeysData(metadata.keys);
@@ -1384,12 +1434,17 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
         }
     }
 
-    private toggleSection(sectionId: string): void {
+    private async toggleSection(sectionId: string): Promise<void> {
         if (this.collapsedSections.has(sectionId)) {
             this.collapsedSections.delete(sectionId);
         } else {
             this.collapsedSections.add(sectionId);
         }
+
+        // Save collapsed sections to preferences
+        await this.stateManager.updateCurrentPreferences({
+            collapsedSections: Array.from(this.collapsedSections)
+        });
 
         // No updateWebview() needed - webview behavior handles visual toggle optimistically
         // State is tracked here for persistence when getHtmlContent() is called again

@@ -72,6 +72,15 @@ export class DataExplorerPanel extends BasePanel<DataExplorerInstanceState, Data
     }
 
     /**
+     * Apply preferences to restore panel state (Template Method Pattern)
+     * Called automatically by BasePanel after environment load/switch
+     */
+    protected async applyPreferences(prefs: DataExplorerPreferences | null): Promise<void> {
+        // No preferences to restore for this placeholder panel
+        this.componentLogger.debug('applyPreferences called (placeholder panel)', { hasPrefs: !!prefs });
+    }
+
+    /**
      * Load data for an environment (stub implementation for placeholder panel)
      */
     protected async loadEnvironmentData(_environmentId: string): Promise<void> {

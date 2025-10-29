@@ -434,6 +434,16 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
     }
 
     /**
+     * Apply preferences to restore panel state (Template Method Pattern)
+     * Called automatically by BasePanel after environment load/switch
+     */
+    protected async applyPreferences(prefs: ConnectionReferencesPreferences | null): Promise<void> {
+        // No preferences to restore for this panel yet
+        // Future: Could restore filter states, sort order, collapsed sections, etc.
+        this.componentLogger.debug('applyPreferences called (no preferences defined yet)', { hasPrefs: !!prefs });
+    }
+
+    /**
      * Load data for an environment (PURE data loading, no switching side effects)
      */
     protected async loadEnvironmentData(environmentId: string): Promise<void> {

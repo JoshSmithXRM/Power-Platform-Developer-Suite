@@ -122,11 +122,18 @@ export abstract class BasePanel<
     protected async initialize(): Promise<void> {
         this.componentLogger.debug('Panel initialization starting', { viewType: this.viewType });
 
-        // Initialize UI
+        // Phase 1: Render initial HTML with defaults
         this.updateWebview();
 
-        // Load environments if panel has an environment selector
+        // Phase 2: Load environments and preferences
         await this.loadEnvironments();
+
+        // Phase 3: Apply loaded preferences (automatically restores state)
+        const prefs = await this.stateManager.getCurrentPreferences();
+        this.componentLogger.debug('Applying preferences after initialization', {
+            hasPreferences: !!prefs
+        });
+        await this.applyPreferences(prefs);
 
         this.componentLogger.info('Panel initialization completed', { viewType: this.viewType });
     }
@@ -175,6 +182,45 @@ export abstract class BasePanel<
      * Get the HTML content for the webview
      */
     protected abstract getHtmlContent(): string;
+
+    /**
+     * Apply preferences to the panel (Template Method Pattern)
+     *
+     * This method is called automatically:
+     * - After initial environment load in initialize()
+     * - After environment switches in processEnvironmentSelection()
+     *
+     * Child panels implement HOW to restore their specific preferences:
+     * - Component state (via component APIs like component.setData())
+     * - Layout state (via messages to webview like postMessage('setSplitRatio'))
+     * - UI state (via component methods like updateButton())
+     *
+     * Example:
+     * ```typescript
+     * protected async applyPreferences(prefs: MyPreferences | null): Promise<void> {
+     *     if (!prefs) return;
+     *
+     *     // Component state
+     *     if (prefs.filters) {
+     *         this.filterComponent.setFilters(prefs.filters);
+     *     }
+     *
+     *     // Layout state
+     *     if (prefs.splitRatio) {
+     *         this.postMessage({ action: 'setSplitRatio', ratio: prefs.splitRatio });
+     *     }
+     *
+     *     // UI state
+     *     if (prefs.autoRefreshInterval) {
+     *         this.autoRefreshInterval = prefs.autoRefreshInterval;
+     *         this.updateAutoRefreshButton(prefs.autoRefreshInterval);
+     *     }
+     * }
+     * ```
+     *
+     * @param prefs The preferences to apply (null if no saved preferences exist)
+     */
+    protected abstract applyPreferences(prefs: TPreferences | null): Promise<void>;
 
     /**
      * Update the webview content
@@ -463,6 +509,14 @@ export abstract class BasePanel<
             if (this.environmentSelectorComponent) {
                 this.environmentSelectorComponent.setSelectedEnvironment(environmentId);
             }
+
+            // Apply loaded preferences for new environment (automatically restores state)
+            const prefs = await this.stateManager.getCurrentPreferences();
+            this.componentLogger.debug('Applying preferences after environment switch', {
+                environmentId,
+                hasPreferences: !!prefs
+            });
+            await this.applyPreferences(prefs);
 
             // Call child panel's hook to load data
             await this.onEnvironmentChanged(environmentId);

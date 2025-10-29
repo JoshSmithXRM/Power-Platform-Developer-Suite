@@ -391,27 +391,34 @@ class SplitPanelBehavior extends BaseBehavior {
     }
 
     /**
-     * Set split ratio
+     * Set split ratio (from preference restoration)
+     * Does NOT trigger save event (avoids circular save loops)
      */
     static setSplitRatio(instance, ratio) {
+        console.log('🔧 setSplitRatio called', { ratio, rightPanelVisible: instance.rightPanelVisible });
+
         if (ratio < 0 || ratio > 100) {
             console.error('SplitPanelBehavior: Split ratio must be between 0 and 100');
             return;
         }
 
-        if (!instance.rightPanelVisible) {
-            // If right panel is hidden, show it first
-            this.showRightPanel(instance);
+        // Only apply if right panel is visible
+        // If hidden, ratio will be applied when panel is shown
+        if (instance.rightPanelVisible) {
+            console.log('📏 Applying split ratio to visible panel');
+            if (instance.orientation === 'horizontal') {
+                instance.leftPanel.style.width = `${ratio}%`;
+                instance.rightPanel.style.width = `${100 - ratio}%`;
+            } else {
+                instance.leftPanel.style.height = `${ratio}%`;
+                instance.rightPanel.style.height = `${100 - ratio}%`;
+            }
+        } else {
+            console.log('ℹ️ Panel hidden, ratio will be applied when shown');
         }
 
-        // Apply new ratio
-        if (instance.orientation === 'horizontal') {
-            instance.leftPanel.style.width = `${ratio}%`;
-            instance.rightPanel.style.width = `${100 - ratio}%`;
-        } else {
-            instance.leftPanel.style.height = `${ratio}%`;
-            instance.rightPanel.style.height = `${100 - ratio}%`;
-        }
+        // Update config for use when showing panel
+        instance.config.initialSplit = ratio;
     }
 
     /**
