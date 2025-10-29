@@ -616,14 +616,16 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             }
         }
 
-        // 2. Split ratio (layout state) - send to webview
+        // 2. Split ratio (layout state) - send to webview after short delay to ensure webview is ready
         if (prefs.splitRatio !== undefined) {
             this.componentLogger.debug('Restoring split ratio', { ratio: prefs.splitRatio });
-            this.postMessage({
-                action: 'setSplitRatio',
-                componentId: 'plugin-trace-split-panel',
-                ratio: prefs.splitRatio
-            });
+            setTimeout(() => {
+                this.postMessage({
+                    action: 'setSplitRatio',
+                    componentId: 'plugin-trace-split-panel',
+                    ratio: prefs.splitRatio
+                });
+            }, 100);
         }
 
         // 3. Filters (component state) - will be applied when panel-ready fires

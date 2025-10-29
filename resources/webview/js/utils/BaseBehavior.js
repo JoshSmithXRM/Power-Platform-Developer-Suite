@@ -219,14 +219,14 @@ class BaseBehavior {
     }
 
     /**
-     * Send message to Extension Host
+     * Send message to Extension Host using standardized component-event pattern
      */
-    static sendMessage(instance, action, data) {
+    static sendMessage(instance, eventType, data) {
         if (typeof window.ComponentUtils !== 'undefined' && window.ComponentUtils.sendMessage) {
-            window.ComponentUtils.sendMessage(action, {
+            window.ComponentUtils.sendMessage('component-event', {
                 componentId: instance.id,
-                componentType: this.getComponentType(),
-                ...data
+                eventType: eventType,
+                data: data
             });
         }
     }

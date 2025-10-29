@@ -68,6 +68,14 @@ class PluginTraceViewerBehavior {
                         timelineTab.click();
                     }
                     break;
+
+                case 'setSplitRatio':
+                    console.log('📏 Setting split ratio:', message.ratio);
+                    if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has(message.componentId)) {
+                        const instance = window.SplitPanelBehavior.instances.get(message.componentId);
+                        window.SplitPanelBehavior.setSplitRatio(instance, message.ratio);
+                    }
+                    break;
             }
         });
     }

@@ -228,9 +228,9 @@ export abstract class BasePanel<
     protected updateWebview(): void {
         this.componentLogger.trace('Updating webview content', { viewType: this.viewType });
         const html = this.getHtmlContent();
-        this.componentLogger.trace('Generated HTML content', { 
-            viewType: this.viewType, 
-            htmlLength: html.length 
+        this.componentLogger.trace('Generated HTML content', {
+            viewType: this.viewType,
+            htmlLength: html.length
         });
         this._panel.webview.html = html;
         this.componentLogger.trace('Webview HTML content updated', { viewType: this.viewType });
@@ -240,17 +240,7 @@ export abstract class BasePanel<
      * Send a message to the webview
      */
     protected postMessage(message: WebviewMessage): void {
-        if (this._panel.webview) {
-            try {
-                this._panel.webview.postMessage(message);
-            } catch (error) {
-                // Webview is disposed, ignore the error
-                this.componentLogger.warn('Attempted to post message to disposed webview', { 
-                    viewType: this.viewType,
-                    error: (error as Error).message 
-                });
-            }
-        }
+        this._panel.webview.postMessage(message);
     }
 
     /**
@@ -378,6 +368,19 @@ export abstract class BasePanel<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     protected static getActivePanels(viewType: string): BasePanel<any, any>[] {
         return BasePanel._activePanels.get(viewType) || [];
+    }
+
+    /**
+     * Get all active panels across all types
+     * Returns IPanelBase interface - callers only need dispose() and viewType
+     * Interface Segregation Principle: Depend on minimal interface, not concrete class
+     */
+    protected static getAllActivePanels(): IPanelBase[] {
+        const allPanels: IPanelBase[] = [];
+        for (const panels of BasePanel._activePanels.values()) {
+            allPanels.push(...panels);
+        }
+        return allPanels;
     }
 
     /**

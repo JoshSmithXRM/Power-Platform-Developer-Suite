@@ -201,6 +201,11 @@
                 "command": "power-platform-dev-suite.testAttributeTypeCasting",
                 "title": "TEST: Attribute Type Casting",
                 "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.stateDebugViewer",
+                "title": "State Debug Viewer",
+                "category": "Power Platform Developer Suite"
             }
         ],
         "viewsContainers": {

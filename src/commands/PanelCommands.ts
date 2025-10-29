@@ -9,6 +9,7 @@ import { ConnectionReferencesPanel } from '../panels/ConnectionReferencesPanel';
 import { EnvironmentVariablesPanel } from '../panels/EnvironmentVariablesPanel';
 import { PluginTraceViewerPanel } from '../panels/PluginTraceViewerPanel';
 import { PluginRegistrationPanel } from '../panels/PluginRegistrationPanel';
+import { StateDebugPanel } from '../panels/StateDebugPanel';
 
 /**
  * Panel-related commands
@@ -79,6 +80,10 @@ export class PanelCommands {
 
             vscode.commands.registerCommand('power-platform-dev-suite.pluginRegistrationNew', () => {
                 PluginRegistrationPanel.createNew(this.context.extensionUri);
+            }),
+
+            vscode.commands.registerCommand('power-platform-dev-suite.stateDebugViewer', () => {
+                StateDebugPanel.createOrShow(this.context.extensionUri);
             }),
 
             // Note: 'power-platform-dev-suite.refreshEnvironments' is registered by EnvironmentCommands
