@@ -31,30 +31,6 @@ class ComponentUtils {
         // This prevents reactive triggers and recursion issues
     }
 
-    /**
-     * Auto-register behaviors that are available in global scope
-     */
-    static registerAvailableBehaviors() {
-        const behaviorTypes = ['EnvironmentSelector', 'SolutionSelector', 'ActionBar', 'DataTable', 'SearchForm', 'EntitySelector', 'FilterPanel', 'SplitPanel', 'TreeView', 'SearchInput'];
-
-        console.log('ComponentUtils: registerAvailableBehaviors() called');
-        console.log('ComponentUtils: window object keys:', Object.keys(window).filter(k => k.includes('Behavior')));
-        
-        behaviorTypes.forEach(type => {
-            const behaviorName = `${type}Behavior`;
-            const behaviorExists = !!window[behaviorName];
-            const alreadyRegistered = this.registeredBehaviors.has(type);
-            
-            console.log(`ComponentUtils: Checking ${behaviorName} - exists: ${behaviorExists}, already registered: ${alreadyRegistered}`);
-            
-            if (window[behaviorName] && !this.registeredBehaviors.has(type)) {
-                console.log(`ComponentUtils: Auto-registering ${behaviorName}`);
-                this.registerBehavior(type, window[behaviorName]);
-            }
-        });
-        
-        console.log('ComponentUtils: Final registered behaviors:', Array.from(this.registeredBehaviors.keys()));
-    }
 
     /**
      * Process pending behavior registrations from stub or deferred registrations
@@ -135,10 +111,6 @@ class ComponentUtils {
             // Don't return - continue initialization
             // The sendMessage method will check for window.vscode dynamically
         }
-
-        console.log('ComponentUtils: About to call registerAvailableBehaviors()');
-        // Auto-register any behaviors that loaded before ComponentUtils
-        this.registerAvailableBehaviors();
 
         // Process any pending registrations from the stub
         this.processPendingRegistrations();
