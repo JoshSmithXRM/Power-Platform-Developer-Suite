@@ -157,17 +157,14 @@ export abstract class BasePanel<
      * BasePanel handles common messages first, then delegates to child implementation
      */
     private async handleMessageInternal(message: WebviewMessage): Promise<void> {
-        // Validate message before processing
         if (!this.isValidMessage(message)) {
-            return; // Invalid message, already logged
+            return;
         }
 
-        // Handle common messages that all panels need
         if (await this.handleCommonMessages(message)) {
-            return; // Message was handled by base class
+            return;
         }
 
-        // Delegate to child panel for panel-specific messages
         await this.handleMessage(message);
     }
 
@@ -178,7 +175,8 @@ export abstract class BasePanel<
     private async handleCommonMessages(message: WebviewMessage): Promise<boolean> {
         switch (message.command) {
             case 'environment-changed': {
-                // User selected environment from dropdown - process through proper flow
+                // Process through full selection flow to trigger all side effects
+                // (validation, warnings, cleanup, state tracking)
                 const envId = message.data?.environmentId || message.environmentId;
                 if (envId) {
                     await this.processEnvironmentSelection(envId);
@@ -187,13 +185,12 @@ export abstract class BasePanel<
             }
 
             case 'component-event': {
-                // Route component events through common handler
                 await this.handleComponentEvent(message);
                 return true;
             }
 
             default:
-                return false; // Not handled by base class
+                return false;
         }
     }
 
@@ -205,58 +202,49 @@ export abstract class BasePanel<
     protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
         const { componentId, eventType, data } = message.data || {};
 
-        // Log component event for debugging
         this.componentLogger.debug('Component event received', {
             componentId,
             eventType,
             data
         });
 
-        // Handle ActionBar actionClicked events
         if (eventType === 'actionClicked') {
             const { actionId } = data;
 
-            // Try standard actions first (refresh, export, etc.)
+            // Try standard actions first (refresh) before delegating to panel-specific handler
             const handled = await this.handleStandardActions(actionId);
             if (handled) {
                 return;
             }
 
-            // Delegate to child panel for panel-specific actions
             await this.handlePanelAction(componentId, actionId);
             return;
         }
 
-        // Other component event types (rowSelected, nodeExpanded, etc.)
-        // Delegate to child panel for handling
         await this.handleOtherComponentEvent(componentId, eventType, data);
     }
 
     /**
-     * Handle panel-specific action bar actions
+     * Handle panel-specific action bar actions (optional hook)
      * Override in child classes to handle custom actions
      *
      * @param componentId - The component that triggered the action
      * @param actionId - The action that was triggered
      */
     protected async handlePanelAction(_componentId: string, _actionId: string): Promise<void> {
-        // Default: no custom actions
-        // Child panels override this to handle their specific actions
+        // No-op by default
     }
 
     /**
-     * Handle non-action component events (optional hook for child panels)
+     * Handle non-action component events (optional hook)
      * Override to handle events like: rowSelected, nodeExpanded, nodeCollapsed, etc.
-     *
-     * Default implementation: does nothing (override in child panel to handle events)
      *
      * @param componentId - The component that triggered the event
      * @param eventType - The type of event (e.g., 'rowSelected', 'nodeExpanded')
      * @param data - The event data payload
      */
     protected async handleOtherComponentEvent(_componentId: string, _eventType: string, _data?: unknown): Promise<void> {
-        // Default: no custom component event handling
-        // Child panels override this to handle their specific event types (rowSelected, nodeExpanded, etc.)
+        // No-op by default
     }
 
     /**
