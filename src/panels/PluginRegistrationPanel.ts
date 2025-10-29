@@ -273,6 +273,7 @@ export class PluginRegistrationPanel extends BasePanel {
             'friendlyname': 'Friendly Name',
             'statecode': 'State',
             'filteringattributes': 'Filtering Attributes',
+            'entitylogicalname': 'Entity',
             'entityalias': 'Entity Alias',
             'imagetype': 'Image Type',
             'createdon': 'Created On',
@@ -646,8 +647,15 @@ export class PluginRegistrationPanel extends BasePanel {
                     const images = imagesByStep.get(step.sdkmessageprocessingstepid) || [];
                     const imageNodes = this.transformImagesToTreeNodes(images);
 
-                    // Include filtering attributes in searchText for comprehensive search
-                    const searchText = step.filteringattributes ? step.filteringattributes : undefined;
+                    // Include filtering attributes and entity name in searchText for comprehensive search
+                    const searchParts: string[] = [];
+                    if (step.filteringattributes) {
+                        searchParts.push(step.filteringattributes);
+                    }
+                    if (step.entityLogicalName) {
+                        searchParts.push(step.entityLogicalName);
+                    }
+                    const searchText = searchParts.length > 0 ? searchParts.join(' ') : undefined;
 
                     return {
                         id: `step-${step.sdkmessageprocessingstepid}`,

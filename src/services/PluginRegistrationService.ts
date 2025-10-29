@@ -36,6 +36,7 @@ export interface PluginStep {
     rank: number;
     filteringattributes?: string;
     statecode: number; // 0=Enabled, 1=Disabled
+    entityLogicalName?: string; // Entity (table) the step is registered to
 }
 
 export interface PluginImage {
@@ -178,7 +179,7 @@ export class PluginRegistrationService {
         }
         const baseUrl = environment.settings.dataverseUrl;
 
-        const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,plugintypeid,sdkmessageid,stage,mode,rank,filteringattributes,statecode&$filter=_plugintypeid_value eq ${pluginTypeId}&$orderby=rank asc`;
+        const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,plugintypeid,sdkmessageid,stage,mode,rank,filteringattributes,statecode&$expand=sdkmessagefilterid($select=primaryobjecttypecode)&$filter=_plugintypeid_value eq ${pluginTypeId}&$orderby=rank asc`;
 
         this.logger.debug('Fetching plugin steps', { pluginTypeId, queryUrl });
 
@@ -198,7 +199,12 @@ export class PluginRegistrationService {
         }
 
         const data = await response.json();
-        return data.value;
+
+        // Extract entity name from expanded filter
+        return data.value.map((step: PluginStep & { sdkmessagefilterid?: { primaryobjecttypecode?: string } }) => ({
+            ...step,
+            entityLogicalName: step.sdkmessagefilterid?.primaryobjecttypecode
+        }));
     }
 
     /**
@@ -275,16 +281,20 @@ export class PluginRegistrationService {
         }
         const baseUrl = environment.settings.dataverseUrl;
 
-        const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,_plugintypeid_value,sdkmessageid,stage,mode,rank,filteringattributes,statecode&$orderby=rank asc`;
+        const queryUrl = `${baseUrl}/api/data/v9.2/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,_plugintypeid_value,sdkmessageid,stage,mode,rank,filteringattributes,statecode&$expand=sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=rank asc`;
 
         this.logger.debug('Bulk fetching all plugin steps', { queryUrl });
 
-        const results = await this.fetchAllPages<PluginStep & { _plugintypeid_value: string }>(queryUrl, token);
+        const results = await this.fetchAllPages<PluginStep & {
+            _plugintypeid_value: string;
+            sdkmessagefilterid?: { primaryobjecttypecode?: string };
+        }>(queryUrl, token);
 
-        // Map the lookup field to the standard property name
+        // Map the lookup fields and extract entity name from expanded filter
         return results.map(step => ({
             ...step,
-            plugintypeid: step._plugintypeid_value
+            plugintypeid: step._plugintypeid_value,
+            entityLogicalName: step.sdkmessagefilterid?.primaryobjecttypecode
         }));
     }
 
