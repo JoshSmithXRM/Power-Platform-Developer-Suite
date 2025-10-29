@@ -44,6 +44,19 @@ export abstract class BasePanel<
     // New type-safe state manager
     protected readonly stateManager: IPanelStateManager<TInstance, TPreferences>;
 
+    /**
+     * Current environment ID being viewed by this panel instance.
+     * This is the SINGLE cache for synchronous access across all panels.
+     *
+     * ARCHITECTURAL RULES:
+     * - NEVER duplicate this field in child panels
+     * - ONLY updated via processEnvironmentSelection() to stay in sync with state manager
+     * - Child panels inherit this and use it directly
+     *
+     * This prevents the "duplicate state" bug where panels cache their own selectedEnvironmentId.
+     */
+    protected currentEnvironmentId?: string;
+
     // Common component reference - child panels can set this if they use EnvironmentSelector
     protected environmentSelectorComponent?: EnvironmentSelectorComponent;
     
@@ -406,6 +419,16 @@ export abstract class BasePanel<
             // Switch environment using state manager (auto-saves old prefs, loads new prefs)
             await this.stateManager.switchEnvironment(environmentId);
 
+            // Update the current environment cache (SINGLE source of sync access)
+            // This MUST happen after state manager update to stay in sync
+            this.currentEnvironmentId = environmentId;
+
+            // CRITICAL: Update the component's internal state to stay in sync
+            // Without this, component's selectedEnvironmentId stays stale
+            if (this.environmentSelectorComponent) {
+                this.environmentSelectorComponent.setSelectedEnvironment(environmentId);
+            }
+
             // Call child panel's hook to load data
             await this.onEnvironmentChanged(environmentId);
         } catch (error) {
@@ -417,23 +440,38 @@ export abstract class BasePanel<
     }
 
     /**
-     * Hook for child panels to respond to environment changes
-     * Override this in child classes to load environment-specific data
+     * Hook for child panels to respond to environment SWITCHES (not refreshes)
+     *
+     * This method handles environment switching side effects, then loads data.
+     * Override this in child classes if you need custom switching logic
+     * (e.g., warnings before leaving, cleanup of previous environment state).
+     *
+     * ARCHITECTURAL RULE:
+     * This method should:
+     * 1. Handle switching logic (warnings, cleanup, state changes)
+     * 2. Call loadEnvironmentData() to load data for the new environment
      *
      * Example:
      * ```typescript
      * protected async onEnvironmentChanged(environmentId: string): Promise<void> {
-     *     await this.loadData(environmentId);
-     *     const prefs = await this.stateManager.getCurrentPreferences();
-     *     if (prefs?.filters) {
-     *         this.applyFilters(prefs.filters);
+     *     // Switching logic
+     *     if (this.needsCleanup()) {
+     *         await this.cleanup();
      *     }
+     *
+     *     // Update state
+     *     this.currentEnvironmentId = environmentId;
+     *
+     *     // Load data
+     *     await this.loadEnvironmentData(environmentId);
      * }
      * ```
      */
     protected async onEnvironmentChanged(environmentId: string): Promise<void> {
-        // Default implementation - child panels should override
+        // Default implementation - just load data
+        // Child panels can override to add switching logic before calling super
         this.componentLogger.debug('Environment changed', { environmentId });
+        await this.loadEnvironmentData(environmentId);
     }
 
     /**
@@ -457,55 +495,60 @@ export abstract class BasePanel<
             // Update the environment selector component with loaded environments
             environmentSelectorComponent.setEnvironments(environments);
 
-            // Restore previously selected environment from instance state
-            let selectedEnvironmentId: string | undefined;
+            // Only perform selection logic if autoSelect is enabled
+            // When autoSelect=false (e.g., during refresh), we only update the list, not the selection
+            if (autoSelect) {
+                // Restore previously selected environment from instance state
+                let selectedEnvironmentId: string | undefined;
 
-            const instanceState = await this.stateManager.getInstanceState();
-            if (instanceState?.selectedEnvironmentId) {
-                selectedEnvironmentId = instanceState.selectedEnvironmentId;
-                logger.debug('Restored environment from instance state', {
-                    environmentId: selectedEnvironmentId
-                });
-            }
-
-            // Verify the cached environment still exists
-            if (selectedEnvironmentId) {
-                const environmentExists = environments.some(env => env.id === selectedEnvironmentId);
-                if (environmentExists) {
-                    logger.info('Restored environment from cached state', {
+                const instanceState = await this.stateManager.getInstanceState();
+                if (instanceState?.selectedEnvironmentId) {
+                    selectedEnvironmentId = instanceState.selectedEnvironmentId;
+                    logger.debug('Restored environment from instance state', {
                         environmentId: selectedEnvironmentId
                     });
-                } else {
-                    logger.warn('Cached environment no longer exists', {
-                        environmentId: selectedEnvironmentId
-                    });
-                    selectedEnvironmentId = undefined;
                 }
-            }
 
-            // Fall back to auto-selecting first environment if no cached state
-            if (!selectedEnvironmentId && autoSelect && environments.length > 0) {
-                selectedEnvironmentId = environments[0].id;
-                logger.info('Auto-selected first environment', {
-                    environmentId: selectedEnvironmentId,
-                    name: environments[0].displayName
-                });
-            }
+                // Verify the cached environment still exists
+                if (selectedEnvironmentId) {
+                    const environmentExists = environments.some(env => env.id === selectedEnvironmentId);
+                    if (environmentExists) {
+                        logger.info('Restored environment from cached state', {
+                            environmentId: selectedEnvironmentId
+                        });
+                    } else {
+                        logger.warn('Cached environment no longer exists', {
+                            environmentId: selectedEnvironmentId
+                        });
+                        selectedEnvironmentId = undefined;
+                    }
+                }
 
-            // Set the selected environment
-            if (selectedEnvironmentId) {
-                logger.info('Calling setSelectedEnvironment', {
-                    selectedEnvironmentId,
-                    componentId: environmentSelectorComponent.getId()
-                });
-                environmentSelectorComponent.setSelectedEnvironment(selectedEnvironmentId);
-                logger.info('setSelectedEnvironment call completed');
+                // Fall back to auto-selecting first environment if no cached state
+                if (!selectedEnvironmentId && environments.length > 0) {
+                    selectedEnvironmentId = environments[0].id;
+                    logger.info('Auto-selected first environment', {
+                        environmentId: selectedEnvironmentId,
+                        name: environments[0].displayName
+                    });
+                }
+
+                // Set the selected environment
+                if (selectedEnvironmentId) {
+                    logger.info('Calling setSelectedEnvironment', {
+                        selectedEnvironmentId,
+                        componentId: environmentSelectorComponent.getId()
+                    });
+                    environmentSelectorComponent.setSelectedEnvironment(selectedEnvironmentId);
+                    logger.info('setSelectedEnvironment call completed');
+                } else {
+                    logger.info('No environment to select', {
+                        selectedEnvironmentId,
+                        environmentCount: environments.length
+                    });
+                }
             } else {
-                logger.info('No environment to select', {
-                    selectedEnvironmentId,
-                    autoSelect,
-                    environmentCount: environments.length
-                });
+                logger.debug('Skipping selection logic (autoSelect=false)');
             }
 
             // Component will handle its own update through event bridges
@@ -687,10 +730,59 @@ export abstract class BasePanel<
 
     /**
      * Handle refresh action
-     * Child panels should override this to implement refresh logic
-     * Default implementation throws error to catch missing implementations
+     * Standard implementation:
+     * 1. Refreshes environment list (picks up newly added environments)
+     * 2. Reloads current environment's data by calling loadEnvironmentData()
+     *
+     * This ensures data/metadata is refreshed WITHOUT triggering environment
+     * switching side effects (warnings, cleanup, state changes).
+     *
+     * Child panels can override if they need custom refresh logic, but should
+     * generally rely on this standard implementation.
      */
     protected async handleRefresh(): Promise<void> {
-        throw new Error(`handleRefresh() not implemented in ${this.constructor.name}`);
+        if (!this.currentEnvironmentId) {
+            this.componentLogger.warn('Cannot refresh - no environment selected');
+            vscode.window.showWarningMessage('Please select an environment first');
+            return;
+        }
+
+        this.componentLogger.info('Refreshing current environment', {
+            environmentId: this.currentEnvironmentId
+        });
+
+        // Refresh environment list without auto-selecting (picks up newly added environments)
+        // autoSelect=false prevents changing the current selection
+        if (this.environmentSelectorComponent) {
+            await this.loadEnvironmentsWithAutoSelect(
+                this.environmentSelectorComponent,
+                this.componentLogger,
+                this.viewType,
+                false // Don't auto-select - keep current environment
+            );
+        }
+
+        // Reload current environment's data WITHOUT switching side effects
+        // This calls loadEnvironmentData() directly, not onEnvironmentChanged()
+        await this.loadEnvironmentData(this.currentEnvironmentId);
     }
+
+    /**
+     * Load data for an environment (PURE data loading, no switching logic)
+     *
+     * ARCHITECTURAL RULE:
+     * This method should ONLY load data. It should NOT:
+     * - Show warning dialogs about leaving environments
+     * - Stop timers/intervals
+     * - Close panels/UI elements
+     * - Update currentEnvironmentId (already set by caller)
+     *
+     * This separation ensures:
+     * - Refresh can reload data without switching side effects
+     * - Environment switches can combine switching logic + data loading
+     * - Single Responsibility Principle is maintained
+     *
+     * Child panels MUST implement this to load their environment-specific data.
+     */
+    protected abstract loadEnvironmentData(environmentId: string): Promise<void>;
 }

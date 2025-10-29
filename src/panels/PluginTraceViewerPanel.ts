@@ -56,7 +56,6 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
     private pluginTraceService: PluginTraceService;
 
     // State
-    private selectedEnvironmentId?: string;
     private currentTraceData: PluginTraceLog[] = [];
     private selectedTraceId?: string;
     private currentTraceLevel: PluginTraceLevel = PluginTraceLevel.Off;
@@ -124,16 +123,12 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             this.dataTableComponent
         ]);
 
-        // Initialize the panel
-        this.initialize();
-
-        // Load environments after initialization
-        this.loadEnvironmentsWithAutoSelect(this.environmentSelectorComponent!, this.componentLogger).then(async () => {
+        // Initialize the panel (this calls loadEnvironments internally)
+        this.initialize().then(async () => {
             // Set the selected environment ID after auto-selection
             const selectedEnv = this.environmentSelectorComponent!.getSelectedEnvironment();
             if (selectedEnv) {
-                this.selectedEnvironmentId = selectedEnv.id;
-                this.componentLogger.info('Selected environment ID set', { environmentId: this.selectedEnvironmentId });
+                this.componentLogger.info('Environment auto-selected', { environmentId: selectedEnv.id });
 
                 // Restore preferences from state manager
                 const prefs = await this.stateManager.getCurrentPreferences();
@@ -211,10 +206,12 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                 }
 
                 // Query current trace level from Dynamics
-                await this.handleGetTraceLevel(this.selectedEnvironmentId);
+                if (this.currentEnvironmentId) {
+                    await this.handleGetTraceLevel(this.currentEnvironmentId);
 
-                // Load traces (will use restored filters if any)
-                await this.handleLoadTraces(this.selectedEnvironmentId, this.currentFilters);
+                    // Load traces (will use restored filters if any)
+                    await this.handleLoadTraces(this.currentEnvironmentId, this.currentFilters);
+                }
 
                 // Start auto-refresh if it was enabled
                 if (this.autoRefreshIntervalSeconds > 0) {
@@ -398,8 +395,9 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                     break;
 
                 case 'environment-changed': {
+                    // User selected environment from dropdown - process through proper flow
                     const envId = message.data?.environmentId || message.environmentId;
-                    await this.onEnvironmentChanged(envId);
+                    await this.processEnvironmentSelection(envId);
                     break;
                 }
 
@@ -587,7 +585,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
             const instanceState = await this.stateManager.getInstanceState();
             const prefs = await this.stateManager.getCurrentPreferences();
-            const selectedEnvironmentId = this.selectedEnvironmentId || instanceState?.selectedEnvironmentId || environments[0]?.id;
+            const selectedEnvironmentId = this.currentEnvironmentId || instanceState?.selectedEnvironmentId || environments[0]?.id;
 
             // Restore auto-refresh interval from preferences
             if (prefs?.autoRefreshIntervalSeconds) {
@@ -605,7 +603,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             });
 
             if (selectedEnvironmentId) {
-                this.selectedEnvironmentId = selectedEnvironmentId;
+                this.currentEnvironmentId = selectedEnvironmentId;
                 await this.handleGetTraceLevel(selectedEnvironmentId);
                 await this.handleLoadTraces(selectedEnvironmentId);
 
@@ -624,16 +622,20 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
     }
 
+    /**
+     * Handle environment switching (with side effects)
+     * Implements warnings, cleanup, then loads data
+     */
     protected async onEnvironmentChanged(environmentId: string): Promise<void> {
-        this.componentLogger.info('🔄 Environment change', {
-            oldEnvironmentId: this.selectedEnvironmentId,
+        this.componentLogger.info('🔄 Environment switching', {
+            oldEnvironmentId: this.currentEnvironmentId,
             newEnvironmentId: environmentId,
             currentTraceLevel: this.currentTraceLevel
         });
 
         // Warn if leaving environment with traces enabled
-        if (this.currentTraceLevel === PluginTraceLevel.All && this.selectedEnvironmentId) {
-            const previousEnvironmentId = this.selectedEnvironmentId;
+        if (this.currentTraceLevel === PluginTraceLevel.All && this.currentEnvironmentId) {
+            const previousEnvironmentId = this.currentEnvironmentId;
             const result = await vscode.window.showWarningMessage(
                 'Plugin traces are currently set to "All" in the previous environment. This can impact performance. Turn off traces before switching?',
                 'Turn Off & Switch',
@@ -663,7 +665,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             }
         }
 
-        this.selectedEnvironmentId = environmentId;
+        this.currentEnvironmentId = environmentId;
 
         // Stop auto-refresh when switching environments
         this.stopAutoRefresh();
@@ -673,13 +675,26 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             action: 'closeDetailPanel'
         });
 
-        // Get trace level for new environment
+        // Load data for new environment
+        await this.loadEnvironmentData(environmentId);
+
+        this.componentLogger.info('✅ Environment switch complete');
+    }
+
+    /**
+     * Load data for an environment (PURE data loading, no switching side effects)
+     * Called by both onEnvironmentChanged (during switches) and handleRefresh (during refreshes)
+     */
+    protected async loadEnvironmentData(environmentId: string): Promise<void> {
+        this.componentLogger.info('Loading environment data', { environmentId });
+
+        // Get trace level for environment
         await this.handleGetTraceLevel(environmentId);
 
-        // Load traces for new environment with current filters
+        // Load traces for environment with current filters
         await this.handleLoadTraces(environmentId, this.currentFilters);
 
-        this.componentLogger.info('✅ Environment change complete');
+        this.componentLogger.info('✅ Environment data loaded');
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -693,7 +708,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
 
         try {
-            this.selectedEnvironmentId = environmentId;
+            this.currentEnvironmentId = environmentId;
 
             // Show loading state
             if (this.dataTableComponent) {
@@ -774,8 +789,8 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
             // Auto-refresh traces after 1 second
             setTimeout(() => {
-                if (this.selectedEnvironmentId) {
-                    this.handleLoadTraces(this.selectedEnvironmentId);
+                if (this.currentEnvironmentId) {
+                    this.handleLoadTraces(this.currentEnvironmentId);
                 }
             }, 1000);
 
@@ -802,8 +817,8 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         // Save filters to preferences
         await this.stateManager.updateCurrentPreferences({ filters: this.currentFilters });
 
-        if (this.selectedEnvironmentId) {
-            await this.handleLoadTraces(this.selectedEnvironmentId, this.currentFilters);
+        if (this.currentEnvironmentId) {
+            await this.handleLoadTraces(this.currentEnvironmentId, this.currentFilters);
         }
     }
 
@@ -830,30 +845,11 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         });
     }
 
-    protected async handleRefresh(): Promise<void> {
-        this.componentLogger.info('🔄 Refresh action triggered');
-        if (this.selectedEnvironmentId) {
-            // Clear table immediately
-            if (this.dataTableComponent) {
-                this.dataTableComponent.setData([]);
-            }
-
-            this.actionBarComponent?.setActionLoading('refresh', true);
-            try {
-                await this.handleLoadTraces(this.selectedEnvironmentId);
-            } finally {
-                this.actionBarComponent?.setActionLoading('refresh', false);
-            }
-        } else {
-            this.componentLogger.warn('⚠️ No environment selected for refresh');
-        }
-    }
-
     private async handleActionBarClick(actionId: string, itemId?: string): Promise<void> {
         this.componentLogger.info('🎬 ACTION BAR CLICK HANDLER', {
             actionId,
             itemId,
-            selectedEnvironmentId: this.selectedEnvironmentId
+            selectedEnvironmentId: this.currentEnvironmentId
         });
 
         // Try standard actions first
@@ -887,15 +883,15 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
             case 'traceLevel':
                 this.componentLogger.info('📊 Trace level action triggered', { itemId });
-                if (itemId && this.selectedEnvironmentId) {
+                if (itemId && this.currentEnvironmentId) {
                     const level = parseInt(itemId) as PluginTraceLevel;
                     this.componentLogger.info('Setting trace level', { level });
-                    await this.handleSetTraceLevel(this.selectedEnvironmentId, level);
+                    await this.handleSetTraceLevel(this.currentEnvironmentId, level);
                     this.updateTraceLevelButton(level);
                 } else {
                     this.componentLogger.warn('⚠️ Missing itemId or environment for trace level', {
                         itemId,
-                        hasEnvironment: !!this.selectedEnvironmentId
+                        hasEnvironment: !!this.currentEnvironmentId
                     });
                 }
                 break;
@@ -1011,7 +1007,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         // Generate content
         let content: string;
         const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-        const defaultFilename = `plugin-traces-${this.selectedEnvironmentId || 'unknown'}-${timestamp}.${format}`;
+        const defaultFilename = `plugin-traces-${this.currentEnvironmentId || 'unknown'}-${timestamp}.${format}`;
 
         if (format === 'csv') {
             content = this.convertToCSV(dataToExport);
@@ -1098,7 +1094,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
     }
 
     private async handleDeleteTrace(traceId: string): Promise<void> {
-        if (!this.selectedEnvironmentId) {
+        if (!this.currentEnvironmentId) {
             return;
         }
 
@@ -1114,12 +1110,12 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
 
         try {
-            await this.pluginTraceService.deleteTrace(this.selectedEnvironmentId, traceId);
+            await this.pluginTraceService.deleteTrace(this.currentEnvironmentId, traceId);
 
             vscode.window.showInformationMessage('Trace deleted successfully');
 
             // Reload traces
-            await this.handleLoadTraces(this.selectedEnvironmentId);
+            await this.handleLoadTraces(this.currentEnvironmentId);
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             vscode.window.showErrorMessage(`Failed to delete trace: ${errorMessage}`);
@@ -1127,7 +1123,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
     }
 
     private async handleDeleteAllTraces(): Promise<void> {
-        if (!this.selectedEnvironmentId) {
+        if (!this.currentEnvironmentId) {
             return;
         }
 
@@ -1145,12 +1141,12 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
 
         try {
-            const deletedCount = await this.pluginTraceService.deleteAllTraces(this.selectedEnvironmentId);
+            const deletedCount = await this.pluginTraceService.deleteAllTraces(this.currentEnvironmentId);
 
             vscode.window.showInformationMessage(`Deleted ${deletedCount} traces`);
 
             // Reload traces
-            await this.handleLoadTraces(this.selectedEnvironmentId);
+            await this.handleLoadTraces(this.currentEnvironmentId);
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             vscode.window.showErrorMessage(`Failed to delete traces: ${errorMessage}`);
@@ -1158,7 +1154,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
     }
 
     private async handleDeleteOldTraces(days: number): Promise<void> {
-        if (!this.selectedEnvironmentId) {
+        if (!this.currentEnvironmentId) {
             return;
         }
 
@@ -1192,12 +1188,12 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
 
         try {
-            const deletedCount = await this.pluginTraceService.deleteOldTraces(this.selectedEnvironmentId, daysToDelete);
+            const deletedCount = await this.pluginTraceService.deleteOldTraces(this.currentEnvironmentId, daysToDelete);
 
             vscode.window.showInformationMessage(`Deleted ${deletedCount} old traces`);
 
             // Reload traces
-            await this.handleLoadTraces(this.selectedEnvironmentId);
+            await this.handleLoadTraces(this.currentEnvironmentId);
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             vscode.window.showErrorMessage(`Failed to delete old traces: ${errorMessage}`);
@@ -1205,13 +1201,13 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
     }
 
     private async handleOpenInDynamics(traceId: string): Promise<void> {
-        if (!this.selectedEnvironmentId) {
+        if (!this.currentEnvironmentId) {
             return;
         }
 
         try {
             const environments = await this._authService.getEnvironments();
-            const environment = environments.find(env => env.id === this.selectedEnvironmentId);
+            const environment = environments.find(env => env.id === this.currentEnvironmentId);
 
             if (!environment) {
                 throw new Error('Environment not found');
@@ -1244,8 +1240,8 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
         this.currentFilters = { quick: [], advanced: [filterCondition] };
 
-        if (this.selectedEnvironmentId) {
-            await this.handleLoadTraces(this.selectedEnvironmentId, this.currentFilters);
+        if (this.currentEnvironmentId) {
+            await this.handleLoadTraces(this.currentEnvironmentId, this.currentFilters);
         }
 
         this.postMessage({
@@ -1286,8 +1282,8 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
 
         this.autoRefreshInterval = setInterval(() => {
-            if (this.selectedEnvironmentId) {
-                this.handleLoadTraces(this.selectedEnvironmentId);
+            if (this.currentEnvironmentId) {
+                this.handleLoadTraces(this.currentEnvironmentId);
             }
         }, this.autoRefreshIntervalSeconds * 1000);
 
@@ -1684,8 +1680,8 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         PluginTraceViewerPanel.currentPanel = undefined;
 
         // Show warning asynchronously if traces are enabled (non-blocking)
-        if (this.currentTraceLevel === PluginTraceLevel.All && this.selectedEnvironmentId) {
-            const envId = this.selectedEnvironmentId;
+        if (this.currentTraceLevel === PluginTraceLevel.All && this.currentEnvironmentId) {
+            const envId = this.currentEnvironmentId;
             vscode.window.showWarningMessage(
                 'Plugin traces were set to "All" in the environment. This can impact performance. Turn off traces?',
                 'Turn Off',

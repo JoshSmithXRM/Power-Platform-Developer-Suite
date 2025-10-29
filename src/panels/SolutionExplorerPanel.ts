@@ -220,12 +220,12 @@ export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceSta
             }
 
             switch (message.command) {
-                case 'environment-changed':
-                    // Only sync component state - onChange callback will handle data loading
-                    if (this.environmentSelectorComponent && message.data?.environmentId) {
-                        this.environmentSelectorComponent.setSelectedEnvironment(message.data.environmentId);
-                    }
+                case 'environment-changed': {
+                    // User selected environment from dropdown - process through proper flow
+                    const envId = message.data?.environmentId || message.environmentId;
+                    await this.processEnvironmentSelection(envId);
                     break;
+                }
 
                 case 'load-solutions':
                     await this.handleLoadSolutions(message.data?.environmentId);
@@ -366,8 +366,8 @@ export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceSta
     }
 
     /**
-     * Hook called when environment changes
-     * State is automatically managed by BasePanel - just load data here
+     * Hook called when environment changes (with switching side effects)
+     * State is automatically managed by BasePanel
      */
     protected async onEnvironmentChanged(environmentId: string): Promise<void> {
         if (!environmentId) {
@@ -383,13 +383,21 @@ export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceSta
                 this.actionBarComponent.setActionDisabled('openInMaker', false);
             }
 
-            // Load solutions for this environment
-            await this.handleLoadSolutions(environmentId);
+            // Load data
+            await this.loadEnvironmentData(environmentId);
 
         } catch (error) {
             this.componentLogger.error('Error handling environment change', error as Error, { environmentId });
             vscode.window.showErrorMessage('Failed to load environment data');
         }
+    }
+
+    /**
+     * Load data for an environment (PURE data loading, no switching side effects)
+     */
+    protected async loadEnvironmentData(environmentId: string): Promise<void> {
+        this.componentLogger.info('Loading environment data', { environmentId });
+        await this.handleLoadSolutions(environmentId);
     }
 
     private async handleLoadSolutions(environmentId: string): Promise<void> {
@@ -553,31 +561,6 @@ export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceSta
         } catch (error) {
             this.componentLogger.error('Error opening solutions page in Maker', error as Error);
             vscode.window.showErrorMessage(`Failed to open solutions page in Maker: ${(error as Error).message}`);
-        }
-    }
-
-    protected async handleRefresh(): Promise<void> {
-        try {
-            this.componentLogger.debug('Refreshing solutions and environments');
-
-            // First refresh the environment list
-            await this.loadEnvironments();
-
-            // Then refresh the solutions for the selected environment
-            const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
-
-            if (selectedEnvironment) {
-                await this.handleLoadSolutions(selectedEnvironment.id);
-                vscode.window.showInformationMessage('Solutions refreshed');
-            } else {
-                vscode.window.showWarningMessage('Please select an environment first');
-            }
-        } catch (error) {
-            this.componentLogger.error('Error refreshing solutions', error as Error);
-            if (this.dataTableComponent) {
-                this.dataTableComponent.setLoading(false);
-            }
-            vscode.window.showErrorMessage('Failed to refresh solutions');
         }
     }
 

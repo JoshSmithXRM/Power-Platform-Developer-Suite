@@ -32,7 +32,6 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
 
     // State
     private assemblies: PluginAssembly[] = [];
-    protected _selectedEnvironmentId?: string;
     private selectedNode?: TreeNode;
 
     // In-memory data for lazy rendering
@@ -143,19 +142,27 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
     }
 
     /**
-     * Hook called when environment changes
-     * State is automatically managed by BasePanel - just load data here
+     * Hook called when environment changes (with switching side effects)
+     * State is automatically managed by BasePanel
      */
     protected async onEnvironmentChanged(environmentId: string): Promise<void> {
         this.componentLogger.info('Environment changed', { environmentId });
 
         if (!environmentId) {
-            this._selectedEnvironmentId = undefined;
+            this.currentEnvironmentId = undefined;
             this.treeViewComponent?.setNodes([]);
             return;
         }
 
-        this._selectedEnvironmentId = environmentId;
+        this.currentEnvironmentId = environmentId;
+        await this.loadEnvironmentData(environmentId);
+    }
+
+    /**
+     * Load data for an environment (PURE data loading, no switching side effects)
+     */
+    protected async loadEnvironmentData(environmentId: string): Promise<void> {
+        this.componentLogger.info('Loading environment data', { environmentId });
         await this.loadAssemblies();
     }
 
@@ -383,7 +390,12 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
         this.componentLogger.info('Handling message', { command: message.command });
 
         switch (message.command) {
-            // environment-changed is now handled by onChange callback - no need to handle here
+            case 'environment-changed': {
+                // User selected environment from dropdown - process through proper flow
+                const envId = message.data?.environmentId || message.environmentId;
+                await this.processEnvironmentSelection(envId);
+                break;
+            }
 
             case 'node-selected':
                 this.componentLogger.info('node-selected message data:', message.data);
@@ -429,20 +441,12 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
         }
     }
 
-    protected async handleRefresh(): Promise<void> {
-        this.componentLogger.info('Refresh clicked');
-
-        if (this._selectedEnvironmentId) {
-            await this.loadAssemblies();
-        }
-    }
-
     /**
      * Load all plugin data using bulk queries and in-memory joining
      * Much faster than individual queries per assembly/type/step
      */
     private async loadAssemblies(): Promise<void> {
-        if (!this._selectedEnvironmentId) {
+        if (!this.currentEnvironmentId) {
             return;
         }
 
@@ -452,10 +456,10 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
             // Load all data in parallel (4 queries total)
             this.treeViewComponent!.setLoading(true, 'Loading plugin data...');
             const [assemblies, allTypes, allSteps, allImages] = await Promise.all([
-                this.pluginService.getAssemblies(this._selectedEnvironmentId),
-                this.pluginService.getAllPluginTypes(this._selectedEnvironmentId),
-                this.pluginService.getAllSteps(this._selectedEnvironmentId),
-                this.pluginService.getAllImages(this._selectedEnvironmentId)
+                this.pluginService.getAssemblies(this.currentEnvironmentId),
+                this.pluginService.getAllPluginTypes(this.currentEnvironmentId),
+                this.pluginService.getAllSteps(this.currentEnvironmentId),
+                this.pluginService.getAllImages(this.currentEnvironmentId)
             ]);
 
             this.assemblies = assemblies;

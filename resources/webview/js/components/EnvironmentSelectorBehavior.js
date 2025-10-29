@@ -16,10 +16,18 @@ class EnvironmentSelectorBehavior extends BaseBehavior {
      * REQUIRED by BaseBehavior - called when event bridge sends updated data
      */
     static onComponentUpdate(instance, data) {
+        console.log(`[EnvironmentSelector] onComponentUpdate called`, {
+            hasEnvironments: !!(data && data.environments),
+            hasSelectedEnvironmentId: !!(data && data.selectedEnvironmentId),
+            selectedEnvironmentId: data?.selectedEnvironmentId,
+            environmentCount: data?.environments?.length
+        });
+
         if (data && data.environments) {
             this.loadEnvironments(instance.id, data.environments);
         }
         if (data && data.selectedEnvironmentId) {
+            console.log(`[EnvironmentSelector] Calling setSelectedEnvironment with: ${data.selectedEnvironmentId}`);
             this.setSelectedEnvironment(instance.id, data.selectedEnvironmentId);
         }
     }
@@ -275,6 +283,10 @@ class EnvironmentSelectorBehavior extends BaseBehavior {
         // Store environments in instance
         instance.environments = environments || [];
 
+        // CRITICAL: Preserve current selection before rebuilding dropdown
+        const currentValue = instance.selector.value || instance.selectedEnvironmentId;
+        console.log(`[EnvironmentSelector] loadEnvironments - preserving selection: ${currentValue}`);
+
         // Clear existing options except placeholder
         const placeholder = instance.selector.options[0];
         instance.selector.innerHTML = '';
@@ -291,8 +303,15 @@ class EnvironmentSelectorBehavior extends BaseBehavior {
             instance.selector.appendChild(option);
         });
 
-        // Auto-select first environment if configured
-        if (instance.config.autoSelectFirst && environments.length > 0 && !instance.selectedEnvironmentId) {
+        // Restore previous selection if it still exists in the new list
+        if (currentValue && environments.some(env => env.id === currentValue)) {
+            console.log(`[EnvironmentSelector] Restoring previous selection: ${currentValue}`);
+            instance.selector.value = currentValue;
+            instance.selectedEnvironmentId = currentValue;
+        }
+        // Otherwise, auto-select first environment if configured
+        else if (instance.config.autoSelectFirst && environments.length > 0 && !instance.selectedEnvironmentId) {
+            console.log(`[EnvironmentSelector] Auto-selecting first environment`);
             instance.selector.value = environments[0].id;
             this.handleSelectorChange(instance, { target: instance.selector });
         }

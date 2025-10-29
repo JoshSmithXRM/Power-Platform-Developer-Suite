@@ -70,4 +70,12 @@ export class DataExplorerPanel extends BasePanel<DataExplorerInstanceState, Data
     protected getHtmlContent(): string {
         return '<html><body>Placeholder - will be rewritten</body></html>';
     }
+
+    /**
+     * Load data for an environment (stub implementation for placeholder panel)
+     */
+    protected async loadEnvironmentData(_environmentId: string): Promise<void> {
+        // Placeholder - no environment data loading yet
+        this.componentLogger.debug('loadEnvironmentData called on placeholder panel');
+    }
 }

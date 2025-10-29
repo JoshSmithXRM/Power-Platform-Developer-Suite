@@ -113,6 +113,10 @@ export class EnvironmentSelectorComponent extends BaseComponent<EnvironmentSelec
      * Get component data for event bridge updates
      */
     public getData(): EnvironmentSelectorData {
+        this.componentLogger.info('🔍 getData() called', {
+            selectedEnvironmentId: this.selectedEnvironmentId,
+            environmentCount: this.environments.length
+        });
         return {
             environments: this.environments,
             selectedEnvironmentId: this.selectedEnvironmentId
@@ -123,7 +127,14 @@ export class EnvironmentSelectorComponent extends BaseComponent<EnvironmentSelec
      * Set the selected environment by ID
      */
     public setSelectedEnvironment(environmentId: string | null): void {
+        this.componentLogger.info('🔧 setSelectedEnvironment called', {
+            newEnvironmentId: environmentId,
+            currentSelectedEnvironmentId: this.selectedEnvironmentId,
+            willUpdate: environmentId !== this.selectedEnvironmentId
+        });
+
         if (environmentId === this.selectedEnvironmentId) {
+            this.componentLogger.info('🔧 Early return - value unchanged');
             return;
         }
 

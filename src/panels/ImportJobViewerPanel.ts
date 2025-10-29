@@ -237,12 +237,12 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
             }
 
             switch (message.command) {
-                case 'environment-changed':
-                    // Only sync component state - onChange callback will handle data loading
-                    if (this.environmentSelectorComponent && message.data?.environmentId) {
-                        this.environmentSelectorComponent.setSelectedEnvironment(message.data.environmentId);
-                    }
+                case 'environment-changed': {
+                    // User selected environment from dropdown - process through proper flow
+                    const envId = message.data?.environmentId || message.environmentId;
+                    await this.processEnvironmentSelection(envId);
                     break;
+                }
 
                 case 'load-import-jobs':
                     await this.handleLoadImportJobs(message.data?.environmentId);
@@ -380,8 +380,8 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
     }
 
     /**
-     * Hook called when environment changes
-     * State is automatically managed by BasePanel - just load data here
+     * Hook called when environment changes (with switching side effects)
+     * State is automatically managed by BasePanel
      */
     protected async onEnvironmentChanged(environmentId: string): Promise<void> {
         if (!environmentId) {
@@ -397,13 +397,21 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
                 this.actionBarComponent.setActionDisabled('openSolutionHistory', false);
             }
 
-            // Load import jobs for this environment
-            await this.handleLoadImportJobs(environmentId);
+            // Load data
+            await this.loadEnvironmentData(environmentId);
 
         } catch (error) {
             this.componentLogger.error('Error handling environment change', error as Error, { environmentId });
             vscode.window.showErrorMessage('Failed to load environment data');
         }
+    }
+
+    /**
+     * Load data for an environment (PURE data loading, no switching side effects)
+     */
+    protected async loadEnvironmentData(environmentId: string): Promise<void> {
+        this.componentLogger.info('Loading environment data', { environmentId });
+        await this.handleLoadImportJobs(environmentId);
     }
 
     private async handleLoadImportJobs(environmentId: string): Promise<void> {
@@ -568,31 +576,6 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
         } catch (error) {
             this.componentLogger.error('Error opening solution history', error as Error);
             vscode.window.showErrorMessage(`Failed to open Solution History: ${(error as Error).message}`);
-        }
-    }
-
-    protected async handleRefresh(): Promise<void> {
-        try {
-            this.componentLogger.debug('Refreshing import jobs and environments');
-
-            // First refresh the environment list
-            await this.loadEnvironments();
-
-            // Then refresh the import jobs for the selected environment
-            const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
-
-            if (selectedEnvironment) {
-                await this.handleLoadImportJobs(selectedEnvironment.id);
-                vscode.window.showInformationMessage('Import Jobs refreshed');
-            } else {
-                vscode.window.showWarningMessage('Please select an environment first');
-            }
-        } catch (error) {
-            this.componentLogger.error('Error refreshing import jobs', error as Error);
-            if (this.dataTableComponent) {
-                this.dataTableComponent.setLoading(false);
-            }
-            vscode.window.showErrorMessage('Failed to refresh import jobs');
         }
     }
 

@@ -217,6 +217,14 @@ export class EnvironmentSetupPanel extends BasePanel {
         }
     }
 
+    /**
+     * Load data for an environment (not applicable to setup panel)
+     */
+    protected async loadEnvironmentData(_environmentId: string): Promise<void> {
+        // Not applicable - this panel is for configuring environments, not viewing environment data
+        this.componentLogger.debug('loadEnvironmentData called on setup panel (no-op)');
+    }
+
     private loadEnvironment(environment: EnvironmentConnection): void {
         this.componentLogger.info('Loading environment for editing', { environmentId: environment.id });
         this.isEditMode = true;

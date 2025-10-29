@@ -290,12 +290,12 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
                     }
                     break;
 
-                case 'environment-changed':
-                    // Only sync component state - onChange callback will handle data loading
-                    if (this.environmentSelectorComponent && message.data?.environmentId) {
-                        this.environmentSelectorComponent.setSelectedEnvironment(message.data.environmentId);
-                    }
+                case 'environment-changed': {
+                    // User selected environment from dropdown - process through proper flow
+                    const envId = message.data?.environmentId || message.environmentId;
+                    await this.processEnvironmentSelection(envId);
                     break;
+                }
 
                 case 'sync-deployment-settings':
                     await this.handleSyncDeploymentSettings(message.data?.relationships, message.data?.solutionUniqueName);
@@ -429,15 +429,21 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
         try {
             this.componentLogger.info('Environment changed', { environmentId });
 
-            // Load solutions for this environment
-            this.componentLogger.debug('About to call handleLoadSolutions', { environmentId });
-            await this.handleLoadSolutions(environmentId);
-            this.componentLogger.debug('handleLoadSolutions completed', { environmentId });
+            // Load data
+            await this.loadEnvironmentData(environmentId);
 
         } catch (error) {
             this.componentLogger.error('Error handling environment change', error as Error, { environmentId });
             vscode.window.showErrorMessage('Failed to load environment configuration');
         }
+    }
+
+    /**
+     * Load data for an environment (PURE data loading, no switching side effects)
+     */
+    protected async loadEnvironmentData(environmentId: string): Promise<void> {
+        this.componentLogger.info('Loading environment data', { environmentId });
+        await this.handleLoadSolutions(environmentId);
     }
 
     private async handleSolutionSelection(solutionId: string): Promise<void> {
@@ -708,43 +714,6 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
         } catch (error) {
             this.componentLogger.error('Error opening in Maker', error as Error);
             this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to open in Maker' });
-        }
-    }
-
-    protected async handleRefresh(): Promise<void> {
-        try {
-            this.componentLogger.debug('Refreshing connection references and environments');
-
-            // First refresh the environment list
-            await this.loadEnvironments();
-
-            // Get current selections
-            const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
-            const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
-
-            if (selectedEnvironment) {
-                // Clear table and show loading state for visual feedback
-                if (this.dataTableComponent) {
-                    this.dataTableComponent.setData([]);
-                    this.dataTableComponent.setLoading(true, 'Refreshing connection references...');
-                }
-
-                // Disable sync button while refreshing
-                if (this.actionBarComponent) {
-                    this.actionBarComponent.setActionDisabled('syncDeploymentBtn', true);
-                }
-
-                await this.handleLoadConnectionReferences(selectedEnvironment.id, selectedSolution?.id);
-                vscode.window.showInformationMessage('Connection References refreshed');
-            } else {
-                vscode.window.showWarningMessage('Please select an environment first');
-            }
-        } catch (error) {
-            this.componentLogger.error('Error refreshing connection references', error as Error);
-            if (this.dataTableComponent) {
-                this.dataTableComponent.setLoading(false);
-            }
-            vscode.window.showErrorMessage('Failed to refresh connection references');
         }
     }
 

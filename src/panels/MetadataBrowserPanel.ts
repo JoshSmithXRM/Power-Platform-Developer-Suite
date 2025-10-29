@@ -441,12 +441,12 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
             }
 
             switch (message.command) {
-                case 'environment-changed':
-                    // Only sync component state - onChange callback will handle data loading
-                    if (this.environmentSelectorComponent && message.data?.environmentId) {
-                        this.environmentSelectorComponent.setSelectedEnvironment(message.data.environmentId);
-                    }
+                case 'environment-changed': {
+                    // User selected environment from dropdown - process through proper flow
+                    const envId = message.data?.environmentId || message.environmentId;
+                    await this.processEnvironmentSelection(envId);
                     break;
+                }
 
                 case 'browse-tables':
                     await this.showTableChoicePicker();
@@ -831,8 +831,8 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
     }
 
     /**
-     * Hook called when environment changes
-     * State is automatically managed by BasePanel - just load data here
+     * Hook called when environment changes (with switching side effects)
+     * State is automatically managed by BasePanel
      */
     protected async onEnvironmentChanged(environmentId: string): Promise<void> {
         if (!environmentId) {
@@ -843,8 +843,8 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
         try {
             this.componentLogger.info('Environment changed', { environmentId });
 
-            // Load entities and choices for the tree
-            await this.loadEntityChoiceTree(environmentId);
+            // Load data
+            await this.loadEnvironmentData(environmentId);
 
             // Keep action buttons disabled until an entity/choice is selected
             this.updateActionBar(false, false);
@@ -853,6 +853,14 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
             this.componentLogger.error('Error handling environment change', error as Error, { environmentId });
             vscode.window.showErrorMessage('Failed to load environment data');
         }
+    }
+
+    /**
+     * Load data for an environment (PURE data loading, no switching side effects)
+     */
+    protected async loadEnvironmentData(environmentId: string): Promise<void> {
+        this.componentLogger.info('Loading environment data', { environmentId });
+        await this.loadEntityChoiceTree(environmentId);
     }
 
     private async loadEntityChoiceTree(environmentId: string): Promise<void> {
