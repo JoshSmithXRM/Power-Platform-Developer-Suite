@@ -31,8 +31,12 @@ export interface JsonViewerConfig extends BaseComponentConfig {
     maxHeight?: string;
 
     /**
-     * Initial collapsed depth (0 = all expanded, 1 = first level expanded, etc.)
-     * @default 0 (all expanded)
+     * Depth at which to start collapsing nodes
+     * - 999 (default) = all expanded
+     * - 0 = all collapsed
+     * - 1 = top level expanded, children collapsed
+     * - 2 = top 2 levels expanded, rest collapsed
+     * @default 999 (all expanded)
      */
     initialCollapseDepth?: number;
 }
@@ -42,5 +46,5 @@ export const DEFAULT_JSON_VIEWER_CONFIG: Partial<JsonViewerConfig> = {
     showCopy: true,
     showLineNumbers: false,
     maxHeight: 'none',
-    initialCollapseDepth: 0
+    initialCollapseDepth: 999 // Start fully expanded, but allow manual collapse
 };

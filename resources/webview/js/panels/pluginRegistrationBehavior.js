@@ -90,15 +90,6 @@ class PluginRegistrationBehavior {
         detailContent.innerHTML = data.html;
         console.log('PluginRegistrationBehavior: innerHTML set. New content:', detailContent.innerHTML.substring(0, 100));
 
-        // Render JSON in the Raw Data tab using shared JSONRenderer
-        if (data.rawData && window.JSONRenderer) {
-            const jsonContent = document.getElementById('detail-json-content');
-            if (jsonContent) {
-                jsonContent.innerHTML = window.JSONRenderer.renderJSONWithWrapper(data.rawData);
-                console.log('PluginRegistrationBehavior: Rendered JSON with syntax highlighting');
-            }
-        }
-
         // Show panel using SplitPanelBehavior public API
         if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('pluginRegistration-splitPanel')) {
             const instance = window.SplitPanelBehavior.instances.get('pluginRegistration-splitPanel');

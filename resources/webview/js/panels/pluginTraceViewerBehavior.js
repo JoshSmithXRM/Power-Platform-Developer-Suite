@@ -187,12 +187,6 @@ class PluginTraceViewerBehavior {
         if (relatedTab) {
             relatedTab.innerHTML = this.generateRelatedTab(relatedTraces, trace.plugintracelogid);
         }
-
-        // Raw data tab with syntax highlighting using shared JSONRenderer
-        const rawTab = document.getElementById('tab-raw');
-        if (rawTab && window.JSONRenderer) {
-            rawTab.innerHTML = window.JSONRenderer.renderJSONWithWrapper(trace);
-        }
     }
 
     /**

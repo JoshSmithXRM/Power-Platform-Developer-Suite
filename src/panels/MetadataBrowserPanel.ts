@@ -6,6 +6,7 @@ import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
+import { JsonViewerComponent } from '../components/viewers/JsonViewer/JsonViewerComponent';
 import {
     CompleteEntityMetadata,
     AttributeMetadata,
@@ -98,6 +99,7 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
     private relationshipsTableComponent?: DataTableComponent;
     private privilegesTableComponent?: DataTableComponent;
     private choiceValuesTableComponent?: DataTableComponent;
+    private jsonViewerComponent?: JsonViewerComponent;
     private componentFactory: ComponentFactory;
 
     // State
@@ -165,7 +167,8 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
             this.keysTableComponent,
             this.relationshipsTableComponent,
             this.privilegesTableComponent,
-            this.choiceValuesTableComponent
+            this.choiceValuesTableComponent,
+            this.jsonViewerComponent
         ]);
 
         // Initialize the panel
@@ -422,6 +425,15 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
                 showFooter: true,
                 className: 'metadata-choice-values-table',
                 defaultSort: [{ column: 'label', direction: 'asc' }]
+            });
+
+            // JSON Viewer Component for detail panel
+            this.jsonViewerComponent = this.componentFactory.createJsonViewer({
+                id: 'metadata-json-viewer',
+                data: null,
+                collapsible: true,
+                showCopy: false,
+                maxHeight: 'none'
             });
 
             this.componentLogger.debug('All components initialized successfully');
@@ -782,7 +794,7 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
                         <!-- Properties will be rendered here by JavaScript -->
                     </div>
                     <div id="detail-json-content" style="display: none;">
-                        <!-- JSON will be rendered here by JavaScript -->
+                        ${this.jsonViewerComponent?.generateHTML() || ''}
                     </div>
                 </div>
             </div>
@@ -803,7 +815,8 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
                     this.keysTableComponent,
                     this.relationshipsTableComponent,
                     this.privilegesTableComponent,
-                    this.choiceValuesTableComponent
+                    this.choiceValuesTableComponent,
+                    this.jsonViewerComponent!
                 ],
                 [
                     'css/panels/metadata-browser.css',
@@ -811,7 +824,6 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
                     'css/components/detail-panel-tabs.css'
                 ],  // Additional panel-specific CSS
                 [
-                    'js/utils/jsonRenderer.js',
                     'js/panels/metadataBrowserBehavior.js',
                     'js/components/SplitPanelBehavior.js'
                 ],  // Additional panel-specific behavior scripts
@@ -1005,7 +1017,12 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
             }
 
             if (metadata) {
-                // Send to webview to display in split panel
+                // Update JSON viewer component with metadata
+                if (this.jsonViewerComponent) {
+                    this.jsonViewerComponent.setData(metadata);
+                }
+
+                // Send to webview to display in split panel (for title and properties tab)
                 this.postMessage({
                     command: 'show-detail',
                     action: 'showDetail',

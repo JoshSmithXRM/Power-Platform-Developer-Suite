@@ -7,6 +7,7 @@ import { PanelComposer } from '../factories/PanelComposer';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { FilterPanelComponent } from '../components/panels/FilterPanel/FilterPanelComponent';
 import { DataTableComponent } from '../components/tables/DataTable/DataTableComponent';
+import { JsonViewerComponent } from '../components/viewers/JsonViewer/JsonViewerComponent';
 import { PluginTraceService, PluginTraceLog, PluginTraceLevel } from '../services/PluginTraceService';
 import { PLUGIN_TRACE_CONTEXT_MENU_ITEMS } from '../config/TableActions';
 import { FilterCondition } from '../components/panels/FilterPanel/FilterPanelConfig';
@@ -50,6 +51,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
     private actionBarComponent?: ActionBarComponent;
     private filterPanelComponent?: FilterPanelComponent;
     private dataTableComponent?: DataTableComponent;
+    private jsonViewerComponent?: JsonViewerComponent;
     private componentFactory: ComponentFactory;
 
     // Services
@@ -120,7 +122,8 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             this.environmentSelectorComponent,
             this.actionBarComponent,
             this.filterPanelComponent,
-            this.dataTableComponent
+            this.dataTableComponent,
+            this.jsonViewerComponent
         ]);
 
         // Initialize the panel (this calls loadEnvironments internally)
@@ -364,6 +367,15 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             contextMenuItems: PLUGIN_TRACE_CONTEXT_MENU_ITEMS,
             emptyMessage: 'No plugin traces found. Adjust filters or enable trace logging.',
             showFooter: true
+        });
+
+        // 5. JSON Viewer
+        this.jsonViewerComponent = this.componentFactory.createJsonViewer({
+            id: 'pluginTrace-jsonViewer',
+            data: null,
+            collapsible: true,
+            showCopy: false,
+            maxHeight: 'none'
         });
 
         this.componentLogger.debug('Components initialized');
@@ -826,6 +838,11 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
 
         this.selectedTraceId = traceId;
+
+        // Update JsonViewerComponent with raw trace data
+        if (this.jsonViewerComponent) {
+            this.jsonViewerComponent.setData(trace);
+        }
 
         // Get related traces by correlation ID
         const relatedTraces = this.currentTraceData.filter(t =>
@@ -1632,7 +1649,9 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                                     <div id="timelineContainer"></div>
                                 </div>
                                 <div id="tab-related" class="tab-content"></div>
-                                <div id="tab-raw" class="tab-content"></div>
+                                <div id="tab-raw" class="tab-content">
+                                    ${this.jsonViewerComponent?.generateHTML() || ''}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1646,7 +1665,8 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                 this.environmentSelectorComponent!,
                 this.actionBarComponent!,
                 this.filterPanelComponent!,
-                this.dataTableComponent!
+                this.dataTableComponent!,
+                this.jsonViewerComponent!
             ],
             [
                 'css/panels/plugin-trace-viewer.css',
@@ -1655,7 +1675,6 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                 'css/components/detail-panel-tabs.css'
             ],
             [
-                'js/utils/jsonRenderer.js',
                 'js/utils/ExportUtils.js',
                 'js/components/TimelineBehavior.js',
                 'js/components/SplitPanelBehavior.js',

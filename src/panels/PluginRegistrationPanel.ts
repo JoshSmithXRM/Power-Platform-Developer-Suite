@@ -6,6 +6,7 @@ import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
 import { TreeViewComponent } from '../components/trees/TreeView/TreeViewComponent';
+import { JsonViewerComponent } from '../components/viewers/JsonViewer/JsonViewerComponent';
 import { TreeNode } from '../components/trees/TreeView/TreeViewConfig';
 import { PluginRegistrationService, PluginAssembly, PluginType, PluginStep, PluginImage } from '../services/PluginRegistrationService';
 
@@ -25,6 +26,7 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
 
     private actionBarComponent?: ActionBarComponent;
     private treeViewComponent?: TreeViewComponent;
+    private jsonViewerComponent?: JsonViewerComponent;
     private componentFactory: ComponentFactory;
 
     // Services
@@ -93,7 +95,8 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
         this.setupComponentEventBridges([
             this.environmentSelectorComponent,
             this.actionBarComponent,
-            this.treeViewComponent
+            this.treeViewComponent,
+            this.jsonViewerComponent
         ]);
 
         // Initialize the panel (restores state and renders initial HTML)
@@ -133,6 +136,15 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
             multiSelect: false,
             lazyLoad: false, // Load all data upfront
             onNodeSelect: (node) => this.handleNodeSelected(node)
+        });
+
+        // JSON Viewer
+        this.jsonViewerComponent = this.componentFactory.createJsonViewer({
+            id: 'pluginRegistration-jsonViewer',
+            data: null,
+            collapsible: true,
+            showCopy: false,
+            maxHeight: 'none'
         });
 
         // Note: SplitPanel is NOT created as a component - it's just HTML with SplitPanelBehavior
@@ -215,9 +227,14 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
 
         return PanelComposer.composeWithCustomHTML(
             customHTML,
-            [this.environmentSelectorComponent!, this.actionBarComponent!, this.treeViewComponent!],
+            [
+                this.environmentSelectorComponent!,
+                this.actionBarComponent!,
+                this.treeViewComponent!,
+                this.jsonViewerComponent!
+            ],
             ['css/panels/plugin-registration.css', 'css/components/split-panel.css', 'css/components/detail-panel-tabs.css'],
-            ['js/utils/jsonRenderer.js', 'js/panels/pluginRegistrationBehavior.js', 'js/components/SplitPanelBehavior.js'],
+            ['js/panels/pluginRegistrationBehavior.js', 'js/components/SplitPanelBehavior.js'],
             this.getCommonWebviewResources(),
             'Plugin Registration'
         );
@@ -248,7 +265,7 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
                     ${propertiesHTML}
                 </div>
                 <div id="detail-json-content" style="display: none;">
-                    <!-- JSON will be rendered by JSONRenderer in webview behavior -->
+                    ${this.jsonViewerComponent?.generateHTML() || ''}
                 </div>
             </div>
         `;
@@ -776,6 +793,11 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
         // Update selected node state
         this.selectedNode = node;
 
+        // Update JsonViewerComponent with raw data
+        if (node.data && this.jsonViewerComponent) {
+            this.jsonViewerComponent.setData(node.data);
+        }
+
         // Generate details HTML
         const detailsHTML = this.generateDetailsHTML(node);
         this.componentLogger.info('Generated HTML', { htmlLength: detailsHTML.length });
@@ -787,8 +809,8 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
             data: {
                 html: detailsHTML,
                 nodeType: node.type,
-                nodeId: node.id,
-                rawData: node.data // Send raw data for JSONRenderer to render in webview
+                nodeId: node.id
+                // rawData removed - JsonViewerComponent now handles this via event bridge
             }
         });
         this.componentLogger.info('Sent show-node-details message');

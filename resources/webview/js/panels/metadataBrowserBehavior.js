@@ -14,7 +14,7 @@ class MetadataBrowserBehavior {
      */
     static initialize() {
         // Setup global functions for inline event handlers
-        window.toggleSection = function(sectionId) {
+        window.toggleSection = function (sectionId) {
             const vscode = window.vscode || acquireVsCodeApi();
             vscode.postMessage({
                 command: 'toggle-section',
@@ -28,27 +28,27 @@ class MetadataBrowserBehavior {
             }
         };
 
-        window.filterEntityTree = function(query) {
+        window.filterEntityTree = function (query) {
             MetadataBrowserBehavior.filterTree(query);
         };
 
-        window.selectEntity = function(logicalName, displayName, metadataId) {
+        window.selectEntity = function (logicalName, displayName, metadataId) {
             MetadataBrowserBehavior.selectEntity(logicalName, displayName, metadataId);
         };
 
-        window.selectChoice = function(name, displayName) {
+        window.selectChoice = function (name, displayName) {
             MetadataBrowserBehavior.selectChoice(name, displayName);
         };
 
-        window.closeDetailPanel = function() {
+        window.closeDetailPanel = function () {
             MetadataBrowserBehavior.closeDetailPanel();
         };
 
-        window.switchDetailTab = function(tabName) {
+        window.switchDetailTab = function (tabName) {
             MetadataBrowserBehavior.switchDetailTab(tabName);
         };
 
-        window.toggleLeftPanel = function() {
+        window.toggleLeftPanel = function () {
             MetadataBrowserBehavior.toggleLeftPanel();
         };
 
@@ -318,7 +318,7 @@ class MetadataBrowserBehavior {
             const logicalName = item.getAttribute('data-logical-name') || item.getAttribute('data-name') || '';
 
             const matches = displayName.toLowerCase().includes(lowerQuery) ||
-                          logicalName.toLowerCase().includes(lowerQuery);
+                logicalName.toLowerCase().includes(lowerQuery);
 
             item.classList.toggle('hidden', !matches);
         });
@@ -485,12 +485,6 @@ class MetadataBrowserBehavior {
         const title = document.getElementById('detail-panel-title');
         if (title) {
             title.textContent = data.title || 'Metadata Details';
-        }
-
-        // Render JSON in the JSON tab content using shared JSONRenderer
-        const jsonContent = document.getElementById('detail-json-content');
-        if (jsonContent && window.JSONRenderer) {
-            jsonContent.innerHTML = window.JSONRenderer.renderJSONWithWrapper(data.metadata);
         }
 
         // Render properties in the Properties tab
