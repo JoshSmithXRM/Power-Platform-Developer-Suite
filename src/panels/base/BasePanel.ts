@@ -7,10 +7,7 @@ import { ServiceFactory } from '../../services/ServiceFactory';
 import { Environment } from '../../components/base/ComponentInterface';
 import { EnvironmentConnection } from '../../models/PowerPlatformSettings';
 import { EnvironmentSelectorComponent } from '../../components/selectors/EnvironmentSelector/EnvironmentSelectorComponent';
-import { SolutionSelectorComponent } from '../../components/selectors/SolutionSelector/SolutionSelectorComponent';
-import { SolutionSelectorView } from '../../components/selectors/SolutionSelector/SolutionSelectorView';
-import { Solution } from '../../services/SolutionService';
-import { ComponentUpdateEvent, ComponentStateChangeEvent, ComponentWithEvents } from '../../types/ComponentEventTypes';
+import { ComponentUpdateEvent, ComponentStateChangeEvent, ComponentWithEvents, ITargetedUpdateRenderer } from '../../types/ComponentEventTypes';
 
 /**
  * Base class for all webview panels providing common functionality
@@ -563,22 +560,15 @@ export abstract class BasePanel implements IPanelBase {
                     dataLength: dataLength
                 });
 
-                // For SolutionSelector, generate options HTML for targeted container update
+                // For components with child components, use targeted updates to avoid destroying children
+                // Components implement ITargetedUpdateRenderer to provide pre-rendered HTML
                 let messageData = componentData;
-                if (componentType === 'SolutionSelector' && componentData && typeof componentData === 'object' && 'solutions' in componentData) {
-                    const solutionComponent = component as SolutionSelectorComponent;
-                    const solutionData = componentData as { solutions: Solution[]; selectedSolutions: Solution[] };
-                    const componentState = solutionComponent.getState();
-
-                    const optionsHtml = SolutionSelectorView.renderOptionsContainer(
-                        solutionData.solutions,
-                        solutionComponent.getConfig(),
-                        solutionData.selectedSolutions,
-                        componentState.loading
-                    );
+                if ('renderTargetedUpdate' in component && componentData && typeof componentData === 'object') {
+                    const renderer = component as unknown as ITargetedUpdateRenderer;
+                    const targetedHtml = renderer.renderTargetedUpdate(componentData as object);
                     messageData = {
-                        ...componentData,
-                        optionsHtml: optionsHtml
+                        ...(componentData as Record<string, unknown>),
+                        targetedHtml: targetedHtml
                     };
                 }
 

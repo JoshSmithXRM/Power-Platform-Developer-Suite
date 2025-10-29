@@ -31,13 +31,13 @@ class SolutionSelectorBehavior extends BaseBehavior {
         console.log('SolutionSelector: Received componentUpdate with data:', {
             componentId: instance.id,
             hasData: !!data,
-            hasOptionsHtml: !!data.optionsHtml
+            hasTargetedHtml: !!data.targetedHtml
         });
 
-        if (data.optionsHtml) {
-            this.updateOptionsContainer(instance, data.optionsHtml);
+        if (data.targetedHtml) {
+            this.updateOptionsContainer(instance, data.targetedHtml);
         } else {
-            console.warn('SolutionSelector: No optionsHtml in componentUpdate', data);
+            console.warn('SolutionSelector: No targetedHtml in componentUpdate', data);
         }
     }
 
@@ -78,7 +78,7 @@ class SolutionSelectorBehavior extends BaseBehavior {
             const handler = (e) => {
                 e.stopPropagation();
                 if (!option.classList.contains('solution-selector-option--disabled')) {
-                    this.handleOptionClick(instance.id, option, e);
+                    this.handleOptionClick(instance.id, e);
                 }
             };
             option._clickHandler = handler;

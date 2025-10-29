@@ -1,6 +1,7 @@
 import { BaseComponent, IRenderable } from '../../base/BaseComponent';
 import { Solution } from '../../../services/SolutionService'; // Use standardized Solution interface
 import { SearchInputComponent } from '../../inputs/SearchInput/SearchInputComponent';
+import { ITargetedUpdateRenderer } from '../../../types/ComponentEventTypes';
 
 import { SolutionSelectorConfig, SolutionSelectorSelectionEvent, SolutionSelectorLoadEvent, DEFAULT_SOLUTION_SELECTOR_CONFIG, SolutionSelectorConfigValidator } from './SolutionSelectorConfig';
 import { SolutionSelectorView, SolutionSelectorViewState } from './SolutionSelectorView';
@@ -19,8 +20,10 @@ export interface SolutionSelectorData {
  * SolutionSelectorComponent - Power Platform solution selector with advanced filtering
  * Provides comprehensive solution selection with search, filtering, and grouping capabilities
  * Supports both single and multi-selection modes with rich solution metadata display
+ *
+ * Implements ITargetedUpdateRenderer to support partial DOM updates that preserve child components (SearchInput)
  */
-export class SolutionSelectorComponent extends BaseComponent<SolutionSelectorData> {
+export class SolutionSelectorComponent extends BaseComponent<SolutionSelectorData> implements ITargetedUpdateRenderer {
     protected config: SolutionSelectorConfig;
 
     // Component state
@@ -490,6 +493,23 @@ export class SolutionSelectorComponent extends BaseComponent<SolutionSelectorDat
      */
     public getConfig(): SolutionSelectorConfig {
         return this.config;
+    }
+
+    /**
+     * Render HTML for targeted partial DOM update (ITargetedUpdateRenderer implementation)
+     * This allows updating only the options container without destroying the SearchInput child component
+     *
+     * @param data - Component data from getData()
+     * @returns HTML string for injection into .solution-selector-options-container
+     */
+    public renderTargetedUpdate(data: object): string {
+        const solutionData = data as SolutionSelectorData;
+        return SolutionSelectorView.renderOptionsContainer(
+            solutionData.solutions,
+            this.config,
+            solutionData.selectedSolutions,
+            this.loading
+        );
     }
 
     /**

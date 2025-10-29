@@ -208,35 +208,6 @@ export class SolutionSelectorView {
     }
 
     /**
-     * Render search input
-     */
-    private static renderSearch(config: SolutionSelectorConfig, state: SolutionSelectorViewState): string {
-        const { searchPlaceholder = 'Search solutions...' } = config;
-        
-        return `
-            <div class="${SOLUTION_SELECTOR_CSS.SEARCH}">
-                <input type="text" 
-                       class="${SOLUTION_SELECTOR_CSS.SEARCH_INPUT}"
-                       placeholder="${this.escapeHtml(searchPlaceholder)}"
-                       value="${this.escapeHtml(state.searchQuery)}"
-                       data-component-element="search"
-                       autocomplete="off">
-                
-                <span class="solution-selector-search-icon">${ICONS.SEARCH}</span>
-                
-                ${state.searchQuery ? `
-                    <button type="button" 
-                            class="${SOLUTION_SELECTOR_CSS.SEARCH_CLEAR}"
-                            data-component-element="clear-search"
-                            title="Clear search">
-                        ${ICONS.CLOSE}
-                    </button>
-                ` : ''}
-            </div>
-        `;
-    }
-
-    /**
      * Render quick filters
      */
     private static renderQuickFilters(config: SolutionSelectorConfig, state: SolutionSelectorViewState): string {
