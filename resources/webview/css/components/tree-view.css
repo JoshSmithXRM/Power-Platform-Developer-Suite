@@ -15,16 +15,10 @@
 }
 
 /* =============================================================================
-   Search Box
-   Note: TreeView now uses SearchInputComponent - base styles in component-base.css
-   These wrapper styles remain for TreeView-specific layout
+   Search Section
+   Note: TreeView uses SearchInputComponent - base styles in component-base.css
+   No wrapper CSS - component is pure, no overrides
    ============================================================================= */
-
-.tree-view-container .base-search-input-container {
-    padding: 8px;
-    border-bottom: 1px solid var(--vscode-panel-border);
-    background: var(--vscode-editor-background);
-}
 
 /* =============================================================================
    Tree Content
@@ -34,7 +28,7 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 8px 0;
+    padding: 8px;
 }
 
 .tree-view-empty {

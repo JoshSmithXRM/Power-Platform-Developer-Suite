@@ -115,8 +115,8 @@ export class DataTableView {
 
         return `
             <div class="data-table-toolbar">
-                ${config.searchable && searchInput ? searchInput.generateHTML() : ''}
-                
+                ${config.searchable && searchInput ? `<div class="data-table-search">${searchInput.generateHTML()}</div>` : ''}
+
                 <div class="data-table-toolbar-actions">
                     ${config.showColumnChooser ? this.renderColumnChooser(config, state) : ''}
                 </div>

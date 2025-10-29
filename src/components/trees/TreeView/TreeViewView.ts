@@ -34,7 +34,7 @@ export class TreeViewView {
 
         return `
             <div id="${escapeHtml(id)}" class="${containerClass}" data-component-id="${escapeHtml(id)}" data-component-type="TreeView">
-                ${searchEnabled && searchInput ? searchInput.generateHTML() : ''}
+                ${searchEnabled && searchInput ? `<div class="tree-view-search">${searchInput.generateHTML()}</div>` : ''}
                 <div class="tree-view-content">
                     ${loading ? this.generateLoadingIndicator(loadingMessage) : this.generateTree(id, nodes)}
                 </div>

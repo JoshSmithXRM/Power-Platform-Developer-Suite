@@ -40,12 +40,11 @@
     gap: 8px;
 }
 
-/* Search box styling
-   Note: DataTable now uses SearchInputComponent - base styles in component-base.css
-   These wrapper styles remain for DataTable-specific layout */
-.data-table-toolbar .base-search-input-container {
-    flex: 0 1 300px;
-    min-width: 200px;
+/* Search box wrapper within toolbar
+   Note: DataTable uses SearchInputComponent - base styles in component-base.css
+   Minimal CSS for flex context - flex: 1 makes it grow in row layout */
+.data-table-search {
+    flex: 1;
 }
 
 /* Hover effects removed for border consistency */
@@ -578,31 +577,6 @@
 }
 
 /* Search */
-.search-container {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--component-border-subtle);
-    background: var(--vscode-editor-background);
-}
-
-.search-input {
-    width: 100%;
-    background: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border);
-    color: var(--vscode-input-foreground);
-    padding: 8px 12px;
-    border-radius: 3px;
-    font-size: 14px;
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: var(--vscode-focusBorder);
-    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
-}
-
-.search-input::placeholder {
-    color: var(--vscode-input-placeholderForeground);
-}
 
 /* Column resize handles */
 .column-resize-handle {
@@ -840,7 +814,7 @@
     }
     
     .data-table-pagination,
-    .search-container {
+    .data-table-search {
         display: none;
     }
     
