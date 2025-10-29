@@ -102,7 +102,7 @@ export abstract class BasePanel<
         // Set up message handling
         this._panel.webview.onDidReceiveMessage(
             async (message: WebviewMessage) => {
-                await this.handleMessage(message);
+                await this.handleMessageInternal(message);
             },
             null,
             this._disposables
@@ -133,6 +133,41 @@ export abstract class BasePanel<
 
     /**
      * Handle messages from the webview
+     * BasePanel handles common messages first, then delegates to child implementation
+     */
+    private async handleMessageInternal(message: WebviewMessage): Promise<void> {
+        // Handle common messages that all panels need
+        if (await this.handleCommonMessages(message)) {
+            return; // Message was handled by base class
+        }
+
+        // Delegate to child panel for panel-specific messages
+        await this.handleMessage(message);
+    }
+
+    /**
+     * Handle common messages shared across all panels
+     * Returns true if message was handled, false if it should be delegated to child
+     */
+    private async handleCommonMessages(message: WebviewMessage): Promise<boolean> {
+        switch (message.command) {
+            case 'environment-changed': {
+                // User selected environment from dropdown - process through proper flow
+                const envId = message.data?.environmentId || message.environmentId;
+                if (envId) {
+                    await this.processEnvironmentSelection(envId);
+                }
+                return true;
+            }
+
+            default:
+                return false; // Not handled by base class
+        }
+    }
+
+    /**
+     * Handle panel-specific messages from the webview
+     * Override in child classes to handle panel-specific messages
      */
     protected abstract handleMessage(message: WebviewMessage): Promise<void>;
 

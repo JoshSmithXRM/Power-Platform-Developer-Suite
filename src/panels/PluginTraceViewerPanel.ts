@@ -394,12 +394,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                     await this.handleLoadEnvironments();
                     break;
 
-                case 'environment-changed': {
-                    // User selected environment from dropdown - process through proper flow
-                    const envId = message.data?.environmentId || message.environmentId;
-                    await this.processEnvironmentSelection(envId);
-                    break;
-                }
+                // 'environment-changed' is handled by BasePanel.handleCommonMessages()
 
                 case 'load-traces':
                     await this.handleLoadTraces(message.environmentId, message.filterOptions);

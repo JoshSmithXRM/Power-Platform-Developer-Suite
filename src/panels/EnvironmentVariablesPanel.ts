@@ -239,12 +239,7 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
             }
 
             switch (message.command) {
-                case 'environment-changed': {
-                    // User selected environment from dropdown - process through proper flow
-                    const envId = message.data?.environmentId || message.environmentId;
-                    await this.processEnvironmentSelection(envId);
-                    break;
-                }
+                // 'environment-changed' is handled by BasePanel.handleCommonMessages()
 
                 case 'solution-selected':
                     await this.handleSolutionSelection(message.data?.solutionId);
