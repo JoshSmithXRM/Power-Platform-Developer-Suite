@@ -83,10 +83,23 @@ export default tseslint.config(
       ],
 
       // 5. General Code Quality
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-var-requires': 'error'
+      '@typescript-eslint/no-explicit-any': 'error',  // Changed from 'warn' to 'error'
+      '@typescript-eslint/no-var-requires': 'error',
 
-      // 6. Type Safety - Prevent implicit 'any' violations
+      // 6. Prevent Extension Host imports in Webview
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/panels/**', '**/services/**', '**/components/**/*Component.ts'],
+              message: '❌ Cannot import Extension Host code in webview context. Webview behaviors should only use postMessage() to communicate. See: docs/EXECUTION_CONTEXTS.md'
+            }
+          ]
+        }
+      ],
+
+      // 7. Type Safety - Prevent implicit 'any' violations
       // TODO: Enable these rules and fix 739 violations (see docs/TECHNICAL_DEBT_TYPE_SAFETY.md)
       // '@typescript-eslint/no-unsafe-return': 'error',
       // '@typescript-eslint/no-unsafe-assignment': 'error',
@@ -154,6 +167,9 @@ export default tseslint.config(
     // Services are ALLOWED to do data transformation - that's their job!
     files: ['src/services/**/*.ts'],
     rules: {
+      // Enforce explicit return types on all service methods
+      '@typescript-eslint/explicit-function-return-type': 'error',
+      '@typescript-eslint/explicit-module-boundary-types': 'error',
       'no-restricted-syntax': [
         'error',
         {
