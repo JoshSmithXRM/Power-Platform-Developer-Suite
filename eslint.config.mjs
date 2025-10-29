@@ -86,20 +86,7 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',  // Changed from 'warn' to 'error'
       '@typescript-eslint/no-var-requires': 'error',
 
-      // 6. Prevent Extension Host imports in Webview
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['**/panels/**', '**/services/**', '**/components/**/*Component.ts'],
-              message: '❌ Cannot import Extension Host code in webview context. Webview behaviors should only use postMessage() to communicate. See: docs/EXECUTION_CONTEXTS.md'
-            }
-          ]
-        }
-      ],
-
-      // 7. Type Safety - Prevent implicit 'any' violations
+      // 6. Type Safety - Prevent implicit 'any' violations
       // TODO: Enable these rules and fix 739 violations (see docs/TECHNICAL_DEBT_TYPE_SAFETY.md)
       // '@typescript-eslint/no-unsafe-return': 'error',
       // '@typescript-eslint/no-unsafe-assignment': 'error',
@@ -136,7 +123,19 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': 'off',
       'no-undef': 'off',
       'no-prototype-builtins': 'off',
-      'no-case-declarations': 'off'
+      'no-case-declarations': 'off',
+      // Prevent webview JS from importing Extension Host TS (would fail anyway)
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/panels/**', '**/services/**', '**/components/**'],
+              message: '❌ Cannot import Extension Host code in webview context. Webview behaviors should only use postMessage() to communicate. See: docs/EXECUTION_CONTEXTS.md'
+            }
+          ]
+        }
+      ]
     }
   },
   {

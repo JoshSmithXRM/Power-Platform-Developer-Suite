@@ -19,6 +19,7 @@
         "node_modules",
         "out",
         "dist",
-        "Old/**/*"
+        "Old/**/*",
+        "templates/**/*"
     ]
 }

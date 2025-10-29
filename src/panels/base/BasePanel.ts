@@ -139,10 +139,29 @@ export abstract class BasePanel<
     }
 
     /**
+     * Validate that a message from the webview is well-formed
+     *
+     * @param message - The message to validate
+     * @returns true if message is valid, false otherwise
+     */
+    protected isValidMessage(message: WebviewMessage): boolean {
+        if (!message || !message.command) {
+            this.componentLogger.trace('Received message without command, ignoring', { message });
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Handle messages from the webview
      * BasePanel handles common messages first, then delegates to child implementation
      */
     private async handleMessageInternal(message: WebviewMessage): Promise<void> {
+        // Validate message before processing
+        if (!this.isValidMessage(message)) {
+            return; // Invalid message, already logged
+        }
+
         // Handle common messages that all panels need
         if (await this.handleCommonMessages(message)) {
             return; // Message was handled by base class
