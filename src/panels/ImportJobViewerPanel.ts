@@ -239,15 +239,18 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
                 // 'environment-changed' is handled by BasePanel.handleCommonMessages()
 
                 case 'load-import-jobs':
-                    await this.handleLoadImportJobs(message.data?.environmentId);
+                    await this.handleLoadImportJobs(message.data?.environmentId ?? '');
                     break;
 
                 case 'view-import-job-xml':
-                    await this.handleViewImportJobXml(message.data?.environmentId, message.data?.importJobId);
+                    await this.handleViewImportJobXml(
+                        message.data?.environmentId,
+                        message.data?.importJobId ?? ''
+                    );
                     break;
 
                 case 'open-solution-history':
-                    await this.handleOpenSolutionHistory(message.data?.environmentId);
+                    await this.handleOpenSolutionHistory(message.data?.environmentId ?? '');
                     break;
 
                 case 'panel-ready':
@@ -268,7 +271,7 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
                 case 'search':
                     // Handle SearchInput component messages
                     if (message.data?.componentId === 'importJobs-table-search' && this.dataTableComponent) {
-                        this.dataTableComponent.search(message.data.query || '');
+                        this.dataTableComponent.search((message.data.query as string | undefined) || '');
                     }
                     break;
 

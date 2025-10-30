@@ -324,7 +324,7 @@ export class DataTableComponent extends BaseDataComponent<DataTableData> {
         const lowerQuery = query.toLowerCase();
         return data.filter(row => {
             return this.config.columns.some(column => {
-                const value = row[column.field];
+                const value = row[column.field] as string | number | boolean | null | undefined;
                 if (value === null || value === undefined) return false;
                 return String(value).toLowerCase().includes(lowerQuery);
             });
@@ -342,8 +342,8 @@ export class DataTableComponent extends BaseDataComponent<DataTableData> {
                 
                 const column = this.config.columns.find(c => c.id === columnId);
                 if (!column) return true;
-                
-                const value = row[column.field];
+
+                const value = row[column.field] as string | number | boolean | null | undefined;
                 
                 // Handle different filter types
                 if (column.filterType === 'multiselect' && Array.isArray(filterValue)) {
@@ -351,8 +351,8 @@ export class DataTableComponent extends BaseDataComponent<DataTableData> {
                 }
                 
                 if (column.filterType === 'daterange' && typeof filterValue === 'object') {
-                    const date = new Date(value);
-                    const { from, to } = filterValue;
+                    const date = new Date(value as string | number | Date);
+                    const { from, to } = filterValue as { from?: string | number | Date; to?: string | number | Date };
                     if (from && date < new Date(from)) return false;
                     if (to && date > new Date(to)) return false;
                     return true;
@@ -378,13 +378,13 @@ export class DataTableComponent extends BaseDataComponent<DataTableData> {
             for (const sort of sortConfig) {
                 const column = this.config.columns.find(c => c.id === sort.column);
                 if (!column) continue;
-                
-                let aVal = a[column.field];
-                let bVal = b[column.field];
+
+                let aVal = a[column.field] as string | number | boolean | null | undefined;
+                let bVal = b[column.field] as string | number | boolean | null | undefined;
                 
                 // Use custom sort if provided
                 if (column.customSort) {
-                    const result = column.customSort(aVal, bVal);
+                    const result = column.customSort(aVal as DataTableRow, bVal as DataTableRow);
                     if (result !== 0) {
                         return sort.direction === 'asc' ? result : -result;
                     }
@@ -400,7 +400,7 @@ export class DataTableComponent extends BaseDataComponent<DataTableData> {
                 if (column.type === 'number') {
                     comparison = Number(aVal) - Number(bVal);
                 } else if (column.type === 'date') {
-                    comparison = new Date(aVal).getTime() - new Date(bVal).getTime();
+                    comparison = new Date(aVal as string | number | Date).getTime() - new Date(bVal as string | number | Date).getTime();
                 } else if (column.type === 'boolean') {
                     comparison = (aVal === bVal) ? 0 : aVal ? 1 : -1;
                 } else {

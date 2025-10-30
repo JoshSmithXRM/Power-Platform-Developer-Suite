@@ -1,3 +1,5 @@
+import { parseODataResponse, parseODataSingleResponse } from '../utils/ODataValidator';
+
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
@@ -331,6 +333,9 @@ export interface OptionSetMetadata {
     IntroducedVersion: string;
     Options: OptionMetadata[];
     OptionSetType: string;
+    // Boolean-specific properties
+    TrueOption?: OptionMetadata;
+    FalseOption?: OptionMetadata;
 }
 
 export interface OptionMetadata {
@@ -372,10 +377,89 @@ export interface CompleteEntityMetadata {
     privileges: EntityPrivilegeMetadata[];
 }
 
+// Discriminated union cache entry types for type-safe caching
+type CachedEntityDefinitions = {
+    type: 'EntityDefinitions';
+    data: EntityDefinition[];
+    timestamp: number;
+};
+
+type CachedEntityMetadata = {
+    type: 'EntityMetadata';
+    data: EntityDefinition;
+    timestamp: number;
+};
+
+type CachedAttributeMetadata = {
+    type: 'AttributeMetadata';
+    data: AttributeMetadata[];
+    timestamp: number;
+};
+
+type CachedEntityKeys = {
+    type: 'EntityKeys';
+    data: EntityKeyMetadata[];
+    timestamp: number;
+};
+
+type CachedOneToManyRelationships = {
+    type: 'OneToManyRelationships';
+    data: OneToManyRelationshipMetadata[];
+    timestamp: number;
+};
+
+type CachedManyToOneRelationships = {
+    type: 'ManyToOneRelationships';
+    data: OneToManyRelationshipMetadata[];
+    timestamp: number;
+};
+
+type CachedManyToManyRelationships = {
+    type: 'ManyToManyRelationships';
+    data: ManyToManyRelationshipMetadata[];
+    timestamp: number;
+};
+
+type CachedEntityPrivileges = {
+    type: 'EntityPrivileges';
+    data: EntityPrivilegeMetadata[];
+    timestamp: number;
+};
+
+type CachedGlobalOptionSets = {
+    type: 'GlobalOptionSets';
+    data: OptionSetMetadata[];
+    timestamp: number;
+};
+
+type CachedOptionSetMetadata = {
+    type: 'OptionSetMetadata';
+    data: OptionSetMetadata;
+    timestamp: number;
+};
+
+type CachedCompleteEntityMetadata = {
+    type: 'CompleteEntityMetadata';
+    data: CompleteEntityMetadata;
+    timestamp: number;
+};
+
+type MetadataCacheEntry =
+    | CachedEntityDefinitions
+    | CachedEntityMetadata
+    | CachedAttributeMetadata
+    | CachedEntityKeys
+    | CachedOneToManyRelationships
+    | CachedManyToOneRelationships
+    | CachedManyToManyRelationships
+    | CachedEntityPrivileges
+    | CachedGlobalOptionSets
+    | CachedOptionSetMetadata
+    | CachedCompleteEntityMetadata;
+
 export class MetadataService {
     private static readonly DEFAULT_CACHE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private cache = new Map<string, any>();
+    private cache = new Map<string, MetadataCacheEntry>();
     private cacheTimeout = MetadataService.DEFAULT_CACHE_TIMEOUT_MS;
     private _logger?: ReturnType<ReturnType<typeof ServiceFactory.getLoggerService>['createComponentLogger']>;
     
@@ -396,17 +480,188 @@ export class MetadataService {
         return Date.now() - timestamp < this.cacheTimeout;
     }
 
-    private getFromCache<T>(key: string): T | null {
+    private getCachedEntityDefinitions(key: string): EntityDefinition[] | null {
         const cached = this.cache.get(key);
-        if (cached && this.isCacheValid(cached.timestamp)) {
+        if (cached && cached.type === 'EntityDefinitions' && this.isCacheValid(cached.timestamp)) {
             return cached.data;
         }
         this.cache.delete(key);
         return null;
     }
 
-    private setCache<T>(key: string, data: T): void {
+    private setCacheEntityDefinitions(key: string, data: EntityDefinition[]): void {
         this.cache.set(key, {
+            type: 'EntityDefinitions',
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    private getCachedEntityMetadata(key: string): EntityDefinition | null {
+        const cached = this.cache.get(key);
+        if (cached && cached.type === 'EntityMetadata' && this.isCacheValid(cached.timestamp)) {
+            return cached.data;
+        }
+        this.cache.delete(key);
+        return null;
+    }
+
+    private setCacheEntityMetadata(key: string, data: EntityDefinition): void {
+        this.cache.set(key, {
+            type: 'EntityMetadata',
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    private getCachedAttributeMetadata(key: string): AttributeMetadata[] | null {
+        const cached = this.cache.get(key);
+        if (cached && cached.type === 'AttributeMetadata' && this.isCacheValid(cached.timestamp)) {
+            return cached.data;
+        }
+        this.cache.delete(key);
+        return null;
+    }
+
+    private setCacheAttributeMetadata(key: string, data: AttributeMetadata[]): void {
+        this.cache.set(key, {
+            type: 'AttributeMetadata',
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    private getCachedEntityKeys(key: string): EntityKeyMetadata[] | null {
+        const cached = this.cache.get(key);
+        if (cached && cached.type === 'EntityKeys' && this.isCacheValid(cached.timestamp)) {
+            return cached.data;
+        }
+        this.cache.delete(key);
+        return null;
+    }
+
+    private setCacheEntityKeys(key: string, data: EntityKeyMetadata[]): void {
+        this.cache.set(key, {
+            type: 'EntityKeys',
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    private getCachedOneToManyRelationships(key: string): OneToManyRelationshipMetadata[] | null {
+        const cached = this.cache.get(key);
+        if (cached && cached.type === 'OneToManyRelationships' && this.isCacheValid(cached.timestamp)) {
+            return cached.data;
+        }
+        this.cache.delete(key);
+        return null;
+    }
+
+    private setCacheOneToManyRelationships(key: string, data: OneToManyRelationshipMetadata[]): void {
+        this.cache.set(key, {
+            type: 'OneToManyRelationships',
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    private getCachedManyToOneRelationships(key: string): OneToManyRelationshipMetadata[] | null {
+        const cached = this.cache.get(key);
+        if (cached && cached.type === 'ManyToOneRelationships' && this.isCacheValid(cached.timestamp)) {
+            return cached.data;
+        }
+        this.cache.delete(key);
+        return null;
+    }
+
+    private setCacheManyToOneRelationships(key: string, data: OneToManyRelationshipMetadata[]): void {
+        this.cache.set(key, {
+            type: 'ManyToOneRelationships',
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    private getCachedManyToManyRelationships(key: string): ManyToManyRelationshipMetadata[] | null {
+        const cached = this.cache.get(key);
+        if (cached && cached.type === 'ManyToManyRelationships' && this.isCacheValid(cached.timestamp)) {
+            return cached.data;
+        }
+        this.cache.delete(key);
+        return null;
+    }
+
+    private setCacheManyToManyRelationships(key: string, data: ManyToManyRelationshipMetadata[]): void {
+        this.cache.set(key, {
+            type: 'ManyToManyRelationships',
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    private getCachedEntityPrivileges(key: string): EntityPrivilegeMetadata[] | null {
+        const cached = this.cache.get(key);
+        if (cached && cached.type === 'EntityPrivileges' && this.isCacheValid(cached.timestamp)) {
+            return cached.data;
+        }
+        this.cache.delete(key);
+        return null;
+    }
+
+    private setCacheEntityPrivileges(key: string, data: EntityPrivilegeMetadata[]): void {
+        this.cache.set(key, {
+            type: 'EntityPrivileges',
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    private getCachedGlobalOptionSets(key: string): OptionSetMetadata[] | null {
+        const cached = this.cache.get(key);
+        if (cached && cached.type === 'GlobalOptionSets' && this.isCacheValid(cached.timestamp)) {
+            return cached.data;
+        }
+        this.cache.delete(key);
+        return null;
+    }
+
+    private setCacheGlobalOptionSets(key: string, data: OptionSetMetadata[]): void {
+        this.cache.set(key, {
+            type: 'GlobalOptionSets',
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    private getCachedOptionSetMetadata(key: string): OptionSetMetadata | null {
+        const cached = this.cache.get(key);
+        if (cached && cached.type === 'OptionSetMetadata' && this.isCacheValid(cached.timestamp)) {
+            return cached.data;
+        }
+        this.cache.delete(key);
+        return null;
+    }
+
+    private setCacheOptionSetMetadata(key: string, data: OptionSetMetadata): void {
+        this.cache.set(key, {
+            type: 'OptionSetMetadata',
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    private getCachedCompleteEntityMetadata(key: string): CompleteEntityMetadata | null {
+        const cached = this.cache.get(key);
+        if (cached && cached.type === 'CompleteEntityMetadata' && this.isCacheValid(cached.timestamp)) {
+            return cached.data;
+        }
+        this.cache.delete(key);
+        return null;
+    }
+
+    private setCacheCompleteEntityMetadata(key: string, data: CompleteEntityMetadata): void {
+        this.cache.set(key, {
+            type: 'CompleteEntityMetadata',
             data,
             timestamp: Date.now()
         });
@@ -414,7 +669,7 @@ export class MetadataService {
 
     async getEntityDefinitions(environmentId: string): Promise<EntityDefinition[]> {
         const cacheKey = this.getCacheKey(environmentId, 'entityDefinitions');
-        const cached = this.getFromCache<EntityDefinition[]>(cacheKey);
+        const cached = this.getCachedEntityDefinitions(cacheKey);
         if (cached) return cached;
 
         const environments = await this.authService.getEnvironments();
@@ -452,7 +707,7 @@ export class MetadataService {
             throw new Error(`Failed to fetch entity definitions: ${response.status} ${response.statusText}. ${errorText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<EntityDefinition>(await response.json());
         const entities = data.value || [];
 
         // Sort client-side by LogicalName since server-side sorting isn't supported
@@ -460,13 +715,13 @@ export class MetadataService {
             return (a.LogicalName || '').localeCompare(b.LogicalName || '');
         });
 
-        this.setCache(cacheKey, entities);
+        this.setCacheEntityDefinitions(cacheKey, entities);
         return entities;
     }
 
     async getEntityMetadata(environmentId: string, entityLogicalName: string): Promise<EntityDefinition> {
         const cacheKey = this.getCacheKey(environmentId, 'entityMetadata', entityLogicalName);
-        const cached = this.getFromCache<EntityDefinition>(cacheKey);
+        const cached = this.getCachedEntityMetadata(cacheKey);
         if (cached) return cached;
 
         const environments = await this.authService.getEnvironments();
@@ -491,14 +746,14 @@ export class MetadataService {
             throw new Error(`Failed to fetch entity metadata: ${response.statusText}`);
         }
 
-        const entity = await response.json();
-        this.setCache(cacheKey, entity);
+        const entity = parseODataSingleResponse<EntityDefinition>(await response.json());
+        this.setCacheEntityMetadata(cacheKey, entity);
         return entity;
     }
 
     async getEntityAttributes(environmentId: string, entityLogicalName: string): Promise<AttributeMetadata[]> {
         const cacheKey = this.getCacheKey(environmentId, 'entityAttributes', entityLogicalName);
-        const cached = this.getFromCache<AttributeMetadata[]>(cacheKey);
+        const cached = this.getCachedAttributeMetadata(cacheKey);
         if (cached) return cached;
 
         const environments = await this.authService.getEnvironments();
@@ -547,7 +802,7 @@ export class MetadataService {
             throw new Error(`Failed to fetch entity attributes: ${normalResponse.statusText}`);
         }
 
-        const normalData = await normalResponse.json();
+        const normalData = parseODataResponse<AttributeMetadata>(await normalResponse.json());
         const attributes = normalData.value || [];
 
         // Helper function to merge OptionSet data from typed queries
@@ -564,7 +819,7 @@ export class MetadataService {
                 return { merged: 0, total: 0 };
             }
 
-            const data = await response.json();
+            const data = parseODataResponse<AttributeMetadata>(await response.json());
             const typedAttributes = data.value || [];
 
             // Create a map of typed attributes by MetadataId for fast lookup
@@ -614,13 +869,13 @@ export class MetadataService {
             totalMerged
         });
 
-        this.setCache(cacheKey, attributes);
+        this.setCacheAttributeMetadata(cacheKey, attributes);
         return attributes;
     }
 
     async getEntityKeys(environmentId: string, entityLogicalName: string): Promise<EntityKeyMetadata[]> {
         const cacheKey = this.getCacheKey(environmentId, 'entityKeys', entityLogicalName);
-        const cached = this.getFromCache<EntityKeyMetadata[]>(cacheKey);
+        const cached = this.getCachedEntityKeys(cacheKey);
         if (cached) return cached;
 
         const environments = await this.authService.getEnvironments();
@@ -644,16 +899,16 @@ export class MetadataService {
             throw new Error(`Failed to fetch entity keys: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<EntityKeyMetadata>(await response.json());
         const keys = data.value || [];
 
-        this.setCache(cacheKey, keys);
+        this.setCacheEntityKeys(cacheKey, keys);
         return keys;
     }
 
     async getOneToManyRelationships(environmentId: string, entityLogicalName: string): Promise<OneToManyRelationshipMetadata[]> {
         const cacheKey = this.getCacheKey(environmentId, 'oneToManyRelationships', entityLogicalName);
-        const cached = this.getFromCache<OneToManyRelationshipMetadata[]>(cacheKey);
+        const cached = this.getCachedOneToManyRelationships(cacheKey);
         if (cached) return cached;
 
         const environments = await this.authService.getEnvironments();
@@ -677,16 +932,16 @@ export class MetadataService {
             throw new Error(`Failed to fetch one-to-many relationships: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<OneToManyRelationshipMetadata>(await response.json());
         const relationships = data.value || [];
 
-        this.setCache(cacheKey, relationships);
+        this.setCacheOneToManyRelationships(cacheKey, relationships);
         return relationships;
     }
 
     async getManyToOneRelationships(environmentId: string, entityLogicalName: string): Promise<OneToManyRelationshipMetadata[]> {
         const cacheKey = this.getCacheKey(environmentId, 'manyToOneRelationships', entityLogicalName);
-        const cached = this.getFromCache<OneToManyRelationshipMetadata[]>(cacheKey);
+        const cached = this.getCachedManyToOneRelationships(cacheKey);
         if (cached) return cached;
 
         const environments = await this.authService.getEnvironments();
@@ -710,16 +965,16 @@ export class MetadataService {
             throw new Error(`Failed to fetch many-to-one relationships: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<OneToManyRelationshipMetadata>(await response.json());
         const relationships = data.value || [];
 
-        this.setCache(cacheKey, relationships);
+        this.setCacheManyToOneRelationships(cacheKey, relationships);
         return relationships;
     }
 
     async getManyToManyRelationships(environmentId: string, entityLogicalName: string): Promise<ManyToManyRelationshipMetadata[]> {
         const cacheKey = this.getCacheKey(environmentId, 'manyToManyRelationships', entityLogicalName);
-        const cached = this.getFromCache<ManyToManyRelationshipMetadata[]>(cacheKey);
+        const cached = this.getCachedManyToManyRelationships(cacheKey);
         if (cached) return cached;
 
         const environments = await this.authService.getEnvironments();
@@ -743,16 +998,16 @@ export class MetadataService {
             throw new Error(`Failed to fetch many-to-many relationships: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<ManyToManyRelationshipMetadata>(await response.json());
         const relationships = data.value || [];
 
-        this.setCache(cacheKey, relationships);
+        this.setCacheManyToManyRelationships(cacheKey, relationships);
         return relationships;
     }
 
     async getEntityPrivileges(environmentId: string, entityLogicalName: string): Promise<EntityPrivilegeMetadata[]> {
         const cacheKey = this.getCacheKey(environmentId, 'entityPrivileges', entityLogicalName);
-        const cached = this.getFromCache<EntityPrivilegeMetadata[]>(cacheKey);
+        const cached = this.getCachedEntityPrivileges(cacheKey);
         if (cached) return cached;
 
         const environments = await this.authService.getEnvironments();
@@ -776,16 +1031,16 @@ export class MetadataService {
             throw new Error(`Failed to fetch entity privileges: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<EntityPrivilegeMetadata>(await response.json());
         const privileges = data.value || [];
 
-        this.setCache(cacheKey, privileges);
+        this.setCacheEntityPrivileges(cacheKey, privileges);
         return privileges;
     }
 
     async getGlobalOptionSets(environmentId: string): Promise<OptionSetMetadata[]> {
         const cacheKey = this.getCacheKey(environmentId, 'globalOptionSets');
-        const cached = this.getFromCache<OptionSetMetadata[]>(cacheKey);
+        const cached = this.getCachedGlobalOptionSets(cacheKey);
         if (cached) return cached;
 
         const environments = await this.authService.getEnvironments();
@@ -809,7 +1064,7 @@ export class MetadataService {
             throw new Error(`Failed to fetch global option sets: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<OptionSetMetadata>(await response.json());
         const optionSets = data.value || [];
 
         // Sort client-side by Name since server-side sorting isn't supported
@@ -817,13 +1072,13 @@ export class MetadataService {
             return (a.Name || '').localeCompare(b.Name || '');
         });
 
-        this.setCache(cacheKey, optionSets);
+        this.setCacheGlobalOptionSets(cacheKey, optionSets);
         return optionSets;
     }
 
     async getOptionSetMetadata(environmentId: string, optionSetName: string): Promise<OptionSetMetadata> {
         const cacheKey = this.getCacheKey(environmentId, 'optionSetMetadata', optionSetName);
-        const cached = this.getFromCache<OptionSetMetadata>(cacheKey);
+        const cached = this.getCachedOptionSetMetadata(cacheKey);
         if (cached) return cached;
 
         const environments = await this.authService.getEnvironments();
@@ -847,14 +1102,14 @@ export class MetadataService {
             throw new Error(`Failed to fetch option set metadata: ${response.statusText}`);
         }
 
-        const optionSet = await response.json();
-        this.setCache(cacheKey, optionSet);
+        const optionSet = parseODataSingleResponse<OptionSetMetadata>(await response.json());
+        this.setCacheOptionSetMetadata(cacheKey, optionSet);
         return optionSet;
     }
 
     async getCompleteEntityMetadata(environmentId: string, entityLogicalName: string): Promise<CompleteEntityMetadata> {
         const cacheKey = this.getCacheKey(environmentId, 'completeEntityMetadata', entityLogicalName);
-        const cached = this.getFromCache<CompleteEntityMetadata>(cacheKey);
+        const cached = this.getCachedCompleteEntityMetadata(cacheKey);
         if (cached) return cached;
 
         // Load all metadata in parallel for better performance
@@ -886,7 +1141,7 @@ export class MetadataService {
             privileges
         };
 
-        this.setCache(cacheKey, completeMetadata);
+        this.setCacheCompleteEntityMetadata(cacheKey, completeMetadata);
         return completeMetadata;
     }
 
@@ -1001,7 +1256,7 @@ export class MetadataService {
             });
 
             if (normalResponse.ok) {
-                const normalData = await normalResponse.json();
+                const normalData = parseODataResponse<AttributeMetadata>(await normalResponse.json());
                 const normalAttributes = normalData.value || [];
                 this.logger.info(`Found ${normalAttributes.length} attributes`);
 
@@ -1053,7 +1308,7 @@ export class MetadataService {
             });
 
             if (picklistResponse.ok) {
-                const picklistData = await picklistResponse.json();
+                const picklistData = parseODataResponse<AttributeMetadata>(await picklistResponse.json());
                 const picklistAttributes = picklistData.value || [];
                 this.logger.info(`Found ${picklistAttributes.length} picklist attributes`);
 
@@ -1099,7 +1354,7 @@ export class MetadataService {
             });
 
             if (lookupResponse.ok) {
-                const lookupData = await lookupResponse.json();
+                const lookupData = parseODataResponse<AttributeMetadata>(await lookupResponse.json());
                 const lookupAttributes = lookupData.value || [];
                 this.logger.info(`Found ${lookupAttributes.length} lookup attributes`);
 
@@ -1134,7 +1389,7 @@ export class MetadataService {
             });
 
             if (stateResponse.ok) {
-                const stateData = await stateResponse.json();
+                const stateData = parseODataResponse<AttributeMetadata>(await stateResponse.json());
                 const stateAttributes = stateData.value || [];
                 this.logger.info(`Found ${stateAttributes.length} state attributes`);
 
@@ -1171,7 +1426,7 @@ export class MetadataService {
             });
 
             if (statusResponse.ok) {
-                const statusData = await statusResponse.json();
+                const statusData = parseODataResponse<AttributeMetadata>(await statusResponse.json());
                 const statusAttributes = statusData.value || [];
                 this.logger.info(`Found ${statusAttributes.length} status attributes`);
 
@@ -1208,7 +1463,7 @@ export class MetadataService {
             });
 
             if (booleanResponse.ok) {
-                const booleanData = await booleanResponse.json();
+                const booleanData = parseODataResponse<AttributeMetadata>(await booleanResponse.json());
                 const booleanAttributes = booleanData.value || [];
                 this.logger.info(`Found ${booleanAttributes.length} boolean attributes`);
 
@@ -1246,7 +1501,7 @@ export class MetadataService {
             });
 
             if (multiSelectResponse.ok) {
-                const multiSelectData = await multiSelectResponse.json();
+                const multiSelectData = parseODataResponse<AttributeMetadata>(await multiSelectResponse.json());
                 const multiSelectAttributes = multiSelectData.value || [];
                 this.logger.info(`Found ${multiSelectAttributes.length} multi-select picklist attributes`);
 

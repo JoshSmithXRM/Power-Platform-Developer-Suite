@@ -457,18 +457,21 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
                     break;
 
                 case 'toggle-section':
-                    this.toggleSection(message.data?.sectionId);
+                    // Custom message type not in union
+                    this.toggleSection((message as unknown as { data?: { sectionId?: string } }).data?.sectionId ?? '');
                     break;
 
                 case 'select-entity':
                     if (message.data) {
-                        await this.handleEntitySelection(message.data);
+                        // Custom message type not in union - data structure is legitimately unknown
+                        await this.handleEntitySelection(message.data as unknown);
                     }
                     break;
 
                 case 'select-choice':
                     if (message.data) {
-                        await this.handleChoiceSelection(message.data);
+                        // Custom message type not in union - data structure is legitimately unknown
+                        await this.handleChoiceSelection(message.data as unknown);
                     }
                     break;
 
@@ -490,31 +493,32 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
 
                 case 'table-search':
                     if (message.tableId) {
+                        const searchQuery = message.searchQuery || '';
                         // Determine which table to search based on tableId
                         switch (message.tableId) {
                             case 'metadata-attributes-table':
                                 if (this.attributesTableComponent) {
-                                    this.attributesTableComponent.search(message.searchQuery || '');
+                                    this.attributesTableComponent.search(searchQuery);
                                 }
                                 break;
                             case 'metadata-keys-table':
                                 if (this.keysTableComponent) {
-                                    this.keysTableComponent.search(message.searchQuery || '');
+                                    this.keysTableComponent.search(searchQuery);
                                 }
                                 break;
                             case 'metadata-relationships-table':
                                 if (this.relationshipsTableComponent) {
-                                    this.relationshipsTableComponent.search(message.searchQuery || '');
+                                    this.relationshipsTableComponent.search(searchQuery);
                                 }
                                 break;
                             case 'metadata-privileges-table':
                                 if (this.privilegesTableComponent) {
-                                    this.privilegesTableComponent.search(message.searchQuery || '');
+                                    this.privilegesTableComponent.search(searchQuery);
                                 }
                                 break;
                             case 'metadata-choice-values-table':
                                 if (this.choiceValuesTableComponent) {
-                                    this.choiceValuesTableComponent.search(message.searchQuery || '');
+                                    this.choiceValuesTableComponent.search(searchQuery);
                                 }
                                 break;
                         }

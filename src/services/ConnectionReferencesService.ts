@@ -1,3 +1,5 @@
+import { parseODataResponse } from '../utils/ODataValidator';
+
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
@@ -165,9 +167,9 @@ export class ConnectionReferencesService {
         debug.allCRStatus = allCRResp?.status;
 
         // Process flows response
-        let allFlowsJson: { value: DataverseFlowResponse[] } = { value: [] };
+        let allFlowsJson = { value: [] as DataverseFlowResponse[] };
         if (allFlowsResp && allFlowsResp.ok) {
-            allFlowsJson = await allFlowsResp.json();
+            allFlowsJson = parseODataResponse<DataverseFlowResponse>(await allFlowsResp.json());
             this.logger.info('Flows loaded from environment', {
                 environmentId,
                 flowCount: allFlowsJson.value?.length || 0
@@ -179,7 +181,7 @@ export class ConnectionReferencesService {
                 statusText: allFlowsResp?.statusText
             });
             try {
-                const errorJson = await allFlowsResp.json();
+                const errorJson = await allFlowsResp.json() as unknown;
                 this.logger.debug('API error details', { errorJson });
                 debug.allFlowsError = errorJson;
             } catch {
@@ -188,9 +190,9 @@ export class ConnectionReferencesService {
         }
 
         // Process connection references response
-        let allCRJson: { value: DataverseConnectionReferenceResponse[] } = { value: [] };
+        let allCRJson = { value: [] as DataverseConnectionReferenceResponse[] };
         if (allCRResp && allCRResp.ok) {
-            allCRJson = await allCRResp.json();
+            allCRJson = parseODataResponse<DataverseConnectionReferenceResponse>(await allCRResp.json());
             this.logger.info('Connection references loaded from environment', {
                 environmentId,
                 connectionReferencesCount: allCRJson.value?.length || 0
@@ -202,7 +204,7 @@ export class ConnectionReferencesService {
                 statusText: allCRResp?.statusText
             });
             try {
-                const errorJson = await allCRResp.json();
+                const errorJson = await allCRResp.json() as unknown;
                 this.logger.debug('Connection references API error details', { errorJson });
                 debug.allCRError = errorJson;
             } catch {
@@ -331,14 +333,18 @@ export class ConnectionReferencesService {
             if (!clientData) return Array.from(names);
 
             try {
-                const parsed = typeof clientData === 'string' ? JSON.parse(clientData) : clientData;
-                
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const parsed = typeof clientData === 'string' ? JSON.parse(clientData) as any : clientData as any;
+
                 // Look for connectionReferences in properties
-                const connRefs = parsed?.properties?.connectionReferences;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const connRefs = parsed?.properties?.connectionReferences as any;
                 if (connRefs && typeof connRefs === 'object') {
-                    Object.keys(connRefs).forEach(key => {
-                        const connRef = connRefs[key];
-                        const logicalName = connRef?.connection?.connectionReferenceLogicalName;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    Object.keys(connRefs).forEach((key: any) => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const connRef = connRefs[key] as any;
+                        const logicalName = connRef?.connection?.connectionReferenceLogicalName as string | undefined;
                         if (logicalName) {
                             names.add(logicalName);
                         }

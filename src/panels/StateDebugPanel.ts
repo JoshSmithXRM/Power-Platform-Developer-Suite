@@ -138,11 +138,13 @@ export class StateDebugPanel extends BasePanel<StateDebugInstanceState, StateDeb
         try {
             switch (message.command) {
                 case 'component-event': {
-                    const { componentId, eventType, data } = message.data || {};
+                    const componentId = message.data.componentId;
+                    const eventType = message.data.eventType;
+                    const data = message.data.eventData && typeof message.data.eventData === 'object' ? message.data.eventData as { actionId?: string } : undefined;
 
                     // Handle action bar events
                     if (componentId === 'stateDebug-actions' && eventType === 'actionClicked') {
-                        const { actionId } = data;
+                        const actionId = data?.actionId ?? '';
                         await this.handleActionClicked(actionId);
                     }
                     break;

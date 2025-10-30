@@ -1,3 +1,5 @@
+import { parseODataResponse, parseODataSingleResponse } from '../utils/ODataValidator';
+
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 import { XmlFormatterService } from './XmlFormatterService';
@@ -88,7 +90,7 @@ export class ImportJobService {
             throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<ImportJob>(await response.json());
         const importJobs = data.value || [];
 
         this.logger.info('Import jobs retrieval completed', {
@@ -147,7 +149,11 @@ export class ImportJobService {
             throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
         }
 
-        const data = await response.json();
+        interface ImportJobXmlResponse {
+            data?: string;
+        }
+
+        const data = parseODataSingleResponse<ImportJobXmlResponse>(await response.json());
         const xmlData = data.data || '<empty>No XML data available</empty>';
 
         this.logger.debug('Import job XML retrieved', {

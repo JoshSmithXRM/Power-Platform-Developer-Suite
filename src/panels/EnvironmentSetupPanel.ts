@@ -131,7 +131,7 @@ export class EnvironmentSetupPanel extends BasePanel {
                     break;
 
                 case 'delete-environment':
-                    await this.deleteEnvironment(message.data?.environmentId);
+                    await this.deleteEnvironment(message.data.environmentId);
                     break;
 
                 case 'new-environment':
@@ -139,7 +139,7 @@ export class EnvironmentSetupPanel extends BasePanel {
                     break;
 
                 case 'load-environment':
-                    await this.loadEnvironmentById(message.data?.environmentId);
+                    await this.loadEnvironmentById(message.data.environmentId);
                     break;
 
                 case 'component-event':

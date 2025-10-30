@@ -1,3 +1,5 @@
+import { parseODataResponse } from '../utils/ODataValidator';
+
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
@@ -60,8 +62,8 @@ export class SolutionComponentService {
             throw new Error(`Failed to fetch entity definition: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json();
-        const entities = data.value as EntityDefinition[];
+        const data = parseODataResponse<EntityDefinition>(await response.json());
+        const entities = data.value;
 
         if (entities.length === 0) {
             this.logger.warn('Entity not found', { entityLogicalName });
@@ -103,8 +105,8 @@ export class SolutionComponentService {
             throw new Error(`Failed to fetch solution components: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json();
-        return data.value as SolutionComponent[];
+        const data = parseODataResponse<SolutionComponent>(await response.json());
+        return data.value;
     }
 
     /**

@@ -303,7 +303,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
         try {
-            const action = message.action || message.command;
+            const action = ('action' in message ? (message as { action?: unknown }).action : undefined) || message.command;
 
             // Only log important messages (debug level for routine events)
             this.componentLogger.debug('📨 MESSAGE RECEIVED', {
@@ -326,11 +326,19 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                 // 'environment-changed' is handled by BasePanel.handleCommonMessages()
 
                 case 'load-traces':
-                    await this.handleLoadTraces(message.environmentId, message.filterOptions);
+                    // Custom message type not in union
+                    await this.handleLoadTraces(
+                        (message as unknown as { environmentId?: string }).environmentId ?? '',
+                        (message as unknown as { filterOptions?: unknown }).filterOptions
+                    );
                     break;
 
                 case 'trace-level-changed':
-                    await this.handleSetTraceLevel(message.environmentId, message.level);
+                    // Custom message type not in union
+                    await this.handleSetTraceLevel(
+                        (message as unknown as { environmentId?: string }).environmentId ?? '',
+                        (message as unknown as { level?: unknown }).level
+                    );
                     break;
 
                 case 'filters-applied':
@@ -338,22 +346,32 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                     break;
 
                 case 'trace-selected':
-                    await this.handleTraceSelected(message.traceId);
+                    // Custom message type not in union
+                    await this.handleTraceSelected((message as unknown as { traceId?: string }).traceId ?? '');
                     break;
 
                 case 'context-menu-action':
-                    await this.handleContextMenuAction(message.actionId, message.rowId);
+                    // Custom message type not in union
+                    await this.handleContextMenuAction(
+                        (message as unknown as { actionId?: string }).actionId ?? '',
+                        (message as unknown as { rowId?: string }).rowId ?? ''
+                    );
                     break;
 
-                case 'table-search':
-                    if (message.tableId && this.dataTableComponent) {
-                        this.dataTableComponent.search(message.searchQuery || '');
+                case 'table-search': {
+                    const tableMsg = message as unknown as { tableId?: string; searchQuery?: string };
+                    if (tableMsg.tableId && this.dataTableComponent) {
+                        this.dataTableComponent.search(tableMsg.searchQuery || '');
                     }
                     break;
+                }
 
-                case 'auto-refresh-changed':
-                    await this.handleAutoRefreshChange(message.interval);
+                case 'auto-refresh-changed': {
+                    // Custom message type not in union
+                    const intervalMsg = message as unknown as { interval?: string };
+                    await this.handleAutoRefreshChange(intervalMsg.interval ?? '');
                     break;
+                }
 
                 case 'panel-ready':
                     await this.handlePanelReadyMessage();
@@ -361,10 +379,13 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
                 // Split panel events are now handled via component-event by overridden handleComponentEvent
 
-                case 'filter-panel-collapsed':
-                    this.componentLogger.info('✅ Filter panel collapsed state changed', { collapsed: message.data?.collapsed });
-                    await this.stateManager.updateCurrentPreferences({ filterPanelCollapsed: message.data?.collapsed });
+                case 'filter-panel-collapsed': {
+                    // Custom message type not in union
+                    const collapsedData = message.data && typeof message.data === 'object' && 'collapsed' in message.data ? (message.data as { collapsed: boolean }).collapsed : false;
+                    this.componentLogger.info('✅ Filter panel collapsed state changed', { collapsed: collapsedData });
+                    await this.stateManager.updateCurrentPreferences({ filterPanelCollapsed: collapsedData });
                     break;
+                }
 
                 default:
                     // Only warn about truly unknown actions, not benign ones
@@ -373,7 +394,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                     }
             }
         } catch (error: unknown) {
-            const action = message.action || message.command;
+            const action = ('action' in message ? (message as { action?: unknown }).action : undefined) || message.command;
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.componentLogger.error(`Error handling message ${action}`, error as Error);
             this.postMessage({
@@ -432,19 +453,23 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
     private async handleDropdownItemClicked(message: WebviewMessage): Promise<void> {
         try {
-            const { componentId, actionId, itemId } = message.data || {};
+            // Custom message type - extract data
+            const messageData = message.data && typeof message.data === 'object' ? message.data as { componentId?: string; actionId?: string; itemId?: string } : undefined;
+            const componentId = messageData?.componentId;
+            const actionId = messageData?.actionId;
+            const itemId = messageData?.itemId;
 
             this.componentLogger.info('🔽 DROPDOWN ITEM CLICKED', {
                 componentId,
                 actionId,
                 itemId,
                 fullMessage: message,
-                messageData: message.data
+                messageData
             });
 
             if (componentId === 'pluginTrace-actionBar') {
                 this.componentLogger.info('✅ Calling handleActionBarClick', { actionId, itemId });
-                await this.handleActionBarClick(actionId, itemId);
+                await this.handleActionBarClick(actionId ?? '', itemId);
             } else {
                 this.componentLogger.warn('⚠️ Unhandled dropdown from component', { componentId });
             }
@@ -458,8 +483,9 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
      * Converts filter data to arrays and delegates to handleFiltersApplied
      */
     private async handleFiltersAppliedMessage(message: WebviewMessage): Promise<void> {
-        const quickFiltersArray = this.convertToArray<string>(message.data?.quickFilters);
-        const advancedFiltersArray = this.convertToArray<FilterCondition>(message.data?.advancedFilters);
+        const messageData = message.data && typeof message.data === 'object' ? message.data as { quickFilters?: unknown; advancedFilters?: unknown } : undefined;
+        const quickFiltersArray = this.convertToArray<string>(messageData?.quickFilters);
+        const advancedFiltersArray = this.convertToArray<FilterCondition>(messageData?.advancedFilters);
         await this.handleFiltersApplied(quickFiltersArray, advancedFiltersArray);
     }
 
@@ -474,29 +500,31 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             return;
         }
 
+        const pendingFilters = this.pendingFilterRestoration as { quick?: unknown[]; advanced?: unknown[] };
+
         this.componentLogger.info('Applying pending filter restoration', {
-            pendingFilters: this.pendingFilterRestoration,
-            quickLength: this.pendingFilterRestoration.quick.length,
-            advancedLength: this.pendingFilterRestoration.advanced.length
+            pendingFilters,
+            quickLength: Array.isArray(pendingFilters.quick) ? pendingFilters.quick.length : 0,
+            advancedLength: Array.isArray(pendingFilters.advanced) ? pendingFilters.advanced.length : 0
         });
 
         // Restore quick filters
-        if (this.pendingFilterRestoration.quick.length > 0) {
+        if (Array.isArray(pendingFilters.quick) && pendingFilters.quick.length > 0) {
             this.postMessage({
                 action: 'set-quick-filters',
                 componentId: this.filterPanelComponent!.getId(),
                 componentType: 'FilterPanel',
-                filterIds: this.pendingFilterRestoration.quick
+                filterIds: pendingFilters.quick
             });
         }
 
         // Restore advanced filters
-        if (this.pendingFilterRestoration.advanced.length > 0) {
+        if (Array.isArray(pendingFilters.advanced) && pendingFilters.advanced.length > 0) {
             this.postMessage({
                 action: 'set-advanced-filters',
                 componentId: this.filterPanelComponent!.getId(),
                 componentType: 'FilterPanel',
-                conditions: this.pendingFilterRestoration.advanced
+                conditions: pendingFilters.advanced
             });
         }
 
@@ -1513,12 +1541,15 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
         // Handle quick filters - convert to OData conditions
         // Ensure quick filters is an array (handle serialization issues)
-        const quickFiltersArray = filters.quick && Array.isArray(filters.quick) ? filters.quick :
-            (filters.quick && typeof filters.quick === 'object' ? Object.values(filters.quick) : []);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const quickRaw = filters.quick as any;
+        const quickFiltersArray = quickRaw && Array.isArray(quickRaw) ? quickRaw :
+            (quickRaw && typeof quickRaw === 'object' ? Object.values(quickRaw) : []);
 
         if (quickFiltersArray.length > 0) {
             this.componentLogger.info('Processing quick filters', { quickFilters: quickFiltersArray });
-            quickFiltersArray.forEach((filterId: string) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            quickFiltersArray.forEach((filterId: any) => {
                 switch (filterId) {
                     case 'exceptionOnly':
                         // In Dynamics, empty exception details are stored as empty string, not null
@@ -1551,16 +1582,19 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
 
         // Handle advanced filters - build OData filter string with OR/AND logic
-        if (filters.advanced && filters.advanced.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const advancedRaw = filters.advanced as any;
+        if (advancedRaw && advancedRaw.length > 0) {
             this.componentLogger.info('Processing advanced filters with OR/AND logic', {
-                count: filters.advanced.length,
-                filters: filters.advanced
+                count: advancedRaw.length,
+                filters: advancedRaw
             });
 
-            const advancedODataFilter = this.buildODataFilterString(filters.advanced);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const advancedODataFilter = this.buildODataFilterString(advancedRaw as any);
             if (advancedODataFilter) {
                 // Wrap advanced filters in parentheses if there are multiple conditions
-                if (filters.advanced.length > 1) {
+                if (advancedRaw.length > 1) {
                     odataConditions.push(`(${advancedODataFilter})`);
                 } else {
                     odataConditions.push(advancedODataFilter);
@@ -1571,8 +1605,10 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
         // Combine all OData conditions with AND (quick filters AND advanced filters)
         if (odataConditions.length > 0) {
-            serviceFilters.odataFilter = odataConditions.join(' and ');
-            this.componentLogger.info('✅ Built complete OData filter', { odataFilter: serviceFilters.odataFilter });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (serviceFilters as any).odataFilter = odataConditions.join(' and ');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            this.componentLogger.info('✅ Built complete OData filter', { odataFilter: (serviceFilters as any).odataFilter });
         }
 
         return serviceFilters;

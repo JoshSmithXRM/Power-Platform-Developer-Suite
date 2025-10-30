@@ -1,3 +1,5 @@
+import { parseODataResponse } from '../utils/ODataValidator';
+
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
@@ -98,7 +100,7 @@ export class SolutionService {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<DataverseSolutionResponse>(await response.json());
         const solutions = data.value || [];
 
         this.logger.debug('Solutions data retrieved', {

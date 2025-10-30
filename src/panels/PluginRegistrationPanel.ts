@@ -424,7 +424,7 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
     }
 
     protected async handleMessage(message: WebviewMessage): Promise<void> {
-        this.componentLogger.info('Handling message', { command: message.command });
+        this.componentLogger.info('Handling message', { command: message.command as string });
 
         switch (message.command) {
             case 'close-details':

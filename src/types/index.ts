@@ -18,11 +18,8 @@ export interface IPanelBase {
 }
 
 // Message types for webview communication
-export interface WebviewMessage {
-    action: string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [key: string]: any; // Dynamic message properties from webview - any is appropriate here
-}
+// Using discriminated union for type-safe message handling
+export * from './WebviewMessages';
 
 export interface Environment {
     id: string;

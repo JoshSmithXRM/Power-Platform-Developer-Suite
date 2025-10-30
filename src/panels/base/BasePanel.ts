@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 import { AuthenticationService } from '../../services/AuthenticationService';
-import { PanelConfig, IPanelBase, WebviewMessage } from '../../types';
+import { PanelConfig, IPanelBase, WebviewMessage, ComponentEventMessage } from '../../types';
 import { ServiceFactory } from '../../services/ServiceFactory';
 import { Environment } from '../../components/base/ComponentInterface';
 import { EnvironmentConnection } from '../../models/PowerPlatformSettings';
@@ -178,7 +178,7 @@ export abstract class BasePanel<
             case 'environment-changed': {
                 // Process through full selection flow to trigger all side effects
                 // (validation, warnings, cleanup, state tracking)
-                const envId = message.data?.environmentId || message.environmentId;
+                const envId = (message.data?.environmentId || message.environmentId) as string | undefined;
                 if (envId) {
                     await this.processEnvironmentSelection(envId);
                 }
@@ -200,8 +200,10 @@ export abstract class BasePanel<
      * Routes ActionBar actionClicked events to handleStandardActions + handlePanelAction
      * Can be extended to handle other component events in the future
      */
-    protected async handleComponentEvent(message: WebviewMessage): Promise<void> {
-        const { componentId, eventType, data } = message.data || {};
+    protected async handleComponentEvent(message: ComponentEventMessage): Promise<void> {
+        const componentId = message.data.componentId;
+        const eventType = message.data.eventType;
+        const data = message.data.eventData;
 
         this.componentLogger.debug('Component event received', {
             componentId,
@@ -210,7 +212,7 @@ export abstract class BasePanel<
         });
 
         if (eventType === 'actionClicked') {
-            const { actionId } = data;
+            const actionId = (data && typeof data === 'object' && 'actionId' in data) ? (data as { actionId?: string }).actionId ?? '' : '';
 
             // Try standard actions first (refresh) before delegating to panel-specific handler
             const handled = await this.handleStandardActions(actionId);

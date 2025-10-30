@@ -1,4 +1,5 @@
 import { EnvironmentConnection } from '../models/PowerPlatformSettings';
+import { parseODataResponse } from '../utils/ODataValidator';
 
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
@@ -204,7 +205,7 @@ export class PluginTraceService {
             throw new Error(`Failed to fetch plugin trace logs: ${response.status} ${response.statusText}. ${errorText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<DataversePluginTraceLogResponse>(await response.json());
 
         // Transform data
         const traceLogs: PluginTraceLog[] = (data.value || []).map((log: DataversePluginTraceLogResponse) => ({
@@ -218,7 +219,7 @@ export class PluginTraceService {
             stage: 0, // Stage is not available in the API response, defaulting to 0
             depth: log.depth || 0,
             duration: log.performanceexecutionduration || 0,
-            exceptiondetails: log.exceptiondetails || null,
+            exceptiondetails: log.exceptiondetails || undefined,
             messageblock: log.messageblock || '',
             typename: log.typename || '',
             configuration: log.configuration || '',
@@ -255,7 +256,7 @@ export class PluginTraceService {
             throw new Error(`Failed to get plugin trace level: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<OrganizationSettings>(await response.json());
         const organization = data.value?.[0];
 
         if (!organization) {
@@ -301,7 +302,7 @@ export class PluginTraceService {
             throw new Error(`Failed to get organization: ${orgResponse.statusText}`);
         }
 
-        const orgData = await orgResponse.json();
+        const orgData = parseODataResponse<OrganizationSettings>(await orgResponse.json());
         const organizationId = orgData.value?.[0]?.organizationid;
 
         if (!organizationId) {
@@ -517,7 +518,7 @@ export class PluginTraceService {
             throw new Error(`Failed to fetch plugin traces: ${countResponse.statusText}`);
         }
 
-        const countData = await countResponse.json();
+        const countData = parseODataResponse<DataverseTraceIdResponse>(await countResponse.json());
         const totalCount = countData['@odata.count'] || countData.value?.length || 0;
 
         if (totalCount === 0) {
@@ -586,7 +587,7 @@ export class PluginTraceService {
             throw new Error(`Failed to fetch old plugin traces: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<DataverseTraceIdResponse>(await response.json());
         const totalCount = data['@odata.count'] || data.value?.length || 0;
 
         if (totalCount === 0) {

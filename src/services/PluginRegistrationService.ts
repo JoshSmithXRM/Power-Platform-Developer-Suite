@@ -1,3 +1,5 @@
+import { parseODataResponse } from '../utils/ODataValidator';
+
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
@@ -89,8 +91,7 @@ export class PluginRegistrationService {
                 throw new Error(`Failed to fetch data: ${response.statusText}`);
             }
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const data: { value: T[]; '@odata.nextLink'?: string } = await response.json() as any;
+            const data = parseODataResponse<T>(await response.json());
             results.push(...data.value);
 
             // Check for next page
@@ -130,7 +131,7 @@ export class PluginRegistrationService {
             throw new Error(`Failed to fetch plugin assemblies: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<PluginAssembly>(await response.json());
         return data.value;
     }
 
@@ -164,7 +165,7 @@ export class PluginRegistrationService {
             throw new Error(`Failed to fetch plugin types: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<PluginType>(await response.json());
         return data.value;
     }
 
@@ -198,10 +199,10 @@ export class PluginRegistrationService {
             throw new Error(`Failed to fetch plugin steps: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<PluginStep & { sdkmessagefilterid?: { primaryobjecttypecode?: string } }>(await response.json());
 
         // Extract entity name from expanded filter
-        return data.value.map((step: PluginStep & { sdkmessagefilterid?: { primaryobjecttypecode?: string } }) => ({
+        return data.value.map((step) => ({
             ...step,
             entityLogicalName: step.sdkmessagefilterid?.primaryobjecttypecode
         }));
@@ -237,7 +238,7 @@ export class PluginRegistrationService {
             throw new Error(`Failed to fetch plugin images: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = parseODataResponse<PluginImage>(await response.json());
         return data.value;
     }
 

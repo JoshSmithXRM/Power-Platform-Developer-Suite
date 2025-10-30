@@ -223,15 +223,23 @@ export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceSta
                 // 'environment-changed' is handled by BasePanel.handleCommonMessages()
 
                 case 'load-solutions':
-                    await this.handleLoadSolutions(message.data?.environmentId);
+                    await this.handleLoadSolutions(message.data?.environmentId ?? '');
                     break;
 
                 case 'open-solution-in-maker':
-                    await this.handleOpenSolutionInMaker(message.data?.environmentId, message.data?.solutionId);
+                    // Custom message type not in union - needs type assertion
+                    await this.handleOpenSolutionInMaker(
+                        (message as unknown as { data?: { environmentId?: string; solutionId?: string } }).data?.environmentId,
+                        (message as unknown as { data?: { environmentId?: string; solutionId?: string } }).data?.solutionId ?? ''
+                    );
                     break;
 
                 case 'open-solution-in-classic':
-                    await this.handleOpenSolutionInClassic(message.data?.environmentId, message.data?.solutionId);
+                    // Custom message type not in union - needs type assertion
+                    await this.handleOpenSolutionInClassic(
+                        (message as unknown as { data?: { environmentId?: string; solutionId?: string } }).data?.environmentId,
+                        (message as unknown as { data?: { environmentId?: string; solutionId?: string } }).data?.solutionId ?? ''
+                    );
                     break;
 
                 case 'panel-ready':
@@ -252,7 +260,7 @@ export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceSta
                 case 'search':
                     // Handle SearchInput component messages
                     if (message.data?.componentId === 'solutions-table-search' && this.dataTableComponent) {
-                        this.dataTableComponent.search(message.data.query || '');
+                        this.dataTableComponent.search((message.data.query as string | undefined) || '');
                     }
                     break;
 

@@ -265,8 +265,8 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
 
             this.componentLogger.debug('Message received', {
                 command,
-                componentId: message.data?.componentId,
-                eventType: message.data?.eventType
+                componentId: 'data' in message && message.data && typeof message.data === 'object' && 'componentId' in message.data ? message.data.componentId : undefined,
+                eventType: 'data' in message && message.data && typeof message.data === 'object' && 'eventType' in message.data ? message.data.eventType : undefined
             });
 
             // Handle empty or undefined command
@@ -274,8 +274,8 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
                 this.componentLogger.trace('Received message with no command property', {
                     message,
                     keys: Object.keys(message || {}),
-                    hasData: !!message.data,
-                    hasAction: !!message.action
+                    hasData: 'data' in message && !!message.data,
+                    hasAction: 'action' in message && !!(message as { action?: unknown }).action
                 });
                 return;
             }
@@ -294,11 +294,18 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
                 // 'environment-changed' is handled by BasePanel.handleCommonMessages()
 
                 case 'sync-deployment-settings':
-                    await this.handleSyncDeploymentSettings(message.data?.relationships, message.data?.solutionUniqueName);
+                    await this.handleSyncDeploymentSettings(
+                        message.data.relationships as RelationshipResult,
+                        message.data.solutionUniqueName
+                    );
                     break;
 
                 case 'open-in-maker':
-                    await this.handleOpenInMaker(message.data?.environmentId, message.data?.solutionId, message.data?.entityType);
+                    await this.handleOpenInMaker(
+                        message.data.environmentId,
+                        message.data.solutionId,
+                        message.data.entityType
+                    );
                     break;
 
                 case 'panel-ready':

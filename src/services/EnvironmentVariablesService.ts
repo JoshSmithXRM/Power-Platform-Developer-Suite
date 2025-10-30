@@ -1,3 +1,5 @@
+import { parseODataResponse } from '../utils/ODataValidator';
+
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
@@ -179,8 +181,8 @@ export class EnvironmentVariablesService {
             throw new Error(`Failed to fetch environment variable values: ${valuesResponse.statusText}`);
         }
 
-        const definitionsData = await definitionsResponse.json();
-        const valuesData = await valuesResponse.json();
+        const definitionsData = parseODataResponse<DataverseEnvVarDefinitionResponse>(await definitionsResponse.json());
+        const valuesData = parseODataResponse<DataverseEnvVarValueResponse>(await valuesResponse.json());
 
         this.logger.debug('Environment variables data retrieved', {
             environmentId,

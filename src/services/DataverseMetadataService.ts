@@ -1,3 +1,5 @@
+import { parseODataResponse } from '../utils/ODataValidator';
+
 import { AuthenticationService } from './AuthenticationService';
 import { ServiceFactory } from './ServiceFactory';
 
@@ -101,16 +103,20 @@ export class DataverseMetadataService {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                this.logger.error('Failed to fetch entity metadata', new Error('API request failed'), { 
-                    entityLogicalName, 
-                    status: response.status, 
+                this.logger.error('Failed to fetch entity metadata', new Error('API request failed'), {
+                    entityLogicalName,
+                    status: response.status,
                     statusText: response.statusText,
                     environmentId
                 });
                 throw new Error(`Failed to fetch entity metadata: ${response.statusText}`);
             }
 
-            const data = await response.json();
+            interface EntityDataResponse {
+                Attributes?: DataverseAttributeResponse[];
+            }
+
+            const data = parseODataResponse<EntityDataResponse>(await response.json());
             if (!data.value || data.value.length === 0) {
                 this.logger.error('Entity not found in metadata response', new Error('Entity not found'), { 
                     entityLogicalName, 

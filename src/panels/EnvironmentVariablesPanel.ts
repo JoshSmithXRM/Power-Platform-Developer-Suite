@@ -243,23 +243,33 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
                 // 'environment-changed' is handled by BasePanel.handleCommonMessages()
 
                 case 'solution-selected':
-                    await this.handleSolutionSelection(message.data?.solutionId);
+                    await this.handleSolutionSelection(message.data?.solutionId ?? '');
                     break;
 
                 case 'load-solutions':
-                    await this.handleLoadSolutions(message.data?.environmentId);
+                    await this.handleLoadSolutions(message.data?.environmentId ?? '');
                     break;
 
                 case 'load-environment-variables':
-                    await this.handleLoadEnvironmentVariables(message.data?.environmentId, message.data?.solutionId);
+                    await this.handleLoadEnvironmentVariables(
+                        message.data?.environmentId ?? '',
+                        message.data?.solutionId
+                    );
                     break;
 
                 case 'sync-deployment-settings':
-                    await this.handleSyncDeploymentSettings(message.data?.environmentVariablesData, message.data?.solutionUniqueName);
+                    await this.handleSyncDeploymentSettings(
+                        message.data.environmentVariablesData as EnvironmentVariableData,
+                        message.data.solutionUniqueName
+                    );
                     break;
 
                 case 'open-in-maker':
-                    await this.handleOpenInMaker(message.data?.environmentId, message.data?.solutionId, message.data?.entityType);
+                    await this.handleOpenInMaker(
+                        message.data.environmentId,
+                        message.data.solutionId,
+                        message.data.entityType
+                    );
                     break;
 
                 case 'panel-ready':

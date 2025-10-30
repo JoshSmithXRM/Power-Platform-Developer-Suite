@@ -275,13 +275,13 @@ export class DataTableView {
      * Render filter dropdown arrow (always visible on filterable columns)
      */
     private static renderFilterIcon(column: DataTableColumn, state: DataTableViewState): string {
-        const hasActiveFilter = state.filters && state.filters[column.id] && 
-                               state.filters[column.id] !== '' && 
-                               state.filters[column.id] !== null && 
-                               state.filters[column.id] !== undefined;
-        
+        const filterValue = state.filters?.[column.id] as string | number | boolean | null | undefined;
+        const hasActiveFilter = state.filters && filterValue !== undefined &&
+                               filterValue !== '' &&
+                               filterValue !== null;
+
         const iconClass = hasActiveFilter ? 'filter-icon--active' : 'filter-icon--inactive';
-        const title = hasActiveFilter ? `Filter applied: ${state.filters[column.id]}` : 'Click to filter';
+        const title = hasActiveFilter ? `Filter applied: ${String(filterValue)}` : 'Click to filter';
         
         return `
             <button class="data-table-filter-dropdown" 
@@ -376,7 +376,7 @@ export class DataTableView {
         column: DataTableColumn, 
         _config: DataTableConfig
     ): string {
-        const value = row[column.field];
+        const value = row[column.field] as string | number | boolean | null | undefined;
         const formattedValue = column.format ? column.format(value, row) : value;
         
         const cellClass = [

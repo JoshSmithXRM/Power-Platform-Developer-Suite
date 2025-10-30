@@ -78,7 +78,7 @@ export class PanelComposer {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private static logWarning(message: string, metadata?: any): void { // Dynamic logging metadata - any is appropriate here
         const logger = ServiceFactory.getLoggerService().createComponentLogger('PanelComposer');
-        logger.warn(message, metadata);
+        logger.warn(message, metadata as Record<string, unknown> | undefined);
     }
 
     /**

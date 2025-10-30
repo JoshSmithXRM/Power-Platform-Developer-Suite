@@ -185,8 +185,8 @@ export class FilterPanelView {
 
         // Between operator needs two inputs
         if (operator === 'between') {
-            const value1 = Array.isArray(value) ? value[0] : value;
-            const value2 = Array.isArray(value) ? value[1] : '';
+            const value1 = Array.isArray(value) ? value[0] : value as string | number;
+            const value2 = Array.isArray(value) ? value[1] : '' as string | number;
 
             return `
                 <input
