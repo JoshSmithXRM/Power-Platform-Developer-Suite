@@ -22,8 +22,9 @@ interface EnvironmentVariablesInstanceState extends DefaultInstanceState {
     selectedEnvironmentId: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface EnvironmentVariablesPreferences {
-    [key: string]: unknown;
+    // No preferences defined yet for this panel
 }
 
 // UI-specific type for table display
@@ -476,7 +477,7 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
             }
 
             this.postMessage({
-                action: 'solutionsLoaded',
+                action: 'solutions-loaded',
                 data: solutions,
                 selectedSolutionId: solutions.find(s => s.uniqueName === 'Default')?.solutionId
             });
@@ -615,7 +616,7 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
 
             // Send success message back to UI
             this.postMessage({
-                action: 'deploymentSettingsSynced',
+                action: 'deployment-settings-synced',
                 data: {
                     filePath: result.filePath,
                     added: result.added,

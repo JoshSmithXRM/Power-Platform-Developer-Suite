@@ -81,8 +81,8 @@ if (Test-Path $ExtensionDir) {
 Write-Host "`n🔍 Webview Resource Check:" -ForegroundColor Yellow
 $WebviewPaths = @(
     "extension/resources/webview/css/panel-base.css",
-    "extension/resources/webview/css/table.css", 
-    "extension/resources/webview/js/panel-utils.js",
+    "extension/resources/webview/css/table.css",
+    "extension/resources/webview/js/utils/PanelUtils.js",
     "extension/resources/webview/js/table-utils.js",
     "extension/resources/webview/js/environment-selector-utils.js"
 )

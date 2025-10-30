@@ -18,8 +18,9 @@ interface ConnectionReferencesInstanceState extends DefaultInstanceState {
     selectedEnvironmentId: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface ConnectionReferencesPreferences {
-    [key: string]: unknown;
+    // No preferences defined yet for this panel
 }
 
 // UI-specific types for table display
@@ -649,7 +650,7 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
 
             // Send success message back to UI
             this.postMessage({
-                action: 'deploymentSettingsSynced',
+                action: 'deployment-settings-synced',
                 data: {
                     filePath: result.filePath,
                     added: result.added,

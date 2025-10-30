@@ -483,7 +483,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         // Restore quick filters
         if (this.pendingFilterRestoration.quick.length > 0) {
             this.postMessage({
-                action: 'setQuickFilters',
+                action: 'set-quick-filters',
                 componentId: this.filterPanelComponent!.getId(),
                 componentType: 'FilterPanel',
                 filterIds: this.pendingFilterRestoration.quick
@@ -493,7 +493,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         // Restore advanced filters
         if (this.pendingFilterRestoration.advanced.length > 0) {
             this.postMessage({
-                action: 'setAdvancedFilters',
+                action: 'set-advanced-filters',
                 componentId: this.filterPanelComponent!.getId(),
                 componentType: 'FilterPanel',
                 conditions: this.pendingFilterRestoration.advanced
@@ -524,7 +524,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             const selectedEnvironmentId = this.currentEnvironmentId || instanceState?.selectedEnvironmentId || environments[0]?.id;
 
             this.postMessage({
-                action: 'environmentsLoaded',
+                action: 'environments-loaded',
                 data: environments,
                 selectedEnvironmentId: selectedEnvironmentId
             });
@@ -593,7 +593,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
         // Close detail panel when switching environments
         this.postMessage({
-            action: 'closeDetailPanel'
+            action: 'close-detail-panel'
         });
 
         // Load data for new environment
@@ -626,17 +626,9 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             }
         }
 
-        // 2. Split ratio (layout state) - send to webview after short delay to ensure webview is ready
-        if (prefs.splitRatio !== undefined) {
-            this.componentLogger.debug('Restoring split ratio', { ratio: prefs.splitRatio });
-            setTimeout(() => {
-                this.postMessage({
-                    action: 'setSplitRatio',
-                    componentId: 'plugin-trace-split-panel',
-                    ratio: prefs.splitRatio
-                });
-            }, 100);
-        }
+        // 2. Split panel state (layout) - use BasePanel abstraction
+        // Note: rightPanelVisible is NOT restored (detail panel starts hidden until user selects a trace)
+        this.restoreSplitPanelState('plugin-trace-split-panel', prefs, false);
 
         // 3. Filters (component state) - will be applied when panel-ready fires
         if (prefs.filters) {
@@ -670,7 +662,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             // Send after a short delay to ensure webview is ready
             setTimeout(() => {
                 this.postMessage({
-                    action: 'componentStateChange',
+                    action: 'component-state-change',
                     componentId: 'pluginTrace-filterPanel',
                     state: {
                         collapsed: prefs.filterPanelCollapsed
@@ -678,9 +670,6 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                 });
             }, 100);
         }
-
-        // Note: rightPanelVisible is NOT restored intentionally
-        // Detail panel should always start hidden until user selects a trace
 
         this.componentLogger.info('✅ Preferences applied successfully');
     }
@@ -739,7 +728,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             this.componentLogger.debug('Loaded traces', { count: traces.length });
 
             this.postMessage({
-                action: 'tracesLoaded',
+                action: 'traces-loaded',
                 count: traces.length
             });
         } catch (error: unknown) {
@@ -770,7 +759,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             this.updateTraceLevelButton(level);
 
             this.postMessage({
-                action: 'traceLevelLoaded',
+                action: 'trace-level-loaded',
                 level: level,
                 displayName: this.pluginTraceService.getTraceLevelDisplayName(level)
             });
@@ -786,7 +775,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             this.currentTraceLevel = level;
 
             this.postMessage({
-                action: 'traceLevelUpdated',
+                action: 'trace-level-updated',
                 level: level,
                 message: `Trace level set to ${this.pluginTraceService.getTraceLevelDisplayName(level)}`
             });
@@ -848,7 +837,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         );
 
         this.postMessage({
-            action: 'showTraceDetails',
+            action: 'show-trace-details',
             trace: trace,
             relatedTraces: relatedTraces
         });
@@ -1254,7 +1243,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
 
         this.postMessage({
-            action: 'filtersUpdated',
+            action: 'filters-updated',
             filters: this.currentFilters
         });
     }
@@ -1264,7 +1253,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
         // Send message to switch to timeline tab
         this.postMessage({
-            action: 'switchToTimelineTab'
+            action: 'switch-to-timeline-tab'
         });
     }
 

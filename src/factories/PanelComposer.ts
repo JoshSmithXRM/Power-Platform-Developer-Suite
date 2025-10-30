@@ -715,6 +715,9 @@ export class PanelComposer {
         // Load BaseBehavior BEFORE component behaviors (required base class)
         scripts.push('js/utils/BaseBehavior.js');
 
+        // Load SplitPanelHandlers BEFORE panel behaviors (required by multiple panels)
+        scripts.push('js/utils/SplitPanelHandlers.js');
+
         // Then load component-specific behavior scripts BEFORE ComponentUtils (including nested children)
         const allComponents = this.collectAllComponents(components);
         allComponents.forEach(component => {

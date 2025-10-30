@@ -36,10 +36,9 @@ interface ImportJobInstanceState extends DefaultInstanceState {
  * Persistent preferences for viewing Import Jobs in a specific environment
  * These preferences follow the environment, not the panel instance
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface ImportJobPreferences {
     // Future: Add sort preferences, filter preferences, auto-refresh settings, etc.
-    // For now, use Record to allow any preferences (satisfies linter)
-    [key: string]: unknown;
 }
 
 export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, ImportJobPreferences> {

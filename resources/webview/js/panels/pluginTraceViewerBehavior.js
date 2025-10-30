@@ -49,37 +49,30 @@ class PluginTraceViewerBehavior {
                 console.log('📨 PluginTraceViewerBehavior message received:', message.action);
 
                 switch (message.action) {
-                    case 'showTraceDetails':
+                    case 'show-trace-details':
                         console.log('🎯 Showing trace detail panel', message);
                         PluginTraceViewerBehavior.showTraceDetailPanel(message.trace, message.relatedTraces);
                         return true;
 
-                    case 'closeDetailPanel':
+                    case 'close-detail-panel':
                         console.log('🚪 Closing detail panel');
                         PluginTraceViewerBehavior.closeDetailPanel();
                         return true;
 
-                    case 'exportTraces':
+                    case 'export-traces':
                         console.log('📤 Export request received', { format: message.format, dataLength: message.data?.length });
                         PluginTraceViewerBehavior.handleExport(message);
                         return true;
 
-                    case 'switchToTimelineTab':
+                    case 'switch-to-timeline-tab':
                         const timelineTab = document.querySelector('[data-tab="timeline"]');
                         if (timelineTab) {
                             timelineTab.click();
                         }
                         return true;
 
-                    case 'setSplitRatio':
-                        console.log('📏 Setting split ratio:', message.ratio);
-                        if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has(message.componentId)) {
-                            const instance = window.SplitPanelBehavior.instances.get(message.componentId);
-                            window.SplitPanelBehavior.setSplitRatio(instance, message.ratio);
-                            return true;
-                        }
-                        console.warn('SplitPanelBehavior instance not found:', message.componentId);
-                        return false;
+                    case 'set-split-ratio':
+                        return window.SplitPanelHandlers.handleSetSplitRatio(message);
 
                     default:
                         // Not a panel-specific action, pass through to component routing

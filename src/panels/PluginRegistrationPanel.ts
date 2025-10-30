@@ -19,7 +19,6 @@ interface PluginRegistrationInstanceState extends DefaultInstanceState {
 interface PluginRegistrationPreferences {
     splitRatio?: number;
     rightPanelVisible?: boolean;
-    [key: string]: unknown;
 }
 
 export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanceState, PluginRegistrationPreferences> {
@@ -177,9 +176,18 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
      * Called automatically by BasePanel after environment load/switch
      */
     protected async applyPreferences(prefs: PluginRegistrationPreferences | null): Promise<void> {
-        // No preferences to restore for this panel yet
-        // Future: Could restore expanded nodes, selected assembly, sort order, etc.
-        this.componentLogger.debug('applyPreferences called (no preferences defined yet)', { hasPrefs: !!prefs });
+        if (!prefs) {
+            this.componentLogger.debug('No preferences to apply');
+            return;
+        }
+
+        this.componentLogger.info('Applying preferences', { prefs });
+
+        // Restore split panel state (layout)
+        // Note: rightPanelVisible is NOT restored (detail panel starts hidden until user selects a node)
+        this.restoreSplitPanelState('pluginRegistration-splitPanel', prefs, false);
+
+        this.componentLogger.info('✅ Preferences applied successfully');
     }
 
     /**
@@ -419,15 +427,6 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
         this.componentLogger.info('Handling message', { command: message.command });
 
         switch (message.command) {
-            case 'node-selected':
-                this.componentLogger.info('node-selected message data:', message.data);
-                if (message.data?.node) {
-                    this.handleNodeSelected(message.data.node as TreeNode);
-                } else {
-                    this.componentLogger.warn('node-selected received but no node data', message);
-                }
-                break;
-
             case 'close-details':
                 this.closeDetailsPanel();
                 break;
@@ -436,9 +435,20 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
 
     /**
      * Handle non-action component events (optional hook from BasePanel)
-     * Used for handling SplitPanel-specific events
+     * Used for handling TreeView and SplitPanel events
      */
     protected async handleOtherComponentEvent(componentId: string, eventType: string, data?: unknown): Promise<void> {
+        // Handle TreeView events
+        if (componentId === 'pluginRegistration-treeView' && eventType === 'node-selected') {
+            const nodeData = data as { node: TreeNode; nodeId: string; nodeType: string };
+            if (nodeData?.node) {
+                await this.handleNodeSelected(nodeData.node);
+            } else {
+                this.componentLogger.warn('node-selected event received but no node data', { data });
+            }
+            return;
+        }
+
         // Handle SplitPanel events using BasePanel abstraction
         if (componentId === 'pluginRegistration-splitPanel') {
             // Save split panel state to preferences

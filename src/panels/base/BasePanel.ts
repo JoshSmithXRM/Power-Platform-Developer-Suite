@@ -277,6 +277,48 @@ export abstract class BasePanel<
     }
 
     /**
+     * Restore split panel state from preferences
+     * Call this from applyPreferences() to restore split ratio and panel visibility.
+     *
+     * @param componentId - The ID of the split panel component
+     * @param prefs - Preferences containing splitRatio and/or rightPanelVisible
+     * @param restoreVisibility - Whether to restore right panel visibility (default: false)
+     *                           Most panels want details hidden until user selects something
+     */
+    protected restoreSplitPanelState(
+        componentId: string,
+        prefs: { splitRatio?: number; rightPanelVisible?: boolean },
+        restoreVisibility: boolean = false
+    ): void {
+        // Restore split ratio
+        if (typeof prefs.splitRatio === 'number') {
+            this.componentLogger.debug('Restoring split ratio', {
+                componentId,
+                ratio: prefs.splitRatio
+            });
+
+            this.postMessage({
+                action: 'set-split-ratio',
+                componentId: componentId,
+                ratio: prefs.splitRatio
+            });
+        }
+
+        // Restore right panel visibility (opt-in for intentional UX)
+        if (restoreVisibility && typeof prefs.rightPanelVisible === 'boolean' && prefs.rightPanelVisible) {
+            this.componentLogger.debug('Restoring right panel visibility', {
+                componentId,
+                visible: prefs.rightPanelVisible
+            });
+
+            this.postMessage({
+                action: 'show-right-panel',
+                componentId: componentId
+            });
+        }
+    }
+
+    /**
      * Handle standard solution selector events
      * Handles: selectionChanged event from SolutionSelectorComponent
      *
@@ -429,7 +471,7 @@ export abstract class BasePanel<
                 vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'css', 'panel-base.css')
             ),
             panelUtilsScript: this._panel.webview.asWebviewUri(
-                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'panel-utils.js')
+                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'utils', 'PanelUtils.js')
             )
         };
     }

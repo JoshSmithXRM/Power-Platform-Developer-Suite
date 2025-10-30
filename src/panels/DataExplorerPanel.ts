@@ -9,8 +9,9 @@ interface DataExplorerInstanceState extends DefaultInstanceState {
     selectedEnvironmentId: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface DataExplorerPreferences {
-    [key: string]: unknown;
+    // No preferences defined yet for this panel
 }
 
 // Placeholder - will be rewritten with component architecture

@@ -255,6 +255,16 @@ export default tseslint.config(
         {
           selector: "SwitchStatement[discriminant.property.name=/^(command|action)$/] > SwitchCase > Literal[value=/[a-z][A-Z]/]",
           message: "❌ Use kebab-case in message handler case statements (detected camelCase). Example: case 'nodeSelected' should be case 'node-selected'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        // Detect camelCase in postMessage action property
+        {
+          selector: "CallExpression[callee.property.name='postMessage'] ObjectExpression > Property[key.name='action'] > Literal[value=/[a-z][A-Z]/]",
+          message: "❌ Use kebab-case in postMessage action field (detected camelCase). Example: action: 'nodeSelected' should be action: 'node-selected'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        // Detect camelCase in postMessage command property
+        {
+          selector: "CallExpression[callee.property.name='postMessage'] ObjectExpression > Property[key.name='command'] > Literal[value=/[a-z][A-Z]/]",
+          message: "❌ Use kebab-case in postMessage command field (detected camelCase). Example: command: 'nodeSelected' should be command: 'node-selected'. See: docs/MESSAGE_CONVENTIONS.md"
         }
       ]
     }

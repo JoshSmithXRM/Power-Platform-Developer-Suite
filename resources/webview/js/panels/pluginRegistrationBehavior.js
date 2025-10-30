@@ -15,19 +15,35 @@ class PluginRegistrationBehavior {
     static initialize() {
         console.log('PluginRegistrationBehavior: Initializing');
 
-        // Setup message listener for updates from Extension Host
-        window.addEventListener('message', (event) => {
-            const message = event.data;
+        // Register panel handler with ComponentUtils for proper message routing
+        if (window.ComponentUtils && window.ComponentUtils.registerPanelHandler) {
+            window.ComponentUtils.registerPanelHandler('pluginRegistration', (message) => {
+                console.log('📨 PluginRegistrationBehavior message received:', message.action || message.command);
 
-            console.log('PluginRegistrationBehavior received message:', message.command, message);
+                // Handle both action and command for backward compatibility
+                const actionType = message.action || message.command;
 
-            switch (message.command) {
-                case 'show-node-details':
-                    console.log('Calling showNodeDetails with data:', message.data);
-                    PluginRegistrationBehavior.showNodeDetails(message.data);
-                    break;
-            }
-        });
+                switch (actionType) {
+                    case 'show-node-details':
+                        console.log('Calling showNodeDetails with data:', message.data);
+                        PluginRegistrationBehavior.showNodeDetails(message.data);
+                        return true;
+
+                    case 'set-split-ratio':
+                        return window.SplitPanelHandlers.handleSetSplitRatio(message);
+
+                    case 'show-right-panel':
+                        return window.SplitPanelHandlers.handleShowRightPanel(message);
+
+                    default:
+                        // Not a panel-specific action, pass through to component routing
+                        return false;
+                }
+            });
+            console.log('✅ PluginRegistrationBehavior registered with ComponentUtils');
+        } else {
+            console.error('ComponentUtils not available, cannot register panel handler');
+        }
 
         // Setup data-action event delegation for close button
         PluginRegistrationBehavior.setupEventDelegation();

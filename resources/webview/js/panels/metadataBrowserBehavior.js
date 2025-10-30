@@ -52,24 +52,54 @@ class MetadataBrowserBehavior {
             MetadataBrowserBehavior.toggleLeftPanel();
         };
 
-        // Setup message listener for updates
-        window.addEventListener('message', (event) => {
-            const message = event.data;
+        // Register panel handler with ComponentUtils for proper message routing
+        if (window.ComponentUtils && window.ComponentUtils.registerPanelHandler) {
+            window.ComponentUtils.registerPanelHandler('metadataBrowser', (message) => {
+                console.log('📨 MetadataBrowserBehavior message received:', message.action || message.command);
 
-            if (message.action === 'set-mode') {
-                MetadataBrowserBehavior.setMode(message.mode);
-            } else if (message.action === 'tree-loading') {
-                MetadataBrowserBehavior.setTreeLoading(message.loading);
-            } else if (message.command === 'populate-tree') {
-                MetadataBrowserBehavior.populateTree(message.data);
-            } else if (message.command === 'update-selection') {
-                MetadataBrowserBehavior.updateSelection(message.data);
-            } else if (message.command === 'update-counts') {
-                MetadataBrowserBehavior.updateCounts(message.data);
-            } else if (message.command === 'show-detail') {
-                MetadataBrowserBehavior.showDetailPanel(message.data);
-            }
-        });
+                // Handle both action and command for backward compatibility
+                const actionType = message.action || message.command;
+
+                switch (actionType) {
+                    case 'set-mode':
+                        MetadataBrowserBehavior.setMode(message.mode);
+                        return true;
+
+                    case 'tree-loading':
+                        MetadataBrowserBehavior.setTreeLoading(message.loading);
+                        return true;
+
+                    case 'populate-tree':
+                        MetadataBrowserBehavior.populateTree(message.data);
+                        return true;
+
+                    case 'update-selection':
+                        MetadataBrowserBehavior.updateSelection(message.data);
+                        return true;
+
+                    case 'update-counts':
+                        MetadataBrowserBehavior.updateCounts(message.data);
+                        return true;
+
+                    case 'show-detail':
+                        MetadataBrowserBehavior.showDetailPanel(message.data);
+                        return true;
+
+                    case 'set-split-ratio':
+                        return window.SplitPanelHandlers.handleSetSplitRatio(message);
+
+                    case 'show-right-panel':
+                        return window.SplitPanelHandlers.handleShowRightPanel(message);
+
+                    default:
+                        // Not a panel-specific action, pass through to component routing
+                        return false;
+                }
+            });
+            console.log('✅ MetadataBrowserBehavior registered with ComponentUtils');
+        } else {
+            console.error('ComponentUtils not available, cannot register panel handler');
+        }
 
         // ROW CLICK DISABLED - Use context menu "View Details" instead
         // MetadataBrowserBehavior.setupTableClickHandlers();

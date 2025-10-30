@@ -33,12 +33,8 @@ interface MetadataBrowserInstanceState extends DefaultInstanceState {
  * These preferences follow the environment, not the panel instance
  */
 interface MetadataBrowserPreferences {
-    selectedEntityLogicalName?: string;
-    selectedEntityMetadataId?: string;
     collapsedSections?: string[];
     splitRatio?: number;
-    rightPanelVisible?: boolean;
-    [key: string]: unknown;
 }
 
 // UI-specific types for table display
@@ -870,26 +866,9 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
             });
         }
 
-        // 2. Restore selected entity (if any)
-        if (prefs.selectedEntityLogicalName && this.currentEnvironmentId) {
-            this.componentLogger.debug('Restoring selected entity', {
-                logicalName: prefs.selectedEntityLogicalName
-            });
-
-            try {
-                // Load the entity metadata
-                await this.loadEntityMetadata(
-                    this.currentEnvironmentId,
-                    prefs.selectedEntityLogicalName,
-                    prefs.selectedEntityMetadataId || '',
-                    prefs.selectedEntityLogicalName // Use logical name as fallback for display name
-                );
-                this.componentLogger.info('Successfully restored selected entity');
-            } catch (error) {
-                this.componentLogger.error('Failed to restore selected entity', error as Error);
-                // Don't fail entirely - just log the error and continue
-            }
-        }
+        // 2. Restore split panel state (layout)
+        // Note: Detail panel always starts hidden - user must select an entity and attribute to view details
+        this.restoreSplitPanelState('metadata-detail-split-panel', prefs, false);
 
         this.componentLogger.info('✅ Preferences applied successfully');
     }
@@ -972,6 +951,12 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
             mode: 'entity'
         });
 
+        // Open the right panel to show entity details
+        this.postMessage({
+            action: 'show-right-panel',
+            componentId: 'metadata-detail-split-panel'
+        });
+
         // Show loading state immediately (important for first load when tables are empty)
         this.setAllTablesLoading(true, 'Loading entity metadata...');
 
@@ -998,6 +983,12 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
         this.postMessage({
             action: 'set-mode',
             mode: 'choice'
+        });
+
+        // Open the right panel to show choice details
+        this.postMessage({
+            action: 'show-right-panel',
+            componentId: 'metadata-detail-split-panel'
         });
 
         // Show loading state immediately (important for first load)
@@ -1057,7 +1048,7 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
                 // Send to webview to display in split panel (for title and properties tab)
                 this.postMessage({
                     command: 'show-detail',
-                    action: 'showDetail',
+                    action: 'show-detail',
                     data: {
                         title,
                         metadata
@@ -1159,12 +1150,6 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
             this.selectedEntityDisplayName = displayName;
             this.selectedChoiceName = undefined;
             this.selectedChoiceDisplayName = undefined;
-
-            // Save selected entity to preferences
-            await this.stateManager.updateCurrentPreferences({
-                selectedEntityLogicalName: logicalName,
-                selectedEntityMetadataId: metadataId
-            });
 
             // Transform and update tables
             const attributesData = this.transformAttributesData(metadata.attributes);

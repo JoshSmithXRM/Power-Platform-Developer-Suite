@@ -21,9 +21,9 @@ interface SolutionExplorerInstanceState extends DefaultInstanceState {
 /**
  * Persistent preferences for Solution Explorer
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface SolutionExplorerPreferences {
     // Future: sort order, filter preferences, etc.
-    [key: string]: unknown;
 }
 
 // UI-specific type for table display
