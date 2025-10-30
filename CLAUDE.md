@@ -1,6 +1,6 @@
 # CLAUDE.md - Quick Reference
 
-**Essential rules for AI assistants. For detailed patterns: `docs/AI_ASSISTANT_DETAILED_REFERENCE.md`**
+**Essential rules for AI assistants working on the Power Platform Developer Suite.**
 
 ---
 
@@ -46,62 +46,6 @@
 - ❌ Obvious code
 - ❌ Placeholders ("Handle event" / "Process data")
 - ❌ Band-aids for bad code
-
-📖 Full guide: `docs/CODE_COMMENTING_GUIDE.md`
-
----
-
-## 📋 Common Tasks
-
-### "I need to create a new panel"
-1. Extend `BasePanel`
-2. Create components via `ComponentFactory`
-3. Use `PanelComposer.compose()` for HTML
-4. Setup event bridges
-📖 Full: `docs/PANEL_LAYOUT_GUIDE.md`
-
-### "I need to update component data"
-1. Call `component.setData(newData)`
-2. Event bridge auto-sends to webview
-3. ❌ DON'T call `updateWebview()`
-📖 Full: `docs/COMPONENT_PATTERNS.md`
-
-### "I need to handle errors"
-1. `catch (error: unknown)`
-2. Log with `this.componentLogger.error()`
-3. Notify user
-📖 Full: `docs/ERROR_HANDLING_PATTERNS.md`
-
-### "I need a webview behavior"
-1. Extend `BaseBehavior`
-2. Implement `getComponentType()`
-3. Implement `onComponentUpdate()`
-4. Call `.register()`
-📖 Full: `docs/COMPONENT_PATTERNS.md`
-
----
-
-## 🎯 Top Violations
-
-1. `any` instead of Interface Segregation → Use `IRenderable[]` not `BaseComponent<any>[]`
-2. eslint-disable comments → Fix root cause
-3. updateWebview() for updates → Use event bridges
-4. Missing onChange in EnvironmentSelector → Panel won't load data
-5. Not extending BaseBehavior → Silent failures
-6. Extension Host controlling UI → Webview owns layout
-7. Skipping panel-content wrapper → Breaks alignment
-8. Overriding handleComponentEvent() → Use hook methods instead
-
----
-
-## 📚 Documentation
-
-- **Quick patterns:** `docs/patterns/DETAILED_PATTERNS.md`
-- **Detailed reference:** `docs/AI_ASSISTANT_DETAILED_REFERENCE.md`
-- **Architecture:** `docs/ARCHITECTURE_GUIDE.md`
-- **Components:** `docs/COMPONENT_PATTERNS.md`
-- **Panels:** `docs/PANEL_LAYOUT_GUIDE.md`
-- **Contexts:** `docs/EXECUTION_CONTEXTS.md`
 
 ---
 
