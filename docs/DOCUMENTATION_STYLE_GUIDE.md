@@ -845,8 +845,3 @@ Never use `any` type. Use `unknown` instead.
 
 ---
 
-## 🔗 See Also
-
-- [DOCUMENTATION_CLEANUP_PLAN.md](cleanup/DOCUMENTATION_CLEANUP_PLAN.md) - Plan for improving existing docs
-- [AI_ASSISTANT_REFERENCE_IMPROVEMENTS.md](cleanup/AI_ASSISTANT_REFERENCE_IMPROVEMENTS.md) - Anthropic recommendations
-- [README.md](README.md) - Master index of all documentation
