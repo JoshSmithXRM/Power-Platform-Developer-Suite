@@ -3,37 +3,90 @@
  * Handles trace detail panel display, tab switching, and rendering
  */
 
-class PluginTraceViewerBehavior {
+class PluginTraceViewerBehavior extends BaseBehavior {
     /**
-     * Initialize plugin trace viewer behavior
+     * Get the component type this behavior handles
      */
-    static initialize() {
-        // Setup tab switching for detail panel
-        this.setupTabSwitching();
+    static getComponentType() {
+        return 'PluginTraceViewerPanel';
+    }
 
-        // Setup message listener
-        this.setupMessageHandler();
+    /**
+     * Create instance with panel-specific state
+     */
+    static createInstance(componentId, config, element) {
+        return {
+            id: componentId,
+            config: { ...config },
+            element: element,
+            boundHandlers: {},
+            vscode: acquireVsCodeApi()
+        };
+    }
 
-        console.log('PluginTraceViewerBehavior initialized');
+    /**
+     * Find and cache DOM elements
+     */
+    static findDOMElements(instance) {
+        instance.detailPanel = document.getElementById('traceDetailContainer');
+        instance.splitContainer = document.getElementById('splitPanelContainer');
+        instance.configTab = document.getElementById('tab-configuration');
+        instance.execTab = document.getElementById('tab-execution');
+        instance.relatedTab = document.getElementById('tab-related');
+        instance.timelineContainer = document.getElementById('timelineContainer');
+    }
+
+    /**
+     * Setup event listeners
+     */
+    static setupEventListeners(instance) {
+        // Setup tab switching
+        this.setupTabSwitching(instance);
+
+        // Setup message handler
+        this.setupMessageHandler(instance);
+
+        // Setup event delegation for related trace clicks
+        this.setupEventDelegation(instance);
+    }
+
+    /**
+     * Initialize component state from DOM
+     */
+    static initializeState(instance) {
+        // No initial state needed for this panel
+    }
+
+    /**
+     * Handle component data updates from Extension Host
+     */
+    static onComponentUpdate(instance, data) {
+        // This panel uses custom message routing instead of standard component-update
+        // Updates come through the registered panel handler
     }
 
     /**
      * Setup tab switching for trace detail panel
      */
-    static setupTabSwitching() {
+    static setupTabSwitching(instance) {
+        instance.boundHandlers.tabClickHandler = (event) => {
+            const btn = event.target.closest('.tab-btn');
+            if (!btn) return;
+
+            const tabId = btn.dataset.tab;
+
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            const targetTab = document.getElementById('tab-' + tabId);
+            if (targetTab) {
+                targetTab.classList.add('active');
+            }
+        };
+
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const tabId = btn.dataset.tab;
-
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                const targetTab = document.getElementById('tab-' + tabId);
-                if (targetTab) {
-                    targetTab.classList.add('active');
-                }
-            });
+            btn.addEventListener('click', instance.boundHandlers.tabClickHandler);
         });
     }
 
@@ -41,9 +94,7 @@ class PluginTraceViewerBehavior {
      * Setup message handler for trace detail operations
      * Registers with ComponentUtils instead of global listener
      */
-    static setupMessageHandler() {
-        // Register panel handler with ComponentUtils
-        // Handler returns true if message was handled, false to pass through
+    static setupMessageHandler(instance) {
         if (window.ComponentUtils && window.ComponentUtils.registerPanelHandler) {
             window.ComponentUtils.registerPanelHandler('pluginTraceViewer', (message) => {
                 console.log('📨 PluginTraceViewerBehavior message received:', message.command);
@@ -51,17 +102,17 @@ class PluginTraceViewerBehavior {
                 switch (message.command) {
                     case 'show-trace-details':
                         console.log('🎯 Showing trace detail panel', message);
-                        PluginTraceViewerBehavior.showTraceDetailPanel(message.trace, message.relatedTraces);
+                        this.showTraceDetailPanel(instance, message.trace, message.relatedTraces);
                         return true;
 
                     case 'close-detail-panel':
                         console.log('🚪 Closing detail panel');
-                        PluginTraceViewerBehavior.closeDetailPanel();
+                        this.closeDetailPanel(instance);
                         return true;
 
                     case 'export-traces':
                         console.log('📤 Export request received', { format: message.format, dataLength: message.data?.length });
-                        PluginTraceViewerBehavior.handleExport(message);
+                        this.handleExport(message);
                         return true;
 
                     case 'switch-to-timeline-tab':
@@ -75,7 +126,6 @@ class PluginTraceViewerBehavior {
                         return window.SplitPanelHandlers.handleSetSplitRatio(message);
 
                     default:
-                        // Not a panel-specific action, pass through to component routing
                         return false;
                 }
             });
@@ -83,6 +133,22 @@ class PluginTraceViewerBehavior {
         } else {
             console.error('ComponentUtils not available, cannot register panel handler');
         }
+    }
+
+    /**
+     * Setup event delegation for related trace clicks
+     */
+    static setupEventDelegation(instance) {
+        instance.boundHandlers.traceSelectHandler = (event) => {
+            const target = event.target.closest('[data-action="select-trace"]');
+            if (!target) return;
+
+            const traceId = target.dataset.traceId;
+            if (traceId) {
+                instance.vscode.postMessage({ command: 'trace-selected', traceId });
+            }
+        };
+        document.addEventListener('click', instance.boundHandlers.traceSelectHandler);
     }
 
     /**
@@ -112,15 +178,12 @@ class PluginTraceViewerBehavior {
     /**
      * Show trace detail panel with trace data
      */
-    static showTraceDetailPanel(trace, relatedTraces) {
+    static showTraceDetailPanel(instance, trace, relatedTraces) {
         console.log('📋 showTraceDetailPanel called', { trace, relatedTraces });
 
-        const detailPanel = document.getElementById('traceDetailContainer');
-        const splitContainer = document.getElementById('splitPanelContainer');
-
         console.log('🔍 Elements found:', {
-            detailPanel: !!detailPanel,
-            splitContainer: !!splitContainer,
+            detailPanel: !!instance.detailPanel,
+            splitContainer: !!instance.splitContainer,
             hasSplitPanelBehavior: !!window.SplitPanelBehavior
         });
 
@@ -128,8 +191,7 @@ class PluginTraceViewerBehavior {
         if (window.SplitPanelBehavior && !window.SplitPanelBehavior.instances.has('plugin-trace-split-panel')) {
             console.log('🎬 Initializing SplitPanelBehavior');
 
-            // Get saved split ratio from state (passed via data attribute)
-            const savedSplitRatio = splitContainer.dataset.splitRatio ? parseFloat(splitContainer.dataset.splitRatio) : 50;
+            const savedSplitRatio = instance.splitContainer.dataset.splitRatio ? parseFloat(instance.splitContainer.dataset.splitRatio) : 50;
 
             window.SplitPanelBehavior.initialize(
                 'plugin-trace-split-panel',
@@ -140,40 +202,34 @@ class PluginTraceViewerBehavior {
                     initialSplit: savedSplitRatio,
                     rightPanelDefaultHidden: true
                 },
-                splitContainer
+                instance.splitContainer
             );
             console.log('✅ SplitPanelBehavior initialized with split ratio:', savedSplitRatio);
         } else {
             console.log('ℹ️ SplitPanelBehavior already initialized');
         }
 
-        // Show the right panel using split panel behavior (without changing size)
+        // Show the right panel using split panel behavior
         if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('plugin-trace-split-panel')) {
             console.log('📂 Showing right panel via SplitPanelBehavior');
-            const instance = window.SplitPanelBehavior.instances.get('plugin-trace-split-panel');
-
-            // Always call showRightPanel to ensure panel is visible
-            // The showRightPanel method now preserves split ratio if already visible
-            window.SplitPanelBehavior.showRightPanel(instance);
+            const splitInstance = window.SplitPanelBehavior.instances.get('plugin-trace-split-panel');
+            window.SplitPanelBehavior.showRightPanel(splitInstance);
             console.log('✅ Right panel shown/updated');
         } else {
             console.log('⚠️ Fallback: showing detail panel directly');
-            // Fallback if split panel behavior isn't available
-            if (detailPanel) {
-                detailPanel.style.display = 'flex';
+            if (instance.detailPanel) {
+                instance.detailPanel.style.display = 'flex';
             }
         }
 
         // Configuration tab
-        const configTab = document.getElementById('tab-configuration');
-        if (configTab) {
-            configTab.innerHTML = this.generateConfigurationTab(trace);
+        if (instance.configTab) {
+            instance.configTab.innerHTML = this.generateConfigurationTab(trace);
         }
 
         // Execution tab
-        const execTab = document.getElementById('tab-execution');
-        if (execTab) {
-            execTab.innerHTML = this.generateExecutionTab(trace);
+        if (instance.execTab) {
+            instance.execTab.innerHTML = this.generateExecutionTab(trace);
         }
 
         // Timeline tab
@@ -183,22 +239,19 @@ class PluginTraceViewerBehavior {
             );
             if (window.TimelineBehavior) {
                 window.TimelineBehavior.renderTimeline(allRelated, 'timelineContainer', (traceId) => {
-                    const vscode = window.vscode || acquireVsCodeApi();
-                    vscode.postMessage({ command: 'trace-selected', traceId });
+                    instance.vscode.postMessage({ command: 'trace-selected', traceId });
                 });
             }
         } else {
-            const timelineContainer = document.getElementById('timelineContainer');
-            if (timelineContainer) {
-                timelineContainer.innerHTML =
+            if (instance.timelineContainer) {
+                instance.timelineContainer.innerHTML =
                     '<div class="timeline-empty"><p>No correlation ID available for timeline view</p></div>';
             }
         }
 
         // Related tab
-        const relatedTab = document.getElementById('tab-related');
-        if (relatedTab) {
-            relatedTab.innerHTML = this.generateRelatedTab(relatedTraces, trace.plugintracelogid);
+        if (instance.relatedTab) {
+            instance.relatedTab.innerHTML = this.generateRelatedTab(relatedTraces, trace.plugintracelogid);
         }
     }
 
@@ -337,60 +390,53 @@ class PluginTraceViewerBehavior {
         return div.innerHTML;
     }
 
-    // renderJSON removed - now using shared JSONRenderer from js/utils/jsonRenderer.js
-
     /**
      * Close detail panel
      */
-    static closeDetailPanel() {
+    static closeDetailPanel(instance) {
         console.log('🚪 closeDetailPanel called');
-
-        const splitContainer = document.getElementById('splitPanelContainer');
 
         if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('plugin-trace-split-panel')) {
             console.log('Closing right panel via SplitPanelBehavior');
-            const instance = window.SplitPanelBehavior.instances.get('plugin-trace-split-panel');
-            window.SplitPanelBehavior.closeRightPanel(instance);
+            const splitInstance = window.SplitPanelBehavior.instances.get('plugin-trace-split-panel');
+            window.SplitPanelBehavior.closeRightPanel(splitInstance);
             console.log('✅ Right panel closed');
         } else {
             console.warn('SplitPanelBehavior not found, falling back to direct DOM manipulation');
-            const detailPanel = document.getElementById('traceDetailContainer');
-            if (detailPanel) {
-                detailPanel.style.display = 'none';
+            if (instance.detailPanel) {
+                instance.detailPanel.style.display = 'none';
             }
-            if (splitContainer) {
-                splitContainer.classList.add('split-panel-right-hidden');
+            if (instance.splitContainer) {
+                instance.splitContainer.classList.add('split-panel-right-hidden');
             }
         }
     }
 
     /**
-     * Setup event delegation for related trace clicks
+     * Cleanup instance resources
      */
-    static setupEventDelegation() {
-        document.addEventListener('click', (event) => {
-            const target = event.target.closest('[data-action="select-trace"]');
-            if (!target) return;
-
-            const traceId = target.dataset.traceId;
-            if (traceId) {
-                const vscode = window.vscode || acquireVsCodeApi();
-                vscode.postMessage({ command: 'trace-selected', traceId });
-            }
-        });
+    static cleanupInstance(instance) {
+        if (instance.boundHandlers.tabClickHandler) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.removeEventListener('click', instance.boundHandlers.tabClickHandler);
+            });
+        }
+        if (instance.boundHandlers.traceSelectHandler) {
+            document.removeEventListener('click', instance.boundHandlers.traceSelectHandler);
+        }
     }
 }
 
-// Initialize when DOM is ready
+// Register behavior
+PluginTraceViewerBehavior.register();
+
+// Initialize panel instance when DOM is ready
 if (typeof window !== 'undefined') {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
-            PluginTraceViewerBehavior.initialize();
-            PluginTraceViewerBehavior.setupEventDelegation();
+            PluginTraceViewerBehavior.initialize('pluginTraceViewerPanel', {}, document.body);
         });
     } else {
-        // DOM already loaded
-        PluginTraceViewerBehavior.initialize();
-        PluginTraceViewerBehavior.setupEventDelegation();
+        PluginTraceViewerBehavior.initialize('pluginTraceViewerPanel', {}, document.body);
     }
 }

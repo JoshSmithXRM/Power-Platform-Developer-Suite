@@ -3,31 +3,58 @@
  * Handles form interactions, validation, and communication with Extension Host
  */
 
-class EnvironmentSetupBehavior {
-    constructor() {
-        this.vscode = acquireVsCodeApi();
-        this.currentEnvironmentId = null;
-
-        this.initializeEventListeners();
-        this.initializeConditionalFields();
+class EnvironmentSetupBehavior extends BaseBehavior {
+    /**
+     * Get the component type this behavior handles
+     */
+    static getComponentType() {
+        return 'EnvironmentSetupPanel';
     }
 
-    initializeEventListeners() {
+    /**
+     * Create instance with panel-specific state
+     */
+    static createInstance(componentId, config, element) {
+        return {
+            id: componentId,
+            config: { ...config },
+            element: element,
+            boundHandlers: {},
+            vscode: acquireVsCodeApi(),
+            currentEnvironmentId: null
+        };
+    }
+
+    /**
+     * Find and cache DOM elements
+     */
+    static findDOMElements(instance) {
+        instance.authMethodSelect = document.getElementById('authenticationMethod');
+        instance.form = document.getElementById('environmentForm');
+        instance.titleElement = document.getElementById('pageTitle');
+        instance.subtitleElement = document.getElementById('pageSubtitle');
+    }
+
+    /**
+     * Setup event listeners
+     */
+    static setupEventListeners(instance) {
         // Handle authentication method changes
-        const authMethodSelect = document.getElementById('authenticationMethod');
-        if (authMethodSelect) {
-            authMethodSelect.addEventListener('change', (e) => {
-                this.updateConditionalFields(e.target.value);
-            });
+        if (instance.authMethodSelect) {
+            instance.boundHandlers.authMethodChange = (e) => {
+                this.updateConditionalFields(instance, e.target.value);
+            };
+            instance.authMethodSelect.addEventListener('change', instance.boundHandlers.authMethodChange);
         }
 
         // Handle messages from extension
-        window.addEventListener('message', (event) => {
+        instance.boundHandlers.messageHandler = (event) => {
             this.handleMessage(event.data);
-        });
+        };
+        window.addEventListener('message', instance.boundHandlers.messageHandler);
 
         // Intercept action bar button clicks and collect form data
-        document.addEventListener('click', (e) => {
+        instance.boundHandlers.clickHandler = (e) => {
             const actionBtn = e.target.closest('[data-action-id]');
             if (!actionBtn) return;
 
@@ -35,29 +62,63 @@ class EnvironmentSetupBehavior {
 
             if (actionId === 'save') {
                 e.stopPropagation();
-                this.saveEnvironment();
+                this.saveEnvironment(instance);
             } else if (actionId === 'test') {
                 e.stopPropagation();
-                this.testConnection();
+                this.testConnection(instance);
             } else if (actionId === 'delete') {
                 e.stopPropagation();
-                this.deleteEnvironment();
+                this.deleteEnvironment(instance);
             } else if (actionId === 'new') {
                 e.stopPropagation();
-                this.vscode.postMessage({ command: 'new-environment' });
+                instance.vscode.postMessage({ command: 'new-environment' });
             }
-        });
+        };
+        document.addEventListener('click', instance.boundHandlers.clickHandler);
     }
 
-    initializeConditionalFields() {
-        // Set initial state
-        const authMethodSelect = document.getElementById('authenticationMethod');
-        if (authMethodSelect) {
-            this.updateConditionalFields(authMethodSelect.value || 'Interactive');
+    /**
+     * Initialize component state from DOM
+     */
+    static initializeState(instance) {
+        // Set initial conditional fields state
+        if (instance.authMethodSelect) {
+            this.updateConditionalFields(instance, instance.authMethodSelect.value || 'Interactive');
         }
     }
 
-    updateConditionalFields(authMethod) {
+    /**
+     * Handle component data updates from Extension Host
+     */
+    static onComponentUpdate(instance, data) {
+        // This panel doesn't use standard component-update pattern
+        // Updates come through custom messages (environment-loaded, environment-saved)
+    }
+
+    /**
+     * Handle custom actions beyond componentUpdate
+     */
+    static handleCustomAction(instance, message) {
+        switch (message.command) {
+            case 'environment-loaded':
+                this.loadEnvironmentData(instance, message.data);
+                break;
+
+            case 'environment-saved':
+                instance.currentEnvironmentId = message.data?.id;
+                this.updatePageTitle(instance, message.data?.name);
+                break;
+
+            default:
+                super.handleCustomAction(instance, message);
+                break;
+        }
+    }
+
+    /**
+     * Update conditional fields visibility based on auth method
+     */
+    static updateConditionalFields(instance, authMethod) {
         // Hide all conditional fields
         document.querySelectorAll('.conditional-field').forEach(field => {
             field.classList.remove('visible');
@@ -69,41 +130,23 @@ class EnvironmentSetupBehavior {
         });
     }
 
-    handleMessage(message) {
-        if (!message) return;
-
-        switch (message.command) {
-            case 'component-update':
-                // Action bar events handled via component-event
-                break;
-
-            case 'environment-loaded':
-                this.loadEnvironmentData(message.data);
-                break;
-
-            case 'environment-saved':
-                this.currentEnvironmentId = message.data?.id;
-                this.updatePageTitle(message.data?.name);
-                break;
-        }
-    }
-
-    loadEnvironmentData(env) {
-        const form = document.getElementById('environmentForm');
-
+    /**
+     * Load environment data into form
+     */
+    static loadEnvironmentData(instance, env) {
         if (!env) {
             // Clear form for new environment
-            if (form) {
-                form.reset();
+            if (instance.form) {
+                instance.form.reset();
             }
-            this.currentEnvironmentId = null;
-            this.updateConditionalFields('Interactive');
-            this.updatePageTitle(null);
+            instance.currentEnvironmentId = null;
+            this.updateConditionalFields(instance, 'Interactive');
+            this.updatePageTitle(instance, null);
             return;
         }
 
         // Load environment data into form
-        this.currentEnvironmentId = env.id;
+        instance.currentEnvironmentId = env.id;
 
         this.setFieldValue('name', env.name || '');
         this.setFieldValue('dataverseUrl', env.settings.dataverseUrl || '');
@@ -114,33 +157,47 @@ class EnvironmentSetupBehavior {
         this.setFieldValue('clientId', env.settings.clientId || '');
         this.setFieldValue('username', env.settings.username || '');
 
-        this.updateConditionalFields(env.settings.authenticationMethod || 'Interactive');
-        this.updatePageTitle(env.name);
+        this.updateConditionalFields(instance, env.settings.authenticationMethod || 'Interactive');
+        this.updatePageTitle(instance, env.name);
     }
 
-    setFieldValue(fieldId, value) {
+    /**
+     * Set form field value
+     */
+    static setFieldValue(fieldId, value) {
         const field = document.getElementById(fieldId);
         if (field) {
             field.value = value;
         }
     }
 
-    updatePageTitle(environmentName) {
-        const titleElement = document.getElementById('pageTitle');
-        const subtitleElement = document.getElementById('pageSubtitle');
+    /**
+     * Get form field value
+     */
+    static getFieldValue(fieldId) {
+        const field = document.getElementById(fieldId);
+        return field ? field.value : '';
+    }
 
-        if (titleElement && subtitleElement) {
+    /**
+     * Update page title based on environment name
+     */
+    static updatePageTitle(instance, environmentName) {
+        if (instance.titleElement && instance.subtitleElement) {
             if (environmentName) {
-                titleElement.textContent = `Edit Environment: ${environmentName}`;
-                subtitleElement.textContent = 'Update authentication and connection settings';
+                instance.titleElement.textContent = `Edit Environment: ${environmentName}`;
+                instance.subtitleElement.textContent = 'Update authentication and connection settings';
             } else {
-                titleElement.textContent = 'New Environment';
-                subtitleElement.textContent = 'Configure authentication and connection settings';
+                instance.titleElement.textContent = 'New Environment';
+                instance.subtitleElement.textContent = 'Configure authentication and connection settings';
             }
         }
     }
 
-    saveEnvironment() {
+    /**
+     * Save environment data
+     */
+    static saveEnvironment(instance) {
         const formData = {
             name: this.getFieldValue('name'),
             dataverseUrl: this.getFieldValue('dataverseUrl'),
@@ -154,10 +211,13 @@ class EnvironmentSetupBehavior {
             password: this.getFieldValue('password')
         };
 
-        this.vscode.postMessage({ command: 'save-environment', data: formData });
+        instance.vscode.postMessage({ command: 'save-environment', data: formData });
     }
 
-    testConnection() {
+    /**
+     * Test connection with current form data
+     */
+    static testConnection(instance) {
         const formData = {
             dataverseUrl: this.getFieldValue('dataverseUrl'),
             tenantId: this.getFieldValue('tenantId'),
@@ -169,29 +229,46 @@ class EnvironmentSetupBehavior {
             password: this.getFieldValue('password')
         };
 
-        this.vscode.postMessage({ command: 'test-connection', data: formData });
+        instance.vscode.postMessage({ command: 'test-connection', data: formData });
     }
 
-    deleteEnvironment() {
-        if (this.currentEnvironmentId) {
-            this.vscode.postMessage({
+    /**
+     * Delete current environment
+     */
+    static deleteEnvironment(instance) {
+        if (instance.currentEnvironmentId) {
+            instance.vscode.postMessage({
                 command: 'delete-environment',
-                data: { environmentId: this.currentEnvironmentId }
+                data: { environmentId: instance.currentEnvironmentId }
             });
         }
     }
 
-    getFieldValue(fieldId) {
-        const field = document.getElementById(fieldId);
-        return field ? field.value : '';
+    /**
+     * Cleanup instance resources
+     */
+    static cleanupInstance(instance) {
+        // Remove event listeners
+        if (instance.authMethodSelect && instance.boundHandlers.authMethodChange) {
+            instance.authMethodSelect.removeEventListener('change', instance.boundHandlers.authMethodChange);
+        }
+        if (instance.boundHandlers.messageHandler) {
+            window.removeEventListener('message', instance.boundHandlers.messageHandler);
+        }
+        if (instance.boundHandlers.clickHandler) {
+            document.removeEventListener('click', instance.boundHandlers.clickHandler);
+        }
     }
 }
 
-// Initialize behavior when DOM is ready
+// Register behavior
+EnvironmentSetupBehavior.register();
+
+// Initialize panel instance when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        new EnvironmentSetupBehavior();
+        EnvironmentSetupBehavior.initialize('environmentSetupPanel', {}, document.body);
     });
 } else {
-    new EnvironmentSetupBehavior();
+    EnvironmentSetupBehavior.initialize('environmentSetupPanel', {}, document.body);
 }

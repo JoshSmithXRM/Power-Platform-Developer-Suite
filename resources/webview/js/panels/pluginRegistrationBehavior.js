@@ -8,25 +8,50 @@
  * - No round-trip messages for UI state (webview owns layout)
  */
 
-class PluginRegistrationBehavior {
+class PluginRegistrationBehavior extends BaseBehavior {
     /**
-     * Initialize plugin registration behavior
+     * Get the component type this behavior handles
      */
-    static initialize() {
-        console.log('PluginRegistrationBehavior: Initializing');
+    static getComponentType() {
+        return 'PluginRegistrationPanel';
+    }
 
+    /**
+     * Create instance with panel-specific state
+     */
+    static createInstance(componentId, config, element) {
+        return {
+            id: componentId,
+            config: { ...config },
+            element: element,
+            boundHandlers: {},
+            vscode: acquireVsCodeApi()
+        };
+    }
+
+    /**
+     * Find and cache DOM elements
+     */
+    static findDOMElements(instance) {
+        instance.detailContent = document.getElementById('detail-panel-content');
+        instance.splitContainer = document.querySelector('[data-component-id="pluginRegistration-splitPanel"]');
+    }
+
+    /**
+     * Setup event listeners
+     */
+    static setupEventListeners(instance) {
         // Register panel handler with ComponentUtils for proper message routing
         if (window.ComponentUtils && window.ComponentUtils.registerPanelHandler) {
             window.ComponentUtils.registerPanelHandler('pluginRegistration', (message) => {
                 console.log('📨 PluginRegistrationBehavior message received:', message.command || message.command);
 
-                // Handle both action and command for backward compatibility
                 const actionType = message.command || message.command;
 
                 switch (actionType) {
                     case 'show-node-details':
                         console.log('Calling showNodeDetails with data:', message.data);
-                        PluginRegistrationBehavior.showNodeDetails(message.data);
+                        this.showNodeDetails(instance, message.data);
                         return true;
 
                     case 'set-split-ratio':
@@ -36,7 +61,6 @@ class PluginRegistrationBehavior {
                         return window.SplitPanelHandlers.handleShowRightPanel(message);
 
                     default:
-                        // Not a panel-specific action, pass through to component routing
                         return false;
                 }
             });
@@ -45,17 +69,30 @@ class PluginRegistrationBehavior {
             console.error('ComponentUtils not available, cannot register panel handler');
         }
 
-        // Setup data-action event delegation for close button
-        PluginRegistrationBehavior.setupEventDelegation();
+        // Setup data-action event delegation
+        this.setupEventDelegation(instance);
+    }
 
-        console.log('PluginRegistrationBehavior: Initialized');
+    /**
+     * Initialize component state from DOM
+     */
+    static initializeState(instance) {
+        // No initial state needed for this panel
+    }
+
+    /**
+     * Handle component data updates from Extension Host
+     */
+    static onComponentUpdate(instance, data) {
+        // This panel uses custom message routing instead of standard component-update
+        // Updates come through the registered panel handler
     }
 
     /**
      * Setup event delegation for data-action attributes
      */
-    static setupEventDelegation() {
-        document.addEventListener('click', (event) => {
+    static setupEventDelegation(instance) {
+        instance.boundHandlers.clickHandler = (event) => {
             const target = event.target;
             if (!target) return;
 
@@ -64,25 +101,26 @@ class PluginRegistrationBehavior {
 
             switch (action) {
                 case 'close-right-panel':
-                    PluginRegistrationBehavior.closeDetailPanel();
+                    this.closeDetailPanel(instance);
                     break;
 
                 case 'switch-detail-tab': {
                     const tabName = target.getAttribute('data-tab') || target.closest('[data-tab]')?.getAttribute('data-tab');
                     if (tabName) {
-                        PluginRegistrationBehavior.switchDetailTab(tabName);
+                        this.switchDetailTab(tabName);
                     }
                     break;
                 }
             }
-        });
+        };
+        document.addEventListener('click', instance.boundHandlers.clickHandler);
     }
 
     /**
      * Show node details panel
      * Handles content update AND delegates panel visibility to SplitPanelBehavior API
      */
-    static showNodeDetails(data) {
+    static showNodeDetails(instance, data) {
         console.log('PluginRegistrationBehavior: showNodeDetails called with data:', data);
 
         if (!data || !data.html) {
@@ -92,9 +130,7 @@ class PluginRegistrationBehavior {
 
         console.log('PluginRegistrationBehavior: HTML data length:', data.html.length);
 
-        const detailContent = document.getElementById('detail-panel-content');
-
-        if (!detailContent) {
+        if (!instance.detailContent) {
             console.warn('PluginRegistrationBehavior: Detail panel content element not found');
             return;
         }
@@ -103,13 +139,13 @@ class PluginRegistrationBehavior {
 
         // Update content first
         console.log('PluginRegistrationBehavior: Setting innerHTML...');
-        detailContent.innerHTML = data.html;
-        console.log('PluginRegistrationBehavior: innerHTML set. New content:', detailContent.innerHTML.substring(0, 100));
+        instance.detailContent.innerHTML = data.html;
+        console.log('PluginRegistrationBehavior: innerHTML set. New content:', instance.detailContent.innerHTML.substring(0, 100));
 
         // Show panel using SplitPanelBehavior public API
         if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('pluginRegistration-splitPanel')) {
-            const instance = window.SplitPanelBehavior.instances.get('pluginRegistration-splitPanel');
-            window.SplitPanelBehavior.showRightPanel(instance);
+            const splitInstance = window.SplitPanelBehavior.instances.get('pluginRegistration-splitPanel');
+            window.SplitPanelBehavior.showRightPanel(splitInstance);
             console.log('PluginRegistrationBehavior: Called SplitPanelBehavior.showRightPanel()');
         } else {
             console.warn('PluginRegistrationBehavior: SplitPanelBehavior not available');
@@ -122,21 +158,20 @@ class PluginRegistrationBehavior {
      * Close detail panel
      * Uses SplitPanelBehavior API to handle panel visibility
      */
-    static closeDetailPanel() {
+    static closeDetailPanel(instance) {
         console.log('PluginRegistrationBehavior: Closing detail panel');
 
         // Close panel using SplitPanelBehavior public API
         if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('pluginRegistration-splitPanel')) {
-            const instance = window.SplitPanelBehavior.instances.get('pluginRegistration-splitPanel');
-            window.SplitPanelBehavior.closeRightPanel(instance);
+            const splitInstance = window.SplitPanelBehavior.instances.get('pluginRegistration-splitPanel');
+            window.SplitPanelBehavior.closeRightPanel(splitInstance);
             console.log('PluginRegistrationBehavior: Called SplitPanelBehavior.closeRightPanel()');
         } else {
             console.warn('PluginRegistrationBehavior: SplitPanelBehavior not available');
         }
 
         // Notify Extension Host that panel was closed (so it can clear selectedNode state)
-        const vscode = window.vscode || acquireVsCodeApi();
-        vscode.postMessage({
+        instance.vscode.postMessage({
             command: 'close-details'
         });
     }
@@ -164,13 +199,25 @@ class PluginRegistrationBehavior {
             jsonContent.style.display = tabName === 'json' ? 'block' : 'none';
         }
     }
+
+    /**
+     * Cleanup instance resources
+     */
+    static cleanupInstance(instance) {
+        if (instance.boundHandlers.clickHandler) {
+            document.removeEventListener('click', instance.boundHandlers.clickHandler);
+        }
+    }
 }
 
-// Initialize when DOM is ready
+// Register behavior
+PluginRegistrationBehavior.register();
+
+// Initialize panel instance when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        PluginRegistrationBehavior.initialize();
+        PluginRegistrationBehavior.initialize('pluginRegistrationPanel', {}, document.body);
     });
 } else {
-    PluginRegistrationBehavior.initialize();
+    PluginRegistrationBehavior.initialize('pluginRegistrationPanel', {}, document.body);
 }

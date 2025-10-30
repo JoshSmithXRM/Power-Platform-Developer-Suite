@@ -3,16 +3,49 @@
  * Handles entity/choice tree, filtering, selection, and metadata display
  */
 
-class MetadataBrowserBehavior {
-    static entities = [];
-    static choices = [];
-    static selectedEntityLogicalName = null;
-    static selectedChoiceName = null;
+class MetadataBrowserBehavior extends BaseBehavior {
+    /**
+     * Get the component type this behavior handles
+     */
+    static getComponentType() {
+        return 'MetadataBrowserPanel';
+    }
 
     /**
-     * Initialize metadata browser behavior
+     * Create instance with panel-specific state
      */
-    static initialize() {
+    static createInstance(componentId, config, element) {
+        return {
+            id: componentId,
+            config: { ...config },
+            element: element,
+            boundHandlers: {},
+            vscode: acquireVsCodeApi(),
+            entities: [],
+            choices: [],
+            selectedEntityLogicalName: null,
+            selectedChoiceName: null,
+            lastClickedRowId: null
+        };
+    }
+
+    /**
+     * Find and cache DOM elements
+     */
+    static findDOMElements(instance) {
+        instance.tablesList = document.getElementById('tables-list');
+        instance.choicesList = document.getElementById('choices-list');
+        instance.detailPanel = document.getElementById('detail-panel');
+        instance.metadataContainer = document.querySelector('.metadata-container');
+        instance.splitContainer = document.querySelector('[data-component-id="metadata-detail-split-panel"]');
+        instance.leftPanel = document.getElementById('left-panel');
+        instance.detailPanelContent = document.querySelector('.detail-panel-content');
+    }
+
+    /**
+     * Setup event listeners
+     */
+    static setupEventListeners(instance) {
         // Setup global functions for inline event handlers
         window.toggleSection = function (sectionId) {
             const vscode = window.vscode || acquireVsCodeApi();
@@ -28,28 +61,28 @@ class MetadataBrowserBehavior {
             }
         };
 
-        window.filterEntityTree = function (query) {
-            MetadataBrowserBehavior.filterTree(query);
+        window.filterEntityTree = (query) => {
+            this.filterTree(instance, query);
         };
 
-        window.selectEntity = function (logicalName, displayName, metadataId) {
-            MetadataBrowserBehavior.selectEntity(logicalName, displayName, metadataId);
+        window.selectEntity = (logicalName, displayName, metadataId) => {
+            this.selectEntity(instance, logicalName, displayName, metadataId);
         };
 
-        window.selectChoice = function (name, displayName) {
-            MetadataBrowserBehavior.selectChoice(name, displayName);
+        window.selectChoice = (name, displayName) => {
+            this.selectChoice(instance, name, displayName);
         };
 
-        window.closeDetailPanel = function () {
-            MetadataBrowserBehavior.closeDetailPanel();
+        window.closeDetailPanel = () => {
+            this.closeDetailPanel(instance);
         };
 
-        window.switchDetailTab = function (tabName) {
-            MetadataBrowserBehavior.switchDetailTab(tabName);
+        window.switchDetailTab = (tabName) => {
+            this.switchDetailTab(tabName);
         };
 
-        window.toggleLeftPanel = function () {
-            MetadataBrowserBehavior.toggleLeftPanel();
+        window.toggleLeftPanel = () => {
+            this.toggleLeftPanel(instance);
         };
 
         // Register panel handler with ComponentUtils for proper message routing
@@ -62,27 +95,27 @@ class MetadataBrowserBehavior {
 
                 switch (actionType) {
                     case 'set-mode':
-                        MetadataBrowserBehavior.setMode(message.mode);
+                        this.setMode(message.mode);
                         return true;
 
                     case 'tree-loading':
-                        MetadataBrowserBehavior.setTreeLoading(message.loading);
+                        this.setTreeLoading(instance, message.loading);
                         return true;
 
                     case 'populate-tree':
-                        MetadataBrowserBehavior.populateTree(message.data);
+                        this.populateTree(instance, message.data);
                         return true;
 
                     case 'update-selection':
-                        MetadataBrowserBehavior.updateSelection(message.data);
+                        this.updateSelection(instance, message.data);
                         return true;
 
                     case 'update-counts':
-                        MetadataBrowserBehavior.updateCounts(message.data);
+                        this.updateCounts(message.data);
                         return true;
 
                     case 'show-detail':
-                        MetadataBrowserBehavior.showDetailPanel(message.data);
+                        this.showDetailPanel(instance, message.data);
                         return true;
 
                     case 'set-split-ratio':
@@ -101,23 +134,36 @@ class MetadataBrowserBehavior {
             console.error('ComponentUtils not available, cannot register panel handler');
         }
 
-        // ROW CLICK DISABLED - Use context menu "View Details" instead
-        // MetadataBrowserBehavior.setupTableClickHandlers();
+        // Setup data-action event delegation
+        this.setupActionHandlers(instance);
 
         // Setup keyboard shortcuts
-        MetadataBrowserBehavior.setupKeyboardShortcuts();
+        this.setupKeyboardShortcuts(instance);
+    }
 
-        // Setup data-action event delegation
-        MetadataBrowserBehavior.setupActionHandlers();
+    /**
+     * Initialize component state from DOM
+     */
+    static initializeState(instance) {
+        // Make detail panel content focusable
+        if (instance.detailPanelContent) {
+            instance.detailPanelContent.setAttribute('tabindex', '0');
+        }
+    }
 
-        console.log('MetadataBrowserBehavior initialized');
+    /**
+     * Handle component data updates from Extension Host
+     */
+    static onComponentUpdate(instance, data) {
+        // This panel uses custom message routing instead of standard component-update
+        // Updates come through the registered panel handler
     }
 
     /**
      * Setup event delegation for data-action attributes
      */
-    static setupActionHandlers() {
-        document.addEventListener('click', (event) => {
+    static setupActionHandlers(instance) {
+        instance.boundHandlers.clickHandler = (event) => {
             const target = event.target.closest('[data-action]');
             if (!target) return;
 
@@ -125,7 +171,7 @@ class MetadataBrowserBehavior {
 
             switch (action) {
                 case 'toggle-left-panel':
-                    MetadataBrowserBehavior.toggleLeftPanel();
+                    this.toggleLeftPanel(instance);
                     break;
 
                 case 'toggle-section': {
@@ -138,50 +184,48 @@ class MetadataBrowserBehavior {
 
                 case 'close-right-panel':
                 case 'close-detail-panel':
-                    MetadataBrowserBehavior.closeDetailPanel();
+                    this.closeDetailPanel(instance);
                     break;
 
                 case 'switch-detail-tab': {
                     const tabName = target.dataset.tab;
                     if (tabName) {
-                        MetadataBrowserBehavior.switchDetailTab(tabName);
+                        this.switchDetailTab(tabName);
                     }
                     break;
                 }
             }
-        });
+        };
+        document.addEventListener('click', instance.boundHandlers.clickHandler);
 
         // Handle input events for filter
-        document.addEventListener('input', (event) => {
+        instance.boundHandlers.inputHandler = (event) => {
             const target = event.target;
             if (target.dataset.action === 'filter-entity-tree') {
-                MetadataBrowserBehavior.filterTree(target.value);
+                this.filterTree(instance, target.value);
             }
-        });
+        };
+        document.addEventListener('input', instance.boundHandlers.inputHandler);
     }
 
     /**
      * Setup keyboard shortcuts for detail panel
      */
-    static setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (event) => {
+    static setupKeyboardShortcuts(instance) {
+        instance.boundHandlers.keydownHandler = (event) => {
             // Ctrl+A / Cmd+A - Select all within focused content area
             if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
-                const detailPanel = document.getElementById('detail-panel');
-                if (!detailPanel || detailPanel.classList.contains('hidden')) return;
+                if (!instance.detailPanel || instance.detailPanel.classList.contains('hidden')) return;
 
-                // Check if we're anywhere within the detail panel area
                 const target = event.target;
 
-                if (detailPanel.contains(target)) {
-                    // We're inside the detail panel - prevent default and scope selection
+                if (instance.detailPanel.contains(target)) {
                     event.preventDefault();
                     event.stopPropagation();
 
                     const propertiesContent = document.getElementById('detail-properties-content');
                     const jsonContent = document.getElementById('detail-json-content');
 
-                    // Select the visible tab's content
                     if (propertiesContent && propertiesContent.style.display !== 'none') {
                         this.selectAllText(propertiesContent);
                     } else if (jsonContent && jsonContent.style.display !== 'none') {
@@ -189,13 +233,8 @@ class MetadataBrowserBehavior {
                     }
                 }
             }
-        }, true);  // Use capture phase to catch it early
-
-        // Make detail panel content focusable
-        const detailPanelContent = document.querySelector('.detail-panel-content');
-        if (detailPanelContent) {
-            detailPanelContent.setAttribute('tabindex', '0');
-        }
+        };
+        document.addEventListener('keydown', instance.boundHandlers.keydownHandler, true);
     }
 
     /**
@@ -210,63 +249,12 @@ class MetadataBrowserBehavior {
     }
 
     /**
-     * Setup click handlers for all metadata tables
-     */
-    static setupTableClickHandlers() {
-        let lastClickedRowId = null;
-
-        // Delegate click events for all metadata tables
-        document.addEventListener('click', (event) => {
-            const row = event.target.closest('tr[data-row-id]');
-            if (!row) return;
-
-            const tableElement = row.closest('table');
-            if (!tableElement) return;
-
-            // Check if this is a metadata table
-            const tableContainer = tableElement.closest('[data-component-type="DataTable"]');
-            if (!tableContainer) return;
-
-            const tableId = tableContainer.getAttribute('data-component-id');
-
-            // Only handle metadata browser tables
-            if (!tableId || !tableId.startsWith('metadata-')) return;
-
-            const rowId = row.getAttribute('data-row-id');
-
-            console.log('Row clicked:', { tableId, rowId });
-
-            // Toggle behavior - if clicking same row, close detail panel
-            if (lastClickedRowId === rowId) {
-                console.log('Same row clicked - closing detail panel');
-                this.closeDetailPanel();
-                lastClickedRowId = null;
-                return;
-            }
-
-            lastClickedRowId = rowId;
-            const vscode = window.vscode || acquireVsCodeApi();
-
-            // Send row click to extension host
-            vscode.postMessage({
-                command: 'metadata-row-click',
-                data: {
-                    tableId,
-                    rowId
-                }
-            });
-        });
-    }
-
-    /**
      * Set the mode (entity or choice) to show/hide appropriate sections
      */
     static setMode(mode) {
         const sectionsContainer = document.querySelector('.metadata-sections');
         if (sectionsContainer) {
-            // Remove both mode classes
             sectionsContainer.classList.remove('entity-mode', 'choice-mode');
-            // Add the appropriate mode class
             if (mode === 'entity') {
                 sectionsContainer.classList.add('entity-mode');
             } else if (mode === 'choice') {
@@ -278,16 +266,13 @@ class MetadataBrowserBehavior {
     /**
      * Show/hide loading state for tree
      */
-    static setTreeLoading(loading) {
-        const tablesList = document.getElementById('tables-list');
-        const choicesList = document.getElementById('choices-list');
-
+    static setTreeLoading(instance, loading) {
         if (loading) {
-            if (tablesList) {
-                tablesList.innerHTML = '<li class="tree-loading">Loading tables...</li>';
+            if (instance.tablesList) {
+                instance.tablesList.innerHTML = '<li class="tree-loading">Loading tables...</li>';
             }
-            if (choicesList) {
-                choicesList.innerHTML = '<li class="tree-loading">Loading choices...</li>';
+            if (instance.choicesList) {
+                instance.choicesList.innerHTML = '<li class="tree-loading">Loading choices...</li>';
             }
         }
     }
@@ -295,17 +280,16 @@ class MetadataBrowserBehavior {
     /**
      * Populate entity and choice tree
      */
-    static populateTree(data) {
+    static populateTree(instance, data) {
         const { entities, choices } = data;
 
-        // Store data
-        MetadataBrowserBehavior.entities = entities || [];
-        MetadataBrowserBehavior.choices = choices || [];
+        // Store data on instance
+        instance.entities = entities || [];
+        instance.choices = choices || [];
 
         // Populate tables list
-        const tablesList = document.getElementById('tables-list');
-        if (tablesList) {
-            tablesList.innerHTML = entities.map(entity => `
+        if (instance.tablesList) {
+            instance.tablesList.innerHTML = entities.map(entity => `
                 <li class="tree-item"
                     data-type="entity"
                     data-logical-name="${entity.logicalName}"
@@ -319,9 +303,8 @@ class MetadataBrowserBehavior {
         }
 
         // Populate choices list
-        const choicesList = document.getElementById('choices-list');
-        if (choicesList) {
-            choicesList.innerHTML = choices.map(choice => `
+        if (instance.choicesList) {
+            instance.choicesList.innerHTML = choices.map(choice => `
                 <li class="tree-item"
                     data-type="choice"
                     data-name="${choice.name}"
@@ -339,10 +322,9 @@ class MetadataBrowserBehavior {
     /**
      * Filter tree based on search query
      */
-    static filterTree(query) {
+    static filterTree(instance, query) {
         const lowerQuery = query.toLowerCase();
 
-        // Filter both entities and choices
         document.querySelectorAll('.tree-item').forEach(item => {
             const displayName = item.getAttribute('data-display-name') || '';
             const logicalName = item.getAttribute('data-logical-name') || item.getAttribute('data-name') || '';
@@ -357,21 +339,19 @@ class MetadataBrowserBehavior {
     /**
      * Select an entity from the tree
      */
-    static selectEntity(logicalName, displayName, metadataId) {
-        const vscode = window.vscode || acquireVsCodeApi();
-
+    static selectEntity(instance, logicalName, displayName, metadataId) {
         // Update selected state in UI
         document.querySelectorAll('.tree-item').forEach(item => {
             item.classList.remove('selected');
         });
         document.querySelector(`[data-logical-name="${logicalName}"]`)?.classList.add('selected');
 
-        // Store selection
-        MetadataBrowserBehavior.selectedEntityLogicalName = logicalName;
-        MetadataBrowserBehavior.selectedChoiceName = null;
+        // Store selection on instance
+        instance.selectedEntityLogicalName = logicalName;
+        instance.selectedChoiceName = null;
 
         // Send to extension host
-        vscode.postMessage({
+        instance.vscode.postMessage({
             command: 'select-entity',
             data: {
                 logicalName,
@@ -384,21 +364,19 @@ class MetadataBrowserBehavior {
     /**
      * Select a choice from the tree
      */
-    static selectChoice(name, displayName) {
-        const vscode = window.vscode || acquireVsCodeApi();
-
+    static selectChoice(instance, name, displayName) {
         // Update selected state in UI
         document.querySelectorAll('.tree-item').forEach(item => {
             item.classList.remove('selected');
         });
         document.querySelector(`[data-name="${name}"]`)?.classList.add('selected');
 
-        // Store selection
-        MetadataBrowserBehavior.selectedEntityLogicalName = null;
-        MetadataBrowserBehavior.selectedChoiceName = name;
+        // Store selection on instance
+        instance.selectedEntityLogicalName = null;
+        instance.selectedChoiceName = name;
 
         // Send to extension host
-        vscode.postMessage({
+        instance.vscode.postMessage({
             command: 'select-choice',
             data: {
                 name,
@@ -410,24 +388,23 @@ class MetadataBrowserBehavior {
     /**
      * Update the current selection display
      */
-    static updateSelection(data) {
+    static updateSelection(instance, data) {
         const selectionElement = document.getElementById('current-selection');
         if (selectionElement && data.displayName) {
             selectionElement.textContent = data.displayName;
         }
 
         // Close detail panel when switching entities/choices
-        this.closeDetailPanel();
+        this.closeDetailPanel(instance);
 
         // Update counts if provided
         if (data.counts) {
-            MetadataBrowserBehavior.updateCounts(data.counts);
+            this.updateCounts(data.counts);
         }
 
         // Auto-expand sections based on what data is available
         if (data.counts) {
             if (data.counts.attributes > 0) {
-                // Auto-expand attributes section for entities
                 const attributesSection = document.querySelector('[data-section="attributes"]');
                 if (attributesSection) {
                     attributesSection.classList.add('expanded');
@@ -435,7 +412,6 @@ class MetadataBrowserBehavior {
             }
 
             if (data.counts.choices > 0) {
-                // Auto-expand choices section when there are choice values
                 const choicesSection = document.querySelector('[data-section="choices"]');
                 if (choicesSection) {
                     choicesSection.classList.add('expanded');
@@ -487,17 +463,13 @@ class MetadataBrowserBehavior {
     /**
      * Show detail panel with metadata
      */
-    static showDetailPanel(data) {
-        const detailPanel = document.getElementById('detail-panel');
-        const metadataContainer = document.querySelector('.metadata-container');
-        const splitContainer = document.querySelector('[data-component-id="metadata-detail-split-panel"]');
-
-        if (!detailPanel || !metadataContainer) return;
+    static showDetailPanel(instance, data) {
+        if (!instance.detailPanel || !instance.metadataContainer) return;
 
         console.log('Showing detail panel:', data.title);
 
         // Initialize split panel behavior if not already initialized
-        if (splitContainer && window.SplitPanelBehavior && !window.SplitPanelBehavior.instances.has('metadata-detail-split-panel')) {
+        if (instance.splitContainer && window.SplitPanelBehavior && !window.SplitPanelBehavior.instances.has('metadata-detail-split-panel')) {
             window.SplitPanelBehavior.initialize(
                 'metadata-detail-split-panel',
                 {
@@ -507,7 +479,7 @@ class MetadataBrowserBehavior {
                     initialSplit: 60,
                     rightPanelDefaultHidden: true
                 },
-                splitContainer
+                instance.splitContainer
             );
         }
 
@@ -525,22 +497,21 @@ class MetadataBrowserBehavior {
 
         // Show panel using split panel behavior
         if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('metadata-detail-split-panel')) {
-            const instance = window.SplitPanelBehavior.instances.get('metadata-detail-split-panel');
-            window.SplitPanelBehavior.showRightPanel(instance);
+            const splitInstance = window.SplitPanelBehavior.instances.get('metadata-detail-split-panel');
+            window.SplitPanelBehavior.showRightPanel(splitInstance);
         } else {
             // Fallback if split panel behavior isn't available
-            detailPanel.classList.remove('hidden');
-            metadataContainer.classList.remove('detail-hidden');
+            instance.detailPanel.classList.remove('hidden');
+            instance.metadataContainer.classList.remove('detail-hidden');
         }
 
-        // Default to properties tab (more user-friendly)
+        // Default to properties tab
         this.switchDetailTab('properties');
 
         // Focus the panel content for Ctrl+A to work
         setTimeout(() => {
-            const detailPanelContent = document.querySelector('.detail-panel-content');
-            if (detailPanelContent) {
-                detailPanelContent.focus();
+            if (instance.detailPanelContent) {
+                instance.detailPanelContent.focus();
             }
         }, 100);
     }
@@ -548,22 +519,19 @@ class MetadataBrowserBehavior {
     /**
      * Close detail panel
      */
-    static closeDetailPanel() {
-        const detailPanel = document.getElementById('detail-panel');
-        const metadataContainer = document.querySelector('.metadata-container');
-
+    static closeDetailPanel(instance) {
         // Close using split panel behavior
         if (window.SplitPanelBehavior && window.SplitPanelBehavior.instances.has('metadata-detail-split-panel')) {
-            const instance = window.SplitPanelBehavior.instances.get('metadata-detail-split-panel');
-            window.SplitPanelBehavior.closeRightPanel(instance);
+            const splitInstance = window.SplitPanelBehavior.instances.get('metadata-detail-split-panel');
+            window.SplitPanelBehavior.closeRightPanel(splitInstance);
         } else {
             // Fallback if split panel behavior isn't available
-            if (detailPanel) {
-                detailPanel.classList.add('hidden');
+            if (instance.detailPanel) {
+                instance.detailPanel.classList.add('hidden');
             }
 
-            if (metadataContainer) {
-                metadataContainer.classList.add('detail-hidden');
+            if (instance.metadataContainer) {
+                instance.metadataContainer.classList.add('detail-hidden');
             }
         }
     }
@@ -603,33 +571,25 @@ class MetadataBrowserBehavior {
         const addProperty = (key, value, path = '') => {
             const fullPath = path ? `${path}.${key}` : key;
 
-            // Skip null, undefined, and empty strings
             if (value === null || value === undefined) return;
             if (value === '' || value === "") return;
-
-            // Only skip @odata.type (redundant with AttributeType)
             if (key === '@odata.type') return;
 
-            // Handle arrays
             if (Array.isArray(value)) {
-                if (value.length === 0) return; // Skip empty arrays
+                if (value.length === 0) return;
 
-                // Add array summary
                 properties.push({
                     key: fullPath,
                     value: `Array[${value.length}]`,
                     type: 'array-header'
                 });
 
-                // Add each array item
                 value.forEach((item, index) => {
                     if (typeof item === 'object' && item !== null) {
-                        // Nested object in array
                         Object.keys(item).forEach(nestedKey => {
                             addProperty(nestedKey, item[nestedKey], `${fullPath}[${index}]`);
                         });
                     } else {
-                        // Primitive in array
                         properties.push({
                             key: `${fullPath}[${index}]`,
                             value: String(item),
@@ -640,18 +600,15 @@ class MetadataBrowserBehavior {
                 return;
             }
 
-            // Handle objects
             if (typeof value === 'object') {
-                if (Object.keys(value).length === 0) return; // Skip empty objects
+                if (Object.keys(value).length === 0) return;
 
-                // Recursively add nested properties
                 Object.keys(value).forEach(nestedKey => {
                     addProperty(nestedKey, value[nestedKey], fullPath);
                 });
                 return;
             }
 
-            // Handle primitives
             let displayValue = value;
             if (typeof value === 'boolean') {
                 displayValue = value ? 'Yes' : 'No';
@@ -664,7 +621,6 @@ class MetadataBrowserBehavior {
             });
         };
 
-        // Add all top-level properties
         Object.keys(obj).forEach(key => {
             addProperty(key, obj[key]);
         });
@@ -673,7 +629,6 @@ class MetadataBrowserBehavior {
             return '<div class="properties-empty">No properties to display</div>';
         }
 
-        // Build HTML table
         const rows = properties.map(prop => {
             const rowClass = prop.type === 'array-header' ? 'property-array-header' : 'property-row';
             const valueClass = prop.type === 'array-header' ? 'property-array-count' : 'property-value';
@@ -701,8 +656,6 @@ class MetadataBrowserBehavior {
         `;
     }
 
-    // renderJSON removed - now using shared JSONRenderer from js/utils/jsonRenderer.js
-
     /**
      * Escape HTML special characters
      */
@@ -720,31 +673,45 @@ class MetadataBrowserBehavior {
     /**
      * Toggle left panel collapsed state
      */
-    static toggleLeftPanel() {
-        const leftPanel = document.getElementById('left-panel');
-        const container = document.querySelector('.metadata-container');
+    static toggleLeftPanel(instance) {
         const collapseBtn = document.getElementById('left-panel-collapse');
 
-        if (!leftPanel || !container || !collapseBtn) return;
+        if (!instance.leftPanel || !instance.metadataContainer || !collapseBtn) return;
 
-        const isCollapsed = leftPanel.classList.toggle('collapsed');
-        container.classList.toggle('left-collapsed', isCollapsed);
+        const isCollapsed = instance.leftPanel.classList.toggle('collapsed');
+        instance.metadataContainer.classList.toggle('left-collapsed', isCollapsed);
 
-        // Update button text and tooltip
         collapseBtn.textContent = isCollapsed ? '▶' : '◀';
         collapseBtn.title = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
         collapseBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
     }
+
+    /**
+     * Cleanup instance resources
+     */
+    static cleanupInstance(instance) {
+        if (instance.boundHandlers.clickHandler) {
+            document.removeEventListener('click', instance.boundHandlers.clickHandler);
+        }
+        if (instance.boundHandlers.inputHandler) {
+            document.removeEventListener('input', instance.boundHandlers.inputHandler);
+        }
+        if (instance.boundHandlers.keydownHandler) {
+            document.removeEventListener('keydown', instance.boundHandlers.keydownHandler, true);
+        }
+    }
 }
 
-// Initialize when DOM is ready
+// Register behavior
+MetadataBrowserBehavior.register();
+
+// Initialize panel instance when DOM is ready
 if (typeof window !== 'undefined') {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
-            MetadataBrowserBehavior.initialize();
+            MetadataBrowserBehavior.initialize('metadataBrowserPanel', {}, document.body);
         });
     } else {
-        // DOM already loaded
-        MetadataBrowserBehavior.initialize();
+        MetadataBrowserBehavior.initialize('metadataBrowserPanel', {}, document.body);
     }
 }
