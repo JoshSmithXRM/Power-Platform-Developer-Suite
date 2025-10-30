@@ -190,6 +190,29 @@ export abstract class BasePanel<
                 return true;
             }
 
+            case 'dropdown-item-clicked': {
+                // Route dropdown clicks to same flow as button clicks
+                const componentId = message.data?.componentId ?? '';
+                const actionId = message.data?.actionId ?? '';
+                const itemId = message.data?.itemId;
+
+                this.componentLogger.debug('Dropdown item clicked', { componentId, actionId, itemId });
+
+                // Route through standard action handling (same as button clicks)
+                const handled = await this.handleStandardActions(actionId);
+                if (!handled) {
+                    // Delegate to panel-specific handler with dropdown item context
+                    await this.handlePanelAction(componentId, actionId, itemId);
+                }
+                return true;
+            }
+
+            case 'overflow-changed': {
+                // Informational message from ActionBar - no action needed
+                this.componentLogger.trace('ActionBar overflow state changed');
+                return true;
+            }
+
             default:
                 return false;
         }
@@ -203,16 +226,16 @@ export abstract class BasePanel<
     protected async handleComponentEvent(message: ComponentEventMessage): Promise<void> {
         const componentId = message.data.componentId;
         const eventType = message.data.eventType;
-        const data = message.data.eventData;
+        const eventData = message.data.data;
 
         this.componentLogger.debug('Component event received', {
             componentId,
             eventType,
-            data
+            eventData
         });
 
         if (eventType === 'actionClicked') {
-            const actionId = (data && typeof data === 'object' && 'actionId' in data) ? (data as { actionId?: string }).actionId ?? '' : '';
+            const actionId = (eventData && typeof eventData === 'object' && 'actionId' in eventData) ? (eventData as { actionId?: string }).actionId ?? '' : '';
 
             // Try standard actions first (refresh) before delegating to panel-specific handler
             const handled = await this.handleStandardActions(actionId);
@@ -224,7 +247,7 @@ export abstract class BasePanel<
             return;
         }
 
-        await this.handleOtherComponentEvent(componentId, eventType, data);
+        await this.handleOtherComponentEvent(componentId, eventType, eventData);
     }
 
     /**
@@ -233,8 +256,9 @@ export abstract class BasePanel<
      *
      * @param componentId - The component that triggered the action
      * @param actionId - The action that was triggered
+     * @param itemId - Optional dropdown item ID (for dropdown selections)
      */
-    protected async handlePanelAction(_componentId: string, _actionId: string): Promise<void> {
+    protected async handlePanelAction(_componentId: string, _actionId: string, _itemId?: string): Promise<void> {
         // No-op by default
     }
 

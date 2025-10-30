@@ -38,7 +38,7 @@ export interface ComponentEventMessage extends BaseWebviewMessage {
     data: {
         componentId: string;
         eventType: string;
-        eventData?: unknown;
+        data?: unknown;
     };
 }
 
@@ -516,6 +516,30 @@ export interface TraceSelectedMessage extends BaseWebviewMessage {
 }
 
 /**
+ * Dropdown item clicked message
+ * Sent when user clicks item in ActionBar dropdown
+ */
+export interface DropdownItemClickedMessage extends BaseWebviewMessage {
+    command: 'dropdown-item-clicked';
+    data?: {
+        componentId?: string;
+        actionId?: string;
+        itemId?: string;
+    };
+}
+
+/**
+ * Overflow changed message
+ * Sent by ActionBar when overflow state changes (informational only)
+ */
+export interface OverflowChangedMessage extends BaseWebviewMessage {
+    command: 'overflow-changed';
+    data?: {
+        isOverflowing?: boolean;
+    };
+}
+
+/**
  * Discriminated union of all webview message types
  *
  * Usage in panels:
@@ -586,7 +610,9 @@ export type WebviewMessage =
     | SelectEntityMessage
     | SelectChoiceMessage
     | CloseDetailsMessage
-    | TraceSelectedMessage;
+    | TraceSelectedMessage
+    | DropdownItemClickedMessage
+    | OverflowChangedMessage;
 
 /**
  * Type guard for environment-changed messages

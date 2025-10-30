@@ -313,11 +313,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
             switch (action) {
                 // 'component-event' is now handled by BasePanel.handleCommonMessages()
-
-                case 'dropdown-item-clicked':
-                    this.componentLogger.info('🎯 Handling dropdown-item-clicked');
-                    await this.handleDropdownItemClicked(message);
-                    break;
+                // 'dropdown-item-clicked' is now handled by BasePanel.handleCommonMessages()
 
                 case 'load-environments':
                     await this.handleLoadEnvironments();
@@ -459,32 +455,15 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
     }
 
-    private async handleDropdownItemClicked(message: WebviewMessage): Promise<void> {
-        try {
-            // Custom message type - extract data
-            const messageData = hasDataProperty(message) && typeof message.data === 'object' && message.data !== null
-                ? message.data as { componentId?: string; actionId?: string; itemId?: string }
-                : undefined;
-            const componentId = messageData?.componentId;
-            const actionId = messageData?.actionId;
-            const itemId = messageData?.itemId;
-
-            this.componentLogger.info('🔽 DROPDOWN ITEM CLICKED', {
-                componentId,
-                actionId,
-                itemId,
-                fullMessage: message,
-                messageData
-            });
-
-            if (componentId === 'pluginTrace-actionBar') {
-                this.componentLogger.info('✅ Calling handleActionBarClick', { actionId, itemId });
-                await this.handleActionBarClick(actionId ?? '', itemId);
-            } else {
-                this.componentLogger.warn('⚠️ Unhandled dropdown from component', { componentId });
-            }
-        } catch (error: unknown) {
-            this.componentLogger.error('❌ Error handling dropdown item click', error as Error);
+    /**
+     * Handle panel-specific action bar actions
+     * Routes to handleActionBarClick for processing
+     */
+    protected async handlePanelAction(componentId: string, actionId: string, itemId?: string): Promise<void> {
+        if (componentId === 'pluginTrace-actionBar') {
+            await this.handleActionBarClick(actionId, itemId);
+        } else {
+            this.componentLogger.warn('⚠️ Unhandled action from component', { componentId, actionId, itemId });
         }
     }
 
