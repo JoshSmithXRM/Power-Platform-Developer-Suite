@@ -8,8 +8,8 @@
 
 If you're new to this codebase or implementing a new feature:
 
-1. **Read [ARCHITECTURE.md](./ARCHITECTURE.md)** - Understand the big picture
-2. **Read [LAYER_RESPONSIBILITIES.md](./LAYER_RESPONSIBILITIES.md)** - Know what goes where
+1. **Read [ARCHITECTURE_GUIDE.md](./ARCHITECTURE_GUIDE.md)** - Understand the big picture
+2. **Read [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md)** - Know what goes where
 3. **Read [QUICK_REFERENCE.md](./QUICK_REFERENCE.md)** - Checklists and common patterns
 4. **Start building** - Follow the step-by-step guide in Quick Reference
 
@@ -21,10 +21,10 @@ If you're new to this codebase or implementing a new feature:
 
 | Document | Purpose | When to Read |
 |----------|---------|--------------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Architecture overview, principles, layer definitions | **Start here** - Understand the foundation |
-| [LAYER_RESPONSIBILITIES.md](./LAYER_RESPONSIBILITIES.md) | Detailed rules for each layer with examples | When deciding where code belongs |
-| [EXECUTION_PIPELINE.md](./EXECUTION_PIPELINE.md) | How requests flow through layers with real examples | When understanding how features work |
-| [DIRECTORY_STRUCTURE.md](./DIRECTORY_STRUCTURE.md) | File organization and naming conventions | When creating new files |
+| [ARCHITECTURE_GUIDE.md](./ARCHITECTURE_GUIDE.md) | Architecture overview, principles, layer definitions | **Start here** - Understand the foundation |
+| [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md) | Detailed rules for each layer with examples | When deciding where code belongs |
+| [EXECUTION_PIPELINE_GUIDE.md](./EXECUTION_PIPELINE_GUIDE.md) | How requests flow through layers with real examples | When understanding how features work |
+| [DIRECTORY_STRUCTURE_GUIDE.md](./DIRECTORY_STRUCTURE_GUIDE.md) | File organization and naming conventions | When creating new files |
 | [COMMUNICATION_PATTERNS.md](./COMMUNICATION_PATTERNS.md) | Extension Host ↔ Webview communication | When working with panels/components |
 | [LOGGING_GUIDE.md](./LOGGING_GUIDE.md) | Logging standards and best practices | When adding logging to code |
 | [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) | Cheat sheet, checklists, common mistakes | **Reference frequently** |
@@ -41,16 +41,16 @@ If you're new to this codebase or implementing a new feature:
 3. Use checklists before committing
 
 #### Understand How Panels Work
-1. Read [ARCHITECTURE.md § Communication Patterns](./ARCHITECTURE.md#communication-patterns)
+1. Read [ARCHITECTURE_GUIDE.md § Communication Patterns](./ARCHITECTURE_GUIDE.md#communication-patterns)
 2. Read [COMMUNICATION_PATTERNS.md](./COMMUNICATION_PATTERNS.md)
-3. Look at [EXECUTION_PIPELINE.md § Example 1](./EXECUTION_PIPELINE.md#example-1-loading-import-jobs)
+3. Look at [EXECUTION_PIPELINE_GUIDE.md § Example 1](./EXECUTION_PIPELINE_GUIDE.md#example-1-loading-import-jobs)
 
 #### Know Where to Put Code
-1. Read [LAYER_RESPONSIBILITIES.md](./LAYER_RESPONSIBILITIES.md)
+1. Read [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md)
 2. Use the [Quick Reference § Where Does This Go?](./QUICK_REFERENCE.md#where-does-this-go) table
 
 #### Fix Legacy Code
-1. Understand [ARCHITECTURE.md § Layers Defined](./ARCHITECTURE.md#layers-defined)
+1. Understand [ARCHITECTURE_GUIDE.md § Layers Defined](./ARCHITECTURE_GUIDE.md#layers-defined)
 2. Identify violations in [QUICK_REFERENCE.md § Common Mistakes](./QUICK_REFERENCE.md#-common-mistakes)
 3. Refactor one layer at a time (see Migration Strategy)
 
@@ -116,7 +116,7 @@ Panel updates component (Presentation Layer)
 Webview updates UI (Behavior)
 ```
 
-See [EXECUTION_PIPELINE.md](./EXECUTION_PIPELINE.md) for detailed examples.
+See [EXECUTION_PIPELINE_GUIDE.md](./EXECUTION_PIPELINE_GUIDE.md) for detailed examples.
 
 ---
 
@@ -164,7 +164,7 @@ const viewModel = this.mapper.toViewModel(entity);
 this.component.setData(viewModel);
 ```
 
-See [ARCHITECTURE.md § Core Principles](./ARCHITECTURE.md#core-principles) for more.
+See [ARCHITECTURE_GUIDE.md § Core Principles](./ARCHITECTURE_GUIDE.md#core-principles) for more.
 
 ---
 
@@ -181,7 +181,7 @@ src/
 └── shared/            # Utilities and helpers
 ```
 
-See [DIRECTORY_STRUCTURE.md](./DIRECTORY_STRUCTURE.md) for complete structure.
+See [DIRECTORY_STRUCTURE_GUIDE.md](./DIRECTORY_STRUCTURE_GUIDE.md) for complete structure.
 
 ---
 
@@ -271,7 +271,7 @@ Key mappings:
 | Controller | Panel |
 | SignalR Hub | postMessage handler |
 
-See [ARCHITECTURE.md § For C# Developers](./ARCHITECTURE.md#for-c-developers).
+See [ARCHITECTURE_GUIDE.md § For C# Developers](./ARCHITECTURE_GUIDE.md#for-c-developers).
 
 ---
 
@@ -287,16 +287,16 @@ Migrating legacy code:
 6. **Test and commit**
 7. **Repeat for next feature**
 
-See [DIRECTORY_STRUCTURE.md § Migration Strategy](./DIRECTORY_STRUCTURE.md#migration-strategy).
+See [DIRECTORY_STRUCTURE_GUIDE.md § Migration Strategy](./DIRECTORY_STRUCTURE_GUIDE.md#migration-strategy).
 
 ---
 
 ## 🎓 Learning Path
 
 ### Week 1: Understand Architecture
-- [ ] Read ARCHITECTURE.md
-- [ ] Read LAYER_RESPONSIBILITIES.md
-- [ ] Study EXECUTION_PIPELINE.md examples
+- [ ] Read ARCHITECTURE_GUIDE.md
+- [ ] Read LAYER_RESPONSIBILITIES_GUIDE.md
+- [ ] Study EXECUTION_PIPELINE_GUIDE.md examples
 
 ### Week 2: Implement Simple Feature
 - [ ] Choose a small feature to refactor
@@ -376,10 +376,9 @@ This architecture aims to:
 
 ---
 
-## 📅 Last Updated
+## 🚀 Status
 
-**Date:** 2025-01-30
-**Status:** Initial architecture documentation complete
+Initial architecture documentation complete.
 
 **Next Steps:**
 1. Create `adr/` folder for Architectural Decision Records

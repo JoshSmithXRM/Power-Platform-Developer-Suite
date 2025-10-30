@@ -1,6 +1,5 @@
 # Architecture Documentation
 
-> **Last Updated:** 2025-01-30
 > **Status:** Living Document - Update as architecture evolves
 
 ## Overview
@@ -35,7 +34,7 @@ If you're coming from C#, here's the mental model:
 
 ### 2. Dependency Rule
 Dependencies point **inward**:
-```
+```text
 Infrastructure ──→ Application ──→ Domain
 Presentation ──→ Application ──→ Domain
 ```
@@ -406,9 +405,9 @@ Based on C# experience and VS Code constraints:
 
 ## Next Steps
 
-- Read [LAYER_RESPONSIBILITIES.md](./LAYER_RESPONSIBILITIES.md) for detailed rules
-- Read [EXECUTION_PIPELINE.md](./EXECUTION_PIPELINE.md) for request flow examples
-- Read [DIRECTORY_STRUCTURE.md](./DIRECTORY_STRUCTURE.md) for file organization
+- Read [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md) for detailed rules
+- Read [EXECUTION_PIPELINE_GUIDE.md](./EXECUTION_PIPELINE_GUIDE.md) for request flow examples
+- Read [DIRECTORY_STRUCTURE_GUIDE.md](./DIRECTORY_STRUCTURE_GUIDE.md) for file organization
 - Read [COMMUNICATION_PATTERNS.md](./COMMUNICATION_PATTERNS.md) for webview details
 
 ---

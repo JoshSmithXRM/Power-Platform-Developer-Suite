@@ -209,10 +209,10 @@ resources/
                 └── EnvironmentSelectorBehavior.js
 
 docs/                                        # Documentation
-├── ARCHITECTURE.md
-├── LAYER_RESPONSIBILITIES.md
-├── EXECUTION_PIPELINE.md
-├── DIRECTORY_STRUCTURE.md
+├── ARCHITECTURE_GUIDE.md
+├── LAYER_RESPONSIBILITIES_GUIDE.md
+├── EXECUTION_PIPELINE_GUIDE.md
+├── DIRECTORY_STRUCTURE_GUIDE.md
 ├── COMMUNICATION_PATTERNS.md
 └── adr/                                     # Architectural Decision Records
     ├── 001-feature-first-structure.md

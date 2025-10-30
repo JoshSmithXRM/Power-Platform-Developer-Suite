@@ -4,10 +4,10 @@
 
 ## 📚 Documentation Index
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - Architecture overview and principles
-- [LAYER_RESPONSIBILITIES.md](./LAYER_RESPONSIBILITIES.md) - What goes in each layer
-- [EXECUTION_PIPELINE.md](./EXECUTION_PIPELINE.md) - How requests flow through layers
-- [DIRECTORY_STRUCTURE.md](./DIRECTORY_STRUCTURE.md) - File organization
+- [ARCHITECTURE_GUIDE.md](./ARCHITECTURE_GUIDE.md) - Architecture overview and principles
+- [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md) - What goes in each layer
+- [EXECUTION_PIPELINE_GUIDE.md](./EXECUTION_PIPELINE_GUIDE.md) - How requests flow through layers
+- [DIRECTORY_STRUCTURE_GUIDE.md](./DIRECTORY_STRUCTURE_GUIDE.md) - File organization
 - [COMMUNICATION_PATTERNS.md](./COMMUNICATION_PATTERNS.md) - Webview ↔ Extension Host
 - [LOGGING_GUIDE.md](./LOGGING_GUIDE.md) - Logging standards
 - **This file** - Quick reference and checklists
