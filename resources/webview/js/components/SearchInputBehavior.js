@@ -166,7 +166,7 @@ class SearchInputBehavior extends BaseBehavior {
      * Handle custom actions beyond componentUpdate
      */
     static handleCustomAction(instance, message) {
-        switch (message.action) {
+        switch (message.command) {
             case 'clear':
                 if (instance.searchInput) {
                     instance.searchInput.value = '';
@@ -193,7 +193,7 @@ class SearchInputBehavior extends BaseBehavior {
                 break;
 
             default:
-                console.warn(`SearchInputBehavior: Unhandled action '${message.action}'`);
+                console.warn(`SearchInputBehavior: Unhandled action '${message.command}'`);
                 break;
         }
     }

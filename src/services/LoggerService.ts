@@ -134,11 +134,9 @@ export class LoggerService {
                 sanitized[key] = '[REDACTED]';
             } else if (typeof value === 'object' && value !== null) {
                 // Recursively sanitize nested objects
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                sanitized[key] = this.sanitizeMetadata(value as Record<string, any>);
+                sanitized[key] = this.sanitizeMetadata(value as Record<string, unknown>);
             } else {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                sanitized[key] = value as any;
+                sanitized[key] = value as unknown;
             }
         }
 

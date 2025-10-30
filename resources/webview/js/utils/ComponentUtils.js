@@ -422,7 +422,7 @@ class ComponentUtils {
         try {
             const message = event.data;
 
-            if (!message || !message.action) {
+            if (!message || !message.command) {
                 return;
             }
 
@@ -458,24 +458,24 @@ class ComponentUtils {
             }
 
             // Fourth priority: Route to specific behavior static handlers
-            if (message.action === 'component-update' ||
-                message.action === 'component-state-change' ||
-                message.action === 'setQuickFilters' ||
-                message.action === 'setAdvancedFilters' ||
-                message.action === 'clearFilters') {
+            if (message.command === 'component-update' ||
+                message.command === 'component-state-change' ||
+                message.command === 'setQuickFilters' ||
+                message.command === 'setAdvancedFilters' ||
+                message.command === 'clearFilters') {
                 this.routeToComponentBehavior(message);
                 return;
             }
 
             // Fifth priority: Try global action handlers
-            const handler = this.messageHandlers.get(message.action);
+            const handler = this.messageHandlers.get(message.command);
             if (handler) {
                 handler(message);
             } else {
                 // Only warn about truly unexpected actions (not informational messages)
                 const informationalActions = ['traceLevelLoaded', 'tracesLoaded', 'jobsLoaded', 'exportTraces', 'show-node-details'];
-                if (!informationalActions.includes(message.action)) {
-                    console.warn(`No handler found for action: ${message.action}`);
+                if (!informationalActions.includes(message.command)) {
+                    console.warn(`No handler found for action: ${message.command}`);
                 }
             }
         } catch (error) {
@@ -508,7 +508,7 @@ class ComponentUtils {
         const behaviorClass = this.registeredBehaviors.get(componentType);
 
         if (behaviorClass && behaviorClass.handleMessage) {
-            console.log(`ComponentUtils: Routing ${message.action} to ${componentType} behavior`);
+            console.log(`ComponentUtils: Routing ${message.command} to ${componentType} behavior`);
             behaviorClass.handleMessage(message);
         } else if (componentType) {
             console.warn(`ComponentUtils: No behavior registered for component type '${componentType}'`);
@@ -585,7 +585,7 @@ class ComponentUtils {
         }
         
         // Only warn if this is an actionable message type
-        const action = message.action || message.command;
+        const action = message.command || message.command;
         const silentActions = ['component-state-change', 'component-update'];
         if (!silentActions.includes(action)) {
             console.warn(`Could not route message to component behavior: ${componentId}`, message);

@@ -271,7 +271,6 @@ export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceSta
             this.componentLogger.error('Error handling message', error as Error, { command: message.command });
             this.postMessage({
                 command: 'error',
-                action: 'error',
                 message: 'An error occurred while processing your request'
             });
         }
@@ -404,7 +403,7 @@ export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceSta
     private async handleLoadSolutions(environmentId: string): Promise<void> {
         if (!environmentId) {
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: 'Environment ID is required'
             });
             return;
@@ -448,7 +447,7 @@ export class SolutionExplorerPanel extends BasePanel<SolutionExplorerInstanceSta
             }
 
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: `Failed to load solutions: ${(error as Error).message}`
             });
         }

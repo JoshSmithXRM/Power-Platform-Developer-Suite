@@ -267,8 +267,8 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
                 case 'open-in-maker':
                     await this.handleOpenInMaker(
                         message.data.environmentId,
-                        message.data.solutionId,
-                        message.data.entityType
+                        message.data.solutionId ?? '',
+                        message.data.entityType ?? ''
                     );
                     break;
 
@@ -295,7 +295,6 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
             this.componentLogger.error('Error handling message', error as Error, { command: message.command });
             this.postMessage({
                 command: 'error',
-                action: 'error',
                 message: 'An error occurred while processing your request'
             });
         }
@@ -357,7 +356,7 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
             case 'syncDeploymentBtn': {
                 // Use original service data for deployment settings sync
                 if (!this.currentEnvironmentVariablesData) {
-                    this.postMessage({ action: 'error', message: 'No environment variables data available for sync' });
+                    this.postMessage({ command: 'error', message: 'No environment variables data available for sync' });
                     break;
                 }
                 const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
@@ -463,7 +462,7 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
 
     private async handleLoadSolutions(environmentId: string): Promise<void> {
         if (!environmentId) {
-            this.postMessage({ action: 'error', message: 'Environment id required' });
+            this.postMessage({ command: 'error', message: 'Environment id required' });
             return;
         }
 
@@ -487,20 +486,20 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
             }
 
             this.postMessage({
-                action: 'solutions-loaded',
+                command: 'solutions-loaded',
                 data: solutions,
                 selectedSolutionId: solutions.find(s => s.uniqueName === 'Default')?.solutionId
             });
         } catch (error) {
             this.componentLogger.error('Error loading solutions', error as Error, { environmentId });
-            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to load solutions' });
+            this.postMessage({ command: 'error', message: (error as Error).message || 'Failed to load solutions' });
         }
     }
 
     private async handleLoadEnvironmentVariables(environmentId: string, solutionId?: string): Promise<void> {
         if (!environmentId) {
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: 'Environment ID is required'
             });
             return;
@@ -560,7 +559,7 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
             }
 
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: `Failed to load environment variables: ${(error as Error).message}`
             });
         }
@@ -626,7 +625,7 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
 
             // Send success message back to UI
             this.postMessage({
-                action: 'deployment-settings-synced',
+                command: 'deployment-settings-synced',
                 data: {
                     filePath: result.filePath,
                     added: result.added,
@@ -637,13 +636,13 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
             });
         } catch (error) {
             this.componentLogger.error('Error syncing deployment settings', error as Error);
-            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to sync deployment settings' });
+            this.postMessage({ command: 'error', message: (error as Error).message || 'Failed to sync deployment settings' });
         }
     }
 
     private async handleOpenInMaker(environmentId: string, solutionId: string, entityType: string): Promise<void> {
         if (!environmentId || !solutionId) {
-            this.postMessage({ action: 'error', message: 'Environment and solution are required' });
+            this.postMessage({ command: 'error', message: 'Environment and solution are required' });
             return;
         }
 
@@ -652,7 +651,7 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
             const environment = environments.find(env => env.id === environmentId);
 
             if (!environment) {
-                this.postMessage({ action: 'error', message: 'Environment not found' });
+                this.postMessage({ command: 'error', message: 'Environment not found' });
                 return;
             }
 
@@ -667,7 +666,7 @@ export class EnvironmentVariablesPanel extends BasePanel<EnvironmentVariablesIns
 
         } catch (error) {
             this.componentLogger.error('Error opening in Maker', error as Error);
-            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to open in Maker' });
+            this.postMessage({ command: 'error', message: (error as Error).message || 'Failed to open in Maker' });
         }
     }
 

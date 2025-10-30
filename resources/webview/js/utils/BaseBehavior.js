@@ -191,7 +191,7 @@ class BaseBehavior {
         }
 
         // Route to specific action handlers
-        switch (message.action) {
+        switch (message.command) {
             case 'component-update':
                 // CRITICAL: Event bridge updates ALWAYS go through onComponentUpdate
                 if (message.data) {
@@ -215,7 +215,7 @@ class BaseBehavior {
      * Subclasses can override to handle component-specific actions
      */
     static handleCustomAction(instance, message) {
-        console.warn(`${this.name}: Unhandled action '${message.action}'`);
+        console.warn(`${this.name}: Unhandled action '${message.command}'`);
     }
 
     /**

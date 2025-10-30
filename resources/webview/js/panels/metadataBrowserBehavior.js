@@ -55,10 +55,10 @@ class MetadataBrowserBehavior {
         // Register panel handler with ComponentUtils for proper message routing
         if (window.ComponentUtils && window.ComponentUtils.registerPanelHandler) {
             window.ComponentUtils.registerPanelHandler('metadataBrowser', (message) => {
-                console.log('📨 MetadataBrowserBehavior message received:', message.action || message.command);
+                console.log('📨 MetadataBrowserBehavior message received:', message.command || message.command);
 
                 // Handle both action and command for backward compatibility
-                const actionType = message.action || message.command;
+                const actionType = message.command || message.command;
 
                 switch (actionType) {
                     case 'set-mode':

@@ -826,7 +826,6 @@ export class PluginRegistrationPanel extends BasePanel<PluginRegistrationInstanc
         // Send data to webview - webview behavior handles BOTH content AND visibility
         this.postMessage({
             command: 'show-node-details',
-            action: 'show-node-details',
             data: {
                 html: detailsHTML,
                 nodeType: node.type,

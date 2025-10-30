@@ -384,7 +384,7 @@ export class DataTableComponent extends BaseDataComponent<DataTableData> {
                 
                 // Use custom sort if provided
                 if (column.customSort) {
-                    const result = column.customSort(aVal as DataTableRow, bVal as DataTableRow);
+                    const result = column.customSort(a, b);
                     if (result !== 0) {
                         return sort.direction === 'asc' ? result : -result;
                     }

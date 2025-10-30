@@ -219,6 +219,303 @@ export interface LoadEnvironmentMessage extends BaseWebviewMessage {
 }
 
 /**
+ * Generic error message
+ */
+export interface ErrorMessage extends BaseWebviewMessage {
+    command: 'error';
+    message: string;
+}
+
+/**
+ * Component update message (event bridge)
+ */
+export interface ComponentUpdateMessage extends BaseWebviewMessage {
+    command: 'component-update';
+    componentId: string;
+    componentType?: string;
+    data: unknown;
+}
+
+/**
+ * Component state change message (event bridge)
+ */
+export interface ComponentStateChangeMessage extends BaseWebviewMessage {
+    command: 'component-state-change';
+    componentId: string;
+    state: unknown;
+}
+
+/**
+ * Deployment settings synced message
+ */
+export interface DeploymentSettingsSyncedMessage extends BaseWebviewMessage {
+    command: 'deployment-settings-synced';
+    data: {
+        filePath: string;
+        added: number;
+        removed: number;
+        updated: number;
+        isNewFile: boolean;
+    };
+}
+
+/**
+ * Environments loaded message
+ */
+export interface EnvironmentsLoadedMessage extends BaseWebviewMessage {
+    command: 'environments-loaded';
+    data: unknown;
+    selectedEnvironmentId?: string;
+}
+
+/**
+ * Solutions loaded message
+ */
+export interface SolutionsLoadedMessage extends BaseWebviewMessage {
+    command: 'solutions-loaded';
+    data: unknown;
+    selectedSolutionId?: string;
+}
+
+/**
+ * Set split ratio message (UI state)
+ */
+export interface SetSplitRatioMessage extends BaseWebviewMessage {
+    command: 'set-split-ratio';
+    componentId: string;
+    ratio: number;
+}
+
+/**
+ * Show right panel message (UI state)
+ */
+export interface ShowRightPanelMessage extends BaseWebviewMessage {
+    command: 'show-right-panel';
+    componentId: string;
+}
+
+/**
+ * Set quick filters message
+ */
+export interface SetQuickFiltersMessage extends BaseWebviewMessage {
+    command: 'set-quick-filters';
+    componentId?: string;
+    componentType?: string;
+    filterIds?: unknown[];
+    filters?: unknown;
+}
+
+/**
+ * Set advanced filters message
+ */
+export interface SetAdvancedFiltersMessage extends BaseWebviewMessage {
+    command: 'set-advanced-filters';
+    componentId?: string;
+    componentType?: string;
+    conditions?: unknown[];
+    filters?: unknown;
+}
+
+/**
+ * Close detail panel message
+ */
+export interface CloseDetailPanelMessage extends BaseWebviewMessage {
+    command: 'close-detail-panel';
+}
+
+/**
+ * Close details message
+ */
+export interface CloseDetailsMessage extends BaseWebviewMessage {
+    command: 'close-details';
+}
+
+/**
+ * Traces loaded message
+ */
+export interface TracesLoadedMessage extends BaseWebviewMessage {
+    command: 'traces-loaded';
+    data?: unknown;
+    count?: number;
+}
+
+/**
+ * Trace level loaded message
+ */
+export interface TraceLevelLoadedMessage extends BaseWebviewMessage {
+    command: 'trace-level-loaded';
+    data?: unknown;
+    level?: unknown;
+    displayName?: string;
+}
+
+/**
+ * Trace level updated message
+ */
+export interface TraceLevelUpdatedMessage extends BaseWebviewMessage {
+    command: 'trace-level-updated';
+    data?: unknown;
+    level?: unknown;
+    message?: string;
+}
+
+/**
+ * Show trace details message
+ */
+export interface ShowTraceDetailsMessage extends BaseWebviewMessage {
+    command: 'show-trace-details';
+    trace: unknown;
+    relatedTraces?: unknown;
+}
+
+/**
+ * Filters updated message
+ */
+export interface FiltersUpdatedMessage extends BaseWebviewMessage {
+    command: 'filters-updated';
+    filters: unknown;
+}
+
+/**
+ * Switch to timeline tab message
+ */
+export interface SwitchToTimelineTabMessage extends BaseWebviewMessage {
+    command: 'switch-to-timeline-tab';
+}
+
+/**
+ * Environment loaded message
+ */
+export interface EnvironmentLoadedMessage extends BaseWebviewMessage {
+    command: 'environment-loaded';
+    data: unknown;
+}
+
+/**
+ * Environment saved message
+ */
+export interface EnvironmentSavedMessage extends BaseWebviewMessage {
+    command: 'environment-saved';
+    data: unknown;
+}
+
+/**
+ * Test connection result message
+ */
+export interface TestConnectionResultMessage extends BaseWebviewMessage {
+    command: 'test-connection-result';
+    success?: boolean;
+    message?: string;
+    data?: {
+        success: boolean;
+        error?: string;
+    };
+}
+
+/**
+ * Tree loading message
+ */
+export interface TreeLoadingMessage extends BaseWebviewMessage {
+    command: 'tree-loading';
+    loading: boolean;
+}
+
+/**
+ * Populate tree message
+ */
+export interface PopulateTreeMessage extends BaseWebviewMessage {
+    command: 'populate-tree';
+    data: unknown;
+}
+
+/**
+ * Set mode message
+ */
+export interface SetModeMessage extends BaseWebviewMessage {
+    command: 'set-mode';
+    mode: string;
+}
+
+/**
+ * Show detail message
+ */
+export interface ShowDetailMessage extends BaseWebviewMessage {
+    command: 'show-detail';
+    data: unknown;
+}
+
+/**
+ * Update selection message
+ */
+export interface UpdateSelectionMessage extends BaseWebviewMessage {
+    command: 'update-selection';
+    selection?: unknown;
+    data?: unknown;
+}
+
+/**
+ * Show node details message
+ */
+export interface ShowNodeDetailsMessage extends BaseWebviewMessage {
+    command: 'show-node-details';
+    node?: unknown;
+    data?: unknown;
+}
+
+/**
+ * Open solution in Maker message
+ */
+export interface OpenSolutionInMakerMessage extends BaseWebviewMessage {
+    command: 'open-solution-in-maker';
+}
+
+/**
+ * Open solution in Classic message
+ */
+export interface OpenSolutionInClassicMessage extends BaseWebviewMessage {
+    command: 'open-solution-in-classic';
+}
+
+/**
+ * Browse tables message
+ */
+export interface BrowseTablesMessage extends BaseWebviewMessage {
+    command: 'browse-tables';
+}
+
+/**
+ * Toggle section message
+ */
+export interface ToggleSectionMessage extends BaseWebviewMessage {
+    command: 'toggle-section';
+    sectionId?: string;
+}
+
+/**
+ * Select entity message
+ */
+export interface SelectEntityMessage extends BaseWebviewMessage {
+    command: 'select-entity';
+    data?: unknown;
+}
+
+/**
+ * Select choice message
+ */
+export interface SelectChoiceMessage extends BaseWebviewMessage {
+    command: 'select-choice';
+    data?: unknown;
+}
+
+/**
+ * Trace selected message
+ */
+export interface TraceSelectedMessage extends BaseWebviewMessage {
+    command: 'trace-selected';
+    traceId: string;
+}
+
+/**
  * Discriminated union of all webview message types
  *
  * Usage in panels:
@@ -255,7 +552,41 @@ export type WebviewMessage =
     | TestConnectionMessage
     | DeleteEnvironmentMessage
     | NewEnvironmentMessage
-    | LoadEnvironmentMessage;
+    | LoadEnvironmentMessage
+    | ErrorMessage
+    | ComponentUpdateMessage
+    | ComponentStateChangeMessage
+    | DeploymentSettingsSyncedMessage
+    | EnvironmentsLoadedMessage
+    | SolutionsLoadedMessage
+    | SetSplitRatioMessage
+    | ShowRightPanelMessage
+    | SetQuickFiltersMessage
+    | SetAdvancedFiltersMessage
+    | CloseDetailPanelMessage
+    | TracesLoadedMessage
+    | TraceLevelLoadedMessage
+    | TraceLevelUpdatedMessage
+    | ShowTraceDetailsMessage
+    | FiltersUpdatedMessage
+    | SwitchToTimelineTabMessage
+    | EnvironmentLoadedMessage
+    | EnvironmentSavedMessage
+    | TestConnectionResultMessage
+    | TreeLoadingMessage
+    | PopulateTreeMessage
+    | SetModeMessage
+    | ShowDetailMessage
+    | UpdateSelectionMessage
+    | ShowNodeDetailsMessage
+    | OpenSolutionInMakerMessage
+    | OpenSolutionInClassicMessage
+    | BrowseTablesMessage
+    | ToggleSectionMessage
+    | SelectEntityMessage
+    | SelectChoiceMessage
+    | CloseDetailsMessage
+    | TraceSelectedMessage;
 
 /**
  * Type guard for environment-changed messages
@@ -276,4 +607,12 @@ export function isComponentEventMessage(message: WebviewMessage): message is Com
  */
 export function isSyncDeploymentSettingsMessage(message: WebviewMessage): message is SyncDeploymentSettingsMessage {
     return message.command === 'sync-deployment-settings';
+}
+
+/**
+ * Type guard to check if message has a data property
+ * Use this when you need to check for data existence before accessing it
+ */
+export function hasDataProperty(message: WebviewMessage): message is WebviewMessage & { data: unknown } {
+    return 'data' in message;
 }

@@ -106,7 +106,7 @@ class TreeViewBehavior extends BaseBehavior {
      * Handle custom actions beyond componentUpdate
      */
     static handleCustomAction(instance, message) {
-        switch (message.action) {
+        switch (message.command) {
             case 'set-nodes':
                 // Tree will be re-rendered by Extension Host
                 // Just clear selection
@@ -173,7 +173,7 @@ class TreeViewBehavior extends BaseBehavior {
                 break;
 
             default:
-                console.warn(`TreeViewBehavior: Unhandled action '${message.action}'`);
+                console.warn(`TreeViewBehavior: Unhandled action '${message.command}'`);
                 break;
         }
     }

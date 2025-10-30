@@ -215,7 +215,7 @@ class FilterPanelBehavior extends BaseBehavior {
      * Handle custom actions beyond componentUpdate
      */
     static handleCustomAction(instance, message) {
-        switch (message.action) {
+        switch (message.command) {
             case 'component-state-change':
                 console.log('FilterPanelBehavior: component-state-change received', message.state);
                 // This is the old action - delegate to onComponentUpdate
@@ -264,7 +264,7 @@ class FilterPanelBehavior extends BaseBehavior {
                 break;
 
             default:
-                console.warn(`FilterPanelBehavior: Unhandled action '${message.action}'`);
+                console.warn(`FilterPanelBehavior: Unhandled action '${message.command}'`);
                 break;
         }
     }

@@ -333,20 +333,36 @@ export class ConnectionReferencesService {
             if (!clientData) return Array.from(names);
 
             try {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const parsed = typeof clientData === 'string' ? JSON.parse(clientData) as any : clientData as any;
+                const parsed = typeof clientData === 'string' ? JSON.parse(clientData) as unknown : clientData;
 
-                // Look for connectionReferences in properties
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const connRefs = parsed?.properties?.connectionReferences as any;
+                // Type guard for parsed structure
+                if (!parsed || typeof parsed !== 'object') {
+                    return Array.from(names);
+                }
+
+                const parsedObj = parsed as Record<string, unknown>;
+                const properties = parsedObj.properties;
+
+                if (!properties || typeof properties !== 'object') {
+                    return Array.from(names);
+                }
+
+                const propertiesObj = properties as Record<string, unknown>;
+                const connRefs = propertiesObj.connectionReferences;
+
                 if (connRefs && typeof connRefs === 'object') {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    Object.keys(connRefs).forEach((key: any) => {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const connRef = connRefs[key] as any;
-                        const logicalName = connRef?.connection?.connectionReferenceLogicalName as string | undefined;
-                        if (logicalName) {
-                            names.add(logicalName);
+                    const connRefsObj = connRefs as Record<string, unknown>;
+                    Object.values(connRefsObj).forEach((connRef) => {
+                        if (connRef && typeof connRef === 'object') {
+                            const connRefObj = connRef as Record<string, unknown>;
+                            const connection = connRefObj.connection;
+                            if (connection && typeof connection === 'object') {
+                                const connectionObj = connection as Record<string, unknown>;
+                                const logicalName = connectionObj.connectionReferenceLogicalName;
+                                if (typeof logicalName === 'string') {
+                                    names.add(logicalName);
+                                }
+                            }
                         }
                     });
                 }

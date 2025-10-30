@@ -282,7 +282,6 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
             this.componentLogger.error('Error handling message', error as Error, { command: message.command });
             this.postMessage({
                 command: 'error',
-                action: 'error',
                 message: 'An error occurred while processing your request'
             });
         }
@@ -411,7 +410,7 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
     private async handleLoadImportJobs(environmentId: string): Promise<void> {
         if (!environmentId) {
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: 'Environment ID is required'
             });
             return;
@@ -455,7 +454,7 @@ export class ImportJobViewerPanel extends BasePanel<ImportJobInstanceState, Impo
             }
 
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: `Failed to load import jobs: ${(error as Error).message}`
             });
         }

@@ -1571,7 +1571,7 @@ class DataTableBehavior extends BaseBehavior {
     static handleCustomMessage(instance, message) {
         console.log(`DataTableBehavior: handleCustomMessage for ${instance.tableId}:`, message);
 
-        if (!message || !message.action) {
+        if (!message || !message.command) {
             console.warn('DataTableBehavior: Invalid message format', message);
             return;
         }

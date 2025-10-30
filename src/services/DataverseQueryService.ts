@@ -1,3 +1,5 @@
+import { parseODataResponse } from '../utils/ODataValidator';
+
 import { AuthenticationService } from './AuthenticationService';
 import { DataverseMetadataService } from './DataverseMetadataService';
 import { ServiceFactory } from './ServiceFactory';
@@ -91,8 +93,7 @@ export interface EntityView {
 export interface QueryFilter {
     field: string;
     operator: FilterOperator;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    value: any; // Filter values can be any type (string, number, boolean, array, etc.) - any is appropriate here
+    value: string | number | boolean | string[] | number[] | Date;
     logicalOperator?: 'and' | 'or';
 }
 
@@ -122,8 +123,7 @@ export interface QueryOptions {
 }
 
 export interface QueryResult {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    value: any[]; // Dataverse query results can be any entity type - any is appropriate here
+    value: Record<string, unknown>[];
     count?: number;
     nextLink?: string;
     hasMore: boolean;
@@ -176,11 +176,9 @@ export class DataverseQueryService {
             throw new Error(`Failed to fetch entities: ${response.statusText}`);
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = await response.json() as any;
+        const data = parseODataResponse<DataverseEntityMetadataResponse>(await response.json());
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return data.value.map((entity: any) => ({
+        return data.value.map((entity) => ({
             id: entity.MetadataId,
             logicalName: entity.LogicalName,
             displayName: entity.DisplayName?.UserLocalizedLabel?.Label || entity.LogicalName,
@@ -224,14 +222,12 @@ export class DataverseQueryService {
             return [];
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = await response.json() as any;
+        const data = parseODataResponse<DataverseViewResponse>(await response.json());
 
         // Log raw view data for debugging
         this.logger.debug('Raw views data from API', { count: data.value?.length || 0 });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const views = data.value.map((view: any) => {
+        const views = data.value.map((view) => {
             const mappedView = {
                 id: view.savedqueryid,
                 name: view.name,
@@ -286,19 +282,17 @@ export class DataverseQueryService {
             throw new Error(`Failed to fetch entity fields: ${response.statusText}`);
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = await response.json() as any;
+        const data = parseODataResponse<DataverseFieldMetadataResponse>(await response.json());
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return data.value.map((field: any) => ({
+        return data.value.map((field) => ({
             logicalName: field.LogicalName,
             displayName: field.DisplayName?.UserLocalizedLabel?.Label || field.LogicalName,
             schemaName: field.SchemaName,
             attributeType: field.AttributeType,
             isRequired: field.RequiredLevel?.Value === 'ApplicationRequired' || field.RequiredLevel?.Value === 'SystemRequired',
-            isSearchable: field.IsValidForAdvancedFind,
-            isPrimaryId: field.IsPrimaryId,
-            isPrimaryName: field.IsPrimaryName
+            isSearchable: field.IsValidForAdvancedFind ?? false,
+            isPrimaryId: field.IsPrimaryId ?? false,
+            isPrimaryName: field.IsPrimaryName ?? false
         }));
     }
 
@@ -364,14 +358,13 @@ export class DataverseQueryService {
             throw new Error(`FetchXML query failed: ${response.statusText}`);
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = await response.json() as any;
+        // FetchXML responses return unknown entity types, use Record<string, unknown>
+        const data = parseODataResponse<Record<string, unknown>>(await response.json());
 
         const result: QueryResult = {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            value: data.value || [] as any[],
-            count: data['@odata.count'] as number | undefined,
-            nextLink: data['@odata.nextLink'] as string | undefined,
+            value: data.value || [],
+            count: data['@odata.count'],
+            nextLink: data['@odata.nextLink'],
             hasMore: !!data['@odata.nextLink']
         };
 
@@ -481,15 +474,14 @@ export class DataverseQueryService {
         }
 
         this.logger.debug('Parsing response JSON');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = await response.json() as any;
+        // OData query results return unknown entity types, use Record<string, unknown>
+        const data = parseODataResponse<Record<string, unknown>>(await response.json());
         this.logger.debug('Response parsed', { recordCount: data.value?.length || 0 });
 
         const result = {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            value: data.value as any[],
-            count: data['@odata.count'] as number | undefined,
-            nextLink: data['@odata.nextLink'] as string | undefined,
+            value: data.value,
+            count: data['@odata.count'],
+            nextLink: data['@odata.nextLink'],
             hasMore: !!data['@odata.nextLink']
         };
         
@@ -537,14 +529,13 @@ export class DataverseQueryService {
             throw new Error(`Failed to query next page: ${response.statusText}`);
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = await response.json() as any;
+        // Next page returns same unknown entity types
+        const data = parseODataResponse<Record<string, unknown>>(await response.json());
 
         return {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            value: data.value as any[],
-            count: data['@odata.count'] as number | undefined,
-            nextLink: data['@odata.nextLink'] as string | undefined,
+            value: data.value,
+            count: data['@odata.count'],
+            nextLink: data['@odata.nextLink'],
             hasMore: !!data['@odata.nextLink']
         };
     }
@@ -739,8 +730,7 @@ export class DataverseQueryService {
     /**
      * Get current user information
      */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private async getCurrentUser(environmentId: string): Promise<any> { // Returns WhoAmI API response with dynamic structure - any is appropriate here
+    private async getCurrentUser(environmentId: string): Promise<{ UserId: string; BusinessUnitId: string; OrganizationId: string }> {
         const token = await this.authService.getAccessToken(environmentId);
         const environment = await this.authService.getEnvironment(environmentId);
         if (!environment) {
@@ -778,7 +768,26 @@ export class DataverseQueryService {
             throw new Error(`Failed to get current user: ${response.statusText}`);
         }
 
-        return await response.json();
+        const data: unknown = await response.json();
+
+        // Validate WhoAmI response structure
+        if (!data || typeof data !== 'object') {
+            throw new Error('Invalid WhoAmI response structure');
+        }
+
+        const whoAmI = data as Record<string, unknown>;
+
+        if (typeof whoAmI.UserId !== 'string' ||
+            typeof whoAmI.BusinessUnitId !== 'string' ||
+            typeof whoAmI.OrganizationId !== 'string') {
+            throw new Error('WhoAmI response missing required fields');
+        }
+
+        return {
+            UserId: whoAmI.UserId,
+            BusinessUnitId: whoAmI.BusinessUnitId,
+            OrganizationId: whoAmI.OrganizationId
+        };
     }
 
     /**

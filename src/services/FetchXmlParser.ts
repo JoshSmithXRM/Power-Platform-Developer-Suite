@@ -358,6 +358,11 @@ export class FetchXmlParser {
                 return null;
         }
 
+        // Return null if filterValue is null (QueryFilter.value doesn't allow null)
+        if (filterValue === null) {
+            return null;
+        }
+
         return {
             field: attribute,
             operator: filterOp,

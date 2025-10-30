@@ -90,7 +90,7 @@ class TemplatePanelBehavior extends BaseBehavior {
      * @param {Object} message - Message from Extension Host
      */
     static handleCustomAction(instance, message) {
-        switch (message.action) {
+        switch (message.command) {
             case 'show-details':
                 this.showDetails(instance, message.data);
                 break;

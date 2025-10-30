@@ -193,7 +193,7 @@ class ActionBarBehavior extends BaseBehavior {
      * Handle custom actions beyond componentUpdate
      */
     static handleCustomAction(instance, message) {
-        switch (message.action) {
+        switch (message.command) {
             case 'actions-updated':
                 this.updateActions(instance.id, message.data.actions);
                 break;
@@ -211,7 +211,7 @@ class ActionBarBehavior extends BaseBehavior {
                 break;
 
             default:
-                console.warn(`ActionBarBehavior: Unknown message action: ${message.action}`);
+                console.warn(`ActionBarBehavior: Unknown message action: ${message.command}`);
         }
     }
 

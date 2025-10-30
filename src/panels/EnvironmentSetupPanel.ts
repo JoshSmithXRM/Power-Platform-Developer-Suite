@@ -153,7 +153,6 @@ export class EnvironmentSetupPanel extends BasePanel {
             this.componentLogger.error('Error handling message', error as Error, { command: message.command });
             this.postMessage({
                 command: 'error',
-                action: 'error',
                 message: 'An error occurred while processing your request'
             });
         }
@@ -193,7 +192,7 @@ export class EnvironmentSetupPanel extends BasePanel {
 
         // Send message to webview to clear form
         this.postMessage({
-            action: 'environment-loaded',
+            command: 'environment-loaded',
             data: null
         });
     }
@@ -239,7 +238,7 @@ export class EnvironmentSetupPanel extends BasePanel {
 
         // Send environment data to webview
         this.postMessage({
-            action: 'environment-loaded',
+            command: 'environment-loaded',
             data: environment
         });
     }
@@ -295,7 +294,7 @@ export class EnvironmentSetupPanel extends BasePanel {
             this.isEditMode = true;
 
             this.postMessage({
-                action: 'environment-saved',
+                command: 'environment-saved',
                 data: environment
             });
 
@@ -367,7 +366,7 @@ export class EnvironmentSetupPanel extends BasePanel {
 
                         vscode.window.showInformationMessage('Connection test successful!');
                         this.postMessage({
-                            action: 'test-connection-result',
+                            command: 'test-connection-result',
                             data: { success: true }
                         });
                     } finally {
@@ -377,7 +376,7 @@ export class EnvironmentSetupPanel extends BasePanel {
                 } catch (error) {
                     vscode.window.showErrorMessage('Connection test failed: ' + (error as Error).message);
                     this.postMessage({
-                        action: 'test-connection-result',
+                        command: 'test-connection-result',
                         data: { success: false, error: (error as Error).message }
                     });
                 }

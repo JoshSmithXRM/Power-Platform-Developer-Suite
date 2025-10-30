@@ -189,7 +189,7 @@ class JsonViewerBehavior extends BaseBehavior {
      * Handle custom actions beyond componentUpdate
      */
     static handleCustomAction(instance, message) {
-        switch (message.action) {
+        switch (message.command) {
             case 'clear':
                 this.clearContent(instance);
                 break;
@@ -200,7 +200,7 @@ class JsonViewerBehavior extends BaseBehavior {
                 this.collapseAll(instance);
                 break;
             default:
-                console.warn('[JsonViewerBehavior] Unknown action:', message.action);
+                console.warn('[JsonViewerBehavior] Unknown command:', message.command);
         }
     }
 
@@ -264,8 +264,7 @@ class JsonViewerBehavior extends BaseBehavior {
                 command: 'component-event',
                 data: {
                     componentId: instance.id,
-                    eventType: 'copyRequested',
-                    action: 'copy'
+                    eventType: 'copy'
                 }
             });
         }

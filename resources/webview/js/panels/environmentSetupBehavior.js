@@ -72,7 +72,7 @@ class EnvironmentSetupBehavior {
     handleMessage(message) {
         if (!message) return;
 
-        switch (message.action) {
+        switch (message.command) {
             case 'component-update':
                 // Action bar events handled via component-event
                 break;

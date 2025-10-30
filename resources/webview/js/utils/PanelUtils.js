@@ -66,12 +66,12 @@ class PanelUtils {
         window.addEventListener('message', event => {
             const message = event.data;
             
-            if (handlers[message.action]) {
-                handlers[message.action](message);
-            } else if (message.action === 'error') {
+            if (handlers[message.command]) {
+                handlers[message.command](message);
+            } else if (message.command === 'error') {
                 PanelUtils.showError(message.message);
             } else {
-                console.log('Unhandled message action:', message.action);
+                console.log('Unhandled message command:', message.command);
             }
         });
     }

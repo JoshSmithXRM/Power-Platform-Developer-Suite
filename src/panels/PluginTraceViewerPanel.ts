@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 import { ServiceFactory } from '../services/ServiceFactory';
-import { WebviewMessage } from '../types';
+import { WebviewMessage, hasDataProperty } from '../types';
 import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { ActionBarComponent } from '../components/actions/ActionBar/ActionBarComponent';
@@ -333,13 +333,16 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                     );
                     break;
 
-                case 'trace-level-changed':
+                case 'trace-level-changed': {
                     // Custom message type not in union
+                    const traceLevelMsg = message as unknown as { environmentId?: string; level?: unknown };
+                    const level = typeof traceLevelMsg.level === 'number' ? traceLevelMsg.level as PluginTraceLevel : PluginTraceLevel.Off;
                     await this.handleSetTraceLevel(
-                        (message as unknown as { environmentId?: string }).environmentId ?? '',
-                        (message as unknown as { level?: unknown }).level
+                        traceLevelMsg.environmentId ?? '',
+                        level
                     );
                     break;
+                }
 
                 case 'filters-applied':
                     await this.handleFiltersAppliedMessage(message);
@@ -381,7 +384,12 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
                 case 'filter-panel-collapsed': {
                     // Custom message type not in union
-                    const collapsedData = message.data && typeof message.data === 'object' && 'collapsed' in message.data ? (message.data as { collapsed: boolean }).collapsed : false;
+                    const collapsedData = hasDataProperty(message) &&
+                        typeof message.data === 'object' &&
+                        message.data !== null &&
+                        'collapsed' in message.data
+                            ? (message.data as { collapsed: boolean }).collapsed
+                            : false;
                     this.componentLogger.info('✅ Filter panel collapsed state changed', { collapsed: collapsedData });
                     await this.stateManager.updateCurrentPreferences({ filterPanelCollapsed: collapsedData });
                     break;
@@ -398,7 +406,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.componentLogger.error(`Error handling message ${action}`, error as Error);
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: `Error: ${errorMessage}`
             });
         }
@@ -454,7 +462,9 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
     private async handleDropdownItemClicked(message: WebviewMessage): Promise<void> {
         try {
             // Custom message type - extract data
-            const messageData = message.data && typeof message.data === 'object' ? message.data as { componentId?: string; actionId?: string; itemId?: string } : undefined;
+            const messageData = hasDataProperty(message) && typeof message.data === 'object' && message.data !== null
+                ? message.data as { componentId?: string; actionId?: string; itemId?: string }
+                : undefined;
             const componentId = messageData?.componentId;
             const actionId = messageData?.actionId;
             const itemId = messageData?.itemId;
@@ -483,7 +493,9 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
      * Converts filter data to arrays and delegates to handleFiltersApplied
      */
     private async handleFiltersAppliedMessage(message: WebviewMessage): Promise<void> {
-        const messageData = message.data && typeof message.data === 'object' ? message.data as { quickFilters?: unknown; advancedFilters?: unknown } : undefined;
+        const messageData = hasDataProperty(message) && typeof message.data === 'object' && message.data !== null
+            ? message.data as { quickFilters?: unknown; advancedFilters?: unknown }
+            : undefined;
         const quickFiltersArray = this.convertToArray<string>(messageData?.quickFilters);
         const advancedFiltersArray = this.convertToArray<FilterCondition>(messageData?.advancedFilters);
         await this.handleFiltersApplied(quickFiltersArray, advancedFiltersArray);
@@ -511,7 +523,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         // Restore quick filters
         if (Array.isArray(pendingFilters.quick) && pendingFilters.quick.length > 0) {
             this.postMessage({
-                action: 'set-quick-filters',
+                command: 'set-quick-filters',
                 componentId: this.filterPanelComponent!.getId(),
                 componentType: 'FilterPanel',
                 filterIds: pendingFilters.quick
@@ -521,7 +533,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         // Restore advanced filters
         if (Array.isArray(pendingFilters.advanced) && pendingFilters.advanced.length > 0) {
             this.postMessage({
-                action: 'set-advanced-filters',
+                command: 'set-advanced-filters',
                 componentId: this.filterPanelComponent!.getId(),
                 componentType: 'FilterPanel',
                 conditions: pendingFilters.advanced
@@ -536,7 +548,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
      */
     private convertToArray<T>(value: unknown): T[] {
         if (Array.isArray(value)) {
-            return value;
+            return value as T[];
         }
         if (value && typeof value === 'object') {
             return Object.values(value) as T[];
@@ -552,7 +564,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             const selectedEnvironmentId = this.currentEnvironmentId || instanceState?.selectedEnvironmentId || environments[0]?.id;
 
             this.postMessage({
-                action: 'environments-loaded',
+                command: 'environments-loaded',
                 data: environments,
                 selectedEnvironmentId: selectedEnvironmentId
             });
@@ -565,7 +577,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to load environments';
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: errorMessage
             });
         }
@@ -621,7 +633,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
         // Close detail panel when switching environments
         this.postMessage({
-            action: 'close-detail-panel'
+            command: 'close-detail-panel'
         });
 
         // Load data for new environment
@@ -690,7 +702,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             // Send after a short delay to ensure webview is ready
             setTimeout(() => {
                 this.postMessage({
-                    action: 'component-state-change',
+                    command: 'component-state-change',
                     componentId: 'pluginTrace-filterPanel',
                     state: {
                         collapsed: prefs.filterPanelCollapsed
@@ -718,11 +730,10 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         this.componentLogger.info('✅ Environment data loaded');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private async handleLoadTraces(environmentId: string, filterOptions?: any): Promise<void> {
+    private async handleLoadTraces(environmentId: string, filterOptions?: unknown): Promise<void> {
         if (!environmentId) {
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: 'Environment ID is required'
             });
             return;
@@ -756,7 +767,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             this.componentLogger.debug('Loaded traces', { count: traces.length });
 
             this.postMessage({
-                action: 'traces-loaded',
+                command: 'traces-loaded',
                 count: traces.length
             });
         } catch (error: unknown) {
@@ -766,7 +777,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
                 this.dataTableComponent.setLoading(false);
             }
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: `Failed to load traces: ${errorMessage}`
             });
         }
@@ -787,7 +798,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             this.updateTraceLevelButton(level);
 
             this.postMessage({
-                action: 'trace-level-loaded',
+                command: 'trace-level-loaded',
                 level: level,
                 displayName: this.pluginTraceService.getTraceLevelDisplayName(level)
             });
@@ -803,7 +814,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             this.currentTraceLevel = level;
 
             this.postMessage({
-                action: 'trace-level-updated',
+                command: 'trace-level-updated',
                 level: level,
                 message: `Trace level set to ${this.pluginTraceService.getTraceLevelDisplayName(level)}`
             });
@@ -819,7 +830,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.componentLogger.error('Failed to set trace level', error as Error);
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: `Failed to set trace level: ${errorMessage}`
             });
         }
@@ -865,7 +876,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         );
 
         this.postMessage({
-            action: 'show-trace-details',
+            command: 'show-trace-details',
             trace: trace,
             relatedTraces: relatedTraces
         });
@@ -1093,8 +1104,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         ];
 
         // CSV escape function
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const escape = (val: any): string => {
+        const escape = (val: unknown): string => {
             if (val === null || val === undefined) return '';
             const str = String(val);
             if (str.includes(',') || str.includes('"') || str.includes('\n')) {
@@ -1111,8 +1121,8 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
         // Data rows
         data.forEach(row => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const values = columns.map(col => escape((row as any)[col]));
+            const rowRecord = row as unknown as Record<string, unknown>;
+            const values = columns.map(col => escape(rowRecord[col]));
             rows.push(values.join(','));
         });
 
@@ -1271,7 +1281,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
 
         this.postMessage({
-            action: 'filters-updated',
+            command: 'filters-updated',
             filters: this.currentFilters
         });
     }
@@ -1281,7 +1291,7 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
         // Send message to switch to timeline tab
         this.postMessage({
-            action: 'switch-to-timeline-tab'
+            command: 'switch-to-timeline-tab'
         });
     }
 
@@ -1494,6 +1504,13 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
     }
 
     /**
+     * Type guard for filter options
+     */
+    private isFilterOptions(value: unknown): value is { quick?: unknown; advanced?: unknown } {
+        return typeof value === 'object' && value !== null;
+    }
+
+    /**
      * Build OData filter string from advanced filters with OR/AND logic
      */
     private buildODataFilterString(advancedFilters: FilterCondition[]): string {
@@ -1523,14 +1540,12 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         return conditions.join(' ');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private convertFiltersToServiceFormat(filters: any): any {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const serviceFilters: any = {
+    private convertFiltersToServiceFormat(filters: unknown): { top: number; odataFilter?: string } {
+        const serviceFilters: { top: number; odataFilter?: string } = {
             top: 100 // Default limit
         };
 
-        if (!filters) {
+        if (!this.isFilterOptions(filters)) {
             this.componentLogger.info('No filters provided, using defaults');
             return serviceFilters;
         }
@@ -1541,15 +1556,16 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
         // Handle quick filters - convert to OData conditions
         // Ensure quick filters is an array (handle serialization issues)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const quickRaw = filters.quick as any;
+        const quickRaw = filters.quick;
         const quickFiltersArray = quickRaw && Array.isArray(quickRaw) ? quickRaw :
             (quickRaw && typeof quickRaw === 'object' ? Object.values(quickRaw) : []);
 
         if (quickFiltersArray.length > 0) {
             this.componentLogger.info('Processing quick filters', { quickFilters: quickFiltersArray });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            quickFiltersArray.forEach((filterId: any) => {
+            quickFiltersArray.forEach((filterId) => {
+                if (typeof filterId !== 'string') {
+                    return;
+                }
                 switch (filterId) {
                     case 'exceptionOnly':
                         // In Dynamics, empty exception details are stored as empty string, not null
@@ -1582,16 +1598,14 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
         }
 
         // Handle advanced filters - build OData filter string with OR/AND logic
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const advancedRaw = filters.advanced as any;
-        if (advancedRaw && advancedRaw.length > 0) {
+        const advancedRaw = filters.advanced;
+        if (Array.isArray(advancedRaw) && advancedRaw.length > 0) {
             this.componentLogger.info('Processing advanced filters with OR/AND logic', {
                 count: advancedRaw.length,
                 filters: advancedRaw
             });
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const advancedODataFilter = this.buildODataFilterString(advancedRaw as any);
+            const advancedODataFilter = this.buildODataFilterString(advancedRaw as FilterCondition[]);
             if (advancedODataFilter) {
                 // Wrap advanced filters in parentheses if there are multiple conditions
                 if (advancedRaw.length > 1) {
@@ -1605,10 +1619,8 @@ export class PluginTraceViewerPanel extends BasePanel<PluginTraceViewerInstanceS
 
         // Combine all OData conditions with AND (quick filters AND advanced filters)
         if (odataConditions.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (serviceFilters as any).odataFilter = odataConditions.join(' and ');
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            this.componentLogger.info('✅ Built complete OData filter', { odataFilter: (serviceFilters as any).odataFilter });
+            serviceFilters.odataFilter = odataConditions.join(' and ');
+            this.componentLogger.info('✅ Built complete OData filter', { odataFilter: serviceFilters.odataFilter });
         }
 
         return serviceFilters;

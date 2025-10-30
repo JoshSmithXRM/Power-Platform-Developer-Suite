@@ -300,7 +300,7 @@ export abstract class BasePanel<
             });
 
             this.postMessage({
-                action: 'set-split-ratio',
+                command: 'set-split-ratio',
                 componentId: componentId,
                 ratio: prefs.splitRatio
             });
@@ -314,7 +314,7 @@ export abstract class BasePanel<
             });
 
             this.postMessage({
-                action: 'show-right-panel',
+                command: 'show-right-panel',
                 componentId: componentId
             });
         }
@@ -405,7 +405,7 @@ export abstract class BasePanel<
      *
      *     // Layout state
      *     if (prefs.splitRatio) {
-     *         this.postMessage({ action: 'set-split-ratio', ratio: prefs.splitRatio });
+     *         this.postMessage({ command: 'set-split-ratio', ratio: prefs.splitRatio });
      *     }
      *
      *     // UI state
@@ -448,14 +448,14 @@ export abstract class BasePanel<
         try {
             const environments = await this._authService.getEnvironments();
             this.postMessage({
-                action: 'environments-loaded',
+                command: 'environments-loaded',
                 data: environments
             });
         } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error));
             this.componentLogger.error('Error loading environments', err);
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: `Failed to load environments: ${err.message}`
             });
         }
@@ -947,7 +947,7 @@ export abstract class BasePanel<
                 }
 
                 this.postMessage({
-                    action: 'component-update',
+                    command: 'component-update',
                     componentId: event.componentId,
                     componentType: componentType,
                     data: messageData
@@ -962,7 +962,7 @@ export abstract class BasePanel<
                     componentId: event.componentId
                 });
                 this.postMessage({
-                    action: 'component-state-change',
+                    command: 'component-state-change',
                     componentId: event.componentId,
                     state: event.state
                 });

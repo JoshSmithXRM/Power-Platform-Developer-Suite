@@ -532,7 +532,6 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
             this.componentLogger.error('Error handling message', error as Error, { command: message.command });
             this.postMessage({
                 command: 'error',
-                action: 'error',
                 message: 'An error occurred while processing your request'
             });
         }
@@ -891,7 +890,7 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
 
             // Show loading state for tree
             this.postMessage({
-                action: 'tree-loading',
+                command: 'tree-loading',
                 loading: true
             });
 
@@ -903,7 +902,6 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
 
             // Send to webview to populate tree
             this.postMessage({
-                action: 'populate-tree',
                 command: 'populate-tree',
                 data: {
                     entities: entities.map(e => ({
@@ -951,13 +949,13 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
 
         // Set entity mode FIRST so sections become visible
         this.postMessage({
-            action: 'set-mode',
+            command: 'set-mode',
             mode: 'entity'
         });
 
         // Open the right panel to show entity details
         this.postMessage({
-            action: 'show-right-panel',
+            command: 'show-right-panel',
             componentId: 'metadata-detail-split-panel'
         });
 
@@ -985,13 +983,13 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
 
         // Set choice mode FIRST so sections become visible
         this.postMessage({
-            action: 'set-mode',
+            command: 'set-mode',
             mode: 'choice'
         });
 
         // Open the right panel to show choice details
         this.postMessage({
-            action: 'show-right-panel',
+            command: 'show-right-panel',
             componentId: 'metadata-detail-split-panel'
         });
 
@@ -1052,7 +1050,6 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
                 // Send to webview to display in split panel (for title and properties tab)
                 this.postMessage({
                     command: 'show-detail',
-                    action: 'show-detail',
                     data: {
                         title,
                         metadata
@@ -1398,7 +1395,6 @@ export class MetadataBrowserPanel extends BasePanel<MetadataBrowserInstanceState
         choices: number;
     }): void {
         this.postMessage({
-            action: 'update-selection',
             command: 'update-selection',
             data: { displayName, counts }
         });

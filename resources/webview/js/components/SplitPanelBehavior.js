@@ -142,7 +142,7 @@ class SplitPanelBehavior extends BaseBehavior {
      * Handle custom actions beyond componentUpdate
      */
     static handleCustomAction(instance, message) {
-        switch (message.action) {
+        switch (message.command) {
             case 'set-split-ratio':
                 if (typeof message.ratio === 'number') {
                     this.setSplitRatio(instance, message.ratio);
@@ -166,7 +166,7 @@ class SplitPanelBehavior extends BaseBehavior {
                 break;
 
             default:
-                console.warn(`SplitPanelBehavior: Unhandled action '${message.action}'`);
+                console.warn(`SplitPanelBehavior: Unhandled action '${message.command}'`);
                 break;
         }
     }

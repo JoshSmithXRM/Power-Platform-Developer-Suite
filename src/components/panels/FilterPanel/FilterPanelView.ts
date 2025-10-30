@@ -185,8 +185,8 @@ export class FilterPanelView {
 
         // Between operator needs two inputs
         if (operator === 'between') {
-            const value1 = Array.isArray(value) ? value[0] : value as string | number;
-            const value2 = Array.isArray(value) ? value[1] : '' as string | number;
+            const value1 = Array.isArray(value) ? this.normalizeValue(value[0]) : this.normalizeValue(value);
+            const value2 = Array.isArray(value) && value.length > 1 ? this.normalizeValue(value[1]) : '';
 
             return `
                 <input
@@ -236,5 +236,21 @@ export class FilterPanelView {
             default:
                 return 'text';
         }
+    }
+
+    /**
+     * Normalize unknown value to string for HTML attributes
+     */
+    private static normalizeValue(value: unknown): string | number {
+        if (value === null || value === undefined) {
+            return '';
+        }
+        if (typeof value === 'string' || typeof value === 'number') {
+            return value;
+        }
+        if (value instanceof Date) {
+            return value.toISOString();
+        }
+        return String(value);
     }
 }

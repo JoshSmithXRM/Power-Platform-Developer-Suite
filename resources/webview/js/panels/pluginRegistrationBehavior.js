@@ -18,10 +18,10 @@ class PluginRegistrationBehavior {
         // Register panel handler with ComponentUtils for proper message routing
         if (window.ComponentUtils && window.ComponentUtils.registerPanelHandler) {
             window.ComponentUtils.registerPanelHandler('pluginRegistration', (message) => {
-                console.log('📨 PluginRegistrationBehavior message received:', message.action || message.command);
+                console.log('📨 PluginRegistrationBehavior message received:', message.command || message.command);
 
                 // Handle both action and command for backward compatibility
-                const actionType = message.action || message.command;
+                const actionType = message.command || message.command;
 
                 switch (actionType) {
                     case 'show-node-details':

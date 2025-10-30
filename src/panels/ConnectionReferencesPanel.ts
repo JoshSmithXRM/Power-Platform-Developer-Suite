@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 
 import { ServiceFactory } from '../services/ServiceFactory';
-import { WebviewMessage } from '../types';
+import { WebviewMessage, hasDataProperty } from '../types';
 import { ComponentFactory } from '../factories/ComponentFactory';
 import { PanelComposer } from '../factories/PanelComposer';
 import { SolutionSelectorComponent } from '../components/selectors/SolutionSelector/SolutionSelectorComponent';
@@ -274,7 +274,7 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
                 this.componentLogger.trace('Received message with no command property', {
                     message,
                     keys: Object.keys(message || {}),
-                    hasData: 'data' in message && !!message.data,
+                    hasData: hasDataProperty(message) && !!(message as WebviewMessage & { data: unknown }).data,
                     hasAction: 'action' in message && !!(message as { action?: unknown }).action
                 });
                 return;
@@ -303,8 +303,8 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
                 case 'open-in-maker':
                     await this.handleOpenInMaker(
                         message.data.environmentId,
-                        message.data.solutionId,
-                        message.data.entityType
+                        message.data.solutionId ?? '',
+                        message.data.entityType ?? ''
                     );
                     break;
 
@@ -318,7 +318,7 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
         } catch (error) {
             this.componentLogger.error('Error handling message', error as Error, { command: message.command });
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: 'An error occurred while processing your request'
             });
         }
@@ -362,7 +362,7 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
             case 'syncDeploymentBtn': {
                 // Use original service data for deployment settings sync
                 if (!this.currentRelationshipData) {
-                    this.postMessage({ action: 'error', message: 'No relationship data available for sync' });
+                    this.postMessage({ command: 'error', message: 'No relationship data available for sync' });
                     break;
                 }
                 const selectedSolution = this.solutionSelectorComponent?.getSelectedSolution();
@@ -466,7 +466,7 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
 
     private async handleLoadSolutions(environmentId: string): Promise<void> {
         if (!environmentId) {
-            this.postMessage({ action: 'error', message: 'Environment id required' });
+            this.postMessage({ command: 'error', message: 'Environment id required' });
             return;
         }
 
@@ -504,13 +504,13 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
 
         } catch (error) {
             this.componentLogger.error('Error loading solutions', error as Error, { environmentId });
-            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to load solutions' });
+            this.postMessage({ command: 'error', message: (error as Error).message || 'Failed to load solutions' });
         }
     }
 
     private async handleLoadConnectionReferences(environmentId: string, solutionId?: string): Promise<void> {
         if (!environmentId) {
-            this.postMessage({ action: 'error', message: 'Environment id required' });
+            this.postMessage({ command: 'error', message: 'Environment id required' });
             return;
         }
 
@@ -593,7 +593,7 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
             }
 
             this.postMessage({
-                action: 'error',
+                command: 'error',
                 message: `Failed to load connection references: ${(error as Error).message}`
             });
         }
@@ -657,7 +657,7 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
 
             // Send success message back to UI
             this.postMessage({
-                action: 'deployment-settings-synced',
+                command: 'deployment-settings-synced',
                 data: {
                     filePath: result.filePath,
                     added: result.added,
@@ -668,13 +668,13 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
             });
         } catch (error) {
             this.componentLogger.error('Error syncing deployment settings', error as Error);
-            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to sync deployment settings' });
+            this.postMessage({ command: 'error', message: (error as Error).message || 'Failed to sync deployment settings' });
         }
     }
 
     private async handleOpenInMaker(environmentId: string, solutionId: string, entityType: string): Promise<void> {
         if (!environmentId || !solutionId) {
-            this.postMessage({ action: 'error', message: 'Environment and solution are required' });
+            this.postMessage({ command: 'error', message: 'Environment and solution are required' });
             return;
         }
 
@@ -683,7 +683,7 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
             const environment = environments.find(env => env.id === environmentId);
 
             if (!environment) {
-                this.postMessage({ action: 'error', message: 'Environment not found' });
+                this.postMessage({ command: 'error', message: 'Environment not found' });
                 return;
             }
 
@@ -698,7 +698,7 @@ export class ConnectionReferencesPanel extends BasePanel<ConnectionReferencesIns
 
         } catch (error) {
             this.componentLogger.error('Error opening in Maker', error as Error);
-            this.postMessage({ action: 'error', message: (error as Error).message || 'Failed to open in Maker' });
+            this.postMessage({ command: 'error', message: (error as Error).message || 'Failed to open in Maker' });
         }
     }
 

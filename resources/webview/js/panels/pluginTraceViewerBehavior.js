@@ -46,9 +46,9 @@ class PluginTraceViewerBehavior {
         // Handler returns true if message was handled, false to pass through
         if (window.ComponentUtils && window.ComponentUtils.registerPanelHandler) {
             window.ComponentUtils.registerPanelHandler('pluginTraceViewer', (message) => {
-                console.log('📨 PluginTraceViewerBehavior message received:', message.action);
+                console.log('📨 PluginTraceViewerBehavior message received:', message.command);
 
-                switch (message.action) {
+                switch (message.command) {
                     case 'show-trace-details':
                         console.log('🎯 Showing trace detail panel', message);
                         PluginTraceViewerBehavior.showTraceDetailPanel(message.trace, message.relatedTraces);
@@ -184,7 +184,7 @@ class PluginTraceViewerBehavior {
             if (window.TimelineBehavior) {
                 window.TimelineBehavior.renderTimeline(allRelated, 'timelineContainer', (traceId) => {
                     const vscode = window.vscode || acquireVsCodeApi();
-                    vscode.postMessage({ action: 'trace-selected', traceId });
+                    vscode.postMessage({ command: 'trace-selected', traceId });
                 });
             }
         } else {
@@ -375,7 +375,7 @@ class PluginTraceViewerBehavior {
             const traceId = target.dataset.traceId;
             if (traceId) {
                 const vscode = window.vscode || acquireVsCodeApi();
-                vscode.postMessage({ action: 'trace-selected', traceId });
+                vscode.postMessage({ command: 'trace-selected', traceId });
             }
         });
     }
