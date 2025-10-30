@@ -216,15 +216,15 @@ class FilterPanelBehavior extends BaseBehavior {
      */
     static handleCustomAction(instance, message) {
         switch (message.action) {
-            case 'componentStateChange':
-                console.log('FilterPanelBehavior: componentStateChange received', message.state);
+            case 'component-state-change':
+                console.log('FilterPanelBehavior: component-state-change received', message.state);
                 // This is the old action - delegate to onComponentUpdate
                 if (message.state) {
                     this.onComponentUpdate(instance, message.state);
                 }
                 break;
 
-            case 'setPreviewCount':
+            case 'set-preview-count':
                 if (instance.previewCount) {
                     const count = message.count;
                     instance.previewCount.textContent = count !== undefined
@@ -233,7 +233,7 @@ class FilterPanelBehavior extends BaseBehavior {
                 }
                 break;
 
-            case 'setQuickFilters':
+            case 'set-quick-filters':
                 if (Array.isArray(message.filterIds)) {
                     instance.activeQuickFilters = new Set(message.filterIds);
                     // Update checkboxes
@@ -246,7 +246,7 @@ class FilterPanelBehavior extends BaseBehavior {
                 }
                 break;
 
-            case 'setAdvancedFilters':
+            case 'set-advanced-filters':
                 if (Array.isArray(message.conditions)) {
                     // Clear existing
                     instance.conditionsList.innerHTML = '';
@@ -259,7 +259,7 @@ class FilterPanelBehavior extends BaseBehavior {
                 }
                 break;
 
-            case 'clearFilters':
+            case 'clear-filters':
                 this.clearAllFilters(instance);
                 break;
 

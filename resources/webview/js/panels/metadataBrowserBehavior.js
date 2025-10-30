@@ -136,7 +136,7 @@ class MetadataBrowserBehavior {
                     break;
                 }
 
-                case 'closeRightPanel':
+                case 'close-right-panel':
                 case 'close-detail-panel':
                     MetadataBrowserBehavior.closeDetailPanel();
                     break;

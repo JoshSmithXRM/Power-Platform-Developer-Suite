@@ -194,19 +194,19 @@ class ActionBarBehavior extends BaseBehavior {
      */
     static handleCustomAction(instance, message) {
         switch (message.action) {
-            case 'actionsUpdated':
+            case 'actions-updated':
                 this.updateActions(instance.id, message.data.actions);
                 break;
 
-            case 'actionUpdated':
+            case 'action-updated':
                 this.updateSingleAction(instance.id, message.data.actionId, message.data.updates);
                 break;
 
-            case 'loadingStateChanged':
+            case 'loading-state-changed':
                 this.setActionLoading(instance, message.data.actionId, message.data.loading);
                 break;
 
-            case 'overflowChanged':
+            case 'overflow-changed':
                 instance.overflowActions = message.data.overflowActions || [];
                 break;
 

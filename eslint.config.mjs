@@ -10,7 +10,7 @@ export default tseslint.config(
     ignores: ['dist/**', 'out/**', 'node_modules/**', '*.config.js', 'webpack.config.js']
   },
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    files: ['src/**/*.ts', '**/*.tsx'],
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: 'module',
@@ -28,6 +28,7 @@ export default tseslint.config(
       // PHASE 1: CRITICAL ARCHITECTURAL RULES
       
       // 1. Component Architecture Violations
+      // Note: Console restriction removed from global TypeScript config - defined per-file-type below
       'no-restricted-syntax': [
         'error',
         {
@@ -37,10 +38,6 @@ export default tseslint.config(
         {
           selector: "ArrowFunctionExpression[parent.callee.property.name='map'] ObjectExpression",
           message: '❌ Move data transformation logic to services. Panels should use service data directly. Pattern: solutions.map(sol => ({ id: sol.solutionId, ... })) should be in service layer.'
-        },
-        {
-          selector: "CallExpression[callee.object.name='console']",
-          message: '❌ Use this.componentLogger instead of console methods in Extension Host context. console.log is only allowed in webview JavaScript files.'
         }
       ],
 
@@ -93,73 +90,6 @@ export default tseslint.config(
       // '@typescript-eslint/no-unsafe-member-access': 'error',
       // '@typescript-eslint/no-unsafe-call': 'error',
       // '@typescript-eslint/no-unsafe-argument': 'error'
-    }
-  },
-  {
-    // Override for JavaScript files (webview)
-    files: ['**/*.js'],
-    languageOptions: {
-      globals: {
-        window: 'readonly',
-        document: 'readonly',
-        console: 'readonly',
-        vscode: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        confirm: 'readonly',
-        ResizeObserver: 'readonly',
-        MutationObserver: 'readonly',
-        Node: 'readonly',
-        CustomEvent: 'readonly',
-        module: 'writable',
-        ComponentUtils: 'readonly',
-        EnvironmentSelectorUtils: 'readonly'
-      }
-    },
-    rules: {
-      'no-console': 'off',
-      'no-restricted-syntax': 'off',
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
-      'no-undef': 'off',
-      'no-prototype-builtins': 'off',
-      'no-case-declarations': 'off',
-      // Prevent webview JS from importing Extension Host TS (would fail anyway)
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['**/panels/**', '**/services/**', '**/components/**'],
-              message: '❌ Cannot import Extension Host code in webview context. Webview behaviors should only use postMessage() to communicate. See: docs/EXECUTION_CONTEXTS.md'
-            }
-          ]
-        }
-      ]
-    }
-  },
-  {
-    // Override for webview JavaScript specifically
-    files: ['resources/webview/js/**/*.js'],
-    languageOptions: {
-      globals: {
-        window: 'readonly',
-        document: 'readonly',
-        console: 'readonly',
-        vscode: 'readonly'
-      }
-    },
-    rules: {
-      'no-console': 'off',
-      'no-restricted-syntax': [
-        'error',
-        // NOTE: console.log IS ALLOWED in webview context - don't add console restriction here!
-        // Detect ANY camelCase in sendMessage calls using regex
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value=/[a-z][A-Z]/]",
-          message: "❌ Use kebab-case in sendMessage() message names (detected camelCase). Example: 'nodeSelected' should be 'node-selected'. See: docs/MESSAGE_CONVENTIONS.md"
-        }
-      ]
     }
   },
   {
@@ -270,7 +200,7 @@ export default tseslint.config(
     }
   },
   {
-    // FINAL OVERRIDE: BasePanel exemption - must be last to override all previous rules
+    // OVERRIDE: BasePanel exemption
     // BasePanel is allowed to use updateWebview() during initialization and for full UI refresh
     files: ['src/panels/base/BasePanel.ts'],
     rules: {
@@ -279,6 +209,20 @@ export default tseslint.config(
         {
           selector: "CallExpression[callee.object.name='console']",
           message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
+        },
+        // Check for camelCase in switch case statements - excluding keyboard events
+        {
+          selector: "SwitchCase > Literal[value=/[a-z][A-Z]/]:not([value=/^(Enter|Escape|Arrow(Up|Down|Left|Right)|Tab|Space|Page(Up|Down)|Home|End|Backspace|Delete|Insert|Meta|Control|Shift|Alt|CapsLock|NumLock|ScrollLock|Pause|PrintScreen|ContextMenu|Help|Clear|Select|Execute|F[0-9]{1,2})$/])",
+          message: "❌ Use kebab-case in switch case statements (detected camelCase). Example: case 'nodeSelected' should be case 'node-selected'. Keyboard event codes like 'Enter', 'Escape' are exceptions. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        // Check for camelCase in postMessage action/command
+        {
+          selector: "CallExpression[callee.property.name='postMessage'] ObjectExpression > Property[key.name='action'] > Literal[value=/[a-z][A-Z]/]",
+          message: "❌ Use kebab-case in postMessage action field (detected camelCase). Example: action: 'nodeSelected' should be action: 'node-selected'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "CallExpression[callee.property.name='postMessage'] ObjectExpression > Property[key.name='command'] > Literal[value=/[a-z][A-Z]/]",
+          message: "❌ Use kebab-case in postMessage command field (detected camelCase). Example: command: 'nodeSelected' should be command: 'node-selected'. See: docs/MESSAGE_CONVENTIONS.md"
         }
         // Note: updateWebview() IS ALLOWED in BasePanel for initialization
         // Note: Data transformation (map) IS ALLOWED in BasePanel
@@ -286,8 +230,7 @@ export default tseslint.config(
     }
   },
   {
-    // FINAL OVERRIDE: PanelComposer exemption - bootstrap scripts are necessary infrastructure
-    // Must be last to override all previous script block restrictions
+    // OVERRIDE: PanelComposer exemption - bootstrap scripts are necessary infrastructure
     files: ['src/factories/PanelComposer.ts'],
     rules: {
       'no-restricted-syntax': [
@@ -299,6 +242,65 @@ export default tseslint.config(
         // Note: Inline <script> blocks ARE ALLOWED in PanelComposer (bootstrap code for vscode API)
         // Note: onclick handlers NOT allowed (use data-action instead)
         // Note: updateWebview() calls NOT allowed
+      ]
+    }
+  },
+  {
+    // FINAL OVERRIDE: JavaScript files (webview context) - MUST be last to prevent TypeScript rules from applying
+    files: ['resources/webview/**/*.js'],
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        console: 'readonly',
+        vscode: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        confirm: 'readonly',
+        ResizeObserver: 'readonly',
+        MutationObserver: 'readonly',
+        Node: 'readonly',
+        CustomEvent: 'readonly',
+        module: 'writable',
+        ComponentUtils: 'readonly',
+        EnvironmentSelectorUtils: 'readonly'
+      }
+    },
+    rules: {
+      'no-console': 'off', // Console IS allowed in webview context
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      'no-undef': 'off',
+      'no-prototype-builtins': 'off',
+      'no-case-declarations': 'off',
+      // Prevent webview JS from importing Extension Host TS (would fail anyway)
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/panels/**', '**/services/**', '**/components/**'],
+              message: '❌ Cannot import Extension Host code in webview context. Webview behaviors should only use postMessage() to communicate. See: docs/EXECUTION_CONTEXTS.md'
+            }
+          ]
+        }
+      ],
+      // Check for camelCase in switch case statements - but exclude legitimate keyboard event codes
+      // Console restrictions do NOT apply to webview - only kebab-case checks
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "SwitchCase > Literal[value=/[a-z][A-Z]/]:not([value=/^(Enter|Escape|Arrow(Up|Down|Left|Right)|Tab|Space|Page(Up|Down)|Home|End|Backspace|Delete|Insert|Meta|Control|Shift|Alt|CapsLock|NumLock|ScrollLock|Pause|PrintScreen|ContextMenu|Help|Clear|Select|Execute|F[0-9]{1,2})$/])",
+          message: "❌ Use kebab-case in switch case statements (detected camelCase). Example: case 'nodeSelected' should be case 'node-selected'. Keyboard event codes like 'Enter', 'Escape', 'ArrowUp' are exceptions. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "CallExpression[callee.property.name='postMessage'] ObjectExpression > Property[key.name='action'] > Literal[value=/[a-z][A-Z]/]",
+          message: "❌ Use kebab-case in postMessage action field (detected camelCase). Example: action: 'nodeSelected' should be action: 'node-selected'. See: docs/MESSAGE_CONVENTIONS.md"
+        },
+        {
+          selector: "CallExpression[callee.property.name='postMessage'] ObjectExpression > Property[key.name='command'] > Literal[value=/[a-z][A-Z]/]",
+          message: "❌ Use kebab-case in postMessage command field (detected camelCase). Example: command: 'nodeSelected' should be command: 'node-selected'. See: docs/MESSAGE_CONVENTIONS.md"
+        }
       ]
     }
   }

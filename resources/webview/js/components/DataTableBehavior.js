@@ -1579,21 +1579,21 @@ class DataTableBehavior extends BaseBehavior {
         const { action, data } = message;
 
         switch (action) {
-            case 'setData':
+            case 'set-data':
                 if (data && Array.isArray(data)) {
                     this.updateTableData(instance, data);
                 }
                 break;
 
-            case 'setLoading':
+            case 'set-loading':
                 this.toggleLoadingState(instance, data?.loading, data?.message);
                 break;
 
-            case 'setError':
+            case 'set-error':
                 this.showErrorOverlay(instance, data?.error || 'An error occurred');
                 break;
 
-            case 'clearError':
+            case 'clear-error':
                 this.hideErrorOverlay(instance);
                 break;
 

@@ -139,7 +139,7 @@ class EnvironmentSelectorBehavior extends BaseBehavior {
         const { action, data } = message;
 
         switch (action) {
-            case 'environmentsLoaded':
+            case 'environments-loaded':
                 if (data && data.environments) {
                     this.loadEnvironments(message.componentId, data.environments);
                 }
@@ -148,7 +148,7 @@ class EnvironmentSelectorBehavior extends BaseBehavior {
                 }
                 break;
 
-            case 'componentStateChange':
+            case 'component-state-change':
                 // Handle state change messages from Extension Host
                 if (data && typeof data === 'object') {
                     // Update internal state without triggering events
@@ -157,21 +157,21 @@ class EnvironmentSelectorBehavior extends BaseBehavior {
                 }
                 break;
 
-            case 'environmentSelected':
+            case 'environment-selected':
                 if (data && data.environmentId) {
                     this.setSelectedEnvironment(message.componentId, data.environmentId);
                 }
                 break;
 
-            case 'loadingStateChanged':
+            case 'loading-state-changed':
                 this.setLoading(message.componentId, data.loading, data.message);
                 break;
 
-            case 'errorOccurred':
+            case 'error-occurred':
                 this.showError(message.componentId, data.error, data.context);
                 break;
 
-            case 'clearError':
+            case 'clear-error':
                 this.clearError(instance);
                 break;
 

@@ -458,8 +458,8 @@ class ComponentUtils {
             }
 
             // Fourth priority: Route to specific behavior static handlers
-            if (message.action === 'componentUpdate' ||
-                message.action === 'componentStateChange' ||
+            if (message.action === 'component-update' ||
+                message.action === 'component-state-change' ||
                 message.action === 'setQuickFilters' ||
                 message.action === 'setAdvancedFilters' ||
                 message.action === 'clearFilters') {
@@ -586,7 +586,7 @@ class ComponentUtils {
         
         // Only warn if this is an actionable message type
         const action = message.action || message.command;
-        const silentActions = ['componentStateChange', 'componentUpdate'];
+        const silentActions = ['component-state-change', 'component-update'];
         if (!silentActions.includes(action)) {
             console.warn(`Could not route message to component behavior: ${componentId}`, message);
         }

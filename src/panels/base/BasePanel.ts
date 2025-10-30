@@ -403,7 +403,7 @@ export abstract class BasePanel<
      *
      *     // Layout state
      *     if (prefs.splitRatio) {
-     *         this.postMessage({ action: 'setSplitRatio', ratio: prefs.splitRatio });
+     *         this.postMessage({ action: 'set-split-ratio', ratio: prefs.splitRatio });
      *     }
      *
      *     // UI state
@@ -446,7 +446,7 @@ export abstract class BasePanel<
         try {
             const environments = await this._authService.getEnvironments();
             this.postMessage({
-                action: 'environmentsLoaded',
+                action: 'environments-loaded',
                 data: environments
             });
         } catch (error: unknown) {
@@ -945,7 +945,7 @@ export abstract class BasePanel<
                 }
 
                 this.postMessage({
-                    action: 'componentUpdate',
+                    action: 'component-update',
                     componentId: event.componentId,
                     componentType: componentType,
                     data: messageData
@@ -960,7 +960,7 @@ export abstract class BasePanel<
                     componentId: event.componentId
                 });
                 this.postMessage({
-                    action: 'componentStateChange',
+                    action: 'component-state-change',
                     componentId: event.componentId,
                     state: event.state
                 });

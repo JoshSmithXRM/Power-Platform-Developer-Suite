@@ -192,10 +192,10 @@ class BaseBehavior {
 
         // Route to specific action handlers
         switch (message.action) {
-            case 'componentUpdate':
+            case 'component-update':
                 // CRITICAL: Event bridge updates ALWAYS go through onComponentUpdate
                 if (message.data) {
-                    console.log(`${this.name}: componentUpdate received`, {
+                    console.log(`${this.name}: component-update received`, {
                         componentId: message.componentId,
                         dataKeys: Object.keys(message.data)
                     });

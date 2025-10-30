@@ -185,7 +185,7 @@ class SearchInputBehavior extends BaseBehavior {
                 }
                 break;
 
-            case 'setQuery':
+            case 'set-query':
                 if (instance.searchInput && message.query !== undefined) {
                     instance.searchInput.value = message.query;
                     instance.currentQuery = message.query;

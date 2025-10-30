@@ -143,21 +143,21 @@ class SplitPanelBehavior extends BaseBehavior {
      */
     static handleCustomAction(instance, message) {
         switch (message.action) {
-            case 'setSplitRatio':
+            case 'set-split-ratio':
                 if (typeof message.ratio === 'number') {
                     this.setSplitRatio(instance, message.ratio);
                 }
                 break;
 
-            case 'showRightPanel':
+            case 'show-right-panel':
                 this.showRightPanel(instance);
                 break;
 
-            case 'hideRightPanel':
+            case 'hide-right-panel':
                 this.closeRightPanel(instance);
                 break;
 
-            case 'toggleRightPanel':
+            case 'toggle-right-panel':
                 if (instance.rightPanelVisible) {
                     this.closeRightPanel(instance);
                 } else {

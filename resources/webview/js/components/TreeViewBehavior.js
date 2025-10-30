@@ -107,13 +107,13 @@ class TreeViewBehavior extends BaseBehavior {
      */
     static handleCustomAction(instance, message) {
         switch (message.action) {
-            case 'setNodes':
+            case 'set-nodes':
                 // Tree will be re-rendered by Extension Host
                 // Just clear selection
                 instance.selectedNodeId = null;
                 break;
 
-            case 'expandNode':
+            case 'expand-node':
                 if (message.nodeId) {
                     const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
                     if (nodeElement && !nodeElement.classList.contains('tree-node--expanded')) {
@@ -122,7 +122,7 @@ class TreeViewBehavior extends BaseBehavior {
                 }
                 break;
 
-            case 'collapseNode':
+            case 'collapse-node':
                 if (message.nodeId) {
                     const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
                     if (nodeElement && nodeElement.classList.contains('tree-node--expanded')) {
@@ -131,7 +131,7 @@ class TreeViewBehavior extends BaseBehavior {
                 }
                 break;
 
-            case 'selectNode':
+            case 'select-node':
                 if (message.nodeId) {
                     const nodeElement = instance.element.querySelector(`[data-node-id="${message.nodeId}"]`);
                     if (nodeElement) {
@@ -140,7 +140,7 @@ class TreeViewBehavior extends BaseBehavior {
                 }
                 break;
 
-            case 'clearSelection':
+            case 'clear-selection':
                 if (instance.selectedNodeId) {
                     const selectedElement = instance.element.querySelector(`[data-node-id="${instance.selectedNodeId}"]`);
                     if (selectedElement) {
@@ -150,13 +150,13 @@ class TreeViewBehavior extends BaseBehavior {
                 }
                 break;
 
-            case 'updateNodeChildren':
+            case 'update-node-children':
                 if (message.nodeId && message.children) {
                     this.updateNodeChildren(instance, message.nodeId, message.children);
                 }
                 break;
 
-            case 'expandAll':
+            case 'expand-all':
                 const allNodes = instance.element.querySelectorAll('.tree-node--has-children');
                 allNodes.forEach(node => {
                     if (!node.classList.contains('tree-node--expanded')) {
@@ -165,7 +165,7 @@ class TreeViewBehavior extends BaseBehavior {
                 });
                 break;
 
-            case 'collapseAll':
+            case 'collapse-all':
                 const expandedNodes = instance.element.querySelectorAll('.tree-node--expanded');
                 expandedNodes.forEach(node => {
                     this.toggleNode(instance, node);

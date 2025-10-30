@@ -139,7 +139,7 @@ export class TreeViewComponent extends BaseDataComponent<TreeViewData> {
         this.nodes = nodes;
 
         this.notifyStateChange({
-            action: 'setNodes',
+            action: 'set-nodes',
             nodes: this.nodes
         });
         // notifyUpdate() called automatically by notifyStateChange()
@@ -166,7 +166,7 @@ export class TreeViewComponent extends BaseDataComponent<TreeViewData> {
             }
 
             this.notifyStateChange({
-                action: 'expandNode',
+                action: 'expand-node',
                 nodeId: nodeId
             });
         }
@@ -186,7 +186,7 @@ export class TreeViewComponent extends BaseDataComponent<TreeViewData> {
             }
 
             this.notifyStateChange({
-                action: 'collapseNode',
+                action: 'collapse-node',
                 nodeId: nodeId
             });
         }
@@ -213,7 +213,7 @@ export class TreeViewComponent extends BaseDataComponent<TreeViewData> {
             node.hasChildren = children.length > 0;
 
             this.notifyStateChange({
-                action: 'updateNodeChildren',
+                action: 'update-node-children',
                 nodeId: nodeId,
                 children: children
             });
@@ -234,7 +234,7 @@ export class TreeViewComponent extends BaseDataComponent<TreeViewData> {
         }
 
         this.notifyStateChange({
-            action: 'selectNode',
+            action: 'select-node',
             nodeId: nodeId,
             oldSelectedId: oldSelectedId
         });
@@ -265,7 +265,7 @@ export class TreeViewComponent extends BaseDataComponent<TreeViewData> {
         this.selectedNodeId = undefined;
 
         this.notifyStateChange({
-            action: 'clearSelection',
+            action: 'clear-selection',
             oldSelectedId: oldSelectedId
         });
     }
@@ -279,7 +279,7 @@ export class TreeViewComponent extends BaseDataComponent<TreeViewData> {
             node.children = children;
 
             this.notifyStateChange({
-                action: 'addChildren',
+                action: 'add-children',
                 nodeId: nodeId,
                 children: children
             });
@@ -295,7 +295,7 @@ export class TreeViewComponent extends BaseDataComponent<TreeViewData> {
         allNodeIds.forEach(id => this.expandedNodes.add(id));
 
         this.notifyStateChange({
-            action: 'expandAll'
+            action: 'expand-all'
         });
     }
 
@@ -306,7 +306,7 @@ export class TreeViewComponent extends BaseDataComponent<TreeViewData> {
         this.expandedNodes.clear();
 
         this.notifyStateChange({
-            action: 'collapseAll'
+            action: 'collapse-all'
         });
     }
 

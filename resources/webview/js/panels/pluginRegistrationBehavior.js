@@ -63,7 +63,7 @@ class PluginRegistrationBehavior {
             if (!action) return;
 
             switch (action) {
-                case 'closeRightPanel':
+                case 'close-right-panel':
                     PluginRegistrationBehavior.closeDetailPanel();
                     break;
 

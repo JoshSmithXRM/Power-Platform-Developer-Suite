@@ -193,10 +193,10 @@ class JsonViewerBehavior extends BaseBehavior {
             case 'clear':
                 this.clearContent(instance);
                 break;
-            case 'expandAll':
+            case 'expand-all':
                 this.expandAll(instance);
                 break;
-            case 'collapseAll':
+            case 'collapse-all':
                 this.collapseAll(instance);
                 break;
             default:
