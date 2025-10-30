@@ -57,88 +57,79 @@ All docs MUST have cross-reference section at end:
 
 ## 🟡 MEDIUM PRIORITY - .claude Folder Setup
 
-### 3. Create CLAUDE_SETUP_GUIDE.md
+### 3. Create CLAUDE_SETUP_GUIDE.md ✅ COMPLETE
 **Location:** `docs/CLAUDE_SETUP_GUIDE.md`
 
 Document Anthropic's best practices for:
-- [ ] How to structure .claude folder
-- [ ] How to write effective CLAUDE.md files
-- [ ] How to design agent prompts
-- [ ] Token limits and context management
-- [ ] When to split vs combine prompts
-- [ ] Best practices from Anthropic docs
+- [x] How to structure .claude folder
+- [x] How to write effective CLAUDE.md files
+- [x] How to design agent prompts
+- [x] Token limits and context management
+- [x] When to split vs combine prompts
+- [x] Best practices from Anthropic docs
 
-**Reference Material:**
-- Anthropic Claude Code documentation
-- Our existing .claude/AGENT_USAGE.md patterns
-- Our existing .claude/WORKFLOW_GUIDE.md patterns
+**Status:** Complete (~850 lines). Covers:
+- CLAUDE.md best practices (20-50 lines, iterate based on effectiveness)
+- Agent prompt structure (context files, output format, decision framework)
+- Token optimization (reference don't duplicate, use checklists)
+- Common mistakes and solutions
 
-**Estimated Time:** 2-3 hours
-
----
-
-### 4. Restructure .claude Folder
-**Current Structure:**
-```
-.claude/
-├── AGENT_USAGE.md
-├── WORKFLOW_GUIDE.md
-└── agents/
-    ├── architect.md
-    ├── code-reviewer.md
-    └── docs-generator.md
-```
-
-**Proposed Structure:**
-```
-.claude/
-├── README.md (quick start)
-├── SETUP_GUIDE.md (Anthropic best practices)
-├── AGENT_WORKFLOW.md (how agents work together)
-└── agents/
-    ├── architect.md
-    ├── code-reviewer.md
-    └── docs-generator.md
-```
-
-**Tasks:**
-- [ ] Create .claude/README.md (quick start for Claude Code)
-- [ ] Move CLAUDE_SETUP_GUIDE.md content to .claude/SETUP_GUIDE.md
-- [ ] Rewrite AGENT_USAGE.md → .claude/AGENT_WORKFLOW.md (Clean Architecture focus)
-- [ ] Update WORKFLOW_GUIDE.md for feature-first workflow
-- [ ] Delete or archive old versions
-
-**Estimated Time:** 3-4 hours
+**Note:** Doc links in CLAUDE.md don't work - Claude won't proactively read them. Keep CLAUDE.md minimal.
 
 ---
 
-### 5. Update Agent Definitions for Clean Architecture
-**Location:** `.claude/agents/*.md`
+### 4. Restructure .claude Folder ✅ COMPLETE
 
-Agent prompts need updates to reference Clean Architecture patterns:
+**Final Structure:**
+```
+.claude/
+├── README.md ✅ NEW - Quick start for Claude Code
+├── SETUP_GUIDE.md ✅ NEW - Anthropic best practices (from docs/)
+├── WORKFLOW_GUIDE.md ✅ UPDATED - Clean Architecture workflow
+├── AGENT_USAGE.OLD.md (archived - old world reference)
+└── agents/
+    ├── architect.md ✅ UPDATED
+    ├── code-reviewer.md ✅ UPDATED
+    └── docs-generator.md ✅ CURRENT
+```
+
+**Completed:**
+- [x] Create .claude/README.md - Quick start guide with examples
+- [x] Copy CLAUDE_SETUP_GUIDE.md to .claude/SETUP_GUIDE.md
+- [x] Archive AGENT_USAGE.md → AGENT_USAGE.OLD.md (old world reference)
+- [x] Update WORKFLOW_GUIDE.md for Clean Architecture
+- [x] Update all agent definitions (architect, code-reviewer, docs-generator)
+- [x] Clean up CLAUDE.md (removed old world, 84 lines of truth)
+
+---
+
+### 5. Update Agent Definitions for Clean Architecture ✅ COMPLETE
+
+**Status:** All agents updated for Clean Architecture
 
 **architect.md:**
-- [ ] Add domain layer design patterns
-- [ ] Add use case design patterns
-- [ ] Add ViewModel design patterns
-- [ ] Remove old refactor-specific instructions
-- [ ] Add feature-first structure examples
+- [x] Designs domain layer (entities, value objects, repository interfaces)
+- [x] Designs application layer (use cases, ViewModels, mappers)
+- [x] Designs infrastructure layer (repositories implementing interfaces)
+- [x] Designs presentation layer (panels calling use cases)
+- [x] Context files: ARCHITECTURE_GUIDE.md, LAYER_RESPONSIBILITIES_GUIDE.md
+- [x] Validates against Clean Architecture principles
 
 **code-reviewer.md:**
-- [ ] Add domain layer violation checks (anemic models, business logic location)
-- [ ] Add application layer violation checks (business logic in use cases)
-- [ ] Add presentation layer violation checks (business logic in panels)
-- [ ] Update examples to reference new architecture
-- [ ] Add Clean Architecture SOLID checks
+- [x] Checks for anemic domain models (entities must have behavior)
+- [x] Checks business logic placement (domain only, not use cases/panels)
+- [x] Checks dependency direction (inward only)
+- [x] Auto-rejects Clean Architecture violations
+- [x] Context files: CLAUDE.md, ARCHITECTURE_GUIDE.md, LAYER_RESPONSIBILITIES_GUIDE.md
 
 **docs-generator.md:**
-- [ ] Update to follow DOCUMENTATION_STYLE_GUIDE.md
-- [ ] Add Quick Reference generation capability
-- [ ] Add "See Also" section generation
-- [ ] Reference new doc naming conventions
-- [ ] Add Clean Architecture doc patterns
+- [x] Already current - references DOCUMENTATION_STYLE_GUIDE.md
+- [x] Will document Clean Architecture examples from actual code
 
-**Estimated Time:** 4-5 hours
+**Key Changes:**
+- Removed references to old patterns (BasePanel, ComponentFactory, BaseBehavior)
+- Added Clean Architecture layer checks
+- Updated context files to existing docs only
 
 ---
 
@@ -235,14 +226,17 @@ Research and document:
 - ✅ All docs renamed to match convention
 - ✅ All cross-references updated
 - ✅ Dates removed from docs
+- ✅ CLAUDE_SETUP_GUIDE.md created (~850 lines)
+- ✅ CLAUDE.md cleaned up (84 lines, Clean Architecture only)
+- ✅ WORKFLOW_GUIDE.md updated for Clean Architecture
+- ✅ All agent definitions updated (architect, code-reviewer, docs-generator)
+- ✅ .claude folder restructured (README.md, SETUP_GUIDE.md, archived old files)
 
 **In Progress:**
 - 🔄 Documentation debt cleanup (See Also sections)
-- 🔄 .claude folder setup
 
 **Not Started:**
-- ⏸️ Quick Reference sections
-- ⏸️ Agent definition updates
+- ⏸️ Quick Reference sections (deferred)
 - ⏸️ ADR creation
 - ⏸️ Code implementation
 
