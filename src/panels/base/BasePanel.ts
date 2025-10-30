@@ -464,16 +464,12 @@ export abstract class BasePanel<
     /**
      * Get common webview resources (CSS and JS files)
      */
-    protected getCommonWebviewResources(): { 
+    protected getCommonWebviewResources(): {
         panelStylesSheet: vscode.Uri;
-        panelUtilsScript: vscode.Uri;
     } {
         return {
             panelStylesSheet: this._panel.webview.asWebviewUri(
                 vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'css', 'panel-base.css')
-            ),
-            panelUtilsScript: this._panel.webview.asWebviewUri(
-                vscode.Uri.joinPath(this._extensionUri, 'resources', 'webview', 'js', 'utils', 'PanelUtils.js')
             )
         };
     }

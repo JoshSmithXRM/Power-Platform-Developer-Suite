@@ -8,7 +8,6 @@ import { ServiceFactory } from '../services/ServiceFactory';
  */
 export interface WebviewResources {
     panelStylesSheet: vscode.Uri;
-    panelUtilsScript: vscode.Uri;
 }
 
 /**
@@ -256,7 +255,6 @@ export class PanelComposer {
             cssFiles.add('css/base/variables.css');
             cssFiles.add('css/base/component-base.css');
             jsFiles.add('js/utils/ComponentUtils.js');
-            jsFiles.add('js/utils/PanelUtils.js');
         }
         
         // Collect component resources
@@ -705,9 +703,6 @@ export class PanelComposer {
 
     private static collectBehaviorScripts(components: IRenderable[]): string[] {
         const scripts: string[] = [];
-        
-        // IMPORTANT: Load PanelUtils first (has no dependencies)
-        scripts.push('js/utils/PanelUtils.js');
 
         // Load ComponentUtils stub for behavior registration BEFORE behavior scripts
         scripts.push('js/utils/ComponentUtilsStub.js');

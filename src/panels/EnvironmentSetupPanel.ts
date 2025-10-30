@@ -556,7 +556,6 @@ export class EnvironmentSetupPanel extends BasePanel {
         </form>
     </div>
 
-    <script src="${resources.panelUtilsScript}"></script>
     <script src="${panelSpecificResources.environmentSetupBehaviorScript}"></script>
 </body>
 </html>`;
