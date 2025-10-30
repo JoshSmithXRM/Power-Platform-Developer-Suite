@@ -1,37 +1,49 @@
 # Multi-Agent Workflow Guide
 
-**How to use Architect + Builder + Reviewer + Docs Generator agents for development**
+**How to use specialized agents when building features with Clean Architecture**
 
 ---
 
-## Current Agent Setup
+## Architecture Context
 
-We have **3 specialized agents** configured:
+This project follows **Clean Architecture** with **feature-first** organization:
+
+```
+Domain Layer (entities, value objects, domain services)
+    ↑
+Application Layer (use cases, commands, ViewModels)
+    ↑
+Presentation Layer (panels, components) + Infrastructure Layer (repositories, API clients)
+```
+
+**Key concepts:**
+- **Domain entities** - Rich models with behavior (NOT anemic interfaces)
+- **Use cases** - Orchestrate domain logic (no business logic)
+- **ViewModels** - DTOs for presentation (mapped from domain)
+- **Repositories** - Implement interfaces defined in domain
+
+See `docs/ARCHITECTURE_GUIDE.md` for details.
+
+---
+
+## Agent Setup
+
+We have **3 specialized agents**:
 
 1. **architect** (`.claude/agents/architect.md`)
-   - **When:** Before starting new features or major refactors
-   - **Purpose:** Design solutions following SOLID/DRY/YAGNI principles
-   - **Output:** Detailed implementation specifications
+   - **When:** Before implementing new features
+   - **Purpose:** Design domain entities, use cases, ViewModels, repositories
+   - **Output:** Clean Architecture implementation specification
 
 2. **code-reviewer** (`.claude/agents/code-reviewer.md`)
    - **When:** After implementing code, before committing
-   - **Purpose:** Enforce architectural principles and code quality
+   - **Purpose:** Enforce Clean Architecture principles and SOLID compliance
    - **Output:** APPROVE/REJECT/CHANGES REQUESTED
 
 3. **docs-generator** (`.claude/agents/docs-generator.md`)
    - **When:** After code is approved, or when patterns change
    - **Purpose:** Create/update documentation following style guide
    - **Output:** Documentation files matching project standards
-
-### Future Agents (Not Yet Implemented)
-
-**test-writer** - Will create unit/integration tests
-- Blocked on: Need to set up test infrastructure (Jest/Mocha)
-- Value: Automated test coverage for services/panels
-
-**test-validator** - Will run automated tests
-- Blocked on: Need test-writer to create tests first
-- Value: Automated validation before commits (currently manual)
 
 ---
 
@@ -40,41 +52,39 @@ We have **3 specialized agents** configured:
 ### For New Features
 
 ```
-1. architect designs solution
-   ↓
-2. Builder implements (you or Claude)
-   ↓
-3. code-reviewer reviews
-   ↓
-4. docs-generator documents
+1. architect designs Clean Architecture solution
+   ↓ (designs domain, application, presentation, infrastructure layers)
+2. Builder implements layer by layer
+   ↓ (domain first, then application, then presentation/infrastructure)
+3. code-reviewer reviews each commit
+   ↓ (checks for anemic models, business logic placement, etc.)
+4. docs-generator documents patterns (if new)
    ↓
 5. Commit & push
 ```
 
-### For Refactoring/Bug Fixes
+### For Bug Fixes
 
 ```
-1. Builder implements (skip architect for small changes)
+1. Builder implements fix (skip architect)
    ↓
 2. code-reviewer reviews
    ↓
-3. docs-generator updates (if patterns changed)
-   ↓
-4. Commit & push
+3. Commit & push
 ```
 
 ---
 
 ## Quick Start Examples
 
-### Example 1: Small Refactor (No Architect Needed)
+### Example 1: Bug Fix (No Architect Needed)
 
-**Step 1: Builder Implements**
+**Step 1: Builder Fixes**
 ```
-You: "Extract message validation to BasePanel"
+You: "Fix the null reference error in ImportJobRepository line 145"
 
 Builder:
-- Implements isValidMessage() method
+- Fixes the bug
 - Runs npm run compile ✅
 - Invokes code-reviewer automatically
 ```
@@ -86,164 +96,186 @@ code-reviewer: "✅ APPROVED - Ready to commit"
 
 **Step 3: You Commit**
 ```bash
-git commit -m "Extract message validation to BasePanel"
-```
+git commit -m "fix: null reference in ImportJobRepository
 
-**Total time:** ~30-45 mins
-
----
-
-### Example 2: New Feature (Full Agent Flow)
-
-**Step 1: Architect Designs**
-```
-You: "I need to add bulk export feature to solution explorer"
-
-architect:
-- Researches existing architecture
-- Designs service layer (ExportService + models)
-- Designs panel layer (ExportPanel + components)
-- Designs behavior layer (exportBehavior.js)
-- Outputs detailed specification
-
-Time: ~20-30 mins
-```
-
-**Step 2: Builder Implements**
-```
-You: "Implement the ExportService as designed by architect"
-
-Builder:
-- Creates ExportService with typed models
-- Implements export methods
-- Runs npm run compile ✅
-- Invokes code-reviewer
-
-Time: ~30-60 mins (per component)
-```
-
-**Step 3: Code Reviewer Approves**
-```
-code-reviewer: "✅ APPROVED - Ready to commit"
-```
-
-**Step 4: Docs Generator Documents**
-```
-You: "Document the new export pattern we just added"
-
-docs-generator:
-- Creates/updates EXPORT_PATTERNS.md
-- Adds examples from actual code
-- Follows style guide
-- Updates cross-references
-
-Time: ~15-20 mins
-```
-
-**Step 5: You Commit Everything**
-```bash
-git add .
-git commit -m "feat: add bulk export feature
-
-- ExportService with typed models
-- ExportPanel with UI components
-- Documentation for export patterns
-
-Reviewed-by: code-reviewer ✅
-Documented-by: docs-generator ✅"
-```
-
-**Total time:** ~2-3 hours (for full feature)
-
----
-
-### Example 3: Quick Bug Fix (Minimal Flow)
-
-**Step 1: Builder Fixes**
-```
-You: "Fix the null reference error in PluginRegistrationPanel line 245"
-
-Builder:
-- Fixes the bug
-- Runs npm run compile ✅
-- Invokes code-reviewer
-
-Time: ~10-15 mins
-```
-
-**Step 2: Code Reviewer Approves**
-```
-code-reviewer: "✅ APPROVED - Ready to commit"
-```
-
-**Step 3: You Commit**
-```bash
-git commit -m "fix: null reference in PluginRegistrationPanel
-
-Added null check before accessing property"
+Added null check before accessing jobData property"
 ```
 
 **Total time:** ~15-20 mins
 
 ---
 
+### Example 2: New Feature (Full Clean Architecture Flow)
+
+**Step 1: Architect Designs**
+```
+You: "I need to add import job tracking feature"
+
+architect:
+- Reads ARCHITECTURE_GUIDE.md and CLAUDE.md
+- Designs domain layer (ImportJob entity with behavior, JobStatus value object)
+- Designs application layer (LoadImportJobsUseCase, ViewJobXmlCommand, ImportJobViewModel)
+- Designs infrastructure layer (ImportJobRepository implementing IImportJobRepository)
+- Designs presentation layer (ImportJobViewerPanel using use cases)
+- Outputs detailed specification
+
+Time: ~20-30 mins
+```
+
+**Step 2: Builder Implements Domain Layer**
+```
+You: "Implement the domain layer as designed"
+
+Builder:
+- Creates src/features/importJobs/domain/entities/ImportJob.ts (rich model)
+- Creates domain/valueObjects/JobStatus.ts
+- Creates domain/interfaces/IImportJobRepository.ts
+- Runs npm run compile ✅
+- Invokes code-reviewer
+
+code-reviewer: Checks for anemic models, ensures behavior in entity
+
+code-reviewer: "✅ APPROVED - Domain layer has rich entities"
+```
+
+**Step 3: Builder Implements Application Layer**
+```
+You: "Implement the application layer"
+
+Builder:
+- Creates application/useCases/LoadImportJobsUseCase.ts
+- Creates application/commands/ViewJobXmlCommand.ts
+- Creates application/viewModels/ImportJobViewModel.ts
+- Creates application/mappers/ImportJobViewModelMapper.ts
+- Runs npm run compile ✅
+- Invokes code-reviewer
+
+code-reviewer: Checks use cases don't contain business logic
+
+code-reviewer: "✅ APPROVED - Use cases orchestrate, don't implement logic"
+```
+
+**Step 4: Builder Implements Infrastructure & Presentation**
+```
+You: "Implement infrastructure and presentation layers"
+
+Builder:
+- Creates infrastructure/repositories/ImportJobRepository.ts
+- Updates presentation/ImportJobViewerPanel.ts to use use cases
+- Runs npm run compile ✅
+- Invokes code-reviewer
+
+code-reviewer: "✅ APPROVED - Clean separation of concerns"
+```
+
+**Step 5: Docs Generator Documents (Optional)**
+```
+You: "Document the import job pattern we just built"
+
+docs-generator:
+- Creates/updates docs with Clean Architecture example
+- Shows domain entity example
+- Shows use case pattern
+- Follows DOCUMENTATION_STYLE_GUIDE.md
+
+Time: ~15-20 mins
+```
+
+**Step 6: You Commit**
+```bash
+git commit -m "feat: add import job tracking with Clean Architecture
+
+Domain layer:
+- ImportJob entity with rich behavior
+- JobStatus value object
+- IImportJobRepository interface
+
+Application layer:
+- LoadImportJobsUseCase (orchestrates)
+- ImportJobViewModel (presentation DTO)
+- Mappers (domain → ViewModel)
+
+Infrastructure layer:
+- ImportJobRepository (implements interface)
+
+Presentation layer:
+- ImportJobViewerPanel (uses use cases, no business logic)
+
+Reviewed-by: code-reviewer ✅"
+```
+
+**Total time:** ~3-4 hours (complete feature with Clean Architecture)
+
+---
+
 ## When to Use Each Agent
 
 ### Use architect When:
-✅ Building new features (not just fixing bugs)
-✅ Major refactors affecting multiple files
-✅ Unsure how to structure the solution
-✅ Need to ensure SOLID compliance upfront
-❌ Skip for: Bug fixes, small refactors, one-file changes
+✅ Building new features (need domain/application/presentation/infrastructure design)
+✅ Adding new domain entities or use cases
+✅ Unsure how to structure solution with Clean Architecture
+✅ Need to design ViewModels and mappers
+❌ Skip for: Bug fixes, documentation updates, minor tweaks
 
 ### Use code-reviewer When:
 ✅ **ALWAYS** - After every code change before commit
 ✅ Builder automatically invokes it
-✅ Catches violations before they merge
+✅ Catches Clean Architecture violations:
+   - Anemic domain models
+   - Business logic in use cases
+   - Business logic in presentation layer
+   - Wrong dependency direction
 
 ### Use docs-generator When:
-✅ New patterns introduced
-✅ Feature documentation needed
+✅ New Clean Architecture patterns introduced
+✅ Feature documentation needed (show all layers)
 ✅ Existing docs are outdated
-✅ After architectural changes
-❌ Skip for: Bug fixes that don't change patterns
+❌ Skip for: Bug fixes that don't introduce patterns
 
 ---
 
 ## Detailed Walkthrough: Using All 3 Agents
 
-### Scenario: Add Environment Comparison Feature
+### Scenario: Add Solution Import Feature
 
 **Phase 1: Design (architect)**
 
 ```
-You: "@architect I need users to compare two environments side by side.
-Show differences in plugins, workflows, and solutions."
+You: "I need to add a solution import feature that tracks import jobs and shows progress"
 ```
 
 **architect researches:**
-- Reads ARCHITECTURE_GUIDE.md
-- Searches for similar comparison panels
-- Identifies reusable services
+- Reads ARCHITECTURE_GUIDE.md (Clean Architecture patterns)
+- Reads LAYER_RESPONSIBILITIES_GUIDE.md (what goes in each layer)
+- Searches for similar features
 
 **architect outputs:**
 ```markdown
-# Design Specification: Environment Comparison
+# Design Specification: Solution Import Feature
 
-## Architecture
-- ComparisonService (fetch data for 2 environments)
-- ComparisonPanel (orchestrate UI)
-- DiffViewerComponent (show differences)
-- comparisonBehavior.js (handle interactions)
+## Domain Layer
+- ImportJob entity (rich model with getStatus(), isComplete(), etc.)
+- Progress value object (immutable, validates 0-100)
+- JobStatus enum (Pending, InProgress, Completed, Failed)
+- IImportJobRepository interface (domain defines contract)
 
-## Models
-interface EnvironmentComparison {
-  left: EnvironmentData;
-  right: EnvironmentData;
-  differences: Difference[];
-}
+## Application Layer
+- LoadImportJobsUseCase (orchestrates loading jobs)
+- StartImportCommand (triggers import)
+- ImportJobViewModel (DTO for presentation)
+- ImportJobViewModelMapper (domain → ViewModel)
 
-[... detailed spec ...]
+## Infrastructure Layer
+- ImportJobRepository (implements IImportJobRepository)
+- ImportJobDto (API response model)
+- Mapper (DTO → domain entity)
+
+## Presentation Layer
+- ImportJobViewerPanel (uses use cases, NO business logic)
+- DataTable component for job list
+- Event handlers call use cases only
+
+[... detailed implementation spec with code examples ...]
 ```
 
 **You review and approve design.**
@@ -252,71 +284,80 @@ interface EnvironmentComparison {
 
 **Phase 2: Implementation (builder + code-reviewer)**
 
+**2a. Domain Layer**
 ```
-You: "Implement ComparisonService as specified by architect"
+You: "Implement domain layer"
 
 builder:
-1. Creates src/models/EnvironmentComparison.ts
-2. Creates src/services/ComparisonService.ts
-3. Implements methods with typed returns
-4. Runs npm run compile ✅
-5. Invokes code-reviewer
+- Creates src/features/importJobs/domain/entities/ImportJob.ts
+  (with getStatus(), isComplete(), getDuration() methods)
+- Creates domain/valueObjects/Progress.ts
+- Creates domain/enums/JobStatus.ts
+- Creates domain/interfaces/IImportJobRepository.ts
 
 code-reviewer:
-- Checks type safety ✅
-- Checks SOLID compliance ✅
-- Checks no `any` usage ✅
+- ✅ ImportJob has behavior (not anemic)
+- ✅ Progress is immutable value object
+- ✅ No infrastructure dependencies
 
-code-reviewer: "✅ APPROVED"
+code-reviewer: "✅ APPROVED - Rich domain model"
+
+You commit: "feat(domain): add ImportJob entity with behavior"
 ```
 
-**You commit:**
-```bash
-git commit -m "feat: add ComparisonService with typed models"
+**2b. Application Layer**
+```
+You: "Implement application layer"
+
+builder:
+- Creates application/useCases/LoadImportJobsUseCase.ts
+- Creates application/commands/StartImportCommand.ts
+- Creates application/viewModels/ImportJobViewModel.ts
+- Creates application/mappers/ImportJobViewModelMapper.ts
+
+code-reviewer:
+- ✅ Use cases orchestrate, no business logic
+- ✅ ViewModels are DTOs (no behavior)
+- ✅ Mappers properly convert domain → ViewModel
+
+code-reviewer: "✅ APPROVED - Clean application layer"
+
+You commit: "feat(app): add import job use cases and ViewModels"
 ```
 
-**Repeat for panel, component, behavior...**
+**2c. Infrastructure & Presentation**
+```
+You: "Implement infrastructure and presentation"
+
+builder:
+- Creates infrastructure/repositories/ImportJobRepository.ts
+- Updates presentation/ImportJobViewerPanel.ts
+
+code-reviewer:
+- ✅ Repository implements domain interface
+- ✅ Panel uses use cases (no business logic in panel)
+- ✅ Proper dependency direction (presentation → application → domain)
+
+code-reviewer: "✅ APPROVED - Clean Architecture maintained"
+
+You commit: "feat(infra+pres): add repository and panel"
+```
 
 ---
 
-**Phase 3: Documentation (docs-generator)**
+**Phase 3: Documentation (optional)**
 
 ```
-You: "@docs-generator Document the environment comparison feature we just built"
+You: "Document the import job feature"
 
 docs-generator:
-1. Reads ComparisonService, ComparisonPanel, etc.
-2. Creates COMPARISON_PATTERNS.md
-3. Adds real code examples
-4. Follows style guide (✅/❌ pattern, no dates, etc.)
-5. Updates cross-references
-6. Updates README.md index
+- Creates docs showing all 4 layers
+- Uses real code from the feature
+- Shows Clean Architecture pattern
+- Follows DOCUMENTATION_STYLE_GUIDE.md
 
-docs-generator outputs:
-"Created COMPARISON_PATTERNS.md (~600 lines)
-Updated README.md with new doc link"
+You commit: "docs: add import job Clean Architecture example"
 ```
-
-**You commit:**
-```bash
-git commit -m "docs: add environment comparison patterns
-
-Documented ComparisonService usage and panel integration"
-```
-
----
-
-**Phase 4: Manual Testing (You)**
-
-```
-1. Press F5 to launch extension
-2. Open comparison panel
-3. Select two environments
-4. Verify differences show correctly
-5. Test edge cases
-```
-
-**If bugs found:** Go back to Phase 2, fix, re-review, re-commit.
 
 ---
 
@@ -324,49 +365,40 @@ Documented ComparisonService usage and panel integration"
 
 ### Work Session (2-3 hours max)
 
-**For Feature Development:**
+**For Feature Development (Clean Architecture):**
 ```
 Hour 1:
-├─ architect designs solution (30 min)
+├─ architect designs all layers (30 min)
 ├─ Review design (15 min)
-└─ Plan implementation tasks (15 min)
+└─ Implement domain layer (15 min start)
 
 Hour 2:
-├─ Builder implements Part 1 (30 min)
-├─ code-reviewer reviews (automatic, ~2 min)
-├─ Commit (3 min)
-├─ Builder implements Part 2 (30 min)
-├─ code-reviewer reviews (automatic, ~2 min)
+├─ Finish domain layer (15 min)
+├─ code-reviewer reviews (auto, ~2 min)
+├─ Commit domain (3 min)
+├─ Implement application layer (35 min)
+├─ code-reviewer reviews (auto, ~2 min)
+└─ Commit application (3 min)
+
+Hour 3:
+├─ Implement infrastructure (25 min)
+├─ code-reviewer reviews (auto, ~2 min)
+├─ Commit infrastructure (3 min)
+├─ Implement presentation (25 min)
+├─ code-reviewer reviews (auto, ~2 min)
+└─ Commit presentation (3 min)
+
+Result: 1 design spec, 4 layer commits
+```
+
+**For Bug Fixes:**
+```
+Hour 1:
+├─ Fix bug (20 min)
+├─ code-reviewer reviews (auto, ~2 min)
 └─ Commit (3 min)
 
-Hour 3:
-├─ Builder implements Part 3 (30 min)
-├─ code-reviewer reviews (automatic, ~2 min)
-├─ Commit (3 min)
-├─ docs-generator documents feature (20 min)
-└─ Commit docs (5 min)
-
-Result: 1 design spec, 3 code commits, 1 doc commit
-```
-
-**For Refactoring:**
-```
-Hour 1:
-├─ Task 1: Builder implements (30 min)
-├─ Task 1: code-reviewer reviews (auto)
-└─ Task 1: Commit (5 min)
-
-Hour 2:
-├─ Task 2: Builder implements (30 min)
-├─ Task 2: code-reviewer reviews (auto)
-└─ Task 2: Commit (5 min)
-
-Hour 3:
-├─ Task 3: Builder implements (30 min)
-├─ Task 3: code-reviewer reviews (auto)
-└─ Task 3: Commit (5 min)
-
-Result: 3 tasks done, 3 commits, fully reviewed
+Result: 1 bug fix commit
 ```
 
 **Break between sessions!** Don't do 8 hours straight.
@@ -429,48 +461,23 @@ docs-generator: [Creates/updates documentation]
 ## Task Size Guidelines
 
 ### ✅ Good Task Size (30-60 mins)
-- Extract one method to base class
-- Add type definitions for one service
-- Delete duplicate utility file
-- Make one behavior extend BaseBehavior
+- Implement one domain entity
+- Implement one use case
+- Implement one repository
+- Create ViewModels and mappers for one feature
+- Update one panel to use use cases
 
 ### ❌ Too Large (>2 hours)
-- Refactor all services at once
-- Implement entire Phase 1.1
-- Fix all DRY violations simultaneously
+- Implement entire feature (all layers) at once
+- Multiple domain entities in one commit
+- Multiple use cases in one commit
 
-### 🎯 Perfect Task
-- **Scope:** One file changed, or one method in base class + updates to children
+### 🎯 Perfect Task (Layer-by-Layer)
+- **Scope:** One layer at a time (domain → application → infrastructure → presentation)
 - **Time:** 30-60 minutes including review
-- **Commits:** One task = one commit
+- **Commits:** One commit per layer
 - **Review:** Can be reviewed in 10-15 minutes
 
----
-
-## Session Structure
-
-### Work Session (2-3 hours max)
-
-```
-Hour 1:
-├─ Task 1: Builder implements (30 min)
-├─ Task 1: Reviewer reviews (10 min)
-└─ Task 1: Commit (5 min)
-
-Hour 2:
-├─ Task 2: Builder implements (30 min)
-├─ Task 2: Reviewer reviews (10 min)
-└─ Task 2: Commit (5 min)
-
-Hour 3:
-├─ Task 3: Builder implements (30 min)
-├─ Task 3: Reviewer reviews (10 min)
-└─ Task 3: Commit (5 min)
-
-Result: 3 tasks done, 3 commits, fully reviewed
-```
-
-**Break between sessions!** Don't do 8 hours straight.
 
 ---
 
@@ -499,39 +506,28 @@ You: "This is valid - update CLAUDE.md to document this exception"
 
 ## Progress Tracking
 
-Use this checklist structure (updated after each task):
+Track features in TODO.md using this pattern:
 
 ```markdown
-## Phase 0: Workflow Setup ✅ COMPLETE
-- [x] Enable TypeScript strict mode
-- [x] Add ESLint rules
-- [x] Simplify CLAUDE.md
-- [x] Create templates
-- [x] Add review checklist
+## Feature: Import Job Tracking
 
-## Phase 1: Foundation 🚧 IN PROGRESS
+- [x] Domain layer (commit: abc123)
+  - ImportJob entity with rich behavior
+  - JobStatus value object
+  - IImportJobRepository interface
 
-### 1.1: BasePanel Abstraction
-- [x] Extract message validation (commit: abc123)
-- [ ] Extract component event handling
-- [ ] Extract environment change handling
-- [ ] Add hook methods for child panels
-- [ ] Update 8 child panels to use new base methods
+- [x] Application layer (commit: def456)
+  - LoadImportJobsUseCase
+  - ImportJobViewModel and mapper
 
-### 1.2: Service Type Safety
-- [ ] Define models for PluginRegistrationService
-- [ ] Define models for MetadataService
-- [ ] ... (continue for all services)
+- [x] Infrastructure layer (commit: ghi789)
+  - ImportJobRepository implementation
 
-### 1.3: BaseBehavior Enforcement
-- [ ] Update environmentSetupBehavior.js
-- [ ] Update metadataBrowserBehavior.js
-- [ ] ... (continue for all behaviors)
+- [x] Presentation layer (commit: jkl012)
+  - ImportJobViewerPanel using use cases
 
-### 1.4: Delete Duplicate PanelUtils
-- [ ] Audit which PanelUtils is used
-- [ ] Delete duplicate
-- [ ] Update imports
+- [ ] Documentation
+  - Clean Architecture example
 ```
 
 ---
@@ -552,19 +548,20 @@ code .           # Launch VS Code
 ```
 
 ### 3. Keep Notes
-Create `SESSION_NOTES.md`:
+Track progress in TODO.md:
 ```
-## Session 2024-10-29 (Saturday Morning)
+## Feature: Import Job Tracking
 
-**Goal:** Phase 1.1 - Extract message validation
+**Status:** In Progress
 
 **Completed:**
-- [x] isValidMessage() extracted (commit: abc123)
-- [x] 6 panels updated to use helper (commit: def456)
+- [x] Domain layer (commit: abc123)
+- [x] Application layer (commit: def456)
+- [ ] Infrastructure layer (in progress)
 
 **Blocked:** None
 
-**Next Session:** Extract component event handling
+**Next:** Finish ImportJobRepository, then presentation layer
 ```
 
 ### 4. Take Breaks
@@ -618,36 +615,42 @@ If "Feeling" is uncertain/confused → STOP, ask questions, don't push forward.
 
 **The workflow is:**
 
-**For New Features:**
-1. architect designs solution (~30 min)
+**For New Features (Clean Architecture):**
+1. architect designs all layers (~30 min)
+   - Domain: Entities, value objects, interfaces
+   - Application: Use cases, ViewModels, mappers
+   - Infrastructure: Repository implementations
+   - Presentation: Panels using use cases
 2. Review design and approve (~15 min)
-3. Builder implements in small chunks (~30 min each)
-4. code-reviewer auto-reviews each chunk (~2 min)
-5. Commit if approved (~5 min)
-6. Repeat steps 3-5 until feature complete
-7. docs-generator documents patterns (~20 min)
-8. Commit docs (~5 min)
+3. Implement layer by layer (~30 min per layer)
+   - Domain first (rich entities, no dependencies)
+   - Application second (use cases orchestrate)
+   - Infrastructure third (repositories implement interfaces)
+   - Presentation last (panels use use cases)
+4. code-reviewer auto-reviews each layer (~2 min)
+   - Checks for anemic models
+   - Checks business logic placement
+   - Checks dependency direction
+5. Commit each layer separately (~5 min)
+6. docs-generator documents pattern if new (~20 min)
 
-**For Refactoring/Bug Fixes:**
-1. Builder implements (~30 min)
+**For Bug Fixes:**
+1. Implement fix (~20 min)
 2. code-reviewer auto-reviews (~2 min)
 3. Commit if approved (~5 min)
-4. docs-generator updates docs if patterns changed (~20 min)
-5. Commit docs (~5 min)
 
 **The keys are:**
-- **architect for design** - Plan before coding (new features only)
-- **Small batches** - One task at a time, easy to review
-- **code-reviewer always** - Catch violations before they merge
-- **docs-generator after** - Document new patterns immediately
-- **Commit frequently** - Easy rollback if something breaks
+- **Clean Architecture** - Domain → Application → Infrastructure/Presentation
+- **Rich domain models** - Entities with behavior (not anemic)
+- **Use cases orchestrate** - No business logic in use cases
+- **Layer by layer** - Commit domain, then application, then infra/presentation
+- **code-reviewer catches** - Anemic models, wrong layer responsibilities
 - **Manual test after commit** - F5 in VS Code, verify it works
-- **Take breaks** - Avoid burnout, this is a marathon
 
 **Current Validation:**
 - ✅ TypeScript compilation (`npm run compile`)
 - ✅ ESLint rules (part of compile)
 - ✅ Manual testing (F5 in VS Code)
-- ⏳ Unit tests (future: test-writer + test-validator)
+- ✅ code-reviewer (Clean Architecture compliance)
 
-**You've got this. Start with ONE task today.**
+**You've got this. Start with ONE feature today.**
