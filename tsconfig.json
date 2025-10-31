@@ -20,6 +20,7 @@
         "out",
         "dist",
         "Old/**/*",
-        "templates/**/*"
+        "templates/**/*",
+        "TEMP/**/*"
     ]
 }
