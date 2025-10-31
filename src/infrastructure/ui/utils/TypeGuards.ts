@@ -104,27 +104,75 @@ export function isSaveEnvironmentMessage(message: unknown): message is SaveEnvir
 
 /**
  * Test connection message from webview.
+ * Sends same environment data as save for connection testing.
  */
 export interface TestConnectionMessage {
-	command: 'test';
-	data?: never;
+	command: 'test-connection';
+	data: {
+		name: string;
+		dataverseUrl: string;
+		tenantId: string;
+		authenticationMethod: AuthenticationMethod;
+		publicClientId: string;
+		powerPlatformEnvironmentId?: string;
+		clientId?: string;
+		clientSecret?: string;
+		username?: string;
+		password?: string;
+	};
 }
 
 /**
- * Type guard for test connection message.
+ * Type guard for test connection message with full validation.
  *
  * @param message - Unknown message from webview
- * @returns True if message is test connection command
+ * @returns True if message is test connection command with valid data
  */
 export function isTestConnectionMessage(message: unknown): message is TestConnectionMessage {
-	return isWebviewMessage(message) && message.command === 'test';
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'test-connection') {
+		return false;
+	}
+
+	const data = message.data;
+
+	if (typeof data !== 'object' || data === null) {
+		return false;
+	}
+
+	// Validate required fields same as save
+	if (!('name' in data && typeof data.name === 'string')) {
+		return false;
+	}
+
+	if (!('dataverseUrl' in data && typeof data.dataverseUrl === 'string')) {
+		return false;
+	}
+
+	if (!('tenantId' in data && typeof data.tenantId === 'string')) {
+		return false;
+	}
+
+	if (!('authenticationMethod' in data && typeof data.authenticationMethod === 'string')) {
+		return false;
+	}
+
+	if (!('publicClientId' in data && typeof data.publicClientId === 'string')) {
+		return false;
+	}
+
+	// Validate authenticationMethod is a valid enum value
+	return AUTHENTICATION_METHODS.includes(data.authenticationMethod as AuthenticationMethod);
 }
 
 /**
  * Delete environment message from webview.
  */
 export interface DeleteEnvironmentMessage {
-	command: 'delete';
+	command: 'delete-environment';
 	data?: never;
 }
 
@@ -132,35 +180,82 @@ export interface DeleteEnvironmentMessage {
  * Type guard for delete environment message.
  *
  * @param message - Unknown message from webview
- * @returns True if message is delete command
+ * @returns True if message is delete-environment command
  */
 export function isDeleteEnvironmentMessage(message: unknown): message is DeleteEnvironmentMessage {
-	return isWebviewMessage(message) && message.command === 'delete';
+	return isWebviewMessage(message) && message.command === 'delete-environment';
 }
 
 /**
  * Discover environment ID message from webview.
+ * Sends environment connection data to discover the Power Platform Environment ID via BAP API.
  */
 export interface DiscoverEnvironmentIdMessage {
-	command: 'discoverEnvironmentId';
-	data?: never;
+	command: 'discover-environment-id';
+	data: {
+		name: string;
+		dataverseUrl: string;
+		tenantId: string;
+		authenticationMethod: AuthenticationMethod;
+		publicClientId: string;
+		clientId?: string;
+		clientSecret?: string;
+		username?: string;
+		password?: string;
+	};
 }
 
 /**
- * Type guard for discover environment ID message.
+ * Type guard for discover environment ID message with validation.
  *
  * @param message - Unknown message from webview
- * @returns True if message is discoverEnvironmentId command
+ * @returns True if message is discover-environment-id command with valid data
  */
 export function isDiscoverEnvironmentIdMessage(message: unknown): message is DiscoverEnvironmentIdMessage {
-	return isWebviewMessage(message) && message.command === 'discoverEnvironmentId';
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'discover-environment-id') {
+		return false;
+	}
+
+	const data = message.data;
+
+	if (typeof data !== 'object' || data === null) {
+		return false;
+	}
+
+	// Validate required fields for discovery
+	if (!('name' in data && typeof data.name === 'string')) {
+		return false;
+	}
+
+	if (!('dataverseUrl' in data && typeof data.dataverseUrl === 'string')) {
+		return false;
+	}
+
+	if (!('tenantId' in data && typeof data.tenantId === 'string')) {
+		return false;
+	}
+
+	if (!('authenticationMethod' in data && typeof data.authenticationMethod === 'string')) {
+		return false;
+	}
+
+	if (!('publicClientId' in data && typeof data.publicClientId === 'string')) {
+		return false;
+	}
+
+	// Validate authenticationMethod is a valid enum value
+	return AUTHENTICATION_METHODS.includes(data.authenticationMethod as AuthenticationMethod);
 }
 
 /**
  * Check unique name message from webview.
  */
 export interface CheckUniqueNameMessage {
-	command: 'checkUniqueName';
+	command: 'validate-name';
 	data: {
 		name: string;
 		currentId?: string;
@@ -178,7 +273,7 @@ export function isCheckUniqueNameMessage(message: unknown): message is CheckUniq
 		return false;
 	}
 
-	if (message.command !== 'checkUniqueName') {
+	if (message.command !== 'validate-name') {
 		return false;
 	}
 

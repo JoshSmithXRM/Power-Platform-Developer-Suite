@@ -4,10 +4,10 @@
  */
 
 import { html, raw, fragment } from '../../../../infrastructure/ui/utils/HtmlUtils';
-import { renderFormField } from '../../../../infrastructure/ui/views/formField';
-import { renderButton } from '../../../../infrastructure/ui/views/button';
-import { renderSelect } from '../../../../infrastructure/ui/views/select';
-import { renderSection } from '../../../../infrastructure/ui/views/section';
+import { renderFormField } from '../../../../shared/presentation/components/html/formField';
+import { renderButton } from '../../../../shared/presentation/components/html/button';
+import { renderSelect } from '../../../../shared/presentation/components/html/select';
+import { renderSection } from '../../../../shared/presentation/components/html/section';
 
 export interface EnvironmentSetupViewResources {
 	styleUri: string;

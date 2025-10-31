@@ -181,18 +181,36 @@ describe('TypeGuards', () => {
 	});
 
 	describe('isTestConnectionMessage', () => {
-		it('should return true for valid test message', () => {
-			const message = { command: 'test' };
+		it('should return true for valid test message with data', () => {
+			const message = {
+				command: 'test-connection',
+				data: {
+					name: 'DEV',
+					dataverseUrl: 'https://org.crm.dynamics.com',
+					tenantId: 'tenant-123',
+					authenticationMethod: 'Interactive',
+					publicClientId: 'client-123'
+				}
+			};
 			expect(isTestConnectionMessage(message)).toBe(true);
 		});
 
-		it('should return true even with data', () => {
-			const message = { command: 'test', data: {} };
-			expect(isTestConnectionMessage(message)).toBe(true);
+		it('should return false for missing required fields', () => {
+			const message = { command: 'test-connection', data: {} };
+			expect(isTestConnectionMessage(message)).toBe(false);
 		});
 
 		it('should return false for invalid command', () => {
-			const message = { command: 'save' };
+			const message = {
+				command: 'save',
+				data: {
+					name: 'DEV',
+					dataverseUrl: 'https://org.crm.dynamics.com',
+					tenantId: 'tenant-123',
+					authenticationMethod: 'Interactive',
+					publicClientId: 'client-123'
+				}
+			};
 			expect(isTestConnectionMessage(message)).toBe(false);
 		});
 
@@ -205,12 +223,12 @@ describe('TypeGuards', () => {
 
 	describe('isDeleteEnvironmentMessage', () => {
 		it('should return true for valid delete message', () => {
-			const message = { command: 'delete' };
+			const message = { command: 'delete-environment' };
 			expect(isDeleteEnvironmentMessage(message)).toBe(true);
 		});
 
 		it('should return true even with data', () => {
-			const message = { command: 'delete', data: {} };
+			const message = { command: 'delete-environment', data: {} };
 			expect(isDeleteEnvironmentMessage(message)).toBe(true);
 		});
 
@@ -225,18 +243,36 @@ describe('TypeGuards', () => {
 	});
 
 	describe('isDiscoverEnvironmentIdMessage', () => {
-		it('should return true for valid discover message', () => {
-			const message = { command: 'discoverEnvironmentId' };
+		it('should return true for valid discover message with data', () => {
+			const message = {
+				command: 'discover-environment-id',
+				data: {
+					name: 'DEV',
+					dataverseUrl: 'https://org.crm.dynamics.com',
+					tenantId: 'tenant-123',
+					authenticationMethod: 'Interactive',
+					publicClientId: 'client-123'
+				}
+			};
 			expect(isDiscoverEnvironmentIdMessage(message)).toBe(true);
 		});
 
-		it('should return true even with data', () => {
-			const message = { command: 'discoverEnvironmentId', data: {} };
-			expect(isDiscoverEnvironmentIdMessage(message)).toBe(true);
+		it('should return false for missing required fields', () => {
+			const message = { command: 'discover-environment-id', data: {} };
+			expect(isDiscoverEnvironmentIdMessage(message)).toBe(false);
 		});
 
 		it('should return false for invalid command', () => {
-			const message = { command: 'discover' };
+			const message = {
+				command: 'discover',
+				data: {
+					name: 'DEV',
+					dataverseUrl: 'https://org.crm.dynamics.com',
+					tenantId: 'tenant-123',
+					authenticationMethod: 'Interactive',
+					publicClientId: 'client-123'
+				}
+			};
 			expect(isDiscoverEnvironmentIdMessage(message)).toBe(false);
 		});
 
@@ -248,7 +284,7 @@ describe('TypeGuards', () => {
 	describe('isCheckUniqueNameMessage', () => {
 		it('should return true for valid check unique name message', () => {
 			const message = {
-				command: 'checkUniqueName',
+				command: 'validate-name',
 				data: { name: 'DEV' }
 			};
 			expect(isCheckUniqueNameMessage(message)).toBe(true);
@@ -256,7 +292,7 @@ describe('TypeGuards', () => {
 
 		it('should return true with currentId', () => {
 			const message = {
-				command: 'checkUniqueName',
+				command: 'validate-name',
 				data: { name: 'DEV', currentId: 'env-123' }
 			};
 			expect(isCheckUniqueNameMessage(message)).toBe(true);
@@ -264,7 +300,7 @@ describe('TypeGuards', () => {
 
 		it('should return false for missing name', () => {
 			const message = {
-				command: 'checkUniqueName',
+				command: 'validate-name',
 				data: {}
 			};
 			expect(isCheckUniqueNameMessage(message)).toBe(false);
@@ -272,7 +308,7 @@ describe('TypeGuards', () => {
 
 		it('should return false for non-string name', () => {
 			const message = {
-				command: 'checkUniqueName',
+				command: 'validate-name',
 				data: { name: 123 }
 			};
 			expect(isCheckUniqueNameMessage(message)).toBe(false);
@@ -280,7 +316,7 @@ describe('TypeGuards', () => {
 
 		it('should return false for null data', () => {
 			const message = {
-				command: 'checkUniqueName',
+				command: 'validate-name',
 				data: null
 			};
 			expect(isCheckUniqueNameMessage(message)).toBe(false);

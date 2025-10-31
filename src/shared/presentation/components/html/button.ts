@@ -3,7 +3,7 @@
  * Renders a button with variant styles.
  */
 
-import { html, attrs } from '../utils/HtmlUtils';
+import { html, attrs } from '../../../../infrastructure/ui/utils/HtmlUtils';
 
 export interface ButtonProps {
 	/** Unique identifier for the button */

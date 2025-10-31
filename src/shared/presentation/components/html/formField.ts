@@ -3,7 +3,7 @@
  * Renders a labeled input field with optional help text and validation.
  */
 
-import { html, attrs } from '../utils/HtmlUtils';
+import { html, attrs } from '../../../../infrastructure/ui/utils/HtmlUtils';
 
 export interface FormFieldProps {
 	/** Unique identifier for the input element */

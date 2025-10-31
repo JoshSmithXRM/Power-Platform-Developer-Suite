@@ -3,7 +3,7 @@
  * Renders a labeled select element with options.
  */
 
-import { html, attrs, each } from '../utils/HtmlUtils';
+import { html, attrs, each } from '../../../../infrastructure/ui/utils/HtmlUtils';
 
 export interface SelectOption {
 	/** Option value */

@@ -7,8 +7,19 @@ import { TestConnectionUseCase } from '../../application/useCases/TestConnection
 import { DiscoverEnvironmentIdUseCase } from '../../application/useCases/DiscoverEnvironmentIdUseCase';
 import { ValidateUniqueNameUseCase } from '../../application/useCases/ValidateUniqueNameUseCase';
 import { CheckConcurrentEditUseCase } from '../../application/useCases/CheckConcurrentEditUseCase';
-import { ApplicationError } from '../../application/errors/ApplicationError';
 import { renderEnvironmentSetup } from '../views/environmentSetup';
+import {
+	isSaveEnvironmentMessage,
+	isTestConnectionMessage,
+	isDiscoverEnvironmentIdMessage,
+	isDeleteEnvironmentMessage,
+	isCheckUniqueNameMessage,
+	isWebviewMessage,
+	type SaveEnvironmentMessage,
+	type TestConnectionMessage,
+	type DiscoverEnvironmentIdMessage,
+	type CheckUniqueNameMessage
+} from '../../../../infrastructure/ui/utils/TypeGuards';
 
 /**
  * Presentation layer panel for Environment Setup
@@ -124,37 +135,23 @@ export class EnvironmentSetupPanel {
 	}
 
 	private async handleMessage(message: unknown): Promise<void> {
-		if (!message || typeof message !== 'object') {
-			return;
-		}
-
-		const msg = message as { command: string; data?: unknown };
 		try {
-			switch (msg.command) {
-				case 'save-environment':
-					await this.handleSaveEnvironment(msg.data);
-					break;
-
-				case 'test-connection':
-					await this.handleTestConnection(msg.data);
-					break;
-
-				case 'discover-environment-id':
-					await this.handleDiscoverEnvironmentId(msg.data);
-					break;
-
-				case 'delete-environment':
-					await this.handleDeleteEnvironment();
-					break;
-
-				case 'validate-name':
-					await this.handleValidateName(msg.data);
-					break;
-
-				default:
-					// Unknown command - ignore
-					break;
+			// Use type guards for proper type narrowing
+			if (isSaveEnvironmentMessage(message)) {
+				await this.handleSaveEnvironment(message.data);
+			} else if (isTestConnectionMessage(message)) {
+				await this.handleTestConnection(message.data);
+			} else if (isDiscoverEnvironmentIdMessage(message)) {
+				await this.handleDiscoverEnvironmentId(message.data);
+			} else if (isDeleteEnvironmentMessage(message)) {
+				await this.handleDeleteEnvironment();
+			} else if (isCheckUniqueNameMessage(message)) {
+				await this.handleValidateName(message.data);
+			} else if (isWebviewMessage(message)) {
+				// Known webview message but not handled - ignore silently
+				return;
 			}
+			// Unknown message type - ignore
 		} catch (error) {
 			this.handleError(error as Error, 'Operation failed');
 		}
@@ -175,28 +172,22 @@ export class EnvironmentSetupPanel {
 		}
 	}
 
-	private async handleSaveEnvironment(data: unknown): Promise<void> {
-		// Validate message data
-		if (!data || typeof data !== 'object') {
-			throw new ApplicationError('Invalid environment data');
-		}
-
-		const envData = data as Record<string, unknown>;
+	private async handleSaveEnvironment(data: SaveEnvironmentMessage['data']): Promise<void> {
 		const wasNew = !this.currentEnvironmentId;
 
-		// Delegate to use case
+		// Delegate to use case - data is already validated by type guard
 		const result = await this.saveEnvironmentUseCase.execute({
 			existingEnvironmentId: this.currentEnvironmentId,
-			name: envData.name as string,
-			dataverseUrl: envData.dataverseUrl as string,
-			tenantId: envData.tenantId as string,
-			authenticationMethod: envData.authenticationMethod as string,
-			publicClientId: envData.publicClientId as string,
-			powerPlatformEnvironmentId: envData.powerPlatformEnvironmentId as string | undefined,
-			clientId: envData.clientId as string | undefined,
-			clientSecret: envData.clientSecret as string | undefined,
-			username: envData.username as string | undefined,
-			password: envData.password as string | undefined,
+			name: data.name,
+			dataverseUrl: data.dataverseUrl,
+			tenantId: data.tenantId,
+			authenticationMethod: data.authenticationMethod,
+			publicClientId: data.publicClientId,
+			powerPlatformEnvironmentId: data.environmentId,
+			clientId: data.clientId,
+			clientSecret: data.clientSecret,
+			username: data.username,
+			password: data.password,
 			preserveExistingCredentials: true
 		});
 
@@ -231,32 +222,26 @@ export class EnvironmentSetupPanel {
 		vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
 	}
 
-	private async handleTestConnection(data: unknown): Promise<void> {
-		if (!data || typeof data !== 'object') {
-			throw new ApplicationError('Invalid connection data');
-		}
-
-		const connData = data as Record<string, unknown>;
-
+	private async handleTestConnection(data: TestConnectionMessage['data']): Promise<void> {
 		// Show progress
 		await vscode.window.withProgress({
 			location: vscode.ProgressLocation.Notification,
 			title: "Testing connection...",
 			cancellable: false
 		}, async () => {
-			// Delegate to use case
+			// Delegate to use case - data is already validated by type guard
 			const result = await this.testConnectionUseCase.execute({
 				existingEnvironmentId: this.currentEnvironmentId,
-				name: connData.name as string,
-				dataverseUrl: connData.dataverseUrl as string,
-				tenantId: connData.tenantId as string,
-				authenticationMethod: connData.authenticationMethod as string,
-				publicClientId: connData.publicClientId as string,
-				powerPlatformEnvironmentId: connData.powerPlatformEnvironmentId as string | undefined,
-				clientId: connData.clientId as string | undefined,
-				clientSecret: connData.clientSecret as string | undefined,
-				username: connData.username as string | undefined,
-				password: connData.password as string | undefined
+				name: data.name,
+				dataverseUrl: data.dataverseUrl,
+				tenantId: data.tenantId,
+				authenticationMethod: data.authenticationMethod,
+				publicClientId: data.publicClientId,
+				powerPlatformEnvironmentId: data.powerPlatformEnvironmentId,
+				clientId: data.clientId,
+				clientSecret: data.clientSecret,
+				username: data.username,
+				password: data.password
 			});
 
 			if (result.success) {
@@ -273,31 +258,25 @@ export class EnvironmentSetupPanel {
 		});
 	}
 
-	private async handleDiscoverEnvironmentId(data: unknown): Promise<void> {
-		if (!data || typeof data !== 'object') {
-			throw new ApplicationError('Invalid connection data');
-		}
-
-		const connData = data as Record<string, unknown>;
-
+	private async handleDiscoverEnvironmentId(data: DiscoverEnvironmentIdMessage['data']): Promise<void> {
 		// Show progress
 		await vscode.window.withProgress({
 			location: vscode.ProgressLocation.Notification,
 			title: "Discovering Power Platform Environment ID...",
 			cancellable: false
 		}, async () => {
-			// Delegate to use case
+			// Delegate to use case - data is already validated by type guard
 			const result = await this.discoverEnvironmentIdUseCase.execute({
 				existingEnvironmentId: this.currentEnvironmentId,
-				name: connData.name as string,
-				dataverseUrl: connData.dataverseUrl as string,
-				tenantId: connData.tenantId as string,
-				authenticationMethod: connData.authenticationMethod as string,
-				publicClientId: connData.publicClientId as string,
-				clientId: connData.clientId as string | undefined,
-				clientSecret: connData.clientSecret as string | undefined,
-				username: connData.username as string | undefined,
-				password: connData.password as string | undefined
+				name: data.name,
+				dataverseUrl: data.dataverseUrl,
+				tenantId: data.tenantId,
+				authenticationMethod: data.authenticationMethod,
+				publicClientId: data.publicClientId,
+				clientId: data.clientId,
+				clientSecret: data.clientSecret,
+				username: data.username,
+				password: data.password
 			});
 
 			if (result.success) {
@@ -312,7 +291,7 @@ export class EnvironmentSetupPanel {
 
 				if (retry === 'Use Interactive Auth') {
 					// Retry with Interactive auth
-					await this.handleDiscoverEnvironmentIdWithInteractive(connData);
+					await this.handleDiscoverEnvironmentIdWithInteractive(data);
 					return; // Don't send result to webview yet
 				} else {
 					vscode.window.showInformationMessage('You can manually enter the Environment ID from the Power Platform Admin Center.');
@@ -329,7 +308,7 @@ export class EnvironmentSetupPanel {
 		});
 	}
 
-	private async handleDiscoverEnvironmentIdWithInteractive(connData: Record<string, unknown>): Promise<void> {
+	private async handleDiscoverEnvironmentIdWithInteractive(data: DiscoverEnvironmentIdMessage['data']): Promise<void> {
 		// Show progress
 		await vscode.window.withProgress({
 			location: vscode.ProgressLocation.Notification,
@@ -340,11 +319,11 @@ export class EnvironmentSetupPanel {
 			const result = await this.discoverEnvironmentIdUseCase.execute({
 				// Use temporary ID to avoid caching credentials
 				existingEnvironmentId: undefined,
-				name: connData.name as string,
-				dataverseUrl: connData.dataverseUrl as string,
-				tenantId: connData.tenantId as string,
+				name: data.name,
+				dataverseUrl: data.dataverseUrl,
+				tenantId: data.tenantId,
 				authenticationMethod: 'Interactive', // Force Interactive for discovery
-				publicClientId: connData.publicClientId as string,
+				publicClientId: data.publicClientId,
 				clientId: undefined,
 				clientSecret: undefined,
 				username: undefined,
@@ -396,16 +375,10 @@ export class EnvironmentSetupPanel {
 		this.dispose();
 	}
 
-	private async handleValidateName(data: unknown): Promise<void> {
-		if (!data || typeof data !== 'object') {
-			return;
-		}
-
-		const nameData = data as { name: string };
-
-		// Delegate to use case
+	private async handleValidateName(data: CheckUniqueNameMessage['data']): Promise<void> {
+		// Delegate to use case - data is already validated by type guard
 		const result = await this.validateUniqueNameUseCase.execute({
-			name: nameData.name,
+			name: data.name,
 			excludeEnvironmentId: this.currentEnvironmentId
 		});
 

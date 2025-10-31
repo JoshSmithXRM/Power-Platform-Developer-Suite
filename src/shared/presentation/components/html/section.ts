@@ -3,7 +3,7 @@
  * Renders a section with title and content.
  */
 
-import { html, raw } from '../utils/HtmlUtils';
+import { html, raw } from '../../../../infrastructure/ui/utils/HtmlUtils';
 
 export interface SectionProps {
 	/** Section title */
