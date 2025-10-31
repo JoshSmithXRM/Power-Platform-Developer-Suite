@@ -379,9 +379,3 @@ This architecture aims to:
 ## 🚀 Status
 
 Initial architecture documentation complete.
-
-**Next Steps:**
-1. Create `adr/` folder for Architectural Decision Records
-2. Document decision: Why Clean Architecture?
-3. Document decision: Why feature-first?
-4. Document decision: Why command pattern?

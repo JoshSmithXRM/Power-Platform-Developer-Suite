@@ -382,12 +382,6 @@ Before submitting documentation, verify:
 2. [Section 2 name]
 3. [Section 3 name]
 
-**Next Steps**:
-- [ ] Review for accuracy
-- [ ] Update README.md index
-- [ ] Add cross-references from related docs
-- [ ] Commit with message: "docs: add {topic} {type}"
-
 **Files Created**:
 - `docs/{FILENAME}`
 

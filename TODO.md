@@ -237,7 +237,6 @@ Document and implement:
 
 - **Quick Reference sections are deferred** - They're valuable but time-consuming. Can be added incrementally.
 - ✅ **.claude setup complete** - Agents ready to guide Clean Architecture implementation.
-- **YAGNI on ADRs** - Architecture docs are sufficient. Add ADRs later only if needed for controversial decisions.
 - **Start small with code** - One feature as reference (ImportJobs), then replicate pattern.
 
 ---
