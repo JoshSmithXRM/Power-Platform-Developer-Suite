@@ -44,7 +44,7 @@ export class EnvironmentSetupPanel {
 			}
 
 			// Register edit session
-			CheckConcurrentEditUseCase.registerEditSession(environmentId);
+			this.checkConcurrentEditUseCase.registerEditSession(environmentId);
 		}
 
 		// Set webview options
@@ -209,7 +209,7 @@ export class EnvironmentSetupPanel {
 		// Update panel state if new
 		if (wasNew) {
 			this.currentEnvironmentId = result.environmentId;
-			CheckConcurrentEditUseCase.registerEditSession(this.currentEnvironmentId);
+			this.checkConcurrentEditUseCase.registerEditSession(this.currentEnvironmentId);
 
 			// Update panel key in map
 			EnvironmentSetupPanel.currentPanels.delete('new');
@@ -774,7 +774,7 @@ export class EnvironmentSetupPanel {
 	public dispose(): void {
 		// Unregister edit session
 		if (this.currentEnvironmentId) {
-			CheckConcurrentEditUseCase.unregisterEditSession(this.currentEnvironmentId);
+			this.checkConcurrentEditUseCase.unregisterEditSession(this.currentEnvironmentId);
 		}
 
 		// Remove from map

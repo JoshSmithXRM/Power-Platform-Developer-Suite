@@ -1,11 +1,12 @@
 /**
  * Query Use Case: Check if environment is being edited in another panel
+ * Uses instance-based state for better testability
  */
 export class CheckConcurrentEditUseCase {
-	private static editingSessions: Set<string> = new Set();
+	private editingSessions: Set<string> = new Set();
 
 	public execute(request: CheckConcurrentEditRequest): CheckConcurrentEditResponse {
-		const isBeingEdited = CheckConcurrentEditUseCase.editingSessions.has(request.environmentId);
+		const isBeingEdited = this.editingSessions.has(request.environmentId);
 
 		return {
 			isBeingEdited,
@@ -13,12 +14,12 @@ export class CheckConcurrentEditUseCase {
 		};
 	}
 
-	public static registerEditSession(environmentId: string): void {
-		CheckConcurrentEditUseCase.editingSessions.add(environmentId);
+	public registerEditSession(environmentId: string): void {
+		this.editingSessions.add(environmentId);
 	}
 
-	public static unregisterEditSession(environmentId: string): void {
-		CheckConcurrentEditUseCase.editingSessions.delete(environmentId);
+	public unregisterEditSession(environmentId: string): void {
+		this.editingSessions.delete(environmentId);
 	}
 }
 
