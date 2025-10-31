@@ -1,62 +1,31 @@
 # Power Platform Developer Suite - Architecture Documentation
 
-> **Purpose:** Comprehensive architecture documentation for building features with Clean Architecture principles.
+> **Purpose:** Clean Architecture documentation for building features with TypeScript in VS Code extensions.
 
 ---
 
 ## 🎯 Start Here
 
-If you're new to this codebase or implementing a new feature:
+**If you're new to this codebase:**
 
-1. **Read [ARCHITECTURE_GUIDE.md](./ARCHITECTURE_GUIDE.md)** - Understand the big picture
-2. **Read [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md)** - Know what goes where
-3. **Read [QUICK_REFERENCE.md](./QUICK_REFERENCE.md)** - Checklists and common patterns
-4. **Start building** - Follow the step-by-step guide in Quick Reference
-
----
-
-## 📚 Documentation Structure
-
-### Core Concepts
-
-| Document | Purpose | When to Read |
-|----------|---------|--------------|
-| [ARCHITECTURE_GUIDE.md](./ARCHITECTURE_GUIDE.md) | Architecture overview, principles, layer definitions | **Start here** - Understand the foundation |
-| [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md) | Detailed rules for each layer with examples | When deciding where code belongs |
-| [EXECUTION_PIPELINE_GUIDE.md](./EXECUTION_PIPELINE_GUIDE.md) | How requests flow through layers with real examples | When understanding how features work |
-| [DIRECTORY_STRUCTURE_GUIDE.md](./DIRECTORY_STRUCTURE_GUIDE.md) | File organization and naming conventions | When creating new files |
-| [COMMUNICATION_PATTERNS.md](./COMMUNICATION_PATTERNS.md) | Extension Host ↔ Webview communication | When working with panels/components |
-| [LOGGING_GUIDE.md](./LOGGING_GUIDE.md) | Logging standards and best practices | When adding logging to code |
-| [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) | Cheat sheet, checklists, common mistakes | **Reference frequently** |
+1. **Read [CLAUDE.md](../CLAUDE.md)** - Non-negotiable rules for AI and developers
+2. **Read [ARCHITECTURAL_DECISION_RECORDS.md](./ARCHITECTURAL_DECISION_RECORDS.md)** - Why we made key decisions
+3. **Read [ARCHITECTURE_GUIDE.md](./ARCHITECTURE_GUIDE.md)** - Understand the layers
+4. **Read [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md)** - Know what goes where
+5. **Start building** - Implement your first feature following the patterns
 
 ---
 
-## 🚀 Quick Start
+## 📚 Documentation
 
-### I Want To...
-
-#### Implement a New Feature
-1. Read [QUICK_REFERENCE.md § Implementing a New Feature](./QUICK_REFERENCE.md#-implementing-a-new-feature)
-2. Follow the step-by-step guide
-3. Use checklists before committing
-
-#### Understand How Panels Work
-1. Read [ARCHITECTURE_GUIDE.md § Communication Patterns](./ARCHITECTURE_GUIDE.md#communication-patterns)
-2. Read [COMMUNICATION_PATTERNS.md](./COMMUNICATION_PATTERNS.md)
-3. Look at [EXECUTION_PIPELINE_GUIDE.md § Example 1](./EXECUTION_PIPELINE_GUIDE.md#example-1-loading-import-jobs)
-
-#### Know Where to Put Code
-1. Read [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md)
-2. Use the [Quick Reference § Where Does This Go?](./QUICK_REFERENCE.md#where-does-this-go) table
-
-#### Fix Legacy Code
-1. Understand [ARCHITECTURE_GUIDE.md § Layers Defined](./ARCHITECTURE_GUIDE.md#layers-defined)
-2. Identify violations in [QUICK_REFERENCE.md § Common Mistakes](./QUICK_REFERENCE.md#-common-mistakes)
-3. Refactor one layer at a time (see Migration Strategy)
-
-#### Add Logging
-1. Read [LOGGING_GUIDE.md](./LOGGING_GUIDE.md)
-2. Use [LOGGING_GUIDE.md § Common Logging Scenarios](./LOGGING_GUIDE.md#common-logging-scenarios)
+| Document | Purpose |
+|----------|---------|
+| **[CLAUDE.md](../CLAUDE.md)** | ⚠️ **Essential rules** - Read first |
+| **[ARCHITECTURAL_DECISION_RECORDS.md](./ARCHITECTURAL_DECISION_RECORDS.md)** | Why we chose feature-first, rich models, TypeScript strict mode |
+| [ARCHITECTURE_GUIDE.md](./ARCHITECTURE_GUIDE.md) | Architecture overview and principles |
+| [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md) | Detailed layer rules with examples |
+| [DIRECTORY_STRUCTURE_GUIDE.md](./DIRECTORY_STRUCTURE_GUIDE.md) | Feature-first file organization |
+| [DOCUMENTATION_REVIEW_FINDINGS.md](./DOCUMENTATION_REVIEW_FINDINGS.md) | Agent review findings (reference) |
 
 ---
 
@@ -65,154 +34,142 @@ If you're new to this codebase or implementing a new feature:
 ### Layers
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Presentation Layer                      │
-│  Panels, Components, Behaviors                              │
-│  - ImportJobViewerPanel                                     │
-│  - DataTableComponent                                       │
-└───────────────────┬─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                  Presentation Layer                     │
+│  Panels, Components (delegate to use cases)             │
+└───────────────────┬─────────────────────────────────────┘
                     │ Uses
-┌───────────────────▼─────────────────────────────────────────┐
-│                    Application Layer                         │
-│  Use Cases, Commands, ViewModels, Mappers                   │
-│  - LoadImportJobsUseCase                                    │
-│  - ViewJobXmlCommand                                        │
-│  - ImportJobViewModel                                       │
-└───────────────────┬─────────────────────────────────────────┘
+┌───────────────────▼─────────────────────────────────────┐
+│                  Application Layer                      │
+│  Use Cases, Commands, ViewModels (orchestrate)          │
+└───────────────────┬─────────────────────────────────────┘
                     │ Uses
-┌───────────────────▼─────────────────────────────────────────┐
-│                      Domain Layer                           │
-│  Entities, Value Objects, Domain Services                   │
-│  - ImportJob (entity)                                       │
-│  - JobStatus (value object)                                 │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────▼─────────────────────────────────────┐
+│                    Domain Layer                         │
+│  Entities, Value Objects (business logic)               │
+└─────────────────────────────────────────────────────────┘
                     ▲
                     │ Implements interfaces
-┌───────────────────┴─────────────────────────────────────────┐
-│                  Infrastructure Layer                        │
-│  Repositories, API Clients, External Services               │
-│  - ImportJobRepository                                      │
-│  - DataverseApiClient                                       │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────┴─────────────────────────────────────┐
+│                Infrastructure Layer                      │
+│  Repositories, API Clients (external dependencies)      │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Data Flow
-
-```
-User clicks button (Webview)
-    ↓ postMessage
-Panel receives message (Extension Host)
-    ↓ delegates
-Use Case executes (Application Layer)
-    ↓ calls
-Repository fetches data (Infrastructure Layer)
-    ↓ transforms
-Domain Entity (Domain Layer)
-    ↓ applies business logic
-Use Case maps to ViewModel (Application Layer)
-    ↓ returns
-Panel updates component (Presentation Layer)
-    ↓ postMessage
-Webview updates UI (Behavior)
-```
-
-See [EXECUTION_PIPELINE_GUIDE.md](./EXECUTION_PIPELINE_GUIDE.md) for detailed examples.
-
----
-
-## 🧠 Key Principles
-
-### 1. Separation of Concerns
-- **Domain** = Business logic (pure TypeScript)
-- **Application** = Orchestration (use cases, commands)
-- **Presentation** = UI (panels, components, behaviors)
-- **Infrastructure** = External dependencies (API, file system, VS Code)
-
-### 2. Dependency Rule
-```
-Infrastructure ──→ Application ──→ Domain
-Presentation ──→ Application ──→ Domain
-```
-
-**Dependencies point inward.** Domain has ZERO dependencies.
-
-### 3. Rich Domain Models
-```typescript
-// ❌ Anemic model
-interface ImportJob {
-    progress?: number;
-    completedon?: string;
-}
-
-// ✅ Rich model
-class ImportJob {
-    getStatus(): JobStatus { /* logic */ }
-    isCompleted(): boolean { /* logic */ }
-}
-```
-
-### 4. Command Pattern for Actions
-```typescript
-// User action → Command
-await this.viewJobXmlCommand.execute({ jobId });
-```
-
-### 5. ViewModels for Presentation
-```typescript
-// Domain → ViewModel → UI
-const viewModel = this.mapper.toViewModel(entity);
-this.component.setData(viewModel);
-```
-
-See [ARCHITECTURE_GUIDE.md § Core Principles](./ARCHITECTURE_GUIDE.md#core-principles) for more.
+**Dependency Rule:** Dependencies point inward. Domain has ZERO dependencies.
 
 ---
 
 ## 📁 Directory Structure
 
+**Feature-First Organization:**
+
 ```
 src/
-├── core/              # Shared base classes
-├── features/          # Feature modules (domain, application, presentation, infrastructure)
+├── core/                    # Shared kernel (cross-cutting)
+│   ├── domain/             # Base entities, value objects
+│   ├── application/        # Base use cases, commands
+│   └── presentation/       # Base panels, components
+├── features/               # Feature modules
 │   ├── importJobs/
-│   ├── solutions/
-│   └── environments/
-├── infrastructure/    # Cross-cutting infrastructure
-└── shared/            # Utilities and helpers
+│   │   ├── domain/        # Business logic
+│   │   ├── application/   # Use cases, ViewModels
+│   │   ├── presentation/  # Panels, components
+│   │   └── infrastructure/# Repositories, API
+│   └── solutions/
+│       ├── domain/
+│       ├── application/
+│       ├── presentation/
+│       └── infrastructure/
+├── infrastructure/         # Cross-cutting infrastructure
+│   ├── api/               # DataverseApiClient
+│   ├── logging/           # LoggerService
+│   └── state/             # StateManager
+└── shared/                # Utilities
+    ├── utils/
+    ├── types/
+    └── constants/
 ```
 
-See [DIRECTORY_STRUCTURE_GUIDE.md](./DIRECTORY_STRUCTURE_GUIDE.md) for complete structure.
+See [DIRECTORY_STRUCTURE_GUIDE.md](./DIRECTORY_STRUCTURE_GUIDE.md) for complete details.
+
+**Why feature-first?** See [ADR-001](./ARCHITECTURAL_DECISION_RECORDS.md#adr-001-feature-first-directory-organization)
 
 ---
 
-## ✅ Pre-Commit Checklist
+## 🧠 Key Principles
 
-Before committing:
+### 1. Rich Domain Models (Not Anemic)
 
-### Domain Layer
-- [ ] Entities have behavior (not just properties)
-- [ ] No external dependencies
-- [ ] Business logic is in domain
+```typescript
+// ❌ NEVER - Anemic model (just data)
+interface ImportJob {
+    progress?: number;
+    completedOn?: string;
+}
 
-### Application Layer
-- [ ] Use cases orchestrate (don't implement)
-- [ ] ViewModels contain display-ready data
-- [ ] No business logic
+// ✅ ALWAYS - Rich model (with behavior)
+class ImportJob {
+    constructor(
+        public readonly id: string,
+        private progress: number,
+        private completedOn?: Date
+    ) {}
 
-### Presentation Layer
-- [ ] Panels delegate to use cases
-- [ ] No business logic
-- [ ] Logs user actions
+    getStatus(): JobStatus {
+        if (this.completedOn) {
+            return this.progress < 100 ? JobStatus.Failed : JobStatus.Completed;
+        }
+        return this.progress > 0 ? JobStatus.InProgress : JobStatus.Pending;
+    }
 
-### Infrastructure Layer
-- [ ] Implements domain interfaces
-- [ ] Transforms DTOs to domain entities
+    isEligibleForRetry(): boolean {
+        return this.getStatus() === JobStatus.Failed;
+    }
+}
+```
 
-### Logging
-- [ ] Appropriate log levels
-- [ ] Rich context (IDs, names, counts)
+**Why?** See [ADR-002](./ARCHITECTURAL_DECISION_RECORDS.md#adr-002-rich-domain-models-over-anemic-models)
 
-See [QUICK_REFERENCE.md § Pre-Commit Checklist](./QUICK_REFERENCE.md#-pre-commit-checklist) for complete list.
+### 2. Use Cases Orchestrate (No Business Logic)
+
+```typescript
+// ✅ Use case orchestrates domain and infrastructure
+export class LoadImportJobsUseCase {
+    constructor(
+        private repo: IImportJobRepository,
+        private mapper: ImportJobViewModelMapper
+    ) {}
+
+    async execute(request: { envId: string }): Promise<ImportJobViewModel[]> {
+        const jobs = await this.repo.getByEnvironment(request.envId);
+        const activeJobs = jobs.filter(job => !job.isArchived()); // ← Domain method
+        return activeJobs.map(job => this.mapper.toViewModel(job));
+    }
+}
+```
+
+### 3. TypeScript Strict Mode
+
+- ✅ Explicit return types on all public methods
+- ✅ No `any` - use `unknown` with type guards
+- ✅ Strict null checks
+- ✅ All CLAUDE.md rules enforced
+
+**Why?** See [ADR-003](./ARCHITECTURAL_DECISION_RECORDS.md#adr-003-typescript-strict-mode)
+
+### 4. Domain Has Zero Dependencies
+
+```typescript
+// ❌ NEVER - Domain importing infrastructure
+import { DataverseApiClient } from '../../infrastructure/api/DataverseApiClient';
+
+// ✅ ALWAYS - Domain only imports from domain
+import { JobStatus } from './valueObjects/JobStatus';
+import { BaseEntity } from '../../../core/domain/entities/BaseEntity';
+```
+
+**Why?** See [ADR-005](./ARCHITECTURAL_DECISION_RECORDS.md#adr-005-domain-has-zero-external-dependencies)
 
 ---
 
@@ -220,162 +177,114 @@ See [QUICK_REFERENCE.md § Pre-Commit Checklist](./QUICK_REFERENCE.md#-pre-commi
 
 ### Mistake 1: Business Logic in Panel
 ```typescript
-// ❌ BAD
+// ❌ BAD - Business logic in presentation
 const status = job.progress < 100 ? 'Failed' : 'Completed';
 
-// ✅ GOOD
+// ✅ GOOD - Business logic in domain
 const status = job.getStatus();
 ```
 
-### Mistake 2: Anemic Domain Model
+### Mistake 2: Use Case Contains Business Logic
 ```typescript
-// ❌ BAD
-interface ImportJob { progress?: number; }
-
-// ✅ GOOD
-class ImportJob { getStatus(): JobStatus { /* logic */ } }
-```
-
-### Mistake 3: Wrong Dependencies
-```typescript
-// ❌ BAD - Domain calling API
-class ImportJob {
-    async load() { await fetch(...); }
+// ❌ BAD - Use case has business logic
+async execute(request: LoadJobsRequest): Promise<JobViewModel[]> {
+    const jobs = await this.repo.getAll();
+    // ❌ Don't calculate status here
+    return jobs.map(j => ({
+        status: j.progress < 100 ? 'Failed' : 'Completed'
+    }));
 }
 
-// ✅ GOOD - Repository implements interface
-class ImportJobRepository implements IImportJobRepository {
-    async getById(id: string): Promise<ImportJob | null> { /* ... */ }
+// ✅ GOOD - Use case orchestrates, domain has logic
+async execute(request: LoadJobsRequest): Promise<JobViewModel[]> {
+    const jobs = await this.repo.getAll();
+    return jobs.map(j => this.mapper.toViewModel(j)); // ← Mapper uses job.getStatus()
 }
 ```
 
-See [QUICK_REFERENCE.md § Common Mistakes](./QUICK_REFERENCE.md#-common-mistakes) for more.
+### Mistake 3: Cross-Feature Imports
+```typescript
+// ❌ BAD - importJobs importing from solutions
+import { Solution } from '../../solutions/domain/entities/Solution';
+
+// ✅ GOOD - Use shared interfaces from core/
+import { ISolutionProvider } from '../../../core/domain/interfaces/ISolutionProvider';
+```
+
+**Why?** See [ADR-006](./ARCHITECTURAL_DECISION_RECORDS.md#adr-006-feature-independence-no-cross-feature-imports)
+
+---
+
+## ✅ Pre-Commit Checklist
+
+**Domain Layer:**
+- [ ] Entities have behavior (methods), not just data
+- [ ] No external dependencies (no imports from outer layers)
+- [ ] Business logic is in domain, not use cases or panels
+
+**Application Layer:**
+- [ ] Use cases orchestrate (no business logic)
+- [ ] ViewModels contain display-ready data only
+- [ ] Explicit return types on all methods
+
+**Presentation Layer:**
+- [ ] Panels delegate to use cases (no business logic)
+- [ ] No domain logic in panels
+
+**Infrastructure Layer:**
+- [ ] Implements domain interfaces
+- [ ] Transforms DTOs to domain entities
+
+**TypeScript:**
+- [ ] Explicit return types on all public methods
+- [ ] No `any` (use `unknown` with type guards)
+- [ ] Strict mode compatible
 
 ---
 
 ## 📖 For C# Developers
 
-This architecture will feel familiar if you've built:
-- **ASP.NET Core with Clean Architecture**
-- **Domain-Driven Design (DDD) applications**
-- **CQRS with MediatR**
+This architecture will feel familiar if you've built ASP.NET Core with Clean Architecture or DDD applications.
 
-Key mappings:
+**Key mappings:**
 
 | C# | TypeScript Equivalent |
 |----|----------------------|
-| Entity Framework entity | Domain entity |
-| DbContext | Repository |
-| MediatR Command | Use Case / Command |
-| ViewModel | ViewModel |
+| Entity (EF Core) | Domain Entity |
+| DbContext / Repository | Repository (implements interface) |
+| MediatR Command/Query | Use Case / Command |
+| ViewModel / DTO | ViewModel |
 | Controller | Panel |
-| SignalR Hub | postMessage handler |
-
-See [ARCHITECTURE_GUIDE.md § For C# Developers](./ARCHITECTURE_GUIDE.md#for-c-developers).
 
 ---
 
-## 🔄 Migration Strategy
+## 🚀 Development
 
-Migrating legacy code:
+```bash
+# Compile TypeScript
+npm run compile
 
-1. **Start with one feature** (e.g., Import Jobs)
-2. **Extract domain entities** from services
-3. **Create use cases** to orchestrate
-4. **Move infrastructure code** to repositories
-5. **Update panels** to use use cases
-6. **Test and commit**
-7. **Repeat for next feature**
-
-See [DIRECTORY_STRUCTURE_GUIDE.md § Migration Strategy](./DIRECTORY_STRUCTURE_GUIDE.md#migration-strategy).
+# Watch mode
+npm run watch
+```
 
 ---
 
-## 🎓 Learning Path
+## 🎯 Architecture Goals
 
-### Week 1: Understand Architecture
-- [ ] Read ARCHITECTURE_GUIDE.md
-- [ ] Read LAYER_RESPONSIBILITIES_GUIDE.md
-- [ ] Study EXECUTION_PIPELINE_GUIDE.md examples
-
-### Week 2: Implement Simple Feature
-- [ ] Choose a small feature to refactor
-- [ ] Extract domain entity
-- [ ] Create use case
-- [ ] Update panel
-- [ ] Follow checklists
-
-### Week 3: Build New Feature
-- [ ] Use QUICK_REFERENCE.md guide
-- [ ] Build feature from scratch
-- [ ] Apply all patterns
-
-### Week 4: Review and Refine
-- [ ] Review with team
-- [ ] Document learnings
-- [ ] Update architecture docs if needed
-
----
-
-## 🛠️ Tools and Utilities
-
-### Recommended VS Code Extensions
-- **ESLint** - Enforce code standards
-- **TypeScript Hero** - Auto-import organization
-- **Better Comments** - Categorize comments
-- **Error Lens** - Inline error display
-
-### TypeScript Configuration
-- Strict mode enabled
-- No implicit any
-- Explicit function return types
-
-### Logging
-- Structured logging with context objects
-- Appropriate log levels (INFO, DEBUG, ERROR)
-- No sensitive data in logs
-
-See [LOGGING_GUIDE.md](./LOGGING_GUIDE.md).
-
----
-
-## 🤝 Contributing
-
-When adding to this documentation:
-
-1. **Keep it practical** - Show examples, not just theory
-2. **Use C# analogies** - Team is C# developers
-3. **Include checklists** - Make it actionable
-4. **Show anti-patterns** - Teach what NOT to do
-5. **Update index** - Add new docs to this README
+- ✅ **Maintainability** - Easy to change and extend
+- ✅ **Testability** - Domain logic testable without mocks
+- ✅ **Type Safety** - Catch bugs at compile time
+- ✅ **Feature Independence** - Add features without affecting others
+- ✅ **Framework Independence** - Domain survives framework changes
 
 ---
 
 ## 📞 Questions?
 
-If something is unclear:
+1. Check [CLAUDE.md](../CLAUDE.md) for rules
+2. Check [ARCHITECTURAL_DECISION_RECORDS.md](./ARCHITECTURAL_DECISION_RECORDS.md) for "why" decisions
+3. Check [ARCHITECTURE_GUIDE.md](./ARCHITECTURE_GUIDE.md) for patterns
+4. Search existing code for examples
 
-1. Check [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) first
-2. Search existing docs
-3. Ask the team
-4. Update docs with the answer
-
-**Remember:** If you had the question, someone else will too. Document it!
-
----
-
-## 🎯 Goals
-
-This architecture aims to:
-
-- ✅ **Maintainability** - Easy to change and extend
-- ✅ **Testability** - Domain logic is testable without mocks
-- ✅ **Scalability** - Add features without affecting others
-- ✅ **Clarity** - Code is self-documenting
-- ✅ **Quality** - Fewer bugs through strong types and separation
-
----
-
-## 🚀 Status
-
-Initial architecture documentation complete.
+**Building from scratch?** Follow the architecture patterns as you implement features. Document new patterns when they emerge, not before.

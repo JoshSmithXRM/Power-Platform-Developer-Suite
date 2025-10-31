@@ -2,7 +2,7 @@
     "compilerOptions": {
         "module": "commonjs",
         "target": "ES2020",
-        "outDir": "TEMP/out",
+        "outDir": "out",
         "lib": [
             "ES2020",
             "DOM"
@@ -17,7 +17,7 @@
     },
     "exclude": [
         "node_modules",
-        "TEMP/out",
+        "out",
         "dist",
         "Old/**/*",
         "templates/**/*"
