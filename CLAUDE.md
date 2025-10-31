@@ -11,7 +11,7 @@
 3. **Technical debt shortcuts** - No "quick fixes". Do it right or discuss tradeoffs
 4. **Duplicate code 3+ times** - Stop at 2nd copy. Create abstraction (Three Strikes Rule)
 5. **Business logic outside domain layer** - Business logic belongs in domain entities/services
-6. **Anemic domain models** - Entities must have behavior, not just getters/setters
+6. **Anemic domain models (entities without behavior)** - Use rich models with methods, not just data
 7. **Domain depending on outer layers** - Domain has ZERO dependencies
 8. **Business logic in use cases** - Use cases orchestrate only, no complex logic
 9. **Business logic in panels** - Panels call use cases, no logic
