@@ -1,6 +1,7 @@
 import { IEnvironmentRepository } from '../../domain/interfaces/IEnvironmentRepository';
 import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
 import { EnvironmentDeleted } from '../../domain/events/EnvironmentDeleted';
+import { AuthenticationCacheInvalidationRequested } from '../../domain/events/AuthenticationCacheInvalidationRequested';
 import { ApplicationError } from '../errors/ApplicationError';
 import { IDomainEventPublisher } from '../interfaces/IDomainEventPublisher';
 
@@ -24,6 +25,14 @@ export class DeleteEnvironmentUseCase {
 
 		// Delete from repository (handles secret cleanup)
 		await this.repository.delete(environmentId);
+
+		// Invalidate authentication cache
+		this.eventPublisher.publish(
+			new AuthenticationCacheInvalidationRequested(
+				environmentId,
+				'environment_deleted'
+			)
+		);
 
 		// Publish domain event
 		this.eventPublisher.publish(new EnvironmentDeleted(

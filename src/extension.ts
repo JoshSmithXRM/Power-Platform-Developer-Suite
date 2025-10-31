@@ -7,11 +7,13 @@ import { EnvironmentValidationService } from './features/environmentSetup/domain
 import { VsCodeEventPublisher } from './features/environmentSetup/infrastructure/services/VsCodeEventPublisher';
 import { MsalAuthenticationService } from './features/environmentSetup/infrastructure/services/MsalAuthenticationService';
 import { WhoAmIService } from './features/environmentSetup/infrastructure/services/WhoAmIService';
+import { PowerPlatformApiService } from './features/environmentSetup/infrastructure/services/PowerPlatformApiService';
 import { LoadEnvironmentsUseCase } from './features/environmentSetup/application/useCases/LoadEnvironmentsUseCase';
 import { LoadEnvironmentByIdUseCase } from './features/environmentSetup/application/useCases/LoadEnvironmentByIdUseCase';
 import { SaveEnvironmentUseCase } from './features/environmentSetup/application/useCases/SaveEnvironmentUseCase';
 import { DeleteEnvironmentUseCase } from './features/environmentSetup/application/useCases/DeleteEnvironmentUseCase';
 import { TestConnectionUseCase } from './features/environmentSetup/application/useCases/TestConnectionUseCase';
+import { DiscoverEnvironmentIdUseCase } from './features/environmentSetup/application/useCases/DiscoverEnvironmentIdUseCase';
 import { ValidateUniqueNameUseCase } from './features/environmentSetup/application/useCases/ValidateUniqueNameUseCase';
 import { CheckConcurrentEditUseCase } from './features/environmentSetup/application/useCases/CheckConcurrentEditUseCase';
 import { EnvironmentListViewModelMapper } from './features/environmentSetup/application/mappers/EnvironmentListViewModelMapper';
@@ -21,6 +23,8 @@ import { EnvironmentId } from './features/environmentSetup/domain/valueObjects/E
 import { EnvironmentCreated } from './features/environmentSetup/domain/events/EnvironmentCreated';
 import { EnvironmentUpdated } from './features/environmentSetup/domain/events/EnvironmentUpdated';
 import { EnvironmentDeleted } from './features/environmentSetup/domain/events/EnvironmentDeleted';
+import { AuthenticationCacheInvalidationRequested } from './features/environmentSetup/domain/events/AuthenticationCacheInvalidationRequested';
+import { AuthenticationCacheInvalidationHandler } from './features/environmentSetup/infrastructure/eventHandlers/AuthenticationCacheInvalidationHandler';
 
 /**
  * Extension activation entry point
@@ -42,6 +46,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	const eventPublisher = new VsCodeEventPublisher();
 	const authService = new MsalAuthenticationService();
 	const whoAmIService = new WhoAmIService(authService);
+	const powerPlatformApiService = new PowerPlatformApiService(authService);
 
 	// Domain Layer
 	const environmentValidationService = new EnvironmentValidationService(environmentRepository);
@@ -56,6 +61,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	const saveEnvironmentUseCase = new SaveEnvironmentUseCase(environmentRepository, environmentValidationService, eventPublisher);
 	const deleteEnvironmentUseCase = new DeleteEnvironmentUseCase(environmentRepository, eventPublisher);
 	const testConnectionUseCase = new TestConnectionUseCase(whoAmIService, environmentRepository);
+	const discoverEnvironmentIdUseCase = new DiscoverEnvironmentIdUseCase(powerPlatformApiService, environmentRepository);
 	const validateUniqueNameUseCase = new ValidateUniqueNameUseCase(environmentRepository);
 	const checkConcurrentEditUseCase = new CheckConcurrentEditUseCase();
 
@@ -83,6 +89,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			saveEnvironmentUseCase,
 			deleteEnvironmentUseCase,
 			testConnectionUseCase,
+			discoverEnvironmentIdUseCase,
 			validateUniqueNameUseCase,
 			checkConcurrentEditUseCase
 		);
@@ -97,6 +104,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				saveEnvironmentUseCase,
 				deleteEnvironmentUseCase,
 				testConnectionUseCase,
+				discoverEnvironmentIdUseCase,
 				validateUniqueNameUseCase,
 				checkConcurrentEditUseCase,
 				environmentItem.envId
@@ -248,6 +256,12 @@ export function activate(context: vscode.ExtensionContext): void {
 	eventPublisher.subscribe(EnvironmentCreated, () => environmentsProvider.refresh());
 	eventPublisher.subscribe(EnvironmentUpdated, () => environmentsProvider.refresh());
 	eventPublisher.subscribe(EnvironmentDeleted, () => environmentsProvider.refresh());
+
+	// Subscribe to authentication cache invalidation events
+	const cacheInvalidationHandler = new AuthenticationCacheInvalidationHandler(authService);
+	eventPublisher.subscribe(AuthenticationCacheInvalidationRequested, (event) => {
+		cacheInvalidationHandler.handle(event);
+	});
 
 	context.subscriptions.push(
 		addEnvironmentCommand,

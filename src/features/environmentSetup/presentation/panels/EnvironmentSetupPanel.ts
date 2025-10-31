@@ -4,6 +4,7 @@ import { LoadEnvironmentByIdUseCase } from '../../application/useCases/LoadEnvir
 import { SaveEnvironmentUseCase } from '../../application/useCases/SaveEnvironmentUseCase';
 import { DeleteEnvironmentUseCase } from '../../application/useCases/DeleteEnvironmentUseCase';
 import { TestConnectionUseCase } from '../../application/useCases/TestConnectionUseCase';
+import { DiscoverEnvironmentIdUseCase } from '../../application/useCases/DiscoverEnvironmentIdUseCase';
 import { ValidateUniqueNameUseCase } from '../../application/useCases/ValidateUniqueNameUseCase';
 import { CheckConcurrentEditUseCase } from '../../application/useCases/CheckConcurrentEditUseCase';
 import { ApplicationError } from '../../application/errors/ApplicationError';
@@ -25,6 +26,7 @@ export class EnvironmentSetupPanel {
 		private readonly saveEnvironmentUseCase: SaveEnvironmentUseCase,
 		private readonly deleteEnvironmentUseCase: DeleteEnvironmentUseCase,
 		private readonly testConnectionUseCase: TestConnectionUseCase,
+		private readonly discoverEnvironmentIdUseCase: DiscoverEnvironmentIdUseCase,
 		private readonly validateUniqueNameUseCase: ValidateUniqueNameUseCase,
 		private readonly checkConcurrentEditUseCase: CheckConcurrentEditUseCase,
 		environmentId?: string
@@ -76,6 +78,7 @@ export class EnvironmentSetupPanel {
 		saveEnvironmentUseCase: SaveEnvironmentUseCase,
 		deleteEnvironmentUseCase: DeleteEnvironmentUseCase,
 		testConnectionUseCase: TestConnectionUseCase,
+		discoverEnvironmentIdUseCase: DiscoverEnvironmentIdUseCase,
 		validateUniqueNameUseCase: ValidateUniqueNameUseCase,
 		checkConcurrentEditUseCase: CheckConcurrentEditUseCase,
 		environmentId?: string
@@ -109,6 +112,7 @@ export class EnvironmentSetupPanel {
 			saveEnvironmentUseCase,
 			deleteEnvironmentUseCase,
 			testConnectionUseCase,
+			discoverEnvironmentIdUseCase,
 			validateUniqueNameUseCase,
 			checkConcurrentEditUseCase,
 			environmentId
@@ -132,6 +136,10 @@ export class EnvironmentSetupPanel {
 
 				case 'test-connection':
 					await this.handleTestConnection(msg.data);
+					break;
+
+				case 'discover-environment-id':
+					await this.handleDiscoverEnvironmentId(msg.data);
 					break;
 
 				case 'delete-environment':
@@ -237,6 +245,7 @@ export class EnvironmentSetupPanel {
 		}, async () => {
 			// Delegate to use case
 			const result = await this.testConnectionUseCase.execute({
+				existingEnvironmentId: this.currentEnvironmentId,
 				name: connData.name as string,
 				dataverseUrl: connData.dataverseUrl as string,
 				tenantId: connData.tenantId as string,
@@ -258,6 +267,98 @@ export class EnvironmentSetupPanel {
 			// Notify webview
 			this.panel.webview.postMessage({
 				command: 'test-connection-result',
+				data: result
+			});
+		});
+	}
+
+	private async handleDiscoverEnvironmentId(data: unknown): Promise<void> {
+		if (!data || typeof data !== 'object') {
+			throw new ApplicationError('Invalid connection data');
+		}
+
+		const connData = data as Record<string, unknown>;
+
+		// Show progress
+		await vscode.window.withProgress({
+			location: vscode.ProgressLocation.Notification,
+			title: "Discovering Power Platform Environment ID...",
+			cancellable: false
+		}, async () => {
+			// Delegate to use case
+			const result = await this.discoverEnvironmentIdUseCase.execute({
+				existingEnvironmentId: this.currentEnvironmentId,
+				name: connData.name as string,
+				dataverseUrl: connData.dataverseUrl as string,
+				tenantId: connData.tenantId as string,
+				authenticationMethod: connData.authenticationMethod as string,
+				publicClientId: connData.publicClientId as string,
+				clientId: connData.clientId as string | undefined,
+				clientSecret: connData.clientSecret as string | undefined,
+				username: connData.username as string | undefined,
+				password: connData.password as string | undefined
+			});
+
+			if (result.success) {
+				vscode.window.showInformationMessage(`Environment ID discovered: ${result.environmentId}`);
+			} else if (result.requiresInteractiveAuth) {
+				// Service Principal doesn't have BAP API permissions - offer Interactive auth
+				const retry = await vscode.window.showWarningMessage(
+					`Discovery failed: Service Principals typically don't have Power Platform API permissions.\n\nWould you like to use Interactive authentication just for discovery?`,
+					'Use Interactive Auth',
+					'Cancel'
+				);
+
+				if (retry === 'Use Interactive Auth') {
+					// Retry with Interactive auth
+					await this.handleDiscoverEnvironmentIdWithInteractive(connData);
+					return; // Don't send result to webview yet
+				} else {
+					vscode.window.showInformationMessage('You can manually enter the Environment ID from the Power Platform Admin Center.');
+				}
+			} else {
+				vscode.window.showErrorMessage(`Failed to discover environment ID: ${result.errorMessage}`);
+			}
+
+			// Notify webview
+			this.panel.webview.postMessage({
+				command: 'discover-environment-id-result',
+				data: result
+			});
+		});
+	}
+
+	private async handleDiscoverEnvironmentIdWithInteractive(connData: Record<string, unknown>): Promise<void> {
+		// Show progress
+		await vscode.window.withProgress({
+			location: vscode.ProgressLocation.Notification,
+			title: "Discovering Power Platform Environment ID with Interactive auth...",
+			cancellable: false
+		}, async () => {
+			// Retry discovery with Interactive authentication (temporary, non-cached)
+			const result = await this.discoverEnvironmentIdUseCase.execute({
+				// Use temporary ID to avoid caching credentials
+				existingEnvironmentId: undefined,
+				name: connData.name as string,
+				dataverseUrl: connData.dataverseUrl as string,
+				tenantId: connData.tenantId as string,
+				authenticationMethod: 'Interactive', // Force Interactive for discovery
+				publicClientId: connData.publicClientId as string,
+				clientId: undefined,
+				clientSecret: undefined,
+				username: undefined,
+				password: undefined
+			});
+
+			if (result.success) {
+				vscode.window.showInformationMessage(`Environment ID discovered: ${result.environmentId}`);
+			} else {
+				vscode.window.showErrorMessage(`Failed to discover environment ID: ${result.errorMessage}`);
+			}
+
+			// Notify webview
+			this.panel.webview.postMessage({
+				command: 'discover-environment-id-result',
 				data: result
 			});
 		});
@@ -348,7 +449,7 @@ export class EnvironmentSetupPanel {
 
 				<div class="form-group">
 					<label for="name">Environment Name *</label>
-					<input type="text" id="name" name="name" required placeholder="e.g., CSDEV">
+					<input type="text" id="name" name="name" required placeholder="e.g., DEV">
 					<span class="help-text">A friendly name to identify this environment</span>
 				</div>
 
@@ -360,8 +461,11 @@ export class EnvironmentSetupPanel {
 
 				<div class="form-group">
 					<label for="environmentId">Environment ID (Optional)</label>
-					<input type="text" id="environmentId" name="powerPlatformEnvironmentId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
-					<span class="help-text">Optional: The unique GUID for this environment (for Power Apps Maker portal)</span>
+					<div style="display: flex; gap: 8px;">
+						<input type="text" id="environmentId" name="powerPlatformEnvironmentId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" style="flex: 1;">
+						<button type="button" id="discoverButton" class="button secondary" style="white-space: nowrap;">Discover ID</button>
+					</div>
+					<span class="help-text">Optional: The unique GUID for this environment (for Power Apps Maker portal). Click "Discover ID" to auto-populate from BAP API.</span>
 				</div>
 			</section>
 
@@ -432,6 +536,7 @@ export class EnvironmentSetupPanel {
 			const authMethodSelect = document.getElementById('authenticationMethod');
 			const saveButton = document.getElementById('saveButton');
 			const testButton = document.getElementById('testButton');
+			const discoverButton = document.getElementById('discoverButton');
 			const deleteButton = document.getElementById('deleteButton');
 
 			// Listen for messages from extension
@@ -449,6 +554,10 @@ export class EnvironmentSetupPanel {
 
 					case 'test-connection-result':
 						handleTestResult(message.data);
+						break;
+
+					case 'discover-environment-id-result':
+						handleDiscoverResult(message.data);
 						break;
 
 					case 'name-validation-result':
@@ -470,6 +579,15 @@ export class EnvironmentSetupPanel {
 			testButton.addEventListener('click', () => {
 				if (form.checkValidity()) {
 					testConnection();
+				} else {
+					form.reportValidity();
+				}
+			});
+
+			// Discover Environment ID button
+			discoverButton.addEventListener('click', () => {
+				if (form.checkValidity()) {
+					discoverEnvironmentId();
 				} else {
 					form.reportValidity();
 				}
@@ -543,6 +661,19 @@ export class EnvironmentSetupPanel {
 				});
 			}
 
+			function discoverEnvironmentId() {
+				const formData = new FormData(form);
+				const data = Object.fromEntries(formData.entries());
+
+				discoverButton.disabled = true;
+				discoverButton.textContent = 'Discovering...';
+
+				vscode.postMessage({
+					command: 'discover-environment-id',
+					data: data
+				});
+			}
+
 			function validateName() {
 				const name = nameInput.value.trim();
 				if (name.length === 0) return;
@@ -590,6 +721,25 @@ export class EnvironmentSetupPanel {
 					testButton.classList.add('error');
 					setTimeout(() => {
 						testButton.classList.remove('error');
+					}, 3000);
+				}
+			}
+
+			function handleDiscoverResult(data) {
+				discoverButton.disabled = false;
+				discoverButton.textContent = 'Discover ID';
+
+				if (data.success && data.environmentId) {
+					// Populate the environment ID field
+					document.getElementById('environmentId').value = data.environmentId;
+					discoverButton.classList.add('success');
+					setTimeout(() => {
+						discoverButton.classList.remove('success');
+					}, 3000);
+				} else {
+					discoverButton.classList.add('error');
+					setTimeout(() => {
+						discoverButton.classList.remove('error');
 					}, 3000);
 				}
 			}

@@ -1,8 +1,12 @@
-import * as msal from '@azure/msal-node';
 import * as http from 'http';
-import { IAuthenticationService } from './IAuthenticationService';
+
+import * as msal from '@azure/msal-node';
+
 import { Environment } from '../../domain/entities/Environment';
 import { AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
+import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
+
+import { IAuthenticationService } from './IAuthenticationService';
 
 /**
  * Authentication service using MSAL (Microsoft Authentication Library)
@@ -12,7 +16,8 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	private clientAppCache: Map<string, msal.PublicClientApplication> = new Map();
 
 	private getClientApp(environment: Environment): msal.PublicClientApplication {
-		const cacheKey = `${environment.getTenantId().getValue()}_${environment.getPublicClientId().getValue()}`;
+		// Cache by environment ID (isolates credentials per environment)
+		const cacheKey = environment.getId().getValue();
 
 		if (!this.clientAppCache.has(cacheKey)) {
 			const clientConfig: msal.Configuration = {
@@ -30,10 +35,14 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	public async getAccessTokenForEnvironment(
 		environment: Environment,
 		clientSecret?: string,
-		password?: string
+		password?: string,
+		customScope?: string
 	): Promise<string> {
 		const authMethod = environment.getAuthenticationMethod().getType();
-		const scopes = [`${environment.getDataverseUrl().getValue()}/.default`];
+		// Use custom scope if provided, otherwise default to Dataverse
+		const scopes = customScope
+			? [customScope]
+			: [`${environment.getDataverseUrl().getValue()}/.default`];
 
 		switch (authMethod) {
 			case AuthenticationMethodType.ServicePrincipal:
@@ -155,7 +164,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 					if (response) {
 						return response.accessToken;
 					}
-				} catch (silentError) {
+				} catch (_silentError) {
 					// Silent acquisition failed, proceed with interactive flow
 				}
 			}
@@ -278,7 +287,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 					if (response) {
 						return response.accessToken;
 					}
-				} catch (silentError) {
+				} catch (_silentError) {
 					// Silent acquisition failed, proceed with device code flow
 				}
 			}
@@ -324,5 +333,40 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			const err = error instanceof Error ? error : new Error(String(error));
 			throw new Error(`Device Code authentication failed: ${err.message}`);
 		}
+	}
+
+	public clearCacheForEnvironment(environmentId: EnvironmentId): void {
+		const cacheKey = environmentId.getValue();
+		const clientApp = this.clientAppCache.get(cacheKey);
+
+		if (clientApp) {
+			// Clear MSAL's internal token cache
+			clientApp.getTokenCache().getAllAccounts().then(accounts => {
+				accounts.forEach(account => {
+					clientApp.getTokenCache().removeAccount(account);
+				});
+			}).catch(() => {
+				// Ignore errors during cache cleanup
+			});
+
+			// Remove from application cache
+			this.clientAppCache.delete(cacheKey);
+		}
+	}
+
+	public clearAllCache(): void {
+		// Clear all MSAL token caches
+		this.clientAppCache.forEach((clientApp) => {
+			clientApp.getTokenCache().getAllAccounts().then(accounts => {
+				accounts.forEach(account => {
+					clientApp.getTokenCache().removeAccount(account);
+				});
+			}).catch(() => {
+				// Ignore errors during cache cleanup
+			});
+		});
+
+		// Clear application cache
+		this.clientAppCache.clear();
 	}
 }

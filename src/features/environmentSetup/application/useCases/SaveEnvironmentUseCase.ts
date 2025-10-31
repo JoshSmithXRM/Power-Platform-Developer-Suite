@@ -9,6 +9,7 @@ import { ClientId } from '../../domain/valueObjects/ClientId';
 import { AuthenticationMethod, AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
 import { EnvironmentCreated } from '../../domain/events/EnvironmentCreated';
 import { EnvironmentUpdated } from '../../domain/events/EnvironmentUpdated';
+import { AuthenticationCacheInvalidationRequested } from '../../domain/events/AuthenticationCacheInvalidationRequested';
 import { ApplicationError } from '../errors/ApplicationError';
 import { IDomainEventPublisher } from '../interfaces/IDomainEventPublisher';
 
@@ -89,6 +90,43 @@ export class SaveEnvironmentUseCase {
 			request.password,
 			request.preserveExistingCredentials
 		);
+
+		// Detect if auth method or credentials changed
+		let shouldInvalidateCache = false;
+		let invalidationReason: 'credentials_changed' | 'auth_method_changed' = 'credentials_changed';
+
+		if (previousEnvironment) {
+			const authMethodChanged = previousEnvironment.getAuthenticationMethod().getType() !==
+				environment.getAuthenticationMethod().getType();
+
+			const clientIdChanged = previousEnvironment.getClientId()?.getValue() !==
+				environment.getClientId()?.getValue();
+
+			const usernameChanged = previousEnvironment.getUsername() !==
+				environment.getUsername();
+
+			// Only consider credentials "changed" if they were explicitly provided (not undefined)
+			// and not using preserveExistingCredentials
+			const credentialsChanged = !request.preserveExistingCredentials &&
+				(!!request.clientSecret || !!request.password);
+
+			shouldInvalidateCache = authMethodChanged || clientIdChanged ||
+				usernameChanged || credentialsChanged;
+
+			if (authMethodChanged) {
+				invalidationReason = 'auth_method_changed';
+			}
+		}
+
+		// Invalidate cache if needed
+		if (shouldInvalidateCache) {
+			this.eventPublisher.publish(
+				new AuthenticationCacheInvalidationRequested(
+					environmentId,
+					invalidationReason
+				)
+			);
+		}
 
 		// Publish domain event
 		if (isUpdate) {

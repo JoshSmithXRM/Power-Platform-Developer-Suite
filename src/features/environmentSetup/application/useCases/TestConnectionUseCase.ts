@@ -22,8 +22,13 @@ export class TestConnectionUseCase {
 
 	public async execute(request: TestConnectionRequest): Promise<TestConnectionResponse> {
 		// Create temporary domain entity from draft data (NOT saved)
+		// Use existing environment ID if provided (to preserve token cache)
+		const environmentId = request.existingEnvironmentId
+			? new EnvironmentId(request.existingEnvironmentId)
+			: EnvironmentId.generate();
+
 		const tempEnvironment = new Environment(
-			EnvironmentId.generate(),
+			environmentId,
 			new EnvironmentName(request.name),
 			new DataverseUrl(request.dataverseUrl),
 			new TenantId(request.tenantId),
@@ -94,6 +99,7 @@ export class TestConnectionUseCase {
 }
 
 export interface TestConnectionRequest {
+	existingEnvironmentId?: string;
 	name: string;
 	dataverseUrl: string;
 	tenantId: string;
