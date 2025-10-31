@@ -171,10 +171,12 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 					if (code) {
 						// Show success page
-						res.writeHead(200, { 'Content-Type': 'text/html' });
+						res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
 						res.end(`
+							<!DOCTYPE html>
 							<html>
 								<head>
+									<meta charset="UTF-8">
 									<title>Authentication Successful</title>
 									<style>
 										body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
