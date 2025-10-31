@@ -133,64 +133,33 @@ Document Anthropic's best practices for:
 
 ---
 
-## 🟢 LOW PRIORITY - Architecture Decision Records
+## 🔵 FUTURE - Code Implementation
 
-### 6. Create ADR Folder and Initial Decisions
-**Location:** `docs/adr/`
+### 6. Document Testing Strategy (REQUIRED BEFORE IMPLEMENTATION) ✅ DECIDED
+**Framework:** Vitest (Jest-compatible API, faster, better TypeScript support)
 
-Document major architectural decisions as ADRs (Architectural Decision Records):
+Document and implement:
+- [ ] Create TESTING_GUIDE.md
+- [ ] Set up Vitest infrastructure (install, config)
+- [ ] Document testing patterns for each layer:
+  - Domain layer: Pure logic tests, no mocks (like XUnit)
+  - Application layer: Use case tests with mocked repository interfaces (like MSTest with Moq)
+  - Infrastructure layer: Deferred (integration tests when needed)
+  - Presentation layer: Deferred (VS Code integration tests when needed)
+- [ ] Create example tests for each layer pattern
+- [ ] Add test scripts to package.json
 
-- [ ] Create docs/adr/ folder
-- [ ] Create ADR template (docs/adr/TEMPLATE.md)
-- [ ] ADR-001: Why Clean Architecture?
-- [ ] ADR-002: Why feature-first structure?
-- [ ] ADR-003: Why command pattern over event bridge?
-- [ ] ADR-004: Why rich domain models over anemic interfaces?
-
-**ADR Format:**
-```markdown
-# ADR-XXX: [Title]
-
-**Status:** Accepted | Rejected | Superseded | Deprecated
-
-**Date:** YYYY-MM-DD
-
-**Context:** What's the issue we're facing?
-
-**Decision:** What did we decide?
-
-**Consequences:** What are the tradeoffs?
-
-**Alternatives Considered:** What else did we evaluate?
-```
+**Decision Context:**
+- User familiar with: XUnit, MSTest (C#)
+- Chosen: Vitest over Jest/Mocha
+- Reasoning: Faster, better TS support, Jest-compatible API
+- Integration tests: Deferred until domain/application layers tested
 
 **Estimated Time:** 3-4 hours
 
 ---
 
-## 🔵 FUTURE - Code Implementation
-
-### 7. Document Testing Strategy (REQUIRED BEFORE IMPLEMENTATION)
-**Prerequisite:** Research TypeScript testing frameworks
-
-Research and document:
-- [ ] Research testing frameworks (Jest, Mocha, Vitest, etc.)
-- [ ] Recommend framework for VS Code extension context
-- [ ] Document testing patterns for each layer:
-  - Domain layer testing (pure logic, no mocks)
-  - Application layer testing (use cases with mocked repos)
-  - Infrastructure layer testing (integration tests)
-  - Presentation layer testing (component tests)
-- [ ] Create TESTING_GUIDE.md
-- [ ] Set up test infrastructure
-
-**User Context:** Familiar with XUnit/MSTest from C#, needs TypeScript equivalent
-
-**Estimated Time:** 4-5 hours
-
----
-
-### 8. Implement ImportJobViewer (Reference Implementation)
+### 7. Implement ImportJobViewer (Reference Implementation)
 **Prerequisite:** Documentation complete, .claude setup complete, testing strategy documented
 
 **Approach:** Bring over panel, implement architecture from scratch
@@ -237,43 +206,39 @@ Research and document:
 
 **Not Started:**
 - ⏸️ Quick Reference sections (deferred)
-- ⏸️ ADR creation
+- ⏸️ Testing strategy documentation
 - ⏸️ Code implementation
 
 ---
 
 ## 🎯 Recommended Order
 
-### Phase 1: Documentation Cleanup (4-6 hours)
-1. Add "See Also" sections to all docs (1-2 hours)
-2. Create CLAUDE_SETUP_GUIDE.md (2-3 hours)
-3. Defer Quick Reference sections for later
+### Phase 1: Documentation Cleanup ✅ MOSTLY COMPLETE
+1. ✅ Create CLAUDE_SETUP_GUIDE.md (complete)
+2. ✅ Restructure .claude folder (complete)
+3. ✅ Update agent definitions (complete)
+4. 🔄 Add "See Also" sections to all docs (1-2 hours remaining)
+5. ⏸️ Quick Reference sections (deferred)
 
-### Phase 2: .claude Setup (3-4 hours)
-1. Restructure .claude folder (1 hour)
-2. Update agent definitions (2-3 hours)
+### Phase 2: Testing Setup (3-4 hours)
+1. Create TESTING_GUIDE.md
+2. Set up Vitest (install, config)
+3. Document testing patterns for each layer
+4. Create example tests
 
-### Phase 3: Architecture Records (3-4 hours)
-1. Create ADR folder and template (1 hour)
-2. Write initial ADRs (2-3 hours)
+### Phase 3: Code Implementation (10-12 hours)
+1. Implement ImportJobs feature as reference (with tests)
 
-### Phase 4: Testing Strategy (4-5 hours)
-1. Research TypeScript testing frameworks (2 hours)
-2. Document testing strategy (2-3 hours)
-
-### Phase 5: Code Implementation (10-12 hours)
-1. Implement ImportJobs feature as reference (10-12 hours)
-
-**Total Estimated Time:** 25-29 hours
+**Total Estimated Time:** 14-18 hours remaining
 
 ---
 
 ## 💡 Notes
 
 - **Quick Reference sections are deferred** - They're valuable but time-consuming. Can be added incrementally.
-- **.claude setup is critical** - Need this before we start implementing features so agents can guide correctly.
-- **ADRs document decisions** - Important for team alignment and future reference.
-- **Start small with code** - One feature as reference, then replicate pattern.
+- ✅ **.claude setup complete** - Agents ready to guide Clean Architecture implementation.
+- **YAGNI on ADRs** - Architecture docs are sufficient. Add ADRs later only if needed for controversial decisions.
+- **Start small with code** - One feature as reference (ImportJobs), then replicate pattern.
 
 ---
 
@@ -287,10 +252,12 @@ Research and document:
    - docs-generator.md: ~3-4k tokens (estimated)
    - **Status:** Should fit comfortably. Verify after updates.
 
-3. **Test infrastructure** - Need to research and document testing strategy:
-   - User is familiar with: XUnit, Microsoft Unit Testing (C#)
-   - Need recommendations for: TypeScript/JavaScript testing (Jest? Mocha? Vitest?)
-   - **Action:** Document testing strategy in new guide
+3. **Test infrastructure** - DECIDED: Vitest
+   - User familiar with: XUnit, MSTest (C#)
+   - Chosen framework: Vitest
+   - Reasoning: Faster than Jest, better TypeScript support, Jest-compatible API
+   - Two-tier approach: Vitest for unit tests (domain/application), VS Code test runner for integration tests (deferred)
+   - **Action:** Create TESTING_GUIDE.md, set up Vitest, document layer-specific patterns
    - **Priority:** Before implementing features
 
 4. **Migration strategy** - START WITH IMPORTJOBVIEWER:

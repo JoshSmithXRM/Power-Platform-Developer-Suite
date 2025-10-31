@@ -371,50 +371,168 @@ Based on C# experience and VS Code constraints:
 
 ### ✅ Use These Patterns
 
-1. **Command Pattern** (like MediatR)
-   - User actions = commands
-   - Commands have single responsibility
-   - Commands are testable
+1. **Command-Query Separation (CQS) in Application Layer**
+
+   **Both are Use Cases** - They live in the Application Layer and orchestrate domain logic. We separate them by behavior:
+
+   ---
+
+   **Query Use Cases** - Fetch and return data (read-only):
+
+   ```typescript
+   // Example: LoadImportJobsUseCase
+   export class LoadImportJobsUseCase {
+       async execute(request: LoadImportJobsRequest): Promise<LoadImportJobsResponse> {
+           // 1. Get domain entities
+           const jobs = await this.repository.getByEnvironment(request.environmentId);
+
+           // 2. Apply domain logic
+           const activeJobs = jobs.filter(job => !job.isArchived());
+
+           // 3. Transform to ViewModels
+           const viewModels = activeJobs.map(job => this.mapper.toViewModel(job));
+
+           return { jobs: viewModels }; // ← Returns data
+       }
+   }
+   ```
+
+   **Characteristics:**
+   - **Returns:** ViewModels/DTOs (data for display)
+   - **Side effects:** None (safe to call multiple times)
+   - **Naming:** `Load*UseCase`, `Get*UseCase`, `Fetch*UseCase`
+   - **When:** Panel loads, refresh, environment change, any "show me data"
+
+   **Panel usage:**
+   ```typescript
+   // Query = Get data and update UI
+   const response = await this.loadJobsUseCase.execute({ environmentId });
+   this.dataTable.setData(response.jobs); // ← Update component with data
+   ```
+
+   ---
+
+   **Command Use Cases** - Perform actions with side effects (write):
+
+   ```typescript
+   // Example: ViewJobXmlCommand
+   export class ViewJobXmlCommand {
+       async execute(request: ViewJobXmlRequest): Promise<void> {
+           // 1. Get domain entity
+           const job = await this.repository.getById(request.jobId);
+
+           // 2. Business rule check
+           if (!job.hasXmlData()) {
+               throw new ApplicationError('Job has no XML data');
+           }
+
+           // 3. Perform action (side effect)
+           const xml = job.getXmlData();
+           const formatted = await this.xmlFormatter.format(xml);
+           await this.documentService.openInEditor(formatted, 'xml');
+
+           // ← Returns nothing (void)
+       }
+   }
+   ```
+
+   **Characteristics:**
+   - **Returns:** `void` or `{ success: boolean }` (no data)
+   - **Side effects:** Yes (opens files, saves data, calls external APIs)
+   - **Naming:** `*Command` (verb-first: `ViewJobXmlCommand`, `ExportSolutionCommand`)
+   - **When:** Button clicks, context menu actions, form submissions, any "do something"
+
+   **Panel usage:**
+   ```typescript
+   // Command = Perform action
+   await this.viewXmlCommand.execute({ jobId }); // ← Action executed, no return value
+   vscode.window.showInformationMessage('XML opened in editor');
+   ```
+
+   ---
+
+   **Decision Table: Query or Command?**
+
+   | Need To... | Use | Returns | Example |
+   |------------|-----|---------|---------|
+   | Load data for display | Query Use Case | ViewModels | `LoadImportJobsUseCase` |
+   | Refresh data | Query Use Case | ViewModels | `LoadSolutionsUseCase` |
+   | Open file in editor | Command | `void` | `ViewJobXmlCommand` |
+   | Export/save data | Command | `void` or success | `ExportSolutionCommand` |
+   | Delete entity | Command | `void` | `DeletePluginCommand` |
+   | Validate and show results | Query Use Case | Validation results | `ValidateSolutionUseCase` |
+
+   ---
+
+   **Important: This is NOT Event Bridge**
+
+   Command-Query Separation is an **Application Layer pattern** (TypeScript classes in Extension Host).
+
+   Event Bridge is a **Presentation Layer pattern** (message passing between Extension Host ↔ Webview).
+
+   ```typescript
+   // ✅ Application Layer - Use Cases/Commands
+   const jobs = await this.loadJobsUseCase.execute({ envId });     // Query
+   await this.viewXmlCommand.execute({ jobId });                   // Command
+
+   // ✅ Presentation Layer - Event Bridge
+   this.dataTable.setData(jobs);  // Triggers message to webview
+   ```
+
+   **Don't confuse them!** Both are important, but serve different purposes:
+   - **CQS** = How we organize business operations
+   - **Event Bridge** = How we update the UI efficiently
 
 2. **Repository Pattern**
    - Abstract data access
    - Domain defines interfaces
    - Infrastructure implements
 
-3. **Use Case Pattern** (Application Services)
-   - Orchestrate domain logic
-   - One use case = one user goal
-
-4. **MVVM** (for components)
+3. **MVVM** (for components)
    - View = HTML + Behavior JS
    - ViewModel = Data shape for view
    - Model = Domain entity
 
-5. **Factory Pattern**
+4. **Factory Pattern**
    - ComponentFactory (already have)
    - ServiceFactory (already have)
 
-### ⚠️ Reconsider These Patterns
+### ✅ Event Bridge
 
-1. **Event Bridge** (as currently implemented)
-   - **Problem:** Adds indirection without clear benefit
-   - **Alternative:** Direct message passing with command handlers
-   - **Keep it if:** You need pub/sub for multiple listeners
+**Event Bridge is for Presentation Layer ONLY** - Component data updates.
+
+**What it does:**
+- Panel updates component state → Component sends message to webview → Webview behavior updates DOM
+- Efficient: Only updates what changed (no full HTML regeneration)
+
+**When to use:**
+```typescript
+// ✅ GOOD - Use Event Bridge for data updates
+this.dataTable.setData(viewModels);           // Updates table rows efficiently
+this.dataTable.setLoading(true, 'Loading...'); // Updates loading state
+```
+
+**When NOT to use:**
+```typescript
+// ❌ BAD - Don't use Event Bridge for user actions
+this.actionBar.emit('action-clicked', { actionId: 'refresh' });
+// Then panel listens for event, then calls use case...
+// Too much indirection! Just call the use case directly:
+
+// ✅ GOOD - Direct method call for user actions
+await this.handleRefresh(); // Panel method → Use Case
+```
+
+**Summary:**
+- ✅ Event Bridge for **data updates** (system → UI)
+- ✅ Direct method calls for **user actions** (UI → system)
 
 ---
 
-## Next Steps
+## 🔗 See Also
 
-- Read [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md) for detailed rules
-- Read [EXECUTION_PIPELINE_GUIDE.md](./EXECUTION_PIPELINE_GUIDE.md) for request flow examples
-- Read [DIRECTORY_STRUCTURE_GUIDE.md](./DIRECTORY_STRUCTURE_GUIDE.md) for file organization
-- Read [COMMUNICATION_PATTERNS.md](./COMMUNICATION_PATTERNS.md) for webview details
-
----
-
-## Architectural Decision Records (ADRs)
-
-Document major decisions in `/docs/adr/`:
-- Why feature-first structure?
-- Why command pattern over event bridge?
-- Why rich domain models over anemic interfaces?
+- [LAYER_RESPONSIBILITIES_GUIDE.md](./LAYER_RESPONSIBILITIES_GUIDE.md) - Detailed rules for each layer
+- [EXECUTION_PIPELINE_GUIDE.md](./EXECUTION_PIPELINE_GUIDE.md) - Request flow examples
+- [DIRECTORY_STRUCTURE_GUIDE.md](./DIRECTORY_STRUCTURE_GUIDE.md) - File organization
+- [COMMUNICATION_PATTERNS.md](./COMMUNICATION_PATTERNS.md) - Webview communication patterns
+- [TESTING_GUIDE.md](./TESTING_GUIDE.md) - Testing strategy and patterns

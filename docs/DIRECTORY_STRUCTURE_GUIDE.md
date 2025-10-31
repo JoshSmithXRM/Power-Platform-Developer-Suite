@@ -214,9 +214,11 @@ docs/                                        # Documentation
 ├── EXECUTION_PIPELINE_GUIDE.md
 ├── DIRECTORY_STRUCTURE_GUIDE.md
 ├── COMMUNICATION_PATTERNS.md
-└── adr/                                     # Architectural Decision Records
-    ├── 001-feature-first-structure.md
-    └── 002-command-pattern.md
+├── CODE_COMMENTING_GUIDE.md
+├── DOCUMENTATION_STYLE_GUIDE.md
+├── LOGGING_GUIDE.md
+├── QUICK_REFERENCE.md
+└── CLAUDE_SETUP_GUIDE.md
 ```
 
 ---
