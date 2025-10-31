@@ -1,4 +1,5 @@
 import { IWhoAmIService } from '../../domain/interfaces/IWhoAmIService';
+import { IEnvironmentRepository } from '../../domain/interfaces/IEnvironmentRepository';
 import { Environment } from '../../domain/entities/Environment';
 import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
 import { EnvironmentName } from '../../domain/valueObjects/EnvironmentName';
@@ -11,10 +12,12 @@ import { ApplicationError } from '../errors/ApplicationError';
 /**
  * Command Use Case: Test connection to Dataverse
  * Works with draft (unsaved) environment data
+ * Falls back to stored credentials if not provided
  */
 export class TestConnectionUseCase {
 	constructor(
-		private readonly whoAmIService: IWhoAmIService | null
+		private readonly whoAmIService: IWhoAmIService | null,
+		private readonly repository: IEnvironmentRepository
 	) {}
 
 	public async execute(request: TestConnectionRequest): Promise<TestConnectionResponse> {
@@ -48,10 +51,31 @@ export class TestConnectionUseCase {
 		}
 
 		try {
+			// Load credentials from storage if not provided
+			let clientSecret = request.clientSecret;
+			let password = request.password;
+
+			const authMethod = tempEnvironment.getAuthenticationMethod();
+
+			// If credentials not provided, try to load from storage
+			if (authMethod.requiresClientCredentials() && !clientSecret) {
+				const clientId = tempEnvironment.getClientId()?.getValue();
+				if (clientId) {
+					clientSecret = await this.repository.getClientSecret(clientId);
+				}
+			}
+
+			if (authMethod.requiresUsernamePassword() && !password) {
+				const username = tempEnvironment.getUsername();
+				if (username) {
+					password = await this.repository.getPassword(username);
+				}
+			}
+
 			const whoAmIResponse = await this.whoAmIService.testConnection(
 				tempEnvironment,
-				request.clientSecret,
-				request.password
+				clientSecret,
+				password
 			);
 
 			return {

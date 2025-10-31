@@ -16,6 +16,7 @@ export class EnvironmentValidationService {
 	 */
 	public async validateForSave(environment: Environment, clientSecret?: string, password?: string): Promise<ValidationResult> {
 		const errors: string[] = [];
+		const warnings: string[] = [];
 
 		// Basic configuration validation
 		const configResult = environment.validateConfiguration();
@@ -52,6 +53,12 @@ export class EnvironmentValidationService {
 			}
 		}
 
-		return new ValidationResult(errors.length === 0, errors);
+		// Warn about Microsoft example client ID
+		const publicClientId = environment.getPublicClientId();
+		if (publicClientId.isMicrosoftExampleClientId()) {
+			warnings.push('Using Microsoft example client ID. Create your own Azure AD app registration for production use.');
+		}
+
+		return new ValidationResult(errors.length === 0, errors, warnings);
 	}
 }

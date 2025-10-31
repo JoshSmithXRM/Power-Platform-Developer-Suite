@@ -23,7 +23,7 @@ export class SaveEnvironmentUseCase {
 		private readonly eventPublisher: IDomainEventPublisher
 	) {}
 
-	public async execute(request: SaveEnvironmentRequest): Promise<string> {
+	public async execute(request: SaveEnvironmentRequest): Promise<SaveEnvironmentResponse> {
 		// Determine if create or update
 		const isUpdate = !!request.existingEnvironmentId;
 
@@ -67,6 +67,9 @@ export class SaveEnvironmentUseCase {
 			throw new ApplicationError(validationResult.errors.join(', '));
 		}
 
+		// Extract warnings to return to user
+		const warnings = validationResult.warnings;
+
 		// Handle orphaned secrets if auth method changed
 		if (previousEnvironment) {
 			const orphanedKeys = environment.getOrphanedSecretKeys(
@@ -101,8 +104,16 @@ export class SaveEnvironmentUseCase {
 			));
 		}
 
-		return environmentId.getValue();
+		return {
+			environmentId: environmentId.getValue(),
+			warnings: warnings
+		};
 	}
+}
+
+export interface SaveEnvironmentResponse {
+	environmentId: string;
+	warnings: string[];
 }
 
 export interface SaveEnvironmentRequest {

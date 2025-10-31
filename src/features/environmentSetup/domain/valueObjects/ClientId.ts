@@ -6,6 +6,7 @@ import { DomainError } from '../errors/DomainError';
 export class ClientId {
 	private readonly value: string;
 	private static readonly GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	private static readonly MICROSOFT_EXAMPLE_CLIENT_ID = '51f81489-12ee-4a9e-aaae-a2591f45987d';
 
 	constructor(value: string) {
 		if (!value || value.trim() === '') {
@@ -26,5 +27,9 @@ export class ClientId {
 
 	public isValid(): boolean {
 		return ClientId.GUID_PATTERN.test(this.value);
+	}
+
+	public isMicrosoftExampleClientId(): boolean {
+		return this.value === ClientId.MICROSOFT_EXAMPLE_CLIENT_ID;
 	}
 }

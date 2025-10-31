@@ -176,7 +176,7 @@ export class EnvironmentSetupPanel {
 		const wasNew = !this.currentEnvironmentId;
 
 		// Delegate to use case
-		const environmentId = await this.saveEnvironmentUseCase.execute({
+		const result = await this.saveEnvironmentUseCase.execute({
 			existingEnvironmentId: this.currentEnvironmentId,
 			name: envData.name as string,
 			dataverseUrl: envData.dataverseUrl as string,
@@ -191,16 +191,21 @@ export class EnvironmentSetupPanel {
 			preserveExistingCredentials: true
 		});
 
-		vscode.window.showInformationMessage('Environment saved successfully');
+		// Show success message with warnings if any
+		if (result.warnings.length > 0) {
+			vscode.window.showWarningMessage(`Environment saved with warnings: ${result.warnings.join(', ')}`);
+		} else {
+			vscode.window.showInformationMessage('Environment saved successfully');
+		}
 
 		// Update panel state if new
 		if (wasNew) {
-			this.currentEnvironmentId = environmentId;
+			this.currentEnvironmentId = result.environmentId;
 			CheckConcurrentEditUseCase.registerEditSession(this.currentEnvironmentId);
 
 			// Update panel key in map
 			EnvironmentSetupPanel.currentPanels.delete('new');
-			EnvironmentSetupPanel.currentPanels.set(environmentId, this);
+			EnvironmentSetupPanel.currentPanels.set(result.environmentId, this);
 		}
 
 		// Notify webview with environment ID
@@ -208,7 +213,7 @@ export class EnvironmentSetupPanel {
 			command: 'environment-saved',
 			data: {
 				success: true,
-				environmentId: environmentId,
+				environmentId: result.environmentId,
 				isNewEnvironment: wasNew
 			}
 		});
