@@ -48,5 +48,5 @@ export function renderButton(props: ButtonProps): string {
 		})}>
 			${props.text}
 		</button>
-	`;
+	`.__html;
 }

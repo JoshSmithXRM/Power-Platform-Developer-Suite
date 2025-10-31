@@ -38,7 +38,7 @@ export function renderEnvironmentSetup(resources: EnvironmentSetupViewResources)
 			${raw(renderScript(resources))}
 		</body>
 		</html>
-	`;
+	`.__html;
 }
 
 /**
@@ -54,7 +54,7 @@ function renderHeader(): string {
 				${raw(renderButton({ id: 'deleteButton', text: 'Delete Environment', variant: 'danger', style: 'display: none;' }))}
 			</div>
 		</div>
-	`;
+	`.__html;
 }
 
 /**
@@ -72,7 +72,7 @@ function renderForm(): string {
 				content: renderAuthenticationSection()
 			}))}
 		</form>
-	`;
+	`.__html;
 }
 
 /**
@@ -126,7 +126,7 @@ function renderEnvironmentIdField(): string {
 			</div>
 			<span class="help-text">Optional: The unique GUID for this environment (for Power Apps Maker portal). Click "Discover ID" to auto-populate from BAP API.</span>
 		</div>
-	`;
+	`.__html;
 }
 
 /**
@@ -193,7 +193,7 @@ function renderServicePrincipalFields(): string {
 				helpText: 'Secret value (stored securely)'
 			}))}
 		</div>
-	`;
+	`.__html;
 }
 
 /**
@@ -219,7 +219,7 @@ function renderUsernamePasswordFields(): string {
 				helpText: 'Password (stored securely)'
 			}))}
 		</div>
-	`;
+	`.__html;
 }
 
 /**
@@ -228,5 +228,5 @@ function renderUsernamePasswordFields(): string {
 function renderScript(resources: EnvironmentSetupViewResources): string {
 	return html`
 		<script src="${resources.scriptUri}"></script>
-	`;
+	`.__html;
 }

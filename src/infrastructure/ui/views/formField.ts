@@ -58,5 +58,5 @@ export function renderFormField(props: FormFieldProps): string {
 			})} />
 			${props.helpText ? html`<span class="help-text">${props.helpText}</span>` : ''}
 		</div>
-	`;
+	`.__html;
 }

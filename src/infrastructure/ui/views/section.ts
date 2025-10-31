@@ -32,5 +32,5 @@ export function renderSection(props: SectionProps): string {
 			<h2>${props.title}</h2>
 			${raw(props.content)}
 		</section>
-	`;
+	`.__html;
 }

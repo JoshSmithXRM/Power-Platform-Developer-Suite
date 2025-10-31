@@ -76,7 +76,7 @@ export function raw(html: string): RawHtml {
  * html`<ul>${items.map(item => html`<li>${item}</li>`)}</ul>`
  * // Auto-flattens arrays from .map()
  */
-export function html(strings: TemplateStringsArray, ...values: unknown[]): string {
+export function html(strings: TemplateStringsArray, ...values: unknown[]): RawHtml {
 	let result = strings[0];
 
 	for (let i = 0; i < values.length; i++) {
@@ -93,6 +93,8 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): strin
 				}
 				return escapeHtml(String(v));
 			}).join('');
+		} else if (value === null || value === undefined) {
+			// Skip null/undefined - don't add anything
 		} else {
 			// Escape regular values
 			result += escapeHtml(String(value));
@@ -101,7 +103,8 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): strin
 		result += strings[i + 1];
 	}
 
-	return result;
+	// Return as RawHtml so nested calls don't double-escape
+	return raw(result);
 }
 
 /**
@@ -109,15 +112,21 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): strin
  * Useful for .map() operations with type safety.
  *
  * @param items - Array of items to render
- * @param fn - Function to render each item
+ * @param fn - Function to render each item (can return string or RawHtml)
  * @returns RawHtml with joined results
  *
  * @example
  * const items = ['Apple', 'Banana', 'Orange'];
  * html`<ul>${each(items, item => html`<li>${item}</li>`)}</ul>`
  */
-export function each<T>(items: T[], fn: (item: T, index: number) => string): RawHtml {
-	return raw(items.map((item, index) => fn(item, index)).join(''));
+export function each<T>(items: T[], fn: (item: T, index: number) => string | RawHtml): RawHtml {
+	return raw(items.map((item, index) => {
+		const result = fn(item, index);
+		if (isRawHtml(result)) {
+			return result.__html;
+		}
+		return result;
+	}).join(''));
 }
 
 /**

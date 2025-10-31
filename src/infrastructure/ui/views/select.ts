@@ -68,5 +68,5 @@ export function renderSelect(props: SelectProps): string {
 			</select>
 			${props.helpText ? html`<span class="help-text">${props.helpText}</span>` : ''}
 		</div>
-	`;
+	`.__html;
 }
