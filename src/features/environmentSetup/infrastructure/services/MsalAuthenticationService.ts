@@ -3,10 +3,9 @@ import * as http from 'http';
 import * as msal from '@azure/msal-node';
 
 import { Environment } from '../../domain/entities/Environment';
+import { IAuthenticationService } from '../../domain/interfaces/IAuthenticationService';
 import { AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
 import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
-
-import { IAuthenticationService } from './IAuthenticationService';
 
 /**
  * Authentication service using MSAL (Microsoft Authentication Library)

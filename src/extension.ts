@@ -49,7 +49,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	const powerPlatformApiService = new PowerPlatformApiService(authService);
 
 	// Domain Layer
-	const environmentValidationService = new EnvironmentValidationService(environmentRepository);
+	const environmentValidationService = new EnvironmentValidationService();
 
 	// Application Layer - Mappers
 	const listViewModelMapper = new EnvironmentListViewModelMapper();

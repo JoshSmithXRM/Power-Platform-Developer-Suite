@@ -1,5 +1,5 @@
 import { AuthenticationCacheInvalidationRequested } from '../../domain/events/AuthenticationCacheInvalidationRequested';
-import { IAuthenticationService } from '../services/IAuthenticationService';
+import { IAuthenticationService } from '../../domain/interfaces/IAuthenticationService';
 
 /**
  * Infrastructure event handler: Clear authentication cache when requested

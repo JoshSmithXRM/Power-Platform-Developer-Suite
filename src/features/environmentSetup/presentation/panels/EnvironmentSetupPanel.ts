@@ -200,7 +200,7 @@ export class EnvironmentSetupPanel {
 		});
 
 		// Show success message with warnings if any
-		if (result.warnings.length > 0) {
+		if (result.warnings && result.warnings.length > 0) {
 			vscode.window.showWarningMessage(`Environment saved with warnings: ${result.warnings.join(', ')}`);
 		} else {
 			vscode.window.showInformationMessage('Environment saved successfully');

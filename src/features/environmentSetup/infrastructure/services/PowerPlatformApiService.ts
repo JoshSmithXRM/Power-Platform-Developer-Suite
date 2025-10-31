@@ -1,7 +1,6 @@
 import { Environment } from '../../domain/entities/Environment';
+import { IAuthenticationService } from '../../domain/interfaces/IAuthenticationService';
 import { IPowerPlatformApiService } from '../../domain/interfaces/IPowerPlatformApiService';
-
-import { IAuthenticationService } from './IAuthenticationService';
 
 /**
  * Service for interacting with Power Platform Business Application Platform (BAP) API

@@ -57,9 +57,26 @@ export class SaveEnvironmentUseCase {
 			request.username
 		);
 
-		// Domain validation
-		const validationResult = await this.validationService.validateForSave(
+		// Gather validation data from repository (use case responsibility)
+		const isNameUnique = await this.repository.isNameUnique(
+			environment.getName().getValue(),
+			environment.getId()
+		);
+
+		const hasExistingClientSecret = environment.getClientId()
+			? !!(await this.repository.getClientSecret(environment.getClientId()!.getValue()))
+			: false;
+
+		const hasExistingPassword = environment.getUsername()
+			? !!(await this.repository.getPassword(environment.getUsername()!))
+			: false;
+
+		// Domain validation (pure business logic, no infrastructure)
+		const validationResult = this.validationService.validateForSave(
 			environment,
+			isNameUnique,
+			hasExistingClientSecret,
+			hasExistingPassword,
 			request.clientSecret,
 			request.password
 		);
