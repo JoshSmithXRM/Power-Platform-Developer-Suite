@@ -15,22 +15,8 @@ export class LoadEnvironmentsUseCase {
 		// Get domain entities
 		const environments = await this.repository.getAll();
 
-		// Transform to ViewModels
-		const viewModels = environments.map(env => this.mapper.toViewModel(env));
-
-		// Sort by last used (most recent first), then by name
-		viewModels.sort((a, b) => {
-			if (a.lastUsed && b.lastUsed) {
-				return b.lastUsed.getTime() - a.lastUsed.getTime();
-			}
-			if (a.lastUsed) {
-				return -1;
-			}
-			if (b.lastUsed) {
-				return 1;
-			}
-			return a.name.localeCompare(b.name);
-		});
+		// Transform to sorted ViewModels (sorting is presentation concern handled by mapper)
+		const viewModels = this.mapper.toSortedViewModels(environments);
 
 		return {
 			environments: viewModels,
