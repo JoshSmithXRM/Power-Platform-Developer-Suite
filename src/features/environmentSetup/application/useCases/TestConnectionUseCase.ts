@@ -14,7 +14,7 @@ import { ApplicationError } from '../errors/ApplicationError';
  */
 export class TestConnectionUseCase {
 	constructor(
-		private readonly whoAmIService: IWhoAmIService
+		private readonly whoAmIService: IWhoAmIService | null
 	) {}
 
 	public async execute(request: TestConnectionRequest): Promise<TestConnectionResponse> {
@@ -40,6 +40,13 @@ export class TestConnectionUseCase {
 		}
 
 		// Test connection using WhoAmI API
+		if (!this.whoAmIService) {
+			return {
+				success: false,
+				errorMessage: 'WhoAmI service not yet implemented'
+			};
+		}
+
 		try {
 			const whoAmIResponse = await this.whoAmIService.testConnection(
 				tempEnvironment,

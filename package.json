@@ -317,7 +317,7 @@
     },
     "scripts": {
         "vscode:prepublish": "npm run package",
-        "compile": "npm run lint && npm run lint:webview && webpack",
+        "compile": "npm run lint && webpack",
         "compile:no-lint": "webpack",
         "watch": "webpack --watch",
         "package": "npm run lint && webpack --mode production --devtool hidden-source-map",

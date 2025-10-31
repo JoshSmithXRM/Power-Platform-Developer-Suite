@@ -1,5 +1,6 @@
 import { IWhoAmIService, WhoAmIResponse } from '../../domain/interfaces/IWhoAmIService';
 import { Environment } from '../../domain/entities/Environment';
+
 import { IAuthenticationService } from './IAuthenticationService';
 
 /**

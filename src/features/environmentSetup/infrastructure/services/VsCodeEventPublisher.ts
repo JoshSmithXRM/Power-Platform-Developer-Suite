@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+
 import { IDomainEventPublisher } from '../../application/interfaces/IDomainEventPublisher';
 
 /**

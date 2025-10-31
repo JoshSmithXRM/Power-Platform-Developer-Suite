@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+
 import { LoadEnvironmentByIdUseCase } from '../../application/useCases/LoadEnvironmentByIdUseCase';
 import { SaveEnvironmentUseCase } from '../../application/useCases/SaveEnvironmentUseCase';
 import { DeleteEnvironmentUseCase } from '../../application/useCases/DeleteEnvironmentUseCase';
@@ -117,15 +118,20 @@ export class EnvironmentSetupPanel {
 		return newPanel;
 	}
 
-	private async handleMessage(message: { command: string; data?: unknown }): Promise<void> {
+	private async handleMessage(message: unknown): Promise<void> {
+		if (!message || typeof message !== 'object') {
+			return;
+		}
+
+		const msg = message as { command: string; data?: unknown };
 		try {
-			switch (message.command) {
+			switch (msg.command) {
 				case 'save-environment':
-					await this.handleSaveEnvironment(message.data);
+					await this.handleSaveEnvironment(msg.data);
 					break;
 
 				case 'test-connection':
-					await this.handleTestConnection(message.data);
+					await this.handleTestConnection(msg.data);
 					break;
 
 				case 'delete-environment':
@@ -133,11 +139,12 @@ export class EnvironmentSetupPanel {
 					break;
 
 				case 'validate-name':
-					await this.handleValidateName(message.data);
+					await this.handleValidateName(msg.data);
 					break;
 
 				default:
-					console.warn('Unknown message command:', message.command);
+					// Unknown command - ignore
+					break;
 			}
 		} catch (error) {
 			this.handleError(error as Error, 'Operation failed');
@@ -166,9 +173,10 @@ export class EnvironmentSetupPanel {
 		}
 
 		const envData = data as Record<string, unknown>;
+		const wasNew = !this.currentEnvironmentId;
 
 		// Delegate to use case
-		await this.saveEnvironmentUseCase.execute({
+		const environmentId = await this.saveEnvironmentUseCase.execute({
 			existingEnvironmentId: this.currentEnvironmentId,
 			name: envData.name as string,
 			dataverseUrl: envData.dataverseUrl as string,
@@ -186,15 +194,23 @@ export class EnvironmentSetupPanel {
 		vscode.window.showInformationMessage('Environment saved successfully');
 
 		// Update panel state if new
-		if (!this.currentEnvironmentId && envData.id) {
-			this.currentEnvironmentId = envData.id as string;
+		if (wasNew) {
+			this.currentEnvironmentId = environmentId;
 			CheckConcurrentEditUseCase.registerEditSession(this.currentEnvironmentId);
+
+			// Update panel key in map
+			EnvironmentSetupPanel.currentPanels.delete('new');
+			EnvironmentSetupPanel.currentPanels.set(environmentId, this);
 		}
 
-		// Notify webview
+		// Notify webview with environment ID
 		this.panel.webview.postMessage({
 			command: 'environment-saved',
-			data: { success: true }
+			data: {
+				success: true,
+				environmentId: environmentId,
+				isNewEnvironment: wasNew
+			}
 		});
 
 		// Trigger environment list refresh
@@ -294,7 +310,6 @@ export class EnvironmentSetupPanel {
 	}
 
 	private handleError(error: Error, message: string): void {
-		console.error(message, error);
 		vscode.window.showErrorMessage(`${message}: ${error.message}`);
 	}
 
@@ -457,11 +472,9 @@ export class EnvironmentSetupPanel {
 
 			// Delete button
 			deleteButton.addEventListener('click', () => {
-				if (confirm('Are you sure you want to delete this environment?')) {
-					vscode.postMessage({
-						command: 'delete-environment'
-					});
-				}
+				vscode.postMessage({
+					command: 'delete-environment'
+				});
 			});
 
 			// Auth method change
@@ -551,6 +564,11 @@ export class EnvironmentSetupPanel {
 					setTimeout(() => {
 						saveButton.textContent = 'Save Environment';
 					}, 2000);
+
+					// Show delete button if newly created
+					if (data.isNewEnvironment && data.environmentId) {
+						deleteButton.style.display = 'inline-block';
+					}
 				}
 			}
 

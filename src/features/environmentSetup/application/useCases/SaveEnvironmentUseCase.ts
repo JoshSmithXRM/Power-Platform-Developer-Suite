@@ -23,7 +23,7 @@ export class SaveEnvironmentUseCase {
 		private readonly eventPublisher: IDomainEventPublisher
 	) {}
 
-	public async execute(request: SaveEnvironmentRequest): Promise<void> {
+	public async execute(request: SaveEnvironmentRequest): Promise<string> {
 		// Determine if create or update
 		const isUpdate = !!request.existingEnvironmentId;
 
@@ -100,6 +100,8 @@ export class SaveEnvironmentUseCase {
 				environment.getName().getValue()
 			));
 		}
+
+		return environmentId.getValue();
 	}
 }
 

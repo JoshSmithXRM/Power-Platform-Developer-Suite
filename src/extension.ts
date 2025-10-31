@@ -20,7 +20,7 @@ import { EnvironmentSetupPanel } from './features/environmentSetup/presentation/
  * Extension activation entry point
  */
 export function activate(context: vscode.ExtensionContext): void {
-	console.log('Power Platform Developer Suite is now active!');
+	// Extension activated
 
 	// ========================================
 	// Dependency Injection Setup (Clean Architecture)
@@ -43,11 +43,11 @@ export function activate(context: vscode.ExtensionContext): void {
 	const formViewModelMapper = new EnvironmentFormViewModelMapper();
 
 	// Application Layer - Use Cases
-	const loadEnvironmentsUseCase = new LoadEnvironmentsUseCase(environmentRepository, listViewModelMapper);
+	const _loadEnvironmentsUseCase = new LoadEnvironmentsUseCase(environmentRepository, listViewModelMapper);
 	const loadEnvironmentByIdUseCase = new LoadEnvironmentByIdUseCase(environmentRepository, formViewModelMapper);
 	const saveEnvironmentUseCase = new SaveEnvironmentUseCase(environmentRepository, environmentValidationService, eventPublisher);
 	const deleteEnvironmentUseCase = new DeleteEnvironmentUseCase(environmentRepository, eventPublisher);
-	const testConnectionUseCase = new TestConnectionUseCase(null as any); // TODO: Implement WhoAmI service with auth
+	const testConnectionUseCase = new TestConnectionUseCase(null); // TODO: Implement WhoAmI service with auth
 	const validateUniqueNameUseCase = new ValidateUniqueNameUseCase(environmentRepository);
 	const checkConcurrentEditUseCase = new CheckConcurrentEditUseCase();
 
@@ -108,7 +108,7 @@ export function activate(context: vscode.ExtensionContext): void {
  * Extension deactivation
  */
 export function deactivate(): void {
-	console.log('Power Platform Developer Suite is now deactivated');
+	// Extension deactivated
 }
 
 /**
@@ -147,7 +147,7 @@ class EnvironmentsTreeProvider implements vscode.TreeDataProvider<EnvironmentIte
 	private _onDidChangeTreeData: vscode.EventEmitter<EnvironmentItem | undefined | null | void> = new vscode.EventEmitter<EnvironmentItem | undefined | null | void>();
 	readonly onDidChangeTreeData: vscode.Event<EnvironmentItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
-	constructor(private context: vscode.ExtensionContext) {}
+	constructor(private context: vscode.ExtensionContext) { }
 
 	refresh(): void {
 		this._onDidChangeTreeData.fire();
