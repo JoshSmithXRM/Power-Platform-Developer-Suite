@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 // Environment Setup - Clean Architecture imports
+import { IEnvironmentRepository } from './features/environmentSetup/domain/interfaces/IEnvironmentRepository';
 import { EnvironmentRepository } from './features/environmentSetup/infrastructure/repositories/EnvironmentRepository';
 import { EnvironmentDomainMapper } from './features/environmentSetup/infrastructure/mappers/EnvironmentDomainMapper';
 import { EnvironmentValidationService } from './features/environmentSetup/domain/services/EnvironmentValidationService';
@@ -17,6 +18,7 @@ import { DiscoverEnvironmentIdUseCase } from './features/environmentSetup/applic
 import { ValidateUniqueNameUseCase } from './features/environmentSetup/application/useCases/ValidateUniqueNameUseCase';
 import { CheckConcurrentEditUseCase } from './features/environmentSetup/application/useCases/CheckConcurrentEditUseCase';
 import { EnvironmentListViewModelMapper } from './features/environmentSetup/application/mappers/EnvironmentListViewModelMapper';
+import { EnvironmentListViewModel } from './features/environmentSetup/application/viewModels/EnvironmentListViewModel';
 import { EnvironmentFormViewModelMapper } from './features/environmentSetup/application/mappers/EnvironmentFormViewModelMapper';
 import { EnvironmentSetupPanel } from './features/environmentSetup/presentation/panels/EnvironmentSetupPanel';
 import { EnvironmentId } from './features/environmentSetup/domain/valueObjects/EnvironmentId';
@@ -74,7 +76,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	vscode.window.registerTreeDataProvider('power-platform-dev-suite-tools', toolsProvider);
 
 	// Register Environments tree view provider
-	const environmentsProvider = new EnvironmentsTreeProvider(context);
+	const environmentsProvider = new EnvironmentsTreeProvider(environmentRepository, listViewModelMapper);
 	vscode.window.registerTreeDataProvider('power-platform-dev-suite-environments', environmentsProvider);
 
 	// ========================================
@@ -313,12 +315,16 @@ class ToolsTreeProvider implements vscode.TreeDataProvider<ToolItem> {
 
 /**
  * Environments tree view provider
+ * Uses repository pattern for data access consistency
  */
 class EnvironmentsTreeProvider implements vscode.TreeDataProvider<EnvironmentItem> {
 	private _onDidChangeTreeData: vscode.EventEmitter<EnvironmentItem | undefined | null | void> = new vscode.EventEmitter<EnvironmentItem | undefined | null | void>();
 	readonly onDidChangeTreeData: vscode.Event<EnvironmentItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
-	constructor(private context: vscode.ExtensionContext) { }
+	constructor(
+		private readonly repository: IEnvironmentRepository,
+		private readonly mapper: EnvironmentListViewModelMapper
+	) { }
 
 	refresh(): void {
 		this._onDidChangeTreeData.fire();
@@ -328,13 +334,9 @@ class EnvironmentsTreeProvider implements vscode.TreeDataProvider<EnvironmentIte
 		return element;
 	}
 
-	getChildren(): EnvironmentItem[] {
-		// Load environments from globalState (same storage key as old implementation)
-		const environments = this.context.globalState.get<Array<{
-			id: string;
-			name: string;
-			settings: { dataverseUrl: string };
-		}>>('power-platform-dev-suite-environments', []);
+	async getChildren(): Promise<EnvironmentItem[]> {
+		// Use repository to load environments
+		const environments = await this.repository.getAll();
 
 		if (environments.length === 0) {
 			return [
@@ -342,9 +344,11 @@ class EnvironmentsTreeProvider implements vscode.TreeDataProvider<EnvironmentIte
 			];
 		}
 
-		return environments.map(env =>
-			new EnvironmentItem(env.name, env.settings.dataverseUrl, 'environment', env.id)
-		);
+		// Map domain entities to view models, then to tree items
+		return environments.map(env => {
+			const vm: EnvironmentListViewModel = this.mapper.toViewModel(env);
+			return new EnvironmentItem(vm.name, vm.dataverseUrl, 'environment', vm.id);
+		});
 	}
 }
 
