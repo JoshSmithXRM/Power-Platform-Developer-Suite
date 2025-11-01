@@ -1342,9 +1342,3 @@ When adding webview logging to a panel:
 - **Production**: WebviewLogger → postMessage → Panel → ILogger → OutputChannel
 - **Development**: Same as production + console.log (when DEV_MODE = true)
 
----
-
-**Document Version:** 1.1
-**Last Updated:** 2025-11-01
-**Author:** Clean Architecture Guardian
-**Changes:** Added Webview Logging section with build-time injection approach

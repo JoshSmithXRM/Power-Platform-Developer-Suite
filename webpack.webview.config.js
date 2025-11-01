@@ -17,12 +17,8 @@ module.exports = (env, argv) => {
 
 		output: {
 			path: path.resolve(__dirname, 'dist/webview'),
-			filename: '[name].js',
-			library: {
-				type: 'umd',
-				name: '[name]'
-			},
-			globalObject: 'this'
+			filename: '[name].js'
+			// No library export needed - webview scripts execute directly
 		},
 
 		plugins: [
