@@ -1,5 +1,19 @@
 /**
- * Value object representing a storage key
+ * Value object representing a storage key in VS Code storage.
+ *
+ * Value objects are immutable, validated on construction, and compared by value.
+ *
+ * Business Rules:
+ * - Cannot be empty
+ * - Immutable once created
+ * - Provides detection for protected and legacy keys
+ *
+ * Key Patterns:
+ * - Current: `power-platform-dev-suite-*`
+ * - Legacy: `power-platform-*` (pre-refactor)
+ * - Protected: `power-platform-dev-suite-environments` (critical data)
+ *
+ * @throws {Error} If key is empty
  */
 export class StorageKey {
 	private constructor(private readonly _value: string) {
@@ -17,14 +31,25 @@ export class StorageKey {
 	}
 
 	/**
-	 * Checks if this is the protected environments key
+	 * Checks if this is the protected environments key.
+	 *
+	 * WHY: Environment configurations are critical extension data that must be
+	 * protected from accidental deletion. This is the only hardcoded protected key.
+	 *
+	 * @returns {boolean} True if this is the environments key
 	 */
 	public isProtectedEnvironmentsKey(): boolean {
 		return this._value === 'power-platform-dev-suite-environments';
 	}
 
 	/**
-	 * Detects legacy keys from pre-refactor codebase
+	 * Detects legacy keys from pre-refactor codebase.
+	 *
+	 * WHY: Codebase was refactored to use `power-platform-dev-suite-` prefix.
+	 * Legacy keys with old prefix may exist in user storage and should be
+	 * flagged for migration or cleanup.
+	 *
+	 * @returns {boolean} True if key uses legacy prefix
 	 */
 	public isLegacyKey(): boolean {
 		return this._value.startsWith('power-platform-') &&

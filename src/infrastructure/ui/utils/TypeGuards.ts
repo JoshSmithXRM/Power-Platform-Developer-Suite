@@ -299,3 +299,47 @@ export function isCheckUniqueNameMessage(message: unknown): message is CheckUniq
 		typeof data.name === 'string'
 	);
 }
+
+/**
+ * Valid log levels for webview logging.
+ */
+export type WebviewLogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+/**
+ * Webview log message sent from webview to extension host.
+ * Used to bridge webview console logs to the extension's OutputChannel.
+ */
+export interface WebviewLogMessage {
+	command: 'webview-log';
+	level: WebviewLogLevel;
+	message: string;
+	componentName: string;
+	data?: unknown;
+	timestamp: string;
+}
+
+/**
+ * Type guard for webview log message.
+ *
+ * @param message - Unknown message from webview
+ * @returns True if message is valid WebviewLogMessage
+ */
+export function isWebviewLogMessage(message: unknown): message is WebviewLogMessage {
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'webview-log') {
+		return false;
+	}
+
+	const msg = message as WebviewLogMessage;
+
+	return (
+		typeof msg.level === 'string' &&
+		['debug', 'info', 'warn', 'error'].includes(msg.level) &&
+		typeof msg.message === 'string' &&
+		typeof msg.componentName === 'string' &&
+		typeof msg.timestamp === 'string'
+	);
+}

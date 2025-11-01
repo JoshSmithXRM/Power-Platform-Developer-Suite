@@ -1,7 +1,18 @@
 type DataTypeValue = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null' | 'undefined' | 'secret';
 
 /**
- * Value object representing data type
+ * Value object representing JavaScript data types for storage values.
+ *
+ * Provides runtime type detection for storage values to support
+ * appropriate rendering in the UI.
+ *
+ * Supported Types:
+ * - Primitives: string, number, boolean, null, undefined
+ * - Complex: object, array
+ * - Special: secret (for hidden values)
+ *
+ * WHY: Storage values can be any serializable type. This value object
+ * classifies types for appropriate UI rendering and validation.
  */
 export class DataType {
 	private constructor(private readonly _value: DataTypeValue) {}

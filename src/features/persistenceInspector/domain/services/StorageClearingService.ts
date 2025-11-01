@@ -9,7 +9,29 @@ import { PropertyNotFoundError } from '../errors/PropertyNotFoundError';
 import { InvalidOperationError } from '../errors/InvalidOperationError';
 
 /**
- * Domain service coordinating clearing logic
+ * Domain service coordinating storage clearing logic.
+ *
+ * Domain services are stateless and contain pure business logic with
+ * ZERO infrastructure dependencies (uses interfaces, not concrete implementations).
+ *
+ * WHY Domain Service: Clearing logic requires validation (via StorageCollection),
+ * business rules enforcement, and coordination with storage repositories.
+ * This orchestration logic belongs in a domain service.
+ *
+ * Responsibilities:
+ * - Validate clear operations before execution
+ * - Enforce protection rules (prevent clearing protected keys)
+ * - Clear individual entries or properties
+ * - Clear all non-protected entries
+ *
+ * Business Rules Enforced:
+ * - Protected keys cannot be cleared
+ * - Secret entry properties cannot be individually cleared (all or nothing)
+ * - Clear all operations skip protected entries
+ * - Must validate before clearing
+ *
+ * Note: Uses repository interfaces (IStorageClearer, IProtectedKeyProvider)
+ * defined in domain layer. Actual implementations are in infrastructure layer.
  */
 export class StorageClearingService {
 	public constructor(
@@ -18,7 +40,18 @@ export class StorageClearingService {
 	) {}
 
 	/**
-	 * Clears a specific storage entry after validation
+	 * Clears a specific storage entry after validation.
+	 *
+	 * Business Rules:
+	 * - Validates entry can be cleared (not protected)
+	 * - Routes to correct storage type (global vs secret)
+	 *
+	 * WHY: Validation before clearing prevents accidental deletion of
+	 * critical data. StorageCollection aggregates validation logic.
+	 *
+	 * @param {StorageEntry} entry - Entry to clear
+	 * @param {StorageCollection} collection - Collection for validation
+	 * @throws {ProtectedKeyError} If entry is protected
 	 */
 	public async clearEntry(
 		entry: StorageEntry,
@@ -38,7 +71,23 @@ export class StorageClearingService {
 	}
 
 	/**
-	 * Clears a specific property within an entry
+	 * Clears a specific property within a storage entry.
+	 *
+	 * Business Rules:
+	 * - Entry must not be protected
+	 * - Entry must not be a secret (secrets are all-or-nothing)
+	 * - Property must exist at the specified path
+	 *
+	 * WHY: Allows fine-grained clearing of nested properties within complex
+	 * storage values (e.g., removing one environment from the array without
+	 * clearing all environments).
+	 *
+	 * @param {StorageEntry} entry - Entry containing the property
+	 * @param {PropertyPath} path - Path to property to clear
+	 * @param {StorageCollection} collection - Collection for validation
+	 * @throws {ProtectedKeyError} If entry is protected
+	 * @throws {InvalidOperationError} If entry is a secret
+	 * @throws {PropertyNotFoundError} If property doesn't exist
 	 */
 	public async clearProperty(
 		entry: StorageEntry,
@@ -63,7 +112,20 @@ export class StorageClearingService {
 	}
 
 	/**
-	 * Clears all non-protected entries
+	 * Clears all non-protected storage entries.
+	 *
+	 * Business Rules:
+	 * - Protected entries are automatically skipped
+	 * - Must have at least one clearable entry
+	 * - Returns result with counts for confirmation
+	 *
+	 * WHY: Provides "nuclear option" for clearing extension storage
+	 * while protecting critical data. Used for troubleshooting and
+	 * testing scenarios.
+	 *
+	 * @param {StorageCollection} collection - Collection to validate
+	 * @returns {Promise<ClearAllResult>} Result with cleared/skipped counts
+	 * @throws {InvalidOperationError} If no clearable entries exist
 	 */
 	public async clearAll(
 		collection: StorageCollection

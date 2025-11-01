@@ -1,5 +1,12 @@
 /**
- * Value object representing storage type (global or secret)
+ * Value object representing VS Code storage type.
+ *
+ * VS Code provides two storage mechanisms:
+ * - Global: WorkspaceState/GlobalState (plain text, visible in storage inspector)
+ * - Secret: SecretStorage (encrypted, credentials/sensitive data)
+ *
+ * WHY: Type-safe enumeration of storage types. Prevents invalid storage
+ * type strings and provides query methods.
  */
 export class StorageType {
 	private constructor(private readonly _value: 'global' | 'secret') {}

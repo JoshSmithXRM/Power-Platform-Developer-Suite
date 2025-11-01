@@ -1,5 +1,24 @@
 /**
- * Value object representing the result of validating a clear operation
+ * Value object representing validation result for a single entry clear operation.
+ *
+ * Encapsulates three possible outcomes:
+ * - Allowed: Entry exists and can be cleared
+ * - Protected: Entry exists but is protected (cannot be cleared)
+ * - Not Found: Entry does not exist in storage
+ *
+ * WHY: Type-safe result object instead of throwing exceptions for validation
+ * failures. Allows domain layer to return rich validation information without
+ * exception handling overhead.
+ *
+ * Pattern: Factory methods enforce valid states (allowed/protected/notFound).
+ *
+ * @example
+ * ```typescript
+ * const result = collection.validateClearOperation(key);
+ * if (!result.isAllowed) {
+ *   console.error(result.reason); // Show why operation failed
+ * }
+ * ```
  */
 export class ClearValidationResult {
 	private constructor(

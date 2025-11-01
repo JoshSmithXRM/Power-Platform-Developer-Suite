@@ -3,36 +3,53 @@ import { StorageInspectionService } from '../../domain/services/StorageInspectio
 import { IDomainEventPublisher } from '../../../environmentSetup/application/interfaces/IDomainEventPublisher';
 import { PropertyPath } from '../../domain/valueObjects/PropertyPath';
 import { StoragePropertyCleared } from '../../domain/events/StoragePropertyCleared';
+import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 /**
  * Use case for clearing a property within a storage entry
- * Orchestrates only - no business logic
+ * Removes a specific nested property without deleting the entire entry
  */
 export class ClearStoragePropertyUseCase {
 	public constructor(
 		private readonly storageClearingService: StorageClearingService,
 		private readonly storageInspectionService: StorageInspectionService,
-		private readonly eventPublisher: IDomainEventPublisher
+		private readonly eventPublisher: IDomainEventPublisher,
+		private readonly logger: ILogger
 	) {}
 
+	/**
+	 * Clears a specific property within a storage entry
+	 * @param key Storage key containing the property
+	 * @param propertyPath Dot-notation path to the property (e.g., "user.settings.theme")
+	 */
 	public async execute(key: string, propertyPath: string): Promise<void> {
-		// Orchestrate: get current collection for validation
-		const collection = await this.storageInspectionService.inspectStorage();
-		const entry = collection.getEntry(key);
+		this.logger.debug(`ClearStoragePropertyUseCase: Clearing property "${propertyPath}" in "${key}"`);
 
-		if (!entry) {
-			throw new Error(`Entry not found: ${key}`);
+		try {
+			// Orchestrate: get current collection for validation
+			const collection = await this.storageInspectionService.inspectStorage();
+			const entry = collection.getEntry(key);
+
+			if (!entry) {
+				this.logger.warn(`Entry not found: ${key}`);
+				throw new Error(`Entry not found: ${key}`);
+			}
+
+			// Orchestrate: create value object
+			const path = PropertyPath.create(propertyPath);
+
+			// Orchestrate: call domain service
+			await this.storageClearingService.clearProperty(entry, path, collection);
+
+			// Orchestrate: raise domain event
+			this.eventPublisher.publish(
+				new StoragePropertyCleared(entry.key, path.toString())
+			);
+
+			this.logger.info(`Property cleared: ${propertyPath} in ${key}`);
+		} catch (error) {
+			this.logger.error('ClearStoragePropertyUseCase: Failed to clear property', error);
+			throw error;
 		}
-
-		// Orchestrate: create value object
-		const path = PropertyPath.create(propertyPath);
-
-		// Orchestrate: call domain service
-		await this.storageClearingService.clearProperty(entry, path, collection);
-
-		// Orchestrate: raise domain event
-		this.eventPublisher.publish(
-			new StoragePropertyCleared(entry.key, path.toString())
-		);
 	}
 }

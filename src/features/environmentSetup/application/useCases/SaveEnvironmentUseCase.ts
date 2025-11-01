@@ -12,21 +12,30 @@ import { EnvironmentUpdated } from '../../domain/events/EnvironmentUpdated';
 import { AuthenticationCacheInvalidationRequested } from '../../domain/events/AuthenticationCacheInvalidationRequested';
 import { ApplicationError } from '../errors/ApplicationError';
 import { IDomainEventPublisher } from '../interfaces/IDomainEventPublisher';
+import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 /**
  * Command Use Case: Save environment (create or update)
- * Handles credential preservation and orphaned secret cleanup
+ * Handles credential preservation, orphaned secret cleanup, and cache invalidation
  */
 export class SaveEnvironmentUseCase {
 	constructor(
 		private readonly repository: IEnvironmentRepository,
 		private readonly validationService: EnvironmentValidationService,
-		private readonly eventPublisher: IDomainEventPublisher
+		private readonly eventPublisher: IDomainEventPublisher,
+		private readonly logger: ILogger
 	) {}
 
+	/**
+	 * Creates or updates an environment with validation and credential management
+	 * @param request Environment data including credentials
+	 * @returns Response indicating success/failure with validation errors or warnings
+	 */
 	public async execute(request: SaveEnvironmentRequest): Promise<SaveEnvironmentResponse> {
-		// Determine if create or update
 		const isUpdate = !!request.existingEnvironmentId;
+		this.logger.debug(`SaveEnvironmentUseCase: ${isUpdate ? 'Updating' : 'Creating'} environment "${request.name}"`);
+
+		try {
 
 		let previousEnvironment: Environment | null = null;
 		if (isUpdate) {
@@ -92,6 +101,7 @@ export class SaveEnvironmentUseCase {
 		);
 
 		if (!validationResult.isValid) {
+			this.logger.warn(`SaveEnvironmentUseCase: Validation failed for "${request.name}"`, { errors: validationResult.errors });
 			// Return validation errors instead of throwing - allows UI to display them inline
 			return {
 				success: false,
@@ -174,11 +184,17 @@ export class SaveEnvironmentUseCase {
 			));
 		}
 
+		this.logger.info(`Environment ${isUpdate ? 'updated' : 'created'}: ${environment.getName().getValue()}`);
+
 		return {
 			success: true,
 			environmentId: environmentId.getValue(),
 			warnings: warnings
 		};
+		} catch (error) {
+			this.logger.error('SaveEnvironmentUseCase: Failed to save environment', error);
+			throw error;
+		}
 	}
 }
 

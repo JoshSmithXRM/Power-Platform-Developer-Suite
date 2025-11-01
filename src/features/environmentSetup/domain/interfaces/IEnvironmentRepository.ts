@@ -2,36 +2,44 @@ import { Environment } from '../entities/Environment';
 import { EnvironmentId } from '../valueObjects/EnvironmentId';
 
 /**
- * Repository interface defined in domain layer
- * Infrastructure layer must implement this contract
+ * Repository interface for environment persistence operations.
+ *
+ * Clean Architecture Principle: Domain defines the interface, infrastructure implements it.
+ * This inverts the dependency: domain does NOT depend on infrastructure.
+ *
+ * WHY Interface in Domain: Allows domain services and use cases to declare their
+ * storage needs without coupling to specific storage implementations (VS Code storage,
+ * file system, database, etc.). Infrastructure layer implements this contract.
+ *
+ * Responsibilities:
+ * - CRUD operations for environments
+ * - Secret storage management (client secrets, passwords)
+ * - Name uniqueness validation
+ * - Orphaned secret cleanup
+ *
+ * Note: Methods are async because actual implementation uses VS Code storage APIs
+ * which are async. Domain interface matches implementation reality.
  */
 export interface IEnvironmentRepository {
-	/**
-	 * Get all environments
-	 */
+	/** Retrieves all environments from storage. */
 	getAll(): Promise<Environment[]>;
 
-	/**
-	 * Get environment by ID
-	 */
+	/** Retrieves environment by ID. Returns null if not found. */
 	getById(id: EnvironmentId): Promise<Environment | null>;
 
-	/**
-	 * Get environment by name (case-sensitive)
-	 */
+	/** Retrieves environment by name (case-sensitive). Returns null if not found. */
 	getByName(name: string): Promise<Environment | null>;
 
-	/**
-	 * Get currently active environment
-	 */
+	/** Retrieves currently active environment. Returns null if none active. */
 	getActive(): Promise<Environment | null>;
 
 	/**
-	 * Save environment (create or update)
-	 * @param environment The environment to save
-	 * @param clientSecret Optional client secret (if auth method requires it)
-	 * @param password Optional password (if auth method requires it)
-	 * @param preserveExistingCredentials If true, preserve existing credentials when not provided
+	 * Saves environment (create or update) with optional credentials.
+	 *
+	 * @param environment - Environment to save
+	 * @param clientSecret - Client secret (if Service Principal auth)
+	 * @param password - Password (if Username/Password auth)
+	 * @param preserveExistingCredentials - If true, keep existing credentials when new ones not provided
 	 */
 	save(
 		environment: Environment,
@@ -41,29 +49,44 @@ export interface IEnvironmentRepository {
 	): Promise<void>;
 
 	/**
-	 * Delete environment and its secrets
+	 * Deletes environment and all associated secrets.
+	 *
+	 * @param id - Environment ID to delete
 	 */
 	delete(id: EnvironmentId): Promise<void>;
 
 	/**
-	 * Check if name is unique (case-sensitive)
-	 * @param name The name to check
-	 * @param excludeId Optional ID to exclude from check (for updates)
+	 * Checks if environment name is unique (case-sensitive).
+	 *
+	 * @param name - Name to check
+	 * @param excludeId - Optional ID to exclude (for update scenarios)
+	 * @returns {Promise<boolean>} True if name is unique
 	 */
 	isNameUnique(name: string, excludeId?: EnvironmentId): Promise<boolean>;
 
 	/**
-	 * Get stored client secret for environment
+	 * Retrieves stored client secret from SecretStorage.
+	 *
+	 * @param clientId - Client ID (used in secret key)
+	 * @returns {Promise<string | undefined>} Client secret or undefined if not found
 	 */
 	getClientSecret(clientId: string): Promise<string | undefined>;
 
 	/**
-	 * Get stored password for environment
+	 * Retrieves stored password from SecretStorage.
+	 *
+	 * @param username - Username (used in secret key)
+	 * @returns {Promise<string | undefined>} Password or undefined if not found
 	 */
 	getPassword(username: string): Promise<string | undefined>;
 
 	/**
-	 * Delete orphaned secrets (cleanup after auth method change)
+	 * Deletes orphaned secrets from SecretStorage.
+	 *
+	 * WHY: When auth method or credentials change, old secrets become orphaned
+	 * and should be cleaned up.
+	 *
+	 * @param secretKeys - Array of secret storage keys to delete
 	 */
 	deleteSecrets(secretKeys: string[]): Promise<void>;
 }

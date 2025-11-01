@@ -1,7 +1,18 @@
 import { DataType } from './DataType';
 
 /**
- * Value object containing metadata about a storage value
+ * Value object containing metadata about a storage value.
+ *
+ * Provides descriptive information about storage values without exposing
+ * the actual value (important for secrets).
+ *
+ * Metadata:
+ * - dataType: JavaScript type (string, number, object, etc.)
+ * - sizeInBytes: Approximate storage size (for monitoring)
+ * - isSecret: Whether value is from SecretStorage
+ *
+ * WHY: Separates value metadata from value itself. Allows displaying
+ * information about secrets without revealing their contents.
  */
 export class StorageMetadata {
 	private constructor(
@@ -34,7 +45,14 @@ export class StorageMetadata {
 	}
 
 	/**
-	 * Calculates approximate storage size in bytes
+	 * Calculates approximate storage size in bytes.
+	 *
+	 * WHY: Provides visibility into storage usage for monitoring and debugging.
+	 * Uses JSON serialization size as approximation.
+	 *
+	 * @param {unknown} value - Value to calculate size for
+	 * @returns {number} Approximate size in bytes
+	 * @private
 	 */
 	private static calculateSize(value: unknown): number {
 		const json = JSON.stringify(value);

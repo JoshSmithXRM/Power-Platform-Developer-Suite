@@ -1,6 +1,21 @@
 /**
- * AuthenticationMethod value object
- * Business rules encoded for each auth method
+ * Value object representing an authentication method for Power Platform environments.
+ *
+ * Encapsulates business rules for different authentication methods supported by MSAL.
+ *
+ * Supported Methods:
+ * - Interactive: Browser-based authentication (best for development)
+ * - DeviceCode: Device code flow (for headless environments)
+ * - ServicePrincipal: Client credentials flow (for automation)
+ * - UsernamePassword: Resource owner password credentials (legacy/testing)
+ *
+ * Business Rules:
+ * - Interactive/DeviceCode: No stored credentials required
+ * - ServicePrincipal: Requires Client ID + Client Secret + Tenant ID
+ * - UsernamePassword: Requires Username + Password
+ *
+ * WHY: Different auth methods have different requirements. This value object
+ * encapsulates the logic for determining credential requirements.
  */
 export enum AuthenticationMethodType {
 	Interactive = 'Interactive',
@@ -21,28 +36,44 @@ export class AuthenticationMethod {
 	}
 
 	/**
-	 * Business rule: ServicePrincipal and UsernamePassword require credentials
+	 * Determines if this authentication method requires stored credentials.
+	 *
+	 * @returns {boolean} True if credentials must be stored in VS Code SecretStorage
 	 */
 	public requiresCredentials(): boolean {
 		return this.requiresClientCredentials() || this.requiresUsernamePassword();
 	}
 
 	/**
-	 * Business rule: ServicePrincipal requires client credentials
+	 * Determines if this method requires client credentials (Service Principal).
+	 *
+	 * Business Rule: Service Principal authentication uses client credentials flow,
+	 * requiring Client ID and Client Secret.
+	 *
+	 * @returns {boolean} True for Service Principal method
 	 */
 	public requiresClientCredentials(): boolean {
 		return this.type === AuthenticationMethodType.ServicePrincipal;
 	}
 
 	/**
-	 * Business rule: UsernamePassword requires username/password
+	 * Determines if this method requires username and password.
+	 *
+	 * Business Rule: Username/Password auth uses resource owner password credentials flow.
+	 *
+	 * @returns {boolean} True for Username/Password method
 	 */
 	public requiresUsernamePassword(): boolean {
 		return this.type === AuthenticationMethodType.UsernamePassword;
 	}
 
 	/**
-	 * Business rule: Interactive and DeviceCode don't require stored credentials
+	 * Determines if this is an interactive authentication flow.
+	 *
+	 * WHY: Interactive flows (browser-based, device code) don't require stored
+	 * credentials. User authenticates interactively each time.
+	 *
+	 * @returns {boolean} True for Interactive or DeviceCode methods
 	 */
 	public isInteractiveFlow(): boolean {
 		return this.type === AuthenticationMethodType.Interactive ||

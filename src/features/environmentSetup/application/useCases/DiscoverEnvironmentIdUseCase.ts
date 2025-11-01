@@ -9,6 +9,7 @@ import { TenantId } from '../../domain/valueObjects/TenantId';
 import { ClientId } from '../../domain/valueObjects/ClientId';
 import { AuthenticationMethod, AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
 import { ApiError } from '../../domain/valueObjects/ApiError';
+import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 /**
  * Command Use Case: Discover Power Platform Environment ID
@@ -17,13 +18,26 @@ import { ApiError } from '../../domain/valueObjects/ApiError';
 export class DiscoverEnvironmentIdUseCase {
 	constructor(
 		private readonly powerPlatformApiService: IPowerPlatformApiService,
-		private readonly repository: IEnvironmentRepository
+		private readonly repository: IEnvironmentRepository,
+		private readonly logger: ILogger
 	) {}
 
+	/**
+	 * Discovers Power Platform environment ID from Dataverse URL via BAP API
+	 * @param request Environment configuration including Dataverse URL
+	 * @param cancellationToken Optional cancellation token for long-running operation
+	 * @returns Response with environment ID or error details
+	 */
 	public async execute(
 		request: DiscoverEnvironmentIdRequest,
 		cancellationToken?: ICancellationToken
 	): Promise<DiscoverEnvironmentIdResponse> {
+		this.logger.debug('DiscoverEnvironmentIdUseCase: Starting discovery', {
+			dataverseUrl: request.dataverseUrl,
+			authMethod: request.authenticationMethod
+		});
+
+		try {
 		// Create temporary domain entity from draft data
 		const tempEnvironment = new Environment(
 			request.existingEnvironmentId
@@ -58,23 +72,27 @@ export class DiscoverEnvironmentIdUseCase {
 			const username = tempEnvironment.getUsername();
 			if (username) {
 				password = await this.repository.getPassword(username);
+				this.logger.debug('Loaded password from storage');
 			}
 		}
 
-		try {
-			// Call BAP API to discover environment ID
-			const environmentId = await this.powerPlatformApiService.discoverEnvironmentId(
-				tempEnvironment,
-				clientSecret,
-				password,
-				cancellationToken
-			);
+		// Call BAP API to discover environment ID
+		const environmentId = await this.powerPlatformApiService.discoverEnvironmentId(
+			tempEnvironment,
+			clientSecret,
+			password,
+			cancellationToken
+		);
 
-			return {
-				success: true,
-				environmentId: environmentId
-			};
+		this.logger.info(`Environment ID discovered: ${environmentId}`);
+
+		return {
+			success: true,
+			environmentId: environmentId
+		};
 		} catch (error) {
+			this.logger.error('DiscoverEnvironmentIdUseCase: Failed to discover environment ID', error);
+
 			const apiError = new ApiError(error instanceof Error ? error.message : 'Unknown error');
 
 			return {

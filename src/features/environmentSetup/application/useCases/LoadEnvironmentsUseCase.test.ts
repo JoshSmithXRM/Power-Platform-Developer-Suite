@@ -7,6 +7,7 @@ import { DataverseUrl } from '../../domain/valueObjects/DataverseUrl';
 import { TenantId } from '../../domain/valueObjects/TenantId';
 import { ClientId } from '../../domain/valueObjects/ClientId';
 import { AuthenticationMethod, AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
+import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
 
 import { LoadEnvironmentsUseCase } from './LoadEnvironmentsUseCase';
 
@@ -33,7 +34,7 @@ describe('LoadEnvironmentsUseCase', () => {
 		// Use real mapper (unit test - mapper is simple)
 		mapper = new EnvironmentListViewModelMapper();
 
-		useCase = new LoadEnvironmentsUseCase(mockRepository, mapper);
+		useCase = new LoadEnvironmentsUseCase(mockRepository, mapper, new NullLogger());
 	});
 
 	function createTestEnvironment(id: string, name: string, isActive: boolean, lastUsed?: Date): Environment {

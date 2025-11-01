@@ -4,8 +4,33 @@ import { StorageType } from '../valueObjects/StorageType';
 import { StorageMetadata } from '../valueObjects/StorageMetadata';
 
 /**
- * Domain entity representing a single storage entry
- * Rich model with behavior, not anemic
+ * Domain entity representing a single storage entry in VS Code storage.
+ * Encapsulates storage data and business rules for storage operations.
+ *
+ * This is a rich domain model (not anemic) - it contains behavior and enforces
+ * business invariants related to storage entries.
+ *
+ * Responsibilities:
+ * - Determine if entry is protected from clearing
+ * - Determine if entry is a secret
+ * - Provide access to nested properties within complex values
+ * - Enforce immutability (value objects pattern)
+ *
+ * Business Rules:
+ * - Protected keys cannot be cleared (e.g., 'power-platform-dev-suite-environments')
+ * - Secret values are hidden by default (show '***')
+ * - Storage entries are immutable once created
+ *
+ * @example
+ * ```typescript
+ * const entry = StorageEntry.create(
+ *   'power-platform-dev-suite-environments',
+ *   { environments: [...] },
+ *   'global'
+ * );
+ * entry.isProtected(); // true
+ * entry.canBeCleared(); // false
+ * ```
  */
 export class StorageEntry {
 	private constructor(
@@ -14,6 +39,17 @@ export class StorageEntry {
 		private readonly _storageType: StorageType
 	) {}
 
+	/**
+	 * Factory method to create a StorageEntry.
+	 *
+	 * WHY: Private constructor enforces creation through factory method,
+	 * ensuring all value objects are properly constructed.
+	 *
+	 * @param {string} key - Storage key
+	 * @param {unknown} value - Storage value (hidden if secret)
+	 * @param {'global' | 'secret'} storageType - Type of storage
+	 * @returns {StorageEntry} New storage entry instance
+	 */
 	public static create(
 		key: string,
 		value: unknown,
@@ -43,27 +79,57 @@ export class StorageEntry {
 	}
 
 	/**
-	 * Business logic: Determines if this entry is protected
+	 * Determines if this entry is protected from clearing.
+	 *
+	 * WHY: Critical extension data (like environment configurations) must
+	 * be protected from accidental deletion. Protected keys cannot be cleared
+	 * through the Persistence Inspector UI.
+	 *
+	 * @returns {boolean} True if entry is protected
 	 */
 	public isProtected(): boolean {
 		return this._key.isProtectedEnvironmentsKey();
 	}
 
+	/**
+	 * Determines if this entry is stored in secret storage.
+	 *
+	 * @returns {boolean} True if stored in VS Code SecretStorage
+	 */
 	public isSecret(): boolean {
 		return this._storageType.isSecret();
 	}
 
 	/**
-	 * Business logic: Determines if this entry can be cleared
+	 * Determines if this entry can be cleared.
+	 *
+	 * Business Rule: Protected entries cannot be cleared.
+	 *
+	 * @returns {boolean} True if entry can be safely cleared
 	 */
 	public canBeCleared(): boolean {
 		return !this.isProtected();
 	}
 
+	/**
+	 * Retrieves property value at specified path within the entry value.
+	 *
+	 * WHY: Storage values can be complex objects/arrays. This allows
+	 * navigation to nested properties (e.g., ['environments', '0', 'name']).
+	 *
+	 * @param {string[]} path - Property path segments
+	 * @returns {unknown} Property value or undefined if not found
+	 */
 	public getPropertyAtPath(path: string[]): unknown {
 		return this._value.getPropertyAtPath(path);
 	}
 
+	/**
+	 * Checks if property exists at specified path.
+	 *
+	 * @param {string[]} path - Property path segments
+	 * @returns {boolean} True if property exists
+	 */
 	public hasProperty(path: string[]): boolean {
 		return this._value.hasProperty(path);
 	}

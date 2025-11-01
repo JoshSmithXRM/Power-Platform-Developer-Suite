@@ -228,6 +228,6 @@ function renderUsernamePasswordFields(): string {
  */
 function renderScript(resources: EnvironmentSetupViewResources): string {
 	return html`
-		<script src="${resources.scriptUri}"></script>
+		<script type="module" src="${resources.scriptUri}"></script>
 	`.__html;
 }

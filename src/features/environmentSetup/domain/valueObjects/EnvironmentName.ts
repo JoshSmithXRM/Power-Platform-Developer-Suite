@@ -1,8 +1,21 @@
 import { DomainError } from '../errors/DomainError';
 
 /**
- * EnvironmentName value object
- * Business rule: Names must be non-empty and unique (case-sensitive)
+ * Value object representing an environment name.
+ *
+ * Value objects are immutable, validated on construction, and compared by value.
+ *
+ * Business Rules:
+ * - Must be non-empty (trimmed)
+ * - Maximum 100 characters
+ * - Uniqueness is case-sensitive
+ * - Leading/trailing whitespace is trimmed
+ *
+ * WHY Case-Sensitive: Environment names are user-visible identifiers.
+ * Case-sensitive comparison respects user intent and avoids confusion
+ * between "DEV" and "dev" environments.
+ *
+ * @throws {DomainError} If name is empty or exceeds 100 characters
  */
 export class EnvironmentName {
 	private readonly value: string;

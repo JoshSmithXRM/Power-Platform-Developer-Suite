@@ -4,31 +4,46 @@ import { IDomainEventPublisher } from '../../../environmentSetup/application/int
 import { StorageClearedAll } from '../../domain/events/StorageClearedAll';
 import { ClearAllResultViewModel } from '../viewModels/ClearAllResultViewModel';
 import { ClearAllResultMapper } from '../mappers/ClearAllResultMapper';
+import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 /**
  * Use case for clearing all non-protected storage
- * Orchestrates only - no business logic
+ * Removes all clearable entries while preserving protected system data
  */
 export class ClearAllStorageUseCase {
 	public constructor(
 		private readonly storageClearingService: StorageClearingService,
 		private readonly storageInspectionService: StorageInspectionService,
-		private readonly eventPublisher: IDomainEventPublisher
+		private readonly eventPublisher: IDomainEventPublisher,
+		private readonly logger: ILogger
 	) {}
 
+	/**
+	 * Clears all non-protected storage entries
+	 * @returns Result view model containing counts of cleared and skipped entries
+	 */
 	public async execute(): Promise<ClearAllResultViewModel> {
-		// Orchestrate: get current collection for validation
-		const collection = await this.storageInspectionService.inspectStorage();
+		this.logger.debug('ClearAllStorageUseCase: Starting clear all operation');
 
-		// Orchestrate: call domain service
-		const result = await this.storageClearingService.clearAll(collection);
+		try {
+			// Orchestrate: get current collection for validation
+			const collection = await this.storageInspectionService.inspectStorage();
 
-		// Orchestrate: raise domain event
-		this.eventPublisher.publish(
-			new StorageClearedAll(result.totalCleared, collection.getProtectedEntries().length)
-		);
+			// Orchestrate: call domain service
+			const result = await this.storageClearingService.clearAll(collection);
 
-		// Orchestrate: map to view model
-		return ClearAllResultMapper.toViewModel(result);
+			this.logger.info(`Clear all completed: ${result.totalCleared} entries cleared, ${collection.getProtectedEntries().length} protected entries skipped`);
+
+			// Orchestrate: raise domain event
+			this.eventPublisher.publish(
+				new StorageClearedAll(result.totalCleared, collection.getProtectedEntries().length)
+			);
+
+			// Orchestrate: map to view model
+			return ClearAllResultMapper.toViewModel(result);
+		} catch (error) {
+			this.logger.error('ClearAllStorageUseCase: Failed to clear storage', error);
+			throw error;
+		}
 	}
 }

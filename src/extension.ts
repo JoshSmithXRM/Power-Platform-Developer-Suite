@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 
+// Logging Infrastructure
+import { ILogger } from './infrastructure/logging/ILogger';
+import { OutputChannelLogger } from './infrastructure/logging/OutputChannelLogger';
 // Environment Setup - Clean Architecture imports
 import { IEnvironmentRepository } from './features/environmentSetup/domain/interfaces/IEnvironmentRepository';
 import { EnvironmentRepository } from './features/environmentSetup/infrastructure/repositories/EnvironmentRepository';
@@ -32,23 +35,30 @@ import { AuthenticationCacheInvalidationHandler } from './features/environmentSe
  * Extension activation entry point
  */
 export function activate(context: vscode.ExtensionContext): void {
-	// Extension activated
+	// ========================================
+	// Logging Infrastructure
+	// ========================================
+	const outputChannel = vscode.window.createOutputChannel('Power Platform Dev Suite');
+	const logger: ILogger = new OutputChannelLogger(outputChannel);
+
+	logger.info('Extension activating...');
 
 	// ========================================
 	// Dependency Injection Setup (Clean Architecture)
 	// ========================================
 
 	// Infrastructure Layer
-	const environmentDomainMapper = new EnvironmentDomainMapper();
+	const environmentDomainMapper = new EnvironmentDomainMapper(logger);
 	const environmentRepository = new EnvironmentRepository(
 		context.globalState,
 		context.secrets,
-		environmentDomainMapper
+		environmentDomainMapper,
+		logger
 	);
-	const eventPublisher = new VsCodeEventPublisher();
-	const authService = new MsalAuthenticationService();
-	const whoAmIService = new WhoAmIService(authService);
-	const powerPlatformApiService = new PowerPlatformApiService(authService);
+	const eventPublisher = new VsCodeEventPublisher(logger);
+	const authService = new MsalAuthenticationService(logger);
+	const whoAmIService = new WhoAmIService(authService, logger);
+	const powerPlatformApiService = new PowerPlatformApiService(authService, logger);
 
 	// Domain Layer
 	const environmentValidationService = new EnvironmentValidationService();
@@ -58,14 +68,14 @@ export function activate(context: vscode.ExtensionContext): void {
 	const formViewModelMapper = new EnvironmentFormViewModelMapper();
 
 	// Application Layer - Use Cases
-	const _loadEnvironmentsUseCase = new LoadEnvironmentsUseCase(environmentRepository, listViewModelMapper);
-	const loadEnvironmentByIdUseCase = new LoadEnvironmentByIdUseCase(environmentRepository, formViewModelMapper);
-	const saveEnvironmentUseCase = new SaveEnvironmentUseCase(environmentRepository, environmentValidationService, eventPublisher);
-	const deleteEnvironmentUseCase = new DeleteEnvironmentUseCase(environmentRepository, eventPublisher);
-	const testConnectionUseCase = new TestConnectionUseCase(whoAmIService, environmentRepository);
-	const discoverEnvironmentIdUseCase = new DiscoverEnvironmentIdUseCase(powerPlatformApiService, environmentRepository);
-	const validateUniqueNameUseCase = new ValidateUniqueNameUseCase(environmentRepository);
-	const checkConcurrentEditUseCase = new CheckConcurrentEditUseCase();
+	const _loadEnvironmentsUseCase = new LoadEnvironmentsUseCase(environmentRepository, listViewModelMapper, logger);
+	const loadEnvironmentByIdUseCase = new LoadEnvironmentByIdUseCase(environmentRepository, formViewModelMapper, logger);
+	const saveEnvironmentUseCase = new SaveEnvironmentUseCase(environmentRepository, environmentValidationService, eventPublisher, logger);
+	const deleteEnvironmentUseCase = new DeleteEnvironmentUseCase(environmentRepository, eventPublisher, logger);
+	const testConnectionUseCase = new TestConnectionUseCase(whoAmIService, environmentRepository, logger);
+	const discoverEnvironmentIdUseCase = new DiscoverEnvironmentIdUseCase(powerPlatformApiService, environmentRepository, logger);
+	const validateUniqueNameUseCase = new ValidateUniqueNameUseCase(environmentRepository, logger);
+	const checkConcurrentEditUseCase = new CheckConcurrentEditUseCase(logger);
 
 	// ========================================
 	// Development Mode Context
@@ -79,7 +89,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	// ========================================
 	if (isDevelopment) {
 		// Lazy-load persistence inspector using dynamic import
-		void initializePersistenceInspector(context, eventPublisher);
+		void initializePersistenceInspector(context, eventPublisher, logger);
 	}
 
 	// ========================================
@@ -108,7 +118,8 @@ export function activate(context: vscode.ExtensionContext): void {
 			testConnectionUseCase,
 			discoverEnvironmentIdUseCase,
 			validateUniqueNameUseCase,
-			checkConcurrentEditUseCase
+			checkConcurrentEditUseCase,
+			logger
 		);
 	});
 
@@ -124,6 +135,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				discoverEnvironmentIdUseCase,
 				validateUniqueNameUseCase,
 				checkConcurrentEditUseCase,
+				logger,
 				environmentItem.envId
 			);
 		}
@@ -275,12 +287,13 @@ export function activate(context: vscode.ExtensionContext): void {
 	eventPublisher.subscribe(EnvironmentDeleted, () => environmentsProvider.refresh());
 
 	// Subscribe to authentication cache invalidation events
-	const cacheInvalidationHandler = new AuthenticationCacheInvalidationHandler(authService);
+	const cacheInvalidationHandler = new AuthenticationCacheInvalidationHandler(authService, logger);
 	eventPublisher.subscribe(AuthenticationCacheInvalidationRequested, (event) => {
 		cacheInvalidationHandler.handle(event);
 	});
 
 	context.subscriptions.push(
+		outputChannel,
 		addEnvironmentCommand,
 		editEnvironmentCommand,
 		testEnvironmentConnectionCommand,
@@ -290,6 +303,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		refreshEnvironmentsCommand,
 		eventPublisher
 	);
+
+	logger.info('Extension activated successfully');
 }
 
 /**
@@ -305,7 +320,8 @@ export function deactivate(): void {
  */
 async function initializePersistenceInspector(
 	context: vscode.ExtensionContext,
-	eventPublisher: VsCodeEventPublisher
+	eventPublisher: VsCodeEventPublisher,
+	logger: ILogger
 ): Promise<void> {
 	const { VsCodeStorageReader } = await import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageReader') as typeof import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageReader');
 	const { VsCodeStorageClearer } = await import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageClearer') as typeof import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageClearer');
@@ -330,12 +346,12 @@ async function initializePersistenceInspector(
 	const storageClearingService = new StorageClearingService(storageClearer, protectedKeyProvider);
 
 	// Application Layer - Use Cases
-	const inspectStorageUseCase = new InspectStorageUseCase(storageInspectionService, eventPublisher);
-	const revealSecretUseCase = new RevealSecretUseCase(storageInspectionService, eventPublisher);
-	const clearStorageEntryUseCase = new ClearStorageEntryUseCase(storageClearingService, storageInspectionService, eventPublisher);
-	const clearStoragePropertyUseCase = new ClearStoragePropertyUseCase(storageClearingService, storageInspectionService, eventPublisher);
-	const clearAllStorageUseCase = new ClearAllStorageUseCase(storageClearingService, storageInspectionService, eventPublisher);
-	const getClearAllConfirmationMessageUseCase = new GetClearAllConfirmationMessageUseCase(storageInspectionService);
+	const inspectStorageUseCase = new InspectStorageUseCase(storageInspectionService, eventPublisher, logger);
+	const revealSecretUseCase = new RevealSecretUseCase(storageInspectionService, eventPublisher, logger);
+	const clearStorageEntryUseCase = new ClearStorageEntryUseCase(storageClearingService, storageInspectionService, eventPublisher, logger);
+	const clearStoragePropertyUseCase = new ClearStoragePropertyUseCase(storageClearingService, storageInspectionService, eventPublisher, logger);
+	const clearAllStorageUseCase = new ClearAllStorageUseCase(storageClearingService, storageInspectionService, eventPublisher, logger);
+	const getClearAllConfirmationMessageUseCase = new GetClearAllConfirmationMessageUseCase(storageInspectionService, logger);
 
 	// Register Command (Development Only)
 	const openPersistenceInspectorCommand = vscode.commands.registerCommand('power-platform-dev-suite.openPersistenceInspector', () => {
@@ -346,7 +362,8 @@ async function initializePersistenceInspector(
 			clearStorageEntryUseCase,
 			clearStoragePropertyUseCase,
 			clearAllStorageUseCase,
-			getClearAllConfirmationMessageUseCase
+			getClearAllConfirmationMessageUseCase,
+			logger
 		);
 	});
 

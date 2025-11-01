@@ -1,8 +1,25 @@
 import { DomainError } from '../errors/DomainError';
 
 /**
- * DataverseUrl value object
- * Business rule: Must be valid Dataverse URL format
+ * Value object representing a Dataverse environment URL.
+ *
+ * Value objects are immutable, validated on construction, and compared by value.
+ *
+ * Business Rules:
+ * - Must match Dataverse URL pattern: `https://<org>.crm[N].dynamics.com`
+ * - Automatically normalizes URLs (adds https, removes trailing slash)
+ * - Provides derived values (API base URL, organization name)
+ *
+ * Supported Formats:
+ * - `https://contoso.crm.dynamics.com` (US)
+ * - `https://contoso.crm2.dynamics.com` (South America)
+ * - `https://contoso.crm4.dynamics.com` (Europe)
+ * - Regional variants with country codes (e.g., crm11.de)
+ *
+ * WHY: Type-safe URL wrapper with validation and normalization. Ensures
+ * only valid Dataverse URLs are used throughout the application.
+ *
+ * @throws {DomainError} If URL format is invalid
  */
 export class DataverseUrl {
 	private readonly value: string;
@@ -41,16 +58,31 @@ export class DataverseUrl {
 		return DataverseUrl.URL_PATTERN.test(this.value);
 	}
 
+	/**
+	 * Gets the Web API base URL for this Dataverse environment.
+	 *
+	 * WHY: Dataverse Web API requires /api/data/v9.2 path. This method
+	 * provides the complete base URL for API calls.
+	 *
+	 * @returns {string} Web API base URL (e.g., `https://org.crm.dynamics.com/api/data/v9.2`)
+	 */
 	public getApiBaseUrl(): string {
 		return `${this.value}/api/data/v9.2`;
 	}
 
 	/**
-	 * Extract organization name from Dataverse URL
-	 * Examples:
-	 *   https://contoso.crm.dynamics.com -> contoso
-	 *   https://contoso.crm2.dynamics.com -> contoso
-	 *   https://contoso.api.crm.dynamics.com -> contoso
+	 * Extracts organization name from Dataverse URL.
+	 *
+	 * WHY: Organization name is used for display and identification purposes.
+	 * Extracted from the hostname's first segment.
+	 *
+	 * @returns {string} Organization name (e.g., "contoso")
+	 * @throws {DomainError} If organization name cannot be extracted
+	 * @example
+	 * ```typescript
+	 * new DataverseUrl('https://contoso.crm.dynamics.com').getOrganizationName(); // "contoso"
+	 * new DataverseUrl('https://contoso.crm2.dynamics.com').getOrganizationName(); // "contoso"
+	 * ```
 	 */
 	public getOrganizationName(): string {
 		try {

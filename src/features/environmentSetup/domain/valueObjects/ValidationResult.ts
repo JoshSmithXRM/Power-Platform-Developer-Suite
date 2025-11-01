@@ -1,5 +1,24 @@
 /**
- * ValidationResult value object
+ * Value object representing validation results with errors and warnings.
+ *
+ * Immutable result object used throughout the domain layer for validation feedback.
+ *
+ * WHY: Separates validation results from exceptions. Allows collecting multiple
+ * errors/warnings before failing, providing better user experience with
+ * comprehensive feedback.
+ *
+ * Patterns:
+ * - Errors: Validation failures that prevent the operation
+ * - Warnings: Issues that should be communicated but don't prevent operation
+ * - isValid: False if any errors exist, true otherwise
+ *
+ * @example
+ * ```typescript
+ * const result = ValidationResult.failure(['Name is required', 'URL is invalid']);
+ * if (!result.isValid) {
+ *   console.log(result.errors); // Show all errors
+ * }
+ * ```
  */
 export class ValidationResult {
 	constructor(
