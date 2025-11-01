@@ -68,6 +68,14 @@ export function activate(context: vscode.ExtensionContext): void {
 	const checkConcurrentEditUseCase = new CheckConcurrentEditUseCase();
 
 	// ========================================
+	// Persistence Inspector (Development Only)
+	// ========================================
+	if (context.extensionMode === vscode.ExtensionMode.Development) {
+		// Lazy-load persistence inspector using dynamic import
+		void initializePersistenceInspector(context, eventPublisher);
+	}
+
+	// ========================================
 	// Register Tree View Providers
 	// ========================================
 
@@ -282,6 +290,60 @@ export function activate(context: vscode.ExtensionContext): void {
  */
 export function deactivate(): void {
 	// Extension deactivated
+}
+
+/**
+ * Initializes the Persistence Inspector (Development Only)
+ * Uses dynamic imports to avoid loading in production
+ */
+async function initializePersistenceInspector(
+	context: vscode.ExtensionContext,
+	eventPublisher: VsCodeEventPublisher
+): Promise<void> {
+	const { VsCodeStorageReader } = await import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageReader') as typeof import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageReader');
+	const { VsCodeStorageClearer } = await import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageClearer') as typeof import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageClearer');
+	const { HardcodedProtectedKeyProvider } = await import('./features/persistenceInspector/infrastructure/providers/HardcodedProtectedKeyProvider') as typeof import('./features/persistenceInspector/infrastructure/providers/HardcodedProtectedKeyProvider');
+	const { StorageInspectionService } = await import('./features/persistenceInspector/domain/services/StorageInspectionService') as typeof import('./features/persistenceInspector/domain/services/StorageInspectionService');
+	const { StorageClearingService } = await import('./features/persistenceInspector/domain/services/StorageClearingService') as typeof import('./features/persistenceInspector/domain/services/StorageClearingService');
+	const { InspectStorageUseCase } = await import('./features/persistenceInspector/application/useCases/InspectStorageUseCase') as typeof import('./features/persistenceInspector/application/useCases/InspectStorageUseCase');
+	const { RevealSecretUseCase } = await import('./features/persistenceInspector/application/useCases/RevealSecretUseCase') as typeof import('./features/persistenceInspector/application/useCases/RevealSecretUseCase');
+	const { ClearStorageEntryUseCase } = await import('./features/persistenceInspector/application/useCases/ClearStorageEntryUseCase') as typeof import('./features/persistenceInspector/application/useCases/ClearStorageEntryUseCase');
+	const { ClearStoragePropertyUseCase } = await import('./features/persistenceInspector/application/useCases/ClearStoragePropertyUseCase') as typeof import('./features/persistenceInspector/application/useCases/ClearStoragePropertyUseCase');
+	const { ClearAllStorageUseCase } = await import('./features/persistenceInspector/application/useCases/ClearAllStorageUseCase') as typeof import('./features/persistenceInspector/application/useCases/ClearAllStorageUseCase');
+	const { GetClearAllConfirmationMessageUseCase } = await import('./features/persistenceInspector/application/useCases/GetClearAllConfirmationMessageUseCase') as typeof import('./features/persistenceInspector/application/useCases/GetClearAllConfirmationMessageUseCase');
+	const { PersistenceInspectorPanel } = await import('./features/persistenceInspector/presentation/panels/PersistenceInspectorPanel') as typeof import('./features/persistenceInspector/presentation/panels/PersistenceInspectorPanel');
+
+	// Infrastructure Layer
+	const storageReader = new VsCodeStorageReader(context.globalState, context.secrets);
+	const storageClearer = new VsCodeStorageClearer(context.globalState, context.secrets);
+	const protectedKeyProvider = new HardcodedProtectedKeyProvider();
+
+	// Domain Layer
+	const storageInspectionService = new StorageInspectionService(storageReader, protectedKeyProvider);
+	const storageClearingService = new StorageClearingService(storageClearer, protectedKeyProvider);
+
+	// Application Layer - Use Cases
+	const inspectStorageUseCase = new InspectStorageUseCase(storageInspectionService, eventPublisher);
+	const revealSecretUseCase = new RevealSecretUseCase(storageInspectionService, eventPublisher);
+	const clearStorageEntryUseCase = new ClearStorageEntryUseCase(storageClearingService, storageInspectionService, eventPublisher);
+	const clearStoragePropertyUseCase = new ClearStoragePropertyUseCase(storageClearingService, storageInspectionService, eventPublisher);
+	const clearAllStorageUseCase = new ClearAllStorageUseCase(storageClearingService, storageInspectionService, eventPublisher);
+	const getClearAllConfirmationMessageUseCase = new GetClearAllConfirmationMessageUseCase(storageInspectionService);
+
+	// Register Command (Development Only)
+	const openPersistenceInspectorCommand = vscode.commands.registerCommand('power-platform-dev-suite.openPersistenceInspector', () => {
+		PersistenceInspectorPanel.createOrShow(
+			context.extensionUri,
+			inspectStorageUseCase,
+			revealSecretUseCase,
+			clearStorageEntryUseCase,
+			clearStoragePropertyUseCase,
+			clearAllStorageUseCase,
+			getClearAllConfirmationMessageUseCase
+		);
+	});
+
+	context.subscriptions.push(openPersistenceInspectorCommand);
 }
 
 /**

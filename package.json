@@ -206,6 +206,11 @@
                 "command": "power-platform-dev-suite.stateDebugViewer",
                 "title": "State Debug Viewer",
                 "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.openPersistenceInspector",
+                "title": "Persistence Inspector (Dev Only)",
+                "category": "Power Platform Developer Suite"
             }
         ],
         "viewsContainers": {
