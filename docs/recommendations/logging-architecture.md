@@ -964,6 +964,362 @@ Search and replace all `console.log` with appropriate logger calls.
 
 ---
 
+## Webview Logging (Special Case)
+
+### The Webview Challenge
+
+VS Code webviews present a unique architectural constraint: they run in an **isolated browser context** without access to Node.js or VS Code APIs.
+
+**The Problem:**
+```
+┌─────────────────────────────────────────┐
+│       VS Code Extension Host            │
+│       (Node.js context)                 │
+│  ✅ Has: OutputChannel, ILogger, APIs   │
+└─────────────────┬───────────────────────┘
+                  │ postMessage only
+                  ▼
+┌─────────────────────────────────────────┐
+│          Webview Panel                  │
+│          (Browser context)              │
+│  ❌ No: VS Code APIs, OutputChannel     │
+│  ✅ Has: postMessage, console.log       │
+└─────────────────────────────────────────┘
+```
+
+- Webviews cannot access `vscode.window.createOutputChannel()`
+- Can only communicate via `postMessage` (async, one-way)
+- `console.log` only visible in DevTools (requires user to manually open)
+- Need production diagnostics for debugging user issues
+
+**This conflicts with the main recommendation:** "console.log for development only (remove before commit)"
+
+### Recommended Solution: Message Bridge with Build-Time Injection
+
+**Architecture:**
+1. **Production Logging**: WebviewLogger sends messages to extension host → ILogger → OutputChannel
+2. **Development Logging**: Build-time flag enables console.log in addition to message bridge
+3. **No Manual Checks**: Webpack DefinePlugin injects `DEV_MODE` at build time
+
+**Why build-time injection:**
+- ✅ Impossible to accidentally commit wrong setting
+- ✅ Automatically correct for dev vs production builds
+- ✅ No manual checks or pipeline validation needed (YAGNI)
+- ✅ Leverages existing webpack build process
+
+### Implementation
+
+#### 1. Webpack Configuration
+
+Add to webpack config for webview bundles:
+
+```javascript
+// webpack.config.js (webview bundle)
+const webpack = require('webpack');
+
+module.exports = (env, argv) => {
+    const isProduction = argv.mode === 'production';
+
+    return {
+        // ... existing config
+        plugins: [
+            new webpack.DefinePlugin({
+                'DEV_MODE': JSON.stringify(!isProduction)
+            })
+        ]
+    };
+};
+```
+
+This replaces `DEV_MODE` at build time:
+- Development builds: `DEV_MODE` → `true`
+- Production builds: `DEV_MODE` → `false`
+
+#### 2. WebviewLogger Class
+
+**File:** `resources/webview/js/utils/WebviewLogger.js`
+
+```javascript
+/**
+ * WebviewLogger - Production logging for webviews
+ * Bridges webview logs to extension host's OutputChannel via postMessage
+ * DEV_MODE is injected at build time by webpack DefinePlugin
+ */
+class WebviewLogger {
+    /**
+     * @param {ReturnType<typeof acquireVsCodeApi>} vscode - VS Code API instance
+     * @param {string} componentName - Component identifier (e.g., 'EnvironmentSetup')
+     */
+    constructor(vscode, componentName) {
+        this.vscode = vscode;
+        this.componentName = componentName;
+    }
+
+    debug(message, context) {
+        this.log('debug', message, context);
+    }
+
+    info(message, context) {
+        this.log('info', message, context);
+    }
+
+    warn(message, context) {
+        this.log('warn', message, context);
+    }
+
+    error(message, error) {
+        this.log('error', message, this.serializeError(error));
+    }
+
+    log(level, message, data) {
+        // Send to extension host (production logging)
+        this.vscode.postMessage({
+            command: 'webview-log',
+            level,
+            message,
+            componentName: this.componentName,
+            data,
+            timestamp: new Date().toISOString()
+        });
+
+        // In development, ALSO log to console (DEV_MODE injected by webpack)
+        if (DEV_MODE) {
+            const formatted = `[${this.componentName}] ${message}`;
+            switch (level) {
+                case 'debug': console.log(formatted, data); break;
+                case 'info': console.info(formatted, data); break;
+                case 'warn': console.warn(formatted, data); break;
+                case 'error': console.error(formatted, data); break;
+            }
+        }
+    }
+
+    serializeError(error) {
+        if (!error) return undefined;
+        if (error instanceof Error) {
+            return {
+                message: error.message,
+                name: error.name,
+                stack: error.stack
+            };
+        }
+        return { message: String(error) };
+    }
+}
+
+window.WebviewLogger = WebviewLogger;
+```
+
+#### 3. Panel Message Handler
+
+**Add to any panel that uses webviews:**
+
+```typescript
+import { ILogger } from '../../../../infrastructure/logging/ILogger';
+
+interface WebviewLogMessage {
+    command: 'webview-log';
+    level: 'debug' | 'info' | 'warn' | 'error';
+    message: string;
+    componentName: string;
+    data?: unknown;
+    timestamp: string;
+}
+
+function isWebviewLogMessage(message: unknown): message is WebviewLogMessage {
+    return typeof message === 'object'
+        && message !== null
+        && 'command' in message
+        && message.command === 'webview-log'
+        && 'level' in message
+        && 'message' in message;
+}
+
+export class ExamplePanel {
+    private constructor(
+        private readonly panel: vscode.WebviewPanel,
+        private readonly logger: ILogger,
+        // ... other dependencies
+    ) {
+        this.panel.webview.onDidReceiveMessage(
+            message => this.handleMessage(message),
+            null,
+            this.disposables
+        );
+    }
+
+    private async handleMessage(message: unknown): Promise<void> {
+        // Handle webview logs FIRST (before other messages)
+        if (isWebviewLogMessage(message)) {
+            this.handleWebviewLog(message);
+            return;
+        }
+
+        // ... other message handlers
+    }
+
+    private handleWebviewLog(message: WebviewLogMessage): void {
+        const prefix = `[Webview:${message.componentName}]`;
+        const logMessage = `${prefix} ${message.message}`;
+
+        switch (message.level) {
+            case 'debug':
+                this.logger.debug(logMessage, message.data);
+                break;
+            case 'info':
+                this.logger.info(logMessage, message.data);
+                break;
+            case 'warn':
+                this.logger.warn(logMessage, message.data);
+                break;
+            case 'error':
+                this.logger.error(logMessage, message.data);
+                break;
+        }
+    }
+}
+```
+
+#### 4. Webview Usage
+
+```javascript
+// resources/webview/js/behaviors/EnvironmentSetupBehavior.js
+(function() {
+    'use strict';
+
+    const vscode = acquireVsCodeApi();
+    const logger = new WebviewLogger(vscode, 'EnvironmentSetup');
+
+    // Production logging (always active)
+    saveButton.addEventListener('click', () => {
+        logger.info('User initiated save', {
+            authMethod: authMethodSelect.value
+        });
+        saveEnvironment();
+    });
+
+    // Development logging (DEV_MODE injected by webpack)
+    if (DEV_MODE) {
+        console.log('Form element:', form);
+        console.time('render');
+    }
+
+    renderForm();
+
+    if (DEV_MODE) {
+        console.timeEnd('render');
+    }
+
+    // Error handling
+    try {
+        // ... operation
+    } catch (error) {
+        logger.error('Operation failed', error);
+
+        if (DEV_MODE) {
+            console.error('Full error context:', {
+                error,
+                formState: getFormState()
+            });
+        }
+    }
+})();
+```
+
+### OutputChannel Format
+
+Webview logs appear in OutputChannel with clear prefix:
+
+```
+[2025-11-01 10:15:23] [INFO] Extension activated
+[2025-11-01 10:15:25] [INFO] [Webview:EnvironmentSetup] Form submitted
+[2025-11-01 10:15:26] [DEBUG] [Webview:EnvironmentSetup] Validation passed
+[2025-11-01 10:15:27] [INFO] SaveEnvironmentUseCase: Starting save operation
+[2025-11-01 10:15:28] [ERROR] [Webview:EnvironmentSetup] Invalid URL
+```
+
+**Benefits:**
+- Users see webview logs in OutputChannel (not trapped in DevTools)
+- Clear attribution: webview vs extension host
+- Chronological ordering shows interaction flow
+
+### Decision Criteria for Webviews
+
+**Use WebviewLogger (Message Bridge):**
+- ✅ User actions (button clicks, form submissions)
+- ✅ Form validation results
+- ✅ Error conditions users might report
+- ✅ State transitions
+- ✅ Production diagnostics
+
+**Use console.log (wrapped in `if (DEV_MODE)`):**
+- ✅ DOM element inspection
+- ✅ Event debugging
+- ✅ Performance profiling (`console.time/timeEnd`)
+- ✅ Complex object exploration
+
+**Use Both for critical paths:**
+```javascript
+function testConnection() {
+    logger.info('Testing connection', { url: dataverseUrl });
+
+    if (DEV_MODE) {
+        console.time('connection-test');
+    }
+
+    // ... perform test ...
+
+    if (DEV_MODE) {
+        console.timeEnd('connection-test');
+    }
+}
+```
+
+### Webview Logging Best Practices
+
+1. **Sanitize sensitive data** - Never log secrets, tokens, or passwords
+   ```javascript
+   // ❌ BAD
+   logger.info('Saving', { clientSecret: secret });
+
+   // ✅ GOOD
+   logger.info('Saving', { hasClientSecret: !!secret });
+   ```
+
+2. **Structured context objects** - Use objects, not string concatenation
+   ```javascript
+   // ✅ GOOD
+   logger.info('Form submitted', { authMethod: 'ServicePrincipal', isEdit: false });
+
+   // ❌ BAD
+   logger.info('Submitted form with ServicePrincipal auth (edit mode)');
+   ```
+
+3. **Development logging pattern** - Always wrap in DEV_MODE check
+   ```javascript
+   if (DEV_MODE) {
+       console.log('Debug info:', complexObject);
+   }
+   ```
+
+### Integration Checklist
+
+When adding webview logging to a panel:
+
+- [ ] Configure webpack with DefinePlugin for DEV_MODE injection
+- [ ] Add WebviewLogger.js to resources/webview/js/utils/
+- [ ] Load WebviewLogger in panel's HTML (before behavior scripts)
+- [ ] Create WebviewLogger instance in behavior script
+- [ ] Add isWebviewLogMessage type guard to panel
+- [ ] Add handleWebviewLog method to panel
+- [ ] Handle webview-log messages FIRST in message handler
+- [ ] Add production logging for user actions
+- [ ] Wrap development console.log in `if (DEV_MODE)` blocks
+- [ ] Test logs appear in OutputChannel with correct prefix
+- [ ] Build production bundle and verify DEV_MODE is false
+
+---
+
 ## Summary
 
 ### Key Takeaways
@@ -974,11 +1330,21 @@ Search and replace all `console.log` with appropriate logger calls.
 4. **Presentation Layer**: User action logging for panels.
 5. **OutputChannel**: Production logging mechanism.
 6. **console.log**: Development only, remove before commit.
-7. **Dependency Injection**: Logger injected through constructors.
-8. **Testing**: Use `NullLogger` for silence, `SpyLogger` for assertions.
+7. **Webview Logging (Special Case)**: Message bridge to OutputChannel + build-time DEV_MODE injection.
+8. **Dependency Injection**: Logger injected through constructors.
+9. **Testing**: Use `NullLogger` for silence, `SpyLogger` for assertions.
+
+### Webview Logging Summary
+
+- **Problem**: Webviews cannot access OutputChannel directly
+- **Solution**: Message bridge via postMessage + webpack DefinePlugin for DEV_MODE
+- **Decision**: YAGNI on manual checks/pipelines - build-time injection handles it
+- **Production**: WebviewLogger → postMessage → Panel → ILogger → OutputChannel
+- **Development**: Same as production + console.log (when DEV_MODE = true)
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Last Updated:** 2025-11-01
 **Author:** Clean Architecture Guardian
+**Changes:** Added Webview Logging section with build-time injection approach
