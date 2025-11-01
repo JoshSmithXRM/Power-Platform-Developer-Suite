@@ -14,6 +14,30 @@ import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
 export class MsalAuthenticationService implements IAuthenticationService {
 	private clientAppCache: Map<string, msal.PublicClientApplication> = new Map();
 
+	/**
+	 * Get MSAL authority URL based on tenant ID and auth method
+	 * - ServicePrincipal: Requires specific tenant (MSAL limitation)
+	 * - Interactive/DeviceCode/UsernamePassword: Can use "organizations" if tenant not provided
+	 */
+	private getAuthority(environment: Environment): string {
+		const tenantId = environment.getTenantId().getValue();
+		const authMethod = environment.getAuthenticationMethod();
+
+		// ServicePrincipal REQUIRES specific tenant (MSAL limitation discovered via testing)
+		if (authMethod.requiresClientCredentials()) {
+			if (!tenantId) {
+				throw new Error('Tenant ID is required for Service Principal authentication');
+			}
+			return `https://login.microsoftonline.com/${tenantId}`;
+		}
+
+		// Interactive, DeviceCode, UsernamePassword: use "organizations" if no tenant provided
+		// This allows users to authenticate without knowing their tenant ID
+		return tenantId
+			? `https://login.microsoftonline.com/${tenantId}`
+			: 'https://login.microsoftonline.com/organizations';
+	}
+
 	private getClientApp(environment: Environment): msal.PublicClientApplication {
 		// Cache by environment ID (isolates credentials per environment)
 		const cacheKey = environment.getId().getValue();
@@ -22,7 +46,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			const clientConfig: msal.Configuration = {
 				auth: {
 					clientId: environment.getPublicClientId().getValue(),
-					authority: `https://login.microsoftonline.com/${environment.getTenantId().getValue()}`
+					authority: this.getAuthority(environment)
 				}
 			};
 			this.clientAppCache.set(cacheKey, new msal.PublicClientApplication(clientConfig));
@@ -79,7 +103,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			auth: {
 				clientId: clientId,
 				clientSecret: clientSecret,
-				authority: `https://login.microsoftonline.com/${environment.getTenantId().getValue()}`
+				authority: this.getAuthority(environment) // Uses tenant-specific authority
 			}
 		};
 
@@ -119,7 +143,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 		const clientConfig: msal.Configuration = {
 			auth: {
 				clientId: environment.getPublicClientId().getValue(),
-				authority: `https://login.microsoftonline.com/${environment.getTenantId().getValue()}`
+				authority: this.getAuthority(environment) // Uses "organizations" if tenant not provided
 			}
 		};
 

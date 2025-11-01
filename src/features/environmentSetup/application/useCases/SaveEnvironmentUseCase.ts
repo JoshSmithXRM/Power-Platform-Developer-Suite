@@ -38,24 +38,34 @@ export class SaveEnvironmentUseCase {
 			}
 		}
 
-		// Create domain entity
+		// Create domain entity - catch validation errors from value objects
 		const environmentId = isUpdate
 			? new EnvironmentId(request.existingEnvironmentId!)
 			: EnvironmentId.generate();
 
-		const environment = new Environment(
-			environmentId,
-			new EnvironmentName(request.name),
-			new DataverseUrl(request.dataverseUrl),
-			new TenantId(request.tenantId),
-			new AuthenticationMethod(request.authenticationMethod as AuthenticationMethodType),
-			new ClientId(request.publicClientId),
-			previousEnvironment?.getIsActive() ?? false,
-			previousEnvironment?.getLastUsed(),
-			request.powerPlatformEnvironmentId,
-			request.clientId ? new ClientId(request.clientId) : undefined,
-			request.username
-		);
+		let environment: Environment;
+		try {
+			environment = new Environment(
+				environmentId,
+				new EnvironmentName(request.name),
+				new DataverseUrl(request.dataverseUrl),
+				new TenantId(request.tenantId),
+				new AuthenticationMethod(request.authenticationMethod as AuthenticationMethodType),
+				new ClientId(request.publicClientId),
+				previousEnvironment?.getIsActive() ?? false,
+				previousEnvironment?.getLastUsed(),
+				request.powerPlatformEnvironmentId,
+				request.clientId ? new ClientId(request.clientId) : undefined,
+				request.username
+			);
+		} catch (error) {
+			// Value object validation failed - return as validation error
+			return {
+				success: false,
+				errors: [error instanceof Error ? error.message : 'Invalid input data'],
+				environmentId: environmentId.getValue()
+			};
+		}
 
 		// Gather validation data from repository (use case responsibility)
 		const isNameUnique = await this.repository.isNameUnique(
@@ -82,7 +92,12 @@ export class SaveEnvironmentUseCase {
 		);
 
 		if (!validationResult.isValid) {
-			throw new ApplicationError(validationResult.errors.join(', '));
+			// Return validation errors instead of throwing - allows UI to display them inline
+			return {
+				success: false,
+				errors: validationResult.errors,
+				environmentId: environmentId.getValue()
+			};
 		}
 
 		// Extract warnings to return to user
@@ -160,6 +175,7 @@ export class SaveEnvironmentUseCase {
 		}
 
 		return {
+			success: true,
 			environmentId: environmentId.getValue(),
 			warnings: warnings
 		};
@@ -167,8 +183,10 @@ export class SaveEnvironmentUseCase {
 }
 
 export interface SaveEnvironmentResponse {
+	success: boolean;
 	environmentId: string;
-	warnings: string[];
+	warnings?: string[];
+	errors?: string[];
 }
 
 export interface SaveEnvironmentRequest {

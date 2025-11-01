@@ -44,7 +44,7 @@ export type AuthenticationMethod = typeof AUTHENTICATION_METHODS[number];
  * Save environment message from webview.
  */
 export interface SaveEnvironmentMessage {
-	command: 'save';
+	command: 'save-environment';
 	data: {
 		name: string;
 		dataverseUrl: string;
@@ -70,7 +70,7 @@ export function isSaveEnvironmentMessage(message: unknown): message is SaveEnvir
 		return false;
 	}
 
-	if (message.command !== 'save') {
+	if (message.command !== 'save-environment') {
 		return false;
 	}
 

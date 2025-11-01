@@ -16,7 +16,7 @@ export class EnvironmentFormViewModelMapper {
 			id: environment.getId().getValue(),
 			name: environment.getName().getValue(),
 			dataverseUrl: environment.getDataverseUrl().getValue(),
-			tenantId: environment.getTenantId().getValue(),
+			tenantId: environment.getTenantId().getValue() || '', // Empty string if not provided (UI will handle)
 			authenticationMethod: authMethod.toString(),
 			publicClientId: environment.getPublicClientId().getValue(),
 			powerPlatformEnvironmentId: environment.getPowerPlatformEnvironmentId(),
@@ -38,14 +38,17 @@ export class EnvironmentFormViewModelMapper {
 	}
 
 	private getRequiredFields(authMethod: string): string[] {
-		const baseFields = ['name', 'dataverseUrl', 'tenantId', 'publicClientId', 'authenticationMethod'];
+		// Base fields (tenant ID optional for Interactive/DeviceCode/UsernamePassword)
+		const baseFields = ['name', 'dataverseUrl', 'publicClientId', 'authenticationMethod'];
 
 		if (authMethod === 'ServicePrincipal') {
-			return [...baseFields, 'clientId', 'clientSecret'];
+			// ServicePrincipal requires tenant ID (MSAL limitation)
+			return [...baseFields, 'tenantId', 'clientId', 'clientSecret'];
 		} else if (authMethod === 'UsernamePassword') {
 			return [...baseFields, 'username', 'password'];
 		}
 
+		// Interactive and DeviceCode - tenant ID is optional
 		return baseFields;
 	}
 }

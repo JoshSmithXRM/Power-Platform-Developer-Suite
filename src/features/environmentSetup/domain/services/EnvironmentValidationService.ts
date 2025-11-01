@@ -12,7 +12,7 @@ export class EnvironmentValidationService {
 	 * - Configuration must be valid
 	 * - Name must be unique
 	 * - Required credentials must be provided or exist
-	 * - Warn about Microsoft example client ID
+	 * - Tenant ID required only for Service Principal
 	 */
 	public validateForSave(
 		environment: Environment,
@@ -50,10 +50,13 @@ export class EnvironmentValidationService {
 			}
 		}
 
-		// Warn about Microsoft example client ID
-		const publicClientId = environment.getPublicClientId();
-		if (publicClientId.isMicrosoftExampleClientId()) {
-			warnings.push('Using Microsoft example client ID. Create your own Azure AD app registration for production use.');
+		// Validate tenant ID for Service Principal (MSAL limitation)
+		// Other auth methods (Interactive, DeviceCode, UsernamePassword) can use "organizations" authority
+		if (authMethod.requiresClientCredentials()) {
+			const tenantId = environment.getTenantId();
+			if (!tenantId.getValue()) {
+				errors.push('Tenant ID is required for Service Principal authentication');
+			}
 		}
 
 		return new ValidationResult(errors.length === 0, errors, warnings);

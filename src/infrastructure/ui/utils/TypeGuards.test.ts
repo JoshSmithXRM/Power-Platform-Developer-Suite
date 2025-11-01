@@ -68,7 +68,7 @@ describe('TypeGuards', () => {
 
 	describe('isSaveEnvironmentMessage', () => {
 		const validMessage = {
-			command: 'save',
+			command: 'save-environment',
 			data: {
 				name: 'DEV',
 				dataverseUrl: 'https://org.crm.dynamics.com',
@@ -84,7 +84,7 @@ describe('TypeGuards', () => {
 
 		it('should return true with optional fields', () => {
 			const messageWithOptional = {
-				command: 'save',
+				command: 'save-environment',
 				data: {
 					...validMessage.data,
 					environmentId: 'env-123',
@@ -105,7 +105,7 @@ describe('TypeGuards', () => {
 
 		it('should return false for missing name', () => {
 			const message = {
-				command: 'save',
+				command: 'save-environment',
 				data: { ...validMessage.data, name: undefined }
 			};
 			expect(isSaveEnvironmentMessage(message)).toBe(false);
@@ -113,7 +113,7 @@ describe('TypeGuards', () => {
 
 		it('should return false for missing dataverseUrl', () => {
 			const message = {
-				command: 'save',
+				command: 'save-environment',
 				data: { ...validMessage.data, dataverseUrl: undefined }
 			};
 			expect(isSaveEnvironmentMessage(message)).toBe(false);
@@ -121,7 +121,7 @@ describe('TypeGuards', () => {
 
 		it('should return false for missing tenantId', () => {
 			const message = {
-				command: 'save',
+				command: 'save-environment',
 				data: { ...validMessage.data, tenantId: undefined }
 			};
 			expect(isSaveEnvironmentMessage(message)).toBe(false);
@@ -129,7 +129,7 @@ describe('TypeGuards', () => {
 
 		it('should return false for missing authenticationMethod', () => {
 			const message = {
-				command: 'save',
+				command: 'save-environment',
 				data: { ...validMessage.data, authenticationMethod: undefined }
 			};
 			expect(isSaveEnvironmentMessage(message)).toBe(false);
@@ -137,7 +137,7 @@ describe('TypeGuards', () => {
 
 		it('should return false for missing publicClientId', () => {
 			const message = {
-				command: 'save',
+				command: 'save-environment',
 				data: { ...validMessage.data, publicClientId: undefined }
 			};
 			expect(isSaveEnvironmentMessage(message)).toBe(false);
@@ -145,7 +145,7 @@ describe('TypeGuards', () => {
 
 		it('should return false for invalid authentication method', () => {
 			const message = {
-				command: 'save',
+				command: 'save-environment',
 				data: { ...validMessage.data, authenticationMethod: 'InvalidMethod' }
 			};
 			expect(isSaveEnvironmentMessage(message)).toBe(false);
@@ -154,7 +154,7 @@ describe('TypeGuards', () => {
 		it('should validate all authentication methods', () => {
 			AUTHENTICATION_METHODS.forEach(method => {
 				const message = {
-					command: 'save',
+					command: 'save-environment',
 					data: { ...validMessage.data, authenticationMethod: method }
 				};
 				expect(isSaveEnvironmentMessage(message)).toBe(true);
@@ -173,7 +173,7 @@ describe('TypeGuards', () => {
 
 		it('should return false for wrong field types', () => {
 			const message = {
-				command: 'save',
+				command: 'save-environment',
 				data: { ...validMessage.data, name: 123 }
 			};
 			expect(isSaveEnvironmentMessage(message)).toBe(false);
@@ -202,7 +202,7 @@ describe('TypeGuards', () => {
 
 		it('should return false for invalid command', () => {
 			const message = {
-				command: 'save',
+				command: 'save-environment',
 				data: {
 					name: 'DEV',
 					dataverseUrl: 'https://org.crm.dynamics.com',
@@ -338,7 +338,7 @@ describe('TypeGuards', () => {
 	describe('Type narrowing in TypeScript', () => {
 		it('should narrow type after guard check', () => {
 			const message: unknown = {
-				command: 'save',
+				command: 'save-environment',
 				data: {
 					name: 'DEV',
 					dataverseUrl: 'https://org.crm.dynamics.com',
@@ -352,9 +352,9 @@ describe('TypeGuards', () => {
 				// TypeScript should know message.data exists and has correct shape
 				expect(message.data.name).toBe('DEV');
 				expect(message.data.dataverseUrl).toBe('https://org.crm.dynamics.com');
-				expect(message.command).toBe('save');
+				expect(message.command).toBe('save-environment');
 			} else {
-				fail('Should have been a save environment message');
+				throw new Error('Should have been a save environment message');
 			}
 		});
 	});
@@ -362,7 +362,7 @@ describe('TypeGuards', () => {
 	describe('Edge cases', () => {
 		it('should handle messages with extra properties', () => {
 			const message = {
-				command: 'save',
+				command: 'save-environment',
 				data: {
 					name: 'DEV',
 					dataverseUrl: 'https://org.crm.dynamics.com',
@@ -379,7 +379,7 @@ describe('TypeGuards', () => {
 
 		it('should handle empty strings in required fields', () => {
 			const message = {
-				command: 'save',
+				command: 'save-environment',
 				data: {
 					name: '',
 					dataverseUrl: '',
@@ -401,7 +401,7 @@ describe('TypeGuards', () => {
 
 		it('should handle case-sensitive authentication methods', () => {
 			const message = {
-				command: 'save',
+				command: 'save-environment',
 				data: {
 					name: 'DEV',
 					dataverseUrl: 'https://org.crm.dynamics.com',

@@ -191,6 +191,18 @@ export class EnvironmentSetupPanel {
 			preserveExistingCredentials: true
 		});
 
+		// Handle validation errors - send to webview for inline display
+		if (!result.success && result.errors) {
+			this.panel.webview.postMessage({
+				command: 'environment-saved',
+				data: {
+					success: false,
+					errors: result.errors
+				}
+			});
+			return;
+		}
+
 		// Show success message with warnings if any
 		if (result.warnings && result.warnings.length > 0) {
 			vscode.window.showWarningMessage(`Environment saved with warnings: ${result.warnings.join(', ')}`);

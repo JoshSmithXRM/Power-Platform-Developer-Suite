@@ -137,11 +137,11 @@ function renderAuthenticationSection(): string {
 		renderFormField({
 			id: 'tenantId',
 			name: 'tenantId',
-			label: 'Tenant ID',
+			label: 'Tenant ID (Optional)',
 			type: 'text',
 			placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-			helpText: 'Your Azure AD tenant ID',
-			required: true
+			helpText: 'Your Azure AD tenant ID. Optional for Interactive/DeviceCode/UsernamePassword (uses "organizations" authority). Required for Service Principal.',
+			required: false
 		}),
 		renderSelect({
 			id: 'authenticationMethod',
@@ -161,8 +161,9 @@ function renderAuthenticationSection(): string {
 			name: 'publicClientId',
 			label: 'Public Client ID',
 			type: 'text',
-			placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-			helpText: 'Application (client) ID for Interactive/DeviceCode flows',
+			value: '51f81489-12ee-4a9e-aaae-a2591f45987d',
+			placeholder: '51f81489-12ee-4a9e-aaae-a2591f45987d',
+			helpText: 'Application (client) ID for Interactive/DeviceCode flows. Default is Microsoft\'s official public client ID.',
 			required: true
 		}),
 		renderServicePrincipalFields(),

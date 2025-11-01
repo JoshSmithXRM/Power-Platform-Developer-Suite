@@ -54,8 +54,17 @@ export class Environment {
 			errors.push('Valid Dataverse URL is required');
 		}
 
+		// Tenant ID validation - format check (when provided)
 		if (!this.tenantId.isValid()) {
-			errors.push('Valid Tenant ID (GUID) is required');
+			errors.push('Invalid Tenant ID format. Expected GUID format');
+		}
+
+		// Tenant ID requirement - only for Service Principal (MSAL limitation)
+		// Interactive, DeviceCode, and UsernamePassword can use "organizations" authority
+		if (this.authenticationMethod.requiresClientCredentials()) {
+			if (!this.tenantId.isProvided()) {
+				errors.push('Tenant ID is required for Service Principal authentication');
+			}
 		}
 
 		// Auth-specific validation

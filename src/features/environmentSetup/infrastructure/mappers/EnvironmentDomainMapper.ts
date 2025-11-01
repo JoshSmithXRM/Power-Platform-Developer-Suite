@@ -33,7 +33,7 @@ export class EnvironmentDomainMapper {
 			name: environment.getName().getValue(),
 			settings: {
 				dataverseUrl: environment.getDataverseUrl().getValue(),
-				tenantId: environment.getTenantId().getValue(),
+				tenantId: environment.getTenantId().getValue() || '', // Empty string if not provided (will use "organizations" authority)
 				authenticationMethod: environment.getAuthenticationMethod().toString() as EnvironmentConnectionDto['settings']['authenticationMethod'],
 				publicClientId: environment.getPublicClientId().getValue(),
 				clientId: environment.getClientId()?.getValue(),

@@ -77,9 +77,21 @@ describe('ValueObjects', () => {
 				expect(tenantId.getValue()).toBe('00000000-0000-0000-0000-000000000000');
 			});
 
-			it('should throw error for empty tenant ID', () => {
-				expect(() => new TenantId('')).toThrow(DomainError);
-				expect(() => new TenantId('   ')).toThrow(DomainError);
+			it('should allow empty tenant ID (uses organizations authority)', () => {
+				const tenantId1 = new TenantId('');
+				expect(tenantId1.getValue()).toBeUndefined();
+				expect(tenantId1.isValid()).toBe(true);
+				expect(tenantId1.isProvided()).toBe(false);
+
+				const tenantId2 = new TenantId('   ');
+				expect(tenantId2.getValue()).toBeUndefined();
+				expect(tenantId2.isValid()).toBe(true);
+				expect(tenantId2.isProvided()).toBe(false);
+
+				const tenantId3 = new TenantId();
+				expect(tenantId3.getValue()).toBeUndefined();
+				expect(tenantId3.isValid()).toBe(true);
+				expect(tenantId3.isProvided()).toBe(false);
 			});
 
 			it('should throw error for invalid GUID format', () => {

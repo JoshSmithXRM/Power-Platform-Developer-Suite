@@ -58,7 +58,7 @@ describe('EnvironmentValidationService', () => {
 			expect(result.errors).toContain('Environment name must be unique');
 		});
 
-		it('should warn about Microsoft example client ID', () => {
+		it('should not warn about Microsoft example client ID (it is the official default)', () => {
 			const env = createValidEnvironment(AuthenticationMethodType.Interactive);
 			const isNameUnique = true;
 
@@ -70,7 +70,7 @@ describe('EnvironmentValidationService', () => {
 			);
 
 			expect(result.isValid).toBe(true);
-			expect(result.warnings).toContain('Using Microsoft example client ID. Create your own Azure AD app registration for production use.');
+			expect(result.warnings).toHaveLength(0); // No warning - Microsoft's ID is the official default
 		});
 	});
 
