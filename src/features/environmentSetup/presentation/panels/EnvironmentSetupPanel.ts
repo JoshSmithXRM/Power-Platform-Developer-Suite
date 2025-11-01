@@ -274,30 +274,41 @@ export class EnvironmentSetupPanel {
 
 	private async handleDiscoverEnvironmentId(data: DiscoverEnvironmentIdMessage['data']): Promise<void> {
 		// Show progress
-		await vscode.window.withProgress({
-			location: vscode.ProgressLocation.Notification,
-			title: "Discovering Power Platform Environment ID...",
-			cancellable: true
-		}, async (_progress, token) => {
-			// Adapt VS Code cancellation token to domain abstraction
-			const cancellationToken = token ? new VsCodeCancellationTokenAdapter(token) : undefined;
+		let result;
+		try {
+			result = await vscode.window.withProgress({
+				location: vscode.ProgressLocation.Notification,
+				title: "Discovering Power Platform Environment ID...",
+				cancellable: true
+			}, async (_progress, token) => {
+				// Adapt VS Code cancellation token to domain abstraction
+				const cancellationToken = token ? new VsCodeCancellationTokenAdapter(token) : undefined;
 
-			// Delegate to use case - data is already validated by type guard
-			const result = await this.discoverEnvironmentIdUseCase.execute({
-				existingEnvironmentId: this.currentEnvironmentId,
-				name: data.name,
-				dataverseUrl: data.dataverseUrl,
-				tenantId: data.tenantId,
-				authenticationMethod: data.authenticationMethod,
-				publicClientId: data.publicClientId,
-				clientId: data.clientId,
-				clientSecret: data.clientSecret,
-				username: data.username,
-				password: data.password
-			}, cancellationToken);
+				// Delegate to use case - data is already validated by type guard
+				const result = await this.discoverEnvironmentIdUseCase.execute({
+					existingEnvironmentId: this.currentEnvironmentId,
+					name: data.name,
+					dataverseUrl: data.dataverseUrl,
+					tenantId: data.tenantId,
+					authenticationMethod: data.authenticationMethod,
+					publicClientId: data.publicClientId,
+					clientId: data.clientId,
+					clientSecret: data.clientSecret,
+					username: data.username,
+					password: data.password
+				}, cancellationToken);
 
+				// Return result from withProgress
+				return result;
+			});
+
+			// Handle results AFTER progress completes
 			if (result.success) {
 				vscode.window.showInformationMessage(`Environment ID discovered: ${result.environmentId}`);
+				this.panel.webview.postMessage({
+					command: 'discover-environment-id-result',
+					data: result
+				});
 			} else if (result.requiresInteractiveAuth) {
 				// Service Principal doesn't have BAP API permissions - offer Interactive auth
 				const retry = await vscode.window.showWarningMessage(
@@ -307,61 +318,88 @@ export class EnvironmentSetupPanel {
 				);
 
 				if (retry === 'Use Interactive Auth') {
-					// Retry with Interactive auth
+					// Retry with Interactive auth (starts new progress notification)
 					await this.handleDiscoverEnvironmentIdWithInteractive(data);
-					return; // Don't send result to webview yet
 				} else {
 					vscode.window.showInformationMessage('You can manually enter the Environment ID from the Power Platform Admin Center.');
+					this.panel.webview.postMessage({
+						command: 'discover-environment-id-result',
+						data: result
+					});
 				}
 			} else {
 				vscode.window.showErrorMessage(`Failed to discover environment ID: ${result.errorMessage}`);
+				this.panel.webview.postMessage({
+					command: 'discover-environment-id-result',
+					data: result
+				});
 			}
-
-			// Notify webview
-			this.panel.webview.postMessage({
-				command: 'discover-environment-id-result',
-				data: result
-			});
-		});
+		} catch (error) {
+			// Handle cancellation - error thrown when user clicks cancel
+			if (error instanceof Error && (error.message.includes('cancelled') || error.message.includes('Authentication cancelled'))) {
+				vscode.window.showInformationMessage('Environment ID discovery cancelled');
+				// Notify webview of cancellation
+				this.panel.webview.postMessage({
+					command: 'discover-environment-id-result',
+					data: { success: false, errorMessage: 'Cancelled by user' }
+				});
+			} else {
+				throw error; // Re-throw unexpected errors
+			}
+		}
 	}
 
 	private async handleDiscoverEnvironmentIdWithInteractive(data: DiscoverEnvironmentIdMessage['data']): Promise<void> {
 		// Show progress
-		await vscode.window.withProgress({
-			location: vscode.ProgressLocation.Notification,
-			title: "Discovering Power Platform Environment ID with Interactive auth...",
-			cancellable: true
-		}, async (_progress, token) => {
-			// Adapt VS Code cancellation token to domain abstraction
-			const cancellationToken = token ? new VsCodeCancellationTokenAdapter(token) : undefined;
+		try {
+			await vscode.window.withProgress({
+				location: vscode.ProgressLocation.Notification,
+				title: "Discovering Power Platform Environment ID with Interactive auth...",
+				cancellable: true
+			}, async (_progress, token) => {
+				// Adapt VS Code cancellation token to domain abstraction
+				const cancellationToken = token ? new VsCodeCancellationTokenAdapter(token) : undefined;
 
-			// Retry discovery with Interactive authentication (temporary, non-cached)
-			const result = await this.discoverEnvironmentIdUseCase.execute({
-				// Use temporary ID to avoid caching credentials
-				existingEnvironmentId: undefined,
-				name: data.name,
-				dataverseUrl: data.dataverseUrl,
-				tenantId: data.tenantId,
-				authenticationMethod: AuthenticationMethodType.Interactive, // Force Interactive for discovery
-				publicClientId: data.publicClientId,
-				clientId: undefined,
-				clientSecret: undefined,
-				username: undefined,
-				password: undefined
-			}, cancellationToken);
+				// Retry discovery with Interactive authentication (temporary, non-cached)
+				const result = await this.discoverEnvironmentIdUseCase.execute({
+					// Use temporary ID to avoid caching credentials
+					existingEnvironmentId: undefined,
+					name: data.name,
+					dataverseUrl: data.dataverseUrl,
+					tenantId: data.tenantId,
+					authenticationMethod: AuthenticationMethodType.Interactive, // Force Interactive for discovery
+					publicClientId: data.publicClientId,
+					clientId: undefined,
+					clientSecret: undefined,
+					username: undefined,
+					password: undefined
+				}, cancellationToken);
 
-			if (result.success) {
-				vscode.window.showInformationMessage(`Environment ID discovered: ${result.environmentId}`);
-			} else {
-				vscode.window.showErrorMessage(`Failed to discover environment ID: ${result.errorMessage}`);
-			}
+				if (result.success) {
+					vscode.window.showInformationMessage(`Environment ID discovered: ${result.environmentId}`);
+				} else {
+					vscode.window.showErrorMessage(`Failed to discover environment ID: ${result.errorMessage}`);
+				}
 
-			// Notify webview
-			this.panel.webview.postMessage({
-				command: 'discover-environment-id-result',
-				data: result
+				// Notify webview
+				this.panel.webview.postMessage({
+					command: 'discover-environment-id-result',
+					data: result
+				});
 			});
-		});
+		} catch (error) {
+			// Handle cancellation - error thrown when user clicks cancel
+			if (error instanceof Error && (error.message.includes('cancelled') || error.message.includes('Authentication cancelled'))) {
+				vscode.window.showInformationMessage('Environment ID discovery cancelled');
+				// Notify webview of cancellation
+				this.panel.webview.postMessage({
+					command: 'discover-environment-id-result',
+					data: { success: false, errorMessage: 'Cancelled by user' }
+				});
+			} else {
+				throw error; // Re-throw unexpected errors
+			}
+		}
 	}
 
 	private async handleDeleteEnvironment(): Promise<void> {

@@ -68,6 +68,11 @@ export class MsalAuthenticationService implements IAuthenticationService {
 		customScope?: string,
 		cancellationToken?: ICancellationToken
 	): Promise<string> {
+		// Check for cancellation before starting
+		if (cancellationToken?.isCancellationRequested) {
+			throw new Error('Authentication cancelled by user');
+		}
+
 		const authMethod = environment.getAuthenticationMethod().getType();
 		// Use custom scope if provided, otherwise default to Dataverse
 		const scopes = customScope
@@ -76,16 +81,16 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 		switch (authMethod) {
 			case AuthenticationMethodType.ServicePrincipal:
-				return await this.authenticateServicePrincipal(environment, clientSecret, scopes);
+				return await this.authenticateServicePrincipal(environment, clientSecret, scopes, cancellationToken);
 
 			case AuthenticationMethodType.UsernamePassword:
-				return await this.authenticateUsernamePassword(environment, password, scopes);
+				return await this.authenticateUsernamePassword(environment, password, scopes, cancellationToken);
 
 			case AuthenticationMethodType.Interactive:
 				return await this.authenticateInteractive(environment, scopes, cancellationToken);
 
 			case AuthenticationMethodType.DeviceCode:
-				return await this.authenticateDeviceCode(environment, scopes);
+				return await this.authenticateDeviceCode(environment, scopes, cancellationToken);
 
 			default:
 				throw new Error(`Unsupported authentication method: ${authMethod}`);
@@ -100,11 +105,40 @@ export class MsalAuthenticationService implements IAuthenticationService {
 		return new Error(`${context}: ${err.message}`);
 	}
 
+	/**
+	 * Executes a promise with cancellation support using Promise.race pattern
+	 * If cancellation token is provided, races the promise against cancellation
+	 * @param promise - The promise to execute
+	 * @param cancellationToken - Optional cancellation token
+	 * @returns The result of the promise, or throws if cancelled
+	 */
+	private async executeWithCancellation<T>(
+		promise: Promise<T>,
+		cancellationToken?: ICancellationToken
+	): Promise<T> {
+		if (!cancellationToken) {
+			return promise;
+		}
+
+		const cancellationPromise = new Promise<never>((_, reject) => {
+			cancellationToken.onCancellationRequested(() => {
+				reject(new Error('Authentication cancelled by user'));
+			});
+		});
+
+		return Promise.race([promise, cancellationPromise]);
+	}
+
 	private async authenticateServicePrincipal(
 		environment: Environment,
 		clientSecret: string | undefined,
-		scopes: string[]
+		scopes: string[],
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
+		// Check for cancellation
+		if (cancellationToken?.isCancellationRequested) {
+			throw new Error('Authentication cancelled by user');
+		}
 		if (!clientSecret) {
 			throw new Error('Client secret is required for Service Principal authentication');
 		}
@@ -129,13 +163,21 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				scopes: scopes
 			};
 
-			const response = await clientApp.acquireTokenByClientCredential(clientCredentialRequest);
+			const response = await this.executeWithCancellation(
+				clientApp.acquireTokenByClientCredential(clientCredentialRequest),
+				cancellationToken
+			);
+
 			if (!response) {
 				throw new Error('Failed to acquire token');
 			}
 
 			return response.accessToken;
 		} catch (error: unknown) {
+			// Check if this is a cancellation error
+			if (error instanceof Error && error.message.includes('cancelled')) {
+				throw error; // Re-throw cancellation errors as-is
+			}
 			throw this.createAuthenticationError(error, 'Service Principal authentication failed');
 		}
 	}
@@ -143,8 +185,13 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	private async authenticateUsernamePassword(
 		environment: Environment,
 		password: string | undefined,
-		scopes: string[]
+		scopes: string[],
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
+		// Check for cancellation
+		if (cancellationToken?.isCancellationRequested) {
+			throw new Error('Authentication cancelled by user');
+		}
 		if (!password) {
 			throw new Error('Password is required for Username/Password authentication');
 		}
@@ -170,13 +217,21 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				password: password
 			};
 
-			const response = await clientApp.acquireTokenByUsernamePassword(usernamePasswordRequest);
+			const response = await this.executeWithCancellation(
+				clientApp.acquireTokenByUsernamePassword(usernamePasswordRequest),
+				cancellationToken
+			);
+
 			if (!response) {
 				throw new Error('Failed to acquire token');
 			}
 
 			return response.accessToken;
 		} catch (error: unknown) {
+			// Check if this is a cancellation error
+			if (error instanceof Error && error.message.includes('cancelled')) {
+				throw error; // Re-throw cancellation errors as-is
+			}
 			throw this.createAuthenticationError(error, 'Username/Password authentication failed. Note: This method does not support MFA');
 		}
 	}
@@ -186,6 +241,11 @@ export class MsalAuthenticationService implements IAuthenticationService {
 		scopes: string[],
 		cancellationToken?: ICancellationToken
 	): Promise<string> {
+		// Check for cancellation before starting
+		if (cancellationToken?.isCancellationRequested) {
+			throw new Error('Authentication cancelled by user');
+		}
+
 		const clientApp = this.getClientApp(environment);
 
 		try {
@@ -197,11 +257,20 @@ export class MsalAuthenticationService implements IAuthenticationService {
 						account: accounts[0],
 						scopes: scopes
 					};
-					const response = await clientApp.acquireTokenSilent(silentRequest);
+
+					const response = await this.executeWithCancellation(
+						clientApp.acquireTokenSilent(silentRequest),
+						cancellationToken
+					);
+
 					if (response) {
 						return response.accessToken;
 					}
-				} catch (_silentError) {
+				} catch (error: unknown) {
+					// Check if this is a cancellation error
+					if (error instanceof Error && error.message.includes('cancelled')) {
+						throw error; // Re-throw cancellation errors
+					}
 					// Silent acquisition failed, proceed with interactive flow
 				}
 			}
@@ -214,6 +283,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 				// eslint-disable-next-line prefer-const -- Variables are reassigned in lines 294 and 300
 				let cancelListener: IDisposable | undefined;
+				let isCancelled = false;
 
 				// Cleanup function
 				const cleanup = (): void => {
@@ -227,6 +297,9 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 				// Wrapped resolve/reject that clean up
 				const resolveWithCleanup = (code: string): void => {
+					if (isCancelled) {
+						return; // Ignore success after cancellation
+					}
 					try {
 						cleanup();
 					} finally {
@@ -294,6 +367,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 				// Register cancellation handler
 				cancelListener = cancellationToken?.onCancellationRequested(() => {
+					isCancelled = true;
 					server.close();
 					rejectWithCleanup(new Error('Authentication cancelled by user'));
 				});
@@ -346,8 +420,13 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 	private async authenticateDeviceCode(
 		environment: Environment,
-		scopes: string[]
+		scopes: string[],
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
+		// Check for cancellation
+		if (cancellationToken?.isCancellationRequested) {
+			throw new Error('Authentication cancelled by user');
+		}
 		const clientApp = this.getClientApp(environment);
 
 		try {
@@ -361,11 +440,20 @@ export class MsalAuthenticationService implements IAuthenticationService {
 						account: accounts[0],
 						scopes: scopes
 					};
-					const response = await clientApp.acquireTokenSilent(silentRequest);
+
+					const response = await this.executeWithCancellation(
+						clientApp.acquireTokenSilent(silentRequest),
+						cancellationToken
+					);
+
 					if (response) {
 						return response.accessToken;
 					}
-				} catch (_silentError) {
+				} catch (error: unknown) {
+					// Check if this is a cancellation error
+					if (error instanceof Error && error.message.includes('cancelled')) {
+						throw error; // Re-throw cancellation errors
+					}
 					// Silent acquisition failed, proceed with device code flow
 				}
 			}
@@ -395,7 +483,11 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				}
 			};
 
-			const response = await clientApp.acquireTokenByDeviceCode(deviceCodeRequest);
+			const response = await this.executeWithCancellation(
+				clientApp.acquireTokenByDeviceCode(deviceCodeRequest),
+				cancellationToken
+			);
+
 			if (!response) {
 				throw new Error('Failed to acquire token');
 			}
@@ -408,6 +500,10 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 			return response.accessToken;
 		} catch (error: unknown) {
+			// Check if this is a cancellation error
+			if (error instanceof Error && error.message.includes('cancelled')) {
+				throw error; // Re-throw cancellation errors as-is
+			}
 			throw this.createAuthenticationError(error, 'Device Code authentication failed');
 		}
 	}

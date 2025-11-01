@@ -29,6 +29,11 @@ export class PowerPlatformApiService implements IPowerPlatformApiService {
 			cancellationToken
 		);
 
+		// Check for cancellation after authentication (before API call)
+		if (cancellationToken?.isCancellationRequested) {
+			throw new Error('Operation cancelled by user');
+		}
+
 		// Extract organization name from Dataverse URL
 		const orgName = environment.getDataverseUrl().getOrganizationName();
 
