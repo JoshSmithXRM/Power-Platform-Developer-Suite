@@ -210,7 +210,8 @@
             {
                 "command": "power-platform-dev-suite.openPersistenceInspector",
                 "title": "Persistence Inspector (Dev Only)",
-                "category": "Power Platform Developer Suite"
+                "category": "Power Platform Developer Suite",
+                "enablement": "powerPlatformDevSuite.isDevelopment"
             }
         ],
         "viewsContainers": {

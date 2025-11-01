@@ -13,9 +13,9 @@ export class ProtectedKeyPattern {
 	 */
 	public matches(key: string): boolean {
 		if (this._pattern.includes('*')) {
-			const regex = new RegExp(
-				'^' + this._pattern.replace(/\*/g, '.*') + '$'
-			);
+			// Escape regex metacharacters, then replace \* with .*
+			const escaped = this._pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const regex = new RegExp('^' + escaped.replace(/\\\*/g, '.*') + '$');
 			return regex.test(key);
 		}
 

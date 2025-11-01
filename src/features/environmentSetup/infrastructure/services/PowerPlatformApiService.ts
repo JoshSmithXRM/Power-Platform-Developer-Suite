@@ -1,5 +1,7 @@
 import { Environment } from '../../domain/entities/Environment';
+import { DataverseUrl } from '../../domain/valueObjects/DataverseUrl';
 import { IAuthenticationService } from '../../domain/interfaces/IAuthenticationService';
+import { ICancellationToken } from '../../domain/interfaces/ICancellationToken';
 import { IPowerPlatformApiService } from '../../domain/interfaces/IPowerPlatformApiService';
 
 /**
@@ -7,28 +9,28 @@ import { IPowerPlatformApiService } from '../../domain/interfaces/IPowerPlatform
  * Used to discover environment metadata
  */
 export class PowerPlatformApiService implements IPowerPlatformApiService {
-	private static readonly BAP_API_BASE_URL = 'https://api.bap.microsoft.com';
-	private static readonly BAP_API_SCOPE = 'https://api.bap.microsoft.com/.default';
+	private static readonly BAP_API_BASE_URL = 'https://api.bap.microsoft.com' as const;
+	private static readonly BAP_API_SCOPE = 'https://api.bap.microsoft.com/.default' as const;
 
 	constructor(private readonly authenticationService: IAuthenticationService) {}
 
 	public async discoverEnvironmentId(
 		environment: Environment,
 		clientSecret?: string,
-		password?: string
+		password?: string,
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
 		// Get access token for BAP API
 		const accessToken = await this.authenticationService.getAccessTokenForEnvironment(
 			environment,
 			clientSecret,
 			password,
-			PowerPlatformApiService.BAP_API_SCOPE
+			PowerPlatformApiService.BAP_API_SCOPE,
+			cancellationToken
 		);
 
 		// Extract organization name from Dataverse URL
-		// Example: https://org.crm.dynamics.com -> org
-		const dataverseUrl = environment.getDataverseUrl().getValue();
-		const orgName = this.extractOrgName(dataverseUrl);
+		const orgName = environment.getDataverseUrl().getOrganizationName();
 
 		// Call BAP API to list environments
 		const response = await fetch(
@@ -46,16 +48,34 @@ export class PowerPlatformApiService implements IPowerPlatformApiService {
 			throw new Error(`BAP API request failed: ${response.status} ${response.statusText} - ${errorText}`);
 		}
 
-		const data = await response.json() as BapApiResponse;
+		const data: unknown = await response.json();
+		if (!isBapApiResponse(data)) {
+			throw new Error('Invalid BAP API response structure');
+		}
 
 		// Find environment matching the organization name
-		const matchingEnvironment = data.value.find((env: BapEnvironment) => {
+		const matchingEnvironment = data.value.find(env => {
 			// Match by organization unique name or URL
 			const envOrgName = env.properties?.linkedEnvironmentMetadata?.uniqueName?.toLowerCase();
-			const envUrl = env.properties?.linkedEnvironmentMetadata?.instanceUrl?.toLowerCase();
+			const envUrl = env.properties?.linkedEnvironmentMetadata?.instanceUrl;
 
-			return envOrgName === orgName.toLowerCase() ||
-				(envUrl && this.extractOrgName(envUrl) === orgName.toLowerCase());
+			// Match by unique name directly
+			if (envOrgName === orgName.toLowerCase()) {
+				return true;
+			}
+
+			// Match by extracting org name from environment's instance URL
+			if (envUrl) {
+				try {
+					const envDataverseUrl = new DataverseUrl(envUrl);
+					return envDataverseUrl.getOrganizationName().toLowerCase() === orgName.toLowerCase();
+				} catch {
+					// Invalid URL format, skip this environment
+					return false;
+				}
+			}
+
+			return false;
 		});
 
 		if (!matchingEnvironment) {
@@ -69,30 +89,6 @@ export class PowerPlatformApiService implements IPowerPlatformApiService {
 		}
 
 		return environmentId;
-	}
-
-	/**
-	 * Extract organization name from Dataverse URL
-	 * Examples:
-	 *   https://org.crm.dynamics.com -> org
-	 *   https://org.crm2.dynamics.com -> org
-	 *   https://org.api.crm.dynamics.com -> org
-	 */
-	private extractOrgName(url: string): string {
-		try {
-			const urlObj = new URL(url);
-			const hostname = urlObj.hostname;
-
-			// Extract first part before .crm or .api
-			const parts = hostname.split('.');
-			if (parts.length > 0) {
-				return parts[0];
-			}
-
-			throw new Error('Unable to extract organization name from URL');
-		} catch (_error) {
-			throw new Error(`Invalid Dataverse URL: ${url}`);
-		}
 	}
 }
 
@@ -108,4 +104,16 @@ interface BapEnvironment {
 			instanceUrl?: string;
 		};
 	};
+}
+
+/**
+ * Type guard to validate BAP API response structure
+ */
+function isBapApiResponse(data: unknown): data is BapApiResponse {
+	return (
+		typeof data === 'object' &&
+		data !== null &&
+		'value' in data &&
+		Array.isArray((data as BapApiResponse).value)
+	);
 }

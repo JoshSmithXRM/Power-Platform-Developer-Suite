@@ -1,5 +1,6 @@
 import { IPowerPlatformApiService } from '../../domain/interfaces/IPowerPlatformApiService';
 import { IEnvironmentRepository } from '../../domain/interfaces/IEnvironmentRepository';
+import { ICancellationToken } from '../../domain/interfaces/ICancellationToken';
 import { Environment } from '../../domain/entities/Environment';
 import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
 import { EnvironmentName } from '../../domain/valueObjects/EnvironmentName';
@@ -7,6 +8,7 @@ import { DataverseUrl } from '../../domain/valueObjects/DataverseUrl';
 import { TenantId } from '../../domain/valueObjects/TenantId';
 import { ClientId } from '../../domain/valueObjects/ClientId';
 import { AuthenticationMethod, AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
+import { ApiError } from '../../domain/valueObjects/ApiError';
 
 /**
  * Command Use Case: Discover Power Platform Environment ID
@@ -18,7 +20,10 @@ export class DiscoverEnvironmentIdUseCase {
 		private readonly repository: IEnvironmentRepository
 	) {}
 
-	public async execute(request: DiscoverEnvironmentIdRequest): Promise<DiscoverEnvironmentIdResponse> {
+	public async execute(
+		request: DiscoverEnvironmentIdRequest,
+		cancellationToken?: ICancellationToken
+	): Promise<DiscoverEnvironmentIdResponse> {
 		// Create temporary domain entity from draft data
 		const tempEnvironment = new Environment(
 			request.existingEnvironmentId
@@ -61,7 +66,8 @@ export class DiscoverEnvironmentIdUseCase {
 			const environmentId = await this.powerPlatformApiService.discoverEnvironmentId(
 				tempEnvironment,
 				clientSecret,
-				password
+				password,
+				cancellationToken
 			);
 
 			return {
@@ -69,15 +75,12 @@ export class DiscoverEnvironmentIdUseCase {
 				environmentId: environmentId
 			};
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-			// Check if this is a 403 permissions error (common with Service Principal)
-			const isForbidden = errorMessage.includes('403') || errorMessage.includes('Forbidden');
+			const apiError = new ApiError(error instanceof Error ? error.message : 'Unknown error');
 
 			return {
 				success: false,
-				errorMessage: errorMessage,
-				requiresInteractiveAuth: isForbidden
+				errorMessage: apiError.getMessage(),
+				requiresInteractiveAuth: apiError.requiresInteractiveAuth()
 			};
 		}
 	}

@@ -4,6 +4,7 @@ import * as msal from '@azure/msal-node';
 
 import { Environment } from '../../domain/entities/Environment';
 import { IAuthenticationService } from '../../domain/interfaces/IAuthenticationService';
+import { ICancellationToken, IDisposable } from '../../domain/interfaces/ICancellationToken';
 import { AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
 import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
 
@@ -52,14 +53,20 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			this.clientAppCache.set(cacheKey, new msal.PublicClientApplication(clientConfig));
 		}
 
-		return this.clientAppCache.get(cacheKey)!;
+		const clientApp = this.clientAppCache.get(cacheKey);
+		if (!clientApp) {
+			throw new Error(`Failed to retrieve MSAL client app for environment ${cacheKey}`);
+		}
+
+		return clientApp;
 	}
 
 	public async getAccessTokenForEnvironment(
 		environment: Environment,
 		clientSecret?: string,
 		password?: string,
-		customScope?: string
+		customScope?: string,
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
 		const authMethod = environment.getAuthenticationMethod().getType();
 		// Use custom scope if provided, otherwise default to Dataverse
@@ -75,7 +82,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				return await this.authenticateUsernamePassword(environment, password, scopes);
 
 			case AuthenticationMethodType.Interactive:
-				return await this.authenticateInteractive(environment, scopes);
+				return await this.authenticateInteractive(environment, scopes, cancellationToken);
 
 			case AuthenticationMethodType.DeviceCode:
 				return await this.authenticateDeviceCode(environment, scopes);
@@ -83,6 +90,14 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			default:
 				throw new Error(`Unsupported authentication method: ${authMethod}`);
 		}
+	}
+
+	/**
+	 * Converts unknown error to Error instance with contextual message
+	 */
+	private createAuthenticationError(error: unknown, context: string): Error {
+		const err = error instanceof Error ? error : new Error(String(error));
+		return new Error(`${context}: ${err.message}`);
 	}
 
 	private async authenticateServicePrincipal(
@@ -121,8 +136,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 			return response.accessToken;
 		} catch (error: unknown) {
-			const err = error instanceof Error ? error : new Error(String(error));
-			throw new Error(`Service Principal authentication failed: ${err.message}`);
+			throw this.createAuthenticationError(error, 'Service Principal authentication failed');
 		}
 	}
 
@@ -163,14 +177,14 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 			return response.accessToken;
 		} catch (error: unknown) {
-			const err = error instanceof Error ? error : new Error(String(error));
-			throw new Error(`Username/Password authentication failed: ${err.message}. Note: This method does not support MFA.`);
+			throw this.createAuthenticationError(error, 'Username/Password authentication failed. Note: This method does not support MFA');
 		}
 	}
 
 	private async authenticateInteractive(
 		environment: Environment,
-		scopes: string[]
+		scopes: string[],
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
 		const clientApp = this.getClientApp(environment);
 
@@ -196,6 +210,38 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 			// Create a promise that resolves when we get the auth code
 			const authCodePromise = new Promise<string>((resolve, reject) => {
+				// eslint-disable-next-line prefer-const -- Variables are reassigned in lines 294 and 300
+				let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+				// eslint-disable-next-line prefer-const -- Variables are reassigned in lines 294 and 300
+				let cancelListener: IDisposable | undefined;
+
+				// Cleanup function
+				const cleanup = (): void => {
+					if (timeoutHandle) {
+						clearTimeout(timeoutHandle);
+					}
+					if (cancelListener) {
+						cancelListener.dispose();
+					}
+				};
+
+				// Wrapped resolve/reject that clean up
+				const resolveWithCleanup = (code: string): void => {
+					try {
+						cleanup();
+					} finally {
+						resolve(code);
+					}
+				};
+
+				const rejectWithCleanup = (error: Error): void => {
+					try {
+						cleanup();
+					} finally {
+						reject(error);
+					}
+				};
+
 				// Create local HTTP server to capture redirect
 				const server = http.createServer((req, res) => {
 					const url = new URL(req.url || '', 'http://localhost:3000');
@@ -228,25 +274,35 @@ export class MsalAuthenticationService implements IAuthenticationService {
 							</html>
 						`);
 						server.close();
-						resolve(code);
+						resolveWithCleanup(code);
 					} else {
 						res.writeHead(400, { 'Content-Type': 'text/html' });
 						res.end('<html><body><h1>Error: No authorization code received</h1></body></html>');
 						server.close();
-						reject(new Error('No authorization code in redirect'));
+						rejectWithCleanup(new Error('No authorization code in redirect'));
 					}
 				});
 
 				// Start server on port 3000
-				server.listen(3000, () => {
-					// Server started successfully
+				server.listen(3000);
+
+				// Handle server errors (e.g., port already in use)
+				server.on('error', (err: Error) => {
+					server.close();
+					rejectWithCleanup(new Error(`Failed to start authentication server: ${err.message}`));
 				});
 
-				// Timeout after 5 minutes
-				setTimeout(() => {
+				// Register cancellation handler
+				cancelListener = cancellationToken?.onCancellationRequested(() => {
 					server.close();
-					reject(new Error('Authentication timeout - no response received within 5 minutes'));
-				}, 300000);
+					rejectWithCleanup(new Error('Authentication cancelled by user'));
+				});
+
+				// Timeout after 90 seconds
+				timeoutHandle = setTimeout(() => {
+					server.close();
+					rejectWithCleanup(new Error('Authentication timeout - no response received within 90 seconds. If you opened the wrong browser, click Cancel and try again.'));
+				}, 90000);
 			});
 
 			// Build auth URL and open browser
@@ -284,8 +340,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 			return response.accessToken;
 		} catch (error: unknown) {
-			const err = error instanceof Error ? error : new Error(String(error));
-			throw new Error(`Interactive authentication failed: ${err.message}`);
+			throw this.createAuthenticationError(error, 'Interactive authentication failed');
 		}
 	}
 
@@ -353,8 +408,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 			return response.accessToken;
 		} catch (error: unknown) {
-			const err = error instanceof Error ? error : new Error(String(error));
-			throw new Error(`Device Code authentication failed: ${err.message}`);
+			throw this.createAuthenticationError(error, 'Device Code authentication failed');
 		}
 	}
 

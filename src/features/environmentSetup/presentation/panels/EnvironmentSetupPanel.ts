@@ -21,6 +21,7 @@ import {
 	type CheckUniqueNameMessage
 } from '../../../../infrastructure/ui/utils/TypeGuards';
 import { AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
+import { VsCodeCancellationTokenAdapter } from '../../infrastructure/adapters/VsCodeCancellationTokenAdapter';
 
 /**
  * Presentation layer panel for Environment Setup
@@ -276,8 +277,11 @@ export class EnvironmentSetupPanel {
 		await vscode.window.withProgress({
 			location: vscode.ProgressLocation.Notification,
 			title: "Discovering Power Platform Environment ID...",
-			cancellable: false
-		}, async () => {
+			cancellable: true
+		}, async (_progress, token) => {
+			// Adapt VS Code cancellation token to domain abstraction
+			const cancellationToken = token ? new VsCodeCancellationTokenAdapter(token) : undefined;
+
 			// Delegate to use case - data is already validated by type guard
 			const result = await this.discoverEnvironmentIdUseCase.execute({
 				existingEnvironmentId: this.currentEnvironmentId,
@@ -290,7 +294,7 @@ export class EnvironmentSetupPanel {
 				clientSecret: data.clientSecret,
 				username: data.username,
 				password: data.password
-			});
+			}, cancellationToken);
 
 			if (result.success) {
 				vscode.window.showInformationMessage(`Environment ID discovered: ${result.environmentId}`);
@@ -326,8 +330,11 @@ export class EnvironmentSetupPanel {
 		await vscode.window.withProgress({
 			location: vscode.ProgressLocation.Notification,
 			title: "Discovering Power Platform Environment ID with Interactive auth...",
-			cancellable: false
-		}, async () => {
+			cancellable: true
+		}, async (_progress, token) => {
+			// Adapt VS Code cancellation token to domain abstraction
+			const cancellationToken = token ? new VsCodeCancellationTokenAdapter(token) : undefined;
+
 			// Retry discovery with Interactive authentication (temporary, non-cached)
 			const result = await this.discoverEnvironmentIdUseCase.execute({
 				// Use temporary ID to avoid caching credentials
@@ -341,7 +348,7 @@ export class EnvironmentSetupPanel {
 				clientSecret: undefined,
 				username: undefined,
 				password: undefined
-			});
+			}, cancellationToken);
 
 			if (result.success) {
 				vscode.window.showInformationMessage(`Environment ID discovered: ${result.environmentId}`);
@@ -446,11 +453,9 @@ export class EnvironmentSetupPanel {
 		this.panel.dispose();
 
 		// Dispose subscriptions
-		while (this.disposables.length) {
-			const disposable = this.disposables.pop();
-			if (disposable) {
-				disposable.dispose();
-			}
-		}
+		this.disposables.forEach((disposable: vscode.Disposable): void => {
+			disposable.dispose();
+		});
+		this.disposables = [];
 	}
 }

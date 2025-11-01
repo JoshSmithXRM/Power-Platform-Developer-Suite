@@ -68,9 +68,16 @@ export function activate(context: vscode.ExtensionContext): void {
 	const checkConcurrentEditUseCase = new CheckConcurrentEditUseCase();
 
 	// ========================================
+	// Development Mode Context
+	// ========================================
+	// Set context variable for conditional command visibility
+	const isDevelopment = context.extensionMode === vscode.ExtensionMode.Development;
+	void vscode.commands.executeCommand('setContext', 'powerPlatformDevSuite.isDevelopment', isDevelopment);
+
+	// ========================================
 	// Persistence Inspector (Development Only)
 	// ========================================
-	if (context.extensionMode === vscode.ExtensionMode.Development) {
+	if (isDevelopment) {
 		// Lazy-load persistence inspector using dynamic import
 		void initializePersistenceInspector(context, eventPublisher);
 	}

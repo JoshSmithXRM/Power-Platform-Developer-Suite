@@ -44,4 +44,31 @@ export class DataverseUrl {
 	public getApiBaseUrl(): string {
 		return `${this.value}/api/data/v9.2`;
 	}
+
+	/**
+	 * Extract organization name from Dataverse URL
+	 * Examples:
+	 *   https://contoso.crm.dynamics.com -> contoso
+	 *   https://contoso.crm2.dynamics.com -> contoso
+	 *   https://contoso.api.crm.dynamics.com -> contoso
+	 */
+	public getOrganizationName(): string {
+		try {
+			const urlObj = new URL(this.value);
+			const hostname = urlObj.hostname;
+
+			// Extract first part before .crm or .api
+			const parts = hostname.split('.');
+			if (parts.length > 0 && parts[0]) {
+				return parts[0];
+			}
+
+			throw new DomainError('Unable to extract organization name from Dataverse URL');
+		} catch (error) {
+			if (error instanceof DomainError) {
+				throw error;
+			}
+			throw new DomainError(`Invalid Dataverse URL format: ${this.value}`);
+		}
+	}
 }
