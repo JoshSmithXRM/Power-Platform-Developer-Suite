@@ -20,6 +20,7 @@ import {
 	type DiscoverEnvironmentIdMessage,
 	type CheckUniqueNameMessage
 } from '../../../../infrastructure/ui/utils/TypeGuards';
+import { AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
 
 /**
  * Presentation layer panel for Environment Setup
@@ -153,7 +154,7 @@ export class EnvironmentSetupPanel {
 			}
 			// Unknown message type - ignore
 		} catch (error) {
-			this.handleError(error as Error, 'Operation failed');
+			this.handleError(error, 'Operation failed');
 		}
 	}
 
@@ -168,7 +169,7 @@ export class EnvironmentSetupPanel {
 				data: viewModel
 			});
 		} catch (error) {
-			this.handleError(error as Error, 'Failed to load environment');
+			this.handleError(error, 'Failed to load environment');
 		}
 	}
 
@@ -334,7 +335,7 @@ export class EnvironmentSetupPanel {
 				name: data.name,
 				dataverseUrl: data.dataverseUrl,
 				tenantId: data.tenantId,
-				authenticationMethod: 'Interactive', // Force Interactive for discovery
+				authenticationMethod: AuthenticationMethodType.Interactive, // Force Interactive for discovery
 				publicClientId: data.publicClientId,
 				clientId: undefined,
 				clientSecret: undefined,
@@ -401,8 +402,18 @@ export class EnvironmentSetupPanel {
 		});
 	}
 
-	private handleError(error: Error, message: string): void {
-		vscode.window.showErrorMessage(`${message}: ${error.message}`);
+	/**
+	 * Handles errors safely, supporting both Error objects and other thrown values.
+	 *
+	 * @param error - Unknown error from catch block
+	 * @param message - Contextual error message
+	 */
+	private handleError(error: unknown, message: string): void {
+		const errorMessage = error instanceof Error
+			? error.message
+			: String(error);
+
+		vscode.window.showErrorMessage(`${message}: ${errorMessage}`);
 	}
 
 	private getHtmlContent(): string {

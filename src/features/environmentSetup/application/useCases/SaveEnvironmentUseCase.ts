@@ -50,7 +50,7 @@ export class SaveEnvironmentUseCase {
 				new EnvironmentName(request.name),
 				new DataverseUrl(request.dataverseUrl),
 				new TenantId(request.tenantId),
-				new AuthenticationMethod(request.authenticationMethod as AuthenticationMethodType),
+				new AuthenticationMethod(request.authenticationMethod),
 				new ClientId(request.publicClientId),
 				previousEnvironment?.getIsActive() ?? false,
 				previousEnvironment?.getLastUsed(),
@@ -194,7 +194,7 @@ export interface SaveEnvironmentRequest {
 	name: string;
 	dataverseUrl: string;
 	tenantId: string;
-	authenticationMethod: string;
+	authenticationMethod: AuthenticationMethodType;
 	publicClientId: string;
 	powerPlatformEnvironmentId?: string;
 	clientId?: string;

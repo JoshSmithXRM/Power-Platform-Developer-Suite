@@ -32,7 +32,7 @@ export class TestConnectionUseCase {
 			new EnvironmentName(request.name),
 			new DataverseUrl(request.dataverseUrl),
 			new TenantId(request.tenantId),
-			new AuthenticationMethod(request.authenticationMethod as AuthenticationMethodType),
+			new AuthenticationMethod(request.authenticationMethod),
 			new ClientId(request.publicClientId),
 			false,
 			undefined,
@@ -103,7 +103,7 @@ export interface TestConnectionRequest {
 	name: string;
 	dataverseUrl: string;
 	tenantId: string;
-	authenticationMethod: string;
+	authenticationMethod: AuthenticationMethodType;
 	publicClientId: string;
 	powerPlatformEnvironmentId?: string;
 	clientId?: string;

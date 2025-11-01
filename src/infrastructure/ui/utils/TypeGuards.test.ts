@@ -2,6 +2,8 @@
  * Unit tests for TypeGuards
  */
 
+import { AuthenticationMethodType } from '../../../features/environmentSetup/domain/valueObjects/AuthenticationMethod';
+
 import {
 	isWebviewMessage,
 	isSaveEnvironmentMessage,
@@ -16,15 +18,15 @@ describe('TypeGuards', () => {
 	describe('AUTHENTICATION_METHODS', () => {
 		it('should have correct authentication method values', () => {
 			expect(AUTHENTICATION_METHODS).toEqual([
-				'Interactive',
-				'ServicePrincipal',
-				'UsernamePassword',
-				'DeviceCode'
+				AuthenticationMethodType.Interactive,
+				AuthenticationMethodType.ServicePrincipal,
+				AuthenticationMethodType.UsernamePassword,
+				AuthenticationMethodType.DeviceCode
 			]);
 		});
 
 		it('should be readonly', () => {
-			const methods = AUTHENTICATION_METHODS;
+			const methods: readonly AuthenticationMethodType[] = AUTHENTICATION_METHODS;
 			// TypeScript enforces readonly at compile time
 			expect(methods.length).toBe(4);
 		});
@@ -73,7 +75,7 @@ describe('TypeGuards', () => {
 				name: 'DEV',
 				dataverseUrl: 'https://org.crm.dynamics.com',
 				tenantId: 'tenant-123',
-				authenticationMethod: 'Interactive',
+				authenticationMethod: AuthenticationMethodType.Interactive,
 				publicClientId: 'client-123'
 			}
 		};
@@ -152,7 +154,8 @@ describe('TypeGuards', () => {
 		});
 
 		it('should validate all authentication methods', () => {
-			AUTHENTICATION_METHODS.forEach(method => {
+			const methods: readonly AuthenticationMethodType[] = AUTHENTICATION_METHODS;
+			methods.forEach((method: AuthenticationMethodType) => {
 				const message = {
 					command: 'save-environment',
 					data: { ...validMessage.data, authenticationMethod: method }

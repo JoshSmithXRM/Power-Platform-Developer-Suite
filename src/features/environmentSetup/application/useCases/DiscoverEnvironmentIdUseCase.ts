@@ -27,7 +27,7 @@ export class DiscoverEnvironmentIdUseCase {
 			new EnvironmentName(request.name),
 			new DataverseUrl(request.dataverseUrl),
 			new TenantId(request.tenantId),
-			new AuthenticationMethod(request.authenticationMethod as AuthenticationMethodType),
+			new AuthenticationMethod(request.authenticationMethod),
 			new ClientId(request.publicClientId),
 			false,
 			undefined,
@@ -88,7 +88,7 @@ export interface DiscoverEnvironmentIdRequest {
 	name: string;
 	dataverseUrl: string;
 	tenantId: string;
-	authenticationMethod: string;
+	authenticationMethod: AuthenticationMethodType;
 	publicClientId: string;
 	clientId?: string;
 	clientSecret?: string;

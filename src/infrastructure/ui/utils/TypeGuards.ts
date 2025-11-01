@@ -5,6 +5,8 @@
  * ensuring type safety at the boundary between client-side JavaScript and TypeScript.
  */
 
+import { AuthenticationMethodType } from '../../../features/environmentSetup/domain/valueObjects/AuthenticationMethod';
+
 /**
  * Base message structure from webview.
  */
@@ -30,15 +32,26 @@ export function isWebviewMessage(message: unknown): message is WebviewMessage {
 
 /**
  * Valid authentication methods for environment setup.
+ * Uses the domain enum values for single source of truth.
  */
-export const AUTHENTICATION_METHODS = [
-	'Interactive',
-	'ServicePrincipal',
-	'UsernamePassword',
-	'DeviceCode'
+export const AUTHENTICATION_METHODS: readonly AuthenticationMethodType[] = [
+	AuthenticationMethodType.Interactive,
+	AuthenticationMethodType.ServicePrincipal,
+	AuthenticationMethodType.UsernamePassword,
+	AuthenticationMethodType.DeviceCode
 ] as const;
 
-export type AuthenticationMethod = typeof AUTHENTICATION_METHODS[number];
+/**
+ * Type guard for authentication method validation.
+ * Validates that a value is a valid AuthenticationMethodType enum member.
+ *
+ * @param value - Unknown value to validate
+ * @returns True if value is valid AuthenticationMethodType
+ */
+function isValidAuthMethod(value: unknown): value is AuthenticationMethodType {
+	return typeof value === 'string' &&
+		(AUTHENTICATION_METHODS as readonly string[]).includes(value);
+}
 
 /**
  * Save environment message from webview.
@@ -49,7 +62,7 @@ export interface SaveEnvironmentMessage {
 		name: string;
 		dataverseUrl: string;
 		tenantId: string;
-		authenticationMethod: AuthenticationMethod;
+		authenticationMethod: AuthenticationMethodType;
 		publicClientId: string;
 		environmentId?: string;
 		clientId?: string;
@@ -98,8 +111,8 @@ export function isSaveEnvironmentMessage(message: unknown): message is SaveEnvir
 		return false;
 	}
 
-	// Validate authenticationMethod is a valid enum value
-	return AUTHENTICATION_METHODS.includes(data.authenticationMethod as AuthenticationMethod);
+	// Validate authenticationMethod is a valid enum value using type guard
+	return isValidAuthMethod(data.authenticationMethod);
 }
 
 /**
@@ -112,7 +125,7 @@ export interface TestConnectionMessage {
 		name: string;
 		dataverseUrl: string;
 		tenantId: string;
-		authenticationMethod: AuthenticationMethod;
+		authenticationMethod: AuthenticationMethodType;
 		publicClientId: string;
 		powerPlatformEnvironmentId?: string;
 		clientId?: string;
@@ -164,8 +177,8 @@ export function isTestConnectionMessage(message: unknown): message is TestConnec
 		return false;
 	}
 
-	// Validate authenticationMethod is a valid enum value
-	return AUTHENTICATION_METHODS.includes(data.authenticationMethod as AuthenticationMethod);
+	// Validate authenticationMethod is a valid enum value using type guard
+	return isValidAuthMethod(data.authenticationMethod);
 }
 
 /**
@@ -196,7 +209,7 @@ export interface DiscoverEnvironmentIdMessage {
 		name: string;
 		dataverseUrl: string;
 		tenantId: string;
-		authenticationMethod: AuthenticationMethod;
+		authenticationMethod: AuthenticationMethodType;
 		publicClientId: string;
 		clientId?: string;
 		clientSecret?: string;
@@ -247,8 +260,8 @@ export function isDiscoverEnvironmentIdMessage(message: unknown): message is Dis
 		return false;
 	}
 
-	// Validate authenticationMethod is a valid enum value
-	return AUTHENTICATION_METHODS.includes(data.authenticationMethod as AuthenticationMethod);
+	// Validate authenticationMethod is a valid enum value using type guard
+	return isValidAuthMethod(data.authenticationMethod);
 }
 
 /**
