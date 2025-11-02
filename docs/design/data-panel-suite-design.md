@@ -61,15 +61,32 @@ class Solution {
     return this.uniqueName === 'Default';
   }
 
-  // Business logic: Maker URL construction
+  /**
+   * Constructs the Maker Portal URL for this solution.
+   *
+   * Business Decision: URL patterns are considered stable domain knowledge.
+   * Microsoft has maintained these patterns for 5+ years across all regions.
+   *
+   * If Microsoft changes URL patterns or sovereign cloud support is needed,
+   * introduce IMakerUrlBuilder domain service at that time.
+   *
+   * @param environmentId - Environment GUID
+   * @returns Maker Portal URL for this solution
+   */
   getMakerUrl(environmentId: string): string {
-    // Returns maker portal URL for this solution
     return `https://make.powerapps.com/environments/${environmentId}/solutions/${this.id}`;
   }
 
-  // Business logic: Dynamics URL construction
+  /**
+   * Constructs the classic Dynamics 365 URL for this solution.
+   *
+   * Note: Uses environment ID as subdomain. For custom domains,
+   * caller should use DataverseUrl value object for URL resolution.
+   *
+   * @param environmentId - Environment GUID
+   * @returns Dynamics 365 URL for solution editor
+   */
   getDynamicsUrl(environmentId: string): string {
-    // Returns classic Dynamics URL for this solution
     return `https://${environmentId}.dynamics.com/tools/solution/edit.aspx?id=${this.id}`;
   }
 
@@ -235,7 +252,12 @@ class CloudFlow {
     public readonly modifiedBy: string
   ) {}
 
-  // Business logic: Extract connection reference names from clientData JSON
+  /**
+   * Extracts connection reference logical names from clientData JSON.
+   *
+   * @throws {InvalidClientDataError} If clientData cannot be parsed
+   * @returns Array of connection reference logical names (empty if none defined)
+   */
   extractConnectionReferenceNames(): string[] {
     try {
       const parsed = JSON.parse(this.clientData);
@@ -256,9 +278,12 @@ class CloudFlow {
 
       return names;
     } catch (error) {
-      // JSON parsing failed - return empty array
-      console.warn(`Failed to parse clientData for flow ${this.id}:`, error);
-      return [];
+      // Domain exception - let outer layers handle logging/display
+      throw new InvalidClientDataError(
+        this.id,
+        this.name,
+        error as Error
+      );
     }
   }
 
@@ -282,8 +307,6 @@ class CloudFlow {
 
 ```typescript
 class ConnectionReference {
-  private flowIds: Set<string> = new Set();
-
   constructor(
     public readonly id: string,
     public readonly logicalName: string,
@@ -294,20 +317,6 @@ class ConnectionReference {
     public readonly modifiedOn: Date,
     public readonly modifiedBy: string
   ) {}
-
-  // Business logic: Track which flows use this connection reference
-  addFlowId(flowId: string): void {
-    this.flowIds.add(flowId);
-  }
-
-  getFlowIds(): string[] {
-    return Array.from(this.flowIds);
-  }
-
-  // Business logic: Check if any flows use this connection reference
-  isUsedByFlows(): boolean {
-    return this.flowIds.size > 0;
-  }
 
   // Business logic: Solution membership check
   isInSolution(solutionComponentIds: Set<string>): boolean {
@@ -336,7 +345,7 @@ class ConnectionReference {
 }
 ```
 
-**Why:** ConnectionReference knows how to track its relationships with flows, extract connector types, and convert to deployment settings. Domain entities are not anemic.
+**Why:** ConnectionReference is fully immutable. All properties are readonly and set in the constructor. Relationship tracking is handled by FlowConnectionRelationshipBuilder domain service.
 
 ---
 
@@ -585,7 +594,131 @@ class DeploymentSettings {
 
 ---
 
-### 2.3 Repository Interfaces (Domain Contracts)
+### 2.3 Value Objects (Data Transfer)
+
+#### EnvironmentVariableDefinition
+
+```typescript
+interface EnvironmentVariableDefinition {
+  readonly id: string;
+  readonly schemaName: string;
+  readonly displayName: string;
+  readonly type: EnvironmentVariableType;
+  readonly defaultValue: string | null;
+  readonly isManaged: boolean;
+  readonly modifiedOn: Date;
+  readonly modifiedBy: string;
+  readonly description: string;
+}
+```
+
+#### EnvironmentVariableValue
+
+```typescript
+interface EnvironmentVariableValue {
+  readonly id: string;
+  readonly definitionId: string;
+  readonly value: string;
+  readonly modifiedOn: Date;
+  readonly modifiedBy: string;
+}
+```
+
+**Why:** These value objects represent data structures for joining into EnvironmentVariable entities. Defined in domain to complete repository contracts.
+
+---
+
+### 2.4 Domain Services
+
+Domain services encapsulate business logic that doesn't naturally belong to a single entity.
+
+#### FlowConnectionRelationshipBuilder
+
+```typescript
+export class FlowConnectionRelationshipBuilder {
+  /**
+   * Builds a complete relationship graph between flows and connection references.
+   *
+   * Business Rules:
+   * - Flows match connection references by logical name (case-insensitive)
+   * - A flow is orphaned if it references connection references that don't exist
+   * - A connection reference is orphaned if no flows reference it
+   */
+  buildRelationships(
+    flows: CloudFlow[],
+    connectionRefs: ConnectionReference[]
+  ): FlowConnectionRelationship[] {
+    const relationships: FlowConnectionRelationship[] = [];
+    const connectionRefMap = new Map(
+      connectionRefs.map(cr => [cr.logicalName.toLowerCase(), cr])
+    );
+    const usedConnectionRefIds = new Set<string>();
+
+    // Build flow-to-connection-reference relationships
+    for (const flow of flows) {
+      try {
+        const refNames = flow.extractConnectionReferenceNames();
+
+        if (refNames.length === 0) {
+          relationships.push(FlowConnectionRelationship.createOrphanedFlow(flow));
+        } else {
+          for (const refName of refNames) {
+            const connectionRef = connectionRefMap.get(refName.toLowerCase());
+            if (connectionRef) {
+              usedConnectionRefIds.add(connectionRef.id);
+              relationships.push(
+                FlowConnectionRelationship.createFlowToConnectionReference(flow, connectionRef)
+              );
+            }
+          }
+        }
+      } catch (error) {
+        if (error instanceof InvalidClientDataError) {
+          relationships.push(FlowConnectionRelationship.createOrphanedFlow(flow));
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    // Find orphaned connection references
+    for (const connectionRef of connectionRefs) {
+      if (!usedConnectionRefIds.has(connectionRef.id)) {
+        relationships.push(
+          FlowConnectionRelationship.createOrphanedConnectionReference(connectionRef)
+        );
+      }
+    }
+
+    return relationships;
+  }
+}
+```
+
+**Why:** Complex relationship building is business logic that spans multiple entities. Domain service keeps this logic testable and separate from use case orchestration.
+
+---
+
+### 2.5 Domain Exceptions
+
+```typescript
+export class InvalidClientDataError extends Error {
+  constructor(
+    public readonly flowId: string,
+    public readonly flowName: string,
+    public readonly cause: Error
+  ) {
+    super(`Failed to parse clientData for flow ${flowId} (${flowName})`);
+    this.name = 'InvalidClientDataError';
+  }
+}
+```
+
+**Why:** Domain exceptions allow domain to signal errors without I/O side effects. Outer layers handle logging and display.
+
+---
+
+### 2.6 Repository Interfaces (Domain Contracts)
 
 Domain defines contracts, infrastructure implements them.
 
@@ -857,7 +990,8 @@ class ListConnectionReferencesUseCase {
   constructor(
     private readonly flowRepository: ICloudFlowRepository,
     private readonly connectionRefRepository: IConnectionReferenceRepository,
-    private readonly solutionComponentRepository: ISolutionComponentRepository
+    private readonly solutionComponentRepository: ISolutionComponentRepository,
+    private readonly relationshipBuilder: FlowConnectionRelationshipBuilder
   ) {}
 
   async execute(
@@ -876,7 +1010,7 @@ class ListConnectionReferencesUseCase {
         this.solutionComponentRepository.findComponentIdsBySolution(
           environmentId,
           solutionId,
-          'subscription' // Cloud flows
+          'subscription'
         ),
         this.solutionComponentRepository.findComponentIdsBySolution(
           environmentId,
@@ -888,15 +1022,14 @@ class ListConnectionReferencesUseCase {
       const flowIdSet = new Set(flowComponentIds);
       const crIdSet = new Set(crComponentIds);
 
-      // Delegate filtering to entities
       flows = flows.filter(f => f.isInSolution(flowIdSet));
       connectionRefs = connectionRefs.filter(cr => cr.isInSolution(crIdSet));
     }
 
-    // Orchestration: build relationships
-    const relationships = this.buildRelationships(flows, connectionRefs);
+    // Delegate relationship building to domain service
+    const relationships = this.relationshipBuilder.buildRelationships(flows, connectionRefs);
 
-    // Orchestration: sort by flow name then connection reference name
+    // Orchestration: sort
     return relationships.sort((a, b) => {
       const flowNameComparison = (a.flowName ?? '').localeCompare(b.flowName ?? '');
       if (flowNameComparison !== 0) {
@@ -907,61 +1040,10 @@ class ListConnectionReferencesUseCase {
       );
     });
   }
-
-  private buildRelationships(
-    flows: CloudFlow[],
-    connectionRefs: ConnectionReference[]
-  ): FlowConnectionRelationship[] {
-    // Orchestration: match flows to connection references
-    const relationships: FlowConnectionRelationship[] = [];
-    const connectionRefMap = new Map(
-      connectionRefs.map(cr => [cr.logicalName.toLowerCase(), cr])
-    );
-
-    // Track which connection references are used
-    const usedConnectionRefIds = new Set<string>();
-
-    // Build flow-to-connection-reference relationships
-    for (const flow of flows) {
-      // Delegate extraction to entity
-      const refNames = flow.extractConnectionReferenceNames();
-
-      if (refNames.length === 0) {
-        // Orphaned flow
-        relationships.push(FlowConnectionRelationship.createOrphanedFlow(flow));
-      } else {
-        // Flow has connection references
-        for (const refName of refNames) {
-          const connectionRef = connectionRefMap.get(refName.toLowerCase());
-          if (connectionRef) {
-            usedConnectionRefIds.add(connectionRef.id);
-            // Delegate relationship creation to value object
-            relationships.push(
-              FlowConnectionRelationship.createFlowToConnectionReference(flow, connectionRef)
-            );
-            // Track on entity
-            connectionRef.addFlowId(flow.id);
-          }
-        }
-      }
-    }
-
-    // Find orphaned connection references
-    for (const connectionRef of connectionRefs) {
-      if (!usedConnectionRefIds.has(connectionRef.id)) {
-        // Orphaned connection reference
-        relationships.push(
-          FlowConnectionRelationship.createOrphanedConnectionReference(connectionRef)
-        );
-      }
-    }
-
-    return relationships;
-  }
 }
 ```
 
-**Why:** Use case orchestrates complex matching logic but delegates business rules to entities (extractConnectionReferenceNames, isInSolution) and value objects (factory methods).
+**Why:** Use case orchestrates fetching and filtering. Complex relationship building delegated to FlowConnectionRelationshipBuilder domain service.
 
 ---
 
@@ -1889,7 +1971,13 @@ src/features/dataPanelSuite/
 │   ├── valueObjects/
 │   │   ├── FlowConnectionRelationship.ts
 │   │   ├── ImportJobStatus.ts
-│   │   └── EnvironmentVariableType.ts
+│   │   ├── EnvironmentVariableType.ts
+│   │   ├── EnvironmentVariableDefinition.ts
+│   │   └── EnvironmentVariableValue.ts
+│   ├── services/
+│   │   └── FlowConnectionRelationshipBuilder.ts
+│   ├── exceptions/
+│   │   └── InvalidClientDataError.ts
 │   └── interfaces/
 │       ├── ISolutionRepository.ts
 │       ├── IImportJobRepository.ts
@@ -2232,6 +2320,140 @@ describe('SolutionExplorerPanel', () => {
 6. Create ConnectionReferencesPanel
 7. Create webview UI
 8. Test end-to-end, especially relationship building
+
+---
+
+## 11. Error Handling Strategy
+
+### 11.1 Layer Responsibilities
+
+| Layer | Throw | Catch | Log |
+|-------|-------|-------|-----|
+| Domain | ✅ Domain exceptions | ❌ | ❌ |
+| Application | ❌ Let propagate | ❌ | ❌ |
+| Infrastructure | ✅ Wrap external errors | ✅ Network errors | ✅ Infrastructure failures |
+| Presentation | ❌ | ✅ All errors | ✅ All errors |
+
+### 11.2 Error Flow
+
+```typescript
+// Domain: Throw specific exceptions
+class CloudFlow {
+  extractConnectionReferenceNames(): string[] {
+    try {
+      // parsing...
+    } catch (error) {
+      throw new InvalidClientDataError(this.id, this.name, error);
+    }
+  }
+}
+
+// Infrastructure: Catch and wrap
+class DataverseApiCloudFlowRepository {
+  async findAll(environmentId: string): Promise<CloudFlow[]> {
+    try {
+      return await this.apiService.get(...);
+    } catch (error) {
+      console.error(`API call failed:`, error);
+      throw new ApiConnectionError(`Cannot connect to ${environmentId}`, error);
+    }
+  }
+}
+
+// Application: Let propagate (no try/catch)
+class ListConnectionReferencesUseCase {
+  async execute(...): Promise<FlowConnectionRelationship[]> {
+    const flows = await this.flowRepository.findAll(environmentId);
+    return this.relationshipBuilder.buildRelationships(flows, connectionRefs);
+  }
+}
+
+// Presentation: Catch all and display
+class ConnectionReferencesPanel {
+  protected async fetchData(): Promise<void> {
+    try {
+      this.data = await this.listConnectionReferencesUseCase.execute(...);
+    } catch (error) {
+      console.error(`Panel error:`, error);
+      this.setError(this.formatError(error));
+    }
+  }
+}
+```
+
+---
+
+## 12. Dependency Injection
+
+### 12.1 DI Container
+
+```typescript
+export class DataPanelSuiteDependencyContainer {
+  private readonly solutionRepository: ISolutionRepository;
+  private readonly flowRepository: ICloudFlowRepository;
+  private readonly connectionRefRepository: IConnectionReferenceRepository;
+  private readonly solutionComponentRepository: ISolutionComponentRepository;
+  private readonly relationshipBuilder: FlowConnectionRelationshipBuilder;
+
+  constructor(
+    apiService: IPowerPlatformApiService,
+    authService: IAuthenticationService
+  ) {
+    // Singletons
+    this.solutionRepository = new DataverseApiSolutionRepository(apiService, authService);
+    this.flowRepository = new DataverseApiCloudFlowRepository(apiService, authService);
+    this.connectionRefRepository = new DataverseApiConnectionReferenceRepository(apiService, authService);
+    this.solutionComponentRepository = new DataverseApiSolutionComponentRepository(apiService, authService);
+    this.relationshipBuilder = new FlowConnectionRelationshipBuilder();
+  }
+
+  createListConnectionReferencesUseCase(): ListConnectionReferencesUseCase {
+    return new ListConnectionReferencesUseCase(
+      this.flowRepository,
+      this.connectionRefRepository,
+      this.solutionComponentRepository,
+      this.relationshipBuilder
+    );
+  }
+
+  createConnectionReferencesPanel(
+    panel: vscode.WebviewPanel,
+    environmentService: IEnvironmentService
+  ): ConnectionReferencesPanel {
+    return new ConnectionReferencesPanel(
+      panel,
+      environmentService,
+      this.createListConnectionReferencesUseCase(),
+      this.createSyncConnectionReferencesToDeploymentSettingsUseCase()
+    );
+  }
+}
+```
+
+### 12.2 Extension Integration
+
+```typescript
+// extension.ts
+export function activate(context: vscode.ExtensionContext) {
+  const authService = new MsalAuthenticationService(...);
+  const apiService = new PowerPlatformApiService(authService);
+  const container = new DataPanelSuiteDependencyContainer(apiService, authService);
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('powerplatform.showConnectionReferences', () => {
+      const panel = vscode.window.createWebviewPanel(...);
+      container.createConnectionReferencesPanel(panel, environmentService);
+    })
+  );
+}
+```
+
+### 12.3 Lifecycle
+
+- **Repositories**: Singleton (expensive, stateless)
+- **Domain Services**: Singleton (stateless)
+- **Use Cases**: Transient (short-lived)
+- **Panels**: Transient (one per webview)
 
 ---
 
