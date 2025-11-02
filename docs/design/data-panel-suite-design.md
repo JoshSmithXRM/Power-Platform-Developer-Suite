@@ -1,5 +1,9 @@
 # Data Panel Suite - Clean Architecture Design
 
+> **Status:** In Progress - Next Feature
+> **Started:** Not yet implemented
+> **See:** This is a design document, not implementation guide
+
 ## 1. Architecture Overview
 
 ### 1.1 Layer Structure

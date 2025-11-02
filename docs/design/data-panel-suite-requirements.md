@@ -1,5 +1,9 @@
 # Data Panel Suite Requirements
 
+> **Status:** In Progress - Next Feature
+> **Started:** Not yet implemented
+> **See:** This is a requirements document, not implementation guide
+
 ## Overview
 
 Build 4 panels for managing Power Platform data with consistent UX:
