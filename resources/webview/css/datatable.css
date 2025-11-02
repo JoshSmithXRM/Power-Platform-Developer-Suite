@@ -33,6 +33,11 @@ th {
 	top: 0;
 	z-index: 10;
 	border-bottom: 2px solid var(--vscode-panel-border);
+	border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+th:last-child {
+	border-right: none;
 }
 
 th:hover {
@@ -75,6 +80,6 @@ tbody tr:hover {
 	background: var(--vscode-editor-background);
 	font-size: 12px;
 	color: var(--vscode-descriptionForeground);
-	text-align: right;
+	text-align: left;
 	flex-shrink: 0;
 }

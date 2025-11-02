@@ -260,7 +260,7 @@ export class EnvironmentSetupPanel {
 			tenantId: data.tenantId,
 			authenticationMethod: data.authenticationMethod,
 			publicClientId: data.publicClientId,
-			powerPlatformEnvironmentId: data.environmentId,
+			powerPlatformEnvironmentId: data.powerPlatformEnvironmentId,
 			clientId: data.clientId,
 			clientSecret: data.clientSecret,
 			username: data.username,

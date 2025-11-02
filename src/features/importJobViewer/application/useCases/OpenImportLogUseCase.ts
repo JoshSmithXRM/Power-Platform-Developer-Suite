@@ -28,10 +28,10 @@ export class OpenImportLogUseCase {
 		importJobId: string,
 		cancellationToken?: ICancellationToken
 	): Promise<void> {
-		this.logger.info('OpenImportLogUseCase started', { environmentId, importJobId });
+		this.logger.debug('OpenImportLogUseCase: Starting import log processing', { environmentId, importJobId });
 
 		if (cancellationToken?.isCancellationRequested) {
-			this.logger.info('OpenImportLogUseCase cancelled before execution');
+			this.logger.debug('OpenImportLogUseCase: Cancelled before execution');
 			throw new OperationCancelledException();
 		}
 
@@ -51,14 +51,11 @@ export class OpenImportLogUseCase {
 			}
 
 			// Open log in editor
-			await this.editorService.openXmlInNewTab(
-				importJob.importLogXml!,
-				`Import Log - ${importJob.name}`
-			);
+			await this.editorService.openXmlInNewTab(importJob.importLogXml!);
 
-			this.logger.info('OpenImportLogUseCase completed successfully', { importJobId });
+			this.logger.info('Import log opened successfully', { importJobId });
 		} catch (error) {
-			this.logger.error('OpenImportLogUseCase failed', error as Error);
+			this.logger.error('OpenImportLogUseCase: Failed to process import log', error as Error);
 			throw error;
 		}
 	}

@@ -64,7 +64,7 @@ export interface SaveEnvironmentMessage {
 		tenantId: string;
 		authenticationMethod: AuthenticationMethodType;
 		publicClientId: string;
-		environmentId?: string;
+		powerPlatformEnvironmentId?: string;
 		clientId?: string;
 		clientSecret?: string;
 		username?: string;

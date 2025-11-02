@@ -297,22 +297,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		try {
 			let initialEnvironmentId: string | undefined;
 
-			// If called from environment context menu, get the Power Platform environment ID
+			// If called from environment context menu, use the internal environment ID
 			if (environmentItem?.envId) {
-				const environment = await environmentRepository.getById(new EnvironmentId(environmentItem.envId));
-
-				if (!environment) {
-					vscode.window.showErrorMessage('Environment not found');
-					return;
-				}
-
-				const powerPlatformEnvId = environment.getPowerPlatformEnvironmentId();
-				if (!powerPlatformEnvId) {
-					vscode.window.showErrorMessage('Environment does not have a Power Platform Environment ID. Please edit the environment and discover the ID.');
-					return;
-				}
-
-				initialEnvironmentId = powerPlatformEnvId;
+				initialEnvironmentId = environmentItem.envId;
 			}
 
 			// Lazy-load solution explorer (works with or without initial environment)
@@ -324,11 +311,33 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// Solution Explorer New command - just opens panel without preselected environment
-	const solutionExplorerNewCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorerNew', async () => {
+	// Solution Explorer Pick Environment command - shows environment picker for tools context menu
+	const solutionExplorerPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorerPickEnvironment', async () => {
 		try {
-			// Just open the panel without preselecting an environment
-			void initializeSolutionExplorer(context, authService, environmentRepository, logger);
+			const environments = await environmentRepository.getAll();
+
+			if (environments.length === 0) {
+				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
+				return;
+			}
+
+			const quickPickItems = environments.map(env => {
+				const ppEnvId = env.getPowerPlatformEnvironmentId();
+				return {
+					label: env.getName().getValue(),
+					description: env.getDataverseUrl().getValue(),
+					detail: ppEnvId ? undefined : '💡 Missing Environment ID - "Open in Maker" button will be disabled',
+					envId: env.getId().getValue()
+				};
+			});
+
+			const selected = await vscode.window.showQuickPick(quickPickItems, {
+				placeHolder: 'Select an environment to open Solutions'
+			});
+
+			if (selected) {
+				void initializeSolutionExplorer(context, authService, environmentRepository, logger, selected.envId);
+			}
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Solutions: ${error instanceof Error ? error.message : String(error)}`
@@ -342,14 +351,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			let initialEnvironmentId: string | undefined;
 
 			if (environmentItem?.envId) {
-				const environment = await environmentRepository.getById(new EnvironmentId(environmentItem.envId));
-
-				if (!environment) {
-					vscode.window.showErrorMessage('Environment not found');
-					return;
-				}
-
-				initialEnvironmentId = environment.getPowerPlatformEnvironmentId();
+				initialEnvironmentId = environmentItem.envId;
 			}
 
 			void initializeImportJobViewer(context, authService, environmentRepository, logger, initialEnvironmentId);
@@ -360,10 +362,33 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// Import Job Viewer New command - just opens panel without preselected environment
-	const importJobViewerNewCommand = vscode.commands.registerCommand('power-platform-dev-suite.importJobViewerNew', async () => {
+	// Import Job Viewer Pick Environment command - shows environment picker for tools context menu
+	const importJobViewerPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.importJobViewerPickEnvironment', async () => {
 		try {
-			void initializeImportJobViewer(context, authService, environmentRepository, logger);
+			const environments = await environmentRepository.getAll();
+
+			if (environments.length === 0) {
+				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
+				return;
+			}
+
+			const quickPickItems = environments.map(env => {
+				const ppEnvId = env.getPowerPlatformEnvironmentId();
+				return {
+					label: env.getName().getValue(),
+					description: env.getDataverseUrl().getValue(),
+					detail: ppEnvId ? undefined : '💡 Missing Environment ID - "Open in Maker" button will be disabled',
+					envId: env.getId().getValue()
+				};
+			});
+
+			const selected = await vscode.window.showQuickPick(quickPickItems, {
+				placeHolder: 'Select an environment to open Import Jobs'
+			});
+
+			if (selected) {
+				void initializeImportJobViewer(context, authService, environmentRepository, logger, selected.envId);
+			}
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Import Jobs: ${error instanceof Error ? error.message : String(error)}`
@@ -377,9 +402,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		editEnvironmentCommand,
 		testEnvironmentConnectionCommand,
 		solutionExplorerCommand,
-		solutionExplorerNewCommand,
+		solutionExplorerPickEnvironmentCommand,
 		importJobViewerCommand,
-		importJobViewerNewCommand,
+		importJobViewerPickEnvironmentCommand,
 		removeEnvironmentCommand,
 		openMakerCommand,
 		openDynamicsCommand,
@@ -417,25 +442,24 @@ async function initializeSolutionExplorer(
 	// Factory function to get all environments
 	const getEnvironments = async (): Promise<Array<{ id: string; name: string; url: string }>> => {
 		const environments = await environmentRepository.getAll();
-		return environments
-			.filter(env => env.getPowerPlatformEnvironmentId()) // Only include environments with PP env ID
-			.map(env => ({
-				id: env.getPowerPlatformEnvironmentId()!,
-				name: env.getName().getValue(),
-				url: env.getDataverseUrl().getValue()
-			}));
+		return environments.map(env => ({
+			id: env.getId().getValue(),
+			name: env.getName().getValue(),
+			url: env.getDataverseUrl().getValue()
+		}));
 	};
 
 	// Factory function to get environment by ID
-	const getEnvironmentById = async (envId: string): Promise<{ id: string; name: string } | null> => {
+	const getEnvironmentById = async (envId: string): Promise<{ id: string; name: string; powerPlatformEnvironmentId?: string } | null> => {
 		const environments = await environmentRepository.getAll();
-		const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+		const environment = environments.find(env => env.getId().getValue() === envId);
 		if (!environment) {
 			return null;
 		}
 		return {
 			id: envId,
-			name: environment.getName().getValue()
+			name: environment.getName().getValue(),
+			powerPlatformEnvironmentId: environment.getPowerPlatformEnvironmentId()
 		};
 	};
 
@@ -444,7 +468,7 @@ async function initializeSolutionExplorer(
 		async (envId: string) => {
 			// Get the environment for this envId
 			const environments = await environmentRepository.getAll();
-			const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+			const environment = environments.find(env => env.getId().getValue() === envId);
 
 			if (!environment) {
 				throw new Error(`Environment not found for ID: ${envId}`);
@@ -467,7 +491,7 @@ async function initializeSolutionExplorer(
 		async (envId: string) => {
 			// Get the Dataverse URL for this environment
 			const environments = await environmentRepository.getAll();
-			const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+			const environment = environments.find(env => env.getId().getValue() === envId);
 
 			if (!environment) {
 				throw new Error(`Environment not found for ID: ${envId}`);
@@ -485,7 +509,7 @@ async function initializeSolutionExplorer(
 	const listSolutionsUseCase = new ListSolutionsUseCase(solutionRepository, logger);
 
 	// Presentation Layer
-	SolutionExplorerPanel.createOrShow(
+	await SolutionExplorerPanel.createOrShow(
 		context.extensionUri,
 		getEnvironments,
 		getEnvironmentById,
@@ -509,6 +533,7 @@ async function initializeImportJobViewer(
 ): Promise<void> {
 	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService') as typeof import('./shared/infrastructure/services/DataverseApiService');
 	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder') as typeof import('./shared/infrastructure/services/MakerUrlBuilder');
+	const { XmlFormatter } = await import('./shared/infrastructure/formatters/XmlFormatter') as typeof import('./shared/infrastructure/formatters/XmlFormatter');
 	const { VsCodeEditorService } = await import('./shared/infrastructure/services/VsCodeEditorService') as typeof import('./shared/infrastructure/services/VsCodeEditorService');
 	const { DataverseApiImportJobRepository } = await import('./features/importJobViewer/infrastructure/repositories/DataverseApiImportJobRepository') as typeof import('./features/importJobViewer/infrastructure/repositories/DataverseApiImportJobRepository');
 	const { ListImportJobsUseCase } = await import('./features/importJobViewer/application/useCases/ListImportJobsUseCase') as typeof import('./features/importJobViewer/application/useCases/ListImportJobsUseCase');
@@ -518,25 +543,24 @@ async function initializeImportJobViewer(
 	// Factory function to get all environments
 	const getEnvironments = async (): Promise<Array<{ id: string; name: string; url: string }>> => {
 		const environments = await environmentRepository.getAll();
-		return environments
-			.filter(env => env.getPowerPlatformEnvironmentId())
-			.map(env => ({
-				id: env.getPowerPlatformEnvironmentId()!,
-				name: env.getName().getValue(),
-				url: env.getDataverseUrl().getValue()
-			}));
+		return environments.map(env => ({
+			id: env.getId().getValue(),
+			name: env.getName().getValue(),
+			url: env.getDataverseUrl().getValue()
+		}));
 	};
 
 	// Factory function to get environment by ID
-	const getEnvironmentById = async (envId: string): Promise<{ id: string; name: string } | null> => {
+	const getEnvironmentById = async (envId: string): Promise<{ id: string; name: string; powerPlatformEnvironmentId?: string } | null> => {
 		const environments = await environmentRepository.getAll();
-		const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+		const environment = environments.find(env => env.getId().getValue() === envId);
 		if (!environment) {
 			return null;
 		}
 		return {
 			id: envId,
-			name: environment.getName().getValue()
+			name: environment.getName().getValue(),
+			powerPlatformEnvironmentId: environment.getPowerPlatformEnvironmentId()
 		};
 	};
 
@@ -544,7 +568,7 @@ async function initializeImportJobViewer(
 	const dataverseApiService = new DataverseApiService(
 		async (envId: string) => {
 			const environments = await environmentRepository.getAll();
-			const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+			const environment = environments.find(env => env.getId().getValue() === envId);
 
 			if (!environment) {
 				throw new Error(`Environment not found for ID: ${envId}`);
@@ -566,7 +590,7 @@ async function initializeImportJobViewer(
 		},
 		async (envId: string) => {
 			const environments = await environmentRepository.getAll();
-			const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+			const environment = environments.find(env => env.getId().getValue() === envId);
 
 			if (!environment) {
 				throw new Error(`Environment not found for ID: ${envId}`);
@@ -579,14 +603,15 @@ async function initializeImportJobViewer(
 
 	const urlBuilder = new MakerUrlBuilder();
 	const importJobRepository = new DataverseApiImportJobRepository(dataverseApiService, logger);
-	const editorService = new VsCodeEditorService(logger);
+	const xmlFormatter = new XmlFormatter();
+	const editorService = new VsCodeEditorService(logger, xmlFormatter);
 
 	// Application Layer
 	const listImportJobsUseCase = new ListImportJobsUseCase(importJobRepository, logger);
 	const openImportLogUseCase = new OpenImportLogUseCase(importJobRepository, editorService, logger);
 
 	// Presentation Layer
-	ImportJobViewerPanel.createOrShow(
+	await ImportJobViewerPanel.createOrShow(
 		context.extensionUri,
 		getEnvironments,
 		getEnvironmentById,
@@ -671,14 +696,8 @@ class ToolsTreeProvider implements vscode.TreeDataProvider<ToolItem> {
 
 	getChildren(): ToolItem[] {
 		return [
-			new ToolItem('Solutions', 'Browse and manage solutions', 'solutionExplorer', 'power-platform-dev-suite.solutionExplorerNew'),
-			new ToolItem('Metadata Browser', 'Explore entity metadata', 'metadataBrowser', 'power-platform-dev-suite.openMetadataBrowserNew'),
-			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewerNew'),
-			new ToolItem('Tables', 'Query and explore table data', 'dataExplorer', 'power-platform-dev-suite.dataExplorerNew'),
-			new ToolItem('Connection References', 'Manage connection references', 'connectionReferences', 'power-platform-dev-suite.connectionReferencesNew'),
-			new ToolItem('Environment Variables', 'Manage environment variables', 'environmentVariables', 'power-platform-dev-suite.environmentVariablesNew'),
-			new ToolItem('Plugin Traces', 'View plugin execution traces', 'pluginTraceViewer', 'power-platform-dev-suite.pluginTraceViewerNew'),
-			new ToolItem('Plugin Registration', 'Register and manage plugins', 'pluginRegistration', 'power-platform-dev-suite.pluginRegistrationNew')
+			new ToolItem('Solutions', 'Browse and manage solutions', 'solutionExplorer', 'power-platform-dev-suite.solutionExplorerPickEnvironment'),
+			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewerPickEnvironment')
 		];
 	}
 }

@@ -356,10 +356,10 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 			// Create a promise that resolves when we get the auth code
 			const authCodePromise = new Promise<string>((resolve, reject) => {
-				// eslint-disable-next-line prefer-const -- Variables are reassigned in lines 294 and 300
-				let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-				// eslint-disable-next-line prefer-const -- Variables are reassigned in lines 294 and 300
+				// eslint-disable-next-line prefer-const -- Reassigned on line 446 when registering cancellation handler
 				let cancelListener: IDisposable | undefined;
+				// eslint-disable-next-line prefer-const -- Reassigned on line 453 when setting up timeout
+				let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 				let isCancelled = false;
 
 				// Cleanup function
