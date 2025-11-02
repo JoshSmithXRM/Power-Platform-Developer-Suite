@@ -1,0 +1,61 @@
+/**
+ * Shared Data Table Styles
+ *
+ * Reusable styles for all data table panels (Solutions, Import Jobs, etc.)
+ * Provides consistent visual styling across all data views.
+ */
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+th, td {
+	text-align: left;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+/* Header styling - distinct blue background like old panel */
+th {
+	font-weight: 600;
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	cursor: pointer;
+	user-select: none;
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	border-bottom: 2px solid var(--vscode-panel-border);
+}
+
+th:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+/* Alternating row colors for better readability */
+tbody tr:nth-child(even) {
+	background: rgba(255, 255, 255, 0.04);
+}
+
+tbody tr:nth-child(odd) {
+	background: transparent;
+}
+
+/* Hover state for rows */
+tbody tr:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+/* Link styling within tables */
+.solution-link,
+.table-link {
+	color: var(--vscode-textLink-foreground);
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.solution-link:hover,
+.table-link:hover {
+	text-decoration: underline;
+}

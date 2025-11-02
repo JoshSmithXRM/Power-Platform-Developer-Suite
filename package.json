@@ -124,12 +124,12 @@
             },
             {
                 "command": "power-platform-dev-suite.solutionExplorer",
-                "title": "Solution Explorer",
+                "title": "Solutions",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.solutionExplorerNew",
-                "title": "Open New Solution Explorer",
+                "title": "Open New Solutions",
                 "category": "Power Platform Developer Suite"
             },
             {
@@ -139,52 +139,52 @@
             },
             {
                 "command": "power-platform-dev-suite.importJobViewer",
-                "title": "Import Job Viewer",
+                "title": "Import Jobs",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.importJobViewerNew",
-                "title": "Open New Import Job Viewer",
+                "title": "Open New Import Jobs",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.dataExplorer",
-                "title": "Data Explorer",
+                "title": "Tables",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.dataExplorerNew",
-                "title": "Open New Data Explorer",
+                "title": "Open New Tables",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.connectionReferences",
-                "title": "Connection References Manager",
+                "title": "Connection References",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.connectionReferencesNew",
-                "title": "Open New Connection References Manager",
+                "title": "Open New Connection References",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.environmentVariables",
-                "title": "Environment Variables Manager",
+                "title": "Environment Variables",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.environmentVariablesNew",
-                "title": "Open New Environment Variables Manager",
+                "title": "Open New Environment Variables",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.pluginTraceViewer",
-                "title": "Plugin Trace Viewer",
+                "title": "Plugin Traces",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.pluginTraceViewerNew",
-                "title": "Open New Plugin Trace Viewer",
+                "title": "Open New Plugin Traces",
                 "category": "Power Platform Developer Suite"
             },
             {
@@ -262,6 +262,11 @@
                     "command": "power-platform-dev-suite.openDynamics",
                     "when": "view == power-platform-dev-suite-environments && viewItem == environment",
                     "group": "1_open@2"
+                },
+                {
+                    "command": "power-platform-dev-suite.solutionExplorer",
+                    "when": "view == power-platform-dev-suite-environments && viewItem == environment",
+                    "group": "1_open@3"
                 },
                 {
                     "command": "power-platform-dev-suite.editEnvironment",

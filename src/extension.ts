@@ -292,11 +292,57 @@ export function activate(context: vscode.ExtensionContext): void {
 		cacheInvalidationHandler.handle(event);
 	});
 
+	// Solution Explorer command - opens panel with optional initial environment
+	const solutionExplorerCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorer', async (environmentItem?: { envId: string }) => {
+		try {
+			let initialEnvironmentId: string | undefined;
+
+			// If called from environment context menu, get the Power Platform environment ID
+			if (environmentItem?.envId) {
+				const environment = await environmentRepository.getById(new EnvironmentId(environmentItem.envId));
+
+				if (!environment) {
+					vscode.window.showErrorMessage('Environment not found');
+					return;
+				}
+
+				const powerPlatformEnvId = environment.getPowerPlatformEnvironmentId();
+				if (!powerPlatformEnvId) {
+					vscode.window.showErrorMessage('Environment does not have a Power Platform Environment ID. Please edit the environment and discover the ID.');
+					return;
+				}
+
+				initialEnvironmentId = powerPlatformEnvId;
+			}
+
+			// Lazy-load solution explorer (works with or without initial environment)
+			void initializeSolutionExplorer(context, authService, environmentRepository, logger, initialEnvironmentId);
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Solution Explorer: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	// Solution Explorer New command - just opens panel without preselected environment
+	const solutionExplorerNewCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorerNew', async () => {
+		try {
+			// Just open the panel without preselecting an environment
+			void initializeSolutionExplorer(context, authService, environmentRepository, logger);
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Solutions: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
 	context.subscriptions.push(
 		outputChannel,
 		addEnvironmentCommand,
 		editEnvironmentCommand,
 		testEnvironmentConnectionCommand,
+		solutionExplorerCommand,
+		solutionExplorerNewCommand,
 		removeEnvironmentCommand,
 		openMakerCommand,
 		openDynamicsCommand,
@@ -312,6 +358,105 @@ export function activate(context: vscode.ExtensionContext): void {
  */
 export function deactivate(): void {
 	// Extension deactivated
+}
+
+/**
+ * Initializes the Solution Explorer
+ * Uses dynamic imports for lazy loading
+ */
+async function initializeSolutionExplorer(
+	context: vscode.ExtensionContext,
+	authService: MsalAuthenticationService,
+	environmentRepository: IEnvironmentRepository,
+	logger: ILogger,
+	initialEnvironmentId?: string
+): Promise<void> {
+	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService') as typeof import('./shared/infrastructure/services/DataverseApiService');
+	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder') as typeof import('./shared/infrastructure/services/MakerUrlBuilder');
+	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository') as typeof import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository');
+	const { ListSolutionsUseCase } = await import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase') as typeof import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase');
+	const { SolutionExplorerPanel } = await import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel') as typeof import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel');
+
+	// Factory function to get all environments
+	const getEnvironments = async (): Promise<Array<{ id: string; name: string; url: string }>> => {
+		const environments = await environmentRepository.getAll();
+		return environments
+			.filter(env => env.getPowerPlatformEnvironmentId()) // Only include environments with PP env ID
+			.map(env => ({
+				id: env.getPowerPlatformEnvironmentId()!,
+				name: env.getName().getValue(),
+				url: env.getDataverseUrl().getValue()
+			}));
+	};
+
+	// Factory function to get environment by ID
+	const getEnvironmentById = async (envId: string): Promise<{ id: string; name: string } | null> => {
+		const environments = await environmentRepository.getAll();
+		const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+		if (!environment) {
+			return null;
+		}
+		return {
+			id: envId,
+			name: environment.getName().getValue()
+		};
+	};
+
+	// Infrastructure Layer - Dataverse API Service that works for any environment
+	const dataverseApiService = new DataverseApiService(
+		async (envId: string) => {
+			// Get the environment for this envId
+			const environments = await environmentRepository.getAll();
+			const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+
+			if (!environment) {
+				throw new Error(`Environment not found for ID: ${envId}`);
+			}
+
+			const authMethod = environment.getAuthenticationMethod();
+			let clientSecret: string | undefined;
+			let password: string | undefined;
+
+			if (authMethod.requiresClientCredentials()) {
+				clientSecret = await environmentRepository.getClientSecret(environment.getClientId()?.getValue() || '');
+			}
+
+			if (authMethod.requiresUsernamePassword()) {
+				password = await environmentRepository.getPassword(environment.getUsername() || '');
+			}
+
+			return authService.getAccessTokenForEnvironment(environment, clientSecret, password);
+		},
+		async (envId: string) => {
+			// Get the Dataverse URL for this environment
+			const environments = await environmentRepository.getAll();
+			const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+
+			if (!environment) {
+				throw new Error(`Environment not found for ID: ${envId}`);
+			}
+
+			return environment.getDataverseUrl().getValue();
+		},
+		logger
+	);
+
+	const urlBuilder = new MakerUrlBuilder();
+	const solutionRepository = new DataverseApiSolutionRepository(dataverseApiService, logger);
+
+	// Application Layer
+	const listSolutionsUseCase = new ListSolutionsUseCase(solutionRepository, logger);
+
+	// Presentation Layer
+	SolutionExplorerPanel.createOrShow(
+		context.extensionUri,
+		getEnvironments,
+		getEnvironmentById,
+		listSolutionsUseCase,
+		urlBuilder,
+		logger,
+		initialEnvironmentId
+	);
 }
 
 /**
@@ -387,14 +532,14 @@ class ToolsTreeProvider implements vscode.TreeDataProvider<ToolItem> {
 
 	getChildren(): ToolItem[] {
 		return [
-			new ToolItem('Solution Explorer', 'Browse and manage solutions', 'solutionExplorer'),
-			new ToolItem('Metadata Browser', 'Explore entity metadata', 'metadataBrowser'),
-			new ToolItem('Import Job Viewer', 'Monitor solution imports', 'importJobViewer'),
-			new ToolItem('Data Explorer', 'Query and explore data', 'dataExplorer'),
-			new ToolItem('Connection References', 'Manage connection references', 'connectionReferences'),
-			new ToolItem('Environment Variables', 'Manage environment variables', 'environmentVariables'),
-			new ToolItem('Plugin Trace Viewer', 'View plugin execution traces', 'pluginTraceViewer'),
-			new ToolItem('Plugin Registration', 'Register and manage plugins', 'pluginRegistration')
+			new ToolItem('Solutions', 'Browse and manage solutions', 'solutionExplorer', 'power-platform-dev-suite.solutionExplorerNew'),
+			new ToolItem('Metadata Browser', 'Explore entity metadata', 'metadataBrowser', 'power-platform-dev-suite.openMetadataBrowserNew'),
+			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewerNew'),
+			new ToolItem('Tables', 'Query and explore table data', 'dataExplorer', 'power-platform-dev-suite.dataExplorerNew'),
+			new ToolItem('Connection References', 'Manage connection references', 'connectionReferences', 'power-platform-dev-suite.connectionReferencesNew'),
+			new ToolItem('Environment Variables', 'Manage environment variables', 'environmentVariables', 'power-platform-dev-suite.environmentVariablesNew'),
+			new ToolItem('Plugin Traces', 'View plugin execution traces', 'pluginTraceViewer', 'power-platform-dev-suite.pluginTraceViewerNew'),
+			new ToolItem('Plugin Registration', 'Register and manage plugins', 'pluginRegistration', 'power-platform-dev-suite.pluginRegistrationNew')
 		];
 	}
 }
@@ -445,12 +590,17 @@ class ToolItem extends vscode.TreeItem {
 	constructor(
 		public readonly label: string,
 		public readonly tooltip: string,
-		public readonly contextValue: string
+		public readonly contextValue: string,
+		commandId: string
 	) {
 		super(label, vscode.TreeItemCollapsibleState.None);
 		this.tooltip = tooltip;
 		this.contextValue = contextValue;
 		this.iconPath = new vscode.ThemeIcon('tools');
+		this.command = {
+			command: commandId,
+			title: label
+		};
 	}
 }
 
