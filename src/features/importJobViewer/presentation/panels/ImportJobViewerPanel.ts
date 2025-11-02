@@ -4,9 +4,10 @@ import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
 import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
-import { ListSolutionsUseCase } from '../../application/useCases/ListSolutionsUseCase';
-import { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
-import { Solution } from '../../domain/entities/Solution';
+import { ListImportJobsUseCase } from '../../application/useCases/ListImportJobsUseCase';
+import { OpenImportLogUseCase } from '../../application/useCases/OpenImportLogUseCase';
+import { ImportJobViewModelMapper } from '../../application/mappers/ImportJobViewModelMapper';
+import { ImportJob } from '../../domain/entities/ImportJob';
 import {
 	isWebviewMessage,
 	isWebviewLogMessage,
@@ -23,14 +24,14 @@ interface EnvironmentOption {
 }
 
 /**
- * Presentation layer panel for Solution Explorer.
- * Displays solutions from a Power Platform environment with environment switching support.
+ * Presentation layer panel for Import Job Viewer.
+ * Displays import jobs from a Power Platform environment with environment switching support.
  */
-export class SolutionExplorerPanel {
-	public static readonly viewType = 'powerPlatformDevSuite.solutionExplorer';
-	private static currentPanel?: SolutionExplorerPanel;
+export class ImportJobViewerPanel {
+	public static readonly viewType = 'powerPlatformDevSuite.importJobViewer';
+	private static currentPanel?: ImportJobViewerPanel;
 
-	private solutions: Solution[] = [];
+	private importJobs: ImportJob[] = [];
 	private cancellationTokenSource: vscode.CancellationTokenSource | null = null;
 	private currentEnvironmentId: string | null = null;
 	private environments: EnvironmentOption[] = [];
@@ -40,13 +41,14 @@ export class SolutionExplorerPanel {
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<{ id: string; name: string } | null>,
-		private readonly listSolutionsUseCase: ListSolutionsUseCase,
+		private readonly listImportJobsUseCase: ListImportJobsUseCase,
+		private readonly openImportLogUseCase: OpenImportLogUseCase,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		private readonly logger: ILogger,
 		private readonly initialEnvironmentId?: string,
 		private disposables: vscode.Disposable[] = []
 	) {
-		this.logger.debug('SolutionExplorerPanel: Initialized');
+		this.logger.debug('ImportJobViewerPanel: Initialized');
 
 		this.panel.webview.options = {
 			enableScripts: true,
@@ -62,7 +64,7 @@ export class SolutionExplorerPanel {
 		);
 
 		this.panel.onDidDispose(() => {
-			this.logger.debug('SolutionExplorerPanel: Disposed');
+			this.logger.debug('ImportJobViewerPanel: Disposed');
 			this.dispose();
 		}, null, this.disposables);
 
@@ -70,32 +72,31 @@ export class SolutionExplorerPanel {
 	}
 
 	/**
-	 * Creates or shows the Solution Explorer panel.
+	 * Creates or shows the Import Job Viewer panel.
 	 */
 	public static createOrShow(
 		extensionUri: vscode.Uri,
 		getEnvironments: () => Promise<EnvironmentOption[]>,
 		getEnvironmentById: (envId: string) => Promise<{ id: string; name: string } | null>,
-		listSolutionsUseCase: ListSolutionsUseCase,
+		listImportJobsUseCase: ListImportJobsUseCase,
+		openImportLogUseCase: OpenImportLogUseCase,
 		urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
 		initialEnvironmentId?: string
-	): SolutionExplorerPanel {
-		const column = vscode.ViewColumn.One;
+	): void {
+		const column = vscode.window.activeTextEditor
+			? vscode.window.activeTextEditor.viewColumn
+			: undefined;
 
-		if (SolutionExplorerPanel.currentPanel) {
-			SolutionExplorerPanel.currentPanel.panel.reveal(column);
-			// If environment is specified, switch to it
-			if (initialEnvironmentId) {
-				void SolutionExplorerPanel.currentPanel.switchEnvironment(initialEnvironmentId);
-			}
-			return SolutionExplorerPanel.currentPanel;
+		if (ImportJobViewerPanel.currentPanel) {
+			ImportJobViewerPanel.currentPanel.panel.reveal(column);
+			return;
 		}
 
 		const panel = vscode.window.createWebviewPanel(
-			SolutionExplorerPanel.viewType,
-			'Solutions',
-			column,
+			ImportJobViewerPanel.viewType,
+			'Import Jobs',
+			column || vscode.ViewColumn.One,
 			{
 				enableScripts: true,
 				localResourceRoots: [extensionUri],
@@ -103,87 +104,63 @@ export class SolutionExplorerPanel {
 			}
 		);
 
-		SolutionExplorerPanel.currentPanel = new SolutionExplorerPanel(
+		ImportJobViewerPanel.currentPanel = new ImportJobViewerPanel(
 			panel,
 			extensionUri,
 			getEnvironments,
 			getEnvironmentById,
-			listSolutionsUseCase,
+			listImportJobsUseCase,
+			openImportLogUseCase,
 			urlBuilder,
 			logger,
 			initialEnvironmentId
 		);
-
-		return SolutionExplorerPanel.currentPanel;
 	}
 
 	/**
-	 * Initializes the panel by loading environments.
+	 * Initializes the panel by loading environments and initial data.
 	 */
 	private async initialize(): Promise<void> {
 		try {
 			this.environments = await this.getEnvironments();
+			this.panel.webview.postMessage({ command: 'environmentsData', data: this.environments });
 
-			if (this.environments.length === 0) {
-				this.panel.webview.postMessage({
-					command: 'error',
-					error: 'No environments configured. Please add an environment first.'
-				});
-				return;
-			}
-
-			// Send environments to webview
-			this.panel.webview.postMessage({
-				command: 'environmentsData',
-				data: this.environments
-			});
-
-			// Set initial environment
-			if (this.initialEnvironmentId) {
-				this.currentEnvironmentId = this.initialEnvironmentId;
-			} else {
-				this.currentEnvironmentId = this.environments[0].id;
-			}
-
-			// Update tab title with environment name
+			this.currentEnvironmentId = this.initialEnvironmentId || this.environments[0]?.id;
 			await this.updateTabTitle();
-
-			// Load solutions for initial environment
-			await this.loadSolutions();
+			await this.loadImportJobs();
 		} catch (error) {
-			this.logger.error('Failed to initialize Solution Explorer', error);
+			this.logger.error('Failed to initialize Import Job Viewer panel', error);
 			this.handleError(error);
 		}
 	}
 
 	/**
-	 * Switches to a different environment and reloads solutions.
+	 * Switches to a different environment and reloads data.
 	 */
 	private async switchEnvironment(environmentId: string): Promise<void> {
 		if (this.currentEnvironmentId === environmentId) {
-			return; // Already on this environment
+			return;
 		}
 
 		this.logger.info('Switching environment', { from: this.currentEnvironmentId, to: environmentId });
 		this.currentEnvironmentId = environmentId;
-
 		await this.updateTabTitle();
-		await this.loadSolutions();
+		await this.loadImportJobs();
 	}
 
 	/**
-	 * Updates the panel tab title with current environment name.
+	 * Updates the panel tab title to include the current environment name.
 	 */
 	private async updateTabTitle(): Promise<void> {
 		if (!this.currentEnvironmentId) {
-			this.panel.title = 'Solutions';
+			this.panel.title = 'Import Jobs';
 			return;
 		}
 
 		try {
 			const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 			if (environment) {
-				this.panel.title = `Solutions - ${environment.name}`;
+				this.panel.title = `Import Jobs - ${environment.name}`;
 			}
 		} catch (error) {
 			this.logger.warn('Failed to update tab title', error);
@@ -209,20 +186,20 @@ export class SolutionExplorerPanel {
 
 			switch (message.command) {
 				case 'refresh':
-					await this.loadSolutions();
+					await this.loadImportJobs();
 					break;
 				case 'environmentChanged':
 					if (typeof message.data === 'object' && message.data !== null && 'environmentId' in message.data) {
 						await this.switchEnvironment((message.data as { environmentId: string }).environmentId);
 					}
 					break;
-				case 'openInMaker':
-					if (typeof message.data === 'object' && message.data !== null && 'solutionId' in message.data) {
-						await this.handleOpenInMaker((message.data as { solutionId: string }).solutionId);
-					}
+				case 'openMakerImportHistory':
+					await this.handleOpenMakerImportHistory();
 					break;
-				case 'openMakerSolutionsList':
-					await this.handleOpenMakerSolutionsList();
+				case 'viewImportLog':
+					if (typeof message.data === 'object' && message.data !== null && 'importJobId' in message.data) {
+						await this.handleViewImportLog((message.data as { importJobId: string }).importJobId);
+					}
 					break;
 			}
 		} catch (error) {
@@ -232,15 +209,15 @@ export class SolutionExplorerPanel {
 	}
 
 	/**
-	 * Loads solutions from the current environment.
+	 * Loads import jobs from the current environment.
 	 */
-	private async loadSolutions(): Promise<void> {
+	private async loadImportJobs(): Promise<void> {
 		if (!this.currentEnvironmentId) {
-			this.logger.warn('Cannot load solutions: No environment selected');
+			this.logger.warn('Cannot load import jobs: No environment selected');
 			return;
 		}
 
-		this.logger.info('Loading solutions', { environmentId: this.currentEnvironmentId });
+		this.logger.info('Loading import jobs', { environmentId: this.currentEnvironmentId });
 
 		this.cancellationTokenSource?.cancel();
 		this.cancellationTokenSource = new vscode.CancellationTokenSource();
@@ -249,7 +226,7 @@ export class SolutionExplorerPanel {
 			this.panel.webview.postMessage({ command: 'loading' });
 
 			const cancellationToken = new VsCodeCancellationTokenAdapter(this.cancellationTokenSource.token);
-			this.solutions = await this.listSolutionsUseCase.execute(
+			this.importJobs = await this.listImportJobsUseCase.execute(
 				this.currentEnvironmentId,
 				cancellationToken
 			);
@@ -258,59 +235,65 @@ export class SolutionExplorerPanel {
 				return;
 			}
 
-			const viewModels = SolutionViewModelMapper.toViewModels(this.solutions);
+			const viewModels = ImportJobViewModelMapper.toViewModels(this.importJobs);
 
 			this.panel.webview.postMessage({
-				command: 'solutionsData',
+				command: 'importJobsData',
 				data: viewModels
 			});
 
-			this.logger.info('Solutions loaded successfully', { count: this.solutions.length });
+			this.logger.info('Import jobs loaded successfully', { count: this.importJobs.length });
 		} catch (error) {
 			if (!(error instanceof OperationCancelledException)) {
-				this.logger.error('Failed to load solutions', error);
+				this.logger.error('Failed to load import jobs', error);
 				this.handleError(error);
 			}
 		}
 	}
 
 	/**
-	 * Opens a solution in the Maker Portal.
+	 * Opens the import history page in the Maker Portal.
 	 */
-	private async handleOpenInMaker(solutionId: string): Promise<void> {
-		if (!this.currentEnvironmentId) {
-			this.logger.warn('Cannot open solution: No environment selected');
-			return;
-		}
-
-		const solution = this.solutions.find(s => s.id === solutionId);
-		if (!solution) {
-			this.logger.warn('Solution not found', { solutionId });
-			return;
-		}
-
-		const url = this.urlBuilder.buildSolutionUrl(this.currentEnvironmentId, solution.id);
-		await vscode.env.openExternal(vscode.Uri.parse(url));
-		this.logger.info('Opened solution in Maker Portal', {
-			solutionId: solution.id,
-			uniqueName: solution.uniqueName
-		});
-	}
-
-	/**
-	 * Opens the solutions list in the Maker Portal.
-	 */
-	private async handleOpenMakerSolutionsList(): Promise<void> {
+	private async handleOpenMakerImportHistory(): Promise<void> {
 		if (!this.currentEnvironmentId) {
 			this.logger.warn('Cannot open Maker Portal: No environment selected');
 			return;
 		}
 
-		const url = this.urlBuilder.buildSolutionsListUrl(this.currentEnvironmentId);
+		const url = this.urlBuilder.buildImportHistoryUrl(this.currentEnvironmentId);
 		await vscode.env.openExternal(vscode.Uri.parse(url));
-		this.logger.info('Opened solutions list in Maker Portal', {
+		this.logger.info('Opened import history in Maker Portal', {
 			environmentId: this.currentEnvironmentId
 		});
+	}
+
+	/**
+	 * Handles opening the import log XML in VS Code editor.
+	 */
+	private async handleViewImportLog(importJobId: string): Promise<void> {
+		if (!this.currentEnvironmentId) {
+			this.logger.warn('Cannot view import log: No environment selected');
+			return;
+		}
+
+		try {
+			this.logger.info('Opening import log', { importJobId });
+
+			const cancellationToken = new VsCodeCancellationTokenAdapter(
+				new vscode.CancellationTokenSource().token
+			);
+
+			await this.openImportLogUseCase.execute(
+				this.currentEnvironmentId,
+				importJobId,
+				cancellationToken
+			);
+
+			this.logger.info('Import log opened successfully', { importJobId });
+		} catch (error) {
+			this.logger.error('Failed to open import log', error);
+			vscode.window.showErrorMessage(`Failed to open import log: ${error instanceof Error ? error.message : String(error)}`);
+		}
 	}
 
 	/**
@@ -360,7 +343,7 @@ export class SolutionExplorerPanel {
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Solutions</title>
+	<title>Import Jobs</title>
 	<link rel="stylesheet" href="${datatableCssUri}">
 	<style>
 		body {
@@ -405,11 +388,6 @@ export class SolutionExplorerPanel {
 		button:disabled {
 			opacity: 0.5;
 			cursor: not-allowed;
-		}
-		.codicon {
-			font-family: codicon;
-			font-size: 16px;
-			margin-right: 4px;
 		}
 		.spinner {
 			display: inline-block;
@@ -460,10 +438,19 @@ export class SolutionExplorerPanel {
 			border: 1px solid var(--vscode-inputValidation-errorBorder);
 			margin-bottom: 16px;
 		}
+		.status-completed {
+			color: var(--vscode-terminal-ansiGreen);
+		}
+		.status-failed {
+			color: var(--vscode-terminal-ansiRed);
+		}
+		.status-in-progress {
+			color: var(--vscode-terminal-ansiYellow);
+		}
 		#errorContainer {
 			padding: 16px;
 		}
-		#solutionsContainer {
+		#importJobsContainer {
 			flex: 1;
 			display: flex;
 			flex-direction: column;
@@ -491,21 +478,21 @@ export class SolutionExplorerPanel {
 
 	<div class="content">
 		<div id="errorContainer"></div>
-		<div id="solutionsContainer"></div>
+		<div id="importJobsContainer"></div>
 	</div>
 
 	<script>
 		const vscode = acquireVsCodeApi();
-		let allSolutions = [];
+		let allImportJobs = [];
 		let environments = [];
-		let sortColumn = 'friendlyName';
-		let sortDirection = 'asc';
+		let sortColumn = 'createdOn';
+		let sortDirection = 'desc';
 
 		// Restore state on load
 		const previousState = vscode.getState();
 		if (previousState) {
-			sortColumn = previousState.sortColumn || 'friendlyName';
-			sortDirection = previousState.sortDirection || 'asc';
+			sortColumn = previousState.sortColumn || 'createdOn';
+			sortDirection = previousState.sortDirection || 'desc';
 		}
 
 		// Event handlers
@@ -514,7 +501,7 @@ export class SolutionExplorerPanel {
 		});
 
 		document.getElementById('openMakerBtn').addEventListener('click', () => {
-			vscode.postMessage({ command: 'openMakerSolutionsList' });
+			vscode.postMessage({ command: 'openMakerImportHistory' });
 		});
 
 		document.getElementById('environmentSelect').addEventListener('change', (e) => {
@@ -528,7 +515,7 @@ export class SolutionExplorerPanel {
 		document.getElementById('searchInput').addEventListener('input', (e) => {
 			const query = e.target.value;
 			saveState({ searchQuery: query });
-			filterSolutions(query.toLowerCase());
+			filterImportJobs(query.toLowerCase());
 		});
 
 		// Message handler
@@ -546,9 +533,9 @@ export class SolutionExplorerPanel {
 					document.getElementById('errorContainer').innerHTML = '';
 					break;
 
-				case 'solutionsData':
+				case 'importJobsData':
 					setLoading(false);
-					allSolutions = message.data;
+					allImportJobs = message.data;
 					applySortAndFilter();
 					break;
 
@@ -595,30 +582,30 @@ export class SolutionExplorerPanel {
 			const state = vscode.getState();
 			if (state && state.searchQuery) {
 				document.getElementById('searchInput').value = state.searchQuery;
-				filterSolutions(state.searchQuery.toLowerCase());
+				filterImportJobs(state.searchQuery.toLowerCase());
 			} else {
-				filterSolutions('');
+				filterImportJobs('');
 			}
 		}
 
-		function filterSolutions(query) {
-			let filtered = allSolutions;
+		function filterImportJobs(query) {
+			let filtered = allImportJobs;
 
 			if (query) {
-				filtered = allSolutions.filter(s =>
-					s.friendlyName.toLowerCase().includes(query) ||
-					s.uniqueName.toLowerCase().includes(query) ||
-					s.publisherName.toLowerCase().includes(query) ||
-					s.description.toLowerCase().includes(query)
+				filtered = allImportJobs.filter(job =>
+					job.solutionName.toLowerCase().includes(query) ||
+					job.createdBy.toLowerCase().includes(query) ||
+					job.status.toLowerCase().includes(query) ||
+					job.operationContext.toLowerCase().includes(query)
 				);
 			}
 
-			const sorted = sortSolutions(filtered, sortColumn, sortDirection);
-			renderSolutions(sorted);
+			const sorted = sortImportJobs(filtered, sortColumn, sortDirection);
+			renderImportJobs(sorted);
 		}
 
-		function sortSolutions(solutions, column, direction) {
-			return [...solutions].sort((a, b) => {
+		function sortImportJobs(jobs, column, direction) {
+			return [...jobs].sort((a, b) => {
 				let aVal = a[column];
 				let bVal = b[column];
 
@@ -645,28 +632,26 @@ export class SolutionExplorerPanel {
 			applySortAndFilter();
 		}
 
-		function renderSolutions(solutions) {
-			const container = document.getElementById('solutionsContainer');
+		function renderImportJobs(jobs) {
+			const container = document.getElementById('importJobsContainer');
 
-			if (!solutions || solutions.length === 0) {
-				container.innerHTML = '<p style="padding: 16px;">No solutions found.</p>';
+			if (!jobs || jobs.length === 0) {
+				container.innerHTML = '<p style="padding: 16px;">No import jobs found.</p>';
 				return;
 			}
 
 			const columns = [
-				{ key: 'friendlyName', label: 'Solution Name' },
-				{ key: 'uniqueName', label: 'Unique Name' },
-				{ key: 'version', label: 'Version' },
-				{ key: 'isManaged', label: 'Type' },
-				{ key: 'publisherName', label: 'Publisher' },
-				{ key: 'isVisible', label: 'Visible' },
-				{ key: 'isApiManaged', label: 'API Managed' },
-				{ key: 'installedOn', label: 'Installed On' },
-				{ key: 'modifiedOn', label: 'Modified On' }
+				{ key: 'solutionName', label: 'Solution' },
+				{ key: 'status', label: 'Status' },
+				{ key: 'progress', label: 'Progress' },
+				{ key: 'createdBy', label: 'Created By' },
+				{ key: 'createdOn', label: 'Created On' },
+				{ key: 'duration', label: 'Duration' },
+				{ key: 'operationContext', label: 'Operation Context' }
 			];
 
-			const totalCount = allSolutions.length;
-			const displayedCount = solutions.length;
+			const totalCount = allImportJobs.length;
+			const displayedCount = jobs.length;
 			const countText = displayedCount === totalCount
 				? totalCount + ' record' + (totalCount !== 1 ? 's' : '')
 				: displayedCount + ' of ' + totalCount + ' record' + (totalCount !== 1 ? 's' : '');
@@ -682,17 +667,15 @@ export class SolutionExplorerPanel {
 			});
 			html += '</tr></thead><tbody>';
 
-			solutions.forEach(solution => {
+			jobs.forEach(job => {
 				html += '<tr>';
-				html += '<td><a class="solution-link" data-id="' + solution.id + '">' + escapeHtml(solution.friendlyName) + '</a></td>';
-				html += '<td>' + escapeHtml(solution.uniqueName) + '</td>';
-				html += '<td>' + escapeHtml(solution.version) + '</td>';
-				html += '<td>' + escapeHtml(solution.isManaged) + '</td>';
-				html += '<td>' + escapeHtml(solution.publisherName) + '</td>';
-				html += '<td>' + escapeHtml(solution.isVisible) + '</td>';
-				html += '<td>' + escapeHtml(solution.isApiManaged) + '</td>';
-				html += '<td>' + escapeHtml(solution.installedOn) + '</td>';
-				html += '<td>' + escapeHtml(solution.modifiedOn) + '</td>';
+				html += '<td><a href="#" class="job-link" data-job-id="' + job.id + '">' + escapeHtml(job.solutionName) + '</a></td>';
+				html += '<td class="' + getStatusClass(job.status) + '">' + escapeHtml(job.status) + '</td>';
+				html += '<td>' + escapeHtml(job.progress) + '</td>';
+				html += '<td>' + escapeHtml(job.createdBy) + '</td>';
+				html += '<td>' + escapeHtml(job.createdOn) + '</td>';
+				html += '<td>' + escapeHtml(job.duration) + '</td>';
+				html += '<td>' + escapeHtml(job.operationContext) + '</td>';
 				html += '</tr>';
 			});
 
@@ -702,14 +685,6 @@ export class SolutionExplorerPanel {
 			html += '</div>';
 			container.innerHTML = html;
 
-			// Attach click handlers to solution links
-			document.querySelectorAll('.solution-link').forEach(link => {
-				link.addEventListener('click', (e) => {
-					const solutionId = e.target.getAttribute('data-id');
-					vscode.postMessage({ command: 'openInMaker', data: { solutionId } });
-				});
-			});
-
 			// Attach sort handlers to table headers
 			document.querySelectorAll('th[data-sort]').forEach(header => {
 				header.addEventListener('click', () => {
@@ -717,6 +692,25 @@ export class SolutionExplorerPanel {
 					handleSort(column);
 				});
 			});
+
+			// Attach click handlers to job name links
+			document.querySelectorAll('.job-link').forEach(link => {
+				link.addEventListener('click', (e) => {
+					e.preventDefault();
+					const importJobId = link.getAttribute('data-job-id');
+					vscode.postMessage({
+						command: 'viewImportLog',
+						data: { importJobId }
+					});
+				});
+			});
+		}
+
+		function getStatusClass(status) {
+			if (status === 'Completed') return 'status-completed';
+			if (status === 'Failed' || status === 'Cancelled') return 'status-failed';
+			if (status === 'In Progress' || status === 'Queued') return 'status-in-progress';
+			return '';
 		}
 
 		function escapeHtml(text) {
@@ -734,7 +728,7 @@ export class SolutionExplorerPanel {
 	 * Disposes the panel and cleans up resources.
 	 */
 	public dispose(): void {
-		SolutionExplorerPanel.currentPanel = undefined;
+		ImportJobViewerPanel.currentPanel = undefined;
 
 		this.cancellationTokenSource?.cancel();
 		this.cancellationTokenSource?.dispose();

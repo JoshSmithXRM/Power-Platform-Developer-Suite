@@ -3,46 +3,49 @@ import * as vscode from 'vscode';
 import { ILogger } from './ILogger';
 
 /**
- * Logger implementation using VS Code OutputChannel
- * Provides structured logging visible to users
+ * Logger implementation using VS Code LogOutputChannel
+ * Provides structured logging with automatic timestamps and level formatting
  */
 export class OutputChannelLogger implements ILogger {
-	constructor(private readonly outputChannel: vscode.OutputChannel) {}
+	constructor(private readonly outputChannel: vscode.LogOutputChannel) {}
 
 	public debug(message: string, ...args: unknown[]): void {
-		this.log('DEBUG', message, args);
-	}
-
-	public info(message: string, ...args: unknown[]): void {
-		this.log('INFO', message, args);
-	}
-
-	public warn(message: string, ...args: unknown[]): void {
-		this.log('WARN', message, args);
-	}
-
-	public error(message: string, error?: unknown): void {
-		this.log('ERROR', message);
-		if (error instanceof Error) {
-			this.outputChannel.appendLine(`  ${error.message}`);
-			if (error.stack) {
-				this.outputChannel.appendLine(`  ${error.stack}`);
-			}
-		} else if (error) {
-			this.outputChannel.appendLine(`  ${String(error)}`);
+		this.outputChannel.debug(message);
+		if (args.length > 0) {
+			args.forEach(arg => {
+				this.outputChannel.debug(this.stringify(arg));
+			});
 		}
 	}
 
-	private log(level: string, message: string, args?: unknown[]): void {
-		const timestamp = new Date().toISOString();
-		const formattedMessage = `[${timestamp}] [${level}] ${message}`;
-
-		this.outputChannel.appendLine(formattedMessage);
-
-		if (args && args.length > 0) {
+	public info(message: string, ...args: unknown[]): void {
+		this.outputChannel.info(message);
+		if (args.length > 0) {
 			args.forEach(arg => {
-				this.outputChannel.appendLine(`  ${this.stringify(arg)}`);
+				this.outputChannel.info(this.stringify(arg));
 			});
+		}
+	}
+
+	public warn(message: string, ...args: unknown[]): void {
+		this.outputChannel.warn(message);
+		if (args.length > 0) {
+			args.forEach(arg => {
+				this.outputChannel.warn(this.stringify(arg));
+			});
+		}
+	}
+
+	public error(message: string, error?: unknown): void {
+		if (error instanceof Error) {
+			this.outputChannel.error(`${message}: ${error.message}`);
+			if (error.stack) {
+				this.outputChannel.error(error.stack);
+			}
+		} else if (error) {
+			this.outputChannel.error(`${message}: ${String(error)}`);
+		} else {
+			this.outputChannel.error(message);
 		}
 	}
 

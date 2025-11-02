@@ -34,6 +34,7 @@ export class ListSolutionsUseCase {
 
       const solutions = await this.solutionRepository.findAll(
         environmentId,
+        undefined,
         cancellationToken
       );
 

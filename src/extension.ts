@@ -38,7 +38,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	// ========================================
 	// Logging Infrastructure
 	// ========================================
-	const outputChannel = vscode.window.createOutputChannel('Power Platform Dev Suite');
+	const outputChannel = vscode.window.createOutputChannel('Power Platform Dev Suite', { log: true });
 	const logger: ILogger = new OutputChannelLogger(outputChannel);
 
 	logger.info('Extension activating...');
@@ -336,6 +336,41 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	// Import Job Viewer command - opens panel with optional initial environment
+	const importJobViewerCommand = vscode.commands.registerCommand('power-platform-dev-suite.importJobViewer', async (environmentItem?: { envId: string }) => {
+		try {
+			let initialEnvironmentId: string | undefined;
+
+			if (environmentItem?.envId) {
+				const environment = await environmentRepository.getById(new EnvironmentId(environmentItem.envId));
+
+				if (!environment) {
+					vscode.window.showErrorMessage('Environment not found');
+					return;
+				}
+
+				initialEnvironmentId = environment.getPowerPlatformEnvironmentId();
+			}
+
+			void initializeImportJobViewer(context, authService, environmentRepository, logger, initialEnvironmentId);
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Import Job Viewer: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	// Import Job Viewer New command - just opens panel without preselected environment
+	const importJobViewerNewCommand = vscode.commands.registerCommand('power-platform-dev-suite.importJobViewerNew', async () => {
+		try {
+			void initializeImportJobViewer(context, authService, environmentRepository, logger);
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Import Jobs: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
 	context.subscriptions.push(
 		outputChannel,
 		addEnvironmentCommand,
@@ -343,6 +378,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		testEnvironmentConnectionCommand,
 		solutionExplorerCommand,
 		solutionExplorerNewCommand,
+		importJobViewerCommand,
+		importJobViewerNewCommand,
 		removeEnvironmentCommand,
 		openMakerCommand,
 		openDynamicsCommand,
@@ -453,6 +490,108 @@ async function initializeSolutionExplorer(
 		getEnvironments,
 		getEnvironmentById,
 		listSolutionsUseCase,
+		urlBuilder,
+		logger,
+		initialEnvironmentId
+	);
+}
+
+/**
+ * Initializes the Import Job Viewer
+ * Uses dynamic imports for lazy loading
+ */
+async function initializeImportJobViewer(
+	context: vscode.ExtensionContext,
+	authService: MsalAuthenticationService,
+	environmentRepository: IEnvironmentRepository,
+	logger: ILogger,
+	initialEnvironmentId?: string
+): Promise<void> {
+	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService') as typeof import('./shared/infrastructure/services/DataverseApiService');
+	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder') as typeof import('./shared/infrastructure/services/MakerUrlBuilder');
+	const { VsCodeEditorService } = await import('./shared/infrastructure/services/VsCodeEditorService') as typeof import('./shared/infrastructure/services/VsCodeEditorService');
+	const { DataverseApiImportJobRepository } = await import('./features/importJobViewer/infrastructure/repositories/DataverseApiImportJobRepository') as typeof import('./features/importJobViewer/infrastructure/repositories/DataverseApiImportJobRepository');
+	const { ListImportJobsUseCase } = await import('./features/importJobViewer/application/useCases/ListImportJobsUseCase') as typeof import('./features/importJobViewer/application/useCases/ListImportJobsUseCase');
+	const { OpenImportLogUseCase } = await import('./features/importJobViewer/application/useCases/OpenImportLogUseCase') as typeof import('./features/importJobViewer/application/useCases/OpenImportLogUseCase');
+	const { ImportJobViewerPanel } = await import('./features/importJobViewer/presentation/panels/ImportJobViewerPanel') as typeof import('./features/importJobViewer/presentation/panels/ImportJobViewerPanel');
+
+	// Factory function to get all environments
+	const getEnvironments = async (): Promise<Array<{ id: string; name: string; url: string }>> => {
+		const environments = await environmentRepository.getAll();
+		return environments
+			.filter(env => env.getPowerPlatformEnvironmentId())
+			.map(env => ({
+				id: env.getPowerPlatformEnvironmentId()!,
+				name: env.getName().getValue(),
+				url: env.getDataverseUrl().getValue()
+			}));
+	};
+
+	// Factory function to get environment by ID
+	const getEnvironmentById = async (envId: string): Promise<{ id: string; name: string } | null> => {
+		const environments = await environmentRepository.getAll();
+		const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+		if (!environment) {
+			return null;
+		}
+		return {
+			id: envId,
+			name: environment.getName().getValue()
+		};
+	};
+
+	// Infrastructure Layer - Dataverse API Service
+	const dataverseApiService = new DataverseApiService(
+		async (envId: string) => {
+			const environments = await environmentRepository.getAll();
+			const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+
+			if (!environment) {
+				throw new Error(`Environment not found for ID: ${envId}`);
+			}
+
+			const authMethod = environment.getAuthenticationMethod();
+			let clientSecret: string | undefined;
+			let password: string | undefined;
+
+			if (authMethod.requiresClientCredentials()) {
+				clientSecret = await environmentRepository.getClientSecret(environment.getClientId()?.getValue() || '');
+			}
+
+			if (authMethod.requiresUsernamePassword()) {
+				password = await environmentRepository.getPassword(environment.getUsername() || '');
+			}
+
+			return authService.getAccessTokenForEnvironment(environment, clientSecret, password);
+		},
+		async (envId: string) => {
+			const environments = await environmentRepository.getAll();
+			const environment = environments.find(env => env.getPowerPlatformEnvironmentId() === envId);
+
+			if (!environment) {
+				throw new Error(`Environment not found for ID: ${envId}`);
+			}
+
+			return environment.getDataverseUrl().getValue();
+		},
+		logger
+	);
+
+	const urlBuilder = new MakerUrlBuilder();
+	const importJobRepository = new DataverseApiImportJobRepository(dataverseApiService, logger);
+	const editorService = new VsCodeEditorService(logger);
+
+	// Application Layer
+	const listImportJobsUseCase = new ListImportJobsUseCase(importJobRepository, logger);
+	const openImportLogUseCase = new OpenImportLogUseCase(importJobRepository, editorService, logger);
+
+	// Presentation Layer
+	ImportJobViewerPanel.createOrShow(
+		context.extensionUri,
+		getEnvironments,
+		getEnvironmentById,
+		listImportJobsUseCase,
+		openImportLogUseCase,
 		urlBuilder,
 		logger,
 		initialEnvironmentId

@@ -16,8 +16,11 @@ export class SolutionViewModelMapper {
       version: solution.version,
       isManaged: solution.isManaged ? 'Managed' : 'Unmanaged',
       publisherName: solution.publisherName,
-      installedOn: solution.installedOn?.toLocaleDateString() ?? '',
+      installedOn: solution.installedOn?.toLocaleString() ?? '',
       description: solution.description,
+      modifiedOn: solution.modifiedOn.toLocaleString(),
+      isVisible: solution.isVisible ? 'Yes' : 'No',
+      isApiManaged: solution.isApiManaged ? 'Yes' : 'No',
     };
   }
 

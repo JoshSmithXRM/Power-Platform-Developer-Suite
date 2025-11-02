@@ -23,6 +23,10 @@ export class Solution {
    * @param publisherName - Publisher display name
    * @param installedOn - Installation date (null if not installed)
    * @param description - Solution description
+   * @param modifiedOn - Last modified date
+   * @param isVisible - Whether solution is visible in UI
+   * @param isApiManaged - Whether solution is API-managed
+   * @param solutionType - Type of solution
    * @throws {ValidationError} When version format is invalid
    */
   constructor(
@@ -34,7 +38,11 @@ export class Solution {
     public readonly publisherId: string,
     public readonly publisherName: string,
     public readonly installedOn: Date | null,
-    public readonly description: string
+    public readonly description: string,
+    public readonly modifiedOn: Date,
+    public readonly isVisible: boolean,
+    public readonly isApiManaged: boolean,
+    public readonly solutionType: string | null
   ) {
     // Trim whitespace from version (API may include trailing/leading spaces)
     this.version = version.trim();

@@ -5,6 +5,12 @@
  * Provides consistent visual styling across all data views.
  */
 
+/* Table container for scrolling */
+.table-container {
+	overflow: auto;
+	flex: 1;
+}
+
 table {
 	width: 100%;
 	border-collapse: collapse;
@@ -35,7 +41,7 @@ th:hover {
 
 /* Alternating row colors for better readability */
 tbody tr:nth-child(even) {
-	background: rgba(255, 255, 255, 0.04);
+	background: var(--vscode-list-inactiveSelectionBackground);
 }
 
 tbody tr:nth-child(odd) {
@@ -49,13 +55,26 @@ tbody tr:hover {
 
 /* Link styling within tables */
 .solution-link,
-.table-link {
+.table-link,
+.job-link {
 	color: var(--vscode-textLink-foreground);
 	cursor: pointer;
 	text-decoration: none;
 }
 
 .solution-link:hover,
-.table-link:hover {
+.table-link:hover,
+.job-link:hover {
 	text-decoration: underline;
+}
+
+/* Table footer for record counts */
+.table-footer {
+	padding: 8px 16px;
+	border-top: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-editor-background);
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	text-align: right;
+	flex-shrink: 0;
 }

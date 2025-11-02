@@ -1,7 +1,9 @@
 import { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
+import { QueryOptions } from '../../../../shared/domain/interfaces/QueryOptions';
 import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import { ODataQueryBuilder } from '../../../../shared/infrastructure/utils/ODataQueryBuilder';
 import { ISolutionRepository } from '../../domain/interfaces/ISolutionRepository';
 import { Solution } from '../../domain/entities/Solution';
 
@@ -24,6 +26,10 @@ interface DataverseSolutionDto {
   _publisherid_value: string;
   installedon: string | null;
   description: string | null;
+  modifiedon: string;
+  isvisible: boolean;
+  isapimanaged: boolean;
+  solutiontype: string | null;
   publisherid?: {
     friendlyname: string;
   };
@@ -43,13 +49,22 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
    */
   async findAll(
     environmentId: string,
+    options?: QueryOptions,
     cancellationToken?: ICancellationToken
   ): Promise<Solution[]> {
-    const endpoint =
-      '/api/data/v9.2/solutions?' +
-      '$select=solutionid,uniquename,friendlyname,version,ismanaged,_publisherid_value,installedon,description&' +
-      '$expand=publisherid($select=friendlyname)&' +
-      '$orderby=friendlyname';
+    // Default options: expand publisher, order by friendly name
+    const defaultOptions: QueryOptions = {
+      expand: 'publisherid($select=friendlyname)',
+      orderBy: 'friendlyname'
+    };
+
+    const mergedOptions: QueryOptions = {
+      ...defaultOptions,
+      ...options
+    };
+
+    const queryString = ODataQueryBuilder.build(mergedOptions);
+    const endpoint = `/api/data/v9.2/solutions${queryString ? '?' + queryString : ''}`;
 
     this.logger.debug('Fetching solutions from Dataverse API', { environmentId });
 
@@ -94,7 +109,11 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
       dto._publisherid_value,
       dto.publisherid?.friendlyname ?? 'Unknown',
       dto.installedon ? new Date(dto.installedon) : null,
-      dto.description ?? ''
+      dto.description ?? '',
+      new Date(dto.modifiedon),
+      dto.isvisible,
+      dto.isapimanaged,
+      dto.solutiontype
     );
   }
 }

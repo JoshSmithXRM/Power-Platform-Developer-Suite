@@ -11,4 +11,7 @@ export interface SolutionViewModel {
   publisherName: string;
   installedOn: string;
   description: string;
+  modifiedOn: string;
+  isVisible: string;
+  isApiManaged: string;
 }

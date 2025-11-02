@@ -13,6 +13,10 @@ describe('Solution', () => {
     publisherName: string;
     installedOn: Date | null;
     description: string;
+    modifiedOn: Date;
+    isVisible: boolean;
+    isApiManaged: boolean;
+    solutionType: string | null;
   }>): Solution {
     const installedOn: Date | null = overrides && 'installedOn' in overrides
       ? overrides.installedOn!
@@ -27,7 +31,11 @@ describe('Solution', () => {
       overrides?.publisherId ?? 'pub-123',
       overrides?.publisherName ?? 'Test Publisher',
       installedOn,
-      overrides?.description ?? 'A test solution'
+      overrides?.description ?? 'A test solution',
+      overrides?.modifiedOn ?? new Date('2024-01-15T10:00:00Z'),
+      overrides?.isVisible ?? true,
+      overrides?.isApiManaged ?? false,
+      overrides?.solutionType ?? null
     );
   }
 
@@ -150,6 +158,7 @@ describe('Solution', () => {
   describe('properties', () => {
     it('should store all properties correctly', () => {
       const installedOn = new Date('2024-01-15');
+      const modifiedOn = new Date('2024-02-20');
       const solution = new Solution(
         'solution-id-123',
         'UniqueName',
@@ -159,7 +168,11 @@ describe('Solution', () => {
         'publisher-id',
         'Publisher Name',
         installedOn,
-        'Description text'
+        'Description text',
+        modifiedOn,
+        true,
+        false,
+        'Managed'
       );
 
       expect(solution.id).toBe('solution-id-123');
@@ -171,6 +184,10 @@ describe('Solution', () => {
       expect(solution.publisherName).toBe('Publisher Name');
       expect(solution.installedOn).toBe(installedOn);
       expect(solution.description).toBe('Description text');
+      expect(solution.modifiedOn).toBe(modifiedOn);
+      expect(solution.isVisible).toBe(true);
+      expect(solution.isApiManaged).toBe(false);
+      expect(solution.solutionType).toBe('Managed');
     });
 
     it('should accept null for installedOn', () => {

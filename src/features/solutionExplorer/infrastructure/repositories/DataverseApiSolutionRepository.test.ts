@@ -222,7 +222,7 @@ describe('DataverseApiSolutionRepository', () => {
 			const mockResponse = { value: [] };
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			await repository.findAll('env-123', mockCancellationToken);
+			await repository.findAll('env-123', undefined, mockCancellationToken);
 
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				'env-123',
@@ -237,7 +237,7 @@ describe('DataverseApiSolutionRepository', () => {
 				onCancellationRequested: jest.fn()
 			};
 
-			await expect(repository.findAll('env-123', mockCancellationToken))
+			await expect(repository.findAll('env-123', undefined, mockCancellationToken))
 				.rejects.toThrow(OperationCancelledException);
 
 			expect(mockApiService.get).not.toHaveBeenCalled();
@@ -260,7 +260,7 @@ describe('DataverseApiSolutionRepository', () => {
 				return mockResponse;
 			});
 
-			await expect(repository.findAll('env-123', mockCancellationToken))
+			await expect(repository.findAll('env-123', undefined, mockCancellationToken))
 				.rejects.toThrow(OperationCancelledException);
 
 			expect(mockLogger.debug).toHaveBeenCalledWith('Repository operation cancelled after API call');
@@ -309,7 +309,7 @@ describe('DataverseApiSolutionRepository', () => {
 
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				'env-123',
-				expect.stringMatching(/.*\$select=.*\$expand=.*\$orderby=.*/),
+				expect.stringMatching(/.*\$expand=.*\$orderby=.*/),
 				undefined
 			);
 		});

@@ -36,6 +36,10 @@ describe('ListSolutionsUseCase', () => {
 		publisherName: string;
 		installedOn: Date | null;
 		description: string;
+		modifiedOn: Date;
+		isVisible: boolean;
+		isApiManaged: boolean;
+		solutionType: string | null;
 	}>): Solution {
 		return new Solution(
 			overrides?.id ?? 'solution-1',
@@ -46,7 +50,11 @@ describe('ListSolutionsUseCase', () => {
 			overrides?.publisherId ?? 'pub-1',
 			overrides?.publisherName ?? 'Test Publisher',
 			overrides?.installedOn ?? null,
-			overrides?.description ?? 'Test description'
+			overrides?.description ?? 'Test description',
+			overrides?.modifiedOn ?? new Date('2024-01-15T10:00:00Z'),
+			overrides?.isVisible ?? true,
+			overrides?.isApiManaged ?? false,
+			overrides?.solutionType ?? null
 		);
 	}
 
@@ -61,7 +69,7 @@ describe('ListSolutionsUseCase', () => {
 
 			const result = await useCase.execute('env-123');
 
-			expect(mockRepository.findAll).toHaveBeenCalledWith('env-123', undefined);
+			expect(mockRepository.findAll).toHaveBeenCalledWith('env-123', undefined, undefined);
 			expect(result).toHaveLength(2);
 			expect(mockLogger.info).toHaveBeenCalledWith('ListSolutionsUseCase started', { environmentId: 'env-123' });
 			expect(mockLogger.info).toHaveBeenCalledWith('ListSolutionsUseCase completed', { count: 2 });
@@ -137,7 +145,7 @@ describe('ListSolutionsUseCase', () => {
 
 			await useCase.execute('env-123', mockCancellationToken);
 
-			expect(mockRepository.findAll).toHaveBeenCalledWith('env-123', mockCancellationToken);
+			expect(mockRepository.findAll).toHaveBeenCalledWith('env-123', undefined, mockCancellationToken);
 		});
 
 		it('should throw OperationCancelledException if cancelled before execution', async () => {
