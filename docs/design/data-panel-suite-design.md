@@ -54,40 +54,16 @@ class Solution {
     public readonly publisherName: string,
     public readonly installedOn: Date | null,
     public readonly description: string
-  ) {}
+  ) {
+    // Validation: version must be in format X.X.X.X
+    if (!/^\d+\.\d+\.\d+\.\d+$/.test(version)) {
+      throw new Error(`Invalid version format: ${version}`);
+    }
+  }
 
   // Business logic: Default solution identification
   isDefaultSolution(): boolean {
     return this.uniqueName === 'Default';
-  }
-
-  /**
-   * Constructs the Maker Portal URL for this solution.
-   *
-   * Business Decision: URL patterns are considered stable domain knowledge.
-   * Microsoft has maintained these patterns for 5+ years across all regions.
-   *
-   * If Microsoft changes URL patterns or sovereign cloud support is needed,
-   * introduce IMakerUrlBuilder domain service at that time.
-   *
-   * @param environmentId - Environment GUID
-   * @returns Maker Portal URL for this solution
-   */
-  getMakerUrl(environmentId: string): string {
-    return `https://make.powerapps.com/environments/${environmentId}/solutions/${this.id}`;
-  }
-
-  /**
-   * Constructs the classic Dynamics 365 URL for this solution.
-   *
-   * Note: Uses environment ID as subdomain. For custom domains,
-   * caller should use DataverseUrl value object for URL resolution.
-   *
-   * @param environmentId - Environment GUID
-   * @returns Dynamics 365 URL for solution editor
-   */
-  getDynamicsUrl(environmentId: string): string {
-    return `https://${environmentId}.dynamics.com/tools/solution/edit.aspx?id=${this.id}`;
   }
 
   // Business logic: Sort ordering for default solution
@@ -97,7 +73,7 @@ class Solution {
 }
 ```
 
-**Why:** Solution knows how to construct its own URLs and determine its sort priority. This keeps business logic in the domain, not scattered across use cases or panels.
+**Why:** Solution contains business logic for identifying and sorting itself. Constructor validation ensures version format is valid. URL construction is delegated to IMakerUrlBuilder domain service (see section 2.4).
 
 ---
 
@@ -119,7 +95,12 @@ class ImportJob {
     public readonly completedOn: Date | null,
     public readonly importLogXml: string,
     public readonly createdBy: string
-  ) {}
+  ) {
+    // Validation: progress must be between 0 and 100
+    if (progress < 0 || progress > 100) {
+      throw new Error(`Progress must be between 0 and 100, got: ${progress}`);
+    }
+  }
 
   // Business logic: Status determination from progress and completion
   getStatus(): ImportJobStatus {
@@ -574,13 +555,36 @@ class DeploymentSettings {
     );
   }
 
-  // Factory method: Parse from JSON
-  static fromJSON(json: string): DeploymentSettings {
-    const parsed = JSON.parse(json);
-    return new DeploymentSettings(
-      parsed.EnvironmentVariables ?? [],
-      parsed.ConnectionReferences ?? []
-    );
+  // Factory method: Parse from JSON with validation
+  static fromJSON(json: string, filePath: string): DeploymentSettings {
+    try {
+      const parsed = JSON.parse(json);
+
+      // Validate structure
+      if (!Array.isArray(parsed.EnvironmentVariables)) {
+        throw new DeploymentSettingsValidationError(
+          filePath,
+          'EnvironmentVariables must be an array'
+        );
+      }
+
+      if (!Array.isArray(parsed.ConnectionReferences)) {
+        throw new DeploymentSettingsValidationError(
+          filePath,
+          'ConnectionReferences must be an array'
+        );
+      }
+
+      return new DeploymentSettings(
+        parsed.EnvironmentVariables ?? [],
+        parsed.ConnectionReferences ?? []
+      );
+    } catch (error) {
+      if (error instanceof DomainError) {
+        throw error; // Re-throw domain errors
+      }
+      throw new DeploymentSettingsParseError(filePath, error as Error);
+    }
   }
 
   // Factory method: Create empty
@@ -631,6 +635,108 @@ interface EnvironmentVariableValue {
 ### 2.4 Domain Services
 
 Domain services encapsulate business logic that doesn't naturally belong to a single entity.
+
+#### IMakerUrlBuilder
+
+```typescript
+/**
+ * Domain service for constructing Power Platform URLs.
+ *
+ * Handles region-specific URLs (sovereign clouds), custom domains,
+ * and URL pattern changes. Keeps infrastructure concerns out of entities.
+ */
+interface IMakerUrlBuilder {
+  /**
+   * Builds Maker Portal URL for a solution.
+   * @param environmentId - Environment GUID
+   * @param solutionId - Solution GUID
+   * @returns Full URL to solution in Maker Portal
+   */
+  buildSolutionUrl(environmentId: string, solutionId: string): string;
+
+  /**
+   * Builds Dynamics 365 URL for solution editor.
+   * @param environmentId - Environment GUID
+   * @param solutionId - Solution GUID
+   * @returns Full URL to solution in Dynamics 365
+   */
+  buildDynamicsUrl(environmentId: string, solutionId: string): string;
+
+  /**
+   * Builds Maker Portal URL for solutions list.
+   * @param environmentId - Environment GUID
+   * @returns Full URL to solutions list
+   */
+  buildSolutionsListUrl(environmentId: string): string;
+
+  /**
+   * Builds Maker Portal URL for import history.
+   * @param environmentId - Environment GUID
+   * @returns Full URL to import history
+   */
+  buildImportHistoryUrl(environmentId: string): string;
+
+  /**
+   * Builds Maker Portal URL for environment variables.
+   * @param environmentId - Environment GUID
+   * @returns Full URL to environment variables list
+   */
+  buildEnvironmentVariablesUrl(environmentId: string): string;
+
+  /**
+   * Builds Maker Portal URL for flows.
+   * @param environmentId - Environment GUID
+   * @returns Full URL to flows list
+   */
+  buildFlowsUrl(environmentId: string): string;
+}
+```
+
+**Why:** URL construction involves infrastructure concerns (regions, custom domains) that don't belong in domain entities. This service keeps entities pure while centralizing URL logic.
+
+**Infrastructure Implementation:**
+```typescript
+class MakerUrlBuilder implements IMakerUrlBuilder {
+  constructor(
+    private readonly baseUrl: string = 'https://make.powerapps.com'
+  ) {}
+
+  buildSolutionUrl(environmentId: string, solutionId: string): string {
+    return `${this.baseUrl}/environments/${environmentId}/solutions/${solutionId}`;
+  }
+
+  buildDynamicsUrl(environmentId: string, solutionId: string): string {
+    return `https://${environmentId}.dynamics.com/tools/solution/edit.aspx?id=${solutionId}`;
+  }
+
+  buildSolutionsListUrl(environmentId: string): string {
+    return `${this.baseUrl}/environments/${environmentId}/solutions`;
+  }
+
+  buildImportHistoryUrl(environmentId: string): string {
+    return `${this.baseUrl}/environments/${environmentId}/solutions/importhistory`;
+  }
+
+  buildEnvironmentVariablesUrl(environmentId: string): string {
+    return `${this.baseUrl}/environments/${environmentId}/environmentvariables`;
+  }
+
+  buildFlowsUrl(environmentId: string): string {
+    return `${this.baseUrl}/environments/${environmentId}/flows`;
+  }
+}
+```
+
+**Sovereign Cloud Example:**
+```typescript
+// China sovereign cloud
+const chinaUrlBuilder = new MakerUrlBuilder('https://make.powerplatform.azure.cn');
+
+// Germany sovereign cloud
+const germanyUrlBuilder = new MakerUrlBuilder('https://make.powerplatform.de');
+```
+
+---
 
 #### FlowConnectionRelationshipBuilder
 
@@ -701,20 +807,125 @@ export class FlowConnectionRelationshipBuilder {
 
 ### 2.5 Domain Exceptions
 
+Domain exceptions signal business rule violations without I/O side effects. Outer layers handle logging and display.
+
+#### Exception Hierarchy
+
 ```typescript
-export class InvalidClientDataError extends Error {
+/**
+ * Base domain exception - all domain exceptions extend this.
+ */
+export abstract class DomainError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+}
+
+/**
+ * Thrown when entity construction fails due to invalid data.
+ */
+export class ValidationError extends DomainError {
+  constructor(
+    public readonly entityName: string,
+    public readonly field: string,
+    public readonly value: any,
+    public readonly constraint: string
+  ) {
+    super(`Validation failed for ${entityName}.${field}: ${constraint} (received: ${value})`);
+  }
+}
+
+/**
+ * Thrown when CloudFlow.clientData JSON cannot be parsed.
+ */
+export class InvalidClientDataError extends DomainError {
   constructor(
     public readonly flowId: string,
     public readonly flowName: string,
     public readonly cause: Error
   ) {
-    super(`Failed to parse clientData for flow ${flowId} (${flowName})`);
-    this.name = 'InvalidClientDataError';
+    super(`Failed to parse clientData for flow ${flowId} (${flowName}): ${cause.message}`);
+  }
+}
+
+/**
+ * Thrown when DeploymentSettings JSON is corrupted or invalid.
+ */
+export class DeploymentSettingsParseError extends DomainError {
+  constructor(
+    public readonly filePath: string,
+    public readonly cause: Error
+  ) {
+    super(`Failed to parse deployment settings from ${filePath}: ${cause.message}`);
+  }
+}
+
+/**
+ * Thrown when DeploymentSettings has invalid structure (missing required fields).
+ */
+export class DeploymentSettingsValidationError extends DomainError {
+  constructor(
+    public readonly filePath: string,
+    public readonly details: string
+  ) {
+    super(`Invalid deployment settings structure in ${filePath}: ${details}`);
   }
 }
 ```
 
-**Why:** Domain exceptions allow domain to signal errors without I/O side effects. Outer layers handle logging and display.
+#### Usage Examples
+
+```typescript
+// In entity constructor
+class Solution {
+  constructor(version: string, ...) {
+    if (!/^\d+\.\d+\.\d+\.\d+$/.test(version)) {
+      throw new ValidationError('Solution', 'version', version, 'must be in format X.X.X.X');
+    }
+  }
+}
+
+// In entity method
+class CloudFlow {
+  extractConnectionReferenceNames(): string[] {
+    try {
+      return JSON.parse(this.clientData).properties?.connectionReferences;
+    } catch (error) {
+      throw new InvalidClientDataError(this.id, this.name, error as Error);
+    }
+  }
+}
+
+// In value object factory
+class DeploymentSettings {
+  static fromJSON(json: string, filePath: string): DeploymentSettings {
+    try {
+      const parsed = JSON.parse(json);
+
+      // Validate structure
+      if (!Array.isArray(parsed.EnvironmentVariables)) {
+        throw new DeploymentSettingsValidationError(
+          filePath,
+          'EnvironmentVariables must be an array'
+        );
+      }
+
+      return new DeploymentSettings(
+        parsed.EnvironmentVariables ?? [],
+        parsed.ConnectionReferences ?? []
+      );
+    } catch (error) {
+      if (error instanceof DomainError) {
+        throw error; // Re-throw domain errors
+      }
+      throw new DeploymentSettingsParseError(filePath, error as Error);
+    }
+  }
+}
+```
+
+**Why:** Explicit exception types make error handling testable and allow outer layers to handle different failure modes appropriately (e.g., corrupted file vs. validation error).
 
 ---
 
@@ -726,32 +937,33 @@ Domain defines contracts, infrastructure implements them.
 // Domain layer: src/features/dataPanelSuite/domain/interfaces/
 
 interface ISolutionRepository {
-  findAll(environmentId: string): Promise<Solution[]>;
+  findAll(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<Solution[]>;
 }
 
 interface IImportJobRepository {
-  findAll(environmentId: string): Promise<ImportJob[]>;
+  findAll(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<ImportJob[]>;
 }
 
 interface IEnvironmentVariableRepository {
-  findAllDefinitions(environmentId: string): Promise<EnvironmentVariableDefinition[]>;
-  findAllValues(environmentId: string): Promise<EnvironmentVariableValue[]>;
+  findAllDefinitions(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<EnvironmentVariableDefinition[]>;
+  findAllValues(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<EnvironmentVariableValue[]>;
 }
 
 interface IConnectionReferenceRepository {
-  findAll(environmentId: string): Promise<ConnectionReference[]>;
+  findAll(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<ConnectionReference[]>;
 }
 
 interface ICloudFlowRepository {
-  findAll(environmentId: string): Promise<CloudFlow[]>;
+  findAll(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<CloudFlow[]>;
 }
 
 interface ISolutionComponentRepository {
-  getObjectTypeCode(environmentId: string, entityLogicalName: string): Promise<number | null>;
+  getObjectTypeCode(environmentId: string, entityLogicalName: string, cancellationToken?: vscode.CancellationToken): Promise<number | null>;
   findComponentIdsBySolution(
     environmentId: string,
     solutionId: string,
-    entityLogicalName: string
+    entityLogicalName: string,
+    cancellationToken?: vscode.CancellationToken
   ): Promise<string[]>;
 }
 
@@ -764,9 +976,180 @@ interface IDeploymentSettingsRepository {
 interface IEditorService {
   openXmlInNewTab(content: string, title?: string): Promise<void>;
 }
+
+/**
+ * Logger interface for use cases and infrastructure.
+ * Reuses existing ILogger from shared infrastructure.
+ *
+ * Note: Domain entities NEVER use ILogger - they stay pure.
+ * Only application and infrastructure layers inject and use ILogger.
+ */
+interface ILogger {
+  debug(message: string, ...args: any[]): void;
+  info(message: string, ...args: any[]): void;
+  warn(message: string, ...args: any[]): void;
+  error(message: string, error?: Error): void;
+}
 ```
 
-**Why:** Domain defines contracts, which allows infrastructure to be swapped without changing domain or application layers. Perfect for testing with mocks.
+**Why:** Domain defines contracts, which allows infrastructure to be swapped without changing domain or application layers. Perfect for testing with mocks. Cancellation tokens allow users to cancel long-running operations. ILogger is injected into use cases for observability.
+
+---
+
+### 2.7 Validation Strategy
+
+**Approach:** Validate eagerly - fail fast in entity constructors.
+
+#### Validation Rules
+
+| Entity | Field | Validation | Why |
+|--------|-------|------------|-----|
+| **Solution** | `version` | Must match `^\d+\.\d+\.\d+\.\d+$` | Microsoft format standard |
+| **ImportJob** | `progress` | Must be 0-100 | Business invariant |
+| **EnvironmentVariable** | `type` | Must be valid EnvironmentVariableType enum | Data integrity |
+| **DeploymentSettings** | `EnvironmentVariables` | Must be array | Required structure |
+| **DeploymentSettings** | `ConnectionReferences` | Must be array | Required structure |
+
+#### Validation Pattern
+
+```typescript
+class Solution {
+  constructor(
+    public readonly id: string,
+    public readonly uniqueName: string,
+    public readonly friendlyName: string,
+    public readonly version: string,
+    public readonly isManaged: boolean,
+    public readonly publisherId: string,
+    public readonly publisherName: string,
+    public readonly installedOn: Date | null,
+    public readonly description: string
+  ) {
+    // Validate business invariants FIRST, before setting properties
+    if (!/^\d+\.\d+\.\d+\.\d+$/.test(version)) {
+      throw new ValidationError('Solution', 'version', version, 'must be in format X.X.X.X');
+    }
+  }
+}
+
+class ImportJob {
+  constructor(
+    public readonly id: string,
+    public readonly solutionName: string,
+    public readonly progress: number,
+    public readonly startedOn: Date,
+    public readonly completedOn: Date | null,
+    public readonly importLogXml: string,
+    public readonly createdBy: string
+  ) {
+    // Validate progress range
+    if (progress < 0 || progress > 100) {
+      throw new ValidationError('ImportJob', 'progress', progress, 'must be between 0 and 100');
+    }
+  }
+}
+
+class EnvironmentVariable {
+  constructor(
+    public readonly id: string,
+    public readonly schemaName: string,
+    public readonly displayName: string,
+    public readonly type: EnvironmentVariableType,
+    public readonly currentValue: string | null,
+    public readonly defaultValue: string | null,
+    public readonly isManaged: boolean,
+    public readonly modifiedOn: Date,
+    public readonly modifiedBy: string
+  ) {
+    // Validate enum value
+    const validTypes = Object.values(EnvironmentVariableType);
+    if (!validTypes.includes(type)) {
+      throw new ValidationError(
+        'EnvironmentVariable',
+        'type',
+        type,
+        `must be one of: ${validTypes.join(', ')}`
+      );
+    }
+  }
+}
+```
+
+#### When NOT to Validate
+
+**Don't validate:**
+- Optional string fields (description, friendlyName) - empty/null is valid
+- Date fields - assume repository provides valid dates
+- GUIDs - assume repository provides valid IDs
+- Display-only data (modifiedBy, createdBy) - not business critical
+
+**Why:** Over-validation adds complexity without value. Validate **business invariants only**.
+
+#### Validation vs. Parsing
+
+| Concern | Validation | Parsing |
+|---------|-----------|---------|
+| **Version format** | ✅ Validation | Entity constructor |
+| **Progress range** | ✅ Validation | Entity constructor |
+| **JSON structure** | ❌ Parsing error | Try/catch, throw specific exception |
+| **XML format** | ❌ Parsing error | Try/catch, throw specific exception |
+| **Enum membership** | ✅ Validation | Entity constructor |
+
+**Rule:** If it's a **business rule**, validate. If it's **data format**, parse and throw domain exception on failure.
+
+**Important Distinction:**
+
+- **Business validation (constructors):** Validate business invariants eagerly when creating entities. These are rules like "progress must be 0-100" or "version must match format X.X.X.X". Fail fast with `ValidationError`.
+
+- **Parsing validation (methods):** Complex data parsing (JSON, XML) happens in entity methods, not constructors. These methods use try/catch and throw specific exceptions like `InvalidClientDataError` or `DeploymentSettingsParseError`.
+
+**Why the split?**
+- Constructors should be simple and fast - just validate invariants
+- Parsing is expensive and failure-prone - belongs in dedicated methods
+- Repositories call constructors with validated data, use cases call parsing methods
+- Clear separation: constructors validate shape, methods validate content
+
+**Examples:**
+```typescript
+// ✅ Constructor validation (business invariant)
+class ImportJob {
+  constructor(progress: number, ...) {
+    if (progress < 0 || progress > 100) {
+      throw new ValidationError('ImportJob', 'progress', progress, 'must be 0-100');
+    }
+  }
+}
+
+// ✅ Method parsing (complex data structure)
+class CloudFlow {
+  extractConnectionReferenceNames(): string[] {
+    try {
+      const parsed = JSON.parse(this.clientData);
+      return parsed.properties?.connectionReferences ?? [];
+    } catch (error) {
+      throw new InvalidClientDataError(this.id, this.name, error as Error);
+    }
+  }
+}
+
+// ✅ Factory method parsing (static constructor alternative)
+class DeploymentSettings {
+  static fromJSON(json: string, filePath: string): DeploymentSettings {
+    try {
+      const parsed = JSON.parse(json);
+
+      // Validate structure after parsing
+      if (!Array.isArray(parsed.EnvironmentVariables)) {
+        throw new DeploymentSettingsValidationError(filePath, '...');
+      }
+
+      return new DeploymentSettings(...);  // Constructor gets validated data
+    } catch (error) {
+      throw new DeploymentSettingsParseError(filePath, error as Error);
+    }
+  }
+}
+```
 
 ---
 
@@ -780,25 +1163,47 @@ Use cases orchestrate domain entities and repositories. They contain **ZERO busi
 
 ```typescript
 class ListSolutionsUseCase {
-  constructor(private readonly solutionRepository: ISolutionRepository) {}
+  constructor(
+    private readonly solutionRepository: ISolutionRepository,
+    private readonly logger: ILogger
+  ) {}
 
-  async execute(environmentId: string): Promise<Solution[]> {
-    // Orchestration only: fetch and sort
-    const solutions = await this.solutionRepository.findAll(environmentId);
+  async execute(
+    environmentId: string,
+    cancellationToken?: vscode.CancellationToken
+  ): Promise<Solution[]> {
+    this.logger.info('ListSolutionsUseCase started', { environmentId });
 
-    // Sort using domain logic (entity knows its sort priority)
-    return solutions.sort((a, b) => {
-      const priorityDiff = a.getSortPriority() - b.getSortPriority();
-      if (priorityDiff !== 0) {
-        return priorityDiff;
+    try {
+      // Check cancellation before expensive operation
+      if (cancellationToken?.isCancellationRequested) {
+        this.logger.info('ListSolutionsUseCase cancelled');
+        throw new Error('Operation cancelled');
       }
-      return a.friendlyName.localeCompare(b.friendlyName);
-    });
+
+      // Orchestration only: fetch and sort
+      const solutions = await this.solutionRepository.findAll(environmentId, cancellationToken);
+
+      // Sort using domain logic (entity knows its sort priority)
+      const sorted = solutions.sort((a, b) => {
+        const priorityDiff = a.getSortPriority() - b.getSortPriority();
+        if (priorityDiff !== 0) {
+          return priorityDiff;
+        }
+        return a.friendlyName.localeCompare(b.friendlyName);
+      });
+
+      this.logger.info('ListSolutionsUseCase completed', { count: sorted.length });
+      return sorted;
+    } catch (error) {
+      this.logger.error('ListSolutionsUseCase failed', error as Error);
+      throw error;
+    }
   }
 }
 ```
 
-**Why:** Use case orchestrates (fetch, sort) but delegates business logic (sort priority) to entities.
+**Why:** Use case orchestrates (fetch, sort) but delegates business logic (sort priority) to entities. Logs at boundaries for observability. Supports cancellation for long-running operations.
 
 ---
 
@@ -808,23 +1213,42 @@ class ListSolutionsUseCase {
 
 ```typescript
 class ListImportJobsUseCase {
-  constructor(private readonly importJobRepository: IImportJobRepository) {}
+  constructor(
+    private readonly importJobRepository: IImportJobRepository,
+    private readonly logger: ILogger
+  ) {}
 
   async execute(
     environmentId: string,
-    solutionId: string | null
+    solutionId: string | null,
+    cancellationToken?: vscode.CancellationToken
   ): Promise<ImportJob[]> {
-    // Orchestration: fetch all jobs
-    let jobs = await this.importJobRepository.findAll(environmentId);
+    this.logger.info('ListImportJobsUseCase started', { environmentId, solutionId });
 
-    // Orchestration: filter by solution name if needed
-    if (solutionId) {
-      const solutionName = await this.getSolutionName(solutionId);
-      jobs = jobs.filter(job => job.solutionName === solutionName);
+    try {
+      if (cancellationToken?.isCancellationRequested) {
+        this.logger.info('ListImportJobsUseCase cancelled');
+        throw new Error('Operation cancelled');
+      }
+
+      // Orchestration: fetch all jobs
+      let jobs = await this.importJobRepository.findAll(environmentId, cancellationToken);
+
+      // Orchestration: filter by solution name if needed
+      if (solutionId) {
+        const solutionName = await this.getSolutionName(solutionId);
+        jobs = jobs.filter(job => job.solutionName === solutionName);
+      }
+
+      // Orchestration: sort by started date (newest first)
+      const sorted = jobs.sort((a, b) => b.startedOn.getTime() - a.startedOn.getTime());
+
+      this.logger.info('ListImportJobsUseCase completed', { count: sorted.length });
+      return sorted;
+    } catch (error) {
+      this.logger.error('ListImportJobsUseCase failed', error as Error);
+      throw error;
     }
-
-    // Orchestration: sort by started date (newest first)
-    return jobs.sort((a, b) => b.startedOn.getTime() - a.startedOn.getTime());
   }
 
   private async getSolutionName(solutionId: string): Promise<string> {
@@ -835,7 +1259,7 @@ class ListImportJobsUseCase {
 }
 ```
 
-**Why:** Use case orchestrates filtering and sorting, but delegates status/error parsing to ImportJob entity methods.
+**Why:** Use case orchestrates filtering and sorting, but delegates status/error parsing to ImportJob entity methods. Logs at boundaries for observability.
 
 ---
 
@@ -843,19 +1267,34 @@ class ListImportJobsUseCase {
 
 ```typescript
 class OpenImportLogInEditorUseCase {
-  constructor(private readonly editorService: IEditorService) {}
+  constructor(
+    private readonly editorService: IEditorService,
+    private readonly logger: ILogger
+  ) {}
 
   async execute(importJob: ImportJob): Promise<void> {
-    // Orchestration only: get XML and open in editor
-    const xml = importJob.importLogXml;
-    const title = `Import Log - ${importJob.solutionName}`;
+    this.logger.info('OpenImportLogInEditorUseCase started', {
+      importJobId: importJob.id,
+      solutionName: importJob.solutionName
+    });
 
-    await this.editorService.openXmlInNewTab(xml, title);
+    try {
+      // Orchestration only: get XML and open in editor
+      const xml = importJob.importLogXml;
+      const title = `Import Log - ${importJob.solutionName}`;
+
+      await this.editorService.openXmlInNewTab(xml, title);
+
+      this.logger.info('OpenImportLogInEditorUseCase completed');
+    } catch (error) {
+      this.logger.error('OpenImportLogInEditorUseCase failed', error as Error);
+      throw error;
+    }
   }
 }
 ```
 
-**Why:** Pure orchestration. No business logic here.
+**Why:** Pure orchestration. No business logic here. Logs at boundaries for observability. No cancellation token needed (fast synchronous operation).
 
 ---
 
@@ -867,39 +1306,65 @@ class OpenImportLogInEditorUseCase {
 class ListEnvironmentVariablesUseCase {
   constructor(
     private readonly envVarRepository: IEnvironmentVariableRepository,
-    private readonly solutionComponentRepository: ISolutionComponentRepository
+    private readonly solutionComponentRepository: ISolutionComponentRepository,
+    private readonly logger: ILogger
   ) {}
 
   async execute(
     environmentId: string,
-    solutionId: string | null
+    solutionId: string | null,
+    cancellationToken?: vscode.CancellationToken
   ): Promise<EnvironmentVariable[]> {
-    // Orchestration: fetch definitions and values in parallel
-    const [definitions, values] = await Promise.all([
-      this.envVarRepository.findAllDefinitions(environmentId),
-      this.envVarRepository.findAllValues(environmentId)
-    ]);
+    this.logger.info('ListEnvironmentVariablesUseCase started', { environmentId, solutionId });
 
-    // Orchestration: join definitions with values
-    const variables = this.joinDefinitionsWithValues(definitions, values);
+    try {
+      if (cancellationToken?.isCancellationRequested) {
+        this.logger.info('ListEnvironmentVariablesUseCase cancelled');
+        throw new Error('Operation cancelled');
+      }
 
-    // Orchestration: filter by solution if needed
-    if (solutionId) {
-      const componentIds = await this.solutionComponentRepository.findComponentIdsBySolution(
-        environmentId,
-        solutionId,
-        'environmentvariabledefinition'
-      );
-      const componentIdSet = new Set(componentIds);
+      // Orchestration: fetch definitions and values in parallel
+      const [definitions, values] = await Promise.all([
+        this.envVarRepository.findAllDefinitions(environmentId, cancellationToken),
+        this.envVarRepository.findAllValues(environmentId, cancellationToken)
+      ]);
 
-      // Delegate filtering logic to entity
-      return variables
-        .filter(v => v.isInSolution(componentIdSet))
-        .sort((a, b) => a.schemaName.localeCompare(b.schemaName));
+      // Orchestration: join definitions with values
+      const variables = this.joinDefinitionsWithValues(definitions, values);
+
+      // Orchestration: filter by solution if needed
+      if (solutionId) {
+        if (cancellationToken?.isCancellationRequested) {
+          this.logger.info('ListEnvironmentVariablesUseCase cancelled');
+          throw new Error('Operation cancelled');
+        }
+
+        const componentIds = await this.solutionComponentRepository.findComponentIdsBySolution(
+          environmentId,
+          solutionId,
+          'environmentvariabledefinition',
+          cancellationToken
+        );
+        const componentIdSet = new Set(componentIds);
+
+        // Delegate filtering logic to entity
+        const filtered = variables
+          .filter(v => v.isInSolution(componentIdSet))
+          .sort((a, b) => a.schemaName.localeCompare(b.schemaName));
+
+        this.logger.info('ListEnvironmentVariablesUseCase completed', { count: filtered.length });
+        return filtered;
+      }
+
+      // Orchestration: sort by schema name
+      const sorted = variables.sort((a, b) => a.schemaName.localeCompare(b.schemaName));
+
+      this.logger.info('ListEnvironmentVariablesUseCase completed', { count: sorted.length });
+      return sorted;
+    } catch (error) {
+      this.logger.error('ListEnvironmentVariablesUseCase failed', error as Error);
+      throw error;
     }
-
-    // Orchestration: sort by schema name
-    return variables.sort((a, b) => a.schemaName.localeCompare(b.schemaName));
   }
 
   private joinDefinitionsWithValues(
@@ -926,7 +1391,7 @@ class ListEnvironmentVariablesUseCase {
 }
 ```
 
-**Why:** Use case orchestrates parallel fetching, joining, and filtering. Business logic (isInSolution, getEffectiveValue) stays in entities.
+**Why:** Use case orchestrates parallel fetching, joining, and filtering. Business logic (isInSolution, getEffectiveValue) stays in entities. Logs at boundaries and checks cancellation at key points.
 
 ---
 
@@ -1161,7 +1626,7 @@ class VsCodeDeploymentSettingsRepository implements IDeploymentSettingsRepositor
   async read(filePath: string): Promise<DeploymentSettings> {
     const fs = require('fs').promises;
     const content = await fs.readFile(filePath, 'utf8');
-    return DeploymentSettings.fromJSON(content);
+    return DeploymentSettings.fromJSON(content, filePath);
   }
 
   async write(filePath: string, settings: DeploymentSettings): Promise<void> {
@@ -1317,8 +1782,18 @@ abstract class BaseDataPanel {
     return 'An unexpected error occurred';
   }
 
-  // Abstract methods that subclasses must implement
+  /**
+   * Fetches data from repositories and updates panel state.
+   * Subclasses must implement this to define specific data loading behavior.
+   * Called automatically when environment changes or user refreshes.
+   */
   protected abstract fetchData(): Promise<void>;
+
+  /**
+   * Returns the Maker Portal URL for the current panel's context.
+   * Used by "Open in Maker" button to navigate to the appropriate page.
+   * @returns Full URL to Maker Portal page (e.g., solutions list, import history)
+   */
   protected abstract getMakerUrl(): string;
 }
 ```
@@ -1390,10 +1865,38 @@ abstract class BaseTablePanel<T> extends BaseDataPanel {
     this.panel.webview.postMessage({ command: 'setData', data: viewModels });
   }
 
-  // Abstract methods that subclasses must implement
+  /**
+   * Converts a domain entity to a ViewModel for display in the webview.
+   * ViewModels should be plain objects with string/number/boolean fields optimized for UI.
+   * @param item Domain entity to convert
+   * @returns ViewModel with UI-friendly format (dates as strings, booleans as "Yes"/"No", etc.)
+   */
   protected abstract toViewModel(item: T): any;
+
+  /**
+   * Determines if a row matches the search query.
+   * Called for each row during client-side search filtering.
+   * @param row Domain entity to search
+   * @param query Lowercase search string
+   * @returns True if row matches query, false otherwise
+   */
   protected abstract searchRow(row: T, query: string): boolean;
+
+  /**
+   * Extracts a column value from a domain entity for sorting.
+   * Used by client-side sort to get comparable values.
+   * @param row Domain entity
+   * @param column Column name to extract (e.g., "friendlyName", "modifiedOn")
+   * @returns Value to sort by (string, number, Date, or null)
+   */
   protected abstract getColumnValue(row: T, column: string): any;
+
+  /**
+   * Handles user actions on table rows (e.g., "openInMaker", "viewDetails").
+   * Called when user clicks context menu or row action button.
+   * @param action Action identifier (e.g., "openInMaker")
+   * @param rowData ViewModel data for the row
+   */
   protected abstract handleRowAction(action: string, rowData: any): Promise<void>;
 
   private compareValues(a: any, b: any): number {
@@ -1415,23 +1918,41 @@ abstract class BaseTablePanel<T> extends BaseDataPanel {
 
 ```typescript
 class SolutionExplorerPanel extends BaseTablePanel<Solution> {
+  private cancellationTokenSource: vscode.CancellationTokenSource | null = null;
+
   constructor(
     panel: vscode.WebviewPanel,
     environmentService: IEnvironmentService,
-    private readonly listSolutionsUseCase: ListSolutionsUseCase
+    private readonly listSolutionsUseCase: ListSolutionsUseCase,
+    private readonly urlBuilder: IMakerUrlBuilder,
+    private readonly logger: ILogger
   ) {
     super(panel, environmentService);
   }
 
   protected async fetchData(): Promise<void> {
-    // Delegate to use case
-    this.data = await this.listSolutionsUseCase.execute(this.environmentId!);
-    this.filteredData = this.data;
-    this.sendDataToWebview();
+    // Cancel previous operation if still running
+    this.cancellationTokenSource?.cancel();
+    this.cancellationTokenSource = new vscode.CancellationTokenSource();
+
+    try {
+      // Delegate to use case with cancellation support
+      this.data = await this.listSolutionsUseCase.execute(
+        this.environmentId!,
+        this.cancellationTokenSource.token
+      );
+      this.filteredData = this.data;
+      this.sendDataToWebview();
+    } catch (error) {
+      if (error.message !== 'Operation cancelled') {
+        throw error;
+      }
+      // Silently ignore cancellation errors
+    }
   }
 
   protected getMakerUrl(): string {
-    return `https://make.powerapps.com/environments/${this.environmentId}/solutions`;
+    return this.urlBuilder.buildSolutionsListUrl(this.environmentId!);
   }
 
   protected toViewModel(solution: Solution): SolutionViewModel {
@@ -1473,21 +1994,27 @@ class SolutionExplorerPanel extends BaseTablePanel<Solution> {
 
     switch (action) {
       case 'openInMaker':
-        // Delegate URL construction to entity
-        const makerUrl = solution.getMakerUrl(this.environmentId!);
+        // Delegate URL construction to domain service
+        const makerUrl = this.urlBuilder.buildSolutionUrl(this.environmentId!, solution.id);
         await vscode.env.openExternal(vscode.Uri.parse(makerUrl));
+        this.logger.info('Opened solution in Maker Portal', { solutionId: solution.id });
         break;
       case 'openInDynamics':
-        // Delegate URL construction to entity
-        const dynamicsUrl = solution.getDynamicsUrl(this.environmentId!);
+        // Delegate URL construction to domain service
+        const dynamicsUrl = this.urlBuilder.buildDynamicsUrl(this.environmentId!, solution.id);
         await vscode.env.openExternal(vscode.Uri.parse(dynamicsUrl));
+        this.logger.info('Opened solution in Dynamics 365', { solutionId: solution.id });
         break;
     }
+  }
+
+  dispose(): void {
+    this.cancellationTokenSource?.dispose();
   }
 }
 ```
 
-**Why:** Panel delegates to use case, maps domain entities to view models, handles UI events. Minimal business logic here.
+**Why:** Panel delegates to use case, maps domain entities to view models, handles UI events. Uses IMakerUrlBuilder domain service for URL construction. Supports cancellation tokens to stop long-running operations. Logs user actions for observability.
 
 ---
 
@@ -1495,27 +2022,47 @@ class SolutionExplorerPanel extends BaseTablePanel<Solution> {
 
 ```typescript
 class ImportJobViewerPanel extends BaseTablePanel<ImportJob> {
+  private cancellationTokenSource: vscode.CancellationTokenSource | null = null;
+
   constructor(
     panel: vscode.WebviewPanel,
     environmentService: IEnvironmentService,
     private readonly listImportJobsUseCase: ListImportJobsUseCase,
-    private readonly openImportLogUseCase: OpenImportLogInEditorUseCase
+    private readonly openImportLogUseCase: OpenImportLogInEditorUseCase,
+    private readonly urlBuilder: IMakerUrlBuilder,
+    private readonly logger: ILogger
   ) {
     super(panel, environmentService);
   }
 
   protected async fetchData(): Promise<void> {
-    // Delegate to use case
-    this.data = await this.listImportJobsUseCase.execute(
-      this.environmentId!,
-      this.solutionId
-    );
-    this.filteredData = this.data;
-    this.sendDataToWebview();
+    // Cancel previous operation if still running
+    this.cancellationTokenSource?.cancel();
+    this.cancellationTokenSource = new vscode.CancellationTokenSource();
+
+    try {
+      // Delegate to use case with cancellation support
+      this.data = await this.listImportJobsUseCase.execute(
+        this.environmentId!,
+        this.solutionId,
+        this.cancellationTokenSource.token
+      );
+      this.filteredData = this.data;
+      this.sendDataToWebview();
+    } catch (error) {
+      if (error.message !== 'Operation cancelled') {
+        throw error;
+      }
+      // Silently ignore cancellation errors
+    }
   }
 
   protected getMakerUrl(): string {
-    return `https://make.powerapps.com/environments/${this.environmentId}/solutions/importhistory`;
+    return this.urlBuilder.buildImportHistoryUrl(this.environmentId!);
+  }
+
+  dispose(): void {
+    this.cancellationTokenSource?.dispose();
   }
 
   protected toViewModel(importJob: ImportJob): ImportJobViewModel {
@@ -1601,7 +2148,7 @@ class EnvironmentVariablesPanel extends BaseTablePanel<EnvironmentVariable> {
   }
 
   protected getMakerUrl(): string {
-    return `https://make.powerapps.com/environments/${this.environmentId}/environmentvariables`;
+    return this.urlBuilder.buildEnvironmentVariablesUrl(this.environmentId!);
   }
 
   protected toViewModel(envVar: EnvironmentVariable): EnvironmentVariableViewModel {
@@ -1706,7 +2253,7 @@ class ConnectionReferencesPanel extends BaseTablePanel<FlowConnectionRelationshi
   }
 
   protected getMakerUrl(): string {
-    return `https://make.powerapps.com/environments/${this.environmentId}/flows`;
+    return this.urlBuilder.buildFlowsUrl(this.environmentId!);
   }
 
   protected toViewModel(relationship: FlowConnectionRelationship): ConnectionReferenceViewModel {
@@ -1834,16 +2381,18 @@ interface ConnectionReferenceViewModel {
 |---------|-------|-----------|
 | Status determination (ImportJob) | Domain Entity | Complex rules, core business logic |
 | Error parsing (ImportJob) | Domain Entity | Domain knows its data structure |
-| URL construction (Solution) | Domain Entity | Entity knows how to represent itself |
+| URL construction (Power Platform) | Domain Service (IMakerUrlBuilder) | Infrastructure concern (regions, custom domains) |
 | Effective value resolution (EnvironmentVariable) | Domain Entity | Core business rule |
 | ClientData parsing (CloudFlow) | Domain Entity | Entity knows its JSON structure |
-| Relationship building (FlowConnectionRelationship) | Domain Value Object | Complex relationship logic |
+| Relationship building (FlowConnectionRelationship) | Domain Service | Complex relationship logic spanning entities |
 | Deployment settings sync algorithm | Domain Entity (DeploymentSettings) | Complex business rule, needs consistency |
 | Solution filtering | Application Use Case | Orchestration: fetch IDs, delegate to entities |
 | Data fetching | Infrastructure Repository | External concern, not business logic |
 | Search/sort | Presentation Panel | UI concern, client-side filtering |
+| Logging | Application/Infrastructure | Observability concern, never in domain |
+| Cancellation | Application/Presentation | Coordination concern, token passed through layers |
 
-**Key Principle:** If it's a business rule that could change based on domain requirements, it belongs in domain entities. If it's coordination between entities/repositories, it belongs in use cases.
+**Key Principle:** If it's a business rule that could change based on domain requirements, it belongs in domain entities. If it's coordination between entities/repositories, it belongs in use cases. Infrastructure concerns (URLs, logging, cancellation) belong in appropriate outer layers.
 
 ---
 
@@ -1953,6 +2502,182 @@ BaseTablePanel (solution filter, search, sort, table)
     ↓
 [SolutionExplorerPanel, ImportJobViewerPanel, EnvironmentVariablesPanel, ConnectionReferencesPanel]
 ```
+
+---
+
+### 6.8 Concurrency & Race Conditions
+
+**Strategy:** Cancel previous requests, always show latest state.
+
+#### Problem Scenarios
+
+| Scenario | Race Condition | Impact |
+|----------|----------------|--------|
+| **Environment switch** | User switches from Env A → Env B while Env A data is loading | Env B selected, but Env A data displayed |
+| **Rapid refresh** | User clicks refresh repeatedly | Multiple API calls in flight, wasting resources |
+| **Solution filter change** | User switches solutions while data is loading | Wrong solution's data displayed |
+
+#### Solution: Cancellation Tokens
+
+**Pattern:** Each panel maintains a `CancellationTokenSource`, cancels previous operation before starting new one.
+
+```typescript
+abstract class BaseTablePanel<T> extends BaseDataPanel {
+  protected data: T[] = [];
+  protected filteredData: T[] = [];
+  protected solutionId: string | null = null;
+
+  // ✅ Cancellation token source for current operation
+  private cancellationTokenSource: vscode.CancellationTokenSource | null = null;
+
+  protected async loadData(): Promise<void> {
+    if (!this.environmentId) {
+      return;
+    }
+
+    // ✅ Cancel previous operation if still running
+    this.cancellationTokenSource?.cancel();
+    this.cancellationTokenSource = new vscode.CancellationTokenSource();
+
+    this.setLoading(true);
+    this.setError(null);
+
+    try {
+      // ✅ Pass cancellation token to use case
+      await this.fetchData(this.cancellationTokenSource.token);
+    } catch (error) {
+      // ✅ Don't show errors for cancelled operations
+      if (error.message !== 'Operation cancelled') {
+        this.setError(this.formatError(error));
+      }
+    } finally {
+      this.setLoading(false);
+    }
+  }
+
+  // Subclasses implement with cancellation token support
+  protected abstract fetchData(cancellationToken: vscode.CancellationToken): Promise<void>;
+
+  dispose(): void {
+    // ✅ Clean up cancellation token on disposal
+    this.cancellationTokenSource?.dispose();
+  }
+}
+```
+
+#### Panel Implementation Example
+
+```typescript
+class SolutionExplorerPanel extends BaseTablePanel<Solution> {
+  protected async fetchData(cancellationToken: vscode.CancellationToken): Promise<void> {
+    // ✅ Delegate to use case with cancellation token
+    this.data = await this.listSolutionsUseCase.execute(
+      this.environmentId!,
+      cancellationToken
+    );
+
+    // ✅ Check cancellation before updating UI
+    if (cancellationToken.isCancellationRequested) {
+      return;
+    }
+
+    this.filteredData = this.data;
+    this.sendDataToWebview();
+  }
+}
+```
+
+#### Use Case Cancellation Checks
+
+```typescript
+class ListEnvironmentVariablesUseCase {
+  async execute(
+    environmentId: string,
+    solutionId: string | null,
+    cancellationToken?: vscode.CancellationToken
+  ): Promise<EnvironmentVariable[]> {
+    this.logger.info('ListEnvironmentVariablesUseCase started', { environmentId, solutionId });
+
+    try {
+      // ✅ Check cancellation before expensive operation
+      if (cancellationToken?.isCancellationRequested) {
+        this.logger.info('ListEnvironmentVariablesUseCase cancelled before fetch');
+        throw new Error('Operation cancelled');
+      }
+
+      // Fetch data (repositories also check cancellation internally)
+      const [definitions, values] = await Promise.all([
+        this.envVarRepository.findAllDefinitions(environmentId, cancellationToken),
+        this.envVarRepository.findAllValues(environmentId, cancellationToken)
+      ]);
+
+      // ✅ Check cancellation after I/O, before CPU-intensive work
+      if (cancellationToken?.isCancellationRequested) {
+        this.logger.info('ListEnvironmentVariablesUseCase cancelled after fetch');
+        throw new Error('Operation cancelled');
+      }
+
+      // Process data (join, filter, sort)
+      const variables = this.joinDefinitionsWithValues(definitions, values);
+
+      this.logger.info('ListEnvironmentVariablesUseCase completed', { count: variables.length });
+      return variables;
+    } catch (error) {
+      this.logger.error('ListEnvironmentVariablesUseCase failed', error as Error);
+      throw error;
+    }
+  }
+}
+```
+
+#### Repository Cancellation Support
+
+```typescript
+class DataverseApiSolutionRepository implements ISolutionRepository {
+  async findAll(
+    environmentId: string,
+    cancellationToken?: vscode.CancellationToken
+  ): Promise<Solution[]> {
+    this.logger.debug('Fetching solutions from Dataverse API', { environmentId });
+
+    // ✅ Check cancellation before API call
+    if (cancellationToken?.isCancellationRequested) {
+      this.logger.debug('Repository operation cancelled before API call');
+      throw new Error('Operation cancelled');
+    }
+
+    try {
+      const response = await this.apiService.get(environmentId, endpoint);
+
+      // ✅ Check cancellation before expensive mapping
+      if (cancellationToken?.isCancellationRequested) {
+        this.logger.debug('Repository operation cancelled after API call');
+        throw new Error('Operation cancelled');
+      }
+
+      return response.value.map(item => new Solution(/* ... */));
+    } catch (error) {
+      this.logger.error('Failed to fetch solutions from Dataverse API', error as Error);
+      throw error;
+    }
+  }
+}
+```
+
+#### Benefits
+
+1. **No stale data** - Previous requests cancelled, only latest displayed
+2. **Resource efficiency** - Abandoned API calls don't waste bandwidth
+3. **Better UX** - Fast environment switching without waiting for old requests
+4. **Graceful cancellation** - Operations check cancellation at key points
+
+#### What We DON'T Need
+
+❌ **Request deduplication** - User actions are infrequent, cancellation is sufficient
+❌ **Request queuing** - Always show latest state, don't wait for previous requests
+❌ **Shared cache** - Each panel independently fetches data (simple, no coordination needed)
+
+**Rationale:** YAGNI - cancellation tokens solve the race condition problem without added complexity.
 
 ---
 
@@ -2230,6 +2955,417 @@ describe('SolutionExplorerPanel', () => {
 
 ---
 
+### 8.5 Logging Strategy
+
+**Logging Principle from CLAUDE.md:** Log at use case boundaries, inject ILogger, never log in domain entities.
+
+#### Layer Responsibilities
+
+| Layer | Logs? | What to Log | How |
+|-------|-------|-------------|-----|
+| **Domain** | ❌ NEVER | Nothing - domain stays pure | N/A |
+| **Application (Use Cases)** | ✅ YES | Start/completion/failure at boundaries | Injected ILogger |
+| **Infrastructure** | ✅ YES | API calls, auth, storage (debug level) | Injected ILogger |
+| **Presentation (Panels)** | ✅ YES | User actions, command invocations, lifecycle | Injected ILogger |
+
+#### Use Case Logging Pattern
+
+```typescript
+class ListSolutionsUseCase {
+  constructor(
+    private readonly solutionRepository: ISolutionRepository,
+    private readonly logger: ILogger  // ← Inject logger
+  ) {}
+
+  async execute(
+    environmentId: string,
+    cancellationToken?: vscode.CancellationToken
+  ): Promise<Solution[]> {
+    // Log start with context
+    this.logger.info('ListSolutionsUseCase started', { environmentId });
+
+    try {
+      const solutions = await this.solutionRepository.findAll(environmentId, cancellationToken);
+      const sorted = solutions.sort(/* ... */);
+
+      // Log completion with metrics
+      this.logger.info('ListSolutionsUseCase completed', { count: sorted.length });
+      return sorted;
+    } catch (error) {
+      // Log failure with error
+      this.logger.error('ListSolutionsUseCase failed', error as Error);
+      throw error;
+    }
+  }
+}
+```
+
+#### Infrastructure Logging Pattern
+
+```typescript
+class DataverseApiSolutionRepository implements ISolutionRepository {
+  constructor(
+    private readonly apiService: IPowerPlatformApiService,
+    private readonly authService: IAuthenticationService,
+    private readonly logger: ILogger  // ← Inject logger
+  ) {}
+
+  async findAll(
+    environmentId: string,
+    cancellationToken?: vscode.CancellationToken
+  ): Promise<Solution[]> {
+    const endpoint = `/api/data/v9.2/solutions?$select=...`;
+
+    // Log infrastructure operation at debug level
+    this.logger.debug('Fetching solutions from Dataverse API', {
+      environmentId,
+      endpoint
+    });
+
+    try {
+      const response = await this.apiService.get(environmentId, endpoint);
+
+      this.logger.debug('Solutions fetched successfully', {
+        count: response.value.length
+      });
+
+      return response.value.map(/* ... */);
+    } catch (error) {
+      // Log infrastructure failures with context
+      this.logger.error('Failed to fetch solutions from Dataverse API', {
+        environmentId,
+        endpoint,
+        error
+      });
+      throw error;
+    }
+  }
+}
+```
+
+#### Panel Logging Pattern
+
+```typescript
+class SolutionExplorerPanel extends BaseTablePanel<Solution> {
+  constructor(
+    panel: vscode.WebviewPanel,
+    environmentService: IEnvironmentService,
+    private readonly listSolutionsUseCase: ListSolutionsUseCase,
+    private readonly urlBuilder: IMakerUrlBuilder,
+    private readonly logger: ILogger  // ← Inject logger
+  ) {
+    super(panel, environmentService);
+    this.logger.info('SolutionExplorerPanel created');
+  }
+
+  protected async handleRowAction(action: string, rowData: any): Promise<void> {
+    const solution = this.data.find(s => s.id === rowData.id);
+    if (!solution) return;
+
+    switch (action) {
+      case 'openInMaker':
+        const makerUrl = this.urlBuilder.buildSolutionUrl(this.environmentId!, solution.id);
+        await vscode.env.openExternal(vscode.Uri.parse(makerUrl));
+
+        // Log user actions for observability
+        this.logger.info('Opened solution in Maker Portal', {
+          solutionId: solution.id,
+          solutionName: solution.friendlyName
+        });
+        break;
+    }
+  }
+
+  dispose(): void {
+    this.logger.info('SolutionExplorerPanel disposed');
+    this.cancellationTokenSource?.dispose();
+  }
+}
+```
+
+#### Testing with NullLogger
+
+```typescript
+describe('ListSolutionsUseCase', () => {
+  it('should fetch and sort solutions', async () => {
+    const mockRepo = {
+      findAll: jest.fn().mockResolvedValue([/* ... */])
+    };
+
+    // Use NullLogger for silent tests
+    const nullLogger = new NullLogger();
+
+    const useCase = new ListSolutionsUseCase(mockRepo, nullLogger);
+    const result = await useCase.execute('env-id');
+
+    expect(result).toHaveLength(/* ... */);
+  });
+});
+```
+
+#### What NOT to Log
+
+❌ **Never log in domain entities** - Domain stays pure, zero infrastructure dependencies
+❌ **Never use console.log** - Use injected ILogger for testability
+❌ **Never log secrets/tokens** - Sanitize sensitive data before logging
+❌ **Never use global Logger.getInstance()** - Always inject via constructor
+
+---
+
+### 8.6 Data Sanitization Patterns
+
+**Principle:** Never log sensitive data in plaintext. Always sanitize tokens, credentials, PII.
+
+#### What to Sanitize
+
+| Data Type | Example | Sanitization Strategy |
+|-----------|---------|----------------------|
+| **Bearer tokens** | `Bearer eyJ0eXAiOiJKV1Q...` | Truncate to first/last 3 chars: `Bearer eyJ...1Q1` |
+| **Access tokens** | `access_token=abc123...` | Truncate: `access_token=abc...xyz` |
+| **API keys** | `api_key=sk_live_abc123...` | Truncate: `api_key=sk_live_abc...xyz` |
+| **Passwords** | `password=mySecret123` | Redact completely: `password=***REDACTED***` |
+| **Email addresses** | `user@example.com` | Hash or truncate domain: `u***@example.com` |
+| **Environment IDs** | GUIDs are OK | No sanitization needed (not secret) |
+| **Solution names** | Strings are OK | No sanitization needed (not secret) |
+
+#### Sanitization Utility
+
+```typescript
+/**
+ * Sanitizes sensitive data for logging.
+ * Prevents accidental exposure of tokens, credentials, PII.
+ */
+export class LogSanitizer {
+  /**
+   * Truncates bearer tokens to first 3 and last 3 characters.
+   * Example: "Bearer eyJ0eXAiOi...xyz123" → "Bearer eyJ...123"
+   */
+  static sanitizeBearerToken(token: string): string {
+    const match = token.match(/^(Bearer\s+)(\w{3})\w+(\w{3})$/);
+    if (match) {
+      return `${match[1]}${match[2]}...${match[3]}`;
+    }
+    return token; // Not a bearer token, return as-is
+  }
+
+  /**
+   * Sanitizes HTTP headers containing authorization.
+   */
+  static sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
+    const sanitized = { ...headers };
+
+    if (sanitized['Authorization']) {
+      sanitized['Authorization'] = this.sanitizeBearerToken(sanitized['Authorization']);
+    }
+
+    if (sanitized['authorization']) {
+      sanitized['authorization'] = this.sanitizeBearerToken(sanitized['authorization']);
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * Sanitizes URL query parameters containing sensitive data.
+   */
+  static sanitizeUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+
+      // Sanitize known sensitive query parameters
+      const sensitiveParams = ['access_token', 'api_key', 'token', 'password'];
+
+      for (const param of sensitiveParams) {
+        if (parsed.searchParams.has(param)) {
+          const value = parsed.searchParams.get(param)!;
+          if (value.length > 6) {
+            parsed.searchParams.set(param, `${value.substring(0, 3)}...${value.substring(value.length - 3)}`);
+          } else {
+            parsed.searchParams.set(param, '***');
+          }
+        }
+      }
+
+      return parsed.toString();
+    } catch {
+      // Not a valid URL, return as-is
+      return url;
+    }
+  }
+
+  /**
+   * Redacts password fields completely.
+   */
+  static redactPassword(data: any): any {
+    if (typeof data !== 'object' || data === null) {
+      return data;
+    }
+
+    const sanitized = { ...data };
+
+    // Redact known password fields
+    const passwordFields = ['password', 'Password', 'pwd', 'secret', 'Secret'];
+
+    for (const field of passwordFields) {
+      if (field in sanitized) {
+        sanitized[field] = '***REDACTED***';
+      }
+    }
+
+    return sanitized;
+  }
+}
+```
+
+#### Usage in Infrastructure
+
+```typescript
+class DataverseApiSolutionRepository implements ISolutionRepository {
+  constructor(
+    private readonly apiService: IPowerPlatformApiService,
+    private readonly authService: IAuthenticationService,
+    private readonly logger: ILogger
+  ) {}
+
+  async findAll(
+    environmentId: string,
+    cancellationToken?: vscode.CancellationToken
+  ): Promise<Solution[]> {
+    const endpoint = `/api/data/v9.2/solutions?$select=...`;
+
+    // ✅ Sanitize URL before logging
+    const sanitizedEndpoint = LogSanitizer.sanitizeUrl(endpoint);
+
+    this.logger.debug('Fetching solutions from Dataverse API', {
+      environmentId,
+      endpoint: sanitizedEndpoint  // ← Sanitized
+    });
+
+    try {
+      const response = await this.apiService.get(environmentId, endpoint);
+
+      this.logger.debug('Solutions fetched successfully', {
+        count: response.value.length,
+        environmentId
+        // ❌ DON'T log response body - may contain sensitive data
+      });
+
+      return response.value.map(/* ... */);
+    } catch (error) {
+      // ✅ Log error without exposing sensitive details
+      this.logger.error('Failed to fetch solutions from Dataverse API', {
+        environmentId,
+        endpoint: sanitizedEndpoint,
+        errorMessage: (error as Error).message  // ← Message only, not full stack with tokens
+      });
+      throw error;
+    }
+  }
+}
+```
+
+#### Usage in Authentication
+
+```typescript
+class MsalAuthenticationService implements IAuthenticationService {
+  constructor(private readonly logger: ILogger) {}
+
+  async getAccessToken(): Promise<string> {
+    this.logger.debug('Requesting access token from MSAL');
+
+    try {
+      const result = await this.msalClient.acquireTokenSilent({
+        scopes: ['https://api.dataverse.microsoft.com/.default']
+      });
+
+      // ✅ NEVER log the actual token
+      this.logger.debug('Access token acquired successfully', {
+        expiresOn: result.expiresOn,
+        account: result.account?.username,  // Username is OK
+        // ❌ token: result.accessToken  ← NEVER DO THIS
+      });
+
+      return result.accessToken;
+    } catch (error) {
+      this.logger.error('Failed to acquire access token', error as Error);
+      throw error;
+    }
+  }
+}
+```
+
+#### What NOT to Sanitize
+
+**Safe to log in plaintext:**
+- Environment IDs (GUIDs) - not sensitive, needed for debugging
+- Solution names - metadata, not secrets
+- Entity logical names - metadata
+- Error messages from business logic - usually safe
+- Counts, durations, timestamps - metrics
+
+**Example of good logging:**
+```typescript
+this.logger.info('ListSolutionsUseCase completed', {
+  environmentId: 'abc123-def456-...',  // ✅ OK - GUID not sensitive
+  solutionCount: 25,                    // ✅ OK - count not sensitive
+  durationMs: 1234,                     // ✅ OK - metric not sensitive
+  defaultSolutionFound: true            // ✅ OK - boolean not sensitive
+});
+```
+
+#### Testing Sanitization
+
+```typescript
+describe('LogSanitizer', () => {
+  it('should sanitize bearer tokens', () => {
+    const token = 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6Imk2bEdrM0...' + 'xyz123';
+    const sanitized = LogSanitizer.sanitizeBearerToken(token);
+
+    expect(sanitized).toBe('Bearer eyJ...123');
+    expect(sanitized).not.toContain('JWT');
+    expect(sanitized.length).toBeLessThan(20);
+  });
+
+  it('should sanitize authorization headers', () => {
+    const headers = {
+      'Authorization': 'Bearer abc123def456ghi789',
+      'Content-Type': 'application/json'
+    };
+
+    const sanitized = LogSanitizer.sanitizeHeaders(headers);
+
+    expect(sanitized['Authorization']).toBe('Bearer abc...789');
+    expect(sanitized['Content-Type']).toBe('application/json');
+  });
+
+  it('should redact password fields', () => {
+    const data = {
+      username: 'john.doe',
+      password: 'mySecret123',
+      email: 'john@example.com'
+    };
+
+    const sanitized = LogSanitizer.redactPassword(data);
+
+    expect(sanitized.username).toBe('john.doe');
+    expect(sanitized.password).toBe('***REDACTED***');
+    expect(sanitized.email).toBe('john@example.com');
+  });
+});
+```
+
+#### Key Rules
+
+1. ✅ **Always sanitize** before passing to logger
+2. ✅ **Truncate tokens** to first/last 3 chars for debugging
+3. ✅ **Redact passwords** completely
+4. ✅ **Test sanitization** to ensure it works
+5. ❌ **Never log full tokens** even in debug mode
+6. ❌ **Never log response bodies** that may contain secrets
+7. ❌ **Never assume data is safe** - sanitize by default
+
+---
+
 ## 9. Dependencies and Reuse
 
 ### 9.1 Reuse from Environment Setup Feature
@@ -2348,33 +3484,79 @@ class CloudFlow {
   }
 }
 
-// Infrastructure: Catch and wrap
+// Infrastructure: Catch and wrap, log with injected logger
 class DataverseApiCloudFlowRepository {
-  async findAll(environmentId: string): Promise<CloudFlow[]> {
+  constructor(
+    private readonly apiService: IPowerPlatformApiService,
+    private readonly authService: IAuthenticationService,
+    private readonly logger: ILogger
+  ) {}
+
+  async findAll(
+    environmentId: string,
+    cancellationToken?: vscode.CancellationToken
+  ): Promise<CloudFlow[]> {
     try {
       return await this.apiService.get(...);
     } catch (error) {
-      console.error(`API call failed:`, error);
+      // ✅ CORRECT: Use injected logger, not console.error
+      this.logger.error('Failed to fetch cloud flows from Dataverse API', error as Error);
       throw new ApiConnectionError(`Cannot connect to ${environmentId}`, error);
     }
   }
 }
 
-// Application: Let propagate (no try/catch)
+// Application: Let propagate (no try/catch), but log at boundaries
 class ListConnectionReferencesUseCase {
-  async execute(...): Promise<FlowConnectionRelationship[]> {
-    const flows = await this.flowRepository.findAll(environmentId);
-    return this.relationshipBuilder.buildRelationships(flows, connectionRefs);
+  constructor(
+    private readonly flowRepository: ICloudFlowRepository,
+    private readonly connectionRefRepository: IConnectionReferenceRepository,
+    private readonly solutionComponentRepository: ISolutionComponentRepository,
+    private readonly relationshipBuilder: FlowConnectionRelationshipBuilder,
+    private readonly logger: ILogger
+  ) {}
+
+  async execute(
+    environmentId: string,
+    solutionId: string | null,
+    cancellationToken?: vscode.CancellationToken
+  ): Promise<FlowConnectionRelationship[]> {
+    this.logger.info('ListConnectionReferencesUseCase started', { environmentId, solutionId });
+
+    try {
+      const flows = await this.flowRepository.findAll(environmentId, cancellationToken);
+      const connectionRefs = await this.connectionRefRepository.findAll(environmentId, cancellationToken);
+      const result = this.relationshipBuilder.buildRelationships(flows, connectionRefs);
+
+      this.logger.info('ListConnectionReferencesUseCase completed', { count: result.length });
+      return result;
+    } catch (error) {
+      // ✅ Log failure at use case boundary
+      this.logger.error('ListConnectionReferencesUseCase failed', error as Error);
+      throw error;
+    }
   }
 }
 
 // Presentation: Catch all and display
 class ConnectionReferencesPanel {
+  constructor(
+    panel: vscode.WebviewPanel,
+    environmentService: IEnvironmentService,
+    private readonly listConnectionReferencesUseCase: ListConnectionReferencesUseCase,
+    private readonly syncToDeploymentSettingsUseCase: SyncConnectionReferencesToDeploymentSettingsUseCase,
+    private readonly urlBuilder: IMakerUrlBuilder,
+    private readonly logger: ILogger
+  ) {
+    super(panel, environmentService);
+  }
+
   protected async fetchData(): Promise<void> {
     try {
       this.data = await this.listConnectionReferencesUseCase.execute(...);
     } catch (error) {
-      console.error(`Panel error:`, error);
+      // ✅ CORRECT: Use injected logger, not console.error
+      this.logger.error('Failed to fetch data in ConnectionReferencesPanel', error as Error);
       this.setError(this.formatError(error));
     }
   }
@@ -2389,22 +3571,71 @@ class ConnectionReferencesPanel {
 
 ```typescript
 export class DataPanelSuiteDependencyContainer {
+  // Singleton repositories
   private readonly solutionRepository: ISolutionRepository;
+  private readonly importJobRepository: IImportJobRepository;
+  private readonly envVarRepository: IEnvironmentVariableRepository;
   private readonly flowRepository: ICloudFlowRepository;
   private readonly connectionRefRepository: IConnectionReferenceRepository;
   private readonly solutionComponentRepository: ISolutionComponentRepository;
+  private readonly deploymentSettingsRepository: IDeploymentSettingsRepository;
+  private readonly editorService: IEditorService;
+
+  // Singleton domain services
   private readonly relationshipBuilder: FlowConnectionRelationshipBuilder;
+  private readonly urlBuilder: IMakerUrlBuilder;
+
+  // Logger
+  private readonly logger: ILogger;
 
   constructor(
     apiService: IPowerPlatformApiService,
-    authService: IAuthenticationService
+    authService: IAuthenticationService,
+    logger: ILogger
   ) {
-    // Singletons
-    this.solutionRepository = new DataverseApiSolutionRepository(apiService, authService);
-    this.flowRepository = new DataverseApiCloudFlowRepository(apiService, authService);
-    this.connectionRefRepository = new DataverseApiConnectionReferenceRepository(apiService, authService);
-    this.solutionComponentRepository = new DataverseApiSolutionComponentRepository(apiService, authService);
+    this.logger = logger;
+
+    // Initialize domain services (stateless singletons)
     this.relationshipBuilder = new FlowConnectionRelationshipBuilder();
+    this.urlBuilder = new MakerUrlBuilder();
+
+    // Initialize repositories (stateless singletons with shared logger)
+    this.solutionRepository = new DataverseApiSolutionRepository(apiService, authService, logger);
+    this.importJobRepository = new DataverseApiImportJobRepository(apiService, authService, logger);
+    this.envVarRepository = new DataverseApiEnvironmentVariableRepository(apiService, authService, logger);
+    this.flowRepository = new DataverseApiCloudFlowRepository(apiService, authService, logger);
+    this.connectionRefRepository = new DataverseApiConnectionReferenceRepository(apiService, authService, logger);
+    this.solutionComponentRepository = new DataverseApiSolutionComponentRepository(apiService, authService, logger);
+    this.deploymentSettingsRepository = new VsCodeDeploymentSettingsRepository(logger);
+    this.editorService = new VsCodeEditorService(logger);
+  }
+
+  // Use case factories (transient - create new instance each time)
+  createListSolutionsUseCase(): ListSolutionsUseCase {
+    return new ListSolutionsUseCase(this.solutionRepository, this.logger);
+  }
+
+  createListImportJobsUseCase(): ListImportJobsUseCase {
+    return new ListImportJobsUseCase(this.importJobRepository, this.logger);
+  }
+
+  createOpenImportLogInEditorUseCase(): OpenImportLogInEditorUseCase {
+    return new OpenImportLogInEditorUseCase(this.editorService, this.logger);
+  }
+
+  createListEnvironmentVariablesUseCase(): ListEnvironmentVariablesUseCase {
+    return new ListEnvironmentVariablesUseCase(
+      this.envVarRepository,
+      this.solutionComponentRepository,
+      this.logger
+    );
+  }
+
+  createSyncEnvironmentVariablesToDeploymentSettingsUseCase(): SyncEnvironmentVariablesToDeploymentSettingsUseCase {
+    return new SyncEnvironmentVariablesToDeploymentSettingsUseCase(
+      this.deploymentSettingsRepository,
+      this.logger
+    );
   }
 
   createListConnectionReferencesUseCase(): ListConnectionReferencesUseCase {
@@ -2412,7 +3643,58 @@ export class DataPanelSuiteDependencyContainer {
       this.flowRepository,
       this.connectionRefRepository,
       this.solutionComponentRepository,
-      this.relationshipBuilder
+      this.relationshipBuilder,
+      this.logger
+    );
+  }
+
+  createSyncConnectionReferencesToDeploymentSettingsUseCase(): SyncConnectionReferencesToDeploymentSettingsUseCase {
+    return new SyncConnectionReferencesToDeploymentSettingsUseCase(
+      this.deploymentSettingsRepository,
+      this.connectionRefRepository,
+      this.logger
+    );
+  }
+
+  // Panel factories (transient - create new instance per webview)
+  createSolutionExplorerPanel(
+    panel: vscode.WebviewPanel,
+    environmentService: IEnvironmentService
+  ): SolutionExplorerPanel {
+    return new SolutionExplorerPanel(
+      panel,
+      environmentService,
+      this.createListSolutionsUseCase(),
+      this.urlBuilder,
+      this.logger
+    );
+  }
+
+  createImportJobViewerPanel(
+    panel: vscode.WebviewPanel,
+    environmentService: IEnvironmentService
+  ): ImportJobViewerPanel {
+    return new ImportJobViewerPanel(
+      panel,
+      environmentService,
+      this.createListImportJobsUseCase(),
+      this.createOpenImportLogInEditorUseCase(),
+      this.urlBuilder,
+      this.logger
+    );
+  }
+
+  createEnvironmentVariablesPanel(
+    panel: vscode.WebviewPanel,
+    environmentService: IEnvironmentService
+  ): EnvironmentVariablesPanel {
+    return new EnvironmentVariablesPanel(
+      panel,
+      environmentService,
+      this.createListEnvironmentVariablesUseCase(),
+      this.createSyncEnvironmentVariablesToDeploymentSettingsUseCase(),
+      this.urlBuilder,
+      this.logger
     );
   }
 
@@ -2424,7 +3706,9 @@ export class DataPanelSuiteDependencyContainer {
       panel,
       environmentService,
       this.createListConnectionReferencesUseCase(),
-      this.createSyncConnectionReferencesToDeploymentSettingsUseCase()
+      this.createSyncConnectionReferencesToDeploymentSettingsUseCase(),
+      this.urlBuilder,
+      this.logger
     );
   }
 }
@@ -2435,11 +3719,31 @@ export class DataPanelSuiteDependencyContainer {
 ```typescript
 // extension.ts
 export function activate(context: vscode.ExtensionContext) {
+  // Create shared infrastructure services
   const authService = new MsalAuthenticationService(...);
   const apiService = new PowerPlatformApiService(authService);
-  const container = new DataPanelSuiteDependencyContainer(apiService, authService);
+  const logger = new OutputChannelLogger('Power Platform Developer Suite');
 
+  // Create DI container with logger
+  const container = new DataPanelSuiteDependencyContainer(apiService, authService, logger);
+
+  // Register panel commands
   context.subscriptions.push(
+    vscode.commands.registerCommand('powerplatform.showSolutionExplorer', () => {
+      const panel = vscode.window.createWebviewPanel(...);
+      container.createSolutionExplorerPanel(panel, environmentService);
+    }),
+
+    vscode.commands.registerCommand('powerplatform.showImportJobViewer', () => {
+      const panel = vscode.window.createWebviewPanel(...);
+      container.createImportJobViewerPanel(panel, environmentService);
+    }),
+
+    vscode.commands.registerCommand('powerplatform.showEnvironmentVariables', () => {
+      const panel = vscode.window.createWebviewPanel(...);
+      container.createEnvironmentVariablesPanel(panel, environmentService);
+    }),
+
     vscode.commands.registerCommand('powerplatform.showConnectionReferences', () => {
       const panel = vscode.window.createWebviewPanel(...);
       container.createConnectionReferencesPanel(panel, environmentService);
@@ -2450,10 +3754,64 @@ export function activate(context: vscode.ExtensionContext) {
 
 ### 12.3 Lifecycle
 
-- **Repositories**: Singleton (expensive, stateless)
-- **Domain Services**: Singleton (stateless)
-- **Use Cases**: Transient (short-lived)
-- **Panels**: Transient (one per webview)
+- **Logger**: Singleton (shared across all layers except domain)
+- **Repositories**: Singleton (expensive, stateless, shared logger)
+- **Domain Services**: Singleton (stateless, no dependencies)
+- **URL Builder**: Singleton (stateless, no dependencies)
+- **Use Cases**: Transient (short-lived, own logger reference)
+- **Panels**: Transient (one per webview, own logger reference)
+
+---
+
+## 13. Performance Monitoring
+
+### 13.1 Approach
+
+**Strategy:** Monitor actual performance during implementation rather than setting arbitrary limits upfront.
+
+### 13.2 Client-side Filtering Performance
+
+**Current Design:** Fetch all data, filter client-side using solution component IDs.
+
+**Monitoring Points:**
+- Track dataset sizes in production (log counts after fetching)
+- Measure filter/sort execution time in panels
+- Add performance warnings if operations exceed thresholds (e.g., >500ms)
+
+**Example Monitoring:**
+```typescript
+protected handleSearch(query: string): void {
+  const startTime = performance.now();
+
+  if (!query) {
+    this.filteredData = this.data;
+  } else {
+    this.filteredData = this.data.filter(row =>
+      this.searchRow(row, query.toLowerCase())
+    );
+  }
+
+  const duration = performance.now() - startTime;
+
+  if (duration > 500) {
+    this.logger.warn('Search operation took longer than expected', {
+      duration,
+      totalItems: this.data.length,
+      filteredItems: this.filteredData.length
+    });
+  }
+
+  this.sendDataToWebview();
+}
+```
+
+**Mitigation Strategies** (implement only if needed):
+1. Virtual scrolling for large tables (>1000 rows)
+2. Pagination for extremely large datasets (>5000 rows)
+3. Server-side filtering for specific scenarios
+4. Background processing with progress indicators
+
+**Decision Point:** Implement mitigation only when monitoring shows actual performance issues.
 
 ---
 
@@ -2462,10 +3820,12 @@ export function activate(context: vscode.ExtensionContext) {
 This design follows **strict clean architecture principles**:
 
 1. **Domain has ZERO dependencies** - pure TypeScript entities with rich behavior
-2. **Business logic lives in domain entities** - status determination, error parsing, URL construction, sync algorithms
+2. **Business logic lives in domain entities** - status determination, error parsing, sync algorithms (NOT URL construction)
 3. **Use cases orchestrate only** - coordinate entities and repositories, NO business logic
 4. **Repository interfaces in domain** - infrastructure implements, domain defines contracts
 5. **All dependencies point inward** - presentation → application → domain ← infrastructure
+6. **Logging at boundaries** - use cases and infrastructure log, domain stays pure
+7. **Cancellation support** - all async operations support cancellation tokens
 6. **Rich domain models** - entities have behavior methods, not anemic data bags
 7. **View Models decouple presentation** - panels map entities to DTOs optimized for UI
 
