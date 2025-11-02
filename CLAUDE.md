@@ -47,6 +47,24 @@
 
 ---
 
+## 📝 Logging Rules
+
+**Never log:**
+- ❌ In domain entities/services - Domain is pure business logic, zero infrastructure
+- ❌ console.log in production code - Remove before commit (dev debugging only)
+- ❌ Secrets/tokens unredacted - Truncate tokens, sanitize sensitive data
+- ❌ Global Logger.getInstance() - Inject ILogger via constructor for testability
+
+**Always log:**
+- ✅ At use case boundaries - Start/completion/failures in application layer
+- ✅ Via injected ILogger - Constructor injection, not global singleton
+- ✅ To OutputChannel in production - VS Code's logging mechanism
+- ✅ Infrastructure operations - API calls, auth, storage (debug level)
+- ✅ User actions in panels - Command invocations, lifecycle events
+- ✅ Use NullLogger in tests - Silent by default, SpyLogger for assertions
+
+---
+
 **Development:** `npm run compile` (use this for testing)
 
 **Remember:** Rich domain models with behavior. Business logic in domain, not use cases or panels.
