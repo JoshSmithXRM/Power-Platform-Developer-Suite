@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
-import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 import { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
+import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
 import { ListSolutionsUseCase } from '../../application/useCases/ListSolutionsUseCase';
 import { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
@@ -267,7 +267,7 @@ export class SolutionExplorerPanel {
 
 			this.logger.info('Solutions loaded successfully', { count: this.solutions.length });
 		} catch (error) {
-			if ((error as Error).message !== 'Operation cancelled') {
+			if (!(error instanceof OperationCancelledException)) {
 				this.logger.error('Failed to load solutions', error);
 				this.handleError(error);
 			}

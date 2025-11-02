@@ -1,4 +1,5 @@
 import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
+import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ISolutionRepository } from '../../domain/interfaces/ISolutionRepository';
 import { Solution } from '../../domain/entities/Solution';
@@ -28,7 +29,7 @@ export class ListSolutionsUseCase {
     try {
       if (cancellationToken?.isCancellationRequested) {
         this.logger.info('ListSolutionsUseCase cancelled before execution');
-        throw new Error('Operation cancelled');
+        throw new OperationCancelledException();
       }
 
       const solutions = await this.solutionRepository.findAll(
@@ -36,7 +37,8 @@ export class ListSolutionsUseCase {
         cancellationToken
       );
 
-      const sorted = solutions.sort((a, b) => {
+      // Create defensive copy before sorting to avoid mutating the original array
+      const sorted = [...solutions].sort((a, b) => {
         const priorityDiff = a.getSortPriority() - b.getSortPriority();
         if (priorityDiff !== 0) {
           return priorityDiff;

@@ -11,6 +11,20 @@ import { ValidationError } from '../../../../shared/domain/errors/ValidationErro
 export class Solution {
   public readonly version: string;
 
+  /**
+   * Creates a new Solution entity.
+   * Validates version format and enforces business rules.
+   * @param id - Solution GUID
+   * @param uniqueName - Unique name identifier
+   * @param friendlyName - Display name
+   * @param version - Version string (must have at least 2 numeric segments)
+   * @param isManaged - Whether the solution is managed
+   * @param publisherId - Publisher GUID
+   * @param publisherName - Publisher display name
+   * @param installedOn - Installation date (null if not installed)
+   * @param description - Solution description
+   * @throws {ValidationError} When version format is invalid
+   */
   constructor(
     public readonly id: string,
     public readonly uniqueName: string,
@@ -34,7 +48,9 @@ export class Solution {
 
   /**
    * Determines if this is the default solution.
-   * The default solution has special significance in Power Platform.
+   * The default solution has special significance in Power Platform as it contains
+   * all unmanaged customizations that are not part of other solutions.
+   * @returns True if this is the Default solution, false otherwise
    */
   isDefaultSolution(): boolean {
     return this.uniqueName === 'Default';
@@ -42,7 +58,9 @@ export class Solution {
 
   /**
    * Gets sort priority for UI ordering.
-   * Default solution should appear first (priority 0), all others after (priority 1).
+   * Business rule: Default solution should appear first in lists,
+   * followed by all other solutions in alphabetical order.
+   * @returns 0 for Default solution (highest priority), 1 for all others
    */
   getSortPriority(): number {
     return this.isDefaultSolution() ? 0 : 1;

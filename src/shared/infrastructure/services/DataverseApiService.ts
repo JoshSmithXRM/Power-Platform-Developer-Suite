@@ -1,4 +1,5 @@
 import { ICancellationToken } from '../../domain/interfaces/ICancellationToken';
+import { OperationCancelledException } from '../../domain/errors/OperationCancelledException';
 import { ILogger } from '../../../infrastructure/logging/ILogger';
 import { IDataverseApiService } from '../interfaces/IDataverseApiService';
 
@@ -70,7 +71,7 @@ export class DataverseApiService implements IDataverseApiService {
     cancellationToken?: ICancellationToken
   ): Promise<T> {
     if (cancellationToken?.isCancellationRequested) {
-      throw new Error('Operation cancelled');
+      throw new OperationCancelledException();
     }
 
     try {
@@ -80,7 +81,7 @@ export class DataverseApiService implements IDataverseApiService {
       ]);
 
       if (cancellationToken?.isCancellationRequested) {
-        throw new Error('Operation cancelled');
+        throw new OperationCancelledException();
       }
 
       const url = `${environmentUrl}${endpoint}`;
@@ -125,7 +126,7 @@ export class DataverseApiService implements IDataverseApiService {
 
       return data as T;
     } catch (error) {
-      if ((error as Error).message === 'Operation cancelled') {
+      if (error instanceof OperationCancelledException) {
         throw error;
       }
 

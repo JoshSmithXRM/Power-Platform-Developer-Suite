@@ -1,5 +1,6 @@
 import { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
+import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ISolutionRepository } from '../../domain/interfaces/ISolutionRepository';
 import { Solution } from '../../domain/entities/Solution';
@@ -54,7 +55,7 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
 
     if (cancellationToken?.isCancellationRequested) {
       this.logger.debug('Repository operation cancelled before API call');
-      throw new Error('Operation cancelled');
+      throw new OperationCancelledException();
     }
 
     try {
@@ -66,7 +67,7 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
 
       if (cancellationToken?.isCancellationRequested) {
         this.logger.debug('Repository operation cancelled after API call');
-        throw new Error('Operation cancelled');
+        throw new OperationCancelledException();
       }
 
       const solutions = response.value.map((dto) => this.mapToEntity(dto));
