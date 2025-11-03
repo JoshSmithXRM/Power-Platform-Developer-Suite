@@ -38,7 +38,7 @@ export class ClearStorageEntryUseCase {
 
 			// Orchestrate: raise domain event
 			this.eventPublisher.publish(
-				new StorageEntryCleared(entry.key, entry.storageType as 'global' | 'secret')
+				new StorageEntryCleared(entry.key, entry.storageType)
 			);
 
 			this.logger.info(`Storage entry cleared: ${key}`);

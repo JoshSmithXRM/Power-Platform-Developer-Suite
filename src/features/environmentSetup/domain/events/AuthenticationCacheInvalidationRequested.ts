@@ -3,8 +3,10 @@ import { EnvironmentId } from '../valueObjects/EnvironmentId';
 /**
  * Domain event: Authentication cache should be invalidated
  * Emitted when credentials change or auth method changes
+ * Discriminated union pattern enables exhaustive type checking
  */
 export class AuthenticationCacheInvalidationRequested {
+	public readonly type = 'AuthenticationCacheInvalidationRequested' as const;
 	public readonly occurredAt: Date;
 
 	constructor(

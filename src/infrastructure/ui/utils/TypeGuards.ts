@@ -17,17 +17,18 @@ export interface WebviewMessage<T = unknown> {
 
 /**
  * Type guard for basic webview messages.
+ * Narrows type without assertions for safer runtime validation.
  *
  * @param message - Unknown message from webview
  * @returns True if message has command string
  */
 export function isWebviewMessage(message: unknown): message is WebviewMessage {
-	return (
-		typeof message === 'object' &&
-		message !== null &&
-		'command' in message &&
-		typeof (message as WebviewMessage).command === 'string'
-	);
+	if (typeof message !== 'object' || message === null) {
+		return false;
+	}
+
+	const obj = message as Record<string, unknown>;
+	return 'command' in obj && typeof obj.command === 'string';
 }
 
 /**
@@ -44,13 +45,17 @@ export const AUTHENTICATION_METHODS: readonly AuthenticationMethodType[] = [
 /**
  * Type guard for authentication method validation.
  * Validates that a value is a valid AuthenticationMethodType enum member.
+ * Type narrowing ensures value is string before array includes check.
  *
  * @param value - Unknown value to validate
  * @returns True if value is valid AuthenticationMethodType
  */
 function isValidAuthMethod(value: unknown): value is AuthenticationMethodType {
-	return typeof value === 'string' &&
-		(AUTHENTICATION_METHODS as readonly string[]).includes(value);
+	if (typeof value !== 'string') {
+		return false;
+	}
+	// Value is narrowed to string, safe to use in includes
+	return AUTHENTICATION_METHODS.includes(value as AuthenticationMethodType);
 }
 
 /**

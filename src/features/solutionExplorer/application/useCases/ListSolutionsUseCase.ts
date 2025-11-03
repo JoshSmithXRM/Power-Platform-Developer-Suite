@@ -3,6 +3,7 @@ import { OperationCancelledException } from '../../../../shared/domain/errors/Op
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ISolutionRepository } from '../../domain/interfaces/ISolutionRepository';
 import { Solution } from '../../domain/entities/Solution';
+import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
  * Use case for listing all solutions in an environment.
@@ -51,8 +52,9 @@ export class ListSolutionsUseCase {
 
       return sorted;
     } catch (error) {
-      this.logger.error('ListSolutionsUseCase failed', error as Error);
-      throw error;
+      const normalizedError = normalizeError(error);
+      this.logger.error('ListSolutionsUseCase failed', normalizedError);
+      throw normalizedError;
     }
   }
 }

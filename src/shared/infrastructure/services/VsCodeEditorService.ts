@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { IEditorService } from '../interfaces/IEditorService';
 import { ILogger } from '../../../infrastructure/logging/ILogger';
 import { XmlFormatter } from '../formatters/XmlFormatter';
+import { normalizeError } from '../../utils/ErrorUtils';
 
 /**
  * VS Code implementation of IEditorService.
@@ -41,8 +42,9 @@ export class VsCodeEditorService implements IEditorService {
 
 			this.logger.debug('Successfully opened and formatted XML in editor');
 		} catch (error) {
-			this.logger.error('Failed to open XML in editor', error as Error);
-			throw error;
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to open XML in editor', normalizedError);
+			throw normalizedError;
 		}
 	}
 }

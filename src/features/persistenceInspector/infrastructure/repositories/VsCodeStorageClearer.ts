@@ -6,6 +6,22 @@ import { ClearAllResult } from '../../domain/results/ClearAllResult';
 import { ProtectedKeyPattern } from '../../domain/valueObjects/ProtectedKeyPattern';
 
 /**
+ * Discriminated union for mutable storage values
+ * Eliminates unsafe type assertions in recursive property deletion.
+ */
+type MutableStorageValue = MutableArray | MutableRecord;
+
+interface MutableArray {
+	readonly type: 'array';
+	value: unknown[];
+}
+
+interface MutableRecord {
+	readonly type: 'record';
+	value: Record<string, unknown>;
+}
+
+/**
  * Infrastructure implementation of storage clearing using VS Code APIs
  * Provides write access to clear VS Code's global state and secret storage
  */
@@ -95,6 +111,9 @@ export class VsCodeStorageClearer implements IStorageClearer {
 	/**
 	 * Deletes a property at the specified path in an object/array
 	 * Returns a new object with the property removed (immutable)
+	 *
+	 * Uses discriminated union pattern for type-safe recursive deletion
+	 * without multiple type assertions.
 	 */
 	private deletePropertyAtPath(
 		obj: unknown,
@@ -109,24 +128,32 @@ export class VsCodeStorageClearer implements IStorageClearer {
 		}
 
 		const [first, ...rest] = path;
-		// Create a mutable copy - we know obj is an object or array at this point
-		const copy = Array.isArray(obj) ? (obj.slice() as unknown[]) : { ...obj as object } as Record<string, unknown>;
+
+		// Create discriminated union for type-safe handling
+		const mutable: MutableStorageValue = Array.isArray(obj)
+			? { type: 'array', value: obj.slice() }
+			: { type: 'record', value: { ...obj as Record<string, unknown> } };
 
 		if (rest.length === 0) {
-			if (Array.isArray(copy)) {
-				copy.splice(parseInt(first), 1);
+			// Type narrowing with discriminated union
+			if (mutable.type === 'array') {
+				mutable.value.splice(parseInt(first), 1);
 			} else {
-				delete (copy as Record<string, unknown>)[first];
+				delete mutable.value[first];
 			}
 		} else {
-			const nested = (copy as Record<string, unknown>)[first];
-			(copy as Record<string, unknown>)[first] = this.deletePropertyAtPath(
-				nested,
-				rest
-			);
+			// Recursively delete nested property
+			if (mutable.type === 'array') {
+				const index = parseInt(first);
+				const nested = mutable.value[index];
+				mutable.value[index] = this.deletePropertyAtPath(nested, rest);
+			} else {
+				const nested = mutable.value[first];
+				mutable.value[first] = this.deletePropertyAtPath(nested, rest);
+			}
 		}
 
-		return copy;
+		return mutable.value;
 	}
 
 	/**

@@ -1,6 +1,7 @@
 import { ClearAllValidationResult } from '../valueObjects/ClearAllValidationResult';
 import { ClearValidationResult } from '../valueObjects/ClearValidationResult';
 import { ProtectedKeyPattern } from '../valueObjects/ProtectedKeyPattern';
+import { StorageTypeValue } from '../valueObjects/StorageType';
 
 import { StorageEntry } from './StorageEntry';
 
@@ -49,7 +50,7 @@ export class StorageCollection {
 	/**
 	 * Factory method to create a StorageCollection.
 	 *
-	 * WHY: Converts arrays to appropriate internal data structures (Map for O(1) lookup)
+	 * Converts arrays to appropriate internal data structures (Map for O(1) lookup)
 	 * and wraps protected patterns in value objects.
 	 *
 	 * @param {StorageEntry[]} entries - Array of storage entries
@@ -90,11 +91,12 @@ export class StorageCollection {
 
 	/**
 	 * Filters entries by storage type.
+	 * Uses StorageTypeValue for type safety and consistency.
 	 *
-	 * @param {'global' | 'secret'} storageType - Type to filter by
+	 * @param {StorageTypeValue} storageType - Type to filter by (use StorageType.GLOBAL or StorageType.SECRET)
 	 * @returns {ReadonlyArray<StorageEntry>} Entries matching the type
 	 */
-	public getEntriesByType(storageType: 'global' | 'secret'): ReadonlyArray<StorageEntry> {
+	public getEntriesByType(storageType: StorageTypeValue): ReadonlyArray<StorageEntry> {
 		return this.getAllEntries().filter(e => e.storageType === storageType);
 	}
 
@@ -119,7 +121,7 @@ export class StorageCollection {
 	/**
 	 * Calculates total storage size across all entries.
 	 *
-	 * WHY: Provides aggregate metric for storage usage monitoring.
+	 * Provides aggregate metric for storage usage monitoring.
 	 *
 	 * @returns {number} Total size in bytes
 	 */
@@ -133,9 +135,8 @@ export class StorageCollection {
 	/**
 	 * Checks if a key matches any protected key patterns.
 	 *
-	 * WHY: Protected patterns use regex for flexible matching beyond
-	 * exact key comparison. Allows protecting entire key families
-	 * (e.g., 'power-platform-dev-suite-*').
+	 * Protected patterns use regex for flexible matching beyond exact key comparison.
+	 * This allows protecting entire key families (e.g., 'power-platform-dev-suite-*').
 	 *
 	 * @param {string} key - Storage key to check
 	 * @returns {boolean} True if key matches a protected pattern

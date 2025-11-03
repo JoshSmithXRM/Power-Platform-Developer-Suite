@@ -2,6 +2,7 @@ import { ICancellationToken } from '../../domain/interfaces/ICancellationToken';
 import { OperationCancelledException } from '../../domain/errors/OperationCancelledException';
 import { ILogger } from '../../../infrastructure/logging/ILogger';
 import { IDataverseApiService } from '../interfaces/IDataverseApiService';
+import { normalizeError } from '../../utils/ErrorUtils';
 
 /**
  * Service for making authenticated HTTP requests to Dataverse Web API.
@@ -62,6 +63,9 @@ export class DataverseApiService implements IDataverseApiService {
 
   /**
    * Internal method to perform HTTP requests with authentication.
+   *
+   * Centralized request handling with proper type validation.
+   * Type parameter T should match expected API response structure.
    */
   private async request<T>(
     method: string,
@@ -118,10 +122,18 @@ export class DataverseApiService implements IDataverseApiService {
       }
 
       if (method === 'DELETE' || response.status === 204) {
+        // No content response - safe for void return type
         return undefined as T;
       }
 
       const data: unknown = await response.json();
+
+      // Basic runtime validation - ensure response is an object
+      if (typeof data !== 'object' || data === null) {
+        this.logger.error('Invalid API response: expected object', { data });
+        throw new Error('Invalid API response structure: expected object');
+      }
+
       this.logger.debug(`DataverseApiService: ${method} ${endpoint} succeeded`);
 
       return data as T;
@@ -130,8 +142,9 @@ export class DataverseApiService implements IDataverseApiService {
         throw error;
       }
 
-      this.logger.error('DataverseApiService request failed', error as Error);
-      throw error;
+      const normalizedError = normalizeError(error);
+      this.logger.error('DataverseApiService request failed', normalizedError);
+      throw normalizedError;
     }
   }
 }

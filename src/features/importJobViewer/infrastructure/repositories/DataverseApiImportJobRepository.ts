@@ -6,6 +6,7 @@ import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../../../../shared/infrastructure/utils/ODataQueryBuilder';
 import { IImportJobRepository } from '../../domain/interfaces/IImportJobRepository';
 import { ImportJob, ImportJobStatus } from '../../domain/entities/ImportJob';
+import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
  * Dataverse API response for importjobs endpoint
@@ -91,8 +92,9 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 
 			return jobs;
 		} catch (error) {
-			this.logger.error('Failed to fetch import jobs from Dataverse API', error as Error);
-			throw error;
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to fetch import jobs from Dataverse API', normalizedError);
+			throw normalizedError;
 		}
 	}
 
@@ -149,8 +151,9 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 
 			return job;
 		} catch (error) {
-			this.logger.error('Failed to fetch import job with log from Dataverse API', error as Error);
-			throw error;
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to fetch import job with log from Dataverse API', normalizedError);
+			throw normalizedError;
 		}
 	}
 

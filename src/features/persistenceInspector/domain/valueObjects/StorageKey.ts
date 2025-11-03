@@ -1,3 +1,5 @@
+import { DomainError } from '../../../environmentSetup/domain/errors/DomainError';
+
 /**
  * Value object representing a storage key in VS Code storage.
  *
@@ -13,12 +15,12 @@
  * - Legacy: `power-platform-*` (pre-refactor)
  * - Protected: `power-platform-dev-suite-environments` (critical data)
  *
- * @throws {Error} If key is empty
+ * @throws {DomainError} If key is empty
  */
 export class StorageKey {
 	private constructor(private readonly _value: string) {
 		if (!_value || _value.trim().length === 0) {
-			throw new Error('Storage key cannot be empty');
+			throw new DomainError('Storage key cannot be empty');
 		}
 	}
 
@@ -33,8 +35,8 @@ export class StorageKey {
 	/**
 	 * Checks if this is the protected environments key.
 	 *
-	 * WHY: Environment configurations are critical extension data that must be
-	 * protected from accidental deletion. This is the only hardcoded protected key.
+	 * Environment configurations are critical extension data that must be protected
+	 * from accidental deletion. This is the only hardcoded protected key.
 	 *
 	 * @returns {boolean} True if this is the environments key
 	 */
@@ -45,7 +47,7 @@ export class StorageKey {
 	/**
 	 * Detects legacy keys from pre-refactor codebase.
 	 *
-	 * WHY: Codebase was refactored to use `power-platform-dev-suite-` prefix.
+	 * Codebase was refactored to use `power-platform-dev-suite-` prefix.
 	 * Legacy keys with old prefix may exist in user storage and should be
 	 * flagged for migration or cleanup.
 	 *

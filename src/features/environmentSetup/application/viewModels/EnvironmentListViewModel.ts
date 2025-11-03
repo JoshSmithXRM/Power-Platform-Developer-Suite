@@ -1,13 +1,14 @@
 /**
  * ViewModel for displaying environment in list
+ * Readonly ensures immutability - ViewModels are snapshots, not mutable state
  */
 export interface EnvironmentListViewModel {
-	id: string;
-	name: string;
-	dataverseUrl: string;
-	authenticationMethod: string;
-	isActive: boolean;
-	lastUsed?: Date;
-	lastUsedDisplay: string;
-	statusBadge: 'active' | 'inactive';
+	readonly id: string;
+	readonly name: string;
+	readonly dataverseUrl: string;
+	readonly authenticationMethod: string;
+	readonly isActive: boolean;
+	readonly lastUsedTimestamp?: number;
+	readonly lastUsedDisplay: string;
+	readonly statusBadge: 'active' | 'inactive';
 }

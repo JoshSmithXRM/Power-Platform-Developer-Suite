@@ -1,6 +1,6 @@
 import { StorageKey } from '../valueObjects/StorageKey';
 import { StorageValue } from '../valueObjects/StorageValue';
-import { StorageType } from '../valueObjects/StorageType';
+import { StorageType, StorageTypeValue } from '../valueObjects/StorageType';
 import { StorageMetadata } from '../valueObjects/StorageMetadata';
 
 /**
@@ -42,22 +42,23 @@ export class StorageEntry {
 	/**
 	 * Factory method to create a StorageEntry.
 	 *
-	 * WHY: Private constructor enforces creation through factory method,
+	 * Private constructor enforces creation through factory method,
 	 * ensuring all value objects are properly constructed.
+	 * Uses StorageTypeValue for type safety and consistency.
 	 *
 	 * @param {string} key - Storage key
 	 * @param {unknown} value - Storage value (hidden if secret)
-	 * @param {'global' | 'secret'} storageType - Type of storage
+	 * @param {StorageTypeValue} storageType - Type of storage (use StorageType.GLOBAL or StorageType.SECRET)
 	 * @returns {StorageEntry} New storage entry instance
 	 */
 	public static create(
 		key: string,
 		value: unknown,
-		storageType: 'global' | 'secret'
+		storageType: StorageTypeValue
 	): StorageEntry {
 		return new StorageEntry(
 			StorageKey.create(key),
-			storageType === 'secret' ? StorageValue.createSecret() : StorageValue.create(value),
+			storageType === StorageType.SECRET ? StorageValue.createSecret() : StorageValue.create(value),
 			StorageType.create(storageType)
 		);
 	}
@@ -70,7 +71,7 @@ export class StorageEntry {
 		return this._value.value;
 	}
 
-	public get storageType(): string {
+	public get storageType(): StorageTypeValue {
 		return this._storageType.value;
 	}
 
@@ -81,9 +82,9 @@ export class StorageEntry {
 	/**
 	 * Determines if this entry is protected from clearing.
 	 *
-	 * WHY: Critical extension data (like environment configurations) must
-	 * be protected from accidental deletion. Protected keys cannot be cleared
-	 * through the Persistence Inspector UI.
+	 * Critical extension data (like environment configurations) must be protected
+	 * from accidental deletion. Protected keys cannot be cleared through the
+	 * Persistence Inspector UI.
 	 *
 	 * @returns {boolean} True if entry is protected
 	 */
@@ -114,8 +115,8 @@ export class StorageEntry {
 	/**
 	 * Retrieves property value at specified path within the entry value.
 	 *
-	 * WHY: Storage values can be complex objects/arrays. This allows
-	 * navigation to nested properties (e.g., ['environments', '0', 'name']).
+	 * Storage values can be complex objects/arrays. This allows navigation
+	 * to nested properties (e.g., ['environments', '0', 'name']).
 	 *
 	 * @param {string[]} path - Property path segments
 	 * @returns {unknown} Property value or undefined if not found

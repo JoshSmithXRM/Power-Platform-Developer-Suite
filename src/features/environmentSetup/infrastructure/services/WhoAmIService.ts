@@ -4,6 +4,32 @@ import { IWhoAmIService, WhoAmIResponse } from '../../domain/interfaces/IWhoAmIS
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 /**
+ * Internal interface for WhoAmI API response structure
+ */
+interface WhoAmIApiResponse {
+	UserId: string;
+	BusinessUnitId: string;
+	OrganizationId: string;
+}
+
+/**
+ * Type guard to validate WhoAmI API response structure
+ * External API responses need runtime validation to ensure type safety.
+ */
+function isWhoAmIApiResponse(data: unknown): data is WhoAmIApiResponse {
+	return (
+		typeof data === 'object' &&
+		data !== null &&
+		'UserId' in data &&
+		typeof (data as WhoAmIApiResponse).UserId === 'string' &&
+		'BusinessUnitId' in data &&
+		typeof (data as WhoAmIApiResponse).BusinessUnitId === 'string' &&
+		'OrganizationId' in data &&
+		typeof (data as WhoAmIApiResponse).OrganizationId === 'string'
+	);
+}
+
+/**
  * WhoAmI service implementation
  * Tests connection using Dataverse WhoAmI API
  */
@@ -69,29 +95,22 @@ export class WhoAmIService implements IWhoAmIService {
 
 				const data: unknown = await response.json();
 
-				if (!data || typeof data !== 'object') {
-					this.logger.error('Invalid WhoAmI response structure');
-					throw new Error('Invalid WhoAmI response structure');
+				// Validate response structure using type guard
+				if (!isWhoAmIApiResponse(data)) {
+					this.logger.error('Invalid WhoAmI response structure', { data });
+					throw new Error('WhoAmI API response missing required fields (UserId, BusinessUnitId, OrganizationId)');
 				}
 
-				const whoAmI = data as Record<string, unknown>;
-
-				if (typeof whoAmI.UserId !== 'string' ||
-					typeof whoAmI.BusinessUnitId !== 'string' ||
-					typeof whoAmI.OrganizationId !== 'string') {
-					this.logger.error('WhoAmI response missing required fields');
-					throw new Error('WhoAmI response missing required fields');
-				}
-
+				// TypeScript now knows data is WhoAmIApiResponse
 				this.logger.info('WhoAmI API call successful', {
-					userId: whoAmI.UserId,
-					organizationId: whoAmI.OrganizationId
+					userId: data.UserId,
+					organizationId: data.OrganizationId
 				});
 
 				return {
-					userId: whoAmI.UserId,
-					businessUnitId: whoAmI.BusinessUnitId,
-					organizationId: whoAmI.OrganizationId
+					userId: data.UserId,
+					businessUnitId: data.BusinessUnitId,
+					organizationId: data.OrganizationId
 				};
 			} catch (error) {
 				if (error instanceof Error && error.name === 'AbortError') {

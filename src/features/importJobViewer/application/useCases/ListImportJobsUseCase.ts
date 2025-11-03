@@ -3,6 +3,7 @@ import { OperationCancelledException } from '../../../../shared/domain/errors/Op
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { IImportJobRepository } from '../../domain/interfaces/IImportJobRepository';
 import { ImportJob } from '../../domain/entities/ImportJob';
+import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
  * Use case for listing all import jobs in an environment.
@@ -53,8 +54,9 @@ export class ListImportJobsUseCase {
 
 			return sorted;
 		} catch (error) {
-			this.logger.error('ListImportJobsUseCase failed', error as Error);
-			throw error;
+			const normalizedError = normalizeError(error);
+			this.logger.error('ListImportJobsUseCase failed', normalizedError);
+			throw normalizedError;
 		}
 	}
 }

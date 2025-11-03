@@ -18,14 +18,15 @@ export class EnvironmentListViewModelMapper {
 	}
 
 	public toViewModel(environment: Environment): EnvironmentListViewModel {
+		const lastUsed = environment.getLastUsed();
 		return {
 			id: environment.getId().getValue(),
 			name: environment.getName().getValue(),
 			dataverseUrl: environment.getDataverseUrl().getValue(),
 			authenticationMethod: environment.getAuthenticationMethod().toString(),
 			isActive: environment.getIsActive(),
-			lastUsed: environment.getLastUsed(),
-			lastUsedDisplay: this.formatLastUsed(environment.getLastUsed()),
+			lastUsedTimestamp: lastUsed?.getTime(),
+			lastUsedDisplay: this.formatLastUsed(lastUsed),
 			statusBadge: environment.getIsActive() ? 'active' : 'inactive'
 		};
 	}
@@ -34,21 +35,23 @@ export class EnvironmentListViewModelMapper {
 	 * Sorts view models by last used (most recent first), then alphabetically by name.
 	 * This is a presentation concern - different views may want different sort orders.
 	 *
+	 * Uses immutable timestamps instead of mutable Date objects for reliable comparison.
+	 *
 	 * @param viewModels - View models to sort
 	 * @returns Sorted view models (mutates and returns same array)
 	 */
 	private sortByLastUsedThenName(viewModels: EnvironmentListViewModel[]): EnvironmentListViewModel[] {
 		return viewModels.sort((a, b) => {
-			// Both have last used - most recent first
-			if (a.lastUsed && b.lastUsed) {
-				return b.lastUsed.getTime() - a.lastUsed.getTime();
+			// Both have last used - most recent first (higher timestamp = more recent)
+			if (a.lastUsedTimestamp && b.lastUsedTimestamp) {
+				return b.lastUsedTimestamp - a.lastUsedTimestamp;
 			}
 			// Only 'a' has last used - 'a' comes first
-			if (a.lastUsed) {
+			if (a.lastUsedTimestamp) {
 				return -1;
 			}
 			// Only 'b' has last used - 'b' comes first
-			if (b.lastUsed) {
+			if (b.lastUsedTimestamp) {
 				return 1;
 			}
 			// Neither has last used - sort alphabetically by name

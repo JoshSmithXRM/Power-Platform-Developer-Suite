@@ -3,6 +3,7 @@ import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancel
 import { IEditorService } from '../../../../shared/infrastructure/interfaces/IEditorService';
 import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import { IImportJobRepository } from '../../domain/interfaces/IImportJobRepository';
+import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
  * Use case for opening an import job's XML log in VS Code editor.
@@ -55,8 +56,9 @@ export class OpenImportLogUseCase {
 
 			this.logger.info('Import log opened successfully', { importJobId });
 		} catch (error) {
-			this.logger.error('OpenImportLogUseCase: Failed to process import log', error as Error);
-			throw error;
+			const normalizedError = normalizeError(error);
+			this.logger.error('OpenImportLogUseCase: Failed to process import log', normalizedError);
+			throw normalizedError;
 		}
 	}
 }

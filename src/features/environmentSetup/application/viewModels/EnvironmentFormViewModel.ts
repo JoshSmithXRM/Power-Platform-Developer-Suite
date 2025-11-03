@@ -1,27 +1,28 @@
 /**
  * ViewModel for editing environment in form
  * Credentials shown as placeholders when editing existing
+ * Readonly ensures immutability - ViewModels are snapshots, not mutable state
  */
 export interface EnvironmentFormViewModel {
-	id: string;
-	name: string;
-	dataverseUrl: string;
-	tenantId: string;
-	authenticationMethod: string;
-	publicClientId: string;
-	powerPlatformEnvironmentId?: string;
+	readonly id: string;
+	readonly name: string;
+	readonly dataverseUrl: string;
+	readonly tenantId: string;
+	readonly authenticationMethod: string;
+	readonly publicClientId: string;
+	readonly powerPlatformEnvironmentId?: string;
 
 	// Service Principal fields
-	clientId?: string;
-	clientSecretPlaceholder?: string;
-	hasStoredClientSecret: boolean;
+	readonly clientId?: string;
+	readonly clientSecretPlaceholder?: string;
+	readonly hasStoredClientSecret: boolean;
 
 	// Username/Password fields
-	username?: string;
-	passwordPlaceholder?: string;
-	hasStoredPassword: boolean;
+	readonly username?: string;
+	readonly passwordPlaceholder?: string;
+	readonly hasStoredPassword: boolean;
 
 	// UI state
-	isExisting: boolean;
-	requiredFields: string[];
+	readonly isExisting: boolean;
+	readonly requiredFields: readonly string[];
 }

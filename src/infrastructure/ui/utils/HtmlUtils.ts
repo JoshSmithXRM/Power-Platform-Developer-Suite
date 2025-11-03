@@ -111,7 +111,11 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): RawHt
  * Utility function to render arrays of HTML elements.
  * Useful for .map() operations with type safety.
  *
- * @param items - Array of items to render
+ * Generic T is intentionally unconstrained - the render function (fn) handles any type.
+ * Readonly array ensures immutability.
+ *
+ * @template T - Item type (can be any type - render function handles conversion)
+ * @param items - Readonly array of items to render
  * @param fn - Function to render each item (can return string or RawHtml)
  * @returns RawHtml with joined results
  *
@@ -119,7 +123,7 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): RawHt
  * const items = ['Apple', 'Banana', 'Orange'];
  * html`<ul>${each(items, item => html`<li>${item}</li>`)}</ul>`
  */
-export function each<T>(items: T[], fn: (item: T, index: number) => string | RawHtml): RawHtml {
+export function each<T>(items: readonly T[], fn: (item: T, index: number) => string | RawHtml): RawHtml {
 	return raw(items.map((item, index) => {
 		const result = fn(item, index);
 		if (isRawHtml(result)) {

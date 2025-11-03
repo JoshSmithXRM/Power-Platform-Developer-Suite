@@ -26,13 +26,15 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 	/**
 	 * Retrieves all environments from storage
 	 * @returns Array of all configured environments
+	 *
+	 * Mapper is synchronous - no need for Promise.all.
 	 */
 	public async getAll(): Promise<Environment[]> {
 		this.logger.debug('EnvironmentRepository: Loading all environments');
 
 		try {
 			const dtos = await this.loadDtos();
-			const environments = await Promise.all(dtos.map(dto => this.mapper.toDomain(dto)));
+			const environments = dtos.map(dto => this.mapper.toDomain(dto));
 
 			this.logger.debug(`Loaded ${environments.length} environment(s) from storage`);
 

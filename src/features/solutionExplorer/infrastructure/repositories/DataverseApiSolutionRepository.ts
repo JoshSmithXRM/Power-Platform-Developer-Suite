@@ -6,6 +6,7 @@ import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../../../../shared/infrastructure/utils/ODataQueryBuilder';
 import { ISolutionRepository } from '../../domain/interfaces/ISolutionRepository';
 import { Solution } from '../../domain/entities/Solution';
+import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
  * Dataverse API response for solutions endpoint
@@ -91,8 +92,9 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
 
       return solutions;
     } catch (error) {
-      this.logger.error('Failed to fetch solutions from Dataverse API', error as Error);
-      throw error;
+      const normalizedError = normalizeError(error);
+      this.logger.error('Failed to fetch solutions from Dataverse API', normalizedError);
+      throw normalizedError;
     }
   }
 
