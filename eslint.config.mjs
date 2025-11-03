@@ -38,6 +38,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-call': 'error',
       '@typescript-eslint/no-unsafe-argument': 'error',
       '@typescript-eslint/no-non-null-assertion': 'error',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
 
       // ===========================
       // EXPLICIT RETURN TYPES (CLAUDE.md: ALWAYS explicit return types)
@@ -45,9 +46,9 @@ export default tseslint.config(
       '@typescript-eslint/explicit-function-return-type': [
         'error',
         {
-          allowExpressions: true,
+          allowExpressions: false,
           allowTypedFunctionExpressions: true,
-          allowHigherOrderFunctions: true,
+          allowHigherOrderFunctions: false,
           allowDirectConstAssertionInArrowFunctions: true
         }
       ],
@@ -94,6 +95,10 @@ export default tseslint.config(
       'local-rules/no-domain-in-presentation': 'error',
       'local-rules/no-outer-layers-in-domain': 'error',
       'local-rules/no-presentation-in-application': 'error',
+      'local-rules/no-static-entity-methods': 'error',
+      'local-rules/no-presentation-methods-in-domain': 'error',
+      'local-rules/no-html-in-typescript': 'error',
+      'local-rules/prefer-explicit-undefined': 'warn',
 
       // ===========================
       // ASYNC/PROMISE HANDLING
@@ -109,7 +114,26 @@ export default tseslint.config(
       'max-lines': ['warn', { max: 500, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': ['warn', { max: 100, skipBlankLines: true, skipComments: true }],
       'max-depth': ['warn', 4],
-      'max-nested-callbacks': ['warn', 3]
+      'max-nested-callbacks': ['warn', 3],
+
+      // ===========================
+      // ERROR HANDLING
+      // ===========================
+      'no-empty': ['error', { allowEmptyCatch: false }],
+
+      // ===========================
+      // TYPE DEFINITIONS
+      // ===========================
+      '@typescript-eslint/consistent-type-definitions': ['error', 'interface']
+    }
+  },
+  {
+    // Use case files - Stricter complexity limits (CLAUDE.md: Use cases orchestrate only)
+    files: ['src/**/application/useCases/**/*.ts'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+    rules: {
+      'max-lines-per-function': ['error', { max: 50, skipBlankLines: true, skipComments: true }],
+      'complexity': ['error', 10]
     }
   },
   {

@@ -170,5 +170,188 @@ module.exports = {
 				}
 			};
 		}
+	},
+
+	'no-static-entity-methods': {
+		meta: {
+			type: 'problem',
+			docs: {
+				description: 'Prevent static utility methods on domain entities',
+				category: 'Clean Architecture',
+				recommended: true
+			},
+			messages: {
+				staticMethodOnEntity: '❌ Static utility method "{{methodName}}" on entity "{{entityName}}". Use domain services or collection classes instead. (CLAUDE.md rule #13)'
+			},
+			schema: []
+		},
+		create(context) {
+			const filename = context.getFilename();
+
+			// Only apply to domain entities
+			if (!filename.includes('/domain/entities/') && !filename.includes('\\domain\\entities\\')) {
+				return {};
+			}
+
+			return {
+				MethodDefinition(node) {
+					// Allow factory methods (create, from, fromJson, etc.)
+					const allowedStaticMethods = ['create', 'from', 'fromJson', 'fromData'];
+					const methodName = node.key.name;
+
+					if (node.static &&
+						node.kind === 'method' &&
+						!allowedStaticMethods.includes(methodName)) {
+						const className = node.parent.parent.id?.name || 'Unknown';
+						context.report({
+							node,
+							messageId: 'staticMethodOnEntity',
+							data: {
+								methodName: methodName,
+								entityName: className
+							}
+						});
+					}
+				}
+			};
+		}
+	},
+
+	'no-presentation-methods-in-domain': {
+		meta: {
+			type: 'problem',
+			docs: {
+				description: 'Prevent presentation/serialization methods in domain entities',
+				category: 'Clean Architecture',
+				recommended: true
+			},
+			messages: {
+				presentationMethodInDomain: '❌ Presentation method "{{methodName}}" in domain entity. Move to mapper in application layer. (CLAUDE.md rule #14: Presentation logic in domain)'
+			},
+			schema: []
+		},
+		create(context) {
+			const filename = context.getFilename();
+
+			// Only apply to domain entities
+			if (!filename.includes('/domain/entities/') && !filename.includes('\\domain\\entities\\')) {
+				return {};
+			}
+
+			const FORBIDDEN_PREFIXES = ['to', 'as', 'serialize', 'deserialize', 'format'];
+			const ALLOWED_METHODS = ['toString', 'toJSON']; // Standard JavaScript methods
+
+			return {
+				MethodDefinition(node) {
+					const methodName = node.key.name;
+
+					// Skip allowed methods
+					if (ALLOWED_METHODS.includes(methodName)) {
+						return;
+					}
+
+					// Check if method starts with forbidden prefix
+					const isForbidden = FORBIDDEN_PREFIXES.some(prefix =>
+						methodName.startsWith(prefix)
+					);
+
+					if (isForbidden) {
+						context.report({
+							node,
+							messageId: 'presentationMethodInDomain',
+							data: {
+								methodName: methodName
+							}
+						});
+					}
+				}
+			};
+		}
+	},
+
+	'no-html-in-typescript': {
+		meta: {
+			type: 'problem',
+			docs: {
+				description: 'Prevent HTML templates in TypeScript panel files',
+				category: 'Clean Architecture',
+				recommended: true
+			},
+			messages: {
+				htmlInTypescript: '❌ HTML template in TypeScript file. Extract to view file in presentation/views/. (CLAUDE.md rule #11: HTML in panel .ts files)'
+			},
+			schema: []
+		},
+		create(context) {
+			const filename = context.getFilename();
+
+			// Only apply to panel files (not view files)
+			const isPanel = (filename.includes('/presentation/panels/') || filename.includes('\\presentation\\panels\\'));
+			const isView = (filename.includes('/presentation/views/') || filename.includes('\\presentation\\views\\'));
+
+			if (!isPanel || isView) {
+				return {};
+			}
+
+			const HTML_TAG_REGEX = /<[a-z][\s\S]*>/i;
+
+			return {
+				TemplateLiteral(node) {
+					const templateValue = context.sourceCode.getText(node);
+
+					// Check if template contains HTML tags
+					if (HTML_TAG_REGEX.test(templateValue)) {
+						context.report({
+							node,
+							messageId: 'htmlInTypescript'
+						});
+					}
+				}
+			};
+		}
+	},
+
+	'prefer-explicit-undefined': {
+		meta: {
+			type: 'suggestion',
+			docs: {
+				description: 'Require explicit "| undefined" instead of optional parameter syntax',
+				category: 'Best Practices',
+				recommended: false
+			},
+			messages: {
+				preferExplicitUndefined: 'Use explicit "| undefined" instead of optional parameter "?". Makes optionality clearer in function signatures.'
+			},
+			schema: []
+		},
+		create(context) {
+			return {
+				'FunctionDeclaration, MethodDefinition, ArrowFunctionExpression': (node) => {
+					const params = node.value?.params || node.params;
+
+					if (!params) {
+						return;
+					}
+
+					params.forEach(param => {
+						// Check if parameter is optional
+						if (param.optional && param.typeAnnotation) {
+							// Check if type annotation already includes undefined
+							const typeAnnotation = param.typeAnnotation.typeAnnotation;
+							const hasExplicitUndefined = typeAnnotation.types?.some(
+								t => t.type === 'TSUndefinedKeyword'
+							);
+
+							if (!hasExplicitUndefined) {
+								context.report({
+									node: param,
+									messageId: 'preferExplicitUndefined'
+								});
+							}
+						}
+					});
+				}
+			};
+		}
 	}
 };
