@@ -50,56 +50,86 @@ See `docs/ARCHITECTURE_GUIDE.md` for details.
 We have **4 specialized agents**:
 
 1. **clean-architecture-guardian** (`.claude/agents/clean-architecture-guardian.md`)
-   - **When:** Reviewing architecture, layer separation, domain model design
+   - **Role:** Designer + Reviewer
+   - **When (Design):** Before implementation - designs all four layers
+   - **When (Review):** After layer implementation - reviews architecture compliance
    - **Purpose:** Enforce Clean Architecture principles, catch anemic models, wrong dependency direction
-   - **Output:** Architecture review with specific violations and recommendations
+   - **Output:** Design specification OR architecture review
 
 2. **typescript-pro** (`.claude/agents/typescript-pro.md`)
-   - **When:** Reviewing TypeScript code quality, type safety, VS Code extension patterns
+   - **Role:** Reviewer (NOT implementer)
+   - **When (Type Contracts):** During design phase - reviews type definitions before implementation
+   - **When (Review):** After layer implementation - reviews type safety
    - **Purpose:** Enforce strict type safety, advanced generics, proper TypeScript patterns
-   - **Output:** Type safety review with specific improvements
+   - **Output:** Type contract recommendations OR type safety review
 
-3. **code-reviewer** (`.claude/agents/code-reviewer.md`)
-   - **When:** After implementing code, before committing
-   - **Purpose:** Enforce Clean Architecture principles and SOLID compliance
-   - **Output:** APPROVE/REJECT/CHANGES REQUESTED
-
-4. **docs-generator** (`.claude/agents/docs-generator.md`)
+3. **code-cleanup-implementer** (`.claude/agents/code-cleanup-implementer.md`)
+   - **Role:** Documentation Specialist
    - **When:** After code is approved, or when patterns change
-   - **Purpose:** Create/update documentation following style guide
-   - **Output:** Documentation files matching project standards
+   - **Purpose:** Create/update documentation, cleanup logging/comments
+   - **Output:** Documentation files OR cleaned-up code
+
+**IMPORTANT**: All agents are REVIEWERS/DESIGNERS, not implementers. YOU (human or builder) implement the code.
 
 ---
 
 ## Complete Workflow
 
-### For New Features
+### For New Features (Type-First Incremental Development)
 
 ```
-1. clean-architecture-guardian designs Clean Architecture solution
-   ↓ (designs domain, application, presentation, infrastructure layers)
-2. Builder implements layer by layer
-   ↓ (domain first, then application, then presentation/infrastructure)
-3. typescript-pro reviews type safety + clean-architecture-guardian reviews layers
-   ↓ (parallel reviews: type safety + architecture compliance)
-4. code-reviewer final approval
-   ↓ (checks for anemic models, business logic placement, etc.)
-5. docs-generator documents patterns (if new)
-   ↓
-6. Commit & push
+Phase 1: Type-Safe Architecture Design
+1. clean-architecture-guardian designs all layers (30 min)
+   ↓ (designs domain, application, infrastructure, presentation layers)
+2. typescript-pro reviews TYPE CONTRACTS (10 min) ← NEW
+   ↓ (reviews interfaces, types, generics BEFORE implementation)
+3. Human approves design + type contracts (10 min)
+
+Phase 2-5: Per-Layer Implementation (repeat for each layer)
+4. YOU implement layer (30-45 min)
+   ↓ (domain → application → infrastructure → presentation)
+5. npm run compile ✅ (30 sec) ← CRITICAL
+   ↓ (must succeed before review)
+6. typescript-pro reviews type safety (5 min) [parallel]
+   + clean-architecture-guardian reviews architecture (5 min) [parallel]
+   ↓ (both review simultaneously)
+7. clean-architecture-guardian final approval (2 min)
+   ↓ (APPROVE/CHANGES REQUESTED/REJECT)
+8. YOU fix issues if any → npm run compile ✅
+9. Commit layer (3 min)
+   ↓ (one commit per layer)
+
+Phase 6: Documentation (optional, 20 min)
+10. code-cleanup-implementer documents patterns (if new)
 ```
+
+**Key Differences from Old Workflow**:
+- ✅ Type contracts reviewed BEFORE implementation (prevents type error cascade)
+- ✅ Compile after EACH layer (not just at end)
+- ✅ Review per layer (not all at once)
+- ✅ Commit per layer (granular rollback capability)
 
 ### For Bug Fixes
 
 ```
-1. Builder implements fix
+1. YOU reproduce bug (5 min)
    ↓
-2. typescript-pro reviews type safety (if type-related)
+2. YOU implement fix (15 min)
    ↓
-3. code-reviewer reviews
+3. npm run compile ✅ (30 sec) ← CRITICAL
    ↓
-4. Commit & push
+4. typescript-pro reviews (if type-related) (2 min) [optional]
+   ↓
+5. clean-architecture-guardian reviews (2 min)
+   ↓ (APPROVE/REJECT)
+6. YOU commit (3 min)
+   ↓
+7. YOU test manually (5 min)
 ```
+
+**Total Time**: ~30 mins
+
+See [BUG_FIX_WORKFLOW.md](workflows/BUG_FIX_WORKFLOW.md) for detailed bug fix process.
 
 ---
 
@@ -115,7 +145,7 @@ Builder:
 - Fixes the bug
 - Runs npm run compile ✅
 - Invokes typescript-pro for type safety review (if type-related)
-- Invokes code-reviewer automatically
+- Invokes clean-architecture-guardian automatically
 ```
 
 **Step 2: typescript-pro Reviews (if needed)**
@@ -125,7 +155,7 @@ typescript-pro: "✅ Type safety maintained - proper null checking added"
 
 **Step 3: Code Reviewer Approves**
 ```
-code-reviewer: "✅ APPROVED - Ready to commit"
+clean-architecture-guardian: "✅ APPROVED - Ready to commit"
 ```
 
 **Step 4: You Commit**
@@ -171,7 +201,7 @@ Builder:
 typescript-pro: "✅ Type safety excellent - strict types, no `any`"
 clean-architecture-guardian: "✅ Rich domain model with behavior, zero external dependencies"
 
-code-reviewer: "✅ APPROVED - Domain layer exemplary"
+clean-architecture-guardian: "✅ APPROVED - Domain layer exemplary"
 ```
 
 **Step 3: Builder Implements Application Layer**
@@ -190,7 +220,7 @@ Builder:
 typescript-pro: "✅ Explicit return types on all methods, proper generics"
 clean-architecture-guardian: "✅ Use cases orchestrate only, no business logic"
 
-code-reviewer: "✅ APPROVED - Clean application layer"
+clean-architecture-guardian: "✅ APPROVED - Clean application layer"
 ```
 
 **Step 4: Builder Implements Infrastructure & Presentation**
@@ -207,7 +237,7 @@ Builder:
 typescript-pro: "✅ Type-safe repository implementation"
 clean-architecture-guardian: "✅ Dependencies point inward, clean separation"
 
-code-reviewer: "✅ APPROVED - Clean Architecture maintained"
+clean-architecture-guardian: "✅ APPROVED - Clean Architecture maintained"
 ```
 
 **Step 5: Docs Generator Documents (Optional)**
@@ -243,7 +273,7 @@ Infrastructure layer:
 Presentation layer:
 - ImportJobViewerPanel (uses use cases, no business logic)
 
-Reviewed-by: code-reviewer ✅"
+Reviewed-by: clean-architecture-guardian ✅"
 ```
 
 **Total time:** ~3-4 hours (complete feature with Clean Architecture)
@@ -269,7 +299,7 @@ Reviewed-by: code-reviewer ✅"
 ✅ Ensuring proper return types on all public methods
 ❌ Skip for: Documentation updates, non-TypeScript changes
 
-### Use code-reviewer When:
+### Use clean-architecture-guardian When:
 ✅ **ALWAYS** - After every code change before commit
 ✅ Builder automatically invokes it
 ✅ Catches Clean Architecture violations:
@@ -358,7 +388,7 @@ clean-architecture-guardian (parallel review):
 - ✅ No infrastructure dependencies
 - ✅ Domain layer has zero external dependencies
 
-code-reviewer: "✅ APPROVED - Rich domain model with excellent type safety"
+clean-architecture-guardian: "✅ APPROVED - Rich domain model with excellent type safety"
 
 You commit: "feat(domain): add ImportJob entity with behavior"
 ```
@@ -383,7 +413,7 @@ clean-architecture-guardian (parallel review):
 - ✅ ViewModels are DTOs (no behavior)
 - ✅ Mappers properly convert domain → ViewModel
 
-code-reviewer: "✅ APPROVED - Clean application layer with strong types"
+clean-architecture-guardian: "✅ APPROVED - Clean application layer with strong types"
 
 You commit: "feat(app): add import job use cases and ViewModels"
 ```
@@ -406,7 +436,7 @@ clean-architecture-guardian (parallel review):
 - ✅ Panel uses use cases (no business logic in panel)
 - ✅ Proper dependency direction (presentation → application → domain)
 
-code-reviewer: "✅ APPROVED - Clean Architecture maintained with type safety"
+clean-architecture-guardian: "✅ APPROVED - Clean Architecture maintained with type safety"
 
 You commit: "feat(infra+pres): add repository and panel"
 ```
@@ -443,7 +473,7 @@ Hour 1:
 Hour 2:
 ├─ Finish domain layer (15 min)
 ├─ typescript-pro + clean-architecture-guardian review (parallel, ~3 min)
-├─ code-reviewer final approval (auto, ~2 min)
+├─ clean-architecture-guardian final approval (auto, ~2 min)
 ├─ Commit domain (3 min)
 ├─ Implement application layer (32 min)
 ├─ typescript-pro + clean-architecture-guardian review (parallel, ~3 min)
@@ -452,11 +482,11 @@ Hour 2:
 Hour 3:
 ├─ Implement infrastructure (20 min)
 ├─ typescript-pro + clean-architecture-guardian review (parallel, ~3 min)
-├─ code-reviewer reviews (auto, ~2 min)
+├─ clean-architecture-guardian reviews (auto, ~2 min)
 ├─ Commit infrastructure (3 min)
 ├─ Implement presentation (22 min)
 ├─ typescript-pro + clean-architecture-guardian review (parallel, ~3 min)
-├─ code-reviewer reviews (auto, ~2 min)
+├─ clean-architecture-guardian reviews (auto, ~2 min)
 └─ Commit presentation (3 min)
 
 Result: 1 design spec, 4 layer commits with multi-agent review
@@ -467,7 +497,7 @@ Result: 1 design spec, 4 layer commits with multi-agent review
 Hour 1:
 ├─ Fix bug (20 min)
 ├─ typescript-pro reviews type safety if needed (auto, ~2 min)
-├─ code-reviewer reviews (auto, ~2 min)
+├─ clean-architecture-guardian reviews (auto, ~2 min)
 └─ Commit (3 min)
 
 Result: 1 bug fix commit
@@ -501,12 +531,12 @@ Builder: "I've implemented the feature. Let me invoke typescript-pro for type sa
 typescript-pro: [Returns type safety analysis]
 ```
 
-**Example: Invoke code-reviewer** (usually automatic)
+**Example: Invoke clean-architecture-guardian** (usually automatic)
 ```
-Builder: "Let me invoke code-reviewer for final approval"
-[Uses Task tool with code-reviewer agent]
+Builder: "Let me invoke clean-architecture-guardian for final approval"
+[Uses Task tool with clean-architecture-guardian agent]
 
-code-reviewer: [Returns APPROVE/REJECT]
+clean-architecture-guardian: [Returns APPROVE/REJECT]
 ```
 
 **Example: Invoke docs-generator**
@@ -521,8 +551,8 @@ docs-generator: [Creates/updates documentation]
 
 ### Agent Invocation Patterns
 
-**Automatic Invocation (code-reviewer)**
-- Builder automatically invokes code-reviewer after implementing
+**Automatic Invocation (clean-architecture-guardian)**
+- Builder automatically invokes clean-architecture-guardian after implementing
 - You don't need to ask for it explicitly
 - Happens before every commit
 
@@ -530,7 +560,7 @@ docs-generator: [Creates/updates documentation]
 - Both agents review simultaneously for comprehensive feedback
 - typescript-pro focuses on type safety
 - clean-architecture-guardian focuses on layer separation
-- Results combined before code-reviewer final approval
+- Results combined before clean-architecture-guardian final approval
 
 **Manual Invocation (clean-architecture-guardian, typescript-pro, docs-generator)**
 - You request these agents when needed
@@ -716,14 +746,14 @@ If "Feeling" is uncertain/confused → STOP, ask questions, don't push forward.
 4. Parallel multi-agent review each layer (~3-5 min)
    - typescript-pro reviews type safety (parallel)
    - clean-architecture-guardian reviews layer separation (parallel)
-   - code-reviewer final approval (~2 min)
+   - clean-architecture-guardian final approval (~2 min)
 5. Commit each layer separately (~5 min)
 6. docs-generator documents pattern if new (~20 min)
 
 **For Bug Fixes:**
 1. Implement fix (~20 min)
 2. typescript-pro reviews type safety if needed (~2 min)
-3. code-reviewer auto-reviews (~2 min)
+3. clean-architecture-guardian auto-reviews (~2 min)
 4. Commit if approved (~5 min)
 
 **The keys are:**
@@ -731,7 +761,7 @@ If "Feeling" is uncertain/confused → STOP, ask questions, don't push forward.
 - **Rich domain models** - Entities with behavior (not anemic)
 - **Use cases orchestrate** - No business logic in use cases
 - **Layer by layer** - Commit domain, then application, then infra/presentation
-- **Multi-agent review** - typescript-pro (types) + clean-architecture-guardian (layers) + code-reviewer (final)
+- **Multi-agent review** - typescript-pro (types) + clean-architecture-guardian (layers) + clean-architecture-guardian (final)
 - **Type safety** - No `any`, explicit return types, proper generics
 - **Manual test after commit** - F5 in VS Code, verify it works
 
@@ -741,6 +771,61 @@ If "Feeling" is uncertain/confused → STOP, ask questions, don't push forward.
 - ✅ Manual testing (F5 in VS Code)
 - ✅ typescript-pro (type safety review)
 - ✅ clean-architecture-guardian (layer separation review)
-- ✅ code-reviewer (final Clean Architecture compliance)
+- ✅ clean-architecture-guardian (final Clean Architecture compliance)
 
 **You've got this. Start with ONE feature today.**
+
+---
+
+## Detailed Workflow Guides
+
+For step-by-step checklists and comprehensive guides, see:
+
+### 📋 Workflow Documents
+
+1. **[NEW_FEATURE_WORKFLOW.md](workflows/NEW_FEATURE_WORKFLOW.md)**
+   - Complete checklist for implementing new features
+   - Comprehensive workflow (complex features, 3+ hours)
+   - Streamlined workflow (simple features, <1 hour)
+   - Phase-by-phase breakdown with time estimates
+
+2. **[BUG_FIX_WORKFLOW.md](workflows/BUG_FIX_WORKFLOW.md)**
+   - Quick bug fix process (~30 mins)
+   - When bug fix becomes feature work
+   - Hotfix workflow for production bugs
+   - Common bug fix patterns
+
+3. **[REFACTORING_WORKFLOW.md](workflows/REFACTORING_WORKFLOW.md)**
+   - Safe, incremental refactoring
+   - Moving business logic to correct layer
+   - Removing code duplication
+   - Replacing `any` with proper types
+   - Extracting long methods
+
+4. **[AGENT_ROLES.md](AGENT_ROLES.md)**
+   - Clarifies who implements vs who reviews
+   - When to invoke each agent
+   - Agent invocation patterns
+   - Common role confusion mistakes
+
+### 🎯 Quick Decision Tree
+
+**Need to build something?**
+```
+├─ New feature?
+│  ├─ Complex (5+ entities, 3+ hours)?
+│  │  └─ Use: NEW_FEATURE_WORKFLOW.md (Comprehensive)
+│  └─ Simple (1-2 entities, <1 hour)?
+│     └─ Use: NEW_FEATURE_WORKFLOW.md (Streamlined)
+│
+├─ Bug to fix?
+│  └─ Use: BUG_FIX_WORKFLOW.md
+│
+├─ Code quality issue?
+│  └─ Use: REFACTORING_WORKFLOW.md
+│
+└─ Confused about agents?
+   └─ Read: AGENT_ROLES.md
+```
+
+---
