@@ -50,7 +50,7 @@ export class PersistenceInspectorPanel {
 
 		// Handle messages from webview
 		this.panel.webview.onDidReceiveMessage(
-			message => this.handleMessage(message),
+			async message => this.handleMessage(message),
 			null,
 			this.disposables
 		);
@@ -62,7 +62,7 @@ export class PersistenceInspectorPanel {
 		}, null, this.disposables);
 
 		// Load initial data
-		this.handleRefresh();
+		void this.handleRefresh();
 	}
 
 	/**

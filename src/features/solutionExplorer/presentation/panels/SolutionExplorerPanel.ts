@@ -5,7 +5,7 @@ import { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrl
 import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import { ListSolutionsUseCase } from '../../application/useCases/ListSolutionsUseCase';
 import { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
-import { Solution } from '../../domain/entities/Solution';
+import { type Solution } from '../../domain/entities/Solution';
 import {
 	DataTablePanel,
 	type EnvironmentOption,

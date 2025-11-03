@@ -23,7 +23,7 @@ import {
 	type CheckUniqueNameMessage,
 	type WebviewLogMessage
 } from '../../../../infrastructure/ui/utils/TypeGuards';
-import { AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
+import { AuthenticationMethodType } from '../../application/types/AuthenticationMethodType';
 import { VsCodeCancellationTokenAdapter } from '../../infrastructure/adapters/VsCodeCancellationTokenAdapter';
 
 /**
@@ -78,7 +78,7 @@ export class EnvironmentSetupPanel {
 		this.panel.webview.html = this.getHtmlContent();
 
 		this.panel.webview.onDidReceiveMessage(
-			message => this.handleMessage(message),
+			async message => this.handleMessage(message),
 			null,
 			this.disposables
 		);
@@ -89,7 +89,7 @@ export class EnvironmentSetupPanel {
 		}, null, this.disposables);
 
 		if (environmentId) {
-			this.loadEnvironment(environmentId);
+			void this.loadEnvironment(environmentId);
 		}
 	}
 

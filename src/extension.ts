@@ -461,30 +461,17 @@ export function deactivate(): void {
 }
 
 /**
- * Initializes the Solution Explorer
- * Uses dynamic imports for lazy loading
+ * Creates DataverseApiService factory with access token and URL providers
  */
-async function initializeSolutionExplorer(
-	context: vscode.ExtensionContext,
+function createDataverseApiServiceFactory(
 	authService: MsalAuthenticationService,
-	environmentRepository: IEnvironmentRepository,
-	logger: ILogger,
-	initialEnvironmentId?: string
-): Promise<void> {
-	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService') as typeof import('./shared/infrastructure/services/DataverseApiService');
-	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder') as typeof import('./shared/infrastructure/services/MakerUrlBuilder');
-	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository') as typeof import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository');
-	const { ListSolutionsUseCase } = await import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase') as typeof import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase');
-	const { SolutionExplorerPanel } = await import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel') as typeof import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel');
-
-	// Create environment factory functions
-	const getEnvironments = createGetEnvironments(environmentRepository);
-	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
-
-	// Infrastructure Layer - Dataverse API Service that works for any environment
-	const dataverseApiService = new DataverseApiService(
-		async (envId: string) => {
-			// Get the environment for this envId
+	environmentRepository: IEnvironmentRepository
+): {
+	getAccessToken: (envId: string) => Promise<string>;
+	getDataverseUrl: (envId: string) => Promise<string>;
+} {
+	return {
+		async getAccessToken(envId: string): Promise<string> {
 			const environments = await environmentRepository.getAll();
 			const environment = environments.find(env => env.getId().getValue() === envId);
 
@@ -506,8 +493,7 @@ async function initializeSolutionExplorer(
 
 			return authService.getAccessTokenForEnvironment(environment, clientSecret, password);
 		},
-		async (envId: string) => {
-			// Get the Dataverse URL for this environment
+		async getDataverseUrl(envId: string): Promise<string> {
 			const environments = await environmentRepository.getAll();
 			const environment = environments.find(env => env.getId().getValue() === envId);
 
@@ -516,9 +502,34 @@ async function initializeSolutionExplorer(
 			}
 
 			return environment.getDataverseUrl().getValue();
-		},
-		logger
-	);
+		}
+	};
+}
+
+/**
+ * Initializes the Solution Explorer
+ * Uses dynamic imports for lazy loading
+ */
+async function initializeSolutionExplorer(
+	context: vscode.ExtensionContext,
+	authService: MsalAuthenticationService,
+	environmentRepository: IEnvironmentRepository,
+	logger: ILogger,
+	initialEnvironmentId?: string
+): Promise<void> {
+	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService') as typeof import('./shared/infrastructure/services/DataverseApiService');
+	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder') as typeof import('./shared/infrastructure/services/MakerUrlBuilder');
+	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository') as typeof import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository');
+	const { ListSolutionsUseCase } = await import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase') as typeof import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase');
+	const { SolutionExplorerPanel } = await import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel') as typeof import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel');
+
+	// Create environment factory functions
+	const getEnvironments = createGetEnvironments(environmentRepository);
+	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
+
+	// Infrastructure Layer - Dataverse API Service
+	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
+	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
 
 	const urlBuilder = new MakerUrlBuilder();
 	const solutionRepository = new DataverseApiSolutionRepository(dataverseApiService, logger);
@@ -563,41 +574,8 @@ async function initializeImportJobViewer(
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
 
 	// Infrastructure Layer - Dataverse API Service
-	const dataverseApiService = new DataverseApiService(
-		async (envId: string) => {
-			const environments = await environmentRepository.getAll();
-			const environment = environments.find(env => env.getId().getValue() === envId);
-
-			if (!environment) {
-				throw new Error(`Environment not found for ID: ${envId}`);
-			}
-
-			const authMethod = environment.getAuthenticationMethod();
-			let clientSecret: string | undefined;
-			let password: string | undefined;
-
-			if (authMethod.requiresClientCredentials()) {
-				clientSecret = await environmentRepository.getClientSecret(environment.getClientId()?.getValue() || '');
-			}
-
-			if (authMethod.requiresUsernamePassword()) {
-				password = await environmentRepository.getPassword(environment.getUsername() || '');
-			}
-
-			return authService.getAccessTokenForEnvironment(environment, clientSecret, password);
-		},
-		async (envId: string) => {
-			const environments = await environmentRepository.getAll();
-			const environment = environments.find(env => env.getId().getValue() === envId);
-
-			if (!environment) {
-				throw new Error(`Environment not found for ID: ${envId}`);
-			}
-
-			return environment.getDataverseUrl().getValue();
-		},
-		logger
-	);
+	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
+	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
 
 	const urlBuilder = new MakerUrlBuilder();
 	const importJobRepository = new DataverseApiImportJobRepository(dataverseApiService, logger);

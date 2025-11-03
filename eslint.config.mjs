@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
+import localRules from 'eslint-plugin-local-rules';
 
 export default tseslint.config(
   js.configs.recommended,
@@ -22,7 +23,8 @@ export default tseslint.config(
     },
     plugins: {
       '@typescript-eslint': tseslint.plugin,
-      'import': importPlugin
+      'import': importPlugin,
+      'local-rules': localRules
     },
     rules: {
       // ===========================
@@ -82,7 +84,30 @@ export default tseslint.config(
       // ===========================
       // LOGGING (No console in Extension Host)
       // ===========================
-      'no-console': 'error'
+      'no-console': 'error',
+
+      // ===========================
+      // CLEAN ARCHITECTURE BOUNDARIES (CLAUDE.md: Layer separation)
+      // ===========================
+      'local-rules/no-domain-in-presentation': 'error',
+      'local-rules/no-outer-layers-in-domain': 'error',
+      'local-rules/no-presentation-in-application': 'error',
+
+      // ===========================
+      // ASYNC/PROMISE HANDLING
+      // ===========================
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/promise-function-async': 'error',
+
+      // ===========================
+      // CODE COMPLEXITY
+      // ===========================
+      'complexity': ['warn', 15],
+      'max-lines': ['warn', { max: 500, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['warn', { max: 100, skipBlankLines: true, skipComments: true }],
+      'max-depth': ['warn', 4],
+      'max-nested-callbacks': ['warn', 3]
     }
   },
   {

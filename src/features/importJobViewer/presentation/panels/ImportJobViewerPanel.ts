@@ -6,7 +6,7 @@ import { OperationCancelledException } from '../../../../shared/domain/errors/Op
 import { ListImportJobsUseCase } from '../../application/useCases/ListImportJobsUseCase';
 import { OpenImportLogUseCase } from '../../application/useCases/OpenImportLogUseCase';
 import { ImportJobViewModelMapper } from '../../application/mappers/ImportJobViewModelMapper';
-import { ImportJob } from '../../domain/entities/ImportJob';
+import { type ImportJob } from '../../domain/entities/ImportJob';
 import {
 	DataTablePanel,
 	type EnvironmentOption,

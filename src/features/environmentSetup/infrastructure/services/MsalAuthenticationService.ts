@@ -556,8 +556,9 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 			const deviceCodeRequest: msal.DeviceCodeRequest = {
 				scopes: scopes,
-				deviceCodeCallback: async (deviceCodeResponse) => {
-					this.logger.debug('Device code generated', {
+				deviceCodeCallback: (deviceCodeResponse) => {
+					void (async (): Promise<void> => {
+						this.logger.debug('Device code generated', {
 						userCode: deviceCodeResponse.userCode,
 						verificationUri: deviceCodeResponse.verificationUri
 					});
@@ -581,6 +582,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 						await vscode.env.clipboard.writeText(deviceCodeResponse.userCode);
 						vscode.window.showInformationMessage('Device code copied to clipboard');
 					}
+					})();
 				}
 			};
 
@@ -629,10 +631,10 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			});
 
 			// Clear MSAL's internal token cache
-			clientApp.getTokenCache().getAllAccounts().then(accounts => {
-				accounts.forEach(account => {
-					clientApp.getTokenCache().removeAccount(account);
-				});
+			void clientApp.getTokenCache().getAllAccounts().then(async accounts => {
+				await Promise.all(accounts.map(async account =>
+					clientApp.getTokenCache().removeAccount(account)
+				));
 				this.logger.debug('MSAL token cache cleared', {
 					environmentId: cacheKey,
 					accountsCleared: accounts.length
@@ -660,10 +662,10 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 		// Clear all MSAL token caches
 		this.clientAppCache.forEach((clientApp) => {
-			clientApp.getTokenCache().getAllAccounts().then(accounts => {
-				accounts.forEach(account => {
-					clientApp.getTokenCache().removeAccount(account);
-				});
+			void clientApp.getTokenCache().getAllAccounts().then(async accounts => {
+				await Promise.all(accounts.map(async account =>
+					clientApp.getTokenCache().removeAccount(account)
+				));
 			}).catch((error) => {
 				this.logger.warn('Error clearing MSAL token cache', error);
 			});

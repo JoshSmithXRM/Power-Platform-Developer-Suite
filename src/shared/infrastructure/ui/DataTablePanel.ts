@@ -77,7 +77,7 @@ export abstract class DataTablePanel {
 		this.panel.webview.html = this.getHtmlContent();
 
 		this.panel.webview.onDidReceiveMessage(
-			message => this.handleMessage(message),
+			async (message) => await this.handleMessage(message),
 			null,
 			this.disposables
 		);
@@ -87,7 +87,7 @@ export abstract class DataTablePanel {
 			this.dispose();
 		}, null, this.disposables);
 
-		this.initialize();
+		void this.initialize();
 	}
 
 	protected abstract getConfig(): DataTableConfig;

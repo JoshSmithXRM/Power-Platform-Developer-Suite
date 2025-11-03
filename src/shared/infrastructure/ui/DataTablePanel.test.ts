@@ -69,7 +69,7 @@ class TestDataTablePanel extends DataTablePanel {
 	}
 
 	// Expose protected methods for testing
-	public testSwitchEnvironment(environmentId: string): Promise<void> {
+	public async testSwitchEnvironment(environmentId: string): Promise<void> {
 		return this.switchEnvironment(environmentId);
 	}
 

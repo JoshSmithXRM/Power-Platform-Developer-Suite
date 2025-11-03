@@ -937,33 +937,72 @@ Domain defines contracts, infrastructure implements them.
 // Domain layer: src/features/dataPanelSuite/domain/interfaces/
 
 interface ISolutionRepository {
-  findAll(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<Solution[]>;
+  findAll(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<Solution[]>;
 }
 
 interface IImportJobRepository {
-  findAll(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<ImportJob[]>;
+  findAll(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<ImportJob[]>;
+
+  findByIdWithLog(
+    environmentId: string,
+    importJobId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<ImportJob>;
 }
 
 interface IEnvironmentVariableRepository {
-  findAllDefinitions(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<EnvironmentVariableDefinition[]>;
-  findAllValues(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<EnvironmentVariableValue[]>;
+  findAllDefinitions(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<EnvironmentVariableDefinition[]>;
+
+  findAllValues(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<EnvironmentVariableValue[]>;
 }
 
 interface IConnectionReferenceRepository {
-  findAll(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<ConnectionReference[]>;
+  findAll(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<ConnectionReference[]>;
 }
 
 interface ICloudFlowRepository {
-  findAll(environmentId: string, cancellationToken?: vscode.CancellationToken): Promise<CloudFlow[]>;
+  findAll(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<CloudFlow[]>;
 }
 
 interface ISolutionComponentRepository {
-  getObjectTypeCode(environmentId: string, entityLogicalName: string, cancellationToken?: vscode.CancellationToken): Promise<number | null>;
+  getObjectTypeCode(
+    environmentId: string,
+    entityLogicalName: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<number | null>;
+
   findComponentIdsBySolution(
     environmentId: string,
     solutionId: string,
     entityLogicalName: string,
-    cancellationToken?: vscode.CancellationToken
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
   ): Promise<string[]>;
 }
 
@@ -992,7 +1031,7 @@ interface ILogger {
 }
 ```
 
-**Why:** Domain defines contracts, which allows infrastructure to be swapped without changing domain or application layers. Perfect for testing with mocks. Cancellation tokens allow users to cancel long-running operations. ILogger is injected into use cases for observability.
+**Why:** Domain defines contracts, which allows infrastructure to be swapped without changing domain or application layers. Perfect for testing with mocks. QueryOptions enables flexible query customization with sensible repository defaults. Cancellation tokens allow users to cancel long-running operations. ILogger is injected into use cases for observability.
 
 ---
 
@@ -1589,33 +1628,69 @@ All repositories live in: `src/features/dataPanelSuite/infrastructure/repositori
 ```typescript
 class DataverseApiSolutionRepository implements ISolutionRepository {
   constructor(
-    private readonly apiService: IPowerPlatformApiService,
-    private readonly authService: IAuthenticationService
+    private readonly apiService: IDataverseApiService,
+    private readonly logger: ILogger
   ) {}
 
-  async findAll(environmentId: string): Promise<Solution[]> {
-    const endpoint = `/api/data/v9.2/solutions?$select=solutionid,uniquename,friendlyname,version,ismanaged,_publisherid_value,installedon,description&$expand=publisherid($select=friendlyname)&$orderby=friendlyname`;
+  async findAll(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<Solution[]> {
+    // Sensible defaults - can be overridden by caller
+    const defaultOptions: QueryOptions = {
+      expand: 'publisherid($select=friendlyname)',
+      orderBy: 'friendlyname'
+    };
 
-    const response = await this.apiService.get(environmentId, endpoint);
+    const mergedOptions: QueryOptions = {
+      ...defaultOptions,
+      ...options  // Caller can customize
+    };
 
-    return response.value.map((item: any) =>
-      new Solution(
-        item.solutionid,
-        item.uniquename,
-        item.friendlyname,
-        item.version,
-        item.ismanaged,
-        item._publisherid_value,
-        item.publisherid?.friendlyname ?? 'Unknown',
-        item.installedon ? new Date(item.installedon) : null,
-        item.description ?? ''
-      )
+    const queryString = ODataQueryBuilder.build(mergedOptions);
+    const endpoint = `/api/data/v9.2/solutions${queryString ? '?' + queryString : ''}`;
+
+    this.logger.debug('Fetching solutions from Dataverse API', { environmentId });
+
+    if (cancellationToken?.isCancellationRequested) {
+      throw new OperationCancelledException();
+    }
+
+    const response = await this.apiService.get<DataverseSolutionsResponse>(
+      environmentId,
+      endpoint,
+      cancellationToken
+    );
+
+    const solutions = response.value.map((dto) => this.mapToEntity(dto));
+
+    this.logger.debug(`Fetched ${solutions.length} solution(s)`, { environmentId });
+
+    return solutions;
+  }
+
+  private mapToEntity(dto: DataverseSolutionDto): Solution {
+    return new Solution(
+      dto.solutionid,
+      dto.uniquename,
+      dto.friendlyname,
+      dto.version,
+      dto.ismanaged,
+      dto._publisherid_value,
+      dto.publisherid?.friendlyname ?? 'Unknown',
+      dto.installedon ? new Date(dto.installedon) : null,
+      dto.description ?? '',
+      new Date(dto.modifiedon),
+      dto.isvisible,
+      dto.isapimanaged,
+      dto.solutiontype
     );
   }
 }
 ```
 
-**Why:** Infrastructure knows how to talk to Dataverse API and map responses to domain entities. Domain stays pure.
+**Why:** Infrastructure provides sensible defaults via QueryOptions but allows callers to customize queries. ODataQueryBuilder constructs query strings. Logger provides observability. Cancellation token allows user to cancel operations. DTO mapping is separated for clarity.
 
 ---
 
@@ -1673,6 +1748,169 @@ class VsCodeEditorService implements IEditorService {
 ```
 
 **Why:** Infrastructure handles VS Code editor integration. Domain doesn't know about VS Code workspace APIs.
+
+---
+
+#### DataverseApiCloudFlowRepository
+
+```typescript
+class DataverseApiCloudFlowRepository implements ICloudFlowRepository {
+  constructor(
+    private readonly apiService: IDataverseApiService,
+    private readonly logger: ILogger
+  ) {}
+
+  async findAll(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<CloudFlow[]> {
+    // EXCLUDE clientdata by default - large JSON field
+    const defaultOptions: QueryOptions = {
+      select: ['workflowid', 'name', 'modifiedon', 'ismanaged', '_createdby_value'],
+      expand: 'createdby($select=fullname)',
+      filter: 'category eq 5',  // Cloud flows only
+      orderBy: 'name'
+    };
+
+    const mergedOptions: QueryOptions = {
+      ...defaultOptions,
+      ...options  // Caller can add 'clientdata' to select if needed
+    };
+
+    const queryString = ODataQueryBuilder.build(mergedOptions);
+    const endpoint = `/api/data/v9.2/workflows${queryString ? '?' + queryString : ''}`;
+
+    this.logger.debug('Fetching cloud flows from Dataverse API', { environmentId });
+
+    if (cancellationToken?.isCancellationRequested) {
+      throw new OperationCancelledException();
+    }
+
+    const response = await this.apiService.get<DataverseWorkflowsResponse>(
+      environmentId,
+      endpoint,
+      cancellationToken
+    );
+
+    const flows = response.value.map((dto) => this.mapToEntity(dto));
+
+    this.logger.debug(`Fetched ${flows.length} cloud flow(s)`, { environmentId });
+
+    return flows;
+  }
+
+  private mapToEntity(dto: DataverseWorkflowDto): CloudFlow {
+    return new CloudFlow(
+      dto.workflowid,
+      dto.name,
+      dto.clientdata ?? '{}',  // Default to empty JSON if not included
+      dto.ismanaged,
+      new Date(dto.modifiedon),
+      dto.createdby?.fullname ?? 'Unknown'
+    );
+  }
+}
+```
+
+**Why:** Excludes large `clientdata` field by default for performance. Use cases that need to parse connection references must explicitly request it via `select: ['clientdata', ...]` in QueryOptions.
+
+---
+
+#### DataverseApiEnvironmentVariableRepository
+
+```typescript
+class DataverseApiEnvironmentVariableRepository implements IEnvironmentVariableRepository {
+  constructor(
+    private readonly apiService: IDataverseApiService,
+    private readonly logger: ILogger
+  ) {}
+
+  async findAllDefinitions(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<EnvironmentVariableDefinition[]> {
+    const defaultOptions: QueryOptions = {
+      expand: 'modifiedby($select=fullname)',
+      orderBy: 'schemaname'
+    };
+
+    const mergedOptions: QueryOptions = {
+      ...defaultOptions,
+      ...options
+    };
+
+    const queryString = ODataQueryBuilder.build(mergedOptions);
+    const endpoint = `/api/data/v9.2/environmentvariabledefinitions${queryString ? '?' + queryString : ''}`;
+
+    this.logger.debug('Fetching environment variable definitions', { environmentId });
+
+    if (cancellationToken?.isCancellationRequested) {
+      throw new OperationCancelledException();
+    }
+
+    const response = await this.apiService.get<DataverseEnvVarDefinitionsResponse>(
+      environmentId,
+      endpoint,
+      cancellationToken
+    );
+
+    const definitions = response.value.map((dto) => this.mapDefinitionToEntity(dto));
+
+    this.logger.debug(`Fetched ${definitions.length} definition(s)`, { environmentId });
+
+    return definitions;
+  }
+
+  async findAllValues(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<EnvironmentVariableValue[]> {
+    const defaultOptions: QueryOptions = {
+      expand: 'modifiedby($select=fullname)',
+      orderBy: 'modifiedon desc'
+    };
+
+    const mergedOptions: QueryOptions = {
+      ...defaultOptions,
+      ...options
+    };
+
+    const queryString = ODataQueryBuilder.build(mergedOptions);
+    const endpoint = `/api/data/v9.2/environmentvariablevalues${queryString ? '?' + queryString : ''}`;
+
+    this.logger.debug('Fetching environment variable values', { environmentId });
+
+    if (cancellationToken?.isCancellationRequested) {
+      throw new OperationCancelledException();
+    }
+
+    const response = await this.apiService.get<DataverseEnvVarValuesResponse>(
+      environmentId,
+      endpoint,
+      cancellationToken
+    );
+
+    const values = response.value.map((dto) => this.mapValueToEntity(dto));
+
+    this.logger.debug(`Fetched ${values.length} value(s)`, { environmentId });
+
+    return values;
+  }
+
+  private mapDefinitionToEntity(dto: DataverseEnvVarDefinitionDto): EnvironmentVariableDefinition {
+    // ... mapping implementation
+  }
+
+  private mapValueToEntity(dto: DataverseEnvVarValueDto): EnvironmentVariableValue {
+    // ... mapping implementation
+  }
+}
+```
+
+**Why:** Environment variables require two separate API calls (definitions + values). Use case joins them into EnvironmentVariable entities. No large fields, so no exclusion needed.
 
 ---
 

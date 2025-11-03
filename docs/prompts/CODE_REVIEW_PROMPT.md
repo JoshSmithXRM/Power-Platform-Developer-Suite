@@ -31,7 +31,8 @@ Invoke the following 3 agents IN PARALLEL to review all uncommitted changes:
 Each agent must:
 - Perform thorough code review of ALL uncommitted changes
 - Create separate file: docs/codereview/{agent-name}-review-{YYYY-MM-DD}.md
-- Focus ONLY on issues (no positives or praise)
+- Focus ONLY on issues (NO positives, NO praise, NO "What's GOOD" sections)
+- Be concise - brief problem descriptions and fixes only
 - Use the format below
 
 Format for each agent's review file:
@@ -40,16 +41,16 @@ Format for each agent's review file:
 
 ## Production Readiness: {X}/10
 
-**Rationale**: [1-2 sentences explaining the score based on severity and quantity of issues]
+**Rationale**: [1 sentence explaining the score]
 
 ## Issues Found
 
 ### CRITICAL
 
 **{File}:{Line}** - {Brief issue description}
-- **Problem**: {Detailed explanation of what's wrong}
-- **Fix**: {Specific steps to fix it}
-- **Rationale**: {Why this matters - performance, security, maintainability, etc.}
+- **Problem**: {What's wrong - 1-2 sentences max}
+- **Fix**: {Specific fix - 1-2 sentences max}
+- **Rationale**: {Why it matters - 1 sentence}
 
 ### MODERATE
 
@@ -63,10 +64,14 @@ Format for each agent's review file:
 
 After all 3 agents complete their reviews:
 
-1. Analyze all findings across the 3 review files
-2. Provide consolidated recommendation
-3. Explain rationale for recommendation
-4. Let me (the user) decide what to fix
+1. Read all 3 review files
+2. Provide SHORT consolidated summary with:
+   - Overall production readiness score
+   - Top 5 critical issues (overlapping across agents)
+   - Top 5 moderate issues
+   - Recommended action: merge/fix first/not ready
+3. NO fluff, NO praise, NO "what's excellent" sections
+4. Keep it under 50 lines total
 
 Do NOT automatically fix issues. Review only.
 ```
@@ -103,35 +108,35 @@ Read the consolidated recommendation and decide which issues to address.
 
 ## Production Readiness: 7/10
 
-**Rationale**: Found 2 critical type safety issues and 4 moderate violations of TypeScript best practices. No blocking issues, but critical items should be addressed before merge.
+**Rationale**: 2 critical type safety issues and 4 moderate violations found.
 
 ## Issues Found
 
 ### CRITICAL
 
-**src/domain/entities/Environment.ts:45** - Using `any` type for configuration object
-- **Problem**: Method `applyConfiguration(config: any)` accepts `any` type, bypassing all type safety
-- **Fix**: Define `EnvironmentConfiguration` interface with explicit properties
-- **Rationale**: Type safety catches bugs at compile time. Each `any` creates a blind spot where runtime errors hide.
+**src/domain/entities/Environment.ts:45** - `any` type used
+- **Problem**: `applyConfiguration(config: any)` bypasses type safety
+- **Fix**: Define `EnvironmentConfiguration` interface
+- **Rationale**: Type safety catches bugs at compile time
 
-**src/application/useCases/SaveEnvironmentUseCase.ts:23** - Missing return type annotation
-- **Problem**: Public method `execute()` has no explicit return type
-- **Fix**: Add `: Promise<EnvironmentViewModel>` return type
-- **Rationale**: Explicit return types prevent unintended API changes and improve IDE autocomplete
+**src/application/useCases/SaveEnvironmentUseCase.ts:23** - Missing return type
+- **Problem**: `execute()` has no explicit return type
+- **Fix**: Add `: Promise<EnvironmentViewModel>`
+- **Rationale**: Prevents API changes and improves autocomplete
 
 ### MODERATE
 
-**src/infrastructure/repositories/EnvironmentRepository.ts:67** - Non-null assertion operator used
-- **Problem**: Using `environment!.id` assumes value is never null without runtime check
-- **Fix**: Use optional chaining or explicit null check: `if (!environment) { throw... }`
-- **Rationale**: Non-null assertions bypass TypeScript's safety checks and can cause runtime crashes
+**src/infrastructure/repositories/EnvironmentRepository.ts:67** - Non-null assertion
+- **Problem**: `environment!.id` assumes non-null without check
+- **Fix**: Use optional chaining: `environment?.id`
+- **Rationale**: Prevents runtime crashes
 
 ### MINOR
 
-**src/presentation/panels/EnvironmentSetupPanel.ts:102** - Implicit `unknown` type in catch block
-- **Problem**: Catch block doesn't explicitly type error parameter
-- **Fix**: Add type annotation: `catch (error: unknown)` and use type guard
-- **Rationale**: Explicit error typing improves clarity and enforces proper error handling patterns
+**src/presentation/panels/EnvironmentSetupPanel.ts:102** - Untyped catch
+- **Problem**: Catch block missing error type annotation
+- **Fix**: `catch (error: unknown)`
+- **Rationale**: Enforces proper error handling
 ```
 
 ---

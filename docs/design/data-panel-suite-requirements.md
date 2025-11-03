@@ -78,10 +78,9 @@ View all solutions in the selected environment.
 **Get Solutions:**
 ```
 GET /api/data/v9.2/solutions
-?$select=solutionid,uniquename,friendlyname,version,ismanaged,_publisherid_value,installedon,description
-&$expand=publisherid($select=friendlyname)
-&$orderby=friendlyname
 ```
+
+**Note:** Query options ($select, $expand, $orderby) are handled by `DataverseApiSolutionRepository` with sensible defaults. See repository implementation for details.
 
 **Response Structure:**
 ```json
@@ -157,10 +156,9 @@ Monitor solution import jobs and view import logs.
 **Get Import Jobs:**
 ```
 GET /api/data/v9.2/importjobs
-?$select=importjobid,name,progress,data,startedon,completedon
-&$expand=createdby($select=fullname)
-&$orderby=startedon desc
 ```
+
+**Note:** Query options are handled by `DataverseApiImportJobRepository`. The `data` field (large XML log) is **excluded by default** for performance. Use `findByIdWithLog()` to fetch individual import jobs with log data.
 
 **Response Structure:**
 ```json
@@ -265,24 +263,19 @@ View environment variables, filter by solution, export deployment settings.
 **Get Environment Variable Definitions:**
 ```
 GET /api/data/v9.2/environmentvariabledefinitions
-?$select=environmentvariabledefinitionid,displayname,schemaname,type,ismanaged,modifiedon,defaultvalue
-&$expand=modifiedby($select=fullname)
 ```
 
 **Get Environment Variable Values:**
 ```
 GET /api/data/v9.2/environmentvariablevalues
-?$select=environmentvariablevalueid,_environmentvariabledefinitionid_value,value,modifiedon
-&$expand=modifiedby($select=fullname)
 ```
 
-**Get Solution Component IDs (if filtering):**
-```
-1. GET /api/data/v9.2/EntityDefinitions?$filter=LogicalName eq 'environmentvariabledefinition'&$select=ObjectTypeCode
-   - Returns ObjectTypeCode (typically ~380)
-2. GET /api/data/v9.2/solutioncomponents?$filter=_solutionid_value eq '<solutionId>' and componenttype eq <objectTypeCode>
-   - Returns array of solution components with objectid field (environment variable definition IDs)
-```
+**Note:** Query options are handled by `DataverseApiEnvironmentVariableRepository` with sensible defaults.
+
+**Solution Filtering:**
+Solution component filtering is handled by `DataverseApiSolutionComponentRepository`:
+1. `getObjectTypeCode('environmentvariabledefinition')` - Returns ObjectTypeCode
+2. `findComponentIdsBySolution(solutionId, 'environmentvariabledefinition')` - Returns component IDs
 
 **Response Structures:**
 
@@ -416,24 +409,21 @@ View flows and connection references, understand relationships, export deploymen
 **Get Cloud Flows:**
 ```
 GET /api/data/v9.2/workflows
-?$filter=category eq 5
-&$select=workflowid,name,clientdata,modifiedon,ismanaged
-&$expand=modifiedby($select=fullname)
 ```
 
 **Get Connection References:**
 ```
 GET /api/data/v9.2/connectionreferences
-?$select=connectionreferenceid,connectionreferencelogicalname,connectionreferencedisplayname,connectorid,connectionid,modifiedon,ismanaged
-&$expand=modifiedby($select=fullname)
 ```
 
-**Get Solution Component IDs (if filtering):**
-```
-1. Get ObjectTypeCode for 'connectionreference' (typically ~10161)
-2. Get ObjectTypeCode for 'subscription' (cloud flows, typically ~29)
-3. Fetch solution components for both types
-```
+**Note:** Query options are handled by repository implementations:
+- `DataverseApiCloudFlowRepository` - Excludes `clientdata` (large JSON) by default for performance. Use cases must explicitly request it via QueryOptions.
+- `DataverseApiConnectionReferenceRepository` - Uses sensible defaults.
+
+**Solution Filtering:**
+Solution component filtering is handled by `DataverseApiSolutionComponentRepository`:
+1. `getObjectTypeCode('connectionreference')` and `getObjectTypeCode('subscription')` - Returns ObjectTypeCodes
+2. `findComponentIdsBySolution(solutionId, entityLogicalName)` - Returns component IDs for filtering
 
 **Response Structures:**
 
@@ -668,50 +658,87 @@ These interfaces define the contracts that infrastructure implementations must f
 ### ISolutionRepository
 ```typescript
 interface ISolutionRepository {
-  findAll(environmentId: string): Promise<Solution[]>;
+  findAll(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<Solution[]>;
 }
 ```
 
 ### IImportJobRepository
 ```typescript
 interface IImportJobRepository {
-  findAll(environmentId: string): Promise<ImportJob[]>;
+  findAll(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<ImportJob[]>;
+
+  findByIdWithLog(
+    environmentId: string,
+    importJobId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<ImportJob>;
 }
 ```
 
 ### IEnvironmentVariableRepository
 ```typescript
 interface IEnvironmentVariableRepository {
-  findAllDefinitions(environmentId: string): Promise<EnvironmentVariableDefinition[]>;
-  findAllValues(environmentId: string): Promise<EnvironmentVariableValue[]>;
+  findAllDefinitions(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<EnvironmentVariableDefinition[]>;
+
+  findAllValues(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<EnvironmentVariableValue[]>;
 }
 ```
 
 ### IConnectionReferenceRepository
 ```typescript
 interface IConnectionReferenceRepository {
-  findAll(environmentId: string): Promise<ConnectionReference[]>;
+  findAll(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<ConnectionReference[]>;
 }
 ```
 
 ### ICloudFlowRepository
 ```typescript
 interface ICloudFlowRepository {
-  findAll(environmentId: string): Promise<CloudFlow[]>;
+  findAll(
+    environmentId: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<CloudFlow[]>;
 }
 ```
 
 ### ISolutionComponentRepository
 ```typescript
 interface ISolutionComponentRepository {
-  // Get ObjectTypeCode for an entity logical name
-  getObjectTypeCode(environmentId: string, entityLogicalName: string): Promise<number | null>;
+  getObjectTypeCode(
+    environmentId: string,
+    entityLogicalName: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
+  ): Promise<number | null>;
 
-  // Get object IDs for components of a specific type in a solution
   findComponentIdsBySolution(
     environmentId: string,
     solutionId: string,
-    entityLogicalName: string
+    entityLogicalName: string,
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
   ): Promise<string[]>;
 }
 ```
