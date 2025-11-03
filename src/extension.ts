@@ -24,6 +24,7 @@ import { EnvironmentListViewModel } from './features/environmentSetup/applicatio
 import { EnvironmentFormViewModelMapper } from './features/environmentSetup/application/mappers/EnvironmentFormViewModelMapper';
 import { EnvironmentSetupPanel } from './features/environmentSetup/presentation/panels/EnvironmentSetupPanel';
 import { EnvironmentId } from './features/environmentSetup/domain/valueObjects/EnvironmentId';
+import { Environment } from './features/environmentSetup/domain/entities/Environment';
 import { EnvironmentCreated } from './features/environmentSetup/domain/events/EnvironmentCreated';
 import { EnvironmentUpdated } from './features/environmentSetup/domain/events/EnvironmentUpdated';
 import { EnvironmentDeleted } from './features/environmentSetup/domain/events/EnvironmentDeleted';
@@ -383,6 +384,96 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	const connectionReferencesCommand = vscode.commands.registerCommand('power-platform-dev-suite.connectionReferences', async (environmentItem?: { envId: string }) => {
+		try {
+			let initialEnvironmentId: string | undefined;
+
+			if (environmentItem?.envId) {
+				initialEnvironmentId = environmentItem.envId;
+			}
+
+			void initializeConnectionReferences(context, authService, environmentRepository, logger, initialEnvironmentId);
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Connection References: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	const connectionReferencesPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.connectionReferencesPickEnvironment', async () => {
+		try {
+			const environments = await environmentRepository.getAll();
+
+			if (environments.length === 0) {
+				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
+				return;
+			}
+
+			const quickPickItems = environments.map(env => ({
+				label: env.getName().getValue(),
+				description: env.getDataverseUrl().getValue(),
+				envId: env.getId().getValue()
+			}));
+
+			const selected = await vscode.window.showQuickPick(quickPickItems, {
+				placeHolder: 'Select an environment to view Connection References'
+			});
+
+			if (selected) {
+				void initializeConnectionReferences(context, authService, environmentRepository, logger, selected.envId);
+			}
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Connection References: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	const environmentVariablesCommand = vscode.commands.registerCommand('power-platform-dev-suite.environmentVariables', async (environmentItem?: { envId: string }) => {
+		try {
+			let initialEnvironmentId: string | undefined;
+
+			if (environmentItem?.envId) {
+				initialEnvironmentId = environmentItem.envId;
+			}
+
+			void initializeEnvironmentVariables(context, authService, environmentRepository, logger, initialEnvironmentId);
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Environment Variables: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	const environmentVariablesPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.environmentVariablesPickEnvironment', async () => {
+		try {
+			const environments = await environmentRepository.getAll();
+
+			if (environments.length === 0) {
+				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
+				return;
+			}
+
+			const quickPickItems = environments.map(env => ({
+				label: env.getName().getValue(),
+				description: env.getDataverseUrl().getValue(),
+				envId: env.getId().getValue()
+			}));
+
+			const selected = await vscode.window.showQuickPick(quickPickItems, {
+				placeHolder: 'Select an environment to view Environment Variables'
+			});
+
+			if (selected) {
+				void initializeEnvironmentVariables(context, authService, environmentRepository, logger, selected.envId);
+			}
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Environment Variables: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
 	context.subscriptions.push(
 		outputChannel,
 		addEnvironmentCommand,
@@ -392,6 +483,10 @@ export function activate(context: vscode.ExtensionContext): void {
 		solutionExplorerPickEnvironmentCommand,
 		importJobViewerCommand,
 		importJobViewerPickEnvironmentCommand,
+		connectionReferencesCommand,
+		connectionReferencesPickEnvironmentCommand,
+		environmentVariablesCommand,
+		environmentVariablesPickEnvironmentCommand,
 		removeEnvironmentCommand,
 		openMakerCommand,
 		openDynamicsCommand,
@@ -417,7 +512,7 @@ function createDataverseApiServiceFactory(
 	getAccessToken: (envId: string) => Promise<string>;
 	getDataverseUrl: (envId: string) => Promise<string>;
 } {
-	async function getEnvironmentById(envId: string) {
+	async function getEnvironmentById(envId: string): Promise<Environment> {
 		const environments = await environmentRepository.getAll();
 		const environment = environments.find(env => env.getId().getValue() === envId);
 
@@ -538,6 +633,91 @@ async function initializeImportJobViewer(
 }
 
 /**
+ * Lazy-loads and initializes Connection References panel.
+ * Dynamic imports reduce initial extension activation time by deferring feature-specific code until needed.
+ */
+async function initializeConnectionReferences(
+	context: vscode.ExtensionContext,
+	authService: MsalAuthenticationService,
+	environmentRepository: IEnvironmentRepository,
+	logger: ILogger,
+	initialEnvironmentId?: string
+): Promise<void> {
+	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService') as typeof import('./shared/infrastructure/services/DataverseApiService');
+	const { DataverseApiConnectionReferenceRepository } = await import('./features/connectionReferences/infrastructure/repositories/DataverseApiConnectionReferenceRepository') as typeof import('./features/connectionReferences/infrastructure/repositories/DataverseApiConnectionReferenceRepository');
+	const { DataverseApiCloudFlowRepository } = await import('./features/connectionReferences/infrastructure/repositories/DataverseApiCloudFlowRepository') as typeof import('./features/connectionReferences/infrastructure/repositories/DataverseApiCloudFlowRepository');
+	const { DataverseApiSolutionComponentRepository } = await import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository') as typeof import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository');
+	const { ListConnectionReferencesUseCase } = await import('./features/connectionReferences/application/useCases/ListConnectionReferencesUseCase') as typeof import('./features/connectionReferences/application/useCases/ListConnectionReferencesUseCase');
+	const { ConnectionReferencesPanel } = await import('./features/connectionReferences/presentation/panels/ConnectionReferencesPanel') as typeof import('./features/connectionReferences/presentation/panels/ConnectionReferencesPanel');
+
+	const getEnvironments = createGetEnvironments(environmentRepository);
+	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
+
+	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
+	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
+
+	const flowRepository = new DataverseApiCloudFlowRepository(dataverseApiService, logger);
+	const connectionReferenceRepository = new DataverseApiConnectionReferenceRepository(dataverseApiService, logger);
+	const solutionComponentRepository = new DataverseApiSolutionComponentRepository(dataverseApiService, logger);
+	const listConnectionReferencesUseCase = new ListConnectionReferencesUseCase(
+		flowRepository,
+		connectionReferenceRepository,
+		solutionComponentRepository,
+		logger
+	);
+
+	await ConnectionReferencesPanel.createOrShow(
+		context.extensionUri,
+		getEnvironments,
+		getEnvironmentById,
+		listConnectionReferencesUseCase,
+		logger,
+		initialEnvironmentId
+	);
+}
+
+/**
+ * Lazy-loads and initializes Environment Variables panel.
+ * Dynamic imports reduce initial extension activation time by deferring feature-specific code until needed.
+ */
+async function initializeEnvironmentVariables(
+	context: vscode.ExtensionContext,
+	authService: MsalAuthenticationService,
+	environmentRepository: IEnvironmentRepository,
+	logger: ILogger,
+	initialEnvironmentId?: string
+): Promise<void> {
+	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService') as typeof import('./shared/infrastructure/services/DataverseApiService');
+	const { DataverseApiEnvironmentVariableRepository } = await import('./features/environmentVariables/infrastructure/repositories/DataverseApiEnvironmentVariableRepository') as typeof import('./features/environmentVariables/infrastructure/repositories/DataverseApiEnvironmentVariableRepository');
+	const { DataverseApiSolutionComponentRepository } = await import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository') as typeof import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository');
+	const { ListEnvironmentVariablesUseCase } = await import('./features/environmentVariables/application/useCases/ListEnvironmentVariablesUseCase') as typeof import('./features/environmentVariables/application/useCases/ListEnvironmentVariablesUseCase');
+	const { EnvironmentVariablesPanel } = await import('./features/environmentVariables/presentation/panels/EnvironmentVariablesPanel') as typeof import('./features/environmentVariables/presentation/panels/EnvironmentVariablesPanel');
+
+	const getEnvironments = createGetEnvironments(environmentRepository);
+	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
+
+	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
+	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
+
+	const environmentVariableRepository = new DataverseApiEnvironmentVariableRepository(dataverseApiService, logger);
+	const solutionComponentRepository = new DataverseApiSolutionComponentRepository(dataverseApiService, logger);
+	const listEnvironmentVariablesUseCase = new ListEnvironmentVariablesUseCase(
+		environmentVariableRepository,
+		solutionComponentRepository,
+		logger
+	);
+
+	await EnvironmentVariablesPanel.createOrShow(
+		context.extensionUri,
+		getEnvironments,
+		getEnvironmentById,
+		listEnvironmentVariablesUseCase,
+		logger,
+		initialEnvironmentId
+	);
+}
+
+/**
  * Lazy-loads and initializes Persistence Inspector (development mode only).
  * Dynamic imports ensure production builds exclude this development-only feature entirely.
  */
@@ -606,7 +786,9 @@ class ToolsTreeProvider implements vscode.TreeDataProvider<ToolItem> {
 	getChildren(): ToolItem[] {
 		return [
 			new ToolItem('Solutions', 'Browse and manage solutions', 'solutionExplorer', 'power-platform-dev-suite.solutionExplorerPickEnvironment'),
-			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewerPickEnvironment')
+			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewerPickEnvironment'),
+			new ToolItem('Connection References', 'View connection references and flows', 'connectionReferences', 'power-platform-dev-suite.connectionReferencesPickEnvironment'),
+			new ToolItem('Environment Variables', 'View environment variables', 'environmentVariables', 'power-platform-dev-suite.environmentVariablesPickEnvironment')
 		];
 	}
 }

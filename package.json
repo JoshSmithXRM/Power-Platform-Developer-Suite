@@ -65,10 +65,8 @@
         "onCommand:power-platform-dev-suite.removeEnvironment",
         "onCommand:power-platform-dev-suite.solutionExplorer",
         "onCommand:power-platform-dev-suite.importJobViewer",
-        "onCommand:power-platform-dev-suite.openMetadataBrowser",
         "onCommand:power-platform-dev-suite.connectionReferences",
-        "onCommand:power-platform-dev-suite.environmentVariables",
-        "onCommand:power-platform-dev-suite.pluginTraceViewer"
+        "onCommand:power-platform-dev-suite.environmentVariables"
     ],
     "main": "./dist/extension.js",
     "contributes": {
@@ -118,11 +116,6 @@
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.openMetadataBrowser",
-                "title": "Open Metadata Browser",
-                "category": "Power Platform Developer Suite"
-            },
-            {
                 "command": "power-platform-dev-suite.solutionExplorer",
                 "title": "Solutions",
                 "category": "Power Platform Developer Suite"
@@ -143,13 +136,13 @@
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.dataExplorer",
-                "title": "Tables",
+                "command": "power-platform-dev-suite.connectionReferences",
+                "title": "Connection References",
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.connectionReferences",
-                "title": "Connection References",
+                "command": "power-platform-dev-suite.connectionReferencesPickEnvironment",
+                "title": "Connection References: Choose Environment",
                 "category": "Power Platform Developer Suite"
             },
             {
@@ -158,13 +151,8 @@
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.pluginTraceViewer",
-                "title": "Plugin Traces",
-                "category": "Power Platform Developer Suite"
-            },
-            {
-                "command": "power-platform-dev-suite.pluginRegistration",
-                "title": "Plugin Registration",
+                "command": "power-platform-dev-suite.environmentVariablesPickEnvironment",
+                "title": "Environment Variables: Choose Environment",
                 "category": "Power Platform Developer Suite"
             },
             {

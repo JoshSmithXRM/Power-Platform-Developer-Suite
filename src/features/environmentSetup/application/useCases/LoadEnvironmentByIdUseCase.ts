@@ -35,12 +35,14 @@ export class LoadEnvironmentByIdUseCase {
 			}
 
 			// Check for stored credentials
-			const hasStoredClientSecret = environment.getClientId()
-				? !!(await this.repository.getClientSecret(environment.getClientId()!.getValue()))
+			const clientId = environment.getClientId();
+			const hasStoredClientSecret = clientId
+				? !!(await this.repository.getClientSecret(clientId.getValue()))
 				: false;
 
-			const hasStoredPassword = environment.getUsername()
-				? !!(await this.repository.getPassword(environment.getUsername()!))
+			const username = environment.getUsername();
+			const hasStoredPassword = username
+				? !!(await this.repository.getPassword(username))
 				: false;
 
 			this.logger.info(`Environment loaded: ${environment.getName().getValue()}`);

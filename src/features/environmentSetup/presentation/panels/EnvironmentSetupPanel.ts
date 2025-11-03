@@ -125,8 +125,8 @@ export class EnvironmentSetupPanel {
 
 		// Check if panel already exists for this environment
 		const panelKey = environmentId || 'new';
-		if (EnvironmentSetupPanel.currentPanels.has(panelKey)) {
-			const existingPanel = EnvironmentSetupPanel.currentPanels.get(panelKey)!;
+		const existingPanel = EnvironmentSetupPanel.currentPanels.get(panelKey);
+		if (existingPanel) {
 			existingPanel.panel.reveal(column);
 			return existingPanel;
 		}

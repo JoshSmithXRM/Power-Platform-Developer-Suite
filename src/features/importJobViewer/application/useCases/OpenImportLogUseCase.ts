@@ -51,8 +51,13 @@ export class OpenImportLogUseCase {
 				throw error;
 			}
 
+			// Type narrowing: hasLog() ensures importLogXml is not null
+			if (importJob.importLogXml === null) {
+				throw new Error('Unexpected: importLogXml is null after hasLog() check');
+			}
+
 			// Open log in editor
-			await this.editorService.openXmlInNewTab(importJob.importLogXml!);
+			await this.editorService.openXmlInNewTab(importJob.importLogXml);
 
 			this.logger.info('Import log opened successfully', { importJobId });
 		} catch (error) {

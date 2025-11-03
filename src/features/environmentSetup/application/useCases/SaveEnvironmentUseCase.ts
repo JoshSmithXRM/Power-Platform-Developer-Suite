@@ -46,7 +46,11 @@ export class SaveEnvironmentUseCase {
 			if (!environmentResult.success) {
 				return environmentResult;
 			}
-			const environment = environmentResult.environment!;
+			// Type narrowing: success === true means environment is defined
+			if (!environmentResult.environment) {
+				throw new Error('Unexpected: environment is undefined after successful creation');
+			}
+			const environment = environmentResult.environment;
 
 			const validationResult = await this.validateEnvironment(environment, request);
 			if (!validationResult.isValid) {
@@ -126,12 +130,14 @@ export class SaveEnvironmentUseCase {
 			environment.getId()
 		);
 
-		const hasExistingClientSecret = environment.getClientId()
-			? !!(await this.repository.getClientSecret(environment.getClientId()!.getValue()))
+		const clientId = environment.getClientId();
+		const hasExistingClientSecret = clientId
+			? !!(await this.repository.getClientSecret(clientId.getValue()))
 			: false;
 
-		const hasExistingPassword = environment.getUsername()
-			? !!(await this.repository.getPassword(environment.getUsername()!))
+		const username = environment.getUsername();
+		const hasExistingPassword = username
+			? !!(await this.repository.getPassword(username))
 			: false;
 
 		return this.validationService.validateForSave(

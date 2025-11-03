@@ -62,8 +62,13 @@ export class CloudFlow {
 			return [];
 		}
 
+		// Explicit null check for type narrowing (already validated by hasClientData)
+		if (this.clientData === null) {
+			return [];
+		}
+
 		try {
-			const data: unknown = JSON.parse(this.clientData!);
+			const data: unknown = JSON.parse(this.clientData);
 
 			// Type guard: check if data has the expected structure
 			if (!this.isValidClientData(data)) {
