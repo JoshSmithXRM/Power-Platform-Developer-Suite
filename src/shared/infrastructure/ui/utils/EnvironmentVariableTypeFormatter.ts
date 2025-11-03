@@ -1,12 +1,8 @@
+import { EnvironmentVariableType } from '../../../../features/environmentVariables/domain/entities/EnvironmentVariable';
+
 /**
  * Formats environment variable types for display in the UI layer.
- * Handles type codes from Dataverse:
- * - 100000000: String
- * - 100000001: Number
- * - 100000002: Boolean
- * - 100000003: JSON
- * - 100000004: Secret
- * - 100000005: Data Source
+ * Uses EnvironmentVariableType enum from domain for type safety.
  */
 export class EnvironmentVariableTypeFormatter {
 	/**
@@ -16,17 +12,17 @@ export class EnvironmentVariableTypeFormatter {
 	 */
 	static formatTypeName(type: number): string {
 		switch (type) {
-			case 100000000:
+			case EnvironmentVariableType.String:
 				return 'String';
-			case 100000001:
+			case EnvironmentVariableType.Number:
 				return 'Number';
-			case 100000002:
+			case EnvironmentVariableType.Boolean:
 				return 'Boolean';
-			case 100000003:
+			case EnvironmentVariableType.JSON:
 				return 'JSON';
-			case 100000004:
+			case EnvironmentVariableType.Secret:
 				return 'Secret';
-			case 100000005:
+			case EnvironmentVariableType.DataSource:
 				return 'Data Source';
 			default:
 				return 'Unknown';

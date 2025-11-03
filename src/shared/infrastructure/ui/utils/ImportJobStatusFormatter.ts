@@ -1,12 +1,8 @@
+import { ImportJobStatus } from '../../../../features/importJobViewer/domain/entities/ImportJob';
+
 /**
  * Formats import job status codes for display in the UI layer.
- * Handles status codes from Dataverse:
- * - 0: In Progress
- * - 1: Completed
- * - 2: Failed
- * - 3: Completed with Errors
- * - 4: Cancelled
- * - 5: Queued
+ * Uses ImportJobStatus enum from domain for type safety.
  */
 export class ImportJobStatusFormatter {
 	/**
@@ -16,17 +12,17 @@ export class ImportJobStatusFormatter {
 	 */
 	static formatStatusLabel(statusCode: number): string {
 		switch (statusCode) {
-			case 0:
+			case ImportJobStatus.InProgress:
 				return 'In Progress';
-			case 1:
+			case ImportJobStatus.Completed:
 				return 'Completed';
-			case 2:
+			case ImportJobStatus.Failed:
 				return 'Failed';
-			case 3:
+			case ImportJobStatus.CompletedWithErrors:
 				return 'Completed with Errors';
-			case 4:
+			case ImportJobStatus.Cancelled:
 				return 'Cancelled';
-			case 5:
+			case 5: // Queued - not in enum
 				return 'Queued';
 			default:
 				return 'Unknown';

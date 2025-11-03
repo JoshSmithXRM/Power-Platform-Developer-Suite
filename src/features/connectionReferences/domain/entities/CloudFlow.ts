@@ -45,6 +45,7 @@ export class CloudFlow {
 	 * @returns Array of connection reference logical names, or empty array if no data
 	 */
 	extractConnectionReferenceNames(): string[] {
+		// Type guard: ensures clientData is non-null string throughout this method
 		if (!this.hasClientData()) {
 			return [];
 		}

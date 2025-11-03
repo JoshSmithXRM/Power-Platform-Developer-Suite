@@ -609,14 +609,14 @@ async function initializeImportJobViewer(
 	logger: ILogger,
 	initialEnvironmentId?: string
 ): Promise<void> {
-	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js') as typeof import('./shared/infrastructure/services/DataverseApiService.js');
-	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js') as typeof import('./shared/infrastructure/services/MakerUrlBuilder.js');
-	const { XmlFormatter } = await import('./shared/infrastructure/formatters/XmlFormatter.js') as typeof import('./shared/infrastructure/formatters/XmlFormatter.js');
-	const { VsCodeEditorService } = await import('./shared/infrastructure/services/VsCodeEditorService.js') as typeof import('./shared/infrastructure/services/VsCodeEditorService.js');
-	const { DataverseApiImportJobRepository } = await import('./features/importJobViewer/infrastructure/repositories/DataverseApiImportJobRepository.js') as typeof import('./features/importJobViewer/infrastructure/repositories/DataverseApiImportJobRepository.js');
-	const { ListImportJobsUseCase } = await import('./features/importJobViewer/application/useCases/ListImportJobsUseCase.js') as typeof import('./features/importJobViewer/application/useCases/ListImportJobsUseCase.js');
-	const { OpenImportLogUseCase } = await import('./features/importJobViewer/application/useCases/OpenImportLogUseCase.js') as typeof import('./features/importJobViewer/application/useCases/OpenImportLogUseCase.js');
-	const { ImportJobViewerPanel } = await import('./features/importJobViewer/presentation/panels/ImportJobViewerPanel.js') as typeof import('./features/importJobViewer/presentation/panels/ImportJobViewerPanel.js');
+	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js');
+	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js');
+	const { XmlFormatter } = await import('./shared/infrastructure/formatters/XmlFormatter.js');
+	const { VsCodeEditorService } = await import('./shared/infrastructure/services/VsCodeEditorService.js');
+	const { DataverseApiImportJobRepository } = await import('./features/importJobViewer/infrastructure/repositories/DataverseApiImportJobRepository.js');
+	const { ListImportJobsUseCase } = await import('./features/importJobViewer/application/useCases/ListImportJobsUseCase.js');
+	const { OpenImportLogUseCase } = await import('./features/importJobViewer/application/useCases/OpenImportLogUseCase.js');
+	const { ImportJobViewerPanel } = await import('./features/importJobViewer/presentation/panels/ImportJobViewerPanel.js');
 
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
@@ -655,20 +655,20 @@ async function initializeConnectionReferences(
 	logger: ILogger,
 	initialEnvironmentId?: string
 ): Promise<void> {
-	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js') as typeof import('./shared/infrastructure/services/DataverseApiService.js');
-	const { DataverseApiConnectionReferenceRepository } = await import('./features/connectionReferences/infrastructure/repositories/DataverseApiConnectionReferenceRepository.js') as typeof import('./features/connectionReferences/infrastructure/repositories/DataverseApiConnectionReferenceRepository.js');
-	const { DataverseApiCloudFlowRepository } = await import('./features/connectionReferences/infrastructure/repositories/DataverseApiCloudFlowRepository.js') as typeof import('./features/connectionReferences/infrastructure/repositories/DataverseApiCloudFlowRepository.js');
-	const { DataverseApiSolutionComponentRepository } = await import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js') as typeof import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js');
-	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js') as typeof import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js');
-	const { FileSystemDeploymentSettingsRepository } = await import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository.js') as typeof import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository.js');
-	const { FlowConnectionRelationshipBuilder } = await import('./features/connectionReferences/domain/services/FlowConnectionRelationshipBuilder.js') as typeof import('./features/connectionReferences/domain/services/FlowConnectionRelationshipBuilder.js');
-	const { FlowConnectionRelationshipCollectionService } = await import('./features/connectionReferences/domain/services/FlowConnectionRelationshipCollectionService.js') as typeof import('./features/connectionReferences/domain/services/FlowConnectionRelationshipCollectionService.js');
-	const { ListConnectionReferencesUseCase } = await import('./features/connectionReferences/application/useCases/ListConnectionReferencesUseCase.js') as typeof import('./features/connectionReferences/application/useCases/ListConnectionReferencesUseCase.js');
-	const { ExportConnectionReferencesToDeploymentSettingsUseCase } = await import('./features/connectionReferences/application/useCases/ExportConnectionReferencesToDeploymentSettingsUseCase.js') as typeof import('./features/connectionReferences/application/useCases/ExportConnectionReferencesToDeploymentSettingsUseCase.js');
-	const { ConnectionReferencesPanel } = await import('./features/connectionReferences/presentation/panels/ConnectionReferencesPanel.js') as typeof import('./features/connectionReferences/presentation/panels/ConnectionReferencesPanel.js');
-	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository.js') as typeof import('./shared/infrastructure/ui/VSCodePanelStateRepository.js');
-	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js') as typeof import('./shared/infrastructure/services/MakerUrlBuilder.js');
-	const { ConnectionReferenceToDeploymentSettingsMapper } = await import('./features/connectionReferences/application/mappers/ConnectionReferenceToDeploymentSettingsMapper.js') as typeof import('./features/connectionReferences/application/mappers/ConnectionReferenceToDeploymentSettingsMapper.js');
+	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js');
+	const { DataverseApiConnectionReferenceRepository } = await import('./features/connectionReferences/infrastructure/repositories/DataverseApiConnectionReferenceRepository.js');
+	const { DataverseApiCloudFlowRepository } = await import('./features/connectionReferences/infrastructure/repositories/DataverseApiCloudFlowRepository.js');
+	const { DataverseApiSolutionComponentRepository } = await import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js');
+	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js');
+	const { FileSystemDeploymentSettingsRepository } = await import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository.js');
+	const { FlowConnectionRelationshipBuilder } = await import('./features/connectionReferences/domain/services/FlowConnectionRelationshipBuilder.js');
+	const { FlowConnectionRelationshipCollectionService } = await import('./features/connectionReferences/domain/services/FlowConnectionRelationshipCollectionService.js');
+	const { ListConnectionReferencesUseCase } = await import('./features/connectionReferences/application/useCases/ListConnectionReferencesUseCase.js');
+	const { ExportConnectionReferencesToDeploymentSettingsUseCase } = await import('./features/connectionReferences/application/useCases/ExportConnectionReferencesToDeploymentSettingsUseCase.js');
+	const { ConnectionReferencesPanel } = await import('./features/connectionReferences/presentation/panels/ConnectionReferencesPanel.js');
+	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository.js');
+	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js');
+	const { ConnectionReferenceToDeploymentSettingsMapper } = await import('./features/connectionReferences/application/mappers/ConnectionReferenceToDeploymentSettingsMapper.js');
 
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
@@ -725,18 +725,18 @@ async function initializeEnvironmentVariables(
 	logger: ILogger,
 	initialEnvironmentId?: string
 ): Promise<void> {
-	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js') as typeof import('./shared/infrastructure/services/DataverseApiService.js');
-	const { DataverseApiEnvironmentVariableRepository } = await import('./features/environmentVariables/infrastructure/repositories/DataverseApiEnvironmentVariableRepository.js') as typeof import('./features/environmentVariables/infrastructure/repositories/DataverseApiEnvironmentVariableRepository.js');
-	const { DataverseApiSolutionComponentRepository } = await import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js') as typeof import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js');
-	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js') as typeof import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js');
-	const { FileSystemDeploymentSettingsRepository } = await import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository.js') as typeof import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository.js');
-	const { EnvironmentVariableFactory } = await import('./features/environmentVariables/domain/services/EnvironmentVariableFactory.js') as typeof import('./features/environmentVariables/domain/services/EnvironmentVariableFactory.js');
-	const { ListEnvironmentVariablesUseCase } = await import('./features/environmentVariables/application/useCases/ListEnvironmentVariablesUseCase.js') as typeof import('./features/environmentVariables/application/useCases/ListEnvironmentVariablesUseCase.js');
-	const { ExportEnvironmentVariablesToDeploymentSettingsUseCase } = await import('./features/environmentVariables/application/useCases/ExportEnvironmentVariablesToDeploymentSettingsUseCase.js') as typeof import('./features/environmentVariables/application/useCases/ExportEnvironmentVariablesToDeploymentSettingsUseCase.js');
-	const { EnvironmentVariablesPanel } = await import('./features/environmentVariables/presentation/panels/EnvironmentVariablesPanel.js') as typeof import('./features/environmentVariables/presentation/panels/EnvironmentVariablesPanel.js');
-	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository.js') as typeof import('./shared/infrastructure/ui/VSCodePanelStateRepository.js');
-	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js') as typeof import('./shared/infrastructure/services/MakerUrlBuilder.js');
-	const { EnvironmentVariableToDeploymentSettingsMapper } = await import('./features/environmentVariables/application/mappers/EnvironmentVariableToDeploymentSettingsMapper.js') as typeof import('./features/environmentVariables/application/mappers/EnvironmentVariableToDeploymentSettingsMapper.js');
+	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js');
+	const { DataverseApiEnvironmentVariableRepository } = await import('./features/environmentVariables/infrastructure/repositories/DataverseApiEnvironmentVariableRepository.js');
+	const { DataverseApiSolutionComponentRepository } = await import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js');
+	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js');
+	const { FileSystemDeploymentSettingsRepository } = await import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository.js');
+	const { EnvironmentVariableFactory } = await import('./features/environmentVariables/domain/services/EnvironmentVariableFactory.js');
+	const { ListEnvironmentVariablesUseCase } = await import('./features/environmentVariables/application/useCases/ListEnvironmentVariablesUseCase.js');
+	const { ExportEnvironmentVariablesToDeploymentSettingsUseCase } = await import('./features/environmentVariables/application/useCases/ExportEnvironmentVariablesToDeploymentSettingsUseCase.js');
+	const { EnvironmentVariablesPanel } = await import('./features/environmentVariables/presentation/panels/EnvironmentVariablesPanel.js');
+	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository.js');
+	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js');
+	const { EnvironmentVariableToDeploymentSettingsMapper } = await import('./features/environmentVariables/application/mappers/EnvironmentVariableToDeploymentSettingsMapper.js');
 
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
@@ -787,18 +787,18 @@ async function initializePersistenceInspector(
 	eventPublisher: VsCodeEventPublisher,
 	logger: ILogger
 ): Promise<void> {
-	const { VsCodeStorageReader } = await import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageReader.js') as typeof import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageReader.js');
-	const { VsCodeStorageClearer } = await import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageClearer.js') as typeof import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageClearer.js');
-	const { HardcodedProtectedKeyProvider } = await import('./features/persistenceInspector/infrastructure/providers/HardcodedProtectedKeyProvider.js') as typeof import('./features/persistenceInspector/infrastructure/providers/HardcodedProtectedKeyProvider.js');
-	const { StorageInspectionService } = await import('./features/persistenceInspector/domain/services/StorageInspectionService.js') as typeof import('./features/persistenceInspector/domain/services/StorageInspectionService.js');
-	const { StorageClearingService } = await import('./features/persistenceInspector/domain/services/StorageClearingService.js') as typeof import('./features/persistenceInspector/domain/services/StorageClearingService.js');
-	const { InspectStorageUseCase } = await import('./features/persistenceInspector/application/useCases/InspectStorageUseCase.js') as typeof import('./features/persistenceInspector/application/useCases/InspectStorageUseCase.js');
-	const { RevealSecretUseCase } = await import('./features/persistenceInspector/application/useCases/RevealSecretUseCase.js') as typeof import('./features/persistenceInspector/application/useCases/RevealSecretUseCase.js');
-	const { ClearStorageEntryUseCase } = await import('./features/persistenceInspector/application/useCases/ClearStorageEntryUseCase.js') as typeof import('./features/persistenceInspector/application/useCases/ClearStorageEntryUseCase.js');
-	const { ClearStoragePropertyUseCase } = await import('./features/persistenceInspector/application/useCases/ClearStoragePropertyUseCase.js') as typeof import('./features/persistenceInspector/application/useCases/ClearStoragePropertyUseCase.js');
-	const { ClearAllStorageUseCase } = await import('./features/persistenceInspector/application/useCases/ClearAllStorageUseCase.js') as typeof import('./features/persistenceInspector/application/useCases/ClearAllStorageUseCase.js');
-	const { GetClearAllConfirmationMessageUseCase } = await import('./features/persistenceInspector/application/useCases/GetClearAllConfirmationMessageUseCase.js') as typeof import('./features/persistenceInspector/application/useCases/GetClearAllConfirmationMessageUseCase.js');
-	const { PersistenceInspectorPanel } = await import('./features/persistenceInspector/presentation/panels/PersistenceInspectorPanel.js') as typeof import('./features/persistenceInspector/presentation/panels/PersistenceInspectorPanel.js');
+	const { VsCodeStorageReader } = await import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageReader.js');
+	const { VsCodeStorageClearer } = await import('./features/persistenceInspector/infrastructure/repositories/VsCodeStorageClearer.js');
+	const { HardcodedProtectedKeyProvider } = await import('./features/persistenceInspector/infrastructure/providers/HardcodedProtectedKeyProvider.js');
+	const { StorageInspectionService } = await import('./features/persistenceInspector/domain/services/StorageInspectionService.js');
+	const { StorageClearingService } = await import('./features/persistenceInspector/domain/services/StorageClearingService.js');
+	const { InspectStorageUseCase } = await import('./features/persistenceInspector/application/useCases/InspectStorageUseCase.js');
+	const { RevealSecretUseCase } = await import('./features/persistenceInspector/application/useCases/RevealSecretUseCase.js');
+	const { ClearStorageEntryUseCase } = await import('./features/persistenceInspector/application/useCases/ClearStorageEntryUseCase.js');
+	const { ClearStoragePropertyUseCase } = await import('./features/persistenceInspector/application/useCases/ClearStoragePropertyUseCase.js');
+	const { ClearAllStorageUseCase } = await import('./features/persistenceInspector/application/useCases/ClearAllStorageUseCase.js');
+	const { GetClearAllConfirmationMessageUseCase } = await import('./features/persistenceInspector/application/useCases/GetClearAllConfirmationMessageUseCase.js');
+	const { PersistenceInspectorPanel } = await import('./features/persistenceInspector/presentation/panels/PersistenceInspectorPanel.js');
 
 	const storageReader = new VsCodeStorageReader(context.globalState, context.secrets);
 	const storageClearer = new VsCodeStorageClearer(context.globalState, context.secrets);
