@@ -126,7 +126,17 @@ export default tseslint.config(
 
       // KEPT: These catch actual problems even in tests
       'max-depth': ['warn', 4],  // Deeply nested if/for/while IS bad
-      'max-statements': ['warn', 30]  // Too many statements = unclear test
+      'max-statements': ['warn', 30],  // Too many statements = unclear test
+
+      // Allow underscore prefix for unused parameters (abstract method implementations)
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_'
+        }
+      ]
     }
   },
   {
