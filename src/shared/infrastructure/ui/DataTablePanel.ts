@@ -40,29 +40,18 @@ export interface DataTableConfig {
 /**
  * Abstract base class for data table panels using Template Method pattern.
  *
- * ARCHITECTURE DECISION:
- * - Uses inheritance over composition for simplicity (current panels have identical needs)
- * - Provides search, sort, environment management, error handling, loading states
- * - Trade-off: Slight SRP violation for massive DRY benefit (eliminated ~950 lines)
+ * Eliminates duplication by providing shared infrastructure for environment switching,
+ * search, sorting, error handling, and loading states across all data table panels.
  *
- * EXTENSIBILITY:
+ * Note: This class violates SRP (accepted trade-off for DRY). See docs/TECHNICAL_DEBT.md
+ * for details on when/how to refactor to composition-based approach.
+ *
+ * Extensibility:
  * - Search is optional via config.enableSearch (default: true)
  * - Override getFilterLogic() for custom search (default: no filtering)
  * - Override getCustomCss/JavaScript for panel-specific behavior
  *
- * FUTURE: If you need a panel without search/sort/table, create a separate base class
- * or consider composition (SearchComponent, SortComponent, etc.)
- *
  * Derived classes implement panel-specific data loading and actions.
- *
- * TODO: TECHNICAL DEBT - DataTablePanel violates SRP
- * This class handles 8+ responsibilities (environment management, search, sorting,
- * error handling, loading states, HTML generation, message routing, cancellation).
- * Trade-off: Eliminated 950 lines of duplication vs. SRP violation.
- * When a 3rd panel type emerges that doesn't fit this pattern, refactor to composition:
- * - Extract SearchBehavior, SortBehavior, EnvironmentSwitchBehavior components
- * - Use composition over inheritance
- * - See: docs/TECHNICAL_DEBT.md for details
  */
 export abstract class DataTablePanel {
 	protected cancellationTokenSource: vscode.CancellationTokenSource | null = null;
@@ -113,7 +102,7 @@ export abstract class DataTablePanel {
 	 * Each panel has different searchable fields. Override to specify which
 	 * fields to search (solution name, status, etc.). Default: no filtering.
 	 *
-	 * EXECUTION TIMING: Runs during search input processing in webview, before rendering.
+	 * Runs during search input processing in webview, before rendering.
 	 * Variables available: 'query' (lowercase search text), 'allData' (all records).
 	 *
 	 * @returns JavaScript code snippet that sets 'filtered' variable
@@ -137,7 +126,7 @@ export abstract class DataTablePanel {
 	 * Each panel may need custom event handlers (e.g., clickable solution names,
 	 * import job links). Override to attach handlers to panel-specific elements.
 	 *
-	 * EXECUTION TIMING: Runs after table rendering in webview - safe to query DOM elements.
+	 * Runs after table rendering in webview - safe to query DOM elements.
 	 *
 	 * @returns JavaScript code snippet to execute after rendering (default: empty)
 	 */
@@ -317,6 +306,7 @@ export abstract class DataTablePanel {
 	 */
 	protected createCancellationToken(): VsCodeCancellationTokenAdapter {
 		this.cancellationTokenSource?.cancel();
+		this.cancellationTokenSource?.dispose();
 		this.cancellationTokenSource = new vscode.CancellationTokenSource();
 		return new VsCodeCancellationTokenAdapter(this.cancellationTokenSource.token);
 	}

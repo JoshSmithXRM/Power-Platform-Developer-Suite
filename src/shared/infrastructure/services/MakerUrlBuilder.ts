@@ -42,7 +42,7 @@ export class MakerUrlBuilder implements IMakerUrlBuilder {
    * @returns Maker Portal import history URL
    */
   buildImportHistoryUrl(environmentId: string): string {
-    return `${this.baseUrl}/environments/${environmentId}/solutions/importhistory`;
+    return `${this.baseUrl}/environments/${environmentId}/solutionsHistory`;
   }
 
   /**

@@ -1,6 +1,6 @@
 import { ImportJob } from '../../domain/entities/ImportJob';
 import { ImportJobViewModel } from '../viewModels/ImportJobViewModel';
-import { DateFormatter } from '../../../../shared/application/utils/DateFormatter';
+import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
 
 /**
  * Maps ImportJob domain entities to ImportJobViewModel presentation objects.
@@ -30,11 +30,11 @@ export class ImportJobViewModelMapper {
 	/**
 	 * Converts an array of ImportJob entities to view models.
 	 * @param jobs - Array of ImportJob entities
-	 * @param sorted - If true, sorts jobs using domain sorting rules before mapping
+	 * @param shouldSort - If true, sorts jobs using domain sorting rules before mapping
 	 * @returns Array of view models
 	 */
-	static toViewModels(jobs: ImportJob[], sorted = false): ImportJobViewModel[] {
-		const jobsToMap = sorted ? ImportJob.sort(jobs) : jobs;
+	static toViewModels(jobs: ImportJob[], shouldSort = false): ImportJobViewModel[] {
+		const jobsToMap = shouldSort ? ImportJob.sort(jobs) : jobs;
 		return jobsToMap.map(job => this.toViewModel(job));
 	}
 

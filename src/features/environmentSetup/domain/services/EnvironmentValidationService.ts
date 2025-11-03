@@ -8,9 +8,9 @@ import { ValidationResult } from '../valueObjects/ValidationResult';
  * ZERO infrastructure dependencies. This service coordinates validation
  * that spans multiple entities or requires external data (like name uniqueness).
  *
- * WHY Domain Service: Validation logic that requires external data (name uniqueness,
- * existing secrets) doesn't belong in the Entity. This service coordinates validation
- * while keeping the Entity pure.
+ * Validation logic that requires external data (name uniqueness, existing secrets)
+ * doesn't belong in the Entity. This service coordinates validation while keeping
+ * the Entity pure.
  *
  * Responsibilities:
  * - Validate environment for save operations
@@ -39,7 +39,7 @@ export class EnvironmentValidationService {
 	 * - Username/Password: Password required (new or existing)
 	 * - Tenant ID required for Service Principal (MSAL limitation)
 	 *
-	 * WHY: Separates validation that requires external data from entity self-validation.
+	 * Separates validation that requires external data from entity self-validation.
 	 * Entity validates its own invariants; this service validates business rules
 	 * requiring external context.
 	 *
@@ -81,13 +81,6 @@ export class EnvironmentValidationService {
 		if (authMethod.requiresUsernamePassword()) {
 			if (!password && !hasExistingPassword) {
 				errors.push('Password is required for Username/Password authentication');
-			}
-		}
-
-		if (authMethod.requiresClientCredentials()) {
-			const tenantId = environment.getTenantId();
-			if (!tenantId.getValue()) {
-				errors.push('Tenant ID is required for Service Principal authentication');
 			}
 		}
 

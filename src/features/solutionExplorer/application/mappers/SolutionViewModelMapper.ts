@@ -1,6 +1,6 @@
 import { Solution } from '../../domain/entities/Solution';
 import { SolutionViewModel } from '../viewModels/SolutionViewModel';
-import { DateFormatter } from '../../../../shared/application/utils/DateFormatter';
+import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
 
 /**
  * Maps Solution domain entities to SolutionViewModel presentation DTOs.
@@ -30,11 +30,11 @@ export class SolutionViewModelMapper {
   /**
    * Maps an array of Solution entities to ViewModels.
    * @param solutions - Array of Solution entities
-   * @param sorted - If true, sorts solutions using domain sorting rules before mapping
+   * @param shouldSort - If true, sorts solutions using domain sorting rules before mapping
    * @returns Array of view models
    */
-  static toViewModels(solutions: Solution[], sorted = false): SolutionViewModel[] {
-    const solutionsToMap = sorted ? Solution.sort(solutions) : solutions;
+  static toViewModels(solutions: Solution[], shouldSort = false): SolutionViewModel[] {
+    const solutionsToMap = shouldSort ? Solution.sort(solutions) : solutions;
     return solutionsToMap.map((solution) => this.toViewModel(solution));
   }
 }

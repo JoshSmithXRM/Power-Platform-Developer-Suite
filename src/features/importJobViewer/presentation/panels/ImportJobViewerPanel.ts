@@ -231,7 +231,7 @@ export class ImportJobViewerPanel extends DataTablePanel {
 					e.preventDefault();
 					const importJobId = link.getAttribute('data-job-id');
 					vscode.postMessage({
-						command: 'viewImportLog',
+						command: 'viewImportJob',
 						data: { importJobId }
 					});
 				});

@@ -7,7 +7,8 @@ import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
  * Use case for listing all solutions in an environment.
- * Orchestrates repository call only - sorting is handled in mapper layer.
+ * Orchestrates repository call only. Returns unsorted domain entities.
+ * Sorting business logic (Solution.sort) is invoked by mapper when converting to ViewModels.
  */
 export class ListSolutionsUseCase {
   constructor(
