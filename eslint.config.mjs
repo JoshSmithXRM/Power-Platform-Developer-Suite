@@ -98,6 +98,7 @@ export default tseslint.config(
       'local-rules/no-static-entity-methods': 'error',
       'local-rules/no-presentation-methods-in-domain': 'error',
       'local-rules/no-html-in-typescript': 'error',
+      'local-rules/no-static-dependency-instantiation': 'warn',
       'local-rules/prefer-explicit-undefined': 'warn',
 
       // ===========================

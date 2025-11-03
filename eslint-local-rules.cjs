@@ -176,27 +176,38 @@ module.exports = {
 		meta: {
 			type: 'problem',
 			docs: {
-				description: 'Prevent static utility methods on domain entities',
+				description: 'Prevent static utility methods on domain entities and value objects',
 				category: 'Clean Architecture',
 				recommended: true
 			},
 			messages: {
-				staticMethodOnEntity: '❌ Static utility method "{{methodName}}" on entity "{{entityName}}". Use domain services or collection classes instead. (CLAUDE.md rule #13)'
+				staticMethodOnEntity: '❌ Static utility method "{{methodName}}" on {{objectType}} "{{entityName}}". Use domain services or collection classes instead. (CLAUDE.md rule #13)'
 			},
 			schema: []
 		},
 		create(context) {
 			const filename = context.getFilename();
 
-			// Only apply to domain entities
-			if (!filename.includes('/domain/entities/') && !filename.includes('\\domain\\entities\\')) {
+			// Only apply to domain entities and value objects
+			const isEntity = filename.includes('/domain/entities/') || filename.includes('\\domain\\entities\\');
+			const isValueObject = filename.includes('/domain/valueObjects/') || filename.includes('\\domain\\valueObjects\\');
+
+			if (!isEntity && !isValueObject) {
 				return {};
 			}
 
+			const objectType = isEntity ? 'entity' : 'value object';
+
 			return {
 				MethodDefinition(node) {
-					// Allow factory methods (create, from, fromJson, etc.)
-					const allowedStaticMethods = ['create', 'from', 'fromJson', 'fromData'];
+					// Allow factory/creation methods (common value object patterns)
+					const allowedStaticMethods = [
+						'create', 'createFrom', 'createEmpty', 'createGlobal', 'createSecret',
+						'from', 'fromJson', 'fromData', 'fromValue', 'fromSegments',
+						'generate', 'success', 'failure', 'successWithWarnings',
+						'allowed', 'protected', 'notFound', 'forSecret', 'parsePath',
+						'calculateSize', 'empty'
+					];
 					const methodName = node.key.name;
 
 					if (node.static &&
@@ -208,7 +219,8 @@ module.exports = {
 							messageId: 'staticMethodOnEntity',
 							data: {
 								methodName: methodName,
-								entityName: className
+								entityName: className,
+								objectType: objectType
 							}
 						});
 					}
@@ -221,24 +233,30 @@ module.exports = {
 		meta: {
 			type: 'problem',
 			docs: {
-				description: 'Prevent presentation/serialization methods in domain entities',
+				description: 'Prevent presentation/serialization methods in domain entities and value objects',
 				category: 'Clean Architecture',
 				recommended: true
 			},
 			messages: {
-				presentationMethodInDomain: '❌ Presentation method "{{methodName}}" in domain entity. Move to mapper in application layer. (CLAUDE.md rule #14: Presentation logic in domain)'
+				presentationMethodInDomain: '❌ Presentation method "{{methodName}}" in domain {{objectType}}. Move to mapper in application layer. (CLAUDE.md rule #14: Presentation logic in domain)'
 			},
 			schema: []
 		},
 		create(context) {
 			const filename = context.getFilename();
 
-			// Only apply to domain entities
-			if (!filename.includes('/domain/entities/') && !filename.includes('\\domain\\entities\\')) {
+			// Only apply to domain entities and value objects
+			const isEntity = filename.includes('/domain/entities/') || filename.includes('\\domain\\entities\\');
+			const isValueObject = filename.includes('/domain/valueObjects/') || filename.includes('\\domain\\valueObjects\\');
+
+			if (!isEntity && !isValueObject) {
 				return {};
 			}
 
+			const objectType = isEntity ? 'entity' : 'value object';
+
 			const FORBIDDEN_PREFIXES = ['to', 'as', 'serialize', 'deserialize', 'format'];
+			const FORBIDDEN_METHODS = ['getTypeName', 'getStatusLabel', 'getLabel', 'getDisplayName', 'getDisplayText'];
 			const ALLOWED_METHODS = ['toString', 'toJSON']; // Standard JavaScript methods
 
 			return {
@@ -250,17 +268,21 @@ module.exports = {
 						return;
 					}
 
+					// Check if method is explicitly forbidden
+					const isExplicitlyForbidden = FORBIDDEN_METHODS.includes(methodName);
+
 					// Check if method starts with forbidden prefix
-					const isForbidden = FORBIDDEN_PREFIXES.some(prefix =>
+					const hasForbiddenPrefix = FORBIDDEN_PREFIXES.some(prefix =>
 						methodName.startsWith(prefix)
 					);
 
-					if (isForbidden) {
+					if (isExplicitlyForbidden || hasForbiddenPrefix) {
 						context.report({
 							node,
 							messageId: 'presentationMethodInDomain',
 							data: {
-								methodName: methodName
+								methodName: methodName,
+								objectType: objectType
 							}
 						});
 					}
@@ -350,6 +372,46 @@ module.exports = {
 							}
 						}
 					});
+				}
+			};
+		}
+	},
+
+	'no-static-dependency-instantiation': {
+		meta: {
+			type: 'problem',
+			docs: {
+				description: 'Prevent static instantiation of dependencies in classes',
+				category: 'Best Practices',
+				recommended: true
+			},
+			messages: {
+				staticDependencyInstantiation: '❌ Static dependency instantiation "{{propertyName}}". Inject dependencies via constructor or method parameters for testability.'
+			},
+			schema: []
+		},
+		create(context) {
+			return {
+				PropertyDefinition(node) {
+					// Check if property is static and readonly
+					const isStatic = node.static === true;
+					const isReadonly = node.readonly === true;
+
+					if (!isStatic || !isReadonly) {
+						return;
+					}
+
+					// Check if value is a NewExpression (new X())
+					if (node.value && node.value.type === 'NewExpression') {
+						const propertyName = node.key.name || 'unknown';
+						context.report({
+							node,
+							messageId: 'staticDependencyInstantiation',
+							data: {
+								propertyName: propertyName
+							}
+						});
+					}
 				}
 			};
 		}
