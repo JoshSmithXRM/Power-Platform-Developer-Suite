@@ -43,7 +43,7 @@ describe('VsCodeEditorService', () => {
 		};
 
 		mockXmlFormatter = {
-			format: jest.fn((xml) => `[FORMATTED]\n${xml}`)
+			format: jest.fn((xml: string): string => `[FORMATTED]\n${xml}`)
 		} as unknown as jest.Mocked<XmlFormatter>;
 
 		const vscode = jest.requireMock<MockedVsCode>('vscode');

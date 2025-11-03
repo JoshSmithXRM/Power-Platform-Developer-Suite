@@ -32,6 +32,44 @@ import { AuthenticationCacheInvalidationRequested } from './features/environment
 import { AuthenticationCacheInvalidationHandler } from './features/environmentSetup/infrastructure/eventHandlers/AuthenticationCacheInvalidationHandler';
 
 /**
+ * Creates a factory function for getting all environments.
+ * Shared across Solution Explorer and Import Job Viewer panels.
+ */
+function createGetEnvironments(
+	environmentRepository: IEnvironmentRepository
+): () => Promise<Array<{ id: string; name: string; url: string }>> {
+	return async () => {
+		const environments = await environmentRepository.getAll();
+		return environments.map(env => ({
+			id: env.getId().getValue(),
+			name: env.getName().getValue(),
+			url: env.getDataverseUrl().getValue()
+		}));
+	};
+}
+
+/**
+ * Creates a factory function for getting environment details by ID.
+ * Shared across Solution Explorer and Import Job Viewer panels.
+ */
+function createGetEnvironmentById(
+	environmentRepository: IEnvironmentRepository
+): (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId?: string } | null> {
+	return async (envId: string) => {
+		const environments = await environmentRepository.getAll();
+		const environment = environments.find(env => env.getId().getValue() === envId);
+		if (!environment) {
+			return null;
+		}
+		return {
+			id: envId,
+			name: environment.getName().getValue(),
+			powerPlatformEnvironmentId: environment.getPowerPlatformEnvironmentId()
+		};
+	};
+}
+
+/**
  * Extension activation entry point
  */
 export function activate(context: vscode.ExtensionContext): void {
@@ -439,29 +477,9 @@ async function initializeSolutionExplorer(
 	const { ListSolutionsUseCase } = await import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase') as typeof import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase');
 	const { SolutionExplorerPanel } = await import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel') as typeof import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel');
 
-	// Factory function to get all environments
-	const getEnvironments = async (): Promise<Array<{ id: string; name: string; url: string }>> => {
-		const environments = await environmentRepository.getAll();
-		return environments.map(env => ({
-			id: env.getId().getValue(),
-			name: env.getName().getValue(),
-			url: env.getDataverseUrl().getValue()
-		}));
-	};
-
-	// Factory function to get environment by ID
-	const getEnvironmentById = async (envId: string): Promise<{ id: string; name: string; powerPlatformEnvironmentId?: string } | null> => {
-		const environments = await environmentRepository.getAll();
-		const environment = environments.find(env => env.getId().getValue() === envId);
-		if (!environment) {
-			return null;
-		}
-		return {
-			id: envId,
-			name: environment.getName().getValue(),
-			powerPlatformEnvironmentId: environment.getPowerPlatformEnvironmentId()
-		};
-	};
+	// Create environment factory functions
+	const getEnvironments = createGetEnvironments(environmentRepository);
+	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
 
 	// Infrastructure Layer - Dataverse API Service that works for any environment
 	const dataverseApiService = new DataverseApiService(
@@ -540,29 +558,9 @@ async function initializeImportJobViewer(
 	const { OpenImportLogUseCase } = await import('./features/importJobViewer/application/useCases/OpenImportLogUseCase') as typeof import('./features/importJobViewer/application/useCases/OpenImportLogUseCase');
 	const { ImportJobViewerPanel } = await import('./features/importJobViewer/presentation/panels/ImportJobViewerPanel') as typeof import('./features/importJobViewer/presentation/panels/ImportJobViewerPanel');
 
-	// Factory function to get all environments
-	const getEnvironments = async (): Promise<Array<{ id: string; name: string; url: string }>> => {
-		const environments = await environmentRepository.getAll();
-		return environments.map(env => ({
-			id: env.getId().getValue(),
-			name: env.getName().getValue(),
-			url: env.getDataverseUrl().getValue()
-		}));
-	};
-
-	// Factory function to get environment by ID
-	const getEnvironmentById = async (envId: string): Promise<{ id: string; name: string; powerPlatformEnvironmentId?: string } | null> => {
-		const environments = await environmentRepository.getAll();
-		const environment = environments.find(env => env.getId().getValue() === envId);
-		if (!environment) {
-			return null;
-		}
-		return {
-			id: envId,
-			name: environment.getName().getValue(),
-			powerPlatformEnvironmentId: environment.getPowerPlatformEnvironmentId()
-		};
-	};
+	// Create environment factory functions
+	const getEnvironments = createGetEnvironments(environmentRepository);
+	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
 
 	// Infrastructure Layer - Dataverse API Service
 	const dataverseApiService = new DataverseApiService(

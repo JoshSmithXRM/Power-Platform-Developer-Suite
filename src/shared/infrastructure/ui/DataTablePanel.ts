@@ -5,6 +5,8 @@ import { VsCodeCancellationTokenAdapter } from '../adapters/VsCodeCancellationTo
 import {
 	isWebviewMessage,
 	isWebviewLogMessage,
+	isRefreshDataMessage,
+	isEnvironmentChangedMessage,
 	type WebviewLogMessage
 } from '../../../infrastructure/ui/utils/TypeGuards';
 
@@ -126,6 +128,10 @@ export abstract class DataTablePanel {
 	/**
 	 * Returns filter logic JavaScript for panel-specific filtering.
 	 * Override to customize search behavior. Default: returns all data unfiltered.
+	 *
+	 * EXECUTION TIMING: Code runs during search input processing, before rendering.
+	 * Access 'query' variable (lowercase search text) and 'allData' array.
+	 *
 	 * @returns JavaScript code snippet that sets 'filtered' variable
 	 */
 	protected getFilterLogic(): string {
@@ -144,6 +150,9 @@ export abstract class DataTablePanel {
 	/**
 	 * Returns custom JavaScript for panel-specific behavior.
 	 * Override to attach event handlers to custom elements (e.g., clickable links).
+	 *
+	 * EXECUTION TIMING: Code runs after table rendering - safe to query DOM elements.
+	 *
 	 * @returns JavaScript code snippet to execute after rendering (default: empty)
 	 */
 	protected getCustomJavaScript(): string {
@@ -255,20 +264,18 @@ export abstract class DataTablePanel {
 
 			this.logger.debug(`Handling webview command: ${message.command}`);
 
-			switch (message.command) {
-				case 'refresh':
-					await this.loadData();
-					break;
-				case 'environmentChanged':
-					if (typeof message.data === 'object' && message.data !== null && 'environmentId' in message.data) {
-						await this.switchEnvironment((message.data as { environmentId: string }).environmentId);
-					}
-					break;
-				default:
-					// Delegate to panel-specific command handler
-					await this.handlePanelCommand(message.command, message.data);
-					break;
+			if (isRefreshDataMessage(message)) {
+				await this.loadData();
+				return;
 			}
+
+			if (isEnvironmentChangedMessage(message)) {
+				await this.switchEnvironment(message.data.environmentId);
+				return;
+			}
+
+			// Delegate to panel-specific command handler
+			await this.handlePanelCommand(message.command, message.data);
 		} catch (error) {
 			this.logger.error('Error handling webview command', error);
 			this.handleError(error);

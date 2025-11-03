@@ -343,3 +343,55 @@ export function isWebviewLogMessage(message: unknown): message is WebviewLogMess
 		typeof msg.timestamp === 'string'
 	);
 }
+
+/**
+ * Refresh data message from DataTable webviews.
+ */
+export interface RefreshDataMessage {
+	command: 'refresh';
+}
+
+/**
+ * Type guard for refresh data message.
+ *
+ * @param message - Unknown message from webview
+ * @returns True if message is refresh command
+ */
+export function isRefreshDataMessage(message: unknown): message is RefreshDataMessage {
+	return isWebviewMessage(message) && message.command === 'refresh';
+}
+
+/**
+ * Environment changed message from DataTable webviews.
+ */
+export interface EnvironmentChangedMessage {
+	command: 'environmentChanged';
+	data: {
+		environmentId: string;
+	};
+}
+
+/**
+ * Type guard for environment changed message.
+ *
+ * @param message - Unknown message from webview
+ * @returns True if message is environmentChanged command with valid environmentId
+ */
+export function isEnvironmentChangedMessage(message: unknown): message is EnvironmentChangedMessage {
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'environmentChanged') {
+		return false;
+	}
+
+	const data = message.data;
+
+	return (
+		typeof data === 'object' &&
+		data !== null &&
+		'environmentId' in data &&
+		typeof (data as { environmentId: string }).environmentId === 'string'
+	);
+}
