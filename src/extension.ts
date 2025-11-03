@@ -11,7 +11,6 @@ import { VsCodeEventPublisher } from './features/environmentSetup/infrastructure
 import { MsalAuthenticationService } from './features/environmentSetup/infrastructure/services/MsalAuthenticationService';
 import { WhoAmIService } from './features/environmentSetup/infrastructure/services/WhoAmIService';
 import { PowerPlatformApiService } from './features/environmentSetup/infrastructure/services/PowerPlatformApiService';
-import { LoadEnvironmentsUseCase } from './features/environmentSetup/application/useCases/LoadEnvironmentsUseCase';
 import { LoadEnvironmentByIdUseCase } from './features/environmentSetup/application/useCases/LoadEnvironmentByIdUseCase';
 import { SaveEnvironmentUseCase } from './features/environmentSetup/application/useCases/SaveEnvironmentUseCase';
 import { DeleteEnvironmentUseCase } from './features/environmentSetup/application/useCases/DeleteEnvironmentUseCase';
@@ -96,7 +95,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const listViewModelMapper = new EnvironmentListViewModelMapper();
 	const formViewModelMapper = new EnvironmentFormViewModelMapper();
-	const _loadEnvironmentsUseCase = new LoadEnvironmentsUseCase(environmentRepository, listViewModelMapper, logger);
 	const loadEnvironmentByIdUseCase = new LoadEnvironmentByIdUseCase(environmentRepository, formViewModelMapper, logger);
 	const saveEnvironmentUseCase = new SaveEnvironmentUseCase(environmentRepository, environmentValidationService, eventPublisher, authCacheInvalidationService, logger);
 	const deleteEnvironmentUseCase = new DeleteEnvironmentUseCase(environmentRepository, eventPublisher, logger);
@@ -647,8 +645,13 @@ async function initializeConnectionReferences(
 	const { DataverseApiConnectionReferenceRepository } = await import('./features/connectionReferences/infrastructure/repositories/DataverseApiConnectionReferenceRepository') as typeof import('./features/connectionReferences/infrastructure/repositories/DataverseApiConnectionReferenceRepository');
 	const { DataverseApiCloudFlowRepository } = await import('./features/connectionReferences/infrastructure/repositories/DataverseApiCloudFlowRepository') as typeof import('./features/connectionReferences/infrastructure/repositories/DataverseApiCloudFlowRepository');
 	const { DataverseApiSolutionComponentRepository } = await import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository') as typeof import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository');
+	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository') as typeof import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository');
+	const { FileSystemDeploymentSettingsRepository } = await import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository') as typeof import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository');
 	const { ListConnectionReferencesUseCase } = await import('./features/connectionReferences/application/useCases/ListConnectionReferencesUseCase') as typeof import('./features/connectionReferences/application/useCases/ListConnectionReferencesUseCase');
+	const { ExportConnectionReferencesToDeploymentSettingsUseCase } = await import('./features/connectionReferences/application/useCases/ExportConnectionReferencesToDeploymentSettingsUseCase') as typeof import('./features/connectionReferences/application/useCases/ExportConnectionReferencesToDeploymentSettingsUseCase');
 	const { ConnectionReferencesPanel } = await import('./features/connectionReferences/presentation/panels/ConnectionReferencesPanel') as typeof import('./features/connectionReferences/presentation/panels/ConnectionReferencesPanel');
+	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository') as typeof import('./shared/infrastructure/ui/VSCodePanelStateRepository');
+	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder') as typeof import('./shared/infrastructure/services/MakerUrlBuilder');
 
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
@@ -659,10 +662,18 @@ async function initializeConnectionReferences(
 	const flowRepository = new DataverseApiCloudFlowRepository(dataverseApiService, logger);
 	const connectionReferenceRepository = new DataverseApiConnectionReferenceRepository(dataverseApiService, logger);
 	const solutionComponentRepository = new DataverseApiSolutionComponentRepository(dataverseApiService, logger);
+	const solutionRepository = new DataverseApiSolutionRepository(dataverseApiService, logger);
+	const deploymentSettingsRepository = new FileSystemDeploymentSettingsRepository(logger);
+	const panelStateRepository = new VSCodePanelStateRepository(context.workspaceState);
+	const urlBuilder = new MakerUrlBuilder();
 	const listConnectionReferencesUseCase = new ListConnectionReferencesUseCase(
 		flowRepository,
 		connectionReferenceRepository,
 		solutionComponentRepository,
+		logger
+	);
+	const exportToDeploymentSettingsUseCase = new ExportConnectionReferencesToDeploymentSettingsUseCase(
+		deploymentSettingsRepository,
 		logger
 	);
 
@@ -671,8 +682,12 @@ async function initializeConnectionReferences(
 		getEnvironments,
 		getEnvironmentById,
 		listConnectionReferencesUseCase,
+		exportToDeploymentSettingsUseCase,
+		solutionRepository,
+		urlBuilder,
 		logger,
-		initialEnvironmentId
+		initialEnvironmentId,
+		panelStateRepository
 	);
 }
 
@@ -690,8 +705,13 @@ async function initializeEnvironmentVariables(
 	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService') as typeof import('./shared/infrastructure/services/DataverseApiService');
 	const { DataverseApiEnvironmentVariableRepository } = await import('./features/environmentVariables/infrastructure/repositories/DataverseApiEnvironmentVariableRepository') as typeof import('./features/environmentVariables/infrastructure/repositories/DataverseApiEnvironmentVariableRepository');
 	const { DataverseApiSolutionComponentRepository } = await import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository') as typeof import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository');
+	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository') as typeof import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository');
+	const { FileSystemDeploymentSettingsRepository } = await import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository') as typeof import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository');
 	const { ListEnvironmentVariablesUseCase } = await import('./features/environmentVariables/application/useCases/ListEnvironmentVariablesUseCase') as typeof import('./features/environmentVariables/application/useCases/ListEnvironmentVariablesUseCase');
+	const { ExportEnvironmentVariablesToDeploymentSettingsUseCase } = await import('./features/environmentVariables/application/useCases/ExportEnvironmentVariablesToDeploymentSettingsUseCase') as typeof import('./features/environmentVariables/application/useCases/ExportEnvironmentVariablesToDeploymentSettingsUseCase');
 	const { EnvironmentVariablesPanel } = await import('./features/environmentVariables/presentation/panels/EnvironmentVariablesPanel') as typeof import('./features/environmentVariables/presentation/panels/EnvironmentVariablesPanel');
+	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository') as typeof import('./shared/infrastructure/ui/VSCodePanelStateRepository');
+	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder') as typeof import('./shared/infrastructure/services/MakerUrlBuilder');
 
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
@@ -701,9 +721,17 @@ async function initializeEnvironmentVariables(
 
 	const environmentVariableRepository = new DataverseApiEnvironmentVariableRepository(dataverseApiService, logger);
 	const solutionComponentRepository = new DataverseApiSolutionComponentRepository(dataverseApiService, logger);
+	const solutionRepository = new DataverseApiSolutionRepository(dataverseApiService, logger);
+	const deploymentSettingsRepository = new FileSystemDeploymentSettingsRepository(logger);
+	const panelStateRepository = new VSCodePanelStateRepository(context.workspaceState);
+	const urlBuilder = new MakerUrlBuilder();
 	const listEnvironmentVariablesUseCase = new ListEnvironmentVariablesUseCase(
 		environmentVariableRepository,
 		solutionComponentRepository,
+		logger
+	);
+	const exportToDeploymentSettingsUseCase = new ExportEnvironmentVariablesToDeploymentSettingsUseCase(
+		deploymentSettingsRepository,
 		logger
 	);
 
@@ -712,8 +740,12 @@ async function initializeEnvironmentVariables(
 		getEnvironments,
 		getEnvironmentById,
 		listEnvironmentVariablesUseCase,
+		exportToDeploymentSettingsUseCase,
+		solutionRepository,
+		urlBuilder,
 		logger,
-		initialEnvironmentId
+		initialEnvironmentId,
+		panelStateRepository
 	);
 }
 

@@ -6,16 +6,6 @@
  * - Provide connection reference identification
  */
 export class ConnectionReference {
-	/**
-	 * Creates a new ConnectionReference entity.
-	 * @param id - Connection reference GUID
-	 * @param connectionReferenceLogicalName - Logical name (unique identifier)
-	 * @param displayName - Display name for UI
-	 * @param connectorId - ID of the connector this references
-	 * @param connectionId - ID of the actual connection (null if not set)
-	 * @param isManaged - Whether the connection reference is managed
-	 * @param modifiedOn - Last modified date
-	 */
 	constructor(
 		public readonly id: string,
 		public readonly connectionReferenceLogicalName: string,
@@ -27,11 +17,31 @@ export class ConnectionReference {
 	) {}
 
 	/**
-	 * Determines if this connection reference has a connection set.
-	 * @returns True if connectionId is set, false otherwise
+	 * Determines if this connection reference has an associated connection.
+	 * Connection references without connections cannot be used by flows.
 	 */
 	hasConnection(): boolean {
 		return this.connectionId !== null;
+	}
+
+	/**
+	 * Checks if this connection reference exists in the specified solution.
+	 * @param solutionComponentIds - Set of component IDs from solution
+	 */
+	isInSolution(solutionComponentIds: Set<string>): boolean {
+		return solutionComponentIds.has(this.id);
+	}
+
+	/**
+	 * Converts to deployment settings entry format.
+	 * Empty strings for null values ensure valid JSON structure for deployment.
+	 */
+	toDeploymentSettingsEntry(): { LogicalName: string; ConnectionId: string; ConnectorId: string } {
+		return {
+			LogicalName: this.connectionReferenceLogicalName,
+			ConnectionId: this.connectionId ?? '',
+			ConnectorId: this.connectorId ?? ''
+		};
 	}
 
 	/**

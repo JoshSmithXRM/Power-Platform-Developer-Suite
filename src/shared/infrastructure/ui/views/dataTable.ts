@@ -147,6 +147,9 @@ export function renderDataTable(resources: DataTableViewResources): string {
 		<div class="toolbar-left">
 			<button id="openMakerBtn">${config.openMakerButtonText}</button>
 			<button id="refreshBtn">Refresh</button>
+			<label for="solutionSelect" id="solutionSelectLabel" style="display: none;">Solution:</label>
+			<select id="solutionSelect" style="display: none;">
+			</select>
 		</div>
 		<div class="toolbar-right">
 			<label for="environmentSelect">Environment:</label>
@@ -166,6 +169,7 @@ export function renderDataTable(resources: DataTableViewResources): string {
 		const config = ${JSON.stringify(config)};
 		let allData = [];
 		let environments = [];
+		let solutions = [];
 		let sortColumn = config.defaultSortColumn;
 		let sortDirection = config.defaultSortDirection;
 
@@ -193,6 +197,14 @@ export function renderDataTable(resources: DataTableViewResources): string {
 			});
 		});
 
+		document.getElementById('solutionSelect').addEventListener('change', (e) => {
+			saveState({ currentSolutionId: e.target.value });
+			vscode.postMessage({
+				command: 'solutionChanged',
+				data: { solutionId: e.target.value || null }
+			});
+		});
+
 		// Search event handler function (will be attached in renderData)
 		function handleSearchInput(e) {
 			const query = e.target.value;
@@ -210,10 +222,23 @@ export function renderDataTable(resources: DataTableViewResources): string {
 					populateEnvironmentDropdown();
 					break;
 
+				case 'solutionFilterOptionsData':
+					solutions = message.data;
+					populateSolutionDropdown();
+					break;
+
 				case 'setCurrentEnvironment':
 					const select = document.getElementById('environmentSelect');
 					select.value = message.environmentId;
 					saveState({ currentEnvironmentId: message.environmentId });
+					break;
+
+				case 'setCurrentSolution':
+					const solutionSelect = document.getElementById('solutionSelect');
+					if (solutionSelect) {
+						solutionSelect.value = message.solutionId;
+						saveState({ currentSolutionId: message.solutionId });
+					}
 					break;
 
 				case 'loading':
@@ -260,6 +285,37 @@ export function renderDataTable(resources: DataTableViewResources): string {
 			if (state && state.currentEnvironmentId) {
 				select.value = state.currentEnvironmentId;
 			}
+		}
+
+		function populateSolutionDropdown() {
+			const select = document.getElementById('solutionSelect');
+			const label = document.getElementById('solutionSelectLabel');
+
+			if (!select || !label) return;
+
+			// Only show if panel has enableSolutionFilter and we have solutions
+			if (!config.enableSolutionFilter || solutions.length === 0) {
+				select.style.display = 'none';
+				label.style.display = 'none';
+				return;
+			}
+
+			select.innerHTML = '';
+			solutions.forEach(solution => {
+				const option = document.createElement('option');
+				option.value = solution.id;
+				option.textContent = solution.name + ' (' + solution.uniqueName + ')';
+				select.appendChild(option);
+			});
+
+			// Restore previous selection from state
+			const previousState = vscode.getState();
+			if (previousState && previousState.currentSolutionId) {
+				select.value = previousState.currentSolutionId;
+			}
+
+			select.style.display = '';
+			label.style.display = '';
 		}
 
 		function setLoading(isLoading) {
@@ -352,7 +408,8 @@ export function renderDataTable(resources: DataTableViewResources): string {
 				}
 			}
 
-			if (!data || data.length === 0) {
+			// Handle case where there's no data at all (not just filtered out)
+			if (!allData || allData.length === 0) {
 				container.innerHTML = '<p style="padding: 16px;">${config.noDataMessage}</p>';
 				return;
 			}
@@ -382,20 +439,26 @@ export function renderDataTable(resources: DataTableViewResources): string {
 				const sortIndicator = sortColumn === col.key
 					? (sortDirection === 'asc' ? ' ▲' : ' ▼')
 					: '';
-				html += '<th data-sort="' + col.key + '">' + col.label + sortIndicator + '</th>';
+				const widthAttr = col.width ? ' style="width: ' + col.width + '"' : '';
+				html += '<th data-sort="' + col.key + '"' + widthAttr + '>' + col.label + sortIndicator + '</th>';
 			});
 			html += '</tr></thead><tbody>';
 
-			data.forEach(row => {
-				html += '<tr>';
-				config.columns.forEach(col => {
-					const value = row[col.key];
-					const cellClass = row[col.key + 'Class'] || '';
-					const cellHtml = row[col.key + 'Html'] || escapeHtml(value);
-					html += '<td class="' + cellClass + '">' + cellHtml + '</td>';
+			if (data.length === 0) {
+				// No results after filtering - show message in table
+				html += '<tr><td colspan="' + config.columns.length + '" style="text-align: center; padding: 24px; color: var(--vscode-descriptionForeground);">No matching records found</td></tr>';
+			} else {
+				data.forEach(row => {
+					html += '<tr>';
+					config.columns.forEach(col => {
+						const value = row[col.key];
+						const cellClass = row[col.key + 'Class'] || '';
+						const cellHtml = row[col.key + 'Html'] || escapeHtml(value);
+						html += '<td class="' + cellClass + '">' + cellHtml + '</td>';
+					});
+					html += '</tr>';
 				});
-				html += '</tr>';
-			});
+			}
 
 			html += '</tbody></table>';
 			html += '</div>'; // Close table-container

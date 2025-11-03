@@ -33,6 +33,7 @@ th {
 	z-index: 10;
 	border-bottom: 2px solid var(--vscode-panel-border);
 	border-right: 1px solid rgba(255, 255, 255, 0.1);
+	white-space: nowrap;
 }
 
 th:last-child {
@@ -60,7 +61,8 @@ tbody tr:hover {
 /* Link styling within tables */
 .solution-link,
 .table-link,
-.job-link {
+.job-link,
+.flow-link {
 	color: var(--vscode-textLink-foreground);
 	cursor: pointer;
 	text-decoration: none;
@@ -68,7 +70,8 @@ tbody tr:hover {
 
 .solution-link:hover,
 .table-link:hover,
-.job-link:hover {
+.job-link:hover,
+.flow-link:hover {
 	text-decoration: underline;
 }
 

@@ -51,9 +51,11 @@ export class CloudFlow {
 	}
 
 	/**
-	 * Extracts connection reference names from the flow's clientData.
-	 * Business logic: Parses the connectionReferences section of clientData JSON
-	 * and returns the keys (connection reference logical names).
+	 * Extracts connection reference logical names from the flow's clientData.
+	 *
+	 * Parses the connectionReferences section of clientData JSON to identify which
+	 * connection references this flow depends on. Required for relationship mapping
+	 * between flows and connection references.
 	 *
 	 * @returns Array of connection reference logical names, or empty array if no data
 	 */
@@ -82,8 +84,21 @@ export class CloudFlow {
 				return [];
 			}
 
-			// Return the keys (connection reference logical names)
-			return Object.keys(connectionRefs);
+			// Extract connectionReferenceLogicalName from each connection reference
+			const names: string[] = [];
+			Object.values(connectionRefs).forEach((connRef) => {
+				if (connRef && typeof connRef === 'object' && 'connection' in connRef) {
+					const connection = connRef.connection;
+					if (connection && typeof connection === 'object' && 'connectionReferenceLogicalName' in connection) {
+						const logicalName = connection.connectionReferenceLogicalName;
+						if (typeof logicalName === 'string') {
+							names.push(logicalName);
+						}
+					}
+				}
+			});
+
+			return names;
 		} catch (_error) {
 			// If JSON parsing fails or structure is unexpected, return empty array
 			// Error was already validated in constructor, so this is defensive

@@ -24,17 +24,6 @@ export enum EnvironmentVariableType {
  */
 export class EnvironmentVariable {
 	/**
-	 * Creates a new EnvironmentVariable entity.
-	 * @param definitionId - Environment variable definition GUID
-	 * @param schemaName - Schema name (unique identifier)
-	 * @param displayName - Display name for UI
-	 * @param type - Type code from EnvironmentVariableType enum
-	 * @param defaultValue - Default value from definition
-	 * @param currentValue - Current value from value record (null if no value set)
-	 * @param isManaged - Whether the definition is managed
-	 * @param description - Definition description
-	 * @param modifiedOn - Last modified date of definition
-	 * @param valueId - Value record GUID (null if no value set)
 	 * @throws {ValidationError} When type code is invalid
 	 */
 	constructor(
@@ -62,8 +51,7 @@ export class EnvironmentVariable {
 
 	/**
 	 * Gets the effective value for this environment variable.
-	 * Business rule: Current value takes precedence over default value.
-	 * @returns The current value if set, otherwise the default value, or null if neither is set
+	 * Current value takes precedence over default value per Power Platform behavior.
 	 */
 	getEffectiveValue(): string | null {
 		return this.currentValue ?? this.defaultValue;
@@ -71,23 +59,21 @@ export class EnvironmentVariable {
 
 	/**
 	 * Determines if this environment variable has any value set.
-	 * @returns True if either current or default value is set, false otherwise
 	 */
 	hasValue(): boolean {
 		return this.getEffectiveValue() !== null;
 	}
 
 	/**
-	 * Determines if the current value overrides the default value.
-	 * @returns True if current value is set and different from default, false otherwise
+	 * Determines if current value differs from default value.
+	 * Environment-specific overrides indicate configuration that varies by environment.
 	 */
 	hasOverride(): boolean {
 		return this.currentValue !== null && this.currentValue !== this.defaultValue;
 	}
 
 	/**
-	 * Gets a user-friendly type name for display.
-	 * @returns Human-readable type string
+	 * Returns friendly display name for variable type.
 	 */
 	getTypeName(): string {
 		switch (this.type) {
@@ -109,12 +95,31 @@ export class EnvironmentVariable {
 	}
 
 	/**
-	 * Determines if this is a secret type environment variable.
-	 * Secrets should be handled carefully in UI (masked display).
-	 * @returns True if type is Secret, false otherwise
+	 * Determines if this environment variable is a secret type.
+	 * Secrets require special handling in UI (masked display, secure storage).
 	 */
 	isSecret(): boolean {
 		return this.type === EnvironmentVariableType.Secret;
+	}
+
+	/**
+	 * Checks if this environment variable exists in the specified solution.
+	 * @param solutionComponentIds - Set of component IDs from solution
+	 */
+	isInSolution(solutionComponentIds: Set<string>): boolean {
+		return solutionComponentIds.has(this.definitionId);
+	}
+
+	/**
+	 * Converts to deployment settings entry format.
+	 * Uses the effective value (current value if set, otherwise default value)
+	 * to capture environment-specific configuration for deployment.
+	 */
+	toDeploymentSettingsEntry(): { SchemaName: string; Value: string } {
+		return {
+			SchemaName: this.schemaName,
+			Value: this.getEffectiveValue() ?? ''
+		};
 	}
 
 	/**

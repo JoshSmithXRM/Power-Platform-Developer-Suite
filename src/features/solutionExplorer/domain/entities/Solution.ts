@@ -9,6 +9,13 @@ import { ValidationError } from '../../../../shared/domain/errors/ValidationErro
  * - Provide sort priority for UI ordering
  */
 export class Solution {
+  /**
+   * The GUID of the Default Solution across all Dataverse environments.
+   * This solution contains all unmanaged customizations not part of other solutions.
+   * This GUID is consistent across all Dataverse instances.
+   */
+  public static readonly DEFAULT_SOLUTION_ID = 'fd140aaf-4df4-11dd-bd17-0019b9312238';
+
   public readonly version: string;
 
   /**

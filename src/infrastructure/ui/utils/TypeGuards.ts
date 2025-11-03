@@ -16,11 +16,7 @@ export interface WebviewMessage<T = unknown> {
 }
 
 /**
- * Type guard for basic webview messages.
  * Narrows type without assertions for safer runtime validation.
- *
- * @param message - Unknown message from webview
- * @returns True if message has command string
  */
 export function isWebviewMessage(message: unknown): message is WebviewMessage {
 	if (typeof message !== 'object' || message === null) {
@@ -43,12 +39,7 @@ export const AUTHENTICATION_METHODS: readonly AuthenticationMethodType[] = [
 ] as const;
 
 /**
- * Type guard for authentication method validation.
- * Validates that a value is a valid AuthenticationMethodType enum member.
  * Type narrowing ensures value is string before array includes check.
- *
- * @param value - Unknown value to validate
- * @returns True if value is valid AuthenticationMethodType
  */
 function isValidAuthMethod(value: unknown): value is AuthenticationMethodType {
 	if (typeof value !== 'string') {
@@ -77,12 +68,6 @@ export interface SaveEnvironmentMessage {
 	};
 }
 
-/**
- * Type guard for save environment message with enum validation.
- *
- * @param message - Unknown message from webview
- * @returns True if message is valid SaveEnvironmentMessage
- */
 export function isSaveEnvironmentMessage(message: unknown): message is SaveEnvironmentMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -118,10 +103,6 @@ export function isSaveEnvironmentMessage(message: unknown): message is SaveEnvir
 	return isValidAuthMethod(data.authenticationMethod);
 }
 
-/**
- * Test connection message from webview.
- * Sends same environment data as save for connection testing.
- */
 export interface TestConnectionMessage {
 	command: 'test-connection';
 	data: {
@@ -138,12 +119,6 @@ export interface TestConnectionMessage {
 	};
 }
 
-/**
- * Type guard for test connection message with full validation.
- *
- * @param message - Unknown message from webview
- * @returns True if message is test connection command with valid data
- */
 export function isTestConnectionMessage(message: unknown): message is TestConnectionMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -182,27 +157,17 @@ export function isTestConnectionMessage(message: unknown): message is TestConnec
 	return isValidAuthMethod(data.authenticationMethod);
 }
 
-/**
- * Delete environment message from webview.
- */
 export interface DeleteEnvironmentMessage {
 	command: 'delete-environment';
 	data?: never;
 }
 
-/**
- * Type guard for delete environment message.
- *
- * @param message - Unknown message from webview
- * @returns True if message is delete-environment command
- */
 export function isDeleteEnvironmentMessage(message: unknown): message is DeleteEnvironmentMessage {
 	return isWebviewMessage(message) && message.command === 'delete-environment';
 }
 
 /**
- * Discover environment ID message from webview.
- * Sends environment connection data to discover the Power Platform Environment ID via BAP API.
+ * Discovers Power Platform Environment ID via BAP API.
  */
 export interface DiscoverEnvironmentIdMessage {
 	command: 'discover-environment-id';
@@ -219,12 +184,6 @@ export interface DiscoverEnvironmentIdMessage {
 	};
 }
 
-/**
- * Type guard for discover environment ID message with validation.
- *
- * @param message - Unknown message from webview
- * @returns True if message is discover-environment-id command with valid data
- */
 export function isDiscoverEnvironmentIdMessage(message: unknown): message is DiscoverEnvironmentIdMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -263,9 +222,6 @@ export function isDiscoverEnvironmentIdMessage(message: unknown): message is Dis
 	return isValidAuthMethod(data.authenticationMethod);
 }
 
-/**
- * Check unique name message from webview.
- */
 export interface CheckUniqueNameMessage {
 	command: 'validate-name';
 	data: {
@@ -274,12 +230,6 @@ export interface CheckUniqueNameMessage {
 	};
 }
 
-/**
- * Type guard for check unique name message.
- *
- * @param message - Unknown message from webview
- * @returns True if message is valid CheckUniqueNameMessage
- */
 export function isCheckUniqueNameMessage(message: unknown): message is CheckUniqueNameMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -299,14 +249,10 @@ export function isCheckUniqueNameMessage(message: unknown): message is CheckUniq
 	);
 }
 
-/**
- * Valid log levels for webview logging.
- */
 export type WebviewLogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 /**
- * Webview log message sent from webview to extension host.
- * Used to bridge webview console logs to the extension's OutputChannel.
+ * Bridges webview console logs to the extension's OutputChannel.
  */
 export interface WebviewLogMessage {
 	command: 'webview-log';
@@ -317,12 +263,6 @@ export interface WebviewLogMessage {
 	timestamp: string;
 }
 
-/**
- * Type guard for webview log message.
- *
- * @param message - Unknown message from webview
- * @returns True if message is valid WebviewLogMessage
- */
 export function isWebviewLogMessage(message: unknown): message is WebviewLogMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -343,26 +283,14 @@ export function isWebviewLogMessage(message: unknown): message is WebviewLogMess
 	);
 }
 
-/**
- * Refresh data message from DataTable webviews.
- */
 export interface RefreshDataMessage {
 	command: 'refresh';
 }
 
-/**
- * Type guard for refresh data message.
- *
- * @param message - Unknown message from webview
- * @returns True if message is refresh command
- */
 export function isRefreshDataMessage(message: unknown): message is RefreshDataMessage {
 	return isWebviewMessage(message) && message.command === 'refresh';
 }
 
-/**
- * Environment changed message from DataTable webviews.
- */
 export interface EnvironmentChangedMessage {
 	command: 'environmentChanged';
 	data: {
@@ -370,12 +298,6 @@ export interface EnvironmentChangedMessage {
 	};
 }
 
-/**
- * Type guard for environment changed message.
- *
- * @param message - Unknown message from webview
- * @returns True if message is environmentChanged command with valid environmentId
- */
 export function isEnvironmentChangedMessage(message: unknown): message is EnvironmentChangedMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -395,17 +317,11 @@ export function isEnvironmentChangedMessage(message: unknown): message is Enviro
 	);
 }
 
-/**
- * Reveal secret message from webview (PersistenceInspector).
- */
 export interface RevealSecretMessage {
 	command: 'revealSecret';
 	key: string;
 }
 
-/**
- * Type guard for reveal secret message.
- */
 export function isRevealSecretMessage(message: unknown): message is RevealSecretMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -418,17 +334,11 @@ export function isRevealSecretMessage(message: unknown): message is RevealSecret
 	return 'key' in message && typeof (message as { key: string }).key === 'string';
 }
 
-/**
- * Clear entry message from webview (PersistenceInspector).
- */
 export interface ClearEntryMessage {
 	command: 'clearEntry';
 	key: string;
 }
 
-/**
- * Type guard for clear entry message.
- */
 export function isClearEntryMessage(message: unknown): message is ClearEntryMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -441,18 +351,12 @@ export function isClearEntryMessage(message: unknown): message is ClearEntryMess
 	return 'key' in message && typeof (message as { key: string }).key === 'string';
 }
 
-/**
- * Clear property message from webview (PersistenceInspector).
- */
 export interface ClearPropertyMessage {
 	command: 'clearProperty';
 	key: string;
 	path: string;
 }
 
-/**
- * Type guard for clear property message.
- */
 export function isClearPropertyMessage(message: unknown): message is ClearPropertyMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -471,9 +375,6 @@ export function isClearPropertyMessage(message: unknown): message is ClearProper
 	);
 }
 
-/**
- * View import job message from webview (ImportJobViewer).
- */
 export interface ViewImportJobMessage {
 	command: 'viewImportJob';
 	data: {
@@ -481,9 +382,6 @@ export interface ViewImportJobMessage {
 	};
 }
 
-/**
- * Type guard for view import job message.
- */
 export function isViewImportJobMessage(message: unknown): message is ViewImportJobMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -503,9 +401,6 @@ export function isViewImportJobMessage(message: unknown): message is ViewImportJ
 	);
 }
 
-/**
- * Open solution in Maker message from webview (SolutionExplorer).
- */
 export interface OpenInMakerMessage {
 	command: 'openInMaker';
 	data: {
@@ -513,9 +408,6 @@ export interface OpenInMakerMessage {
 	};
 }
 
-/**
- * Type guard for open in Maker message.
- */
 export function isOpenInMakerMessage(message: unknown): message is OpenInMakerMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -532,5 +424,31 @@ export function isOpenInMakerMessage(message: unknown): message is OpenInMakerMe
 		data !== null &&
 		'solutionId' in data &&
 		typeof (data as { solutionId: string }).solutionId === 'string'
+	);
+}
+
+export interface OpenFlowMessage {
+	command: 'openFlow';
+	data: {
+		flowId: string;
+	};
+}
+
+export function isOpenFlowMessage(message: unknown): message is OpenFlowMessage {
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'openFlow') {
+		return false;
+	}
+
+	const data = message.data;
+
+	return (
+		typeof data === 'object' &&
+		data !== null &&
+		'flowId' in data &&
+		typeof (data as { flowId: string }).flowId === 'string'
 	);
 }

@@ -99,6 +99,58 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
   }
 
   /**
+   * Fetches minimal solution data for dropdown display (only visible solutions).
+   * Optimized query: only fetches id, friendlyName, uniqueName.
+   * Filters to isvisible = true.
+   */
+  async findAllForDropdown(
+    environmentId: string,
+    cancellationToken?: ICancellationToken
+  ): Promise<Array<{ id: string; name: string; uniqueName: string }>> {
+    const queryString = ODataQueryBuilder.build({
+      select: ['solutionid', 'friendlyname', 'uniquename'],
+      filter: 'isvisible eq true',
+      orderBy: 'friendlyname'
+    });
+
+    const endpoint = `/api/data/v9.2/solutions?${queryString}`;
+
+    this.logger.debug('Fetching solutions for dropdown from Dataverse API', { environmentId });
+
+    if (cancellationToken?.isCancellationRequested) {
+      this.logger.debug('Repository operation cancelled before API call');
+      throw new OperationCancelledException();
+    }
+
+    try {
+      const response = await this.apiService.get<DataverseSolutionsResponse>(
+        environmentId,
+        endpoint,
+        cancellationToken
+      );
+
+      if (cancellationToken?.isCancellationRequested) {
+        this.logger.debug('Repository operation cancelled after API call');
+        throw new OperationCancelledException();
+      }
+
+      const solutions = response.value.map(dto => ({
+        id: dto.solutionid,
+        name: dto.friendlyname,
+        uniqueName: dto.uniquename
+      }));
+
+      this.logger.debug(`Fetched ${solutions.length} visible solution(s) for dropdown`, { environmentId });
+
+      return solutions;
+    } catch (error) {
+      const normalizedError = normalizeError(error);
+      this.logger.error('Failed to fetch solutions for dropdown from Dataverse API', normalizedError);
+      throw normalizedError;
+    }
+  }
+
+  /**
    * Maps Dataverse DTO to Solution domain entity.
    */
   private mapToEntity(dto: DataverseSolutionDto): Solution {

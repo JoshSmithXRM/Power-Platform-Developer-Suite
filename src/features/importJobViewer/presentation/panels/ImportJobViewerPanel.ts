@@ -133,6 +133,13 @@ export class ImportJobViewerPanel extends DataTablePanel {
 	}
 
 	/**
+	 * Returns panel type identifier for state persistence.
+	 */
+	protected getPanelType(): string {
+		return 'importJobs';
+	}
+
+	/**
 	 * Loads import jobs from the current environment.
 	 */
 	protected async loadData(): Promise<void> {

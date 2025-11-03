@@ -1,14 +1,19 @@
 import * as vscode from 'vscode';
 
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
 import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import { ListEnvironmentVariablesUseCase } from '../../application/useCases/ListEnvironmentVariablesUseCase';
+import { ExportEnvironmentVariablesToDeploymentSettingsUseCase } from '../../application/useCases/ExportEnvironmentVariablesToDeploymentSettingsUseCase';
 import { EnvironmentVariableViewModelMapper } from '../../application/mappers/EnvironmentVariableViewModelMapper';
 import { type EnvironmentVariable } from '../../domain/entities/EnvironmentVariable';
+import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
+import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import {
 	DataTablePanel,
 	type EnvironmentOption,
-	type DataTableConfig
+	type DataTableConfig,
+	type SolutionOption
 } from '../../../../shared/infrastructure/ui/DataTablePanel';
 
 /**
@@ -27,10 +32,14 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 		getEnvironments: () => Promise<EnvironmentOption[]>,
 		getEnvironmentById: (envId: string) => Promise<{ id: string; name: string } | null>,
 		private readonly listEnvVarsUseCase: ListEnvironmentVariablesUseCase,
+		private readonly exportToDeploymentSettingsUseCase: ExportEnvironmentVariablesToDeploymentSettingsUseCase,
+		private readonly solutionRepository: ISolutionRepository,
+		private readonly urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId?: string
+		initialEnvironmentId?: string,
+		panelStateRepository?: IPanelStateRepository
 	) {
-		super(panel, extensionUri, getEnvironments, getEnvironmentById, logger, initialEnvironmentId);
+		super(panel, extensionUri, getEnvironments, getEnvironmentById, logger, initialEnvironmentId, panelStateRepository);
 	}
 
 	/**
@@ -42,8 +51,12 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 		getEnvironments: () => Promise<EnvironmentOption[]>,
 		getEnvironmentById: (envId: string) => Promise<{ id: string; name: string } | null>,
 		listEnvVarsUseCase: ListEnvironmentVariablesUseCase,
+		exportToDeploymentSettingsUseCase: ExportEnvironmentVariablesToDeploymentSettingsUseCase,
+		solutionRepository: ISolutionRepository,
+		urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId?: string
+		initialEnvironmentId?: string,
+		panelStateRepository?: IPanelStateRepository
 	): Promise<EnvironmentVariablesPanel> {
 		const column = vscode.ViewColumn.One;
 
@@ -87,8 +100,12 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 			getEnvironments,
 			getEnvironmentById,
 			listEnvVarsUseCase,
+			exportToDeploymentSettingsUseCase,
+			solutionRepository,
+			urlBuilder,
 			logger,
-			targetEnvironmentId
+			targetEnvironmentId,
+			panelStateRepository
 		);
 
 		EnvironmentVariablesPanel.panels.set(targetEnvironmentId, newPanel);
@@ -117,8 +134,32 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 			],
 			searchPlaceholder: '🔍 Search environment variables...',
 			openMakerButtonText: 'Open in Maker',
-			noDataMessage: 'No environment variables found.'
+			noDataMessage: 'No environment variables found.',
+			enableSolutionFilter: true
 		};
+	}
+
+	/**
+	 * Returns panel type identifier for state persistence.
+	 */
+	protected getPanelType(): string {
+		return 'environmentVariables';
+	}
+
+	/**
+	 * Loads solutions for the current environment (dropdown display only).
+	 */
+	protected async loadSolutions(): Promise<SolutionOption[]> {
+		if (!this.currentEnvironmentId) {
+			return [];
+		}
+
+		try {
+			return await this.solutionRepository.findAllForDropdown(this.currentEnvironmentId);
+		} catch (error) {
+			this.logger.error('Failed to load solutions', error);
+			return [];
+		}
 	}
 
 	/**
@@ -138,7 +179,7 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 			const cancellationToken = this.createCancellationToken();
 			this.environmentVariables = await this.listEnvVarsUseCase.execute(
 				this.currentEnvironmentId,
-				undefined, // No solution filtering for now
+				this.currentSolutionId || undefined, // Solution filtering
 				cancellationToken
 			);
 
@@ -168,6 +209,8 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 	protected async handlePanelCommand(message: import('../../../../infrastructure/ui/utils/TypeGuards').WebviewMessage): Promise<void> {
 		if (message.command === 'openMaker') {
 			await this.handleOpenMaker();
+		} else if (message.command === 'syncDeploymentSettings') {
+			await this.handleSyncDeploymentSettings();
 		}
 	}
 
@@ -177,13 +220,32 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 	protected getFilterLogic(): string {
 		return `
 			filtered = allData.filter(ev =>
-				ev.schemaName.toLowerCase().includes(query) ||
-				ev.displayName.toLowerCase().includes(query) ||
-				ev.type.toLowerCase().includes(query) ||
-				ev.currentValue.toLowerCase().includes(query) ||
-				ev.defaultValue.toLowerCase().includes(query) ||
-				ev.description.toLowerCase().includes(query)
+				(ev.schemaName || '').toLowerCase().includes(query) ||
+				(ev.displayName || '').toLowerCase().includes(query) ||
+				(ev.type || '').toLowerCase().includes(query) ||
+				(ev.currentValue || '').toLowerCase().includes(query) ||
+				(ev.defaultValue || '').toLowerCase().includes(query) ||
+				(ev.description || '').toLowerCase().includes(query)
 			);
+		`;
+	}
+
+	/**
+	 * Returns custom JavaScript to add the Sync Deployment Settings button.
+	 */
+	protected getCustomJavaScript(): string {
+		return `
+			// Add Sync Deployment Settings button to toolbar
+			const toolbarLeft = document.querySelector('.toolbar-left');
+			if (toolbarLeft && !document.getElementById('syncDeploymentSettingsBtn')) {
+				const syncBtn = document.createElement('button');
+				syncBtn.id = 'syncDeploymentSettingsBtn';
+				syncBtn.textContent = 'Sync Deployment Settings';
+				syncBtn.addEventListener('click', () => {
+					vscode.postMessage({ command: 'syncDeploymentSettings' });
+				});
+				toolbarLeft.appendChild(syncBtn);
+			}
 		`;
 	}
 
@@ -203,12 +265,52 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 			return;
 		}
 
-		// Environment variables page URL pattern
-		const url = `https://make.powerapps.com/environments/${environment.powerPlatformEnvironmentId}/environmentvariables`;
+		const url = this.urlBuilder.buildEnvironmentVariablesObjectsUrl(
+			environment.powerPlatformEnvironmentId,
+			this.currentSolutionId || undefined
+		);
 		await vscode.env.openExternal(vscode.Uri.parse(url));
 		this.logger.info('Opened environment variables in Maker Portal', {
-			environmentId: this.currentEnvironmentId
+			environmentId: this.currentEnvironmentId,
+			solutionId: this.currentSolutionId
 		});
+	}
+
+	/**
+	 * Syncs environment variables to a deployment settings file.
+	 */
+	private async handleSyncDeploymentSettings(): Promise<void> {
+		if (this.environmentVariables.length === 0) {
+			vscode.window.showWarningMessage('No environment variables to export.');
+			return;
+		}
+
+		// Get current solution uniqueName for filename
+		const currentSolution = this.solutionFilterOptions.find(sol => sol.id === this.currentSolutionId);
+		const filename = currentSolution
+			? `${currentSolution.uniqueName}.deploymentsettings.json`
+			: 'deploymentsettings.json';
+
+		this.logger.info('Syncing deployment settings', {
+			count: this.environmentVariables.length,
+			filename
+		});
+
+		try {
+			const result = await this.exportToDeploymentSettingsUseCase.execute(
+				this.environmentVariables,
+				filename
+			);
+
+			if (result) {
+				const message = `Synced deployment settings: ${result.added} added, ${result.removed} removed, ${result.preserved} preserved`;
+				vscode.window.showInformationMessage(message);
+				this.logger.info('Deployment settings synced successfully', result);
+			}
+		} catch (error) {
+			this.logger.error('Failed to sync deployment settings', error);
+			vscode.window.showErrorMessage(`Failed to sync deployment settings: ${error instanceof Error ? error.message : String(error)}`);
+		}
 	}
 
 	/**

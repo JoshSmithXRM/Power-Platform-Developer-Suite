@@ -10,6 +10,14 @@ import { ConnectionReference } from '../../domain/entities/ConnectionReference';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
+ * Result of listing connection references.
+ */
+export interface ListConnectionReferencesResult {
+	readonly relationships: FlowConnectionRelationship[];
+	readonly connectionReferences: ConnectionReference[];
+}
+
+/**
  * Use case for listing connection references and their relationships with cloud flows.
  * Orchestrates fetching flows (WITH clientdata), connection references, and building relationships.
  */
@@ -26,13 +34,13 @@ export class ListConnectionReferencesUseCase {
 	 * @param environmentId - Power Platform environment GUID
 	 * @param solutionId - Optional solution GUID to filter by
 	 * @param cancellationToken - Optional token to cancel the operation
-	 * @returns Promise resolving to array of FlowConnectionRelationship value objects
+	 * @returns Promise resolving to relationships and filtered connection references
 	 */
 	async execute(
 		environmentId: string,
 		solutionId?: string,
 		cancellationToken?: ICancellationToken
-	): Promise<FlowConnectionRelationship[]> {
+	): Promise<ListConnectionReferencesResult> {
 		this.logger.info('ListConnectionReferencesUseCase started', { environmentId, solutionId });
 
 		try {
@@ -67,11 +75,11 @@ export class ListConnectionReferencesUseCase {
 			let filteredConnectionRefs = connectionRefs;
 
 			if (solutionId) {
-				// Filter flows by solution
+				// Filter flows by solution (Cloud Flows are stored as 'subscription' entities in solution components)
 				const flowComponentIds = await this.solutionComponentRepository.findComponentIdsBySolution(
 					environmentId,
 					solutionId,
-					'workflow',
+					'subscription',
 					undefined,
 					cancellationToken
 				);
@@ -114,7 +122,10 @@ export class ListConnectionReferencesUseCase {
 				connectionRefCount: filteredConnectionRefs.length
 			});
 
-			return relationships;
+			return {
+				relationships,
+				connectionReferences: filteredConnectionRefs
+			};
 		} catch (error) {
 			const normalizedError = normalizeError(error);
 			this.logger.error('ListConnectionReferencesUseCase failed', normalizedError);
@@ -135,9 +146,9 @@ export class ListConnectionReferencesUseCase {
 	): FlowConnectionRelationship[] {
 		const relationships: FlowConnectionRelationship[] = [];
 
-		// Create a map of connection references by logical name for quick lookup
+		// Create a map of connection references by logical name (lowercase for case-insensitive matching)
 		const crByLogicalName = new Map(
-			connectionRefs.map((cr) => [cr.connectionReferenceLogicalName, cr])
+			connectionRefs.map((cr) => [cr.connectionReferenceLogicalName.toLowerCase(), cr])
 		);
 
 		// Track which connection references are used by flows
@@ -154,7 +165,7 @@ export class ListConnectionReferencesUseCase {
 
 			// Create a relationship for each connection reference the flow uses
 			for (const crName of crNames) {
-				const cr = crByLogicalName.get(crName);
+				const cr = crByLogicalName.get(crName.toLowerCase());
 
 				if (cr) {
 					// Valid relationship: flow-to-cr
@@ -172,7 +183,7 @@ export class ListConnectionReferencesUseCase {
 							cr.modifiedOn
 						)
 					);
-					usedCrLogicalNames.add(crName);
+					usedCrLogicalNames.add(crName.toLowerCase());
 				} else {
 					// Orphaned flow: references a CR that doesn't exist
 					relationships.push(
@@ -195,7 +206,7 @@ export class ListConnectionReferencesUseCase {
 
 		// Find orphaned connection references (CRs not used by any flow)
 		for (const cr of connectionRefs) {
-			if (!usedCrLogicalNames.has(cr.connectionReferenceLogicalName)) {
+			if (!usedCrLogicalNames.has(cr.connectionReferenceLogicalName.toLowerCase())) {
 				relationships.push(
 					new FlowConnectionRelationship(
 						null,

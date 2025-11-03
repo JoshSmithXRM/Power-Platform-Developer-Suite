@@ -129,6 +129,13 @@ export class SolutionExplorerPanel extends DataTablePanel {
 	}
 
 	/**
+	 * Returns panel type identifier for state persistence.
+	 */
+	protected getPanelType(): string {
+		return 'solutions';
+	}
+
+	/**
 	 * Loads solutions from the current environment.
 	 */
 	protected async loadData(): Promise<void> {

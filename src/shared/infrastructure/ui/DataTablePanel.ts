@@ -10,8 +10,10 @@ import {
 	type WebviewMessage,
 	type WebviewLogMessage
 } from '../../../infrastructure/ui/utils/TypeGuards';
+import { Solution } from '../../../features/solutionExplorer/domain/entities/Solution';
 
 import { renderDataTable } from './views/dataTable';
+import type { IPanelStateRepository, PanelState } from './IPanelStateRepository';
 
 export interface EnvironmentOption {
 	readonly id: string;
@@ -22,6 +24,7 @@ export interface EnvironmentOption {
 export interface DataTableColumn {
 	readonly key: string;
 	readonly label: string;
+	readonly width?: string; // CSS width value (e.g., '20%', '150px', 'auto')
 }
 
 export interface DataTableConfig {
@@ -35,6 +38,7 @@ export interface DataTableConfig {
 	readonly openMakerButtonText: string;
 	readonly noDataMessage: string;
 	readonly enableSearch?: boolean; // Default: true
+	readonly enableSolutionFilter?: boolean; // Default: false
 }
 
 /**
@@ -53,10 +57,18 @@ export interface DataTableConfig {
  *
  * Derived classes implement panel-specific data loading and actions.
  */
+export interface SolutionOption {
+	readonly id: string;
+	readonly name: string;
+	readonly uniqueName: string;
+}
+
 export abstract class DataTablePanel {
 	protected cancellationTokenSource: vscode.CancellationTokenSource | null = null;
 	protected currentEnvironmentId: string | null = null;
+	protected currentSolutionId: string = Solution.DEFAULT_SOLUTION_ID;
 	protected environments: EnvironmentOption[] = [];
+	protected solutionFilterOptions: SolutionOption[] = [];
 	protected disposables: vscode.Disposable[] = [];
 
 	constructor(
@@ -65,7 +77,8 @@ export abstract class DataTablePanel {
 		protected readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		protected readonly getEnvironmentById: (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId?: string } | null>,
 		protected readonly logger: ILogger,
-		protected readonly initialEnvironmentId?: string
+		protected readonly initialEnvironmentId?: string,
+		protected readonly panelStateRepository?: IPanelStateRepository
 	) {
 		this.logger.debug(`${this.getConfig().title} Panel: Initialized`);
 
@@ -95,6 +108,68 @@ export abstract class DataTablePanel {
 	protected abstract loadData(): Promise<void>;
 
 	protected abstract handlePanelCommand(message: WebviewMessage): Promise<void>;
+
+	/**
+	 * Returns the panel type identifier used for state persistence.
+	 * Each panel type should return a unique identifier (e.g., 'environmentVariables', 'connectionReferences').
+	 */
+	protected abstract getPanelType(): string;
+
+	/**
+	 * Loads solutions for the current environment (optional, for panels that support solution filtering).
+	 * Default implementation returns empty array - override in panels that need solution filtering.
+	 * @returns Promise resolving to array of solution options
+	 */
+	protected async loadSolutions(): Promise<SolutionOption[]> {
+		return [];
+	}
+
+	/**
+	 * Loads persisted solution filter selection for the current environment.
+	 * Returns Default Solution GUID if no persisted state found (migration from legacy null values).
+	 * @returns The persisted solution ID (never null)
+	 */
+	private async loadPersistedSolutionFilter(): Promise<string> {
+		if (!this.panelStateRepository || !this.currentEnvironmentId) {
+			return Solution.DEFAULT_SOLUTION_ID;
+		}
+
+		try {
+			const state = await this.panelStateRepository.load({
+				panelType: this.getPanelType(),
+				environmentId: this.currentEnvironmentId
+			});
+
+			// Migration: Legacy null values become Default Solution
+			return state?.selectedSolutionId ?? Solution.DEFAULT_SOLUTION_ID;
+		} catch (error) {
+			this.logger.warn('Failed to load persisted solution filter', error);
+			return Solution.DEFAULT_SOLUTION_ID;
+		}
+	}
+
+	/**
+	 * Persists the current solution filter selection for the current environment.
+	 */
+	private async persistSolutionFilter(): Promise<void> {
+		if (!this.panelStateRepository || !this.currentEnvironmentId) {
+			return;
+		}
+
+		try {
+			const state: PanelState = {
+				selectedSolutionId: this.currentSolutionId,
+				lastUpdated: new Date().toISOString()
+			};
+
+			await this.panelStateRepository.save({
+				panelType: this.getPanelType(),
+				environmentId: this.currentEnvironmentId
+			}, state);
+		} catch (error) {
+			this.logger.warn('Failed to persist solution filter', error);
+		}
+	}
 
 	/**
 	 * Registers this panel in the panel tracking map for the given environment.
@@ -175,6 +250,17 @@ export abstract class DataTablePanel {
 				enabled: hasPowerPlatformEnvId
 			});
 
+			// Load solutions if panel has solution filtering enabled
+			const config = this.getConfig();
+			if (config.enableSolutionFilter && this.currentEnvironmentId) {
+				this.solutionFilterOptions = await this.loadSolutions();
+				this.panel.webview.postMessage({ command: 'solutionFilterOptionsData', data: this.solutionFilterOptions });
+
+				// Load persisted solution filter (defaults to Default Solution)
+				this.currentSolutionId = await this.loadPersistedSolutionFilter();
+				this.panel.webview.postMessage({ command: 'setCurrentSolution', solutionId: this.currentSolutionId });
+			}
+
 			await this.updateTabTitle();
 			await this.loadData();
 		} catch (error) {
@@ -215,6 +301,17 @@ export abstract class DataTablePanel {
 			command: 'setMakerButtonState',
 			enabled: hasPowerPlatformEnvId
 		});
+
+		// Reload solutions if panel has solution filtering enabled
+		const config = this.getConfig();
+		if (config.enableSolutionFilter) {
+			this.solutionFilterOptions = await this.loadSolutions();
+			this.panel.webview.postMessage({ command: 'solutionFilterOptionsData', data: this.solutionFilterOptions });
+
+			// Load persisted solution filter for new environment (defaults to Default Solution)
+			this.currentSolutionId = await this.loadPersistedSolutionFilter();
+			this.panel.webview.postMessage({ command: 'setCurrentSolution', solutionId: this.currentSolutionId });
+		}
 
 		await this.updateTabTitle();
 		await this.loadData();
@@ -259,6 +356,17 @@ export abstract class DataTablePanel {
 
 			if (isEnvironmentChangedMessage(message)) {
 				await this.switchEnvironment(message.data.environmentId);
+				return;
+			}
+
+			if (message.command === 'solutionChanged') {
+				const solutionId = message.data && typeof message.data === 'object' && 'solutionId' in message.data
+					? (message.data as { solutionId: string }).solutionId
+					: Solution.DEFAULT_SOLUTION_ID;
+				this.currentSolutionId = solutionId;
+				this.logger.debug('Solution filter changed', { solutionId: this.currentSolutionId });
+				await this.persistSolutionFilter();
+				await this.loadData();
 				return;
 			}
 
