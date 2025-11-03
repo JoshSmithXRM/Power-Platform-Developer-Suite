@@ -54,7 +54,7 @@ export class TenantId {
 	/**
 	 * Checks if a specific tenant ID was provided.
 	 *
-	 * WHY: Distinguishes between explicit tenant ID and fallback to "organizations".
+	 * Distinguishes between explicit tenant ID and fallback to "organizations".
 	 * Used for validation (Service Principal requires explicit tenant).
 	 *
 	 * @returns {boolean} True if explicit tenant ID provided, false if using default

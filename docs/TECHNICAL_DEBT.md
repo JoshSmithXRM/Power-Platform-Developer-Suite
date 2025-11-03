@@ -2,6 +2,38 @@
 
 This document tracks known technical debt and future improvement opportunities that have been deferred for valid reasons.
 
+**Goal**: Keep this document as small as possible. Items should only be listed here if they represent genuine architectural trade-offs or intentionally deferred work with clear reasoning.
+
+---
+
+## Summary
+
+### Code Quality (1 issue)
+1. **Cross-Feature DTO Coupling** - Persistence Inspector imports EnvironmentConnectionDto from environmentSetup feature. Infrastructure-to-infrastructure coupling is acceptable but could be improved with shared DTOs.
+
+### Documentation (1 issue)
+2. **CLEAN_ARCHITECTURE_GUIDE.md Length** - Documentation exceeds 1,708 lines (limit: 1,200). Wait until Data Panel Suite is complete before splitting into 3 separate guides.
+
+### Architecture & Design (4 issues)
+3. **DataTablePanel SRP Violation** - Base class handles 8+ responsibilities (environment, search, sort, error, loading, HTML, routing, cancellation). Template Method pattern eliminates 950 lines of duplication across 2 panels, acceptable trade-off.
+
+4. **DataTablePanel Generic Types** - Panel could use `<TData>` generic for stronger type safety. Current `unknown[]` works fine with zero bugs found, complexity not justified.
+
+5. **IXmlFormatter Interface** - Suggested interface extraction unnecessary. XmlFormatter is infrastructure using concrete class correctly, no polymorphism needed.
+
+6. **getValue() Pattern Without Branded Types** - Value objects return primitives without compile-time type branding. Zero bugs found in 100+ callsites, 6-8 hour refactor not justified.
+
+7. **CSS Extraction from HTML Templates** - 200+ lines of CSS embedded in TypeScript strings. Standard VS Code pattern, not causing bugs, defer until 5+ webview templates exist.
+
+### Deferred Refactoring (3 issues)
+8. **Business Logic in Command Handlers** - extension.ts commands contain orchestration that belongs in use cases. Use cases exist but need integration work, defer until command testing sprint.
+
+9. **Unsafe Type Assertions in API Service** - DataverseApiService uses `as T` without runtime validation. Repositories validate at mapping layer, external API contracts stable, zero bugs found.
+
+10. **Long Repository Methods** - Save methods exceed 70+ lines with persistence + credential concerns mixed. Defer until repository testing improvements or new implementations.
+
+---
+
 ## Code Quality
 
 ### Cross-Feature DTO Coupling in Persistence Inspector
@@ -15,8 +47,8 @@ The Persistence Inspector infrastructure layer directly references `EnvironmentC
 
 **Current State:**
 ```typescript
-// VsCodeStorageReader.ts
-import { EnvironmentConnectionDto } from '../../../environmentSetup/application/dto/EnvironmentConnectionDto';
+// VsCodeStorageReader.ts (line 4)
+import { EnvironmentConnectionDto } from '../../../environmentSetup/infrastructure/dtos/EnvironmentConnectionDto';
 
 public async readAllSecretKeys(): Promise<string[]> {
     const environments = this.globalState.get<EnvironmentConnectionDto[]>(
@@ -38,12 +70,9 @@ public async readAllSecretKeys(): Promise<string[]> {
 - During refactoring sprint focused on shared infrastructure
 
 **Recommended Solution:**
-1. Create shared DTOs in `src/shared/domain/` or `src/shared/application/`
+1. Create shared DTOs in `src/shared/application/`
 2. Move environment-related DTOs to shared location
 3. Both features reference shared DTOs instead of cross-feature imports
-
-**Related Review Finding:**
-Clean Architecture Guardian - Optional Improvement #1
 
 ---
 
@@ -56,7 +85,7 @@ Clean Architecture Guardian - Optional Improvement #1
 **Effort**: Medium (2-3 hours to split properly)
 
 **Issue:**
-`docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` is 1,709 lines, exceeding the DOCUMENTATION_STYLE_GUIDE.md hard limit of 1,200 lines.
+`docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` is 1,708 lines, exceeding the DOCUMENTATION_STYLE_GUIDE.md hard limit of 1,200 lines.
 
 **Current State:**
 - Comprehensive guide with Quick Reference, 5 core principles, layer architecture, decision frameworks, 3 real-world examples, and 5 common mistakes
@@ -82,9 +111,6 @@ Split into 3 documents (~500-600 lines each):
 2. `CLEAN_ARCHITECTURE_EXAMPLES.md` - Detailed real-world examples (Environment, Data Panels)
 3. `CLEAN_ARCHITECTURE_PATTERNS.md` - Common mistakes, value objects, rich models
 
-**Related Review Finding:**
-Code review by primary developer - scored 88/100, exceeded 1200 line hard limit
-
 ---
 
 ## Architecture & Design Patterns
@@ -108,7 +134,7 @@ Code review by primary developer - scored 88/100, exceeded 1200 line hard limit
 
 **Current State:**
 ```typescript
-// DataTablePanel.ts (750+ lines)
+// DataTablePanel.ts (365 lines)
 export abstract class DataTablePanel {
     // Handles all table-related responsibilities
 }
@@ -150,9 +176,6 @@ export abstract class BasePanelWithBehaviors {
     ) {}
 }
 ```
-
-**Related Review Finding:**
-Code Quality Review - Critical Issue #2 (Acknowledged trade-off)
 
 ---
 
@@ -203,9 +226,6 @@ export class ImportJobViewerPanel extends DataTablePanel<ImportJobViewModel> {
 - During a broader TypeScript enhancement initiative
 - When developers report confusion or bugs related to data typing
 
-**Related Review Finding:**
-TypeScript Pro Review - Medium Priority Issue #8
-
 ---
 
 ### IXmlFormatter Interface Extraction
@@ -215,24 +235,12 @@ TypeScript Pro Review - Medium Priority Issue #8
 **Effort**: Low (1 hour)
 
 **Why This Was Suggested:**
-Clean Architecture Guardian suggested extracting an interface for `XmlFormatter` to follow the Dependency Inversion Principle more strictly:
-
-```typescript
-// Domain layer
-export interface IXmlFormatter {
-    format(xml: string): string;
-}
-
-// Infrastructure layer
-export class XmlFormatter implements IXmlFormatter {
-    format(xml: string): string { /* ... */ }
-}
-```
+Clean Architecture Guardian suggested extracting an interface for `XmlFormatter` to follow the Dependency Inversion Principle more strictly.
 
 **Why This Is Unnecessary:**
 
 1. **XmlFormatter is already in infrastructure layer** (not domain)
-   - After code review fixes, moved from `src/shared/domain/services/` to `src/shared/infrastructure/formatters/`
+   - Located at `src/shared/infrastructure/formatters/XmlFormatter.ts`
    - Infrastructure can use concrete classes without interfaces
 
 2. **No multiple implementations needed**
@@ -242,7 +250,7 @@ export class XmlFormatter implements IXmlFormatter {
 
 3. **Already highly testable**
    - Pure function with no dependencies
-   - Easy to mock if needed (just pass a mock object with `format()` method)
+   - Easy to mock if needed
    - Current tests work perfectly without interface
 
 4. **Adding interface would be cargo cult DIP**
@@ -256,9 +264,6 @@ export class XmlFormatter implements IXmlFormatter {
 - If we had multiple implementations with different trade-offs
 
 **Verdict:** Interface would add ceremony without benefit. XmlFormatter is correctly placed in infrastructure and correctly injected as concrete class.
-
-**Related Review Finding:**
-Clean Architecture Guardian - Recommendation #4
 
 ---
 
@@ -386,21 +391,6 @@ Consider branded types only if:
 
 Otherwise, **keep the current pattern indefinitely**.
 
-**Related Review Finding:**
-TypeScript Pro Review - Issue M4
-
----
-
-### Branded Types for Environment IDs
-
-**Status**: Will Not Implement (See getValue() Pattern above)
-**Priority**: N/A
-
-**Note:** This finding has been superseded by the more comprehensive "getValue() Pattern in Value Objects" section above, which addresses the broader architectural pattern rather than just environment IDs.
-
-**Related Review Finding:**
-TypeScript Pro Review - Low Priority Issue #14
-
 ---
 
 ### CSS Extraction from DataTablePanel
@@ -410,12 +400,12 @@ TypeScript Pro Review - Low Priority Issue #14
 **Effort**: Medium (2-3 hours)
 
 **Issue:**
-DataTablePanel embeds 400+ lines of HTML/CSS/JavaScript in TypeScript string literals.
+DataTablePanel embeds HTML/CSS/JavaScript in TypeScript string literals (extracted to separate view file at `src/shared/infrastructure/ui/views/dataTable.ts`).
 
 **Current State:**
 ```typescript
-// DataTablePanel.ts:295-709
-private getHtmlContent(): string {
+// src/shared/infrastructure/ui/views/dataTable.ts
+export function renderDataTableHtml(...): string {
     return `<!DOCTYPE html>
         <html>
         <head>
@@ -424,9 +414,9 @@ private getHtmlContent(): string {
             </style>
         </head>
         <body>
-            <!-- 200+ lines of HTML -->
+            <!-- HTML -->
             <script>
-                /* 100+ lines of JavaScript */
+                /* JavaScript */
             </script>
         </body>
         </html>`;
@@ -438,95 +428,6 @@ private getHtmlContent(): string {
 - Hard to maintain mixed concerns (TypeScript + HTML + CSS + JS)
 - No HTML/CSS validation during development
 - Difficult to see diffs in code reviews
-
-**What Extraction Would Look Like:**
-
-### Option 1: Separate Template Files
-```typescript
-// DataTablePanel.ts
-private getHtmlContent(): string {
-    const templatePath = vscode.Uri.joinPath(
-        this.extensionUri,
-        'resources',
-        'webview',
-        'templates',
-        'datatable.html'
-    );
-
-    const template = fs.readFileSync(templatePath.fsPath, 'utf-8');
-
-    // Inject dynamic values
-    return this.injectConfig(template);
-}
-
-// resources/webview/templates/datatable.html
-<!DOCTYPE html>
-<html>
-<head>
-    <link rel="stylesheet" href="{{datatableCssUri}}">
-    <link rel="stylesheet" href="{{customCss}}">
-</head>
-<!-- Full HTML with {{placeholder}} syntax -->
-</html>
-```
-
-**Pros:**
-- ✅ Proper syntax highlighting
-- ✅ Better separation of concerns
-- ✅ Easier to maintain HTML/CSS
-
-**Cons:**
-- ❌ Requires template engine or manual string replacement
-- ❌ Another place to look when debugging
-- ❌ More complex build/packaging
-
-### Option 2: Template Literals with Tagged Templates
-```typescript
-// DataTablePanel.ts
-import { html, css } from './templateHelpers';
-
-private getHtmlContent(): string {
-    return html`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            ${css`
-                .toolbar { /* ... */ }
-            `}
-        </head>
-        </html>
-    `;
-}
-```
-
-**Pros:**
-- ✅ Better syntax highlighting with lit-html VS Code extension
-- ✅ Still in TypeScript (single file to debug)
-
-**Cons:**
-- ❌ Requires template helper library
-- ❌ Still mixing concerns in one file
-
-### Option 3: Build-Time Template Injection
-```typescript
-// Build script injects HTML at compile time
-import htmlTemplate from './templates/datatable.html';
-
-private getHtmlContent(): string {
-    return htmlTemplate
-        .replace('{{title}}', this.config.title)
-        .replace('{{columns}}', JSON.stringify(this.config.columns));
-}
-```
-
-**Pros:**
-- ✅ Clean separation
-- ✅ Syntax highlighting
-- ✅ Type-safe at runtime
-
-**Cons:**
-- ❌ More complex webpack/build config
-- ❌ Another build step to maintain
 
 **Why Deferred:**
 - **Standard VS Code pattern**: Embedding HTML in TypeScript is the recommended approach for webview panels
@@ -541,12 +442,100 @@ private getHtmlContent(): string {
 - During major webview refactoring initiative
 
 **Recommended Solution (if implemented):**
-**Option 3 (Build-Time Injection)** - Best balance of separation and VS Code compatibility
-
-**Related Review Finding:**
-Code Quality Review - Moderate Issue #7
+Build-time template injection with webpack raw-loader
 
 ---
 
-### Other deferred items will be added here as they arise
 
+## Business Logic in Command Handlers
+
+**Status**: Deferred
+**Priority**: Medium
+**Effort**: Medium (4-6 hours)
+
+**Issue:** `extension.ts` command handlers contain orchestration logic that belongs in use cases.
+
+**Examples:**
+- `testEnvironmentConnectionCommand` (lines 183-236): Loads credentials, handles auth methods
+- `openMakerCommand` (lines 264-292): Builds URLs based on environment presence
+- `createGetEnvironments`/`createGetEnvironmentById` (lines 38-70): Mapping logic in composition root
+
+**Why Deferred:**
+- Use cases already exist and contain the logic (`TestConnectionUseCase`, etc.)
+- Refactoring requires careful integration to avoid breaking existing functionality
+- Lower priority than architectural violations (which are now fixed via ESLint)
+
+**When to Address:**
+- When adding tests for command handlers
+- When refactoring `extension.ts` for length issues
+- During next sprint focused on command layer cleanup
+
+**Fix Strategy:**
+1. Refactor `testEnvironmentConnectionCommand` to call `TestConnectionUseCase.execute()` directly
+2. Create `GetMakerUrlUseCase` for URL building logic
+3. Create `GetEnvironmentListUseCase` that returns ViewModels (not mapping in composition root)
+
+---
+
+### Unsafe Type Assertions in DataverseApiService
+
+**Status**: Acknowledged - Acceptable Risk
+**Priority**: Low
+**Effort**: High (8-12 hours to implement full validation)
+
+**Issue:** `DataverseApiService.request<T>()` returns `data as T` without runtime shape validation.
+
+**Current Mitigation:**
+- Basic validation: ensures response is non-null object
+- Repositories use mappers that validate individual fields
+- TypeScript provides compile-time safety for known APIs
+
+**Why Not Fixed:**
+- Adding Zod/AJV schema validation for every API response is substantial work
+- Current approach hasn't caused bugs in practice
+- External API contracts (Dataverse) are stable
+- Repositories already validate data when mapping to domain entities
+
+**When to Revisit:**
+- If API contract violations cause runtime errors
+- When adding integration tests that mock API responses
+- If Microsoft changes Dataverse API contracts unexpectedly
+
+**Recommended Solution (if implemented):**
+```typescript
+// Optional type guard parameter
+async get<T>(
+  environmentId: string,
+  endpoint: string,
+  typeGuard?: (data: unknown) => data is T,
+  cancellationToken?: ICancellationToken
+): Promise<T> {
+  const data = await this.request(...);
+
+  if (typeGuard && !typeGuard(data)) {
+    throw new Error('API response validation failed');
+  }
+
+  return data as T;
+}
+```
+
+---
+
+### Long Repository Methods
+
+**Status**: Deferred
+**Priority**: Low
+**Effort**: Medium (3-4 hours)
+
+**Issue:** Repository save methods exceed 70+ lines with mixed concerns.
+
+**Examples:**
+- `EnvironmentRepository.save()` - Handles persistence + credential management
+- `DataverseApiImportJobRepository` - Duplicate mapping logic
+
+**When to Address:**
+- When adding new repository implementations
+- During repository testing improvements
+
+---

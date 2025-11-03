@@ -9,7 +9,7 @@ import { StorageEntry } from '../entities/StorageEntry';
  * Domain services are stateless and contain pure business logic with
  * ZERO infrastructure dependencies (uses interfaces, not concrete implementations).
  *
- * WHY Domain Service: Inspection logic coordinates multiple repositories
+ * Domain Service Rationale: Inspection logic coordinates multiple repositories
  * (global state and secrets) to build the StorageCollection aggregate.
  * This coordination logic belongs in a domain service.
  *
@@ -33,7 +33,7 @@ export class StorageInspectionService {
 	 * Reads from both global state and secret storage, combining them into
 	 * a single collection with protection rules applied.
 	 *
-	 * WHY: Provides unified view of all extension storage for debugging
+	 * Provides unified view of all extension storage for debugging
 	 * and troubleshooting. Secret values are hidden ('***') by default.
 	 *
 	 * @returns {Promise<StorageCollection>} Collection of all storage entries
@@ -62,7 +62,7 @@ export class StorageInspectionService {
 	/**
 	 * Reveals a secret value for display.
 	 *
-	 * WHY: Secrets are hidden by default ('***') for security.
+	 * Secrets are hidden by default ('***') for security.
 	 * This method allows revealing the actual value when explicitly requested.
 	 *
 	 * @param {string} key - Secret storage key

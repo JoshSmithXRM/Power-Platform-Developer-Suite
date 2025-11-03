@@ -3,7 +3,7 @@
  *
  * Encapsulates error interpretation logic to determine error type and recovery actions.
  *
- * WHY: Different API errors require different handling. This value object
+ * Different API errors require different handling. This value object
  * interprets error messages to provide actionable information (e.g., suggesting
  * interactive auth for permission errors).
  *
@@ -19,7 +19,7 @@ export class ApiError {
 	 * Determines if error indicates a permission/authorization issue
 	 * that might be resolved with interactive authentication.
 	 *
-	 * WHY: Service Principal may lack permissions that user account has.
+	 * Service Principal may lack permissions that user account has.
 	 * Suggesting interactive auth provides recovery path without requiring
 	 * Service Principal permission changes.
 	 *

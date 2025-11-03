@@ -11,7 +11,7 @@ type DataTypeValue = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'nul
  * - Complex: object, array
  * - Special: secret (for hidden values)
  *
- * WHY: Storage values can be any serializable type. This value object
+ * Storage values can be any serializable type. This value object
  * classifies types for appropriate UI rendering and validation.
  */
 export class DataType {

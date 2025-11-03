@@ -25,10 +25,9 @@ export class XmlFormatter {
 
 	/**
 	 * Internal formatting logic with indentation.
-	 * Uses regex-based tag detection and padding calculation for consistent formatting.
+	 * Uses regex-based tag detection for line breaks, then calculates padding depth for each line.
 	 */
 	private formatXmlInternal(xml: string): string {
-		// Regex inserts line breaks between tags to enable proper indentation
 		const reg = /(>)(<)(\/*)/g;
 		const formatted = xml.replace(reg, '$1\n$2$3');
 
@@ -41,15 +40,12 @@ export class XmlFormatter {
 			const trimmedLine = line.trim();
 
 			if (trimmedLine.match(/.+<\/\w[^>]*>$/)) {
-				// Single line element (e.g., <tag>content</tag>)
 				indent = 0;
 			} else if (trimmedLine.match(/^<\/\w/)) {
-				// Closing tag
 				if (pad > 0) {
 					pad -= 1;
 				}
 			} else if (trimmedLine.match(/^<\w[^>]*[^/]>.*$/)) {
-				// Opening tag
 				indent = 1;
 			}
 

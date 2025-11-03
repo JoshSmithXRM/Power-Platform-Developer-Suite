@@ -1,13 +1,12 @@
 import * as vscode from 'vscode';
 
-// Logging Infrastructure
 import { ILogger } from './infrastructure/logging/ILogger';
 import { OutputChannelLogger } from './infrastructure/logging/OutputChannelLogger';
-// Environment Setup - Clean Architecture imports
 import { IEnvironmentRepository } from './features/environmentSetup/domain/interfaces/IEnvironmentRepository';
 import { EnvironmentRepository } from './features/environmentSetup/infrastructure/repositories/EnvironmentRepository';
 import { EnvironmentDomainMapper } from './features/environmentSetup/infrastructure/mappers/EnvironmentDomainMapper';
 import { EnvironmentValidationService } from './features/environmentSetup/domain/services/EnvironmentValidationService';
+import { AuthenticationCacheInvalidationService } from './features/environmentSetup/domain/services/AuthenticationCacheInvalidationService';
 import { VsCodeEventPublisher } from './features/environmentSetup/infrastructure/services/VsCodeEventPublisher';
 import { MsalAuthenticationService } from './features/environmentSetup/infrastructure/services/MsalAuthenticationService';
 import { WhoAmIService } from './features/environmentSetup/infrastructure/services/WhoAmIService';
@@ -73,17 +72,10 @@ function createGetEnvironmentById(
  * Extension activation entry point
  */
 export function activate(context: vscode.ExtensionContext): void {
-	// ========================================
-	// Logging Infrastructure
-	// ========================================
 	const outputChannel = vscode.window.createOutputChannel('Power Platform Dev Suite', { log: true });
 	const logger: ILogger = new OutputChannelLogger(outputChannel);
 
 	logger.info('Extension activating...');
-
-	// ========================================
-	// Dependency Injection Setup (Clean Architecture)
-	// ========================================
 
 	// Infrastructure Layer
 	const environmentDomainMapper = new EnvironmentDomainMapper(logger);
@@ -98,55 +90,32 @@ export function activate(context: vscode.ExtensionContext): void {
 	const whoAmIService = new WhoAmIService(authService, logger);
 	const powerPlatformApiService = new PowerPlatformApiService(authService, logger);
 
-	// Domain Layer
 	const environmentValidationService = new EnvironmentValidationService();
+	const authCacheInvalidationService = new AuthenticationCacheInvalidationService();
 
-	// Application Layer - Mappers
 	const listViewModelMapper = new EnvironmentListViewModelMapper();
 	const formViewModelMapper = new EnvironmentFormViewModelMapper();
-
-	// Application Layer - Use Cases
 	const _loadEnvironmentsUseCase = new LoadEnvironmentsUseCase(environmentRepository, listViewModelMapper, logger);
 	const loadEnvironmentByIdUseCase = new LoadEnvironmentByIdUseCase(environmentRepository, formViewModelMapper, logger);
-	const saveEnvironmentUseCase = new SaveEnvironmentUseCase(environmentRepository, environmentValidationService, eventPublisher, logger);
+	const saveEnvironmentUseCase = new SaveEnvironmentUseCase(environmentRepository, environmentValidationService, eventPublisher, authCacheInvalidationService, logger);
 	const deleteEnvironmentUseCase = new DeleteEnvironmentUseCase(environmentRepository, eventPublisher, logger);
 	const testConnectionUseCase = new TestConnectionUseCase(whoAmIService, environmentRepository, logger);
 	const discoverEnvironmentIdUseCase = new DiscoverEnvironmentIdUseCase(powerPlatformApiService, environmentRepository, logger);
 	const validateUniqueNameUseCase = new ValidateUniqueNameUseCase(environmentRepository, logger);
 	const checkConcurrentEditUseCase = new CheckConcurrentEditUseCase(logger);
 
-	// ========================================
-	// Development Mode Context
-	// ========================================
-	// Set context variable for conditional command visibility
 	const isDevelopment = context.extensionMode === vscode.ExtensionMode.Development;
 	void vscode.commands.executeCommand('setContext', 'powerPlatformDevSuite.isDevelopment', isDevelopment);
 
-	// ========================================
-	// Persistence Inspector (Development Only)
-	// ========================================
 	if (isDevelopment) {
-		// Lazy-load persistence inspector using dynamic import
 		void initializePersistenceInspector(context, eventPublisher, logger);
 	}
-
-	// ========================================
-	// Register Tree View Providers
-	// ========================================
-
-	// Register Tools tree view provider
 	const toolsProvider = new ToolsTreeProvider();
 	vscode.window.registerTreeDataProvider('power-platform-dev-suite-tools', toolsProvider);
 
-	// Register Environments tree view provider
 	const environmentsProvider = new EnvironmentsTreeProvider(environmentRepository, listViewModelMapper);
 	vscode.window.registerTreeDataProvider('power-platform-dev-suite-environments', environmentsProvider);
 
-	// ========================================
-	// Register Commands
-	// ========================================
-
-	// Add Environment command - Opens EnvironmentSetupPanel
 	const addEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.addEnvironment', () => {
 		EnvironmentSetupPanel.createOrShow(
 			context.extensionUri,
@@ -161,7 +130,6 @@ export function activate(context: vscode.ExtensionContext): void {
 		);
 	});
 
-	// Edit Environment command
 	const editEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.editEnvironment', async (environmentItem?: { envId: string }) => {
 		if (environmentItem) {
 			EnvironmentSetupPanel.createOrShow(
@@ -179,7 +147,6 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// Test Environment Connection command
 	const testEnvironmentConnectionCommand = vscode.commands.registerCommand('power-platform-dev-suite.testEnvironmentConnection', async (environmentItem?: { envId: string }) => {
 		if (!environmentItem?.envId) {
 			vscode.window.showErrorMessage('No environment selected');
@@ -187,15 +154,12 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 
 		try {
-			// Load environment from repository
 			const environment = await environmentRepository.getById(new EnvironmentId(environmentItem.envId));
 
 			if (!environment) {
 				vscode.window.showErrorMessage('Environment not found');
 				return;
 			}
-
-			// Load credentials from secret storage if needed
 			const authMethod = environment.getAuthenticationMethod();
 			let clientSecret: string | undefined;
 			let password: string | undefined;
@@ -216,7 +180,6 @@ export function activate(context: vscode.ExtensionContext): void {
 				}
 			}
 
-			// Test connection
 			await vscode.window.withProgress({
 				location: vscode.ProgressLocation.Notification,
 				title: `Testing connection to ${environment.getName().getValue()}...`,
@@ -235,7 +198,6 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// Remove Environment command
 	const removeEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.removeEnvironment', async (environmentItem?: { envId: string; label: string }) => {
 		if (!environmentItem?.envId) {
 			vscode.window.showErrorMessage('No environment selected');
@@ -261,7 +223,6 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// Open in Maker command
 	const openMakerCommand = vscode.commands.registerCommand('power-platform-dev-suite.openMaker', async (environmentItem?: { envId: string }) => {
 		if (!environmentItem?.envId) {
 			vscode.window.showErrorMessage('No environment selected');
@@ -278,7 +239,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
 			const powerPlatformEnvId = environment.getPowerPlatformEnvironmentId();
 			if (!powerPlatformEnvId) {
-				// No environment ID - just send to make.powerapps.com
 				vscode.env.openExternal(vscode.Uri.parse('https://make.powerapps.com/'));
 			} else {
 				const makerUrl = `https://make.powerapps.com/environments/${powerPlatformEnvId}/home`;
@@ -291,7 +251,6 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// Open in Dynamics command
 	const openDynamicsCommand = vscode.commands.registerCommand('power-platform-dev-suite.openDynamics', async (environmentItem?: { envId: string }) => {
 		if (!environmentItem?.envId) {
 			vscode.window.showErrorMessage('No environment selected');
@@ -314,33 +273,26 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// Refresh Environments command
 	const refreshEnvironmentsCommand = vscode.commands.registerCommand('power-platform-dev-suite.refreshEnvironments', () => {
 		environmentsProvider.refresh();
 	});
 
-	// Subscribe to domain events to auto-refresh tree view
 	eventPublisher.subscribe(EnvironmentCreated, () => environmentsProvider.refresh());
 	eventPublisher.subscribe(EnvironmentUpdated, () => environmentsProvider.refresh());
 	eventPublisher.subscribe(EnvironmentDeleted, () => environmentsProvider.refresh());
-
-	// Subscribe to authentication cache invalidation events
 	const cacheInvalidationHandler = new AuthenticationCacheInvalidationHandler(authService, logger);
 	eventPublisher.subscribe(AuthenticationCacheInvalidationRequested, (event) => {
 		cacheInvalidationHandler.handle(event);
 	});
 
-	// Solution Explorer command - opens panel with optional initial environment
 	const solutionExplorerCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorer', async (environmentItem?: { envId: string }) => {
 		try {
 			let initialEnvironmentId: string | undefined;
 
-			// If called from environment context menu, use the internal environment ID
 			if (environmentItem?.envId) {
 				initialEnvironmentId = environmentItem.envId;
 			}
 
-			// Lazy-load solution explorer (works with or without initial environment)
 			void initializeSolutionExplorer(context, authService, environmentRepository, logger, initialEnvironmentId);
 		} catch (error) {
 			vscode.window.showErrorMessage(
@@ -349,7 +301,6 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// Solution Explorer Pick Environment command - shows environment picker for tools context menu
 	const solutionExplorerPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorerPickEnvironment', async () => {
 		try {
 			const environments = await environmentRepository.getAll();
@@ -383,7 +334,6 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// Import Job Viewer command - opens panel with optional initial environment
 	const importJobViewerCommand = vscode.commands.registerCommand('power-platform-dev-suite.importJobViewer', async (environmentItem?: { envId: string }) => {
 		try {
 			let initialEnvironmentId: string | undefined;
@@ -400,7 +350,6 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// Import Job Viewer Pick Environment command - shows environment picker for tools context menu
 	const importJobViewerPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.importJobViewerPickEnvironment', async () => {
 		try {
 			const environments = await environmentRepository.getAll();
@@ -453,15 +402,13 @@ export function activate(context: vscode.ExtensionContext): void {
 	logger.info('Extension activated successfully');
 }
 
-/**
- * Extension deactivation
- */
 export function deactivate(): void {
-	// Extension deactivated
+	// Intentionally empty - extension cleanup handled by disposables
 }
 
 /**
- * Creates DataverseApiService factory with access token and URL providers
+ * Creates factory functions for DataverseApiService to access tokens and URLs.
+ * Encapsulates environment lookup and credential retrieval logic for shared API services.
  */
 function createDataverseApiServiceFactory(
 	authService: MsalAuthenticationService,
@@ -507,8 +454,8 @@ function createDataverseApiServiceFactory(
 }
 
 /**
- * Initializes the Solution Explorer
- * Uses dynamic imports for lazy loading
+ * Lazy-loads and initializes Solution Explorer panel.
+ * Dynamic imports reduce initial extension activation time by deferring feature-specific code until needed.
  */
 async function initializeSolutionExplorer(
 	context: vscode.ExtensionContext,
@@ -523,21 +470,17 @@ async function initializeSolutionExplorer(
 	const { ListSolutionsUseCase } = await import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase') as typeof import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase');
 	const { SolutionExplorerPanel } = await import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel') as typeof import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel');
 
-	// Create environment factory functions
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
 
-	// Infrastructure Layer - Dataverse API Service
 	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
 	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
 
 	const urlBuilder = new MakerUrlBuilder();
 	const solutionRepository = new DataverseApiSolutionRepository(dataverseApiService, logger);
 
-	// Application Layer
 	const listSolutionsUseCase = new ListSolutionsUseCase(solutionRepository, logger);
 
-	// Presentation Layer
 	await SolutionExplorerPanel.createOrShow(
 		context.extensionUri,
 		getEnvironments,
@@ -550,8 +493,8 @@ async function initializeSolutionExplorer(
 }
 
 /**
- * Initializes the Import Job Viewer
- * Uses dynamic imports for lazy loading
+ * Lazy-loads and initializes Import Job Viewer panel.
+ * Dynamic imports reduce initial extension activation time by deferring feature-specific code until needed.
  */
 async function initializeImportJobViewer(
 	context: vscode.ExtensionContext,
@@ -569,11 +512,9 @@ async function initializeImportJobViewer(
 	const { OpenImportLogUseCase } = await import('./features/importJobViewer/application/useCases/OpenImportLogUseCase') as typeof import('./features/importJobViewer/application/useCases/OpenImportLogUseCase');
 	const { ImportJobViewerPanel } = await import('./features/importJobViewer/presentation/panels/ImportJobViewerPanel') as typeof import('./features/importJobViewer/presentation/panels/ImportJobViewerPanel');
 
-	// Create environment factory functions
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
 
-	// Infrastructure Layer - Dataverse API Service
 	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
 	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
 
@@ -582,11 +523,9 @@ async function initializeImportJobViewer(
 	const xmlFormatter = new XmlFormatter();
 	const editorService = new VsCodeEditorService(logger, xmlFormatter);
 
-	// Application Layer
 	const listImportJobsUseCase = new ListImportJobsUseCase(importJobRepository, logger);
 	const openImportLogUseCase = new OpenImportLogUseCase(importJobRepository, editorService, logger);
 
-	// Presentation Layer
 	await ImportJobViewerPanel.createOrShow(
 		context.extensionUri,
 		getEnvironments,
@@ -600,8 +539,8 @@ async function initializeImportJobViewer(
 }
 
 /**
- * Initializes the Persistence Inspector (Development Only)
- * Uses dynamic imports to avoid loading in production
+ * Lazy-loads and initializes Persistence Inspector (development mode only).
+ * Dynamic imports ensure production builds exclude this development-only feature entirely.
  */
 async function initializePersistenceInspector(
 	context: vscode.ExtensionContext,
@@ -621,16 +560,12 @@ async function initializePersistenceInspector(
 	const { GetClearAllConfirmationMessageUseCase } = await import('./features/persistenceInspector/application/useCases/GetClearAllConfirmationMessageUseCase') as typeof import('./features/persistenceInspector/application/useCases/GetClearAllConfirmationMessageUseCase');
 	const { PersistenceInspectorPanel } = await import('./features/persistenceInspector/presentation/panels/PersistenceInspectorPanel') as typeof import('./features/persistenceInspector/presentation/panels/PersistenceInspectorPanel');
 
-	// Infrastructure Layer
 	const storageReader = new VsCodeStorageReader(context.globalState, context.secrets);
 	const storageClearer = new VsCodeStorageClearer(context.globalState, context.secrets);
 	const protectedKeyProvider = new HardcodedProtectedKeyProvider();
 
-	// Domain Layer
 	const storageInspectionService = new StorageInspectionService(storageReader, protectedKeyProvider);
 	const storageClearingService = new StorageClearingService(storageClearer, protectedKeyProvider);
-
-	// Application Layer - Use Cases
 	const inspectStorageUseCase = new InspectStorageUseCase(storageInspectionService, eventPublisher, logger);
 	const revealSecretUseCase = new RevealSecretUseCase(storageInspectionService, eventPublisher, logger);
 	const clearStorageEntryUseCase = new ClearStorageEntryUseCase(storageClearingService, storageInspectionService, eventPublisher, logger);
@@ -638,7 +573,6 @@ async function initializePersistenceInspector(
 	const clearAllStorageUseCase = new ClearAllStorageUseCase(storageClearingService, storageInspectionService, eventPublisher, logger);
 	const getClearAllConfirmationMessageUseCase = new GetClearAllConfirmationMessageUseCase(storageInspectionService, logger);
 
-	// Register Command (Development Only)
 	const openPersistenceInspectorCommand = vscode.commands.registerCommand('power-platform-dev-suite.openPersistenceInspector', () => {
 		PersistenceInspectorPanel.createOrShow(
 			context.extensionUri,
@@ -679,8 +613,8 @@ class ToolsTreeProvider implements vscode.TreeDataProvider<ToolItem> {
 }
 
 /**
- * Environments tree view provider
- * Uses repository pattern for data access consistency
+ * Provides environments tree view data.
+ * Loads from repository to maintain consistency with actual persistence layer.
  */
 class EnvironmentsTreeProvider implements vscode.TreeDataProvider<EnvironmentItem> {
 	private _onDidChangeTreeData: vscode.EventEmitter<EnvironmentItem | undefined | null | void> = new vscode.EventEmitter<EnvironmentItem | undefined | null | void>();
@@ -700,7 +634,6 @@ class EnvironmentsTreeProvider implements vscode.TreeDataProvider<EnvironmentIte
 	}
 
 	async getChildren(): Promise<EnvironmentItem[]> {
-		// Use repository to load environments
 		const environments = await this.repository.getAll();
 
 		if (environments.length === 0) {
@@ -708,8 +641,6 @@ class EnvironmentsTreeProvider implements vscode.TreeDataProvider<EnvironmentIte
 				new EnvironmentItem('No environments configured', 'Click + to add an environment', 'placeholder')
 			];
 		}
-
-		// Map domain entities to view models, then to tree items
 		return environments.map(env => {
 			const vm: EnvironmentListViewModel = this.mapper.toViewModel(env);
 			return new EnvironmentItem(vm.name, vm.dataverseUrl, 'environment', vm.id);

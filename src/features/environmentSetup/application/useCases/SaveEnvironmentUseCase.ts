@@ -1,5 +1,6 @@
 import { IEnvironmentRepository } from '../../domain/interfaces/IEnvironmentRepository';
 import { EnvironmentValidationService } from '../../domain/services/EnvironmentValidationService';
+import { AuthenticationCacheInvalidationService } from '../../domain/services/AuthenticationCacheInvalidationService';
 import { Environment } from '../../domain/entities/Environment';
 import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
 import { EnvironmentName } from '../../domain/valueObjects/EnvironmentName';
@@ -13,6 +14,7 @@ import { AuthenticationCacheInvalidationRequested } from '../../domain/events/Au
 import { ApplicationError } from '../errors/ApplicationError';
 import { IDomainEventPublisher } from '../interfaces/IDomainEventPublisher';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import { ValidationResult } from '../../domain/valueObjects/ValidationResult';
 
 /**
  * Command Use Case: Save environment (create or update)
@@ -23,6 +25,7 @@ export class SaveEnvironmentUseCase {
 		private readonly repository: IEnvironmentRepository,
 		private readonly validationService: EnvironmentValidationService,
 		private readonly eventPublisher: IDomainEventPublisher,
+		private readonly cacheInvalidationService: AuthenticationCacheInvalidationService,
 		private readonly logger: ILogger
 	) {}
 
@@ -36,25 +39,62 @@ export class SaveEnvironmentUseCase {
 		this.logger.debug(`SaveEnvironmentUseCase: ${isUpdate ? 'Updating' : 'Creating'} environment "${request.name}"`);
 
 		try {
+			const previousEnvironment = await this.loadPreviousEnvironment(request.existingEnvironmentId);
+			const environmentId = this.createEnvironmentId(request.existingEnvironmentId);
 
-		let previousEnvironment: Environment | null = null;
-		if (isUpdate) {
-			previousEnvironment = await this.repository.getById(
-				new EnvironmentId(request.existingEnvironmentId!)
-			);
-			if (!previousEnvironment) {
-				throw new ApplicationError('Environment not found');
+			const environmentResult = this.createEnvironment(request, environmentId, previousEnvironment);
+			if (!environmentResult.success) {
+				return environmentResult;
 			}
+			const environment = environmentResult.environment!;
+
+			const validationResult = await this.validateEnvironment(environment, request);
+			if (!validationResult.isValid) {
+				return this.createValidationErrorResponse(environmentId, validationResult.errors, request.name);
+			}
+
+			await this.cleanupOrphanedSecrets(previousEnvironment, environment);
+			await this.repository.save(environment, request.clientSecret, request.password, request.preserveExistingCredentials);
+			await this.handleCacheInvalidation(previousEnvironment, environment, environmentId);
+			this.publishDomainEvent(isUpdate, environmentId, environment, previousEnvironment);
+
+			this.logger.info(`Environment ${isUpdate ? 'updated' : 'created'}: ${environment.getName().getValue()}`);
+
+			return {
+				success: true,
+				environmentId: environmentId.getValue(),
+				warnings: validationResult.warnings
+			};
+		} catch (error) {
+			this.logger.error('SaveEnvironmentUseCase: Failed to save environment', error);
+			throw error;
 		}
+	}
 
-		// Create domain entity - catch validation errors from value objects
-		const environmentId = isUpdate
-			? new EnvironmentId(request.existingEnvironmentId!)
+	private async loadPreviousEnvironment(existingEnvironmentId?: string): Promise<Environment | null> {
+		if (!existingEnvironmentId) {
+			return null;
+		}
+		const environment = await this.repository.getById(new EnvironmentId(existingEnvironmentId));
+		if (!environment) {
+			throw new ApplicationError('Environment not found');
+		}
+		return environment;
+	}
+
+	private createEnvironmentId(existingEnvironmentId?: string): EnvironmentId {
+		return existingEnvironmentId
+			? new EnvironmentId(existingEnvironmentId)
 			: EnvironmentId.generate();
+	}
 
-		let environment: Environment;
+	private createEnvironment(
+		request: SaveEnvironmentRequest,
+		environmentId: EnvironmentId,
+		previousEnvironment: Environment | null
+	): { success: true; environment: Environment } | { success: false; errors: string[]; environmentId: string } {
 		try {
-			environment = new Environment(
+			const environment = new Environment(
 				environmentId,
 				new EnvironmentName(request.name),
 				new DataverseUrl(request.dataverseUrl),
@@ -67,16 +107,20 @@ export class SaveEnvironmentUseCase {
 				request.clientId ? new ClientId(request.clientId) : undefined,
 				request.username
 			);
+			return { success: true, environment };
 		} catch (error) {
-			// Value object validation failed - return as validation error
 			return {
 				success: false,
 				errors: [error instanceof Error ? error.message : 'Invalid input data'],
 				environmentId: environmentId.getValue()
 			};
 		}
+	}
 
-		// Gather validation data from repository (use case responsibility)
+	private async validateEnvironment(
+		environment: Environment,
+		request: SaveEnvironmentRequest
+	): Promise<ValidationResult> {
 		const isNameUnique = await this.repository.isNameUnique(
 			environment.getName().getValue(),
 			environment.getId()
@@ -90,8 +134,7 @@ export class SaveEnvironmentUseCase {
 			? !!(await this.repository.getPassword(environment.getUsername()!))
 			: false;
 
-		// Domain validation (pure business logic, no infrastructure)
-		const validationResult = this.validationService.validateForSave(
+		return this.validationService.validateForSave(
 			environment,
 			isNameUnique,
 			hasExistingClientSecret,
@@ -99,78 +142,76 @@ export class SaveEnvironmentUseCase {
 			request.clientSecret,
 			request.password
 		);
+	}
 
-		if (!validationResult.isValid) {
-			this.logger.warn(`SaveEnvironmentUseCase: Validation failed for "${request.name}"`, { errors: validationResult.errors });
-			// Return validation errors instead of throwing - allows UI to display them inline
-			return {
-				success: false,
-				errors: validationResult.errors,
-				environmentId: environmentId.getValue()
-			};
+	private createValidationErrorResponse(
+		environmentId: EnvironmentId,
+		errors: string[],
+		environmentName: string
+	): SaveEnvironmentResponse {
+		this.logger.warn(`SaveEnvironmentUseCase: Validation failed for "${environmentName}"`, { errors });
+		return {
+			success: false,
+			errors,
+			environmentId: environmentId.getValue()
+		};
+	}
+
+	private async cleanupOrphanedSecrets(
+		previousEnvironment: Environment | null,
+		environment: Environment
+	): Promise<void> {
+		if (!previousEnvironment) {
+			return;
 		}
-
-		// Extract warnings to return to user
-		const warnings = validationResult.warnings;
-
-		// Handle orphaned secrets if auth method changed
-		if (previousEnvironment) {
-			const orphanedKeys = environment.getOrphanedSecretKeys(
-				previousEnvironment.getAuthenticationMethod(),
-				previousEnvironment.getClientId(),
-				previousEnvironment.getUsername()
-			);
-			if (orphanedKeys.length > 0) {
-				await this.repository.deleteSecrets(orphanedKeys);
-			}
+		const orphanedKeys = environment.getOrphanedSecretKeys(
+			previousEnvironment.getAuthenticationMethod(),
+			previousEnvironment.getClientId(),
+			previousEnvironment.getUsername()
+		);
+		if (orphanedKeys.length > 0) {
+			await this.repository.deleteSecrets(orphanedKeys);
 		}
+	}
 
-		// Save environment
-		await this.repository.save(
-			environment,
-			request.clientSecret,
-			request.password,
-			request.preserveExistingCredentials
+	private async handleCacheInvalidation(
+		previousEnvironment: Environment | null,
+		environment: Environment,
+		environmentId: EnvironmentId
+	): Promise<void> {
+		const shouldInvalidateCache = this.cacheInvalidationService.shouldInvalidateCache(
+			previousEnvironment,
+			environment
 		);
 
-		// Detect if auth method or credentials changed
-		let shouldInvalidateCache = false;
-		let invalidationReason: 'credentials_changed' | 'auth_method_changed' = 'credentials_changed';
-
-		if (previousEnvironment) {
-			const authMethodChanged = previousEnvironment.getAuthenticationMethod().getType() !==
-				environment.getAuthenticationMethod().getType();
-
-			const clientIdChanged = previousEnvironment.getClientId()?.getValue() !==
-				environment.getClientId()?.getValue();
-
-			const usernameChanged = previousEnvironment.getUsername() !==
-				environment.getUsername();
-
-			// Only consider credentials "changed" if they were explicitly provided (not undefined)
-			// and not using preserveExistingCredentials
-			const credentialsChanged = !request.preserveExistingCredentials &&
-				(!!request.clientSecret || !!request.password);
-
-			shouldInvalidateCache = authMethodChanged || clientIdChanged ||
-				usernameChanged || credentialsChanged;
-
-			if (authMethodChanged) {
-				invalidationReason = 'auth_method_changed';
-			}
+		if (!shouldInvalidateCache) {
+			return;
 		}
 
-		// Invalidate cache if needed
-		if (shouldInvalidateCache) {
-			this.eventPublisher.publish(
-				new AuthenticationCacheInvalidationRequested(
-					environmentId,
-					invalidationReason
-				)
-			);
-		}
+		const invalidationReason = this.determineInvalidationReason(previousEnvironment, environment);
+		this.eventPublisher.publish(
+			new AuthenticationCacheInvalidationRequested(environmentId, invalidationReason)
+		);
+	}
 
-		// Publish domain event
+	private determineInvalidationReason(
+		previousEnvironment: Environment | null,
+		environment: Environment
+	): 'credentials_changed' | 'auth_method_changed' {
+		if (!previousEnvironment) {
+			return 'credentials_changed';
+		}
+		const authMethodChanged = previousEnvironment.getAuthenticationMethod().getType() !==
+			environment.getAuthenticationMethod().getType();
+		return authMethodChanged ? 'auth_method_changed' : 'credentials_changed';
+	}
+
+	private publishDomainEvent(
+		isUpdate: boolean,
+		environmentId: EnvironmentId,
+		environment: Environment,
+		previousEnvironment: Environment | null
+	): void {
 		if (isUpdate) {
 			this.eventPublisher.publish(new EnvironmentUpdated(
 				environmentId,
@@ -182,18 +223,6 @@ export class SaveEnvironmentUseCase {
 				environmentId,
 				environment.getName().getValue()
 			));
-		}
-
-		this.logger.info(`Environment ${isUpdate ? 'updated' : 'created'}: ${environment.getName().getValue()}`);
-
-		return {
-			success: true,
-			environmentId: environmentId.getValue(),
-			warnings: warnings
-		};
-		} catch (error) {
-			this.logger.error('SaveEnvironmentUseCase: Failed to save environment', error);
-			throw error;
 		}
 	}
 }

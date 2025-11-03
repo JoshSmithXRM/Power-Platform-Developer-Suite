@@ -11,7 +11,7 @@ import { DataType } from './DataType';
  * - sizeInBytes: Approximate storage size (for monitoring)
  * - isSecret: Whether value is from SecretStorage
  *
- * WHY: Separates value metadata from value itself. Allows displaying
+ * Separates value metadata from value itself. Allows displaying
  * information about secrets without revealing their contents.
  */
 export class StorageMetadata {
@@ -47,7 +47,7 @@ export class StorageMetadata {
 	/**
 	 * Calculates approximate storage size in bytes.
 	 *
-	 * WHY: Provides visibility into storage usage for monitoring and debugging.
+	 * Provides visibility into storage usage for monitoring and debugging.
 	 * Uses JSON serialization size as approximation.
 	 *
 	 * @param {unknown} value - Value to calculate size for

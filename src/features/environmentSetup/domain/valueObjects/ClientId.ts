@@ -14,7 +14,7 @@ import { DomainError } from '../errors/DomainError';
  * - Public Client ID (for Interactive/DeviceCode flows)
  * - Confidential Client ID (for Service Principal flow)
  *
- * WHY: Type-safe wrapper around client ID with validation. Prevents
+ * Type-safe wrapper around client ID with validation. Prevents
  * invalid GUIDs from being used in authentication flows.
  *
  * @throws {DomainError} If value is empty or not a valid GUID
@@ -48,7 +48,7 @@ export class ClientId {
 	/**
 	 * Checks if this is Microsoft's example public client ID.
 	 *
-	 * WHY: Microsoft provides a sample public client ID for testing.
+	 * Microsoft provides a sample public client ID for testing.
 	 * This method helps identify if the default/example ID is being used.
 	 *
 	 * @returns {boolean} True if this is the Microsoft example client ID

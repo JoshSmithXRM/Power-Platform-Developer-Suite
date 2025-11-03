@@ -114,10 +114,6 @@ form.addEventListener('input', () => {
 	clearSaveValidationErrors();
 });
 
-/**
- * Loads environment data into the form.
- * Called when extension sends 'environment-loaded' message.
- */
 function loadEnvironmentData(data) {
 	if (!data) return;
 
@@ -145,9 +141,6 @@ function loadEnvironmentData(data) {
 	deleteButton.style.display = 'inline-block';
 }
 
-/**
- * Saves the environment by sending form data to extension.
- */
 function saveEnvironment() {
 	const formData = new FormData(form);
 	const data = Object.fromEntries(formData.entries());
@@ -163,9 +156,6 @@ function saveEnvironment() {
 	});
 }
 
-/**
- * Tests the connection by sending form data to extension.
- */
 function testConnection() {
 	const formData = new FormData(form);
 	const data = Object.fromEntries(formData.entries());
@@ -183,9 +173,6 @@ function testConnection() {
 	});
 }
 
-/**
- * Discovers the Power Platform Environment ID from BAP API.
- */
 function discoverEnvironmentId() {
 	const formData = new FormData(form);
 	const data = Object.fromEntries(formData.entries());
@@ -203,9 +190,6 @@ function discoverEnvironmentId() {
 	});
 }
 
-/**
- * Validates the environment name is unique.
- */
 function validateName() {
 	const name = nameInput.value.trim();
 	if (name.length === 0) return;
@@ -238,9 +222,6 @@ function clearOrphanedCredentials() {
 	}
 }
 
-/**
- * Updates visibility of conditional fields based on auth method.
- */
 function updateConditionalFields() {
 	const authMethod = authMethodSelect.value;
 	const conditionalFields = document.querySelectorAll('.conditional-field');
@@ -251,9 +232,6 @@ function updateConditionalFields() {
 	});
 }
 
-/**
- * Handles the save complete message from extension.
- */
 function handleSaveComplete(data) {
 	if (data.success) {
 		logger.info('Environment saved successfully', {
@@ -289,9 +267,6 @@ function handleSaveComplete(data) {
 	}
 }
 
-/**
- * Displays validation errors inline in the form.
- */
 function displayValidationErrors(errors) {
 	// Don't clear name validation errors - they're managed separately
 	// Only clear errors from previous save attempts
@@ -325,9 +300,6 @@ function displayValidationErrors(errors) {
 	});
 }
 
-/**
- * Shows an error message below a specific field.
- */
 function showFieldError(fieldId, errorMessage) {
 	const field = document.getElementById(fieldId);
 	if (!field) return;
@@ -382,9 +354,6 @@ function clearSaveValidationErrors() {
 	});
 }
 
-/**
- * Clears all validation errors from the form.
- */
 function clearAllValidationErrors() {
 	// Remove all field error messages
 	const errorMessages = form.querySelectorAll('.validation-error');
@@ -398,9 +367,6 @@ function clearAllValidationErrors() {
 	});
 }
 
-/**
- * Handles the test connection result from extension.
- */
 function handleTestResult(data) {
 	testButton.disabled = false;
 	testButton.textContent = 'Test Connection';
@@ -424,9 +390,6 @@ function handleTestResult(data) {
 	}
 }
 
-/**
- * Handles the discover environment ID result from extension.
- */
 function handleDiscoverResult(data) {
 	discoverButton.disabled = false;
 	discoverButton.textContent = 'Discover ID';
@@ -454,9 +417,6 @@ function handleDiscoverResult(data) {
 	}
 }
 
-/**
- * Handles the name validation result from extension.
- */
 function handleNameValidation(data) {
 	const nameField = nameInput.parentElement;
 	const existingError = nameField.querySelector('.validation-error');

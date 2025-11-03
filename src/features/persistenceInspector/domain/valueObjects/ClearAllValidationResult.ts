@@ -11,7 +11,7 @@
  * - Protected entries are automatically skipped (never cleared)
  * - Counts used for generating user-friendly confirmation messages
  *
- * WHY: Separates validation logic from UI concerns. Domain layer computes
+ * Separates validation logic from UI concerns. Domain layer computes
  * counts; presentation layer decides how to display them.
  *
  * @example
@@ -53,7 +53,7 @@ export class ClearAllValidationResult {
 	/**
 	 * Generates user-friendly confirmation message for clear all operation.
 	 *
-	 * WHY: Provides clear, actionable information for user confirmation dialog.
+	 * Provides clear, actionable information for user confirmation dialog.
 	 * Shows what will happen (counts) and consequences (cannot be undone).
 	 *
 	 * @returns {string} Confirmation message with counts

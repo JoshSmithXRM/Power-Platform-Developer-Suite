@@ -1,5 +1,6 @@
 import { IEnvironmentRepository } from '../../domain/interfaces/IEnvironmentRepository';
 import { EnvironmentValidationService } from '../../domain/services/EnvironmentValidationService';
+import { AuthenticationCacheInvalidationService } from '../../domain/services/AuthenticationCacheInvalidationService';
 import { IDomainEventPublisher } from '../interfaces/IDomainEventPublisher';
 import { Environment } from '../../domain/entities/Environment';
 import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
@@ -18,6 +19,7 @@ describe('SaveEnvironmentUseCase', () => {
 	let mockRepository: jest.Mocked<IEnvironmentRepository>;
 	let mockValidationService: jest.Mocked<EnvironmentValidationService>;
 	let mockEventPublisher: jest.Mocked<IDomainEventPublisher>;
+	let mockCacheInvalidationService: jest.Mocked<AuthenticationCacheInvalidationService>;
 
 	beforeEach(() => {
 		mockRepository = {
@@ -42,10 +44,15 @@ describe('SaveEnvironmentUseCase', () => {
 			subscribe: jest.fn()
 		};
 
+		mockCacheInvalidationService = {
+			shouldInvalidateCache: jest.fn()
+		} as unknown as jest.Mocked<AuthenticationCacheInvalidationService>;
+
 		useCase = new SaveEnvironmentUseCase(
 			mockRepository,
 			mockValidationService,
 			mockEventPublisher,
+			mockCacheInvalidationService,
 			new NullLogger()
 		);
 	});

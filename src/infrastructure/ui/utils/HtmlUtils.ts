@@ -36,9 +36,6 @@ interface RawHtml {
 	__html: string;
 }
 
-/**
- * Type guard to check if a value is RawHtml.
- */
 function isRawHtml(value: unknown): value is RawHtml {
 	return typeof value === 'object' && value !== null && '__html' in value;
 }
@@ -83,10 +80,8 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): RawHt
 		const value = values[i];
 
 		if (isRawHtml(value)) {
-			// Don't escape raw HTML
 			result += value.__html;
 		} else if (Array.isArray(value)) {
-			// Handle arrays from .map() - join without separators
 			result += value.map(v => {
 				if (isRawHtml(v)) {
 					return v.__html;
@@ -94,16 +89,15 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): RawHt
 				return escapeHtml(String(v));
 			}).join('');
 		} else if (value === null || value === undefined) {
-			// Skip null/undefined - don't add anything
+			// Skip null/undefined
 		} else {
-			// Escape regular values
 			result += escapeHtml(String(value));
 		}
 
 		result += strings[i + 1];
 	}
 
-	// Return as RawHtml so nested calls don't double-escape
+	// Nested html`` calls don't double-escape
 	return raw(result);
 }
 
@@ -170,15 +164,12 @@ export function attrs(attributes: Record<string, string | number | boolean | nul
 
 	for (const [key, value] of Object.entries(attributes)) {
 		if (value === null || value === undefined || value === false) {
-			// Skip falsy values
 			continue;
 		}
 
 		if (value === true) {
-			// Boolean attribute (e.g., required, disabled)
 			parts.push(key);
 		} else {
-			// Regular attribute with escaped value
 			parts.push(`${key}="${escapeHtml(String(value))}"`);
 		}
 	}

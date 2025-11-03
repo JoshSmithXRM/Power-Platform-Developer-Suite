@@ -34,7 +34,7 @@ export interface IStorageClearer {
 	/**
 	 * Clears a specific property within a global state entry.
 	 *
-	 * WHY: Allows fine-grained clearing without removing entire entry.
+	 * Allows fine-grained clearing without removing entire entry.
 	 * Example: Remove one environment from array without clearing all environments.
 	 *
 	 * @param {string} key - Global state key containing the property
@@ -45,7 +45,7 @@ export interface IStorageClearer {
 	/**
 	 * Clears all non-protected entries from both storage types.
 	 *
-	 * WHY: Provides "nuclear option" for clearing extension storage while
+	 * Provides "nuclear option" for clearing extension storage while
 	 * protecting critical data.
 	 *
 	 * @param {string[]} protectedKeys - Array of protected key patterns

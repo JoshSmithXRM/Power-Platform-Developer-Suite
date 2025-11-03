@@ -98,7 +98,6 @@ export function isSaveEnvironmentMessage(message: unknown): message is SaveEnvir
 		return false;
 	}
 
-	// Type-safe field validation
 	const hasRequiredFields = (
 		'name' in data &&
 		typeof data.name === 'string' &&
@@ -116,7 +115,6 @@ export function isSaveEnvironmentMessage(message: unknown): message is SaveEnvir
 		return false;
 	}
 
-	// Validate authenticationMethod is a valid enum value using type guard
 	return isValidAuthMethod(data.authenticationMethod);
 }
 
@@ -161,7 +159,6 @@ export function isTestConnectionMessage(message: unknown): message is TestConnec
 		return false;
 	}
 
-	// Validate required fields same as save
 	if (!('name' in data && typeof data.name === 'string')) {
 		return false;
 	}
@@ -182,7 +179,6 @@ export function isTestConnectionMessage(message: unknown): message is TestConnec
 		return false;
 	}
 
-	// Validate authenticationMethod is a valid enum value using type guard
 	return isValidAuthMethod(data.authenticationMethod);
 }
 
@@ -244,7 +240,6 @@ export function isDiscoverEnvironmentIdMessage(message: unknown): message is Dis
 		return false;
 	}
 
-	// Validate required fields for discovery
 	if (!('name' in data && typeof data.name === 'string')) {
 		return false;
 	}
@@ -265,7 +260,6 @@ export function isDiscoverEnvironmentIdMessage(message: unknown): message is Dis
 		return false;
 	}
 
-	// Validate authenticationMethod is a valid enum value using type guard
 	return isValidAuthMethod(data.authenticationMethod);
 }
 

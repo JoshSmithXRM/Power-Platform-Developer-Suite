@@ -5,7 +5,7 @@ import { DomainError } from '../errors/DomainError';
  *
  * Value objects are immutable, validated on construction, and compared by value.
  *
- * WHY: Provides type-safe identifier for environments instead of raw strings.
+ * Provides type-safe identifier for environments instead of raw strings.
  * Ensures non-empty values and provides factory method for generation.
  *
  * @example
@@ -29,7 +29,7 @@ export class EnvironmentId {
 	 *
 	 * Format: `env-{timestamp}-{random}`
 	 *
-	 * WHY: Provides collision-resistant IDs without external dependencies.
+	 * Provides collision-resistant IDs without external dependencies.
 	 * Timestamp ensures chronological ordering; random suffix prevents collisions.
 	 *
 	 * @returns {EnvironmentId} New unique environment ID

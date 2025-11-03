@@ -19,23 +19,23 @@ import type { AuthenticationCacheInvalidationRequested } from './AuthenticationC
  *
  * @example
  * ```typescript
- * function handleEnvironmentEvent(event: EnvironmentEvent): void {
+ * function handleEnvironmentEvent(event: EnvironmentEvent, logger: ILogger): void {
  *   switch (event.type) {
  *     case 'EnvironmentCreated':
  *       // TypeScript knows event is EnvironmentCreated
- *       console.log(`Created: ${event.environmentName}`);
+ *       logger.info(`Created: ${event.environmentName}`);
  *       break;
  *     case 'EnvironmentUpdated':
  *       // TypeScript knows event is EnvironmentUpdated
- *       console.log(`Updated: ${event.previousName} -> ${event.environmentName}`);
+ *       logger.info(`Updated: ${event.previousName} -> ${event.environmentName}`);
  *       break;
  *     case 'EnvironmentDeleted':
  *       // TypeScript knows event is EnvironmentDeleted
- *       console.log(`Deleted: ${event.environmentName}`);
+ *       logger.info(`Deleted: ${event.environmentName}`);
  *       break;
  *     case 'AuthenticationCacheInvalidationRequested':
  *       // TypeScript knows event is AuthenticationCacheInvalidationRequested
- *       console.log(`Cache invalidation: ${event.reason}`);
+ *       logger.info(`Cache invalidation: ${event.reason}`);
  *       break;
  *     default:
  *       // Exhaustive check - TypeScript ensures all cases handled

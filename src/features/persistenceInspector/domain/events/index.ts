@@ -22,22 +22,22 @@ import type { SecretRevealed } from './SecretRevealed';
  *
  * @example
  * ```typescript
- * function handleStorageEvent(event: StorageEvent): void {
+ * function handleStorageEvent(event: StorageEvent, logger: ILogger): void {
  *   switch (event.type) {
  *     case 'StorageInspected':
- *       console.log(`Inspected: ${event.totalEntries} entries`);
+ *       logger.info(`Inspected: ${event.totalEntries} entries`);
  *       break;
  *     case 'StorageEntryCleared':
- *       console.log(`Cleared entry: ${event.key}`);
+ *       logger.info(`Cleared entry: ${event.key}`);
  *       break;
  *     case 'StoragePropertyCleared':
- *       console.log(`Cleared property: ${event.key}.${event.path}`);
+ *       logger.info(`Cleared property: ${event.key}.${event.path}`);
  *       break;
  *     case 'StorageClearedAll':
- *       console.log(`Cleared all: ${event.clearedCount} entries`);
+ *       logger.info(`Cleared all: ${event.clearedCount} entries`);
  *       break;
  *     case 'SecretRevealed':
- *       console.log(`Secret revealed: ${event.key}`);
+ *       logger.info(`Secret revealed: ${event.key}`);
  *       break;
  *     default:
  *       const _exhaustive: never = event;

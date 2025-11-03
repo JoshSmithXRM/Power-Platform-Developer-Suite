@@ -5,7 +5,6 @@
  * Provides consistent visual styling across all data views.
  */
 
-/* Table container for scrolling */
 .table-container {
 	overflow: auto;
 	flex: 1;

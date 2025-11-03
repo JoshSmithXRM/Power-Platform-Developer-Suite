@@ -83,7 +83,7 @@ export interface IEnvironmentRepository {
 	/**
 	 * Deletes orphaned secrets from SecretStorage.
 	 *
-	 * WHY: When auth method or credentials change, old secrets become orphaned
+	 * When auth method or credentials change, old secrets become orphaned
 	 * and should be cleaned up.
 	 *
 	 * @param secretKeys - Array of secret storage keys to delete

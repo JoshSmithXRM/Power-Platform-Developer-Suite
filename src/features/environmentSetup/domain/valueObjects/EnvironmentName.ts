@@ -11,7 +11,7 @@ import { DomainError } from '../errors/DomainError';
  * - Uniqueness is case-sensitive
  * - Leading/trailing whitespace is trimmed
  *
- * WHY Case-Sensitive: Environment names are user-visible identifiers.
+ * Case-Sensitive Comparison: Environment names are user-visible identifiers.
  * Case-sensitive comparison respects user intent and avoids confusion
  * between "DEV" and "dev" environments.
  *

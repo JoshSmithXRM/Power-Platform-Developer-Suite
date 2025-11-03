@@ -129,7 +129,7 @@ describe('DataTablePanel', () => {
 			html: '',
 			options: {},
 			postMessage: jest.fn().mockResolvedValue(true),
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-return -- Mocked function returns uri as-is for testing
+			 
 			asWebviewUri: jest.fn((uri) => uri),
 			onDidReceiveMessage: jest.fn()
 		} as unknown as jest.Mocked<vscode.Webview>;
@@ -139,7 +139,7 @@ describe('DataTablePanel', () => {
 			webview: mockWebview,
 			title: '',
 			dispose: jest.fn(),
-			onDidDispose: jest.fn((_callback) => {
+			onDidDispose: jest.fn(() => {
 				// Don't call callback immediately
 				return { dispose: jest.fn() };
 			})

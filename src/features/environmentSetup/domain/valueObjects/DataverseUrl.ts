@@ -16,7 +16,7 @@ import { DomainError } from '../errors/DomainError';
  * - `https://contoso.crm4.dynamics.com` (Europe)
  * - Regional variants with country codes (e.g., crm11.de)
  *
- * WHY: Type-safe URL wrapper with validation and normalization. Ensures
+ * Type-safe URL wrapper with validation and normalization. Ensures
  * only valid Dataverse URLs are used throughout the application.
  *
  * @throws {DomainError} If URL format is invalid
@@ -61,7 +61,7 @@ export class DataverseUrl {
 	/**
 	 * Gets the Web API base URL for this Dataverse environment.
 	 *
-	 * WHY: Dataverse Web API requires /api/data/v9.2 path. This method
+	 * Dataverse Web API requires /api/data/v9.2 path. This method
 	 * provides the complete base URL for API calls.
 	 *
 	 * @returns {string} Web API base URL (e.g., `https://org.crm.dynamics.com/api/data/v9.2`)
@@ -73,7 +73,7 @@ export class DataverseUrl {
 	/**
 	 * Extracts organization name from Dataverse URL.
 	 *
-	 * WHY: Organization name is used for display and identification purposes.
+	 * Organization name is used for display and identification purposes.
 	 * Extracted from the hostname's first segment.
 	 *
 	 * @returns {string} Organization name (e.g., "contoso")

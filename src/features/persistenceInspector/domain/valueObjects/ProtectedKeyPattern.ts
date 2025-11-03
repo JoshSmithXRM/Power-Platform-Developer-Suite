@@ -5,7 +5,7 @@
  * - Exact match: `power-platform-dev-suite-environments`
  * - Wildcard: `power-platform-dev-suite-*` (matches all extension keys)
  *
- * WHY: Provides regex-based pattern matching for protecting entire families
+ * Provides regex-based pattern matching for protecting entire families
  * of storage keys without hardcoding each individual key. Wildcard support
  * allows protecting all keys with a common prefix.
  *

@@ -170,8 +170,7 @@ export abstract class DataTablePanel {
 
 	/**
 	 * Switches to a different environment and reloads data.
-	 * Updates Maker button state based on whether Power Platform Environment ID is configured.
-	 * @param environmentId - Internal environment ID to switch to
+	 * Updates Maker button availability based on whether environment has configured Power Platform Environment ID.
 	 */
 	protected async switchEnvironment(environmentId: string): Promise<void> {
 		if (this.currentEnvironmentId === environmentId) {
@@ -243,9 +242,8 @@ export abstract class DataTablePanel {
 	}
 
 	/**
-	 * Forwards webview logs to the extension logger.
-	 * Enables debugging of webview JavaScript by routing console logs to VS Code output channel.
-	 * @param message - Webview log message with level and content
+	 * Forwards webview logs to extension logger.
+	 * Webview JavaScript cannot access VS Code OutputChannel directly, so this bridges the gap.
 	 */
 	protected handleWebviewLog(message: WebviewLogMessage): void {
 		const logMessage = `[Webview] ${message.message}`;
@@ -268,7 +266,6 @@ export abstract class DataTablePanel {
 
 	/**
 	 * Displays error message in webview.
-	 * @param error - Error object or value to display
 	 */
 	protected handleError(error: unknown): void {
 		const errorMessage = error instanceof Error ? error.message : String(error);
@@ -281,7 +278,6 @@ export abstract class DataTablePanel {
 
 	/**
 	 * Updates loading state in webview (shows/hides spinner).
-	 * @param isLoading - True to show loading spinner, false to hide
 	 */
 	protected setLoading(isLoading: boolean): void {
 		this.panel.webview.postMessage({ command: isLoading ? 'loading' : 'loaded' });
@@ -289,7 +285,6 @@ export abstract class DataTablePanel {
 
 	/**
 	 * Sends data to webview for table rendering.
-	 * @param data - Array of data objects to display (must be serializable records)
 	 */
 	protected sendData(data: Record<string, unknown>[]): void {
 		const config = this.getConfig();
@@ -301,8 +296,7 @@ export abstract class DataTablePanel {
 
 	/**
 	 * Creates cancellation token for async operations.
-	 * Cancels any previous operation to prevent race conditions when switching environments.
-	 * @returns Adapter wrapping VS Code cancellation token
+	 * Cancels previous operation to prevent race conditions when rapidly switching environments.
 	 */
 	protected createCancellationToken(): VsCodeCancellationTokenAdapter {
 		this.cancellationTokenSource?.cancel();
@@ -312,8 +306,7 @@ export abstract class DataTablePanel {
 	}
 
 	/**
-	 * Escapes HTML special characters to prevent XSS.
-	 * Use when injecting user-controlled data into HTML.
+	 * Escapes HTML special characters to prevent XSS attacks.
 	 */
 	protected escapeHtml(text: string): string {
 		return text
@@ -325,9 +318,7 @@ export abstract class DataTablePanel {
 	}
 
 	/**
-	 * Maps status strings to CSS classes for consistent styling across panels.
-	 * @param status - Status text (e.g., 'Completed', 'Failed', 'In Progress')
-	 * @returns CSS class name or empty string
+	 * Maps status strings to CSS classes for consistent styling.
 	 */
 	protected getStatusClass(status: string): string {
 		if (status === 'Completed') return 'status-completed';

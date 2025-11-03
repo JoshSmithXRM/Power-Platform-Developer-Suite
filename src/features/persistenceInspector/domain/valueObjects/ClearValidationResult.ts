@@ -6,7 +6,7 @@
  * - Protected: Entry exists but is protected (cannot be cleared)
  * - Not Found: Entry does not exist in storage
  *
- * WHY: Type-safe result object instead of throwing exceptions for validation
+ * Type-safe result object instead of throwing exceptions for validation
  * failures. Allows domain layer to return rich validation information without
  * exception handling overhead.
  *
@@ -16,7 +16,8 @@
  * ```typescript
  * const result = collection.validateClearOperation(key);
  * if (!result.isAllowed) {
- *   console.error(result.reason); // Show why operation failed
+ *   // Handle validation failure (show reason in UI)
+ *   throw new Error(result.reason);
  * }
  * ```
  */

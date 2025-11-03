@@ -13,30 +13,18 @@ export class WebviewLogger {
 		this.componentName = componentName;
 	}
 
-	/**
-	 * Log debug information
-	 */
 	debug(message, context) {
 		this.log('debug', message, context);
 	}
 
-	/**
-	 * Log informational messages
-	 */
 	info(message, context) {
 		this.log('info', message, context);
 	}
 
-	/**
-	 * Log warnings
-	 */
 	warn(message, context) {
 		this.log('warn', message, context);
 	}
 
-	/**
-	 * Log errors
-	 */
 	error(message, error) {
 		this.log('error', message, this.serializeError(error));
 	}

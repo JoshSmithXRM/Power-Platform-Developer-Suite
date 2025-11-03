@@ -3,7 +3,7 @@
  *
  * Immutable result object used throughout the domain layer for validation feedback.
  *
- * WHY: Separates validation results from exceptions. Allows collecting multiple
+ * Separates validation results from exceptions. Allows collecting multiple
  * errors/warnings before failing, providing better user experience with
  * comprehensive feedback.
  *
@@ -16,7 +16,8 @@
  * ```typescript
  * const result = ValidationResult.failure(['Name is required', 'URL is invalid']);
  * if (!result.isValid) {
- *   console.log(result.errors); // Show all errors
+ *   // Return errors to presentation layer for UI display
+ *   return { success: false, errors: result.errors };
  * }
  * ```
  */

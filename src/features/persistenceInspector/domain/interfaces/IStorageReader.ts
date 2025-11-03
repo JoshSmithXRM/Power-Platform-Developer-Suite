@@ -35,7 +35,7 @@ export interface IStorageReader {
 	/**
 	 * Reveals a specific secret value for display.
 	 *
-	 * WHY: Secrets are hidden by default. This method allows explicit
+	 * Secrets are hidden by default. This method allows explicit
 	 * revelation when user clicks "Show" button.
 	 *
 	 * @param {string} key - Secret storage key

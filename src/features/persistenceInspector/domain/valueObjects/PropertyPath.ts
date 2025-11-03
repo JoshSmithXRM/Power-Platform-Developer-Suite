@@ -10,7 +10,7 @@
  * - Stored as array of string segments: `["environments", "0", "dataverseUrl"]`
  * - Bracket notation converted to dot notation internally
  *
- * WHY: Provides type-safe property path handling for clearing individual
+ * Provides type-safe property path handling for clearing individual
  * properties within complex storage values. Supports flexible input formats
  * while maintaining consistent internal representation.
  *
@@ -49,7 +49,7 @@ export class PropertyPath {
 	 * 2. Split on dots
 	 * 3. Filter empty segments
 	 *
-	 * WHY: Internal representation uses consistent format (array of segments)
+	 * Internal representation uses consistent format (array of segments)
 	 * regardless of input notation style.
 	 *
 	 * @param {string} path - Property path string

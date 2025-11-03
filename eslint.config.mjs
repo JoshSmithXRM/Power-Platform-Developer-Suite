@@ -11,8 +11,9 @@ export default tseslint.config(
     ignores: ['dist/**', 'out/**', 'node_modules/**', '*.config.js', 'webpack.config.js']
   },
   {
-    // TypeScript files (Extension Host)
+    // TypeScript files (Extension Host) - excluding tests
     files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: 'module',
@@ -108,6 +109,48 @@ export default tseslint.config(
       'max-lines-per-function': ['warn', { max: 100, skipBlankLines: true, skipComments: true }],
       'max-depth': ['warn', 4],
       'max-nested-callbacks': ['warn', 3]
+    }
+  },
+  {
+    // Test files - Relax structural complexity rules
+    // These rules measure framework structure (describe → it → expect), not logical complexity
+    // See: Clean Architecture Guardian recommendation (2025-11-02)
+    files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+    rules: {
+      // DISABLED: Framework nesting is structural, not algorithmic complexity
+      'max-nested-callbacks': 'off',
+      'max-lines-per-function': 'off',
+      'max-lines': 'off',
+      'complexity': 'off',
+
+      // KEPT: These catch actual problems even in tests
+      'max-depth': ['warn', 4],  // Deeply nested if/for/while IS bad
+      'max-statements': ['warn', 30]  // Too many statements = unclear test
+    }
+  },
+  {
+    // Composition root - naturally long due to DI wiring
+    files: ['src/extension.ts'],
+    rules: {
+      'max-lines': 'off',
+      'max-lines-per-function': 'off'
+    }
+  },
+  {
+    // Authentication service - complex auth flows are inherently long
+    files: ['src/features/environmentSetup/infrastructure/services/MsalAuthenticationService.ts'],
+    rules: {
+      'max-lines-per-function': 'off'
+    }
+  },
+  {
+    // HTML rendering - template generation is naturally verbose
+    files: [
+      'src/features/persistenceInspector/presentation/views/persistenceInspector.ts',
+      'src/shared/infrastructure/ui/views/dataTable.ts'
+    ],
+    rules: {
+      'max-lines-per-function': 'off'
     }
   },
   {

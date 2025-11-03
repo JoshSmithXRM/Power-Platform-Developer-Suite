@@ -46,7 +46,7 @@ export class StorageClearingService {
 	 * - Validates entry can be cleared (not protected)
 	 * - Routes to correct storage type (global vs secret)
 	 *
-	 * WHY: Validation before clearing prevents accidental deletion of
+	 * Validation before clearing prevents accidental deletion of
 	 * critical data. StorageCollection aggregates validation logic.
 	 *
 	 * @param {StorageEntry} entry - Entry to clear
@@ -78,7 +78,7 @@ export class StorageClearingService {
 	 * - Entry must not be a secret (secrets are all-or-nothing)
 	 * - Property must exist at the specified path
 	 *
-	 * WHY: Allows fine-grained clearing of nested properties within complex
+	 * Allows fine-grained clearing of nested properties within complex
 	 * storage values (e.g., removing one environment from the array without
 	 * clearing all environments).
 	 *
@@ -119,7 +119,7 @@ export class StorageClearingService {
 	 * - Must have at least one clearable entry
 	 * - Returns result with counts for confirmation
 	 *
-	 * WHY: Provides "nuclear option" for clearing extension storage
+	 * Provides "nuclear option" for clearing extension storage
 	 * while protecting critical data. Used for troubleshooting and
 	 * testing scenarios.
 	 *

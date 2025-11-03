@@ -14,7 +14,7 @@
  * - ServicePrincipal: Requires Client ID + Client Secret + Tenant ID
  * - UsernamePassword: Requires Username + Password
  *
- * WHY: Different auth methods have different requirements. This value object
+ * Different auth methods have different requirements. This value object
  * encapsulates the logic for determining credential requirements.
  */
 export enum AuthenticationMethodType {
@@ -70,7 +70,7 @@ export class AuthenticationMethod {
 	/**
 	 * Determines if this is an interactive authentication flow.
 	 *
-	 * WHY: Interactive flows (browser-based, device code) don't require stored
+	 * Interactive flows (browser-based, device code) don't require stored
 	 * credentials. User authenticates interactively each time.
 	 *
 	 * @returns {boolean} True for Interactive or DeviceCode methods

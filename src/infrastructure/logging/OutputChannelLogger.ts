@@ -9,11 +9,6 @@ import { ILogger } from './ILogger';
 export class OutputChannelLogger implements ILogger {
 	constructor(private readonly outputChannel: vscode.LogOutputChannel) {}
 
-	/**
-	 * Logs debug-level messages for diagnostic information.
-	 * @param message - The message to log
-	 * @param args - Additional data to log (objects, numbers, strings)
-	 */
 	public debug(message: string, ...args: unknown[]): void {
 		if (args.length > 0) {
 			const argsStr = args.map(arg => this.stringify(arg)).join('\n');
@@ -23,11 +18,6 @@ export class OutputChannelLogger implements ILogger {
 		}
 	}
 
-	/**
-	 * Logs info-level messages for general information.
-	 * @param message - The message to log
-	 * @param args - Additional data to log (objects, numbers, strings)
-	 */
 	public info(message: string, ...args: unknown[]): void {
 		if (args.length > 0) {
 			const argsStr = args.map(arg => this.stringify(arg)).join('\n');
@@ -37,11 +27,6 @@ export class OutputChannelLogger implements ILogger {
 		}
 	}
 
-	/**
-	 * Logs warning-level messages for potentially problematic situations.
-	 * @param message - The message to log
-	 * @param args - Additional data to log (objects, numbers, strings)
-	 */
 	public warn(message: string, ...args: unknown[]): void {
 		if (args.length > 0) {
 			const argsStr = args.map(arg => this.stringify(arg)).join('\n');
@@ -51,11 +36,6 @@ export class OutputChannelLogger implements ILogger {
 		}
 	}
 
-	/**
-	 * Logs error-level messages with optional error object details.
-	 * @param message - The error message to log
-	 * @param error - Optional error object or value to log
-	 */
 	public error(message: string, error?: unknown): void {
 		if (error instanceof Error) {
 			this.outputChannel.error(`${message}: ${error.message}`);
@@ -70,8 +50,9 @@ export class OutputChannelLogger implements ILogger {
 	}
 
 	/**
-	 * Converts values to string representation for logging.
-	 * Handles primitive types and objects with JSON serialization fallback.
+	 * Converts values to string for logging with safe JSON serialization.
+	 * Uses tab indentation to match VS Code's JSON formatting.
+	 * Falls back to String() for circular references or non-serializable objects.
 	 */
 	private stringify(value: unknown): string {
 		try {

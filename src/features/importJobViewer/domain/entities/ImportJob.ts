@@ -66,7 +66,7 @@ export class ImportJob {
 	/**
 	 * Factory method: Creates ImportJob with status derived from Dataverse raw data.
 	 *
-	 * WHY: The Dataverse importjobs entity doesn't have a statuscode field. We must
+	 * The Dataverse importjobs entity doesn't have a statuscode field. We must
 	 * infer the status from completedOn, startedOn, and progress fields.
 	 *
 	 * Business Rules:
@@ -122,7 +122,7 @@ export class ImportJob {
 	/**
 	 * Business logic: Derives ImportJobStatus from Dataverse field values.
 	 *
-	 * WHY: Dataverse importjobs entity lacks a statuscode field, so we infer
+	 * Dataverse importjobs entity lacks a statuscode field, so we infer
 	 * status from the combination of completedOn, startedOn, and progress.
 	 *
 	 * @param completedOn - Completion date (null if not completed)
