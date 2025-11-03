@@ -62,7 +62,7 @@ describe('ListImportJobsUseCase', () => {
 
 			mockRepository.findAll.mockResolvedValue(jobs);
 
-			const result = await useCase.execute('env-123');
+			const result = await useCase.execute('env-123', undefined);
 
 			expect(mockRepository.findAll).toHaveBeenCalledWith('env-123', undefined, undefined);
 			expect(result).toHaveLength(2);
@@ -91,12 +91,15 @@ describe('ListImportJobsUseCase', () => {
 
 			mockRepository.findAll.mockResolvedValue(jobs);
 
-			const result = await useCase.execute('env-123');
+			const result = await useCase.execute('env-123', undefined);
 
 			// Use case should NOT sort - that's a presentation concern handled by the mapper
-			expect(result[0].name).toBe('Oldest Completed');
-			expect(result[1].name).toBe('Newest Completed');
-			expect(result[2].name).toBe('Oldest In-Progress');
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.name).toBe('Oldest Completed');
+			expect(result[1]).toBeDefined();
+			expect(result[1]!.name).toBe('Newest Completed');
+			expect(result[2]).toBeDefined();
+			expect(result[2]!.name).toBe('Oldest In-Progress');
 			expect(result.length).toBe(3);
 		});
 
@@ -117,7 +120,7 @@ describe('ListImportJobsUseCase', () => {
 			mockRepository.findAll.mockResolvedValue(jobs);
 
 			const originalOrder = jobs.map(j => j.name);
-			await useCase.execute('env-123');
+			await useCase.execute('env-123', undefined);
 
 			// Repository array should remain unchanged
 			expect(jobs.map(j => j.name)).toEqual(originalOrder);
@@ -126,7 +129,7 @@ describe('ListImportJobsUseCase', () => {
 		it('should handle empty job list', async () => {
 			mockRepository.findAll.mockResolvedValue([]);
 
-			const result = await useCase.execute('env-123');
+			const result = await useCase.execute('env-123', undefined);
 
 			expect(result).toHaveLength(0);
 			expect(mockLogger.info).toHaveBeenCalledWith('ListImportJobsUseCase completed', { count: 0 });
@@ -162,7 +165,7 @@ describe('ListImportJobsUseCase', () => {
 			const error = new Error('Repository failed');
 			mockRepository.findAll.mockRejectedValue(error);
 
-			await expect(useCase.execute('env-123')).rejects.toThrow('Repository failed');
+			await expect(useCase.execute('env-123', undefined)).rejects.toThrow('Repository failed');
 
 			expect(mockLogger.error).toHaveBeenCalledWith('ListImportJobsUseCase failed', error);
 		});
@@ -171,7 +174,7 @@ describe('ListImportJobsUseCase', () => {
 			const cancelledException = new OperationCancelledException();
 			mockRepository.findAll.mockRejectedValue(cancelledException);
 
-			await expect(useCase.execute('env-123')).rejects.toThrow(OperationCancelledException);
+			await expect(useCase.execute('env-123', undefined)).rejects.toThrow(OperationCancelledException);
 
 			expect(mockLogger.error).toHaveBeenCalledWith('ListImportJobsUseCase failed', cancelledException);
 		});

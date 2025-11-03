@@ -54,10 +54,10 @@ export class Environment {
 		private authenticationMethod: AuthenticationMethod,
 		private publicClientId: ClientId,
 		private isActive: boolean,
-		private lastUsed?: Date,
-		private powerPlatformEnvironmentId?: string,
-		private clientId?: ClientId,
-		private username?: string
+		private lastUsed: Date | undefined,
+		private powerPlatformEnvironmentId: string | undefined,
+		private clientId: ClientId | undefined,
+		private username: string | undefined
 	) {
 		this.validate();
 	}
@@ -200,11 +200,11 @@ export class Environment {
 	 * security best practices to remove unused credentials.
 	 *
 	 * @param {AuthenticationMethod} previousAuthMethod - Previous authentication method
-	 * @param {ClientId} [previousClientId] - Previous client ID (if Service Principal)
-	 * @param {string} [previousUsername] - Previous username (if Username/Password)
+	 * @param {ClientId | undefined} previousClientId - Previous client ID (if Service Principal)
+	 * @param {string | undefined} previousUsername - Previous username (if Username/Password)
 	 * @returns {string[]} Array of secret storage keys to delete
 	 */
-	public getOrphanedSecretKeys(previousAuthMethod: AuthenticationMethod, previousClientId?: ClientId, previousUsername?: string): string[] {
+	public getOrphanedSecretKeys(previousAuthMethod: AuthenticationMethod, previousClientId: ClientId | undefined, previousUsername: string | undefined): string[] {
 		const orphanedKeys: string[] = [];
 
 		if (previousAuthMethod.requiresClientCredentials() && previousClientId) {
@@ -278,9 +278,9 @@ export class Environment {
 	 * @param {TenantId} tenantId - New tenant ID
 	 * @param {AuthenticationMethod} authenticationMethod - New auth method
 	 * @param {ClientId} publicClientId - New public client ID
-	 * @param {string} [powerPlatformEnvironmentId] - New Power Platform environment ID
-	 * @param {ClientId} [clientId] - New client ID (for Service Principal)
-	 * @param {string} [username] - New username (for Username/Password)
+	 * @param {string | undefined} powerPlatformEnvironmentId - New Power Platform environment ID
+	 * @param {ClientId | undefined} clientId - New client ID (for Service Principal)
+	 * @param {string | undefined} username - New username (for Username/Password)
 	 * @throws {DomainError} If new configuration is invalid
 	 */
 	public updateConfiguration(
@@ -289,9 +289,9 @@ export class Environment {
 		tenantId: TenantId,
 		authenticationMethod: AuthenticationMethod,
 		publicClientId: ClientId,
-		powerPlatformEnvironmentId?: string,
-		clientId?: ClientId,
-		username?: string
+		powerPlatformEnvironmentId: string | undefined,
+		clientId: ClientId | undefined,
+		username: string | undefined
 	): void {
 		this.name = name;
 		this.dataverseUrl = dataverseUrl;

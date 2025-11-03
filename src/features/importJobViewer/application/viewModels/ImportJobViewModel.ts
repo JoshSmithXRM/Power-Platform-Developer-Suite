@@ -4,6 +4,7 @@
  * Readonly ensures immutability - ViewModels are snapshots, not mutable state.
  */
 export interface ImportJobViewModel {
+	[key: string]: unknown;
 	readonly id: string;
 	readonly name: string;
 	readonly solutionName: string;

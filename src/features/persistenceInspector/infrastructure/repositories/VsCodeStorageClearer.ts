@@ -109,6 +109,30 @@ export class VsCodeStorageClearer implements IStorageClearer {
 	}
 
 	/**
+	 * Safely retrieves a value from storage container
+	 * Returns unknown since storage values are dynamic
+	 */
+	private getFromStorage(target: unknown[] | Record<string, unknown>, key: string | number): unknown {
+		if (Array.isArray(target)) {
+			return target[key as number];
+		} else {
+			return target[key as string];
+		}
+	}
+
+	/**
+	 * Safely assigns an unknown value to a storage container
+	 * This is safe because storage values are inherently dynamic (unknown)
+	 */
+	private assignToStorage(target: unknown[] | Record<string, unknown>, key: string | number, value: unknown): void {
+		if (Array.isArray(target)) {
+			target[key as number] = value;
+		} else {
+			target[key as string] = value;
+		}
+	}
+
+	/**
 	 * Deletes a property at the specified path in an object/array
 	 * Returns a new object with the property removed (immutable)
 	 *
@@ -129,6 +153,10 @@ export class VsCodeStorageClearer implements IStorageClearer {
 
 		const [first, ...rest] = path;
 
+		if (first === undefined) {
+			throw new Error('Path segment is undefined');
+		}
+
 		// Create discriminated union for type-safe handling
 		const mutable: MutableStorageValue = Array.isArray(obj)
 			? { type: 'array', value: obj.slice() }
@@ -145,11 +173,19 @@ export class VsCodeStorageClearer implements IStorageClearer {
 			// Recursively delete nested property
 			if (mutable.type === 'array') {
 				const index = parseInt(first);
-				const nested = mutable.value[index];
-				mutable.value[index] = this.deletePropertyAtPath(nested, rest);
+				const nested = this.getFromStorage(mutable.value, index);
+				this.assignToStorage(
+					mutable.value,
+					index,
+					this.deletePropertyAtPath(nested, rest)
+				);
 			} else {
-				const nested = mutable.value[first];
-				mutable.value[first] = this.deletePropertyAtPath(nested, rest);
+				const nested = this.getFromStorage(mutable.value, first);
+				this.assignToStorage(
+					mutable.value,
+					first,
+					this.deletePropertyAtPath(nested, rest)
+				);
 			}
 		}
 

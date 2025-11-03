@@ -58,41 +58,21 @@ export class DeploymentSettings {
 		settings: DeploymentSettings;
 		syncResult: SyncResult;
 	} {
-		const existingMap = new Map(this.environmentVariables.map(ev => [ev.SchemaName, ev.Value]));
-
-		let added = 0;
-		let preserved = 0;
-
-		const synced: EnvironmentVariableEntry[] = [];
-
-		// Add or preserve existing entries
-		for (const entry of newEntries) {
-			if (existingMap.has(entry.SchemaName)) {
-				// Preserve existing value (don't overwrite with environment value)
-				const existingValue = existingMap.get(entry.SchemaName);
-				if (existingValue !== undefined) {
-					synced.push({
-						SchemaName: entry.SchemaName,
-						Value: existingValue
-					});
-					preserved++;
-				}
-			} else {
-				// Add new entry with environment value
-				synced.push(entry);
-				added++;
-			}
-		}
-
-		// Calculate removed count
-		const removed = this.environmentVariables.length - preserved;
-
-		// Sort alphabetically by SchemaName
-		synced.sort((a, b) => a.SchemaName.localeCompare(b.SchemaName));
+		const { synced, syncResult } = this.syncEntries(
+			this.environmentVariables,
+			newEntries,
+			(entry) => entry.SchemaName,
+			(entry) => entry.Value,
+			(entry, preservedValue) => ({
+				SchemaName: entry.SchemaName,
+				Value: preservedValue as string
+			}),
+			(a, b) => a.SchemaName.localeCompare(b.SchemaName)
+		);
 
 		return {
 			settings: new DeploymentSettings(synced, this.connectionReferences),
-			syncResult: { added, removed, preserved }
+			syncResult
 		};
 	}
 
@@ -111,52 +91,85 @@ export class DeploymentSettings {
 		settings: DeploymentSettings;
 		syncResult: SyncResult;
 	} {
-		const existingMap = new Map(
-			this.connectionReferences.map(cr => [cr.LogicalName, { ConnectionId: cr.ConnectionId, ConnectorId: cr.ConnectorId }])
+		const { synced, syncResult } = this.syncEntries(
+			this.connectionReferences,
+			newEntries,
+			(entry) => entry.LogicalName,
+			(entry) => ({ ConnectionId: entry.ConnectionId, ConnectorId: entry.ConnectorId }),
+			(entry, preservedValue) => {
+				const existing = preservedValue as { ConnectionId: string; ConnectorId: string };
+				return {
+					LogicalName: entry.LogicalName,
+					ConnectionId: existing.ConnectionId,
+					ConnectorId: existing.ConnectorId
+				};
+			},
+			(a, b) => a.LogicalName.localeCompare(b.LogicalName)
 		);
+
+		return {
+			settings: new DeploymentSettings(this.environmentVariables, synced),
+			syncResult
+		};
+	}
+
+	/**
+	 * Generic sync pattern for deployment settings entries.
+	 * Business rules:
+	 * - Add entries not in existing array
+	 * - Remove entries in existing array that aren't in new data
+	 * - Preserve existing values for entries that remain (via preserveValue callback)
+	 * - Sort by provided comparator
+	 *
+	 * @param existing - Existing entries in deployment settings
+	 * @param newEntries - New entries from environment
+	 * @param keySelector - Extracts unique key from entry
+	 * @param valueExtractor - Extracts value(s) to preserve from existing entry
+	 * @param createPreservedEntry - Creates entry with preserved values
+	 * @param comparator - Sort comparator for final array
+	 * @returns Synced entries and sync statistics
+	 */
+	private syncEntries<T>(
+		existing: T[],
+		newEntries: T[],
+		keySelector: (entry: T) => string,
+		valueExtractor: (entry: T) => unknown,
+		createPreservedEntry: (newEntry: T, preservedValue: unknown) => T,
+		comparator: (a: T, b: T) => number
+	): { synced: T[]; syncResult: SyncResult } {
+		const existingMap = new Map(existing.map(entry => [keySelector(entry), valueExtractor(entry)]));
 
 		let added = 0;
 		let preserved = 0;
 
-		const synced: ConnectionReferenceEntry[] = [];
+		const synced: T[] = [];
 
 		// Add or preserve existing entries
 		for (const entry of newEntries) {
-			if (existingMap.has(entry.LogicalName)) {
-				// Preserve existing values (don't overwrite with environment values)
-				const existing = existingMap.get(entry.LogicalName);
-				if (existing !== undefined) {
-					synced.push({
-						LogicalName: entry.LogicalName,
-						ConnectionId: existing.ConnectionId,
-						ConnectorId: existing.ConnectorId
-					});
+			const key = keySelector(entry);
+			if (existingMap.has(key)) {
+				// Preserve existing value (don't overwrite with environment value)
+				const existingValue = existingMap.get(key);
+				if (existingValue !== undefined) {
+					synced.push(createPreservedEntry(entry, existingValue));
 					preserved++;
 				}
 			} else {
-				// Add new entry with environment values
+				// Add new entry with environment value
 				synced.push(entry);
 				added++;
 			}
 		}
 
 		// Calculate removed count
-		const removed = this.connectionReferences.length - preserved;
+		const removed = existing.length - preserved;
 
-		// Sort alphabetically by LogicalName
-		synced.sort((a, b) => a.LogicalName.localeCompare(b.LogicalName));
+		// Sort alphabetically
+		synced.sort(comparator);
 
 		return {
-			settings: new DeploymentSettings(this.environmentVariables, synced),
+			synced,
 			syncResult: { added, removed, preserved }
 		};
-	}
-
-	/**
-	 * Creates an empty DeploymentSettings instance.
-	 * @returns New DeploymentSettings with empty arrays
-	 */
-	static createEmpty(): DeploymentSettings {
-		return new DeploymentSettings([], []);
 	}
 }

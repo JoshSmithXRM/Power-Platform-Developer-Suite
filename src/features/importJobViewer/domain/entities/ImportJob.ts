@@ -26,7 +26,6 @@ export enum ImportJobStatus {
  * - Determine completion status
  * - Calculate duration
  * - Provide user-friendly status labels
- * - Derive status from Dataverse fields (since importjobs entity lacks statuscode)
  */
 export class ImportJob {
 	/**
@@ -57,96 +56,9 @@ export class ImportJob {
 		public readonly operationContext: string | null,
 		public readonly importLogXml: string | null = null
 	) {
-		// Validate progress is within valid range
 		if (progress < 0 || progress > 100) {
 			throw new ValidationError('ImportJob', 'progress', progress, 'Must be between 0 and 100');
 		}
-	}
-
-	/**
-	 * Factory method: Creates ImportJob with status derived from Dataverse raw data.
-	 *
-	 * The Dataverse importjobs entity doesn't have a statuscode field. We must
-	 * infer the status from completedOn, startedOn, and progress fields.
-	 *
-	 * Business Rules:
-	 * - If completedOn is set and progress < 100: Failed
-	 * - If completedOn is set and progress = 100: Completed
-	 * - If startedOn is set but no completedOn and progress = 0: Failed
-	 * - If startedOn is set but no completedOn and progress > 0: InProgress
-	 * - If neither startedOn nor completedOn is set: Queued
-	 *
-	 * @param id - Import job GUID
-	 * @param name - Import job name
-	 * @param solutionName - Name of the solution being imported
-	 * @param createdBy - User who initiated the import
-	 * @param createdOn - When the import was created
-	 * @param completedOn - When the import finished (null if still running)
-	 * @param startedOn - When the import started (null if not started)
-	 * @param progress - Progress percentage (0-100)
-	 * @param importContext - Import context
-	 * @param operationContext - Operation context
-	 * @param importLogXml - XML log data (null if not loaded)
-	 * @returns ImportJob with derived status
-	 */
-	static createFromDataverseData(
-		id: string,
-		name: string,
-		solutionName: string,
-		createdBy: string,
-		createdOn: Date,
-		completedOn: Date | null,
-		startedOn: Date | null,
-		progress: number,
-		importContext: string | null,
-		operationContext: string | null,
-		importLogXml: string | null = null
-	): ImportJob {
-		const status = ImportJob.deriveStatusFromFields(completedOn, startedOn, progress);
-
-		return new ImportJob(
-			id,
-			name,
-			solutionName,
-			createdBy,
-			createdOn,
-			completedOn,
-			progress,
-			status,
-			importContext,
-			operationContext,
-			importLogXml
-		);
-	}
-
-	/**
-	 * Business logic: Derives ImportJobStatus from Dataverse field values.
-	 *
-	 * Dataverse importjobs entity lacks a statuscode field, so we infer
-	 * status from the combination of completedOn, startedOn, and progress.
-	 *
-	 * @param completedOn - Completion date (null if not completed)
-	 * @param startedOn - Start date (null if not started)
-	 * @param progress - Progress percentage (0-100)
-	 * @returns Derived ImportJobStatus
-	 */
-	private static deriveStatusFromFields(
-		completedOn: Date | null,
-		startedOn: Date | null,
-		progress: number
-	): ImportJobStatus {
-		// If job has completed
-		if (completedOn) {
-			return progress < 100 ? ImportJobStatus.Failed : ImportJobStatus.Completed;
-		}
-
-		// If job has started but not completed
-		if (startedOn) {
-			return progress === 0 ? ImportJobStatus.Failed : ImportJobStatus.InProgress;
-		}
-
-		// Job hasn't started yet
-		return ImportJobStatus.Queued;
 	}
 
 	/**
@@ -210,8 +122,7 @@ export class ImportJob {
 	}
 
 	/**
-	 * Gets sort priority for UI ordering.
-	 * Business rule: In-progress jobs first, then by most recent creation date.
+	 * Gets sort priority for UI ordering (in-progress first).
 	 * @returns 0 for in-progress jobs (highest priority), 1 for completed jobs
 	 */
 	getSortPriority(): number {
@@ -224,22 +135,5 @@ export class ImportJob {
 	 */
 	hasLog(): boolean {
 		return this.importLogXml !== null && this.importLogXml.length > 0;
-	}
-
-	/**
-	 * Sorts import jobs by business rules: in-progress jobs first (by priority), then by most recent creation date.
-	 * Creates a defensive copy to avoid mutating the original array.
-	 * @param jobs - Array of ImportJob entities to sort
-	 * @returns New sorted array
-	 */
-	static sort(jobs: ImportJob[]): ImportJob[] {
-		return [...jobs].sort((a, b) => {
-			const priorityDiff = a.getSortPriority() - b.getSortPriority();
-			if (priorityDiff !== 0) {
-				return priorityDiff;
-			}
-			// Most recent first
-			return b.createdOn.getTime() - a.createdOn.getTime();
-		});
 	}
 }

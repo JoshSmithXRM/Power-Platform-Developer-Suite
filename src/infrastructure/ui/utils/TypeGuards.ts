@@ -24,7 +24,7 @@ export function isWebviewMessage(message: unknown): message is WebviewMessage {
 	}
 
 	const obj = message as Record<string, unknown>;
-	return 'command' in obj && typeof obj.command === 'string';
+	return 'command' in obj && typeof obj['command'] === 'string';
 }
 
 /**
@@ -68,6 +68,17 @@ export interface SaveEnvironmentMessage {
 	};
 }
 
+/**
+ * Type guard for SaveEnvironmentMessage with multi-property validation.
+ *
+ * Validates message structure and all required fields for saving Power Platform
+ * environment configuration. Ensures authentication method is valid enum value.
+ * Optional properties (clientId, clientSecret, username, password) are validated
+ * elsewhere based on authentication method selected.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches SaveEnvironmentMessage structure
+ */
 export function isSaveEnvironmentMessage(message: unknown): message is SaveEnvironmentMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -119,6 +130,16 @@ export interface TestConnectionMessage {
 	};
 }
 
+/**
+ * Type guard for TestConnectionMessage with multi-property validation.
+ *
+ * Validates message structure for testing Power Platform environment connection
+ * before saving. Uses same validation rules as SaveEnvironmentMessage since
+ * connection testing requires same credential structure.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches TestConnectionMessage structure
+ */
 export function isTestConnectionMessage(message: unknown): message is TestConnectionMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -184,6 +205,16 @@ export interface DiscoverEnvironmentIdMessage {
 	};
 }
 
+/**
+ * Type guard for DiscoverEnvironmentIdMessage with multi-property validation.
+ *
+ * Validates message structure for discovering Power Platform environment GUID
+ * from Dataverse URL via Business Application Platform (BAP) API. Requires
+ * authentication credentials to query BAP API for environment metadata.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches DiscoverEnvironmentIdMessage structure
+ */
 export function isDiscoverEnvironmentIdMessage(message: unknown): message is DiscoverEnvironmentIdMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -263,6 +294,16 @@ export interface WebviewLogMessage {
 	timestamp: string;
 }
 
+/**
+ * Type guard for WebviewLogMessage with multi-property validation.
+ *
+ * Validates message structure for routing webview console logs to VS Code
+ * OutputChannel. Webviews run in isolated JavaScript context, so this message
+ * bridge enables centralized logging through extension's logging infrastructure.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches WebviewLogMessage structure
+ */
 export function isWebviewLogMessage(message: unknown): message is WebviewLogMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -357,6 +398,16 @@ export interface ClearPropertyMessage {
 	path: string;
 }
 
+/**
+ * Type guard for ClearPropertyMessage with multi-property validation.
+ *
+ * Validates message structure for clearing nested properties in deployment settings.
+ * Used for removing specific connection or environment variable values while preserving
+ * the entry structure (e.g., clear connectionId but keep connectionReferenceLogicalName).
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches ClearPropertyMessage structure
+ */
 export function isClearPropertyMessage(message: unknown): message is ClearPropertyMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -450,5 +501,31 @@ export function isOpenFlowMessage(message: unknown): message is OpenFlowMessage 
 		data !== null &&
 		'flowId' in data &&
 		typeof (data as { flowId: string }).flowId === 'string'
+	);
+}
+
+export interface SolutionChangedMessage {
+	command: 'solutionChanged';
+	data: {
+		solutionId: string;
+	};
+}
+
+export function isSolutionChangedMessage(message: unknown): message is SolutionChangedMessage {
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'solutionChanged') {
+		return false;
+	}
+
+	const data = message.data;
+
+	return (
+		typeof data === 'object' &&
+		data !== null &&
+		'solutionId' in data &&
+		typeof (data as { solutionId: string }).solutionId === 'string'
 	);
 }

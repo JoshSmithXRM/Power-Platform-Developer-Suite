@@ -19,16 +19,18 @@ export class EnvironmentListViewModelMapper {
 
 	public toViewModel(environment: Environment): EnvironmentListViewModel {
 		const lastUsed = environment.getLastUsed();
-		return {
+		const result: EnvironmentListViewModel = {
 			id: environment.getId().getValue(),
 			name: environment.getName().getValue(),
 			dataverseUrl: environment.getDataverseUrl().getValue(),
 			authenticationMethod: environment.getAuthenticationMethod().toString(),
 			isActive: environment.getIsActive(),
-			lastUsedTimestamp: lastUsed?.getTime(),
 			lastUsedDisplay: this.formatLastUsed(lastUsed),
-			statusBadge: environment.getIsActive() ? 'active' : 'inactive'
+			statusBadge: environment.getIsActive() ? 'active' : 'inactive',
+			...(lastUsed !== undefined && { lastUsedTimestamp: lastUsed.getTime() })
 		};
+
+		return result;
 	}
 
 	/**

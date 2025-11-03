@@ -109,26 +109,4 @@ export class EnvironmentVariable {
 	isInSolution(solutionComponentIds: Set<string>): boolean {
 		return solutionComponentIds.has(this.definitionId);
 	}
-
-	/**
-	 * Converts to deployment settings entry format.
-	 * Uses the effective value (current value if set, otherwise default value)
-	 * to capture environment-specific configuration for deployment.
-	 */
-	toDeploymentSettingsEntry(): { SchemaName: string; Value: string } {
-		return {
-			SchemaName: this.schemaName,
-			Value: this.getEffectiveValue() ?? ''
-		};
-	}
-
-	/**
-	 * Sorts environment variables alphabetically by schema name.
-	 * Creates a defensive copy to avoid mutating the original array.
-	 * @param variables - Array of EnvironmentVariable entities to sort
-	 * @returns New sorted array
-	 */
-	static sort(variables: EnvironmentVariable[]): EnvironmentVariable[] {
-		return [...variables].sort((a, b) => a.schemaName.localeCompare(b.schemaName));
-	}
 }

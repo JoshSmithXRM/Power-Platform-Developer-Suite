@@ -46,7 +46,10 @@ describe('LoadEnvironmentsUseCase', () => {
 			new AuthenticationMethod(AuthenticationMethodType.Interactive),
 			new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'),
 			isActive,
-			lastUsed
+			lastUsed ?? undefined,
+			undefined,
+			undefined,
+			undefined
 		);
 	}
 
@@ -71,8 +74,10 @@ describe('LoadEnvironmentsUseCase', () => {
 
 			expect(result.environments).toHaveLength(2);
 			expect(result.totalCount).toBe(2);
-			expect(result.environments[0].name).toBe('Development');
-			expect(result.environments[1].name).toBe('Production');
+			expect(result.environments[0]).toBeDefined();
+			expect(result.environments[0]!.name).toBe('Development');
+			expect(result.environments[1]).toBeDefined();
+			expect(result.environments[1]!.name).toBe('Production');
 		});
 
 		it('should identify active environment', async () => {
@@ -109,9 +114,12 @@ describe('LoadEnvironmentsUseCase', () => {
 			const result = await useCase.execute();
 
 			// Should be sorted: Production (now), Staging (yesterday), Development (last week)
-			expect(result.environments[0].name).toBe('Production');
-			expect(result.environments[1].name).toBe('Staging');
-			expect(result.environments[2].name).toBe('Development');
+			expect(result.environments[0]).toBeDefined();
+			expect(result.environments[0]!.name).toBe('Production');
+			expect(result.environments[1]).toBeDefined();
+			expect(result.environments[1]!.name).toBe('Staging');
+			expect(result.environments[2]).toBeDefined();
+			expect(result.environments[2]!.name).toBe('Development');
 		});
 
 		it('should sort environments without lastUsed alphabetically at the end', async () => {
@@ -126,9 +134,12 @@ describe('LoadEnvironmentsUseCase', () => {
 			const result = await useCase.execute();
 
 			// Should be sorted: Production (has lastUsed), then Alpha, Zebra (alphabetically)
-			expect(result.environments[0].name).toBe('Production');
-			expect(result.environments[1].name).toBe('Alpha');
-			expect(result.environments[2].name).toBe('Zebra');
+			expect(result.environments[0]).toBeDefined();
+			expect(result.environments[0]!.name).toBe('Production');
+			expect(result.environments[1]).toBeDefined();
+			expect(result.environments[1]!.name).toBe('Alpha');
+			expect(result.environments[2]).toBeDefined();
+			expect(result.environments[2]!.name).toBe('Zebra');
 		});
 
 		it('should map environment properties correctly', async () => {
@@ -138,12 +149,13 @@ describe('LoadEnvironmentsUseCase', () => {
 			const result = await useCase.execute();
 
 			const viewModel = result.environments[0];
-			expect(viewModel.id).toBe('env-1');
-			expect(viewModel.name).toBe('Development');
-			expect(viewModel.dataverseUrl).toBe('https://org.crm.dynamics.com');
-			expect(viewModel.authenticationMethod).toBe('Interactive');
-			expect(viewModel.isActive).toBe(true);
-			expect(viewModel.statusBadge).toBe('active');
+			expect(viewModel).toBeDefined();
+			expect(viewModel!.id).toBe('env-1');
+			expect(viewModel!.name).toBe('Development');
+			expect(viewModel!.dataverseUrl).toBe('https://org.crm.dynamics.com');
+			expect(viewModel!.authenticationMethod).toBe('Interactive');
+			expect(viewModel!.isActive).toBe(true);
+			expect(viewModel!.statusBadge).toBe('active');
 		});
 	});
 });

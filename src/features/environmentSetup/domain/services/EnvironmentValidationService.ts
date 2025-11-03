@@ -47,8 +47,8 @@ export class EnvironmentValidationService {
 	 * @param {boolean} isNameUnique - Whether name is unique (provided by use case)
 	 * @param {boolean} hasExistingClientSecret - Whether client secret exists in storage
 	 * @param {boolean} hasExistingPassword - Whether password exists in storage
-	 * @param {string} [clientSecret] - New client secret being provided
-	 * @param {string} [password] - New password being provided
+	 * @param {string | undefined} clientSecret - New client secret being provided
+	 * @param {string | undefined} password - New password being provided
 	 * @returns {ValidationResult} Result with errors and warnings
 	 */
 	public validateForSave(
@@ -56,8 +56,8 @@ export class EnvironmentValidationService {
 		isNameUnique: boolean,
 		hasExistingClientSecret: boolean,
 		hasExistingPassword: boolean,
-		clientSecret?: string,
-		password?: string
+		clientSecret: string | undefined,
+		password: string | undefined
 	): ValidationResult {
 		const errors: string[] = [];
 		const warnings: string[] = [];

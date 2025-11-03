@@ -33,7 +33,9 @@ class TestDataTablePanel extends DataTablePanel {
 		configOverride?: Partial<DataTableConfig>
 	) {
 		super(panel, extensionUri, getEnvironments, getEnvironmentById, logger, initialEnvironmentId);
-		this.configOverride = configOverride;
+		if (configOverride !== undefined) {
+			this.configOverride = configOverride;
+		}
 	}
 
 	protected getConfig(): DataTableConfig {

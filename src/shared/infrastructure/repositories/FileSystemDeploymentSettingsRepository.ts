@@ -11,6 +11,36 @@ import {
 import type { IDeploymentSettingsRepository } from '../../domain/interfaces/IDeploymentSettingsRepository';
 
 /**
+ * Type guard to validate EnvironmentVariableEntry structure.
+ */
+function isEnvironmentVariableEntry(obj: unknown): obj is EnvironmentVariableEntry {
+	return (
+		typeof obj === 'object' &&
+		obj !== null &&
+		'SchemaName' in obj &&
+		typeof obj.SchemaName === 'string' &&
+		'Value' in obj &&
+		typeof obj.Value === 'string'
+	);
+}
+
+/**
+ * Type guard to validate ConnectionReferenceEntry structure.
+ */
+function isConnectionReferenceEntry(obj: unknown): obj is ConnectionReferenceEntry {
+	return (
+		typeof obj === 'object' &&
+		obj !== null &&
+		'LogicalName' in obj &&
+		typeof obj.LogicalName === 'string' &&
+		'ConnectionId' in obj &&
+		typeof obj.ConnectionId === 'string' &&
+		'ConnectorId' in obj &&
+		typeof obj.ConnectorId === 'string'
+	);
+}
+
+/**
  * Infrastructure implementation of IDeploymentSettingsRepository using Node.js file system.
  */
 export class FileSystemDeploymentSettingsRepository implements IDeploymentSettingsRepository {
@@ -32,12 +62,34 @@ export class FileSystemDeploymentSettingsRepository implements IDeploymentSettin
 			}
 
 			const jsonObj = json as Record<string, unknown>;
-			const environmentVariables = (Array.isArray(jsonObj.EnvironmentVariables)
-				? jsonObj.EnvironmentVariables
-				: []) as EnvironmentVariableEntry[];
-			const connectionReferences = (Array.isArray(jsonObj.ConnectionReferences)
-				? jsonObj.ConnectionReferences
-				: []) as ConnectionReferenceEntry[];
+
+			// Validate and parse EnvironmentVariables array
+			const environmentVariables: EnvironmentVariableEntry[] = [];
+			if (Array.isArray(jsonObj['EnvironmentVariables'])) {
+				for (let i = 0; i < jsonObj['EnvironmentVariables'].length; i++) {
+					const entry: unknown = jsonObj['EnvironmentVariables'][i];
+					if (!isEnvironmentVariableEntry(entry)) {
+						throw new Error(
+							`Invalid EnvironmentVariables entry at index ${i}: expected object with SchemaName (string) and Value (string)`
+						);
+					}
+					environmentVariables.push(entry);
+				}
+			}
+
+			// Validate and parse ConnectionReferences array
+			const connectionReferences: ConnectionReferenceEntry[] = [];
+			if (Array.isArray(jsonObj['ConnectionReferences'])) {
+				for (let i = 0; i < jsonObj['ConnectionReferences'].length; i++) {
+					const entry: unknown = jsonObj['ConnectionReferences'][i];
+					if (!isConnectionReferenceEntry(entry)) {
+						throw new Error(
+							`Invalid ConnectionReferences entry at index ${i}: expected object with LogicalName (string), ConnectionId (string), and ConnectorId (string)`
+						);
+					}
+					connectionReferences.push(entry);
+				}
+			}
 
 			this.logger.info('Deployment settings read successfully', {
 				filePath,
@@ -93,13 +145,10 @@ export class FileSystemDeploymentSettingsRepository implements IDeploymentSettin
 	/**
 	 * Prompts user to select or create a deployment settings file.
 	 */
-	async promptForFilePath(suggestedName?: string, defaultUri?: string): Promise<string | undefined> {
+	async promptForFilePath(suggestedName: string | undefined, defaultUri: string | undefined): Promise<string | undefined> {
 		this.logger.debug('Prompting for deployment settings file path', { suggestedName, defaultUri });
 
 		const options: vscode.SaveDialogOptions = {
-			defaultUri: defaultUri
-				? vscode.Uri.file(defaultUri)
-				: vscode.workspace.workspaceFolders?.[0]?.uri,
 			filters: {
 				'Deployment Settings': ['json'],
 				'All Files': ['*']
@@ -107,9 +156,17 @@ export class FileSystemDeploymentSettingsRepository implements IDeploymentSettin
 			saveLabel: 'Select Deployment Settings File'
 		};
 
-		// If suggested name provided, append it to default URI
-		if (suggestedName && options.defaultUri) {
-			options.defaultUri = vscode.Uri.joinPath(options.defaultUri, suggestedName);
+		const baseUri = defaultUri
+			? vscode.Uri.file(defaultUri)
+			: vscode.workspace.workspaceFolders?.[0]?.uri;
+
+		if (baseUri !== undefined) {
+			// If suggested name provided, append it to default URI
+			if (suggestedName !== undefined) {
+				options.defaultUri = vscode.Uri.joinPath(baseUri, suggestedName);
+			} else {
+				options.defaultUri = baseUri;
+			}
 		}
 
 		const uri = await vscode.window.showSaveDialog(options);

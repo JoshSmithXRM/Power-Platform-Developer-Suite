@@ -68,7 +68,7 @@ describe('ListSolutionsUseCase', () => {
 
 			mockRepository.findAll.mockResolvedValue(solutions);
 
-			const result = await useCase.execute('env-123');
+			const result = await useCase.execute('env-123', undefined);
 
 			expect(mockRepository.findAll).toHaveBeenCalledWith('env-123', undefined, undefined);
 			expect(result).toHaveLength(2);
@@ -85,12 +85,14 @@ describe('ListSolutionsUseCase', () => {
 
 			mockRepository.findAll.mockResolvedValue(solutions);
 
-			const result = await useCase.execute('env-123');
+			const result = await useCase.execute('env-123', undefined);
 
-			// Use case should NOT sort - that's a presentation concern handled by the mapper
-			expect(result[0].uniqueName).toBe('Zebra');
-			expect(result[1].uniqueName).toBe('Default');
-			expect(result[2].uniqueName).toBe('Alpha');
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.uniqueName).toBe('Zebra');
+			expect(result[1]).toBeDefined();
+			expect(result[1]!.uniqueName).toBe('Default');
+			expect(result[2]).toBeDefined();
+			expect(result[2]!.uniqueName).toBe('Alpha');
 			expect(result.length).toBe(3);
 		});
 
@@ -103,16 +105,15 @@ describe('ListSolutionsUseCase', () => {
 			mockRepository.findAll.mockResolvedValue(solutions);
 
 			const originalOrder = solutions.map(s => s.uniqueName);
-			await useCase.execute('env-123');
+			await useCase.execute('env-123', undefined);
 
-			// Repository array should remain unchanged
 			expect(solutions.map(s => s.uniqueName)).toEqual(originalOrder);
 		});
 
 		it('should handle empty solution list', async () => {
 			mockRepository.findAll.mockResolvedValue([]);
 
-			const result = await useCase.execute('env-123');
+			const result = await useCase.execute('env-123', undefined);
 
 			expect(result).toHaveLength(0);
 			expect(mockLogger.info).toHaveBeenCalledWith('ListSolutionsUseCase completed', { count: 0 });
@@ -148,7 +149,7 @@ describe('ListSolutionsUseCase', () => {
 			const error = new Error('Repository failed');
 			mockRepository.findAll.mockRejectedValue(error);
 
-			await expect(useCase.execute('env-123')).rejects.toThrow('Repository failed');
+			await expect(useCase.execute('env-123', undefined)).rejects.toThrow('Repository failed');
 
 			expect(mockLogger.error).toHaveBeenCalledWith('ListSolutionsUseCase failed', error);
 		});
@@ -157,9 +158,8 @@ describe('ListSolutionsUseCase', () => {
 			const cancelledException = new OperationCancelledException();
 			mockRepository.findAll.mockRejectedValue(cancelledException);
 
-			await expect(useCase.execute('env-123')).rejects.toThrow(OperationCancelledException);
+			await expect(useCase.execute('env-123', undefined)).rejects.toThrow(OperationCancelledException);
 
-			// Error logger should still be called since we log all errors, but the error is then rethrown
 			expect(mockLogger.error).toHaveBeenCalledWith('ListSolutionsUseCase failed', cancelledException);
 		});
 	});

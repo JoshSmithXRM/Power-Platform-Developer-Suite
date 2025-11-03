@@ -1,138 +1,172 @@
 # Code Reviewer Code Review - 2025-11-03
 
-## Production Readiness: 6/10
+## Production Readiness: 7/10
 
-**Rationale**: Code follows Clean Architecture but has critical violations of CLAUDE.md rules including static utility methods on entities, presentation logic in domain, and missing domain service for complex logic.
+**Rationale**: Significant Clean Architecture improvements with domain services and mappers properly separated, but critical violations remain with presentation logic in domain entities (getTypeName, getStatusLabel) and static utility method on value object.
 
 ## Issues Found
 
 ### CRITICAL
 
-**CloudFlow.ts:134** - Static utility method violates CLAUDE.md rule #13
-- **Problem**: `CloudFlow.sort()` is a static utility method on an entity - explicitly forbidden by CLAUDE.md rule #13 which states "Static utility methods on entities - Put in domain services or collection classes"
-- **Fix**: Create `CloudFlowCollection` domain service with `sort()` method, or extract to standalone `CloudFlowSorter` domain service
-- **Rationale**: Static utility methods on entities violate Single Responsibility Principle and make entities harder to test and extend
+**EnvironmentVariable.ts:78-95** - Presentation logic in domain entity violates CLAUDE.md rule #14
+- **Problem**: `getTypeName()` converts enum to display string ("String", "Number", etc.) - this is presentation formatting logic in domain entity, explicitly forbidden by CLAUDE.md rule #14: "Presentation logic in domain - Display formatting belongs in mappers, not entities"
+- **Fix**: Move to `EnvironmentVariableViewModelMapper` - create private static method `formatTypeName(type: EnvironmentVariableType): string` and use in mapper instead of calling entity method
+- **Rationale**: Display formatting for UI belongs in application layer mappers, not domain entities
 
-**ConnectionReference.ts:39** - Presentation logic in domain entity violates CLAUDE.md rule #14
-- **Problem**: `toDeploymentSettingsEntry()` is presentation/data transformation logic in domain entity - explicitly forbidden by CLAUDE.md rule #14 which states "Presentation logic in domain - Display formatting belongs in mappers, not entities"
-- **Fix**: Move transformation logic to `ConnectionReferenceToDeploymentSettingsMapper` in application layer
-- **Rationale**: Domain entities should contain business logic only, not presentation or data transformation logic
+**ImportJob.ts:94-111** - Presentation logic in domain entity violates CLAUDE.md rule #14
+- **Problem**: `getStatusLabel()` converts enum to display string ("In Progress", "Completed", etc.) - presentation formatting in domain entity
+- **Fix**: Move to `ImportJobViewModelMapper` - create private static method `formatStatusLabel(status: ImportJobStatus): string` and use in mapper
+- **Rationale**: User-facing labels are presentation concern, domain should only have business logic
 
-**ConnectionReference.ts:53** - Static utility method violates CLAUDE.md rule #13
-- **Problem**: `ConnectionReference.sort()` is a static utility method on entity
-- **Fix**: Create `ConnectionReferenceCollection` domain service or move to application layer mapper
-- **Rationale**: Same as CloudFlow.sort() - static utility methods don't belong on entities
+**FlowConnectionRelationship.ts:70-81** - Static utility method on value object violates CLAUDE.md rule #13
+- **Problem**: `FlowConnectionRelationship.sort()` is static utility method on value object - CLAUDE.md rule #13: "Static utility methods on entities - Put in domain services or collection classes"
+- **Fix**: Create `FlowConnectionRelationshipCollectionService` domain service with `sort()` method, update `FlowConnectionRelationshipViewModelMapper` to use service instead
+- **Rationale**: Sorting is collection operation, not value object behavior; domain services provide better testability and separation of concerns
 
-**EnvironmentVariable.ts:118** - Presentation logic in domain entity violates CLAUDE.md rule #14
-- **Problem**: `toDeploymentSettingsEntry()` is presentation/data transformation logic in domain entity
-- **Fix**: Move to `EnvironmentVariableToDeploymentSettingsMapper` in application layer
-- **Rationale**: Transformation for external systems belongs in mappers, not domain entities
-
-**EnvironmentVariable.ts:131** - Static utility method violates CLAUDE.md rule #13
-- **Problem**: `EnvironmentVariable.sort()` is static utility method on entity
-- **Fix**: Create domain service or move to mapper
-- **Rationale**: Sorting is presentation concern or collection operation, not entity behavior
-
-**Solution.ts:90** - Static utility method violates CLAUDE.md rule #13
-- **Problem**: `Solution.sort()` is static utility method on entity with business logic (sort priority)
-- **Fix**: Create `SolutionCollection` domain service to encapsulate sorting business rules
-- **Rationale**: Sorting with business rules (Default solution first) should be in domain service, not static method
-
-**IPanelStateRepository.ts:13** - Nullable type should use explicit null check pattern
-- **Problem**: `selectedSolutionId: string | null` allows null but CLAUDE.md emphasizes explicit null checks and the codebase uses Default Solution ID as default
-- **Fix**: Change to `selectedSolutionId: string` (never null) and update load/save to use `Solution.DEFAULT_SOLUTION_ID` as default
-- **Rationale**: Migration comment in DataTablePanel.ts line 143 shows null is legacy pattern being migrated away from
-
-**DataTablePanel.ts:68-69** - Should use non-null default instead of nullable field
-- **Problem**: `currentSolutionId` starts as default but is typed to allow arbitrary assignment; defaults to `Solution.DEFAULT_SOLUTION_ID` suggesting null should never be needed
-- **Fix**: Document that currentSolutionId is never null after initialization and update persistence to match
-- **Rationale**: Consistency with migration from legacy null values (line 143 comment)
+**EnvironmentVariable.ts:78-95, ImportJob.ts:94-111** - Tests for presentation logic in domain layer
+- **Problem**: Domain entity tests (ImportJob.test.ts lines 160-194) verify presentation formatting output, coupling domain tests to UI strings
+- **Fix**: Remove tests for getTypeName/getStatusLabel from domain tests, add tests in mapper test files verifying correct string output
+- **Rationale**: Domain tests should verify business logic only, not UI formatting strings
 
 ### MODERATE
 
-**DeploymentSettings.ts:60-61** - Inconsistent parameter ordering between sync methods
-- **Problem**: Both `syncEnvironmentVariables()` and `syncConnectionReferences()` have identical parameter patterns but map operations are structured differently internally
-- **Fix**: Extract sync logic to private helper method to reduce duplication: `private syncEntries<T extends { [key: string]: string }>(existing: T[], newEntries: T[], keySelector: (entry: T) => string)`
-- **Rationale**: Two sync methods have 90% identical logic - violates DRY principle
+**CloudFlowCollectionService.ts:10-12, ConnectionReferenceCollectionService.ts:10-14, EnvironmentVariableCollectionService.ts:17-19** - Inconsistent naming pattern
+- **Problem**: Three collection services use `sort()` method name but `ImportJobSorter` uses different naming convention with dedicated class
+- **Fix**: Either rename ImportJobSorter to ImportJobCollectionService with sort() method, or rename all collection services to XxxSorter for consistency
+- **Rationale**: Consistent naming makes codebase easier to navigate and understand patterns
 
-**ExportConnectionReferencesToDeploymentSettingsUseCase.ts:38** - Missing validation before mapping
-- **Problem**: Use case maps connection references without verifying they're valid for export (e.g., checking if they have connections)
-- **Fix**: Add validation step: filter connection references using `hasConnection()` before mapping, or document why empty values are acceptable
-- **Rationale**: Exporting CRs without connections may create invalid deployment settings
+**ListConnectionReferencesUseCase.ts:64-67** - Business logic (relationship building) orchestrated in use case but could be domain service
+- **Problem**: Use case calls `relationshipBuilder.buildRelationships()` which is good, but relationship builder could encapsulate more business rules (like filtering by solution before building)
+- **Fix**: Consider moving solution filtering logic into FlowConnectionRelationshipBuilder as `buildRelationshipsForSolution()` method
+- **Rationale**: Domain services should encapsulate complete business operations, not just parts
 
-**ExportEnvironmentVariablesToDeploymentSettingsUseCase.ts:36** - Missing validation before mapping
-- **Problem**: Use case maps environment variables without verifying they have values set
-- **Fix**: Add validation step: filter env vars using `hasValue()` before mapping, or document why empty values are acceptable
-- **Rationale**: Exporting env vars without values may create invalid deployment settings
+**EnvironmentVariableViewModelMapper.ts:10** - Static domain service instantiation in mapper
+- **Problem**: `private static readonly collectionService = new EnvironmentVariableCollectionService()` creates static instance instead of injecting dependency
+- **Fix**: Either make mapper methods non-static and inject service, or accept service as parameter to `toViewModels()` method
+- **Rationale**: Static instantiation prevents testing with mocks and violates dependency injection principle
 
-**FileSystemDeploymentSettingsRepository.ts:36-37** - Unsafe type casting without validation
-- **Problem**: Type casts array contents to `EnvironmentVariableEntry[]` and `ConnectionReferenceEntry[]` without validating structure
-- **Fix**: Add validation functions to verify each entry has required fields (SchemaName/Value or LogicalName/ConnectionId/ConnectorId) before casting
-- **Rationale**: Invalid JSON could be cast to wrong types, causing runtime errors downstream
+**SolutionViewModelMapper.ts:10, ImportJobViewModelMapper.ts:10** - Same static instantiation pattern
+- **Problem**: Static domain service instances in mappers (repeated 3 times across mappers)
+- **Fix**: Same as EnvironmentVariableViewModelMapper - inject or pass as parameter
+- **Rationale**: Consistent with other fix, enables testing
 
-**DataTablePanel.ts:255-262** - Solution loading happens even when filter disabled
-- **Problem**: Code loads solution filter options and persisted state even when `enableSolutionFilter` is true, but shouldn't execute if false
-- **Fix**: Wrap entire block (lines 255-262) in the existing if statement condition
-- **Rationale**: Unnecessary work and potential errors if solution repo fails when feature disabled
+**DeploymentSettingsFactory.ts:15-17** - Trivial factory method adds no value
+- **Problem**: `createEmpty()` just calls `new DeploymentSettings([], [])` - no validation, transformation, or business logic
+- **Fix**: Remove factory, call `new DeploymentSettings([], [])` directly where needed, or add meaningful factory methods (e.g., `createFromEnvironment()`, `mergeSettings()`)
+- **Rationale**: Factories should provide value beyond simple constructor calls
 
-**DataTablePanel.ts:306-314** - Duplicate solution loading logic
-- **Problem**: Same solution loading code appears in both `initialize()` and `switchEnvironment()` methods
-- **Fix**: Extract to private method `private async loadAndApplySolutionFilter(): Promise<void>`
-- **Rationale**: Violates DRY principle - same logic duplicated twice
-
-**ListConnectionReferencesUseCase.ts:143-228** - Complex relationship building logic in use case
-- **Problem**: `buildRelationships()` method contains complex business logic (case-insensitive matching, orphan detection) that belongs in domain layer
-- **Fix**: Create `FlowConnectionRelationshipBuilder` domain service to handle relationship construction logic
-- **Rationale**: Use cases should orchestrate, not implement complex logic (CLAUDE.md rule #8)
+**ImportJobFactory.ts:34-62** - Factory has business logic that could be in entity
+- **Problem**: `deriveStatusFromFields()` contains business rules for status determination - this could be static factory method on ImportJob entity or remain in factory
+- **Fix**: Document why this is in factory (Dataverse API limitation) rather than entity, or move to entity as `static createFromDataverseFields()`
+- **Rationale**: Business logic placement should be explicit and justified
 
 ### MINOR
 
-**CloudFlow.ts:34** - Unused variable with underscore prefix
-- **Problem**: `_error` variable caught but never used - underscore prefix suppresses TypeScript warning
-- **Fix**: Remove variable entirely: `} catch { throw new ValidationError(...); }`
-- **Rationale**: Cleaner code without unnecessary variable binding
+**ConnectionReference.ts:19-21** - Method name doesn't express business rule clearly
+- **Problem**: `hasConnection()` returns true when connectionId is not null, but doesn't express WHY this matters (business rule: "Connection references without connections cannot be used by flows")
+- **Fix**: Add JSDoc comment explaining business rule (already present, good!) or consider renaming to `canBeUsedByFlows()` for clarity
+- **Rationale**: Method names should express business intent, not just technical check
 
-**CloudFlow.ts:102** - Same unused variable pattern
-- **Problem**: `_error` caught but never used in extractConnectionReferenceNames
-- **Fix**: Use catch without binding: `} catch { return []; }`
-- **Rationale**: Consistent with CloudFlow.ts:34 fix
+**CloudFlow.ts:96-98** - Method `hasConnectionReferences()` duplicates logic
+- **Problem**: Calls `extractConnectionReferenceNames().length > 0` instead of checking clientData directly
+- **Fix**: Optimize by checking `hasClientData()` first (early return false), then parsing once and caching result, or accept current implementation as clear code
+- **Rationale**: Minor performance issue but code clarity is good - acceptable tradeoff
 
-**DeploymentSettings.ts:73** - Redundant undefined check after has()
-- **Problem**: `if (existingValue !== undefined)` check is redundant after `has()` returns true - Map.get() returns undefined only if key doesn't exist
-- **Fix**: Remove undefined check: `const existingValue = existingMap.get(entry.SchemaName); synced.push({ SchemaName: entry.SchemaName, Value: existingValue });`
-- **Rationale**: Cleaner code - has() guarantees get() returns defined value
+**EnvironmentVariable.ts:41-50** - Validation in constructor could throw more specific error
+- **Problem**: Throws generic `ValidationError` for invalid type code, but doesn't suggest valid values
+- **Fix**: Update error message: `Must be a valid EnvironmentVariableType enum value (100000000-100000005)`
+- **Rationale**: Better developer experience with actionable error messages
 
-**DeploymentSettings.ts:128** - Same redundant undefined check
-- **Problem**: Same redundant check in syncConnectionReferences
-- **Fix**: Remove undefined check like line 73
-- **Rationale**: Consistency and cleaner code
+**Solution.ts:58-60** - Version validation regex allows 2+ segments but comment says "X.X minimum"
+- **Problem**: Regex `/^\d+(\.\d+)+$/` allows unlimited segments (9.0.2404.3002) but comment implies only 2 minimum
+- **Fix**: Update comment to clarify: "Must have at least 2 numeric segments (e.g., 1.0, 1.0.0, or 9.0.2404.3002)"
+- **Rationale**: Comments should match implementation precisely
 
-**ListConnectionReferencesUseCase.ts:104** - Filter operation could use entity method
-- **Problem**: Manual filtering `flows.filter((flow) => flowIdSet.has(flow.id))` when entity has `isInSolution()` method
-- **Fix**: Use entity method: `filteredFlows = flows.filter(flow => flow.isInSolution(flowIdSet));` (requires adding method to CloudFlow entity)
-- **Rationale**: Consistent use of entity behavior methods instead of external logic
+**ImportJob.ts:59-62** - Progress validation could use constant
+- **Problem**: Hardcoded 0 and 100 in validation without named constants
+- **Fix**: Add `private static readonly MIN_PROGRESS = 0; private static readonly MAX_PROGRESS = 100;` and use in validation
+- **Rationale**: Named constants improve maintainability and self-document valid range
 
-**ListConnectionReferencesUseCase.ts:105** - Same manual filtering pattern
-- **Problem**: Manual filtering for connection references
-- **Fix**: Use entity method: `filteredConnectionRefs = connectionRefs.filter(cr => cr.isInSolution(crIdSet));`
-- **Rationale**: Consistency with other entity filtering
+**FlowConnectionRelationshipBuilder.ts:41** - Comment about case-insensitive behavior could be more prominent
+- **Problem**: Critical business rule (case-insensitive matching) is documented in private method comment but not in public method JSDoc
+- **Fix**: Add to `buildRelationships()` JSDoc: "@remarks Uses case-insensitive matching for connection reference names to align with Power Platform behavior"
+- **Rationale**: Important business rules should be documented on public API
 
-**DataTablePanel.ts:363** - Hardcoded default value duplicates constant
-- **Problem**: `Solution.DEFAULT_SOLUTION_ID` is used as fallback but extracted as ternary instead of nullish coalescing
-- **Fix**: Simplify: `const solutionId = (message.data as { solutionId: string }).solutionId ?? Solution.DEFAULT_SOLUTION_ID;`
-- **Rationale**: Cleaner code using nullish coalescing operator
+**CloudFlowCollectionService.ts, ConnectionReferenceCollectionService.ts, EnvironmentVariableCollectionService.ts** - Defensive copy pattern repeated
+- **Problem**: All three services use identical defensive copy pattern `[...items].sort()` with same comment
+- **Fix**: Document pattern once in CLAUDE.md or architecture guide, reference in code comments
+- **Rationale**: Reduce comment duplication while maintaining clarity
 
-**IPanelStateRepository.ts:1-41** - File location violates layer separation
-- **Problem**: Interface is in `infrastructure/ui/` but should be in `domain/interfaces/` or `shared/domain/interfaces/`
-- **Fix**: Move to `src/shared/domain/interfaces/IPanelStateRepository.ts`
-- **Rationale**: Domain interfaces should live in domain layer, not infrastructure layer
+**ListEnvironmentVariablesUseCase.ts:120-143** - Join operation could be extracted to domain service
+- **Problem**: `joinDefinitionsWithValues()` contains domain logic (how to combine definitions with values) in use case
+- **Fix**: Create `EnvironmentVariableFactory` domain service with `createFromDefinitionsAndValues()` method
+- **Rationale**: Domain logic for entity creation belongs in domain layer, not use case
 
-**VSCodePanelStateRepository.ts:1-89** - Implementation references interface from wrong layer
-- **Problem**: Infrastructure implementation imports from infrastructure layer interface instead of domain layer
-- **Fix**: After moving IPanelStateRepository to domain, update import path
-- **Rationale**: Clean Architecture - infrastructure implements domain interfaces
+## Recommended ESLint Rules
 
-**MakerUrlBuilder.ts:8** - Default parameter in constructor
-- **Problem**: Default parameter `baseUrl: string = 'https://make.powerapps.com'` prevents proper dependency injection for testing
-- **Fix**: Remove default, require explicit injection, create factory function for default URL
-- **Rationale**: Explicit dependencies are easier to test and override for sovereign clouds
+**Pattern**: Presentation formatting methods in domain entities (getTypeName, getStatusLabel, toDisplayString, formatXxx)
+- **Rule Name**: `@powerplatform/no-presentation-in-domain`
+- **Severity**: error
+- **Current Violations**: 2 instances (EnvironmentVariable.getTypeName, ImportJob.getStatusLabel)
+- **Enforcement**: Custom rule
+- **Example**:
+```typescript
+// ❌ Bad (would be caught)
+export class ImportJob {
+  getStatusLabel(): string {
+    return 'In Progress'; // Presentation formatting
+  }
+}
+
+// ✅ Good (correct pattern)
+export class ImportJobViewModelMapper {
+  private static formatStatus(status: ImportJobStatus): string {
+    return 'In Progress'; // Formatting in mapper
+  }
+}
+```
+- **Rationale**: Prevents presentation logic from leaking into domain layer, enforcing Clean Architecture boundaries
+
+**Pattern**: Static utility methods on domain entities/value objects (sort, map, filter operations)
+- **Rule Name**: `@powerplatform/no-static-utilities-on-entities`
+- **Severity**: error
+- **Current Violations**: 1 instance (FlowConnectionRelationship.sort)
+- **Enforcement**: Custom rule
+- **Example**:
+```typescript
+// ❌ Bad (would be caught)
+export class FlowConnectionRelationship {
+  static sort(items: FlowConnectionRelationship[]): FlowConnectionRelationship[] {
+    return [...items].sort();
+  }
+}
+
+// ✅ Good (correct pattern)
+export class FlowConnectionRelationshipCollectionService {
+  sort(items: FlowConnectionRelationship[]): FlowConnectionRelationship[] {
+    return [...items].sort();
+  }
+}
+```
+- **Rationale**: Static methods on entities violate SRP and make testing harder; domain services provide better encapsulation
+
+**Pattern**: Static instantiation of dependencies in mappers/services
+- **Rule Name**: `@typescript-eslint/no-static-dependency-instantiation`
+- **Severity**: warn
+- **Current Violations**: 3 instances (mapper static service instantiations)
+- **Enforcement**: Custom rule checking `private static readonly x = new`
+- **Example**:
+```typescript
+// ❌ Bad (would be caught)
+export class MyMapper {
+  private static readonly service = new MyService();
+}
+
+// ✅ Good (correct pattern)
+export class MyMapper {
+  static toViewModel(entity: Entity, service: MyService): ViewModel {
+    // Inject as parameter
+  }
+}
+```
+- **Rationale**: Static instantiation prevents dependency injection and testing with mocks

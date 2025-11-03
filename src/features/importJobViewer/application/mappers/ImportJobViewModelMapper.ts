@@ -1,11 +1,14 @@
 import { ImportJob } from '../../domain/entities/ImportJob';
 import { ImportJobViewModel } from '../viewModels/ImportJobViewModel';
+import { ImportJobSorter } from '../../domain/services/ImportJobSorter';
 import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
 
 /**
  * Maps ImportJob domain entities to ImportJobViewModel presentation objects.
  */
 export class ImportJobViewModelMapper {
+	private static readonly sorter = new ImportJobSorter();
+
 	/**
 	 * Converts a single ImportJob entity to a view model.
 	 * @param job - ImportJob entity to convert
@@ -34,7 +37,7 @@ export class ImportJobViewModelMapper {
 	 * @returns Array of view models
 	 */
 	static toViewModels(jobs: ImportJob[], shouldSort = false): ImportJobViewModel[] {
-		const jobsToMap = shouldSort ? ImportJob.sort(jobs) : jobs;
+		const jobsToMap = shouldSort ? this.sorter.sort(jobs) : jobs;
 		return jobsToMap.map(job => this.toViewModel(job));
 	}
 

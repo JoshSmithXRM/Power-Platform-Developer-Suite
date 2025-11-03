@@ -6,6 +6,7 @@ import { OperationCancelledException } from '../../../../shared/domain/errors/Op
 import { ListSolutionsUseCase } from '../../application/useCases/ListSolutionsUseCase';
 import { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
 import { type Solution } from '../../domain/entities/Solution';
+import { enhanceViewModelsWithSolutionLinks } from '../views/SolutionLinkView';
 import {
 	DataTablePanel,
 	type EnvironmentOption,
@@ -31,7 +32,7 @@ export class SolutionExplorerPanel extends DataTablePanel {
 		private readonly listSolutionsUseCase: ListSolutionsUseCase,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId?: string
+		initialEnvironmentId: string | undefined
 	) {
 		super(panel, extensionUri, getEnvironments, getEnvironmentById, logger, initialEnvironmentId);
 	}
@@ -47,7 +48,7 @@ export class SolutionExplorerPanel extends DataTablePanel {
 		listSolutionsUseCase: ListSolutionsUseCase,
 		urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId?: string
+		initialEnvironmentId: string | undefined
 	): Promise<SolutionExplorerPanel> {
 		const column = vscode.ViewColumn.One;
 
@@ -101,9 +102,6 @@ export class SolutionExplorerPanel extends DataTablePanel {
 		return newPanel;
 	}
 
-	/**
-	 * Returns the panel configuration.
-	 */
 	protected getConfig(): DataTableConfig {
 		return {
 			viewType: SolutionExplorerPanel.viewType,
@@ -128,16 +126,10 @@ export class SolutionExplorerPanel extends DataTablePanel {
 		};
 	}
 
-	/**
-	 * Returns panel type identifier for state persistence.
-	 */
 	protected getPanelType(): string {
 		return 'solutions';
 	}
 
-	/**
-	 * Loads solutions from the current environment.
-	 */
 	protected async loadData(): Promise<void> {
 		if (!this.currentEnvironmentId) {
 			this.logger.warn('Cannot load solutions: No environment selected');
@@ -160,12 +152,7 @@ export class SolutionExplorerPanel extends DataTablePanel {
 			}
 
 			const viewModels = SolutionViewModelMapper.toViewModels(this.solutions, true);
-
-			// Add HTML for clickable solution names
-			const enhancedViewModels = viewModels.map(vm => ({
-				...vm,
-				friendlyNameHtml: `<a class="solution-link" data-id="${vm.id}">${this.escapeHtml(vm.friendlyName)}</a>`
-			}));
+			const enhancedViewModels = enhanceViewModelsWithSolutionLinks(viewModels);
 
 			this.sendData(enhancedViewModels);
 
@@ -178,9 +165,6 @@ export class SolutionExplorerPanel extends DataTablePanel {
 		}
 	}
 
-	/**
-	 * Handles panel-specific commands from webview.
-	 */
 	protected async handlePanelCommand(message: import('../../../../infrastructure/ui/utils/TypeGuards').WebviewMessage): Promise<void> {
 		if (isOpenInMakerMessage(message)) {
 			await this.handleOpenInMaker(message.data.solutionId);
@@ -189,9 +173,6 @@ export class SolutionExplorerPanel extends DataTablePanel {
 		}
 	}
 
-	/**
-	 * Returns filter logic JavaScript for solution-specific filtering.
-	 */
 	protected getFilterLogic(): string {
 		return `
 			filtered = allData.filter(s =>
@@ -203,13 +184,8 @@ export class SolutionExplorerPanel extends DataTablePanel {
 		`;
 	}
 
-	/**
-	 * Returns custom JavaScript for solution-specific event handlers.
-	 * Attaches click handlers to solution links to open them in Maker Portal.
-	 */
 	protected getCustomJavaScript(): string {
 		return `
-			// Attach click handlers to solution links
 			document.querySelectorAll('.solution-link').forEach(link => {
 				link.addEventListener('click', (e) => {
 					const solutionId = e.target.getAttribute('data-id');
@@ -230,7 +206,6 @@ export class SolutionExplorerPanel extends DataTablePanel {
 			return;
 		}
 
-		// Get Power Platform Environment ID
 		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 		if (!environment?.powerPlatformEnvironmentId) {
 			this.logger.warn('Cannot open solution: Environment ID not configured');
@@ -262,7 +237,6 @@ export class SolutionExplorerPanel extends DataTablePanel {
 			return;
 		}
 
-		// Get Power Platform Environment ID
 		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 		if (!environment?.powerPlatformEnvironmentId) {
 			this.logger.warn('Cannot open Maker Portal: Environment ID not configured');
@@ -277,16 +251,10 @@ export class SolutionExplorerPanel extends DataTablePanel {
 		});
 	}
 
-	/**
-	 * Registers this panel in the static panels map for the given environment.
-	 */
 	protected registerPanelForEnvironment(environmentId: string): void {
 		SolutionExplorerPanel.panels.set(environmentId, this);
 	}
 
-	/**
-	 * Unregisters this panel from the static panels map for the given environment.
-	 */
 	protected unregisterPanelForEnvironment(environmentId: string): void {
 		SolutionExplorerPanel.panels.delete(environmentId);
 	}

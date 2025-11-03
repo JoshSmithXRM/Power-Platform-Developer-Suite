@@ -1,11 +1,14 @@
 import { Solution } from '../../domain/entities/Solution';
 import { SolutionViewModel } from '../viewModels/SolutionViewModel';
 import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
+import { SolutionCollectionService } from '../../domain/services/SolutionCollectionService';
 
 /**
  * Maps Solution domain entities to SolutionViewModel presentation DTOs.
  */
 export class SolutionViewModelMapper {
+  private static readonly collectionService = new SolutionCollectionService();
+
   /**
    * Maps a single Solution entity to a ViewModel.
    * @param solution - Solution entity to convert
@@ -30,11 +33,11 @@ export class SolutionViewModelMapper {
   /**
    * Maps an array of Solution entities to ViewModels.
    * @param solutions - Array of Solution entities
-   * @param shouldSort - If true, sorts solutions using domain sorting rules before mapping
+   * @param shouldSort - If true, sorts solutions (Default first, then alphabetically)
    * @returns Array of view models
    */
   static toViewModels(solutions: Solution[], shouldSort = false): SolutionViewModel[] {
-    const solutionsToMap = shouldSort ? Solution.sort(solutions) : solutions;
+    const solutionsToMap = shouldSort ? this.collectionService.sort(solutions) : solutions;
     return solutionsToMap.map((solution) => this.toViewModel(solution));
   }
 }

@@ -6,6 +6,7 @@ import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../../../../shared/infrastructure/utils/ODataQueryBuilder';
 import { IImportJobRepository } from '../../domain/interfaces/IImportJobRepository';
 import { ImportJob } from '../../domain/entities/ImportJob';
+import { ImportJobFactory } from '../../domain/services/ImportJobFactory';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
@@ -39,20 +40,24 @@ interface DataverseImportJobDto {
  * Infrastructure implementation of IImportJobRepository using Dataverse Web API.
  */
 export class DataverseApiImportJobRepository implements IImportJobRepository {
+	private readonly factory: ImportJobFactory;
+
 	constructor(
 		private readonly apiService: IDataverseApiService,
 		private readonly logger: ILogger
-	) {}
+	) {
+		this.factory = new ImportJobFactory();
+	}
 
 	/**
 	 * Fetches all import jobs from Dataverse for the specified environment.
 	 */
 	async findAll(
 		environmentId: string,
-		options?: QueryOptions,
-		cancellationToken?: ICancellationToken
+		options: QueryOptions | undefined,
+		cancellationToken: ICancellationToken | undefined
 	): Promise<ImportJob[]> {
-		// Default options: exclude 'data' field (large XML logs), expand createdby, order by createdon desc
+		// Exclude 'data' field to avoid fetching large XML logs in list view
 		const defaultOptions: QueryOptions = {
 			select: ['importjobid', 'name', 'solutionname', 'createdon', 'startedon', 'completedon', 'progress', 'importcontext', 'operationcontext', '_createdby_value'],
 			expand: 'createdby($select=fullname)',
@@ -105,10 +110,10 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 	async findByIdWithLog(
 		environmentId: string,
 		importJobId: string,
-		options?: QueryOptions,
-		cancellationToken?: ICancellationToken
+		options: QueryOptions | undefined,
+		cancellationToken: ICancellationToken | undefined
 	): Promise<ImportJob> {
-		// Default options: include 'data' field (XML log), expand createdby
+		// Include 'data' field to fetch XML log for editor display
 		const defaultOptions: QueryOptions = {
 			select: ['importjobid', 'name', 'solutionname', 'createdon', 'startedon', 'completedon', 'progress', 'importcontext', 'operationcontext', 'data', '_createdby_value'],
 			expand: 'createdby($select=fullname)'
@@ -158,11 +163,10 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 	}
 
 	/**
-	 * Maps Dataverse DTO to ImportJob domain entity.
-	 * Uses factory method to derive status from raw Dataverse fields.
+	 * Maps Dataverse DTO to ImportJob domain entity without log data.
 	 */
 	private mapToEntity(dto: DataverseImportJobDto): ImportJob {
-		return ImportJob.createFromDataverseData(
+		return this.factory.createFromDataverseData(
 			dto.importjobid,
 			dto.name || 'Unnamed Import',
 			dto.solutionname || 'Unknown Solution',
@@ -178,11 +182,10 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 	}
 
 	/**
-	 * Maps Dataverse DTO to ImportJob domain entity WITH log data.
-	 * Uses factory method to derive status from raw Dataverse fields.
+	 * Maps Dataverse DTO to ImportJob domain entity with log data included.
 	 */
 	private mapToEntityWithLog(dto: DataverseImportJobDto): ImportJob {
-		return ImportJob.createFromDataverseData(
+		return this.factory.createFromDataverseData(
 			dto.importjobid,
 			dto.name || 'Unnamed Import',
 			dto.solutionname || 'Unknown Solution',

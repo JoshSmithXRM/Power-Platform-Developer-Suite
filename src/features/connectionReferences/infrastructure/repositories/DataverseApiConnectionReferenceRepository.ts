@@ -8,16 +8,10 @@ import { IConnectionReferenceRepository } from '../../domain/interfaces/IConnect
 import { ConnectionReference } from '../../domain/entities/ConnectionReference';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
-/**
- * Dataverse API response for connectionreferences endpoint
- */
 interface DataverseConnectionReferencesResponse {
 	value: DataverseConnectionReferenceDto[];
 }
 
-/**
- * DTO for connection reference data from Dataverse API
- */
 interface DataverseConnectionReferenceDto {
 	connectionreferenceid: string;
 	connectionreferencelogicalname: string;
@@ -37,15 +31,11 @@ export class DataverseApiConnectionReferenceRepository implements IConnectionRef
 		private readonly logger: ILogger
 	) {}
 
-	/**
-	 * Fetches all connection references from Dataverse for the specified environment.
-	 */
 	async findAll(
 		environmentId: string,
-		options?: QueryOptions,
-		cancellationToken?: ICancellationToken
+		options: QueryOptions | undefined,
+		cancellationToken: ICancellationToken | undefined
 	): Promise<ConnectionReference[]> {
-		// Default options: order by logical name for consistent results
 		const defaultOptions: QueryOptions = {
 			orderBy: 'connectionreferencelogicalname'
 		};
@@ -89,9 +79,6 @@ export class DataverseApiConnectionReferenceRepository implements IConnectionRef
 		}
 	}
 
-	/**
-	 * Maps Dataverse DTO to ConnectionReference domain entity.
-	 */
 	private mapToEntity(dto: DataverseConnectionReferenceDto): ConnectionReference {
 		return new ConnectionReference(
 			dto.connectionreferenceid,

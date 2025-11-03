@@ -85,8 +85,9 @@ describe('TestConnectionUseCase', () => {
 				undefined
 			);
 			// Verify auth method was set correctly
-			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0][0];
-			expect(calledEnv.getAuthenticationMethod().getType()).toBe(AuthenticationMethodType.ServicePrincipal);
+			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0]?.[0];
+			expect(calledEnv).toBeDefined();
+			expect(calledEnv!.getAuthenticationMethod().getType()).toBe(AuthenticationMethodType.ServicePrincipal);
 		});
 
 		it('should test connection with username/password', async () => {
@@ -110,8 +111,9 @@ describe('TestConnectionUseCase', () => {
 				'secret-password'
 			);
 			// Verify username was set correctly
-			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0][0];
-			expect(calledEnv.getUsername()).toBe('admin@contoso.com');
+			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0]?.[0];
+			expect(calledEnv).toBeDefined();
+			expect(calledEnv!.getUsername()).toBe('admin@contoso.com');
 		});
 
 		it('should preserve existing environment ID for token cache', async () => {
@@ -126,8 +128,9 @@ describe('TestConnectionUseCase', () => {
 
 			await useCase.execute(request);
 
-			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0][0];
-			expect(calledEnv.getId().getValue()).toBe('env-existing-123');
+			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0]?.[0];
+			expect(calledEnv).toBeDefined();
+			expect(calledEnv!.getId().getValue()).toBe('env-existing-123');
 		});
 
 		it('should generate temporary ID when no existing ID provided', async () => {
@@ -140,8 +143,9 @@ describe('TestConnectionUseCase', () => {
 
 			await useCase.execute(request);
 
-			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0][0];
-			expect(calledEnv.getId().getValue()).toMatch(/^env-/);
+			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0]?.[0];
+			expect(calledEnv).toBeDefined();
+			expect(calledEnv!.getId().getValue()).toMatch(/^env-/);
 		});
 	});
 
@@ -415,10 +419,11 @@ describe('TestConnectionUseCase', () => {
 			expect(result.success).toBe(true);
 			expect(mockWhoAmIService.testConnection).toHaveBeenCalledTimes(1);
 
-			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0][0];
-			expect(calledEnv.getName().getValue()).toBe('Development');
-			expect(calledEnv.getDataverseUrl().getValue()).toBe('https://contoso.crm.dynamics.com');
-			expect(calledEnv.getPowerPlatformEnvironmentId()).toBe('00000000-0000-0000-0000-000000000001');
+			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0]?.[0];
+			expect(calledEnv).toBeDefined();
+			expect(calledEnv!.getName().getValue()).toBe('Development');
+			expect(calledEnv!.getDataverseUrl().getValue()).toBe('https://contoso.crm.dynamics.com');
+			expect(calledEnv!.getPowerPlatformEnvironmentId()).toBe('00000000-0000-0000-0000-000000000001');
 		});
 
 		it('should create temporary environment without optional fields', async () => {
@@ -434,10 +439,11 @@ describe('TestConnectionUseCase', () => {
 			expect(result.success).toBe(true);
 			expect(mockWhoAmIService.testConnection).toHaveBeenCalledTimes(1);
 
-			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0][0];
-			expect(calledEnv.getPowerPlatformEnvironmentId()).toBeUndefined();
-			expect(calledEnv.getClientId()).toBeUndefined();
-			expect(calledEnv.getUsername()).toBeUndefined();
+			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0]?.[0];
+			expect(calledEnv).toBeDefined();
+			expect(calledEnv!.getPowerPlatformEnvironmentId()).toBeUndefined();
+			expect(calledEnv!.getClientId()).toBeUndefined();
+			expect(calledEnv!.getUsername()).toBeUndefined();
 		});
 	});
 });

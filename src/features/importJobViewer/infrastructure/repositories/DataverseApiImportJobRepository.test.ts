@@ -52,7 +52,7 @@ describe('DataverseApiImportJobRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				'env-123',
@@ -60,13 +60,14 @@ describe('DataverseApiImportJobRepository', () => {
 				undefined
 			);
 			expect(result).toHaveLength(1);
+			expect(result[0]).toBeDefined();
 			expect(result[0]).toBeInstanceOf(ImportJob);
-			expect(result[0].id).toBe('job-1');
-			expect(result[0].name).toBe('Test Import');
-			expect(result[0].solutionName).toBe('TestSolution');
-			expect(result[0].progress).toBe(100);
-			expect(result[0].statusCode).toBe(ImportJobStatus.Completed);
-			expect(result[0].createdBy).toBe('Test User');
+			expect(result[0]!.id).toBe('job-1');
+			expect(result[0]!.name).toBe('Test Import');
+			expect(result[0]!.solutionName).toBe('TestSolution');
+			expect(result[0]!.progress).toBe(100);
+			expect(result[0]!.statusCode).toBe(ImportJobStatus.Completed);
+			expect(result[0]!.createdBy).toBe('Test User');
 		});
 
 		it('should handle null completedOn date and derive InProgress status', async () => {
@@ -90,10 +91,11 @@ describe('DataverseApiImportJobRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0].completedOn).toBeNull();
-			expect(result[0].statusCode).toBe(ImportJobStatus.InProgress);
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.completedOn).toBeNull();
+			expect(result[0]!.statusCode).toBe(ImportJobStatus.InProgress);
 		});
 
 		it('should handle missing job name with default value', async () => {
@@ -117,9 +119,10 @@ describe('DataverseApiImportJobRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0].name).toBe('Unnamed Import');
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.name).toBe('Unnamed Import');
 		});
 
 		it('should handle missing solution name with default value', async () => {
@@ -143,9 +146,10 @@ describe('DataverseApiImportJobRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0].solutionName).toBe('Unknown Solution');
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.solutionName).toBe('Unknown Solution');
 		});
 
 		it('should handle missing createdby fullname with default value', async () => {
@@ -166,9 +170,10 @@ describe('DataverseApiImportJobRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0].createdBy).toBe('Unknown User');
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.createdBy).toBe('Unknown User');
 		});
 
 		it('should derive status from completedOn and progress', async () => {
@@ -198,9 +203,10 @@ describe('DataverseApiImportJobRepository', () => {
 
 				mockApiService.get.mockResolvedValue(mockResponse);
 
-				const result = await repository.findAll('env-123');
+				const result = await repository.findAll('env-123', undefined, undefined);
 
-				expect(result[0].statusCode).toBe(testCase.expected);
+				expect(result[0]).toBeDefined();
+				expect(result[0]!.statusCode).toBe(testCase.expected);
 			}
 		});
 
@@ -234,11 +240,13 @@ describe('DataverseApiImportJobRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
 			expect(result).toHaveLength(2);
-			expect(result[0].name).toBe('Import 1');
-			expect(result[1].name).toBe('Import 2');
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.name).toBe('Import 1');
+			expect(result[1]).toBeDefined();
+			expect(result[1]!.name).toBe('Import 2');
 		});
 
 		it('should handle empty job list', async () => {
@@ -246,7 +254,7 @@ describe('DataverseApiImportJobRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
 			expect(result).toHaveLength(0);
 		});
@@ -270,7 +278,7 @@ describe('DataverseApiImportJobRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			await expect(repository.findAll('env-123')).rejects.toThrow(ValidationError);
+			await expect(repository.findAll('env-123', undefined, undefined)).rejects.toThrow(ValidationError);
 		});
 
 		it('should pass cancellation token to API service', async () => {
@@ -328,7 +336,7 @@ describe('DataverseApiImportJobRepository', () => {
 			const error = new Error('API request failed');
 			mockApiService.get.mockRejectedValue(error);
 
-			await expect(repository.findAll('env-123')).rejects.toThrow('API request failed');
+			await expect(repository.findAll('env-123', undefined, undefined)).rejects.toThrow('API request failed');
 
 			expect(mockLogger.error).toHaveBeenCalledWith('Failed to fetch import jobs from Dataverse API', error);
 		});
@@ -352,7 +360,7 @@ describe('DataverseApiImportJobRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			await repository.findAll('env-123');
+			await repository.findAll('env-123', undefined, undefined);
 
 			expect(mockLogger.debug).toHaveBeenCalledWith('Fetching import jobs from Dataverse API', { environmentId: 'env-123' });
 			expect(mockLogger.debug).toHaveBeenCalledWith('Fetched 1 import job(s) from Dataverse', { environmentId: 'env-123' });
@@ -362,7 +370,7 @@ describe('DataverseApiImportJobRepository', () => {
 			const mockResponse = { value: [] };
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			await repository.findAll('env-123');
+			await repository.findAll('env-123', undefined, undefined);
 
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				'env-123',

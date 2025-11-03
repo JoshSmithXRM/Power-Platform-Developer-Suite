@@ -19,15 +19,14 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	constructor(private readonly logger: ILogger) {}
 
 	/**
-	 * Get MSAL authority URL based on tenant ID and auth method
-	 * - ServicePrincipal: Requires specific tenant (MSAL limitation)
-	 * - Interactive/DeviceCode/UsernamePassword: Can use "organizations" if tenant not provided
+	 * Get MSAL authority URL based on tenant ID and auth method.
+	 * Service Principal requires specific tenant due to MSAL limitations.
+	 * Interactive flows can use "organizations" authority for multi-tenant scenarios.
 	 */
 	private getAuthority(environment: Environment): string {
 		const tenantId = environment.getTenantId().getValue();
 		const authMethod = environment.getAuthenticationMethod();
 
-		// ServicePrincipal REQUIRES specific tenant (MSAL limitation discovered via testing)
 		if (authMethod.requiresClientCredentials()) {
 			if (!tenantId) {
 				throw new Error('Tenant ID is required for Service Principal authentication');
@@ -35,15 +34,12 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			return `https://login.microsoftonline.com/${tenantId}`;
 		}
 
-		// Interactive, DeviceCode, UsernamePassword: use "organizations" if no tenant provided
-		// This allows users to authenticate without knowing their tenant ID
 		return tenantId
 			? `https://login.microsoftonline.com/${tenantId}`
 			: 'https://login.microsoftonline.com/organizations';
 	}
 
 	private getClientApp(environment: Environment): msal.PublicClientApplication {
-		// Cache by environment ID (isolates credentials per environment)
 		const cacheKey = environment.getId().getValue();
 
 		if (!this.clientAppCache.has(cacheKey)) {
@@ -76,10 +72,10 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	 */
 	public async getAccessTokenForEnvironment(
 		environment: Environment,
-		clientSecret?: string,
-		password?: string,
-		customScope?: string,
-		cancellationToken?: ICancellationToken
+		clientSecret: string | undefined,
+		password: string | undefined,
+		customScope: string | undefined,
+		cancellationToken: ICancellationToken | undefined
 	): Promise<string> {
 		// Check for cancellation before starting
 		if (cancellationToken?.isCancellationRequested) {
@@ -87,7 +83,6 @@ export class MsalAuthenticationService implements IAuthenticationService {
 		}
 
 		const authMethod = environment.getAuthenticationMethod().getType();
-		// Use custom scope if provided, otherwise default to Dataverse
 		const scopes = customScope
 			? [customScope]
 			: [`${environment.getDataverseUrl().getValue()}/.default`];
@@ -153,7 +148,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	 */
 	private async executeWithCancellation<T>(
 		promise: Promise<T>,
-		cancellationToken?: ICancellationToken
+		cancellationToken: ICancellationToken | undefined
 	): Promise<T> {
 		if (!cancellationToken) {
 			return promise;
@@ -169,16 +164,71 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	}
 
 	/**
-	 * Authenticates using Service Principal (client credentials flow)
-	 * Requires client ID and client secret
+	 * Attempts to acquire a token silently from cache
+	 * @param clientApp - MSAL client application instance
+	 * @param scopes - OAuth scopes to request
+	 * @param cancellationToken - Optional cancellation token
+	 * @param flowName - Name of the authentication flow for logging
+	 * @returns Access token if successful, undefined if cache miss/expired (caller should fall back to interactive flow)
+	 * @throws If authentication is cancelled by user
+	 */
+	private async tryAcquireTokenSilent(
+		clientApp: msal.PublicClientApplication,
+		scopes: string[],
+		cancellationToken: ICancellationToken | undefined,
+		flowName: string
+	): Promise<string | undefined> {
+		const accounts = await clientApp.getTokenCache().getAllAccounts();
+		if (accounts.length === 0) {
+			return undefined;
+		}
+
+		this.logger.debug('Attempting silent token acquisition from cache', {
+			accountCount: accounts.length
+		});
+
+		try {
+			const account = accounts[0];
+			if (account === undefined) {
+				throw new Error('No account found in cache');
+			}
+
+			const silentRequest: msal.SilentFlowRequest = {
+				account: account,
+				scopes: scopes
+			};
+
+			const response = await this.executeWithCancellation(
+				clientApp.acquireTokenSilent(silentRequest),
+				cancellationToken
+			);
+
+			if (response) {
+				this.logger.debug('Silent token acquisition successful');
+				return response.accessToken;
+			}
+
+			return undefined;
+		} catch (error: unknown) {
+			if (error instanceof Error && error.message.includes('cancelled')) {
+				this.logger.debug('Silent token acquisition cancelled by user');
+				throw error;
+			}
+			this.logger.debug(`Silent token acquisition failed, proceeding with ${flowName}`);
+			return undefined;
+		}
+	}
+
+	/**
+	 * Authenticates using Service Principal (client credentials flow).
+	 * Requires client ID and client secret stored in VS Code SecretStorage.
 	 */
 	private async authenticateServicePrincipal(
 		environment: Environment,
 		clientSecret: string | undefined,
 		scopes: string[],
-		cancellationToken?: ICancellationToken
+		cancellationToken: ICancellationToken | undefined
 	): Promise<string> {
-		// Check for cancellation
 		if (cancellationToken?.isCancellationRequested) {
 			throw new Error('Authentication cancelled by user');
 		}
@@ -200,7 +250,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			auth: {
 				clientId: clientId,
 				clientSecret: clientSecret,
-				authority: this.getAuthority(environment) // Uses tenant-specific authority
+				authority: this.getAuthority(environment)
 			}
 		};
 
@@ -223,10 +273,9 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			this.logger.debug('Service Principal authentication successful');
 			return response.accessToken;
 		} catch (error: unknown) {
-			// Check if this is a cancellation error
 			if (error instanceof Error && error.message.includes('cancelled')) {
 				this.logger.debug('Service Principal authentication cancelled by user');
-				throw error; // Re-throw cancellation errors as-is
+				throw error;
 			}
 			this.logger.error('Service Principal authentication failed', error);
 			throw this.createAuthenticationError(error, 'Service Principal authentication failed');
@@ -234,16 +283,15 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	}
 
 	/**
-	 * Authenticates using username and password flow
-	 * Does not support MFA - use Interactive or DeviceCode for MFA scenarios
+	 * Authenticates using username and password flow.
+	 * Does not support MFA - use Interactive or DeviceCode for MFA scenarios.
 	 */
 	private async authenticateUsernamePassword(
 		environment: Environment,
 		password: string | undefined,
 		scopes: string[],
-		cancellationToken?: ICancellationToken
+		cancellationToken: ICancellationToken | undefined
 	): Promise<string> {
-		// Check for cancellation
 		if (cancellationToken?.isCancellationRequested) {
 			throw new Error('Authentication cancelled by user');
 		}
@@ -264,7 +312,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 		const clientConfig: msal.Configuration = {
 			auth: {
 				clientId: environment.getPublicClientId().getValue(),
-				authority: this.getAuthority(environment) // Uses "organizations" if tenant not provided
+				authority: this.getAuthority(environment)
 			}
 		};
 
@@ -289,10 +337,9 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			this.logger.debug('Username/Password authentication successful', { username });
 			return response.accessToken;
 		} catch (error: unknown) {
-			// Check if this is a cancellation error
 			if (error instanceof Error && error.message.includes('cancelled')) {
 				this.logger.debug('Username/Password authentication cancelled by user');
-				throw error; // Re-throw cancellation errors as-is
+				throw error;
 			}
 			this.logger.error('Username/Password authentication failed', error);
 			throw this.createAuthenticationError(error, 'Username/Password authentication failed. Note: This method does not support MFA');
@@ -300,16 +347,15 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	}
 
 	/**
-	 * Authenticates using interactive browser flow
-	 * Opens browser window for user authentication, supports MFA
-	 * Uses local HTTP server on port 3000 to capture auth code redirect
+	 * Authenticates using interactive browser flow.
+	 * Opens browser window for user authentication, supports MFA.
+	 * Uses local HTTP server on port 3000 to capture OAuth redirect.
 	 */
 	private async authenticateInteractive(
 		environment: Environment,
 		scopes: string[],
-		cancellationToken?: ICancellationToken
+		cancellationToken: ICancellationToken | undefined
 	): Promise<string> {
-		// Check for cancellation before starting
 		if (cancellationToken?.isCancellationRequested) {
 			throw new Error('Authentication cancelled by user');
 		}
@@ -319,50 +365,27 @@ export class MsalAuthenticationService implements IAuthenticationService {
 		const clientApp = this.getClientApp(environment);
 
 		try {
-			// Try silent token acquisition first
-			const accounts = await clientApp.getTokenCache().getAllAccounts();
-			if (accounts.length > 0) {
-				this.logger.debug('Attempting silent token acquisition from cache', {
-					accountCount: accounts.length
-				});
-
-				try {
-					const silentRequest: msal.SilentFlowRequest = {
-						account: accounts[0],
-						scopes: scopes
-					};
-
-					const response = await this.executeWithCancellation(
-						clientApp.acquireTokenSilent(silentRequest),
-						cancellationToken
-					);
-
-					if (response) {
-						this.logger.debug('Silent token acquisition successful');
-						return response.accessToken;
-					}
-				} catch (error: unknown) {
-					// Check if this is a cancellation error
-					if (error instanceof Error && error.message.includes('cancelled')) {
-						this.logger.debug('Silent token acquisition cancelled by user');
-						throw error; // Re-throw cancellation errors
-					}
-					// Silent acquisition failed, proceed with interactive flow
-					this.logger.debug('Silent token acquisition failed, proceeding with interactive flow');
-				}
+			const cachedToken = await this.tryAcquireTokenSilent(
+				clientApp,
+				scopes,
+				cancellationToken,
+				'interactive flow'
+			);
+			if (cachedToken) {
+				return cachedToken;
 			}
 
 			const vscode = await import('vscode');
 
-			// Create a promise that resolves when we get the auth code
 			const authCodePromise = new Promise<string>((resolve, reject) => {
-				// eslint-disable-next-line prefer-const -- Reassigned on line 446 when registering cancellation handler
+				// Declared here for cleanup closure scope, assigned in cancellation handler below
+				// eslint-disable-next-line prefer-const
 				let cancelListener: IDisposable | undefined;
-				// eslint-disable-next-line prefer-const -- Reassigned on line 453 when setting up timeout
+				// Declared here for cleanup closure scope, assigned in timeout setup below
+				// eslint-disable-next-line prefer-const
 				let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 				let isCancelled = false;
 
-				// Cleanup function
 				const cleanup = (): void => {
 					if (timeoutHandle) {
 						clearTimeout(timeoutHandle);
@@ -372,10 +395,9 @@ export class MsalAuthenticationService implements IAuthenticationService {
 					}
 				};
 
-				// Wrapped resolve/reject that clean up
 				const resolveWithCleanup = (code: string): void => {
 					if (isCancelled) {
-						return; // Ignore success after cancellation
+						return;
 					}
 					try {
 						cleanup();
@@ -392,13 +414,11 @@ export class MsalAuthenticationService implements IAuthenticationService {
 					}
 				};
 
-				// Create local HTTP server to capture redirect
 				const server = http.createServer((req, res) => {
 					const url = new URL(req.url || '', 'http://localhost:3000');
 					const code = url.searchParams.get('code');
 
 					if (code) {
-						// Show success page
 						res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
 						res.end(`
 							<!DOCTYPE html>
@@ -433,34 +453,29 @@ export class MsalAuthenticationService implements IAuthenticationService {
 					}
 				});
 
-				// Start server on port 3000
 				server.listen(3000);
 
-				// Handle server errors (e.g., port already in use)
 				server.on('error', (err: Error) => {
 					server.close();
 					rejectWithCleanup(new Error(`Failed to start authentication server: ${err.message}`));
 				});
 
-				// Register cancellation handler
 				cancelListener = cancellationToken?.onCancellationRequested(() => {
 					isCancelled = true;
 					server.close();
 					rejectWithCleanup(new Error('Authentication cancelled by user'));
 				});
 
-				// Timeout after 90 seconds
 				timeoutHandle = setTimeout(() => {
 					server.close();
 					rejectWithCleanup(new Error('Authentication timeout - no response received within 90 seconds. If you opened the wrong browser, click Cancel and try again.'));
 				}, 90000);
 			});
 
-			// Build auth URL and open browser
 			const authCodeUrlParameters: msal.AuthorizationUrlRequest = {
 				scopes: scopes,
 				redirectUri: 'http://localhost:3000',
-				prompt: 'select_account' // Force account picker - user MUST choose which account
+				prompt: 'select_account'
 			};
 
 			const authUrl = await clientApp.getAuthCodeUrl(authCodeUrlParameters);
@@ -469,11 +484,9 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			vscode.window.showInformationMessage('Opening browser for authentication. You will be asked to select an account.');
 			await vscode.env.openExternal(vscode.Uri.parse(authUrl));
 
-			// Wait for auth code from local server
 			const code = await authCodePromise;
 			this.logger.debug('Authorization code received, exchanging for token');
 
-			// Exchange code for token
 			const tokenRequest: msal.AuthorizationCodeRequest = {
 				code: code,
 				scopes: scopes,
@@ -485,7 +498,6 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				throw new Error('Failed to acquire token');
 			}
 
-			// Show who signed in
 			if (response.account) {
 				const username = response.account.username || response.account.name || 'Unknown';
 				this.logger.debug('Interactive authentication successful', { username });
@@ -500,16 +512,15 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	}
 
 	/**
-	 * Authenticates using device code flow
-	 * Displays code for user to enter on another device, supports MFA
-	 * Useful for environments without browser access or SSH sessions
+	 * Authenticates using device code flow.
+	 * Displays code for user to enter on another device, supports MFA.
+	 * Useful for environments without browser access or SSH sessions.
 	 */
 	private async authenticateDeviceCode(
 		environment: Environment,
 		scopes: string[],
-		cancellationToken?: ICancellationToken
+		cancellationToken: ICancellationToken | undefined
 	): Promise<string> {
-		// Check for cancellation
 		if (cancellationToken?.isCancellationRequested) {
 			throw new Error('Authentication cancelled by user');
 		}
@@ -519,40 +530,17 @@ export class MsalAuthenticationService implements IAuthenticationService {
 		const clientApp = this.getClientApp(environment);
 
 		try {
-			const vscode = await import('vscode');
-
-			// Try silent token acquisition first
-			const accounts = await clientApp.getTokenCache().getAllAccounts();
-			if (accounts.length > 0) {
-				this.logger.debug('Attempting silent token acquisition from cache', {
-					accountCount: accounts.length
-				});
-
-				try {
-					const silentRequest: msal.SilentFlowRequest = {
-						account: accounts[0],
-						scopes: scopes
-					};
-
-					const response = await this.executeWithCancellation(
-						clientApp.acquireTokenSilent(silentRequest),
-						cancellationToken
-					);
-
-					if (response) {
-						this.logger.debug('Silent token acquisition successful');
-						return response.accessToken;
-					}
-				} catch (error: unknown) {
-					// Check if this is a cancellation error
-					if (error instanceof Error && error.message.includes('cancelled')) {
-						this.logger.debug('Silent token acquisition cancelled by user');
-						throw error; // Re-throw cancellation errors
-					}
-					// Silent acquisition failed, proceed with device code flow
-					this.logger.debug('Silent token acquisition failed, proceeding with device code flow');
-				}
+			const cachedToken = await this.tryAcquireTokenSilent(
+				clientApp,
+				scopes,
+				cancellationToken,
+				'device code flow'
+			);
+			if (cachedToken) {
+				return cachedToken;
 			}
+
+			const vscode = await import('vscode');
 
 			const deviceCodeRequest: msal.DeviceCodeRequest = {
 				scopes: scopes,
@@ -563,10 +551,8 @@ export class MsalAuthenticationService implements IAuthenticationService {
 						verificationUri: deviceCodeResponse.verificationUri
 					});
 
-					// Show device code to user with modal dialog
 					const message = `Device Code Authentication\n\nCode: ${deviceCodeResponse.userCode}\n\n1. Click "Open Browser" to go to ${deviceCodeResponse.verificationUri}\n2. Enter the code shown above\n3. Complete sign-in\n\nThis dialog will close automatically after you authenticate.`;
 
-					// Copy code to clipboard automatically
 					await vscode.env.clipboard.writeText(deviceCodeResponse.userCode);
 
 					const selection = await vscode.window.showInformationMessage(
@@ -597,7 +583,6 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				throw new Error('Failed to acquire token');
 			}
 
-			// Show who signed in
 			if (response.account) {
 				const username = response.account.username || response.account.name || 'Unknown';
 				this.logger.debug('Device code authentication successful', { username });
@@ -606,10 +591,9 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 			return response.accessToken;
 		} catch (error: unknown) {
-			// Check if this is a cancellation error
 			if (error instanceof Error && error.message.includes('cancelled')) {
 				this.logger.debug('Device code authentication cancelled by user');
-				throw error; // Re-throw cancellation errors as-is
+				throw error;
 			}
 			this.logger.error('Device code authentication failed', error);
 			throw this.createAuthenticationError(error, 'Device Code authentication failed');
@@ -617,8 +601,8 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	}
 
 	/**
-	 * Clears authentication cache for a specific environment
-	 * Forces fresh authentication on next token acquisition
+	 * Clears authentication cache for a specific environment.
+	 * Forces fresh authentication on next token acquisition.
 	 * @param environmentId - ID of environment to clear cache for
 	 */
 	public clearCacheForEnvironment(environmentId: EnvironmentId): void {
@@ -643,7 +627,6 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				this.logger.warn('Error clearing MSAL token cache', error);
 			});
 
-			// Remove from application cache
 			this.clientAppCache.delete(cacheKey);
 			this.logger.debug('Environment removed from application cache', {
 				environmentId: cacheKey
@@ -652,15 +635,14 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	}
 
 	/**
-	 * Clears all authentication caches for all environments
-	 * Forces fresh authentication for all environments on next token acquisition
+	 * Clears all authentication caches for all environments.
+	 * Forces fresh authentication for all environments on next token acquisition.
 	 */
 	public clearAllCache(): void {
 		this.logger.info('Clearing all authentication caches', {
 			environmentCount: this.clientAppCache.size
 		});
 
-		// Clear all MSAL token caches
 		this.clientAppCache.forEach((clientApp) => {
 			void clientApp.getTokenCache().getAllAccounts().then(async accounts => {
 				await Promise.all(accounts.map(async account =>
@@ -671,7 +653,6 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			});
 		});
 
-		// Clear application cache
 		this.clientAppCache.clear();
 		this.logger.debug('All authentication caches cleared');
 	}

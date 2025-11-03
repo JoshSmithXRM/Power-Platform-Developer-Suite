@@ -1,9 +1,9 @@
 /**
  * View model for presenting FlowConnectionRelationship data in the UI.
- * Presentation layer DTO with strings formatted for display.
- * Readonly ensures immutability - ViewModels are snapshots, not mutable state.
+ * Readonly properties ensure immutability - ViewModels are snapshots, not mutable state.
  */
 export interface FlowConnectionRelationshipViewModel {
+	[key: string]: unknown;
 	readonly flowId: string;
 	readonly flowName: string;
 	readonly connectionReferenceId: string;

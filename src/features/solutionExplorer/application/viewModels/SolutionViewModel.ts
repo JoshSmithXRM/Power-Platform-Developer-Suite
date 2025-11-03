@@ -4,6 +4,7 @@
  * Readonly ensures immutability - ViewModels are snapshots, not mutable state.
  */
 export interface SolutionViewModel {
+  [key: string]: unknown;
   readonly id: string;
   readonly uniqueName: string;
   readonly friendlyName: string;

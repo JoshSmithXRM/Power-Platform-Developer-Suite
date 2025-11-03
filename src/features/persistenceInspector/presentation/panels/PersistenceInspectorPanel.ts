@@ -23,7 +23,7 @@ import { renderPersistenceInspector } from '../views/persistenceInspector';
  */
 export class PersistenceInspectorPanel {
 	public static readonly viewType = 'powerPlatformDevSuite.persistenceInspector';
-	private static currentPanel?: PersistenceInspectorPanel;
+	private static currentPanel?: PersistenceInspectorPanel | undefined;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -67,17 +67,7 @@ export class PersistenceInspectorPanel {
 
 	/**
 	 * Creates or shows the Persistence Inspector panel.
-	 * Reuses existing panel if already open.
-	 *
-	 * @param extensionUri - Extension URI for resource paths
-	 * @param inspectStorageUseCase - Use case to inspect storage
-	 * @param revealSecretUseCase - Use case to reveal secrets
-	 * @param clearStorageEntryUseCase - Use case to clear storage entry
-	 * @param clearStoragePropertyUseCase - Use case to clear storage property
-	 * @param clearAllStorageUseCase - Use case to clear all storage
-	 * @param getClearAllConfirmationMessageUseCase - Use case to get confirmation message
-	 * @param logger - Logger instance
-	 * @returns Panel instance
+	 * Reuses existing panel if already open (singleton pattern).
 	 */
 	public static createOrShow(
 		extensionUri: vscode.Uri,
@@ -164,19 +154,11 @@ export class PersistenceInspectorPanel {
 		}
 	}
 
-	/**
-	 * Handles refresh request to reload storage data.
-	 */
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing storage data');
 
 		try {
 			const viewModel = await this.inspectStorageUseCase.execute();
-
-			this.logger.info('Storage data refreshed', {
-				globalStateEntries: viewModel.globalStateEntries.length,
-				secretEntries: viewModel.secretEntries.length
-			});
 
 			this.panel.webview.postMessage({
 				command: 'storageData',
@@ -188,18 +170,11 @@ export class PersistenceInspectorPanel {
 		}
 	}
 
-	/**
-	 * Handles request to reveal a secret value.
-	 *
-	 * @param key - Storage key of the secret
-	 */
 	private async handleRevealSecret(key: string): Promise<void> {
 		this.logger.info('User revealed secret', { key });
 
 		try {
 			const value = await this.revealSecretUseCase.execute(key);
-
-			this.logger.debug('Secret revealed successfully', { key });
 
 			this.panel.webview.postMessage({
 				command: 'secretRevealed',
@@ -212,11 +187,6 @@ export class PersistenceInspectorPanel {
 		}
 	}
 
-	/**
-	 * Handles request to clear a storage entry.
-	 *
-	 * @param key - Storage key to clear
-	 */
 	private async handleClearEntry(key: string): Promise<void> {
 		this.logger.info('User initiated clear entry', { key });
 
@@ -245,12 +215,6 @@ export class PersistenceInspectorPanel {
 		}
 	}
 
-	/**
-	 * Handles request to clear a specific property from a storage entry.
-	 *
-	 * @param key - Storage key
-	 * @param path - Property path to clear
-	 */
 	private async handleClearProperty(key: string, path: string): Promise<void> {
 		this.logger.info('User initiated clear property', { key, path });
 
@@ -279,9 +243,6 @@ export class PersistenceInspectorPanel {
 		}
 	}
 
-	/**
-	 * Handles request to clear all non-protected storage entries.
-	 */
 	private async handleClearAll(): Promise<void> {
 		this.logger.info('User initiated clear all storage');
 
@@ -325,11 +286,6 @@ export class PersistenceInspectorPanel {
 		}
 	}
 
-	/**
-	 * Displays error message in webview.
-	 *
-	 * @param error - Error object or value to display
-	 */
 	private handleError(error: unknown): void {
 		const message = error instanceof Error ? error.message : String(error);
 		this.panel.webview.postMessage({
@@ -340,8 +296,7 @@ export class PersistenceInspectorPanel {
 
 	/**
 	 * Forwards webview log messages to the extension host logger.
-	 *
-	 * @param message - Log message from webview
+	 * Webviews run in isolated context without access to OutputChannel.
 	 */
 	private handleWebviewLog(message: WebviewLogMessage): void {
 		const prefix = `[Webview:${message.componentName}]`;
@@ -350,22 +305,16 @@ export class PersistenceInspectorPanel {
 		this.logger[message.level](logMessage, message.data);
 	}
 
-	/**
-	 * Generates the HTML content for the webview panel.
-	 *
-	 * @returns HTML content string
-	 */
 	private getHtmlContent(): string {
 		return renderPersistenceInspector();
 	}
 
-	/**
-	 * Disposes the panel and cleans up resources.
-	 */
 	public dispose(): void {
 		this.logger.debug('PersistenceInspectorPanel: Disposing');
 
-		PersistenceInspectorPanel.currentPanel = undefined;
+		if (PersistenceInspectorPanel.currentPanel === this) {
+			PersistenceInspectorPanel.currentPanel = undefined;
+		}
 
 		this.panel.dispose();
 

@@ -1,27 +1,21 @@
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IDeploymentSettingsRepository } from '../../../../shared/domain/interfaces/IDeploymentSettingsRepository';
-import { DeploymentSettings } from '../../../../shared/domain/entities/DeploymentSettings';
+import type { DeploymentSettings } from '../../../../shared/domain/entities/DeploymentSettings';
 import type { ConnectionReference } from '../../domain/entities/ConnectionReference';
 import type { SyncResult } from '../../../../shared/domain/entities/DeploymentSettings';
+import { ConnectionReferenceToDeploymentSettingsMapper } from '../mappers/ConnectionReferenceToDeploymentSettingsMapper';
+import { DeploymentSettingsFactory } from '../../../../shared/domain/services/DeploymentSettingsFactory';
 
-/**
- * Result of exporting connection references to deployment settings.
- */
 export interface ExportResult extends SyncResult {
 	readonly filePath: string;
 }
 
 /**
  * Use case for exporting connection references to a deployment settings file.
- *
- * Orchestrates:
- * 1. Extracting unique connection references from relationships
- * 2. Prompting user for file path
- * 3. Reading existing deployment settings (if file exists)
- * 4. Syncing connection references section
- * 5. Writing updated deployment settings to file
  */
 export class ExportConnectionReferencesToDeploymentSettingsUseCase {
+	private readonly deploymentSettingsFactory = new DeploymentSettingsFactory();
+
 	constructor(
 		private readonly deploymentSettingsRepository: IDeploymentSettingsRepository,
 		private readonly logger: ILogger
@@ -36,21 +30,19 @@ export class ExportConnectionReferencesToDeploymentSettingsUseCase {
 	 */
 	async execute(
 		connectionReferences: ConnectionReference[],
-		suggestedFileName?: string
+		suggestedFileName: string | undefined
 	): Promise<ExportResult | null> {
 		this.logger.info('Exporting connection references to deployment settings', {
 			count: connectionReferences.length,
 			suggestedFileName
 		});
 
-		// Prompt user for file path
 		const filePath = await this.deploymentSettingsRepository.promptForFilePath(suggestedFileName);
 		if (!filePath) {
 			this.logger.debug('User cancelled deployment settings export');
 			return null;
 		}
 
-		// Read existing deployment settings or create empty
 		let existingSettings: DeploymentSettings;
 		const fileExists = await this.deploymentSettingsRepository.exists(filePath);
 
@@ -59,16 +51,15 @@ export class ExportConnectionReferencesToDeploymentSettingsUseCase {
 			existingSettings = await this.deploymentSettingsRepository.read(filePath);
 		} else {
 			this.logger.debug('Creating new deployment settings file', { filePath });
-			existingSettings = DeploymentSettings.createEmpty();
+			existingSettings = this.deploymentSettingsFactory.createEmpty();
 		}
 
-		// Convert connection references to deployment settings entries
-		const entries = connectionReferences.map(cr => cr.toDeploymentSettingsEntry());
+		// Export all connection references as-is, including those without connections.
+		// Data quality issues should be addressed in the solution itself, not hidden by filtering.
+		const entries = ConnectionReferenceToDeploymentSettingsMapper.toDeploymentSettingsEntries(connectionReferences);
 
-		// Sync connection references section
 		const { settings: updatedSettings, syncResult } = existingSettings.syncConnectionReferences(entries);
 
-		// Write updated deployment settings
 		await this.deploymentSettingsRepository.write(filePath, updatedSettings);
 
 		this.logger.info('Connection references exported successfully', {

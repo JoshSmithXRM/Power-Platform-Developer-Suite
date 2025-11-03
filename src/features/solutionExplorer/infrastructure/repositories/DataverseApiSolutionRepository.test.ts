@@ -52,7 +52,7 @@ describe('DataverseApiSolutionRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				'env-123',
@@ -60,13 +60,14 @@ describe('DataverseApiSolutionRepository', () => {
 				undefined
 			);
 			expect(result).toHaveLength(1);
+			expect(result[0]).toBeDefined();
 			expect(result[0]).toBeInstanceOf(Solution);
-			expect(result[0].id).toBe('sol-1');
-			expect(result[0].uniqueName).toBe('TestSolution');
-			expect(result[0].friendlyName).toBe('Test Solution');
-			expect(result[0].version).toBe('1.0.0.0');
-			expect(result[0].isManaged).toBe(false);
-			expect(result[0].publisherName).toBe('Test Publisher');
+			expect(result[0]!.id).toBe('sol-1');
+			expect(result[0]!.uniqueName).toBe('TestSolution');
+			expect(result[0]!.friendlyName).toBe('Test Solution');
+			expect(result[0]!.version).toBe('1.0.0.0');
+			expect(result[0]!.isManaged).toBe(false);
+			expect(result[0]!.publisherName).toBe('Test Publisher');
 		});
 
 		it('should handle null installedOn date', async () => {
@@ -90,9 +91,10 @@ describe('DataverseApiSolutionRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0].installedOn).toBeNull();
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.installedOn).toBeNull();
 		});
 
 		it('should handle null description', async () => {
@@ -116,9 +118,10 @@ describe('DataverseApiSolutionRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0].description).toBe('');
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.description).toBe('');
 		});
 
 		it('should handle missing publisher friendly name', async () => {
@@ -139,9 +142,10 @@ describe('DataverseApiSolutionRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0].publisherName).toBe('Unknown');
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.publisherName).toBe('Unknown');
 		});
 
 		it('should handle multiple solutions', async () => {
@@ -174,11 +178,13 @@ describe('DataverseApiSolutionRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
 			expect(result).toHaveLength(2);
-			expect(result[0].uniqueName).toBe('Solution1');
-			expect(result[1].uniqueName).toBe('Solution2');
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.uniqueName).toBe('Solution1');
+			expect(result[1]).toBeDefined();
+			expect(result[1]!.uniqueName).toBe('Solution2');
 		});
 
 		it('should handle empty solution list', async () => {
@@ -186,7 +192,7 @@ describe('DataverseApiSolutionRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			const result = await repository.findAll('env-123');
+			const result = await repository.findAll('env-123', undefined, undefined);
 
 			expect(result).toHaveLength(0);
 		});
@@ -210,7 +216,7 @@ describe('DataverseApiSolutionRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			await expect(repository.findAll('env-123')).rejects.toThrow(ValidationError);
+			await expect(repository.findAll('env-123', undefined, undefined)).rejects.toThrow(ValidationError);
 		});
 
 		it('should pass cancellation token to API service', async () => {
@@ -270,7 +276,7 @@ describe('DataverseApiSolutionRepository', () => {
 			const error = new Error('API request failed');
 			mockApiService.get.mockRejectedValue(error);
 
-			await expect(repository.findAll('env-123')).rejects.toThrow('API request failed');
+			await expect(repository.findAll('env-123', undefined, undefined)).rejects.toThrow('API request failed');
 
 			expect(mockLogger.error).toHaveBeenCalledWith('Failed to fetch solutions from Dataverse API', error);
 		});
@@ -294,7 +300,7 @@ describe('DataverseApiSolutionRepository', () => {
 
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			await repository.findAll('env-123');
+			await repository.findAll('env-123', undefined, undefined);
 
 			expect(mockLogger.debug).toHaveBeenCalledWith('Fetching solutions from Dataverse API', { environmentId: 'env-123' });
 			expect(mockLogger.debug).toHaveBeenCalledWith('Fetched 1 solution(s) from Dataverse', { environmentId: 'env-123' });
@@ -304,7 +310,7 @@ describe('DataverseApiSolutionRepository', () => {
 			const mockResponse = { value: [] };
 			mockApiService.get.mockResolvedValue(mockResponse);
 
-			await repository.findAll('env-123');
+			await repository.findAll('env-123', undefined, undefined);
 
 
 			expect(mockApiService.get).toHaveBeenCalledWith(

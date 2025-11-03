@@ -8,6 +8,7 @@ import { ExportConnectionReferencesToDeploymentSettingsUseCase } from '../../app
 import { FlowConnectionRelationshipViewModelMapper } from '../../application/mappers/FlowConnectionRelationshipViewModelMapper';
 import { type FlowConnectionRelationship } from '../../domain/valueObjects/FlowConnectionRelationship';
 import { type ConnectionReference } from '../../domain/entities/ConnectionReference';
+import { enhanceViewModelsWithFlowLinks } from '../views/FlowLinkView';
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { isOpenFlowMessage } from '../../../../infrastructure/ui/utils/TypeGuards';
@@ -39,15 +40,14 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		private readonly solutionRepository: ISolutionRepository,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId?: string,
-		panelStateRepository?: IPanelStateRepository
+		initialEnvironmentId: string | undefined,
+		panelStateRepository: IPanelStateRepository | undefined
 	) {
 		super(panel, extensionUri, getEnvironments, getEnvironmentById, logger, initialEnvironmentId, panelStateRepository);
 	}
 
 	/**
 	 * Creates or shows the Connection References panel.
-	 * Tracks panels by environment - each environment gets its own panel instance.
 	 */
 	public static async createOrShow(
 		extensionUri: vscode.Uri,
@@ -58,15 +58,13 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		solutionRepository: ISolutionRepository,
 		urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId?: string,
-		panelStateRepository?: IPanelStateRepository
+		initialEnvironmentId: string | undefined,
+		panelStateRepository: IPanelStateRepository | undefined
 	): Promise<ConnectionReferencesPanel> {
 		const column = vscode.ViewColumn.One;
 
-		// Determine which environment to use
 		let targetEnvironmentId = initialEnvironmentId;
 		if (!targetEnvironmentId) {
-			// No environment specified - use first available
 			const environments = await getEnvironments();
 			targetEnvironmentId = environments[0]?.id;
 		}
@@ -75,14 +73,12 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 			throw new Error('No environments available');
 		}
 
-		// Check if panel already exists for this environment
 		const existingPanel = ConnectionReferencesPanel.panels.get(targetEnvironmentId);
 		if (existingPanel) {
 			existingPanel.panel.reveal(column);
 			return existingPanel;
 		}
 
-		// Get environment name for title
 		const environment = await getEnvironmentById(targetEnvironmentId);
 		const environmentName = environment?.name || 'Unknown';
 
@@ -116,9 +112,6 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		return newPanel;
 	}
 
-	/**
-	 * Returns the panel configuration.
-	 */
 	protected getConfig(): DataTableConfig {
 		return {
 			viewType: ConnectionReferencesPanel.viewType,
@@ -143,16 +136,10 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		};
 	}
 
-	/**
-	 * Returns panel type identifier for state persistence.
-	 */
 	protected getPanelType(): string {
 		return 'connectionReferences';
 	}
 
-	/**
-	 * Loads solutions for the current environment (dropdown display only).
-	 */
 	protected async loadSolutions(): Promise<SolutionOption[]> {
 		if (!this.currentEnvironmentId) {
 			return [];
@@ -166,9 +153,6 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		}
 	}
 
-	/**
-	 * Loads connection references and their relationships from the current environment.
-	 */
 	protected async loadData(): Promise<void> {
 		if (!this.currentEnvironmentId) {
 			this.logger.warn('Cannot load connection references: No environment selected');
@@ -183,7 +167,7 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 			const cancellationToken = this.createCancellationToken();
 			const result: ListConnectionReferencesResult = await this.listConnectionReferencesUseCase.execute(
 				this.currentEnvironmentId,
-				this.currentSolutionId || undefined, // Solution filtering
+				this.currentSolutionId || undefined,
 				cancellationToken
 			);
 
@@ -195,14 +179,7 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 			this.connectionReferences = result.connectionReferences;
 
 			const viewModels = FlowConnectionRelationshipViewModelMapper.toViewModels(this.relationships, true);
-
-			// Add HTML for clickable flow names
-			const enhancedViewModels = viewModels.map(vm => ({
-				...vm,
-				flowNameHtml: vm.flowId
-					? `<a class="flow-link" data-id="${vm.flowId}">${this.escapeHtml(vm.flowName)}</a>`
-					: this.escapeHtml(vm.flowName)
-			}));
+			const enhancedViewModels = enhanceViewModelsWithFlowLinks(viewModels);
 
 			this.sendData(enhancedViewModels);
 
@@ -215,9 +192,6 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		}
 	}
 
-	/**
-	 * Handles panel-specific commands from webview.
-	 */
 	protected async handlePanelCommand(message: import('../../../../infrastructure/ui/utils/TypeGuards').WebviewMessage): Promise<void> {
 		if (isOpenFlowMessage(message)) {
 			await this.handleOpenFlow(message.data.flowId);
@@ -228,9 +202,6 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		}
 	}
 
-	/**
-	 * Returns filter logic JavaScript for connection reference search.
-	 */
 	protected getFilterLogic(): string {
 		return `
 			filtered = allData.filter(rel =>
@@ -242,9 +213,6 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		`;
 	}
 
-	/**
-	 * Returns custom CSS for connection reference status highlighting.
-	 */
 	protected getCustomCss(): string {
 		return `
 			/* Highlight orphaned relationships */
@@ -258,22 +226,9 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		`;
 	}
 
-	/**
-	 * Returns custom JavaScript to add the Sync Deployment Settings button and flow link handlers.
-	 */
 	protected getCustomJavaScript(): string {
 		return `
-			// Add Sync Deployment Settings button to toolbar
-			const toolbarLeft = document.querySelector('.toolbar-left');
-			if (toolbarLeft && !document.getElementById('syncDeploymentSettingsBtn')) {
-				const syncBtn = document.createElement('button');
-				syncBtn.id = 'syncDeploymentSettingsBtn';
-				syncBtn.textContent = 'Sync Deployment Settings';
-				syncBtn.addEventListener('click', () => {
-					vscode.postMessage({ command: 'syncDeploymentSettings' });
-				});
-				toolbarLeft.appendChild(syncBtn);
-			}
+			${super.getCustomJavaScript()}
 
 			// Attach click handlers to flow links
 			document.querySelectorAll('.flow-link').forEach(link => {
@@ -285,10 +240,6 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		`;
 	}
 
-	/**
-	 * Opens a flow in the Maker Portal.
-	 * @param flowId - GUID of the flow to open
-	 */
 	private async handleOpenFlow(flowId: string): Promise<void> {
 		if (!this.currentEnvironmentId) {
 			this.logger.warn('Cannot open flow: No environment selected');
@@ -316,9 +267,6 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		});
 	}
 
-	/**
-	 * Opens the connection references page in the Maker Portal.
-	 */
 	private async handleOpenMaker(): Promise<void> {
 		if (!this.currentEnvironmentId) {
 			this.logger.warn('Cannot open Maker Portal: No environment selected');
@@ -343,9 +291,6 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		});
 	}
 
-	/**
-	 * Syncs connection references to a deployment settings file.
-	 */
 	private async handleSyncDeploymentSettings(): Promise<void> {
 		if (!this.currentEnvironmentId) {
 			this.logger.warn('Cannot sync deployment settings: No environment selected');
@@ -357,7 +302,6 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 			return;
 		}
 
-		// Get current solution uniqueName for filename
 		const currentSolution = this.solutionFilterOptions.find(sol => sol.id === this.currentSolutionId);
 		const filename = currentSolution
 			? `${currentSolution.uniqueName}.deploymentsettings.json`
@@ -385,16 +329,10 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		}
 	}
 
-	/**
-	 * Registers this panel in the static panels map for the given environment.
-	 */
 	protected registerPanelForEnvironment(environmentId: string): void {
 		ConnectionReferencesPanel.panels.set(environmentId, this);
 	}
 
-	/**
-	 * Unregisters this panel from the static panels map for the given environment.
-	 */
 	protected unregisterPanelForEnvironment(environmentId: string): void {
 		ConnectionReferencesPanel.panels.delete(environmentId);
 	}

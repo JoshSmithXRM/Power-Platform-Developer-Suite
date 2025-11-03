@@ -75,7 +75,7 @@ export class SaveEnvironmentUseCase {
 		}
 	}
 
-	private async loadPreviousEnvironment(existingEnvironmentId?: string): Promise<Environment | null> {
+	private async loadPreviousEnvironment(existingEnvironmentId: string | undefined): Promise<Environment | null> {
 		if (!existingEnvironmentId) {
 			return null;
 		}
@@ -86,7 +86,7 @@ export class SaveEnvironmentUseCase {
 		return environment;
 	}
 
-	private createEnvironmentId(existingEnvironmentId?: string): EnvironmentId {
+	private createEnvironmentId(existingEnvironmentId: string | undefined): EnvironmentId {
 		return existingEnvironmentId
 			? new EnvironmentId(existingEnvironmentId)
 			: EnvironmentId.generate();

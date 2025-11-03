@@ -36,7 +36,7 @@ export class OutputChannelLogger implements ILogger {
 		}
 	}
 
-	public error(message: string, error?: unknown): void {
+	public error(message: string, error: unknown | undefined): void {
 		if (error instanceof Error) {
 			this.outputChannel.error(`${message}: ${error.message}`);
 			if (error.stack) {

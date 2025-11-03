@@ -7,7 +7,6 @@ import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
  * Use case for opening an import job's XML log in VS Code editor.
- * Orchestrates: fetch import job with log data → open in editor
  */
 export class OpenImportLogUseCase {
 	constructor(
@@ -27,7 +26,7 @@ export class OpenImportLogUseCase {
 	async execute(
 		environmentId: string,
 		importJobId: string,
-		cancellationToken?: ICancellationToken
+		cancellationToken: ICancellationToken | undefined
 	): Promise<void> {
 		this.logger.debug('OpenImportLogUseCase: Starting import log processing', { environmentId, importJobId });
 
@@ -37,7 +36,6 @@ export class OpenImportLogUseCase {
 		}
 
 		try {
-			// Fetch import job with log data
 			const importJob = await this.importJobRepository.findByIdWithLog(
 				environmentId,
 				importJobId,
@@ -51,12 +49,10 @@ export class OpenImportLogUseCase {
 				throw error;
 			}
 
-			// Type narrowing: hasLog() ensures importLogXml is not null
 			if (importJob.importLogXml === null) {
 				throw new Error('Unexpected: importLogXml is null after hasLog() check');
 			}
 
-			// Open log in editor
 			await this.editorService.openXmlInNewTab(importJob.importLogXml);
 
 			this.logger.info('Import log opened successfully', { importJobId });

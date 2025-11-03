@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 
+import type { ILogger } from '../../../infrastructure/logging/ILogger';
+import { Solution } from '../../../features/solutionExplorer/domain/entities/Solution';
+
 import type {
 	IPanelStateRepository,
 	PanelStateKey,
@@ -7,14 +10,32 @@ import type {
 } from './IPanelStateRepository';
 
 /**
+ * Type guard for storage-related errors (quota exceeded, serialization failures)
+ */
+function isStorageError(error: unknown): boolean {
+	if (error instanceof Error) {
+		return (
+			error.message.includes('quota') ||
+			error.message.includes('storage') ||
+			error.message.includes('JSON')
+		);
+	}
+	return false;
+}
+
+/**
  * VS Code implementation of panel state repository using workspace state.
  * Stores panel UI preferences in VS Code's workspace-level storage.
  */
 export class VSCodePanelStateRepository implements IPanelStateRepository {
-	constructor(private readonly workspaceState: vscode.Memento) {}
+	constructor(
+		private readonly workspaceState: vscode.Memento,
+		private readonly logger: ILogger
+	) {}
 
 	/**
-	 * Load persisted state for a specific panel and environment
+	 * Load persisted state for a specific panel and environment.
+	 * Migrates legacy null solution IDs to DEFAULT_SOLUTION_ID.
 	 */
 	async load(key: PanelStateKey): Promise<PanelState | null> {
 		try {
@@ -23,9 +44,38 @@ export class VSCodePanelStateRepository implements IPanelStateRepository {
 				storageKey,
 				{}
 			);
-			return allStates[key.environmentId] ?? null;
-		} catch {
-			return null;
+			const state = allStates[key.environmentId] ?? null;
+
+			if (state === null) {
+				return null;
+			}
+
+			// Migration: Legacy null selectedSolutionId becomes DEFAULT_SOLUTION_ID
+			if (state.selectedSolutionId === null) {
+				this.logger.warn('Migrating legacy null solution ID to default', {
+					panelType: key.panelType,
+					environmentId: key.environmentId
+				});
+
+				const migratedState: PanelState = {
+					selectedSolutionId: Solution.DEFAULT_SOLUTION_ID,
+					lastUpdated: new Date().toISOString()
+				};
+
+				// Persist migrated value back to storage
+				allStates[key.environmentId] = migratedState;
+				await this.workspaceState.update(storageKey, allStates);
+
+				return migratedState;
+			}
+
+			return state;
+		} catch (error) {
+			if (isStorageError(error)) {
+				return null;
+			}
+			this.logger.error('Unexpected error loading panel state', error);
+			throw error;
 		}
 	}
 
@@ -43,8 +93,12 @@ export class VSCodePanelStateRepository implements IPanelStateRepository {
 			allStates[key.environmentId] = state;
 
 			await this.workspaceState.update(storageKey, allStates);
-		} catch {
-			// Silently ignore persistence failures
+		} catch (error) {
+			if (isStorageError(error)) {
+				return;
+			}
+			this.logger.error('Unexpected error saving panel state', error);
+			throw error;
 		}
 	}
 
@@ -62,8 +116,12 @@ export class VSCodePanelStateRepository implements IPanelStateRepository {
 			delete allStates[key.environmentId];
 
 			await this.workspaceState.update(storageKey, allStates);
-		} catch {
-			// Silently ignore persistence failures
+		} catch (error) {
+			if (isStorageError(error)) {
+				return;
+			}
+			this.logger.error('Unexpected error clearing panel state', error);
+			throw error;
 		}
 	}
 
@@ -74,8 +132,12 @@ export class VSCodePanelStateRepository implements IPanelStateRepository {
 		try {
 			const storageKey = this.getStorageKey(panelType);
 			await this.workspaceState.update(storageKey, undefined);
-		} catch {
-			// Silently ignore persistence failures
+		} catch (error) {
+			if (isStorageError(error)) {
+				return;
+			}
+			this.logger.error('Unexpected error clearing all panel state', error);
+			throw error;
 		}
 	}
 

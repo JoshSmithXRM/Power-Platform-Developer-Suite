@@ -7,8 +7,8 @@ import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
  * Use case for listing all import jobs in an environment.
- * Orchestrates repository call only. Returns unsorted domain entities.
- * Sorting business logic (ImportJob.sort) is invoked by mapper when converting to ViewModels.
+ * Orchestrates repository call only - returns unsorted entities because sorting
+ * is a presentation concern handled by ImportJobViewModelMapper.
  */
 export class ListImportJobsUseCase {
 	constructor(
@@ -24,7 +24,7 @@ export class ListImportJobsUseCase {
 	 */
 	async execute(
 		environmentId: string,
-		cancellationToken?: ICancellationToken
+		cancellationToken: ICancellationToken | undefined
 	): Promise<ImportJob[]> {
 		this.logger.info('ListImportJobsUseCase started', { environmentId });
 

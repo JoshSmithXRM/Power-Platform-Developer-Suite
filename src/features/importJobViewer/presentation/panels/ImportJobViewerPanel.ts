@@ -13,6 +13,7 @@ import {
 	type DataTableConfig
 } from '../../../../shared/infrastructure/ui/DataTablePanel';
 import { isViewImportJobMessage } from '../../../../infrastructure/ui/utils/TypeGuards';
+import { enhanceViewModelsWithImportJobLinks } from '../views/ImportJobLinkView';
 
 /**
  * Presentation layer panel for Import Job Viewer.
@@ -33,14 +34,14 @@ export class ImportJobViewerPanel extends DataTablePanel {
 		private readonly openImportLogUseCase: OpenImportLogUseCase,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId?: string
+		initialEnvironmentId: string | undefined
 	) {
 		super(panel, extensionUri, getEnvironments, getEnvironmentById, logger, initialEnvironmentId);
 	}
 
 	/**
-	 * Creates or shows the Import Job Viewer panel.
-	 * Tracks panels by environment - each environment gets its own panel instance.
+	 * Creates or shows the Import Job Viewer panel for the specified environment.
+	 * Each environment gets its own panel instance to avoid data mixing.
 	 */
 	public static async createOrShow(
 		extensionUri: vscode.Uri,
@@ -50,7 +51,7 @@ export class ImportJobViewerPanel extends DataTablePanel {
 		openImportLogUseCase: OpenImportLogUseCase,
 		urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId?: string
+		initialEnvironmentId: string | undefined
 	): Promise<ImportJobViewerPanel> {
 		const column = vscode.window.activeTextEditor
 			? vscode.window.activeTextEditor.viewColumn
@@ -164,13 +165,7 @@ export class ImportJobViewerPanel extends DataTablePanel {
 			}
 
 			const viewModels = ImportJobViewModelMapper.toViewModels(this.importJobs, true);
-
-			// Add HTML and CSS classes for status and clickable solution names
-			const enhancedViewModels = viewModels.map(vm => ({
-				...vm,
-				solutionNameHtml: `<a href="#" class="job-link" data-job-id="${vm.id}">${this.escapeHtml(vm.solutionName)}</a>`,
-				statusClass: this.getStatusClass(vm.status)
-			}));
+			const enhancedViewModels = enhanceViewModelsWithImportJobLinks(viewModels);
 
 			this.sendData(enhancedViewModels);
 
@@ -228,7 +223,6 @@ export class ImportJobViewerPanel extends DataTablePanel {
 
 	/**
 	 * Returns custom JavaScript for import job-specific event handlers.
-	 * Attaches click handlers to job name links to trigger import log viewing.
 	 */
 	protected getCustomJavaScript(): string {
 		return `
@@ -273,7 +267,6 @@ export class ImportJobViewerPanel extends DataTablePanel {
 
 	/**
 	 * Handles opening the import log XML in VS Code editor.
-	 * Delegates to OpenImportLogUseCase for fetching and displaying the log.
 	 * @param importJobId - GUID of the import job to view
 	 */
 	private async handleViewImportLog(importJobId: string): Promise<void> {

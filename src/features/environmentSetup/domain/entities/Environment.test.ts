@@ -18,7 +18,11 @@ describe('Environment', () => {
 			new TenantId('00000000-0000-0000-0000-000000000000'),
 			new AuthenticationMethod(authMethod),
 			new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'), // Public client ID
-			false
+			false,
+			undefined,
+			undefined,
+			undefined,
+			undefined
 		);
 	}
 

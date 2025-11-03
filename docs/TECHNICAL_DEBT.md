@@ -12,7 +12,7 @@ This document tracks known technical debt and future improvement opportunities t
 1. **Cross-Feature DTO Coupling** - Persistence Inspector imports EnvironmentConnectionDto from environmentSetup feature. Infrastructure-to-infrastructure coupling is acceptable but could be improved with shared DTOs.
 
 ### Documentation (1 issue)
-2. **CLEAN_ARCHITECTURE_GUIDE.md Length** - Documentation exceeds 1,708 lines (limit: 1,200). Wait until Data Panel Suite is complete before splitting into 3 separate guides.
+2. **CLEAN_ARCHITECTURE_GUIDE.md Length** - Documentation exceeds 1,403 lines (limit: 1,200). Wait until Data Panel Suite is complete before splitting into 3 separate guides.
 
 ### Architecture & Design (4 issues)
 3. **DataTablePanel SRP Violation** - Base class handles 8+ responsibilities (environment, search, sort, error, loading, HTML, routing, cancellation). Template Method pattern eliminates 950 lines of duplication across 2 panels, acceptable trade-off.
@@ -23,14 +23,12 @@ This document tracks known technical debt and future improvement opportunities t
 
 6. **getValue() Pattern Without Branded Types** - Value objects return primitives without compile-time type branding. Zero bugs found in 100+ callsites, 6-8 hour refactor not justified.
 
-7. **CSS Extraction from HTML Templates** - 200+ lines of CSS embedded in TypeScript strings. Standard VS Code pattern, not causing bugs, defer until 5+ webview templates exist.
+7. **CSS Extraction from HTML Templates** - 451 lines of CSS embedded in TypeScript strings. Standard VS Code pattern, not causing bugs, defer until 5+ webview templates exist.
 
-### Deferred Refactoring (3 issues)
+### Deferred Refactoring (2 issues)
 8. **Business Logic in Command Handlers** - extension.ts commands contain orchestration that belongs in use cases. Use cases exist but need integration work, defer until command testing sprint.
 
 9. **Unsafe Type Assertions in API Service** - DataverseApiService uses `as T` without runtime validation. Repositories validate at mapping layer, external API contracts stable, zero bugs found.
-
-10. **Long Repository Methods** - Save methods exceed 70+ lines with persistence + credential concerns mixed. Defer until repository testing improvements or new implementations.
 
 ---
 
@@ -85,7 +83,7 @@ public async readAllSecretKeys(): Promise<string[]> {
 **Effort**: Medium (2-3 hours to split properly)
 
 **Issue:**
-`docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` is 1,708 lines, exceeding the DOCUMENTATION_STYLE_GUIDE.md hard limit of 1,200 lines.
+`docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` is 1,403 lines, exceeding the DOCUMENTATION_STYLE_GUIDE.md hard limit of 1,200 lines.
 
 **Current State:**
 - Comprehensive guide with Quick Reference, 5 core principles, layer architecture, decision frameworks, 3 real-world examples, and 5 common mistakes
@@ -400,17 +398,17 @@ Otherwise, **keep the current pattern indefinitely**.
 **Effort**: Medium (2-3 hours)
 
 **Issue:**
-DataTablePanel embeds HTML/CSS/JavaScript in TypeScript string literals (extracted to separate view file at `src/shared/infrastructure/ui/views/dataTable.ts`).
+DataTablePanel embeds 451 lines of HTML/CSS/JavaScript in TypeScript string literals (extracted to separate view file at `src/shared/infrastructure/ui/views/dataTable.ts`).
 
 **Current State:**
 ```typescript
-// src/shared/infrastructure/ui/views/dataTable.ts
+// src/shared/infrastructure/ui/views/dataTable.ts (451 lines total)
 export function renderDataTableHtml(...): string {
     return `<!DOCTYPE html>
         <html>
         <head>
             <style>
-                /* 200+ lines of CSS */
+                /* Inline CSS styles */
             </style>
         </head>
         <body>
@@ -431,13 +429,13 @@ export function renderDataTableHtml(...): string {
 
 **Why Deferred:**
 - **Standard VS Code pattern**: Embedding HTML in TypeScript is the recommended approach for webview panels
-- **Not causing bugs**: Current approach works reliably
+- **Not causing bugs**: Current approach works reliably (451 lines is still manageable)
 - **Other priorities**: Architecture improvements more valuable than HTML extraction
 - **Minimal team**: Setup cost not justified for solo/small team
 
 **When to Address:**
-- When HTML grows beyond 1000 lines
-- When we have 5+ different webview templates
+- When HTML grows beyond 1000 lines (currently 451)
+- When we have 5+ different webview templates (currently 1-2)
 - When frontend developer joins team (they'll want separate files)
 - During major webview refactoring initiative
 
@@ -519,23 +517,5 @@ async get<T>(
   return data as T;
 }
 ```
-
----
-
-### Long Repository Methods
-
-**Status**: Deferred
-**Priority**: Low
-**Effort**: Medium (3-4 hours)
-
-**Issue:** Repository save methods exceed 70+ lines with mixed concerns.
-
-**Examples:**
-- `EnvironmentRepository.save()` - Handles persistence + credential management
-- `DataverseApiImportJobRepository` - Duplicate mapping logic
-
-**When to Address:**
-- When adding new repository implementations
-- During repository testing improvements
 
 ---

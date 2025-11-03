@@ -11,44 +11,40 @@ export class EnvironmentFormViewModelMapper {
 		hasStoredPassword: boolean = false
 	): EnvironmentFormViewModel {
 		const authMethod = environment.getAuthenticationMethod();
+		const powerPlatformEnvironmentId = environment.getPowerPlatformEnvironmentId();
+		const clientId = environment.getClientId()?.getValue();
+		const username = environment.getUsername();
 
-		return {
+		const result: EnvironmentFormViewModel = {
 			id: environment.getId().getValue(),
 			name: environment.getName().getValue(),
 			dataverseUrl: environment.getDataverseUrl().getValue(),
-			tenantId: environment.getTenantId().getValue() || '', // Empty string if not provided (UI will handle)
+			tenantId: environment.getTenantId().getValue() || '',
 			authenticationMethod: authMethod.toString(),
 			publicClientId: environment.getPublicClientId().getValue(),
-			powerPlatformEnvironmentId: environment.getPowerPlatformEnvironmentId(),
-
-			// Service Principal
-			clientId: environment.getClientId()?.getValue(),
-			clientSecretPlaceholder: hasStoredClientSecret ? '••••••••• (stored)' : undefined,
 			hasStoredClientSecret,
-
-			// Username/Password
-			username: environment.getUsername(),
-			passwordPlaceholder: hasStoredPassword ? '••••••••• (stored)' : undefined,
 			hasStoredPassword,
-
-			// UI state
 			isExisting: true,
-			requiredFields: this.getRequiredFields(authMethod.toString())
+			requiredFields: this.getRequiredFields(authMethod.toString()),
+			...(powerPlatformEnvironmentId !== undefined && { powerPlatformEnvironmentId }),
+			...(clientId !== undefined && { clientId }),
+			...(hasStoredClientSecret && { clientSecretPlaceholder: '••••••••• (stored)' }),
+			...(username !== undefined && { username }),
+			...(hasStoredPassword && { passwordPlaceholder: '••••••••• (stored)' })
 		};
+
+		return result;
 	}
 
 	private getRequiredFields(authMethod: string): string[] {
-		// Base fields (tenant ID optional for Interactive/DeviceCode/UsernamePassword)
 		const baseFields = ['name', 'dataverseUrl', 'publicClientId', 'authenticationMethod'];
 
 		if (authMethod === 'ServicePrincipal') {
-			// ServicePrincipal requires tenant ID (MSAL limitation)
 			return [...baseFields, 'tenantId', 'clientId', 'clientSecret'];
 		} else if (authMethod === 'UsernamePassword') {
 			return [...baseFields, 'username', 'password'];
 		}
 
-		// Interactive and DeviceCode - tenant ID is optional
 		return baseFields;
 	}
 }

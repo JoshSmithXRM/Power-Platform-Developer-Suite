@@ -7,6 +7,7 @@ import {
 	isWebviewLogMessage,
 	isRefreshDataMessage,
 	isEnvironmentChangedMessage,
+	isSolutionChangedMessage,
 	type WebviewMessage,
 	type WebviewLogMessage
 } from '../../../infrastructure/ui/utils/TypeGuards';
@@ -172,6 +173,23 @@ export abstract class DataTablePanel {
 	}
 
 	/**
+	 * Loads solutions and applies persisted solution filter for the current environment.
+	 * Only executes if solution filtering is enabled in config.
+	 */
+	private async loadAndApplySolutionFilter(): Promise<void> {
+		const config = this.getConfig();
+		if (!config.enableSolutionFilter) {
+			return;
+		}
+
+		this.solutionFilterOptions = await this.loadSolutions();
+		this.panel.webview.postMessage({ command: 'solutionFilterOptionsData', data: this.solutionFilterOptions });
+
+		this.currentSolutionId = await this.loadPersistedSolutionFilter();
+		this.panel.webview.postMessage({ command: 'setCurrentSolution', solutionId: this.currentSolutionId });
+	}
+
+	/**
 	 * Registers this panel in the panel tracking map for the given environment.
 	 * Derived classes override this to manage their static panel maps.
 	 *
@@ -214,15 +232,27 @@ export abstract class DataTablePanel {
 	/**
 	 * Returns custom JavaScript for panel-specific behavior.
 	 *
-	 * Each panel may need custom event handlers (e.g., clickable solution names,
-	 * import job links). Override to attach handlers to panel-specific elements.
+	 * Base implementation handles common Sync Deployment Settings button.
+	 * Override and call super.getCustomJavaScript() to add panel-specific handlers.
 	 *
 	 * Runs after table rendering in webview - safe to query DOM elements.
 	 *
-	 * @returns JavaScript code snippet to execute after rendering (default: empty)
+	 * @returns JavaScript code snippet to execute after rendering
 	 */
 	protected getCustomJavaScript(): string {
-		return '';
+		return `
+			// Add Sync Deployment Settings button to toolbar
+			const toolbarLeft = document.querySelector('.toolbar-left');
+			if (toolbarLeft && !document.getElementById('syncDeploymentSettingsBtn')) {
+				const syncBtn = document.createElement('button');
+				syncBtn.id = 'syncDeploymentSettingsBtn';
+				syncBtn.textContent = 'Sync Deployment Settings';
+				syncBtn.addEventListener('click', () => {
+					vscode.postMessage({ command: 'syncDeploymentSettings' });
+				});
+				toolbarLeft.appendChild(syncBtn);
+			}
+		`;
 	}
 
 	private async initialize(): Promise<void> {
@@ -230,7 +260,7 @@ export abstract class DataTablePanel {
 			this.environments = await this.getEnvironments();
 			this.panel.webview.postMessage({ command: 'environmentsData', data: this.environments });
 
-			this.currentEnvironmentId = this.initialEnvironmentId || this.environments[0]?.id;
+			this.currentEnvironmentId = this.initialEnvironmentId || this.environments[0]?.id || null;
 
 			if (this.currentEnvironmentId) {
 				this.panel.webview.postMessage({
@@ -250,16 +280,7 @@ export abstract class DataTablePanel {
 				enabled: hasPowerPlatformEnvId
 			});
 
-			// Load solutions if panel has solution filtering enabled
-			const config = this.getConfig();
-			if (config.enableSolutionFilter && this.currentEnvironmentId) {
-				this.solutionFilterOptions = await this.loadSolutions();
-				this.panel.webview.postMessage({ command: 'solutionFilterOptionsData', data: this.solutionFilterOptions });
-
-				// Load persisted solution filter (defaults to Default Solution)
-				this.currentSolutionId = await this.loadPersistedSolutionFilter();
-				this.panel.webview.postMessage({ command: 'setCurrentSolution', solutionId: this.currentSolutionId });
-			}
+			await this.loadAndApplySolutionFilter();
 
 			await this.updateTabTitle();
 			await this.loadData();
@@ -302,16 +323,7 @@ export abstract class DataTablePanel {
 			enabled: hasPowerPlatformEnvId
 		});
 
-		// Reload solutions if panel has solution filtering enabled
-		const config = this.getConfig();
-		if (config.enableSolutionFilter) {
-			this.solutionFilterOptions = await this.loadSolutions();
-			this.panel.webview.postMessage({ command: 'solutionFilterOptionsData', data: this.solutionFilterOptions });
-
-			// Load persisted solution filter for new environment (defaults to Default Solution)
-			this.currentSolutionId = await this.loadPersistedSolutionFilter();
-			this.panel.webview.postMessage({ command: 'setCurrentSolution', solutionId: this.currentSolutionId });
-		}
+		await this.loadAndApplySolutionFilter();
 
 		await this.updateTabTitle();
 		await this.loadData();
@@ -359,11 +371,8 @@ export abstract class DataTablePanel {
 				return;
 			}
 
-			if (message.command === 'solutionChanged') {
-				const solutionId = message.data && typeof message.data === 'object' && 'solutionId' in message.data
-					? (message.data as { solutionId: string }).solutionId
-					: Solution.DEFAULT_SOLUTION_ID;
-				this.currentSolutionId = solutionId;
+			if (isSolutionChangedMessage(message)) {
+				this.currentSolutionId = message.data.solutionId;
 				this.logger.debug('Solution filter changed', { solutionId: this.currentSolutionId });
 				await this.persistSolutionFilter();
 				await this.loadData();

@@ -3,19 +3,10 @@ import { ValidationError } from '../../../../shared/domain/errors/ValidationErro
 /**
  * CloudFlow entity representing a Power Automate cloud flow.
  *
- * Responsibilities:
- * - Parse clientdata JSON to extract connection reference names
- * - Provide flow metadata (name, status, etc.)
- * - Validate clientdata format when present
+ * Parses clientdata JSON to extract connection reference names and provides flow metadata.
  */
 export class CloudFlow {
 	/**
-	 * Creates a new CloudFlow entity.
-	 * @param id - Flow GUID (workflowid)
-	 * @param name - Flow display name
-	 * @param modifiedOn - Last modified date
-	 * @param isManaged - Whether the flow is managed
-	 * @param createdBy - User who created the flow
 	 * @param clientData - JSON string containing flow definition (null if not loaded)
 	 * @throws {ValidationError} When clientData is present but invalid JSON
 	 */
@@ -27,7 +18,6 @@ export class CloudFlow {
 		public readonly createdBy: string,
 		public readonly clientData: string | null
 	) {
-		// Validate clientData is valid JSON if present
 		if (clientData !== null && clientData.length > 0) {
 			try {
 				JSON.parse(clientData);
@@ -42,10 +32,6 @@ export class CloudFlow {
 		}
 	}
 
-	/**
-	 * Determines if this flow has clientData loaded.
-	 * @returns True if clientData is present and not empty, false otherwise
-	 */
 	hasClientData(): boolean {
 		return this.clientData !== null && this.clientData.length > 0;
 	}
@@ -54,8 +40,7 @@ export class CloudFlow {
 	 * Extracts connection reference logical names from the flow's clientData.
 	 *
 	 * Parses the connectionReferences section of clientData JSON to identify which
-	 * connection references this flow depends on. Required for relationship mapping
-	 * between flows and connection references.
+	 * connection references this flow depends on.
 	 *
 	 * @returns Array of connection reference logical names, or empty array if no data
 	 */
@@ -64,7 +49,6 @@ export class CloudFlow {
 			return [];
 		}
 
-		// Explicit null check for type narrowing (already validated by hasClientData)
 		if (this.clientData === null) {
 			return [];
 		}
@@ -72,19 +56,16 @@ export class CloudFlow {
 		try {
 			const data: unknown = JSON.parse(this.clientData);
 
-			// Type guard: check if data has the expected structure
 			if (!this.isValidClientData(data)) {
 				return [];
 			}
 
-			// Navigate to connectionReferences object
 			const connectionRefs = data.properties?.connectionReferences;
 
 			if (!connectionRefs || typeof connectionRefs !== 'object' || connectionRefs === null) {
 				return [];
 			}
 
-			// Extract connectionReferenceLogicalName from each connection reference
 			const names: string[] = [];
 			Object.values(connectionRefs).forEach((connRef) => {
 				if (connRef && typeof connRef === 'object' && 'connection' in connRef) {
@@ -100,15 +81,10 @@ export class CloudFlow {
 
 			return names;
 		} catch (_error) {
-			// If JSON parsing fails or structure is unexpected, return empty array
-			// Error was already validated in constructor, so this is defensive
 			return [];
 		}
 	}
 
-	/**
-	 * Type guard to check if parsed JSON has the expected structure.
-	 */
 	private isValidClientData(data: unknown): data is { properties?: { connectionReferences?: Record<string, unknown> } } {
 		return (
 			typeof data === 'object' &&
@@ -117,21 +93,7 @@ export class CloudFlow {
 		);
 	}
 
-	/**
-	 * Determines if this flow uses any connection references.
-	 * @returns True if flow has at least one connection reference, false otherwise
-	 */
 	hasConnectionReferences(): boolean {
 		return this.extractConnectionReferenceNames().length > 0;
-	}
-
-	/**
-	 * Sorts flows alphabetically by name.
-	 * Creates a defensive copy to avoid mutating the original array.
-	 * @param flows - Array of CloudFlow entities to sort
-	 * @returns New sorted array
-	 */
-	static sort(flows: CloudFlow[]): CloudFlow[] {
-		return [...flows].sort((a, b) => a.name.localeCompare(b.name));
 	}
 }

@@ -30,11 +30,17 @@ export class LoadEnvironmentsUseCase {
 
 			this.logger.info(`Loaded ${viewModels.length} environment(s)`);
 
-			return {
+			const result: LoadEnvironmentsResponse = {
 				environments: viewModels,
-				totalCount: viewModels.length,
-				activeEnvironmentId: viewModels.find(vm => vm.isActive)?.id
+				totalCount: viewModels.length
 			};
+
+			const activeId = viewModels.find(vm => vm.isActive)?.id;
+			if (activeId !== undefined) {
+				result.activeEnvironmentId = activeId;
+			}
+
+			return result;
 		} catch (error) {
 			this.logger.error('LoadEnvironmentsUseCase: Failed to load environments', error);
 			throw error;

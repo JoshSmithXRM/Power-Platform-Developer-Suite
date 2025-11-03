@@ -11,7 +11,6 @@ import { ValidationError } from '../../../../shared/domain/errors/ValidationErro
 export class Solution {
   /**
    * The GUID of the Default Solution across all Dataverse environments.
-   * This solution contains all unmanaged customizations not part of other solutions.
    * This GUID is consistent across all Dataverse instances.
    */
   public static readonly DEFAULT_SOLUTION_ID = 'fd140aaf-4df4-11dd-bd17-0019b9312238';
@@ -63,8 +62,6 @@ export class Solution {
 
   /**
    * Determines if this is the default solution.
-   * The default solution has special significance in Power Platform as it contains
-   * all unmanaged customizations that are not part of other solutions.
    * @returns True if this is the Default solution, false otherwise
    */
   isDefaultSolution(): boolean {
@@ -79,21 +76,5 @@ export class Solution {
    */
   getSortPriority(): number {
     return this.isDefaultSolution() ? 0 : 1;
-  }
-
-  /**
-   * Sorts solutions by business rules: Default solution last (by priority), then alphabetically by friendly name.
-   * Creates a defensive copy to avoid mutating the original array.
-   * @param solutions - Array of Solution entities to sort
-   * @returns New sorted array
-   */
-  static sort(solutions: Solution[]): Solution[] {
-    return [...solutions].sort((a, b) => {
-      const priorityDiff = a.getSortPriority() - b.getSortPriority();
-      if (priorityDiff !== 0) {
-        return priorityDiff;
-      }
-      return a.friendlyName.localeCompare(b.friendlyName);
-    });
   }
 }

@@ -5,7 +5,7 @@ import { DataverseUrl } from '../../domain/valueObjects/DataverseUrl';
 import { TenantId } from '../../domain/valueObjects/TenantId';
 import { ClientId } from '../../domain/valueObjects/ClientId';
 import { AuthenticationMethod, AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
-import { EnvironmentConnectionDto } from '../dtos/EnvironmentConnectionDto';
+import { EnvironmentConnectionDto, PowerPlatformSettingsDto } from '../dtos/EnvironmentConnectionDto';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 /**
@@ -16,8 +16,8 @@ export class EnvironmentDomainMapper {
 	constructor(private readonly logger: ILogger) {}
 
 	/**
-	 * Converts infrastructure DTO to domain entity
-	 * Maps persistence format to rich domain model
+	 * Converts infrastructure DTO to domain entity.
+	 * Maps persistence format to rich domain model.
 	 * @param dto - Infrastructure DTO from storage
 	 * @returns Domain entity with behavior
 	 */
@@ -51,8 +51,8 @@ export class EnvironmentDomainMapper {
 	}
 
 	/**
-	 * Converts domain entity to infrastructure DTO
-	 * Maps rich domain model to persistence format
+	 * Converts domain entity to infrastructure DTO.
+	 * Maps rich domain model to persistence format.
 	 * @param environment - Domain entity with behavior
 	 * @returns Infrastructure DTO for storage
 	 */
@@ -63,21 +63,39 @@ export class EnvironmentDomainMapper {
 		});
 
 		try {
+			const settings: PowerPlatformSettingsDto = {
+				dataverseUrl: environment.getDataverseUrl().getValue(),
+				tenantId: environment.getTenantId().getValue() || '',
+				authenticationMethod: environment.getAuthenticationMethod().toString() as PowerPlatformSettingsDto['authenticationMethod'],
+				publicClientId: environment.getPublicClientId().getValue()
+			};
+
+			const clientId = environment.getClientId()?.getValue();
+			if (clientId !== undefined) {
+				settings.clientId = clientId;
+			}
+
+			const username = environment.getUsername();
+			if (username !== undefined) {
+				settings.username = username;
+			}
+
 			const dto: EnvironmentConnectionDto = {
 				id: environment.getId().getValue(),
 				name: environment.getName().getValue(),
-				settings: {
-					dataverseUrl: environment.getDataverseUrl().getValue(),
-					tenantId: environment.getTenantId().getValue() || '', // Empty string if not provided (will use "organizations" authority)
-					authenticationMethod: environment.getAuthenticationMethod().toString() as EnvironmentConnectionDto['settings']['authenticationMethod'],
-					publicClientId: environment.getPublicClientId().getValue(),
-					clientId: environment.getClientId()?.getValue(),
-					username: environment.getUsername()
-				},
-				isActive: environment.getIsActive(),
-				lastUsed: environment.getLastUsed()?.toISOString(),
-				environmentId: environment.getPowerPlatformEnvironmentId()
+				settings,
+				isActive: environment.getIsActive()
 			};
+
+			const lastUsed = environment.getLastUsed();
+			if (lastUsed !== undefined) {
+				dto.lastUsed = lastUsed.toISOString();
+			}
+
+			const environmentId = environment.getPowerPlatformEnvironmentId();
+			if (environmentId !== undefined) {
+				dto.environmentId = environmentId;
+			}
 
 			this.logger.debug('Successfully mapped domain entity to DTO');
 			return dto;

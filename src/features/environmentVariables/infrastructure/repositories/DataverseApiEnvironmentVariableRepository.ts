@@ -39,10 +39,10 @@ export class DataverseApiEnvironmentVariableRepository implements IEnvironmentVa
 	 */
 	async findAllDefinitions(
 		environmentId: string,
-		options?: QueryOptions,
-		cancellationToken?: ICancellationToken
+		options: QueryOptions | undefined,
+		cancellationToken: ICancellationToken | undefined
 	): Promise<EnvironmentVariableDefinitionData[]> {
-		// Default options: order by schema name for consistent results
+		// Order by schema name to ensure consistent display order across panel refreshes
 		const defaultOptions: QueryOptions = {
 			orderBy: 'schemaname'
 		};
@@ -91,10 +91,10 @@ export class DataverseApiEnvironmentVariableRepository implements IEnvironmentVa
 	 */
 	async findAllValues(
 		environmentId: string,
-		options?: QueryOptions,
-		cancellationToken?: ICancellationToken
+		options: QueryOptions | undefined,
+		cancellationToken: ICancellationToken | undefined
 	): Promise<EnvironmentVariableValueData[]> {
-		// Default options: no specific ordering needed for values
+		// Values are joined with definitions by ID in memory, so API order doesn't matter
 		const defaultOptions: QueryOptions = {};
 
 		const mergedOptions: QueryOptions = {

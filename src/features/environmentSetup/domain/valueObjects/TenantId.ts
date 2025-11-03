@@ -24,10 +24,10 @@ export class TenantId {
 	private readonly value?: string;
 	private static readonly GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-	constructor(value?: string) {
+	constructor(value: string | undefined) {
 		// Allow empty/undefined - will use "organizations" authority for MSAL
 		if (!value || value.trim() === '') {
-			this.value = undefined;
+			// Leave this.value undefined (don't explicitly assign)
 			return;
 		}
 

@@ -1,18 +1,18 @@
 /**
  * Key for identifying panel state by panel type and environment
  */
-export type PanelStateKey = {
+export interface PanelStateKey {
 	panelType: string;
 	environmentId: string;
-};
+}
 
 /**
  * Panel state data that is persisted
  */
-export type PanelState = {
-	selectedSolutionId: string | null;
+export interface PanelState {
+	selectedSolutionId: string;
 	lastUpdated: string;
-};
+}
 
 /**
  * Repository interface for persisting and retrieving panel state.

@@ -42,7 +42,7 @@ export class WhoAmIService implements IWhoAmIService {
 	) {}
 
 	/**
-	 * Tests connection to Dataverse environment using WhoAmI API
+	 * Tests connection to Dataverse environment using WhoAmI API.
 	 * @param environment Environment to test
 	 * @param clientSecret Optional client secret (for service principal auth)
 	 * @param password Optional password (for username/password auth)
@@ -50,8 +50,8 @@ export class WhoAmIService implements IWhoAmIService {
 	 */
 	public async testConnection(
 		environment: Environment,
-		clientSecret?: string,
-		password?: string
+		clientSecret: string | undefined,
+		password: string | undefined
 	): Promise<WhoAmIResponse> {
 		const url = `${environment.getDataverseUrl().getApiBaseUrl()}/WhoAmI`;
 		this.logger.debug(`WhoAmIService: Testing connection to ${url}`, {
@@ -61,7 +61,6 @@ export class WhoAmIService implements IWhoAmIService {
 		});
 
 		try {
-			// Get access token
 			const token = await this.authService.getAccessTokenForEnvironment(
 				environment,
 				clientSecret,
@@ -72,7 +71,6 @@ export class WhoAmIService implements IWhoAmIService {
 				tokenPrefix: token.substring(0, 10) + '...'
 			});
 
-			// Call WhoAmI API
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), WhoAmIService.TIMEOUT_MS);
 
@@ -95,13 +93,11 @@ export class WhoAmIService implements IWhoAmIService {
 
 				const data: unknown = await response.json();
 
-				// Validate response structure using type guard
 				if (!isWhoAmIApiResponse(data)) {
 					this.logger.error('Invalid WhoAmI response structure', { data });
 					throw new Error('WhoAmI API response missing required fields (UserId, BusinessUnitId, OrganizationId)');
 				}
 
-				// TypeScript now knows data is WhoAmIApiResponse
 				this.logger.info('WhoAmI API call successful', {
 					userId: data.UserId,
 					organizationId: data.OrganizationId

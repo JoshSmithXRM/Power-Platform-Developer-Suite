@@ -30,7 +30,7 @@ export class DiscoverEnvironmentIdUseCase {
 	 */
 	public async execute(
 		request: DiscoverEnvironmentIdRequest,
-		cancellationToken?: ICancellationToken
+		cancellationToken: ICancellationToken | undefined
 	): Promise<DiscoverEnvironmentIdResponse> {
 		this.logger.debug('DiscoverEnvironmentIdUseCase: Starting discovery', {
 			dataverseUrl: request.dataverseUrl,
@@ -38,8 +38,32 @@ export class DiscoverEnvironmentIdUseCase {
 		});
 
 		try {
-		// Create temporary domain entity from draft data
-		const tempEnvironment = new Environment(
+			const tempEnvironment = this.createTemporaryEnvironment(request);
+			const credentials = await this.loadCredentials(request, tempEnvironment);
+
+			const environmentId = await this.powerPlatformApiService.discoverEnvironmentId(
+				tempEnvironment,
+				credentials.clientSecret,
+				credentials.password,
+				cancellationToken
+			);
+
+			this.logger.info(`Environment ID discovered: ${environmentId}`);
+
+			return {
+				success: true,
+				environmentId: environmentId
+			};
+		} catch (error) {
+			return this.handleError(error);
+		}
+	}
+
+	/**
+	 * Creates temporary environment entity from request data
+	 */
+	private createTemporaryEnvironment(request: DiscoverEnvironmentIdRequest): Environment {
+		return new Environment(
 			request.existingEnvironmentId
 				? new EnvironmentId(request.existingEnvironmentId)
 				: EnvironmentId.generate(),
@@ -54,53 +78,74 @@ export class DiscoverEnvironmentIdUseCase {
 			request.clientId ? new ClientId(request.clientId) : undefined,
 			request.username
 		);
+	}
 
-		// Load credentials from storage if not provided
+	/**
+	 * Loads credentials from storage if not provided in request
+	 */
+	private async loadCredentials(
+		request: DiscoverEnvironmentIdRequest,
+		environment: Environment
+	): Promise<{ clientSecret?: string; password?: string }> {
+		const authMethod = environment.getAuthenticationMethod();
 		let clientSecret = request.clientSecret;
 		let password = request.password;
 
-		const authMethod = tempEnvironment.getAuthenticationMethod();
-
 		if (authMethod.requiresClientCredentials() && !clientSecret) {
-			const clientId = tempEnvironment.getClientId()?.getValue();
-			if (clientId) {
-				clientSecret = await this.repository.getClientSecret(clientId);
-			}
+			clientSecret = await this.loadClientSecret(environment);
 		}
 
 		if (authMethod.requiresUsernamePassword() && !password) {
-			const username = tempEnvironment.getUsername();
-			if (username) {
-				password = await this.repository.getPassword(username);
-				this.logger.debug('Loaded password from storage');
-			}
+			password = await this.loadPassword(environment);
 		}
 
-		// Call BAP API to discover environment ID
-		const environmentId = await this.powerPlatformApiService.discoverEnvironmentId(
-			tempEnvironment,
-			clientSecret,
-			password,
-			cancellationToken
-		);
+		const result: { clientSecret?: string; password?: string } = {};
+		if (clientSecret !== undefined) {
+			result.clientSecret = clientSecret;
+		}
+		if (password !== undefined) {
+			result.password = password;
+		}
+		return result;
+	}
 
-		this.logger.info(`Environment ID discovered: ${environmentId}`);
+	/**
+	 * Loads client secret from repository
+	 */
+	private async loadClientSecret(environment: Environment): Promise<string | undefined> {
+		const clientId = environment.getClientId()?.getValue();
+		if (clientId) {
+			return await this.repository.getClientSecret(clientId);
+		}
+		return undefined;
+	}
+
+	/**
+	 * Loads password from repository
+	 */
+	private async loadPassword(environment: Environment): Promise<string | undefined> {
+		const username = environment.getUsername();
+		if (username) {
+			const password = await this.repository.getPassword(username);
+			this.logger.debug('Loaded password from storage');
+			return password;
+		}
+		return undefined;
+	}
+
+	/**
+	 * Handles errors and creates error response
+	 */
+	private handleError(error: unknown): DiscoverEnvironmentIdResponse {
+		this.logger.error('DiscoverEnvironmentIdUseCase: Failed to discover environment ID', error);
+
+		const apiError = new ApiError(error instanceof Error ? error.message : 'Unknown error');
 
 		return {
-			success: true,
-			environmentId: environmentId
+			success: false,
+			errorMessage: apiError.getMessage(),
+			requiresInteractiveAuth: apiError.requiresInteractiveAuth()
 		};
-		} catch (error) {
-			this.logger.error('DiscoverEnvironmentIdUseCase: Failed to discover environment ID', error);
-
-			const apiError = new ApiError(error instanceof Error ? error.message : 'Unknown error');
-
-			return {
-				success: false,
-				errorMessage: apiError.getMessage(),
-				requiresInteractiveAuth: apiError.requiresInteractiveAuth()
-			};
-		}
 	}
 }
 

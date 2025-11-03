@@ -5,19 +5,11 @@ import { ILogger } from './ILogger';
  * Discards all log messages
  */
 export class NullLogger implements ILogger {
-	public debug(_message: string, ..._args: unknown[]): void {
-		// No-op
-	}
+	public debug(_message: string, ..._args: unknown[]): void {}
 
-	public info(_message: string, ..._args: unknown[]): void {
-		// No-op
-	}
+	public info(_message: string, ..._args: unknown[]): void {}
 
-	public warn(_message: string, ..._args: unknown[]): void {
-		// No-op
-	}
+	public warn(_message: string, ..._args: unknown[]): void {}
 
-	public error(_message: string, _error?: unknown): void {
-		// No-op
-	}
+	public error(_message: string, _error: unknown | undefined): void {}
 }

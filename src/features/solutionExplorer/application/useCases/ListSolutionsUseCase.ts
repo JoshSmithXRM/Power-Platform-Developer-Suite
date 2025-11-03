@@ -7,8 +7,7 @@ import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
  * Use case for listing all solutions in an environment.
- * Orchestrates repository call only. Returns unsorted domain entities.
- * Sorting business logic (Solution.sort) is invoked by mapper when converting to ViewModels.
+ * Returns unsorted domain entities - sorting is handled by mapper when needed.
  */
 export class ListSolutionsUseCase {
   constructor(
@@ -24,7 +23,7 @@ export class ListSolutionsUseCase {
    */
   async execute(
     environmentId: string,
-    cancellationToken?: ICancellationToken
+    cancellationToken: ICancellationToken | undefined
   ): Promise<Solution[]> {
     this.logger.info('ListSolutionsUseCase started', { environmentId });
 

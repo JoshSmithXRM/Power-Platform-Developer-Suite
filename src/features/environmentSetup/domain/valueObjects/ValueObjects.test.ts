@@ -88,7 +88,7 @@ describe('ValueObjects', () => {
 				expect(tenantId2.isValid()).toBe(true);
 				expect(tenantId2.isProvided()).toBe(false);
 
-				const tenantId3 = new TenantId();
+				const tenantId3 = new TenantId(undefined);
 				expect(tenantId3.getValue()).toBeUndefined();
 				expect(tenantId3.isValid()).toBe(true);
 				expect(tenantId3.isProvided()).toBe(false);

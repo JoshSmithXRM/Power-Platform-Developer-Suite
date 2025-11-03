@@ -35,8 +35,8 @@ export function normalizeError(error: unknown): Error {
 	if (typeof error === 'object' && error !== null) {
 		// Try to extract message property if it exists
 		const obj = error as Record<string, unknown>;
-		if ('message' in obj && typeof obj.message === 'string') {
-			return new Error(obj.message);
+		if ('message' in obj && typeof obj['message'] === 'string') {
+			return new Error(obj['message']);
 		}
 		return new Error(JSON.stringify(error));
 	}

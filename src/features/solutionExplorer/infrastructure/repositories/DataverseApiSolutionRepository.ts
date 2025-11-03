@@ -8,16 +8,10 @@ import { ISolutionRepository } from '../../domain/interfaces/ISolutionRepository
 import { Solution } from '../../domain/entities/Solution';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
-/**
- * Dataverse API response for solutions endpoint
- */
 interface DataverseSolutionsResponse {
   value: DataverseSolutionDto[];
 }
 
-/**
- * DTO for solution data from Dataverse API
- */
 interface DataverseSolutionDto {
   solutionid: string;
   uniquename: string;
@@ -45,15 +39,11 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
     private readonly logger: ILogger
   ) {}
 
-  /**
-   * Fetches all solutions from Dataverse for the specified environment.
-   */
   async findAll(
     environmentId: string,
-    options?: QueryOptions,
-    cancellationToken?: ICancellationToken
+    options: QueryOptions | undefined,
+    cancellationToken: ICancellationToken | undefined
   ): Promise<Solution[]> {
-    // Default options: expand publisher, order by friendly name
     const defaultOptions: QueryOptions = {
       expand: 'publisherid($select=friendlyname)',
       orderBy: 'friendlyname'
@@ -105,7 +95,7 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
    */
   async findAllForDropdown(
     environmentId: string,
-    cancellationToken?: ICancellationToken
+    cancellationToken: ICancellationToken | undefined
   ): Promise<Array<{ id: string; name: string; uniqueName: string }>> {
     const queryString = ODataQueryBuilder.build({
       select: ['solutionid', 'friendlyname', 'uniquename'],
@@ -150,9 +140,6 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
     }
   }
 
-  /**
-   * Maps Dataverse DTO to Solution domain entity.
-   */
   private mapToEntity(dto: DataverseSolutionDto): Solution {
     return new Solution(
       dto.solutionid,

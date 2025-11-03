@@ -71,7 +71,7 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 	}
 
 	/**
-	 * Saves an environment to storage with optional credentials
+	 * Saves an environment to storage with optional credentials.
 	 * @param environment Environment domain entity to save
 	 * @param clientSecret Optional client secret (stored in SecretStorage)
 	 * @param password Optional password (stored in SecretStorage)
@@ -79,8 +79,8 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 	 */
 	public async save(
 		environment: Environment,
-		clientSecret?: string,
-		password?: string,
+		clientSecret: string | undefined,
+		password: string | undefined,
 		preserveExistingCredentials: boolean = false
 	): Promise<void> {
 		const envId = environment.getId().getValue();
@@ -150,7 +150,7 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 	}
 
 	/**
-	 * Deletes an environment and all associated secrets
+	 * Deletes an environment and all associated secrets.
 	 * @param id Environment ID to delete
 	 */
 	public async delete(id: EnvironmentId): Promise<void> {
@@ -178,11 +178,12 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 
 	/**
 	 * Checks if name is unique across all environments.
+	 * Excludes specified environment ID when checking (allows keeping same name during updates).
 	 * @param name Name to check
-	 * @param excludeId Optional ID to exclude (for updates - allows keeping same name)
+	 * @param excludeId Optional ID to exclude from check
 	 * @returns True if name is unique, false otherwise
 	 */
-	public async isNameUnique(name: string, excludeId?: EnvironmentId): Promise<boolean> {
+	public async isNameUnique(name: string, excludeId: EnvironmentId | undefined): Promise<boolean> {
 		const dtos = await this.loadDtos();
 		const existing = dtos.find(d =>
 			d.name === name &&
@@ -202,8 +203,8 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 	}
 
 	/**
-	 * Deletes multiple secrets from secure storage
-	 * Used for cleanup when auth method changes or environment is deleted
+	 * Deletes multiple secrets from secure storage.
+	 * Used for cleanup when auth method changes or environment is deleted.
 	 * @param secretKeys Array of secret keys to delete
 	 */
 	public async deleteSecrets(secretKeys: string[]): Promise<void> {

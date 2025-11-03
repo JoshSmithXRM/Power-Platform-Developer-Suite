@@ -54,8 +54,8 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 	async getObjectTypeCode(
 		environmentId: string,
 		entityLogicalName: string,
-		options?: QueryOptions,
-		cancellationToken?: ICancellationToken
+		options: QueryOptions | undefined,
+		cancellationToken: ICancellationToken | undefined
 	): Promise<number | null> {
 		const defaultOptions: QueryOptions = {
 			select: ['ObjectTypeCode', 'LogicalName'],
@@ -97,7 +97,13 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 				return null;
 			}
 
-			const objectTypeCode = response.value[0].ObjectTypeCode;
+			const firstEntity = response.value[0];
+			if (firstEntity === undefined) {
+				this.logger.warn(`Entity definition array is empty for: ${entityLogicalName}`);
+				return null;
+			}
+
+			const objectTypeCode = firstEntity.ObjectTypeCode;
 
 			this.logger.debug(`Fetched ObjectTypeCode for ${entityLogicalName}`, {
 				environmentId,
@@ -119,8 +125,8 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 		environmentId: string,
 		solutionId: string,
 		entityLogicalName: string,
-		options?: QueryOptions,
-		cancellationToken?: ICancellationToken
+		options: QueryOptions | undefined,
+		cancellationToken: ICancellationToken | undefined
 	): Promise<string[]> {
 		this.logger.debug('Fetching solution component IDs from Dataverse API', {
 			environmentId,

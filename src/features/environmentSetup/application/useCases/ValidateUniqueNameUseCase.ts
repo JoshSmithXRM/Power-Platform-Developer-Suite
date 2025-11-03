@@ -28,10 +28,15 @@ export class ValidateUniqueNameUseCase {
 
 		this.logger.debug(`Name "${request.name}" is ${isUnique ? 'unique' : 'duplicate'}`);
 
-		return {
-			isUnique,
-			message: isUnique ? undefined : 'Environment name must be unique'
+		const result: ValidateUniqueNameResponse = {
+			isUnique
 		};
+
+		if (!isUnique) {
+			result.message = 'Environment name must be unique';
+		}
+
+		return result;
 	}
 }
 

@@ -8,16 +8,10 @@ import { ICloudFlowRepository } from '../../domain/interfaces/ICloudFlowReposito
 import { CloudFlow } from '../../domain/entities/CloudFlow';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
-/**
- * Dataverse API response for workflows endpoint
- */
 interface DataverseWorkflowsResponse {
 	value: DataverseWorkflowDto[];
 }
 
-/**
- * DTO for workflow (cloud flow) data from Dataverse API
- */
 interface DataverseWorkflowDto {
 	workflowid: string;
 	name: string;
@@ -40,22 +34,20 @@ export class DataverseApiCloudFlowRepository implements ICloudFlowRepository {
 	) {}
 
 	/**
-	 * Fetches all cloud flows from Dataverse for the specified environment.
+	 * Fetches all cloud flows from Dataverse.
 	 *
-	 * CRITICAL: By default, excludes the large 'clientdata' field for performance.
-	 * Uses explicit $select to exclude it. Callers must explicitly request clientdata
-	 * via options.select if they need it.
+	 * By default, excludes the large 'clientdata' field for performance.
+	 * Callers must explicitly request clientdata via options.select if needed.
 	 */
 	async findAll(
 		environmentId: string,
-		options?: QueryOptions,
-		cancellationToken?: ICancellationToken
+		options: QueryOptions | undefined,
+		cancellationToken: ICancellationToken | undefined
 	): Promise<CloudFlow[]> {
-		// Default options: exclude 'clientdata' field (large JSON), expand createdby, filter for cloud flows, order by name
 		const defaultOptions: QueryOptions = {
 			select: ['workflowid', 'name', 'modifiedon', 'ismanaged', '_createdby_value'],
 			expand: 'createdby($select=fullname)',
-			filter: 'category eq 5', // Cloud flows have category = 5
+			filter: 'category eq 5',
 			orderBy: 'name'
 		};
 
@@ -98,9 +90,6 @@ export class DataverseApiCloudFlowRepository implements ICloudFlowRepository {
 		}
 	}
 
-	/**
-	 * Maps Dataverse DTO to CloudFlow domain entity.
-	 */
 	private mapToEntity(dto: DataverseWorkflowDto): CloudFlow {
 		return new CloudFlow(
 			dto.workflowid,
@@ -108,7 +97,7 @@ export class DataverseApiCloudFlowRepository implements ICloudFlowRepository {
 			new Date(dto.modifiedon),
 			dto.ismanaged,
 			dto.createdby?.fullname ?? 'Unknown User',
-			dto.clientdata ?? null // Will be null if not selected in query
+			dto.clientdata ?? null
 		);
 	}
 }

@@ -21,7 +21,7 @@ export class DataverseApiService implements IDataverseApiService {
   async get<T = unknown>(
     environmentId: string,
     endpoint: string,
-    cancellationToken?: ICancellationToken
+    cancellationToken: ICancellationToken | undefined
   ): Promise<T> {
     return this.request<T>('GET', environmentId, endpoint, undefined, cancellationToken);
   }
@@ -33,7 +33,7 @@ export class DataverseApiService implements IDataverseApiService {
     environmentId: string,
     endpoint: string,
     body: unknown,
-    cancellationToken?: ICancellationToken
+    cancellationToken: ICancellationToken | undefined
   ): Promise<T> {
     return this.request<T>('POST', environmentId, endpoint, body, cancellationToken);
   }
@@ -45,7 +45,7 @@ export class DataverseApiService implements IDataverseApiService {
     environmentId: string,
     endpoint: string,
     body: unknown,
-    cancellationToken?: ICancellationToken
+    cancellationToken: ICancellationToken | undefined
   ): Promise<T> {
     return this.request<T>('PATCH', environmentId, endpoint, body, cancellationToken);
   }
@@ -56,7 +56,7 @@ export class DataverseApiService implements IDataverseApiService {
   async delete(
     environmentId: string,
     endpoint: string,
-    cancellationToken?: ICancellationToken
+    cancellationToken: ICancellationToken | undefined
   ): Promise<void> {
     await this.request<void>('DELETE', environmentId, endpoint, undefined, cancellationToken);
   }
@@ -71,8 +71,8 @@ export class DataverseApiService implements IDataverseApiService {
     method: string,
     environmentId: string,
     endpoint: string,
-    body?: unknown,
-    cancellationToken?: ICancellationToken
+    body: unknown | undefined,
+    cancellationToken: ICancellationToken | undefined
   ): Promise<T> {
     if (cancellationToken?.isCancellationRequested) {
       throw new OperationCancelledException();
@@ -98,15 +98,17 @@ export class DataverseApiService implements IDataverseApiService {
         'OData-Version': '4.0'
       };
 
+      const fetchOptions: RequestInit = {
+        method,
+        headers
+      };
+
       if (body !== undefined) {
         headers['Content-Type'] = 'application/json';
+        fetchOptions.body = JSON.stringify(body);
       }
 
-      const response = await fetch(url, {
-        method,
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined
-      });
+      const response = await fetch(url, fetchOptions);
 
       if (!response.ok) {
         const errorText = await response.text();

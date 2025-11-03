@@ -36,8 +36,8 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 		private readonly solutionRepository: ISolutionRepository,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId?: string,
-		panelStateRepository?: IPanelStateRepository
+		initialEnvironmentId: string | undefined,
+		panelStateRepository: IPanelStateRepository | undefined
 	) {
 		super(panel, extensionUri, getEnvironments, getEnvironmentById, logger, initialEnvironmentId, panelStateRepository);
 	}
@@ -55,8 +55,8 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 		solutionRepository: ISolutionRepository,
 		urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId?: string,
-		panelStateRepository?: IPanelStateRepository
+		initialEnvironmentId: string | undefined,
+		panelStateRepository: IPanelStateRepository | undefined
 	): Promise<EnvironmentVariablesPanel> {
 		const column = vscode.ViewColumn.One;
 
@@ -230,24 +230,6 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 		`;
 	}
 
-	/**
-	 * Returns custom JavaScript to add the Sync Deployment Settings button.
-	 */
-	protected getCustomJavaScript(): string {
-		return `
-			// Add Sync Deployment Settings button to toolbar
-			const toolbarLeft = document.querySelector('.toolbar-left');
-			if (toolbarLeft && !document.getElementById('syncDeploymentSettingsBtn')) {
-				const syncBtn = document.createElement('button');
-				syncBtn.id = 'syncDeploymentSettingsBtn';
-				syncBtn.textContent = 'Sync Deployment Settings';
-				syncBtn.addEventListener('click', () => {
-					vscode.postMessage({ command: 'syncDeploymentSettings' });
-				});
-				toolbarLeft.appendChild(syncBtn);
-			}
-		`;
-	}
 
 	/**
 	 * Opens the environment variables page in the Maker Portal.

@@ -74,7 +74,7 @@ export function raw(html: string): RawHtml {
  * // Auto-flattens arrays from .map()
  */
 export function html(strings: TemplateStringsArray, ...values: unknown[]): RawHtml {
-	let result = strings[0];
+	let result = strings[0] ?? '';
 
 	for (let i = 0; i < values.length; i++) {
 		const value = values[i];
@@ -94,7 +94,10 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): RawHt
 			result += escapeHtml(String(value));
 		}
 
-		result += strings[i + 1];
+		const nextString = strings[i + 1];
+		if (nextString !== undefined) {
+			result += nextString;
+		}
 	}
 
 	// Nested html`` calls don't double-escape

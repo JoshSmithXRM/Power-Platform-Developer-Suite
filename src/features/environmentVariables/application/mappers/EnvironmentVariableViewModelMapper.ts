@@ -1,11 +1,14 @@
 import { EnvironmentVariable } from '../../domain/entities/EnvironmentVariable';
 import { EnvironmentVariableViewModel } from '../viewModels/EnvironmentVariableViewModel';
 import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
+import { EnvironmentVariableCollectionService } from '../../domain/services/EnvironmentVariableCollectionService';
 
 /**
  * Maps EnvironmentVariable domain entities to EnvironmentVariableViewModel presentation DTOs.
  */
 export class EnvironmentVariableViewModelMapper {
+	private static readonly collectionService = new EnvironmentVariableCollectionService();
+
 	/**
 	 * Maps a single EnvironmentVariable entity to a ViewModel.
 	 * @param envVar - EnvironmentVariable entity to convert
@@ -32,7 +35,7 @@ export class EnvironmentVariableViewModelMapper {
 	 * @returns Array of view models
 	 */
 	static toViewModels(envVars: EnvironmentVariable[], shouldSort = false): EnvironmentVariableViewModel[] {
-		const varsToMap = shouldSort ? EnvironmentVariable.sort(envVars) : envVars;
+		const varsToMap = shouldSort ? this.collectionService.sort(envVars) : envVars;
 		return varsToMap.map((envVar) => this.toViewModel(envVar));
 	}
 }

@@ -23,7 +23,11 @@ describe('EnvironmentValidationService', () => {
 			new TenantId('00000000-0000-0000-0000-000000000000'),
 			new AuthenticationMethod(authMethod),
 			new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'), // Public client ID
-			false
+			false,
+			undefined,
+			undefined,
+			undefined,
+			undefined
 		);
 	}
 
@@ -36,7 +40,9 @@ describe('EnvironmentValidationService', () => {
 				env,
 				isNameUnique,
 				false,
-				false
+				false,
+				undefined,
+				undefined
 			);
 
 			expect(result.isValid).toBe(true);
@@ -51,7 +57,9 @@ describe('EnvironmentValidationService', () => {
 				env,
 				isNameUnique,
 				false,
-				false
+				false,
+				undefined,
+				undefined
 			);
 
 			expect(result.isValid).toBe(false);
@@ -66,7 +74,9 @@ describe('EnvironmentValidationService', () => {
 				env,
 				isNameUnique,
 				false,
-				false
+				false,
+				undefined,
+				undefined
 			);
 
 			expect(result.isValid).toBe(true);
@@ -128,7 +138,9 @@ describe('EnvironmentValidationService', () => {
 				env,
 				isNameUnique,
 				hasExistingClientSecret,
-				false
+				false,
+				undefined,
+				undefined
 			);
 
 			expect(result.isValid).toBe(true);
@@ -220,7 +232,9 @@ describe('EnvironmentValidationService', () => {
 				env,
 				isNameUnique,
 				false,
-				hasExistingPassword
+				hasExistingPassword,
+			undefined,
+			undefined
 			);
 
 			expect(result.isValid).toBe(true);
@@ -305,7 +319,9 @@ describe('EnvironmentValidationService', () => {
 				env,
 				isNameUnique,
 				false,
-				false
+				false,
+			undefined,
+			undefined
 			);
 
 			expect(result.isValid).toBe(true);
