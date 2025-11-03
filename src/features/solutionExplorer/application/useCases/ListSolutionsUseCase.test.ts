@@ -75,7 +75,7 @@ describe('ListSolutionsUseCase', () => {
 			expect(mockLogger.info).toHaveBeenCalledWith('ListSolutionsUseCase completed', { count: 2 });
 		});
 
-		it('should sort Default solution first, then alphabetically by friendlyName', async () => {
+		it('should return solutions in the order provided by repository', async () => {
 			const solutions = [
 				createSolution({ uniqueName: 'Zebra', friendlyName: 'Zebra Solution' }),
 				createSolution({ uniqueName: 'Default', friendlyName: 'Default' }),
@@ -86,25 +86,11 @@ describe('ListSolutionsUseCase', () => {
 
 			const result = await useCase.execute('env-123');
 
-			expect(result[0].uniqueName).toBe('Default');
-			expect(result[1].friendlyName).toBe('Alpha Solution');
-			expect(result[2].friendlyName).toBe('Zebra Solution');
-		});
-
-		it('should sort non-Default solutions alphabetically when no Default exists', async () => {
-			const solutions = [
-				createSolution({ uniqueName: 'Charlie', friendlyName: 'Charlie' }),
-				createSolution({ uniqueName: 'Alpha', friendlyName: 'Alpha' }),
-				createSolution({ uniqueName: 'Bravo', friendlyName: 'Bravo' })
-			];
-
-			mockRepository.findAll.mockResolvedValue(solutions);
-
-			const result = await useCase.execute('env-123');
-
-			expect(result[0].friendlyName).toBe('Alpha');
-			expect(result[1].friendlyName).toBe('Bravo');
-			expect(result[2].friendlyName).toBe('Charlie');
+			// Use case should NOT sort - that's a presentation concern handled by the mapper
+			expect(result[0].uniqueName).toBe('Zebra');
+			expect(result[1].uniqueName).toBe('Default');
+			expect(result[2].uniqueName).toBe('Alpha');
+			expect(result.length).toBe(3);
 		});
 
 		it('should not mutate the original array from repository', async () => {
@@ -115,15 +101,11 @@ describe('ListSolutionsUseCase', () => {
 
 			mockRepository.findAll.mockResolvedValue(solutions);
 
-			const result = await useCase.execute('env-123');
+			const originalOrder = solutions.map(s => s.uniqueName);
+			await useCase.execute('env-123');
 
-			// Original array should remain unchanged
-			expect(solutions[0].friendlyName).toBe('Zebra');
-			expect(solutions[1].friendlyName).toBe('Alpha');
-
-			// Result should be sorted
-			expect(result[0].friendlyName).toBe('Alpha');
-			expect(result[1].friendlyName).toBe('Zebra');
+			// Repository array should remain unchanged
+			expect(solutions.map(s => s.uniqueName)).toEqual(originalOrder);
 		});
 
 		it('should handle empty solution list', async () => {

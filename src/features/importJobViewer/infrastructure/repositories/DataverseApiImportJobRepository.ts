@@ -5,7 +5,7 @@ import { OperationCancelledException } from '../../../../shared/domain/errors/Op
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../../../../shared/infrastructure/utils/ODataQueryBuilder';
 import { IImportJobRepository } from '../../domain/interfaces/IImportJobRepository';
-import { ImportJob, ImportJobStatus } from '../../domain/entities/ImportJob';
+import { ImportJob } from '../../domain/entities/ImportJob';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
@@ -159,17 +159,18 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 
 	/**
 	 * Maps Dataverse DTO to ImportJob domain entity.
+	 * Uses factory method to derive status from raw Dataverse fields.
 	 */
 	private mapToEntity(dto: DataverseImportJobDto): ImportJob {
-		return new ImportJob(
+		return ImportJob.createFromDataverseData(
 			dto.importjobid,
 			dto.name || 'Unnamed Import',
 			dto.solutionname || 'Unknown Solution',
 			dto.createdby?.fullname ?? 'Unknown User',
 			new Date(dto.createdon),
 			dto.completedon ? new Date(dto.completedon) : null,
+			dto.startedon ? new Date(dto.startedon) : null,
 			dto.progress,
-			this.deriveStatus(dto.completedon, dto.startedon, dto.progress),
 			dto.importcontext,
 			dto.operationcontext,
 			null // No log data for list view
@@ -178,46 +179,21 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 
 	/**
 	 * Maps Dataverse DTO to ImportJob domain entity WITH log data.
+	 * Uses factory method to derive status from raw Dataverse fields.
 	 */
 	private mapToEntityWithLog(dto: DataverseImportJobDto): ImportJob {
-		return new ImportJob(
+		return ImportJob.createFromDataverseData(
 			dto.importjobid,
 			dto.name || 'Unnamed Import',
 			dto.solutionname || 'Unknown Solution',
 			dto.createdby?.fullname ?? 'Unknown User',
 			new Date(dto.createdon),
 			dto.completedon ? new Date(dto.completedon) : null,
+			dto.startedon ? new Date(dto.startedon) : null,
 			dto.progress,
-			this.deriveStatus(dto.completedon, dto.startedon, dto.progress),
 			dto.importcontext,
 			dto.operationcontext,
 			dto.data || null // Include log XML data
 		);
-	}
-
-	/**
-	 * Derives ImportJobStatus from completedOn, startedOn, and progress fields.
-	 * The importjobs entity doesn't have a statuscode field, so we infer status from available data.
-	 */
-	private deriveStatus(completedOn: string | null, startedOn: string | null, progress: number): ImportJobStatus {
-		// If job has completed
-		if (completedOn) {
-			if (progress < 100) {
-				return ImportJobStatus.Failed;
-			}
-			return ImportJobStatus.Completed;
-		}
-
-		// If job has started but not completed
-		if (startedOn) {
-			// If no progress or 0 progress, it failed
-			if (progress === 0 || progress === null || progress === undefined) {
-				return ImportJobStatus.Failed;
-			}
-			return ImportJobStatus.InProgress;
-		}
-
-		// Job hasn't started yet - queued
-		return ImportJobStatus.Queued;
 	}
 }

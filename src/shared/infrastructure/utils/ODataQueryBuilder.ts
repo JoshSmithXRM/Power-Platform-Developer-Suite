@@ -5,9 +5,9 @@ import { QueryOptions } from '../../domain/interfaces/QueryOptions';
  */
 export class ODataQueryBuilder {
 	/**
-	 * Builds a query string from QueryOptions.
+	 * Builds OData query string from options (without leading '?').
 	 * @param options Query options
-	 * @returns OData query string (without leading '?')
+	 * @returns OData query string
 	 */
 	static build(options?: QueryOptions): string {
 		if (!options) {

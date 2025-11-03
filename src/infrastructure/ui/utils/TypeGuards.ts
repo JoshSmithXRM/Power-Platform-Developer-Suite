@@ -400,3 +400,143 @@ export function isEnvironmentChangedMessage(message: unknown): message is Enviro
 		typeof (data as { environmentId: string }).environmentId === 'string'
 	);
 }
+
+/**
+ * Reveal secret message from webview (PersistenceInspector).
+ */
+export interface RevealSecretMessage {
+	command: 'revealSecret';
+	key: string;
+}
+
+/**
+ * Type guard for reveal secret message.
+ */
+export function isRevealSecretMessage(message: unknown): message is RevealSecretMessage {
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'revealSecret') {
+		return false;
+	}
+
+	return 'key' in message && typeof (message as { key: string }).key === 'string';
+}
+
+/**
+ * Clear entry message from webview (PersistenceInspector).
+ */
+export interface ClearEntryMessage {
+	command: 'clearEntry';
+	key: string;
+}
+
+/**
+ * Type guard for clear entry message.
+ */
+export function isClearEntryMessage(message: unknown): message is ClearEntryMessage {
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'clearEntry') {
+		return false;
+	}
+
+	return 'key' in message && typeof (message as { key: string }).key === 'string';
+}
+
+/**
+ * Clear property message from webview (PersistenceInspector).
+ */
+export interface ClearPropertyMessage {
+	command: 'clearProperty';
+	key: string;
+	path: string;
+}
+
+/**
+ * Type guard for clear property message.
+ */
+export function isClearPropertyMessage(message: unknown): message is ClearPropertyMessage {
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'clearProperty') {
+		return false;
+	}
+
+	const msg = message as unknown as { key?: unknown; path?: unknown };
+	return (
+		'key' in message &&
+		typeof msg.key === 'string' &&
+		'path' in message &&
+		typeof msg.path === 'string'
+	);
+}
+
+/**
+ * View import job message from webview (ImportJobViewer).
+ */
+export interface ViewImportJobMessage {
+	command: 'viewImportJob';
+	data: {
+		importJobId: string;
+	};
+}
+
+/**
+ * Type guard for view import job message.
+ */
+export function isViewImportJobMessage(message: unknown): message is ViewImportJobMessage {
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'viewImportJob') {
+		return false;
+	}
+
+	const data = message.data;
+
+	return (
+		typeof data === 'object' &&
+		data !== null &&
+		'importJobId' in data &&
+		typeof (data as { importJobId: string }).importJobId === 'string'
+	);
+}
+
+/**
+ * Open solution in Maker message from webview (SolutionExplorer).
+ */
+export interface OpenInMakerMessage {
+	command: 'openInMaker';
+	data: {
+		solutionId: string;
+	};
+}
+
+/**
+ * Type guard for open in Maker message.
+ */
+export function isOpenInMakerMessage(message: unknown): message is OpenInMakerMessage {
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'openInMaker') {
+		return false;
+	}
+
+	const data = message.data;
+
+	return (
+		typeof data === 'object' &&
+		data !== null &&
+		'solutionId' in data &&
+		typeof (data as { solutionId: string }).solutionId === 'string'
+	);
+}

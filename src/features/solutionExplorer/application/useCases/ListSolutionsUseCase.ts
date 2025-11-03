@@ -7,7 +7,7 @@ import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
  * Use case for listing all solutions in an environment.
- * Orchestrates repository call and sorting logic.
+ * Orchestrates repository call only - sorting is handled in mapper layer.
  */
 export class ListSolutionsUseCase {
   constructor(
@@ -19,7 +19,7 @@ export class ListSolutionsUseCase {
    * Executes the use case to list solutions.
    * @param environmentId - Power Platform environment GUID
    * @param cancellationToken - Optional token to cancel the operation
-   * @returns Promise resolving to sorted array of Solution entities
+   * @returns Promise resolving to array of Solution entities
    */
   async execute(
     environmentId: string,
@@ -39,18 +39,9 @@ export class ListSolutionsUseCase {
         cancellationToken
       );
 
-      // Create defensive copy before sorting to avoid mutating the original array
-      const sorted = [...solutions].sort((a, b) => {
-        const priorityDiff = a.getSortPriority() - b.getSortPriority();
-        if (priorityDiff !== 0) {
-          return priorityDiff;
-        }
-        return a.friendlyName.localeCompare(b.friendlyName);
-      });
+      this.logger.info('ListSolutionsUseCase completed', { count: solutions.length });
 
-      this.logger.info('ListSolutionsUseCase completed', { count: sorted.length });
-
-      return sorted;
+      return solutions;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error('ListSolutionsUseCase failed', normalizedError);

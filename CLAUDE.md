@@ -15,6 +15,7 @@
 7. **Domain depending on outer layers** - Domain has ZERO dependencies
 8. **Business logic in use cases** - Use cases orchestrate only, no complex logic
 9. **Business logic in panels** - Panels call use cases, no logic
+10. **HTML in panel .ts files** - Extract all HTML to separate view files in `presentation/views/`
 
 ---
 
@@ -30,6 +31,7 @@
 8. **Explicit return types** - All public methods have return types
 9. **Abstract methods for enforcement** - Make missing implementations compilation errors
 10. **Refactor on 2nd duplication** - Don't wait for 3rd
+11. **HTML in separate view files** - All panel HTML goes in `presentation/views/` as render functions
 
 ---
 
@@ -44,6 +46,7 @@
 - ❌ Obvious code
 - ❌ Placeholders ("Handle event" / "Process data")
 - ❌ Band-aids for bad code
+- ❌ "WHY:" prefix - Explain WHY naturally, don't label it
 
 ---
 

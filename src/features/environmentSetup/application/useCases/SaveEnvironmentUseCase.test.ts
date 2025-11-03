@@ -8,9 +8,6 @@ import { DataverseUrl } from '../../domain/valueObjects/DataverseUrl';
 import { TenantId } from '../../domain/valueObjects/TenantId';
 import { ClientId } from '../../domain/valueObjects/ClientId';
 import { AuthenticationMethod, AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
-import { EnvironmentCreated } from '../../domain/events/EnvironmentCreated';
-import { EnvironmentUpdated } from '../../domain/events/EnvironmentUpdated';
-import { AuthenticationCacheInvalidationRequested } from '../../domain/events/AuthenticationCacheInvalidationRequested';
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
 import { ValidationResult } from '../../domain/valueObjects/ValidationResult';
 

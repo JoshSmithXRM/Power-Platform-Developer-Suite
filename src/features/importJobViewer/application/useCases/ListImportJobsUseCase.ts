@@ -7,7 +7,7 @@ import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
  * Use case for listing all import jobs in an environment.
- * Orchestrates repository call and sorting logic.
+ * Orchestrates repository call only - sorting is handled in mapper layer.
  */
 export class ListImportJobsUseCase {
 	constructor(
@@ -19,7 +19,7 @@ export class ListImportJobsUseCase {
 	 * Executes the use case to list import jobs.
 	 * @param environmentId - Power Platform environment GUID
 	 * @param cancellationToken - Optional token to cancel the operation
-	 * @returns Promise resolving to sorted array of ImportJob entities
+	 * @returns Promise resolving to array of ImportJob entities
 	 */
 	async execute(
 		environmentId: string,
@@ -39,20 +39,9 @@ export class ListImportJobsUseCase {
 				cancellationToken
 			);
 
-			// Create defensive copy before sorting to avoid mutating the original array
-			// Sort by priority (in-progress first) then by most recent creation date
-			const sorted = [...jobs].sort((a, b) => {
-				const priorityDiff = a.getSortPriority() - b.getSortPriority();
-				if (priorityDiff !== 0) {
-					return priorityDiff;
-				}
-				// Most recent first
-				return b.createdOn.getTime() - a.createdOn.getTime();
-			});
+			this.logger.info('ListImportJobsUseCase completed', { count: jobs.length });
 
-			this.logger.info('ListImportJobsUseCase completed', { count: sorted.length });
-
-			return sorted;
+			return jobs;
 		} catch (error) {
 			const normalizedError = normalizeError(error);
 			this.logger.error('ListImportJobsUseCase failed', normalizedError);

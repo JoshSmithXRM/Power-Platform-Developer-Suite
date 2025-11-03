@@ -12,6 +12,7 @@ import {
 	type EnvironmentOption,
 	type DataTableConfig
 } from '../../../../shared/infrastructure/ui/DataTablePanel';
+import { isViewImportJobMessage } from '../../../../infrastructure/ui/utils/TypeGuards';
 
 /**
  * Presentation layer panel for Import Job Viewer.
@@ -155,7 +156,7 @@ export class ImportJobViewerPanel extends DataTablePanel {
 				return;
 			}
 
-			const viewModels = ImportJobViewModelMapper.toViewModels(this.importJobs);
+			const viewModels = ImportJobViewModelMapper.toViewModels(this.importJobs, true);
 
 			// Add HTML and CSS classes for status and clickable solution names
 			const enhancedViewModels = viewModels.map(vm => ({
@@ -178,16 +179,11 @@ export class ImportJobViewerPanel extends DataTablePanel {
 	/**
 	 * Handles panel-specific commands from webview.
 	 */
-	protected async handlePanelCommand(command: string, data: unknown): Promise<void> {
-		switch (command) {
-			case 'viewImportLog':
-				if (typeof data === 'object' && data !== null && 'importJobId' in data) {
-					await this.handleViewImportLog((data as { importJobId: string }).importJobId);
-				}
-				break;
-			case 'openMaker':
-				await this.handleOpenMakerImportHistory();
-				break;
+	protected async handlePanelCommand(message: import('../../../../infrastructure/ui/utils/TypeGuards').WebviewMessage): Promise<void> {
+		if (isViewImportJobMessage(message)) {
+			await this.handleViewImportLog(message.data.importJobId);
+		} else if (message.command === 'openMaker') {
+			await this.handleOpenMakerImportHistory();
 		}
 	}
 

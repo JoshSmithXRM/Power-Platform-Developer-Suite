@@ -63,8 +63,10 @@ export class Environment {
 	}
 
 	/**
-	 * Validates the environment configuration on construction.
-	 * Prevents creation of invalid environment entities.
+	 * Validates environment configuration on construction.
+	 *
+	 * Prevents creation of invalid environment entities by catching configuration
+	 * errors immediately rather than at runtime (fail-fast principle).
 	 *
 	 * @throws {DomainError} If configuration validation fails
 	 * @private
@@ -88,8 +90,8 @@ export class Environment {
 	 * - Username/Password requires Username
 	 * - Secrets (clientSecret, password) validated separately (not stored in entity)
 	 *
-	 * WHY: Different auth methods have different credential requirements.
-	 * Service Principal uses Client ID + Secret, while Username/Password uses Username + Password.
+	 * Different auth methods have different credential requirements: Service Principal
+	 * uses Client ID + Secret, Username/Password uses Username + Password, while
 	 * Interactive/DeviceCode flows use browser-based auth with no stored credentials.
 	 *
 	 * @returns {ValidationResult} Result containing validation errors
@@ -97,7 +99,6 @@ export class Environment {
 	public validateConfiguration(): ValidationResult {
 		const errors: string[] = [];
 
-		// Basic validation
 		if (!this.name.isValid()) {
 			errors.push('Environment name is required and must be unique');
 		}
@@ -106,32 +107,26 @@ export class Environment {
 			errors.push('Valid Dataverse URL is required');
 		}
 
-		// Tenant ID validation - format check (when provided)
 		if (!this.tenantId.isValid()) {
 			errors.push('Invalid Tenant ID format. Expected GUID format');
 		}
 
-		// Tenant ID requirement - only for Service Principal (MSAL limitation)
-		// Interactive, DeviceCode, and UsernamePassword can use "organizations" authority
 		if (this.authenticationMethod.requiresClientCredentials()) {
 			if (!this.tenantId.isProvided()) {
 				errors.push('Tenant ID is required for Service Principal authentication');
 			}
 		}
 
-		// Auth-specific validation
 		if (this.authenticationMethod.requiresClientCredentials()) {
 			if (!this.clientId || !this.clientId.isValid()) {
 				errors.push('Client ID is required for Service Principal authentication');
 			}
-			// Note: clientSecret validated separately (not stored in entity)
 		}
 
 		if (this.authenticationMethod.requiresUsernamePassword()) {
 			if (!this.username || this.username.trim() === '') {
 				errors.push('Username is required for Username/Password authentication');
 			}
-			// Note: password validated separately (not stored in entity)
 		}
 
 		return new ValidationResult(errors.length === 0, errors);
@@ -140,9 +135,9 @@ export class Environment {
 	/**
 	 * Determines if environment requires stored credentials to connect.
 	 *
-	 * WHY: Interactive and DeviceCode flows use browser-based authentication
-	 * and don't require stored credentials. Service Principal and Username/Password
-	 * require credentials stored in VS Code SecretStorage.
+	 * Interactive and DeviceCode flows use browser-based authentication without
+	 * stored credentials. Service Principal and Username/Password require credentials
+	 * stored in VS Code SecretStorage.
 	 *
 	 * @returns {boolean} True if credentials must be stored
 	 */
@@ -153,8 +148,8 @@ export class Environment {
 	/**
 	 * Checks if connection can be tested.
 	 *
-	 * WHY: Connection testing requires valid configuration. We validate
-	 * before allowing test to prevent confusing error messages.
+	 * Connection testing requires valid configuration. Validates before allowing
+	 * test to prevent confusing error messages.
 	 *
 	 * @returns {boolean} True if configuration is valid for testing
 	 */
@@ -170,9 +165,8 @@ export class Environment {
 	 * - Username/Password: `power-platform-dev-suite-password-{username}`
 	 * - Interactive/DeviceCode: Empty array (no secrets)
 	 *
-	 * WHY: Different auth methods store different secrets. We use the
-	 * client ID or username as part of the key to allow multiple environments
-	 * with different credentials.
+	 * Uses the client ID or username as part of the key to allow multiple
+	 * environments with different credentials for the same auth method.
 	 *
 	 * @returns {string[]} Array of secret storage keys required for this environment
 	 */
@@ -202,8 +196,8 @@ export class Environment {
 	 * - Changing Client ID on Service Principal → orphan old client secret
 	 * - Changing Username on Username/Password → orphan old password
 	 *
-	 * WHY: Prevents accumulation of stale secrets in VS Code SecretStorage.
-	 * Security best practice to remove unused credentials.
+	 * Prevents accumulation of stale secrets in VS Code SecretStorage, following
+	 * security best practices to remove unused credentials.
 	 *
 	 * @param {AuthenticationMethod} previousAuthMethod - Previous authentication method
 	 * @param {ClientId} [previousClientId] - Previous client ID (if Service Principal)
@@ -213,7 +207,6 @@ export class Environment {
 	public getOrphanedSecretKeys(previousAuthMethod: AuthenticationMethod, previousClientId?: ClientId, previousUsername?: string): string[] {
 		const orphanedKeys: string[] = [];
 
-		// If switching FROM ServicePrincipal, orphan its secret
 		if (previousAuthMethod.requiresClientCredentials() && previousClientId) {
 			const oldKey = `power-platform-dev-suite-secret-${previousClientId.getValue()}`;
 			if (!this.getRequiredSecretKeys().includes(oldKey)) {
@@ -221,7 +214,6 @@ export class Environment {
 			}
 		}
 
-		// If switching FROM UsernamePassword, orphan its password
 		if (previousAuthMethod.requiresUsernamePassword() && previousUsername) {
 			const oldKey = `power-platform-dev-suite-password-${previousUsername}`;
 			if (!this.getRequiredSecretKeys().includes(oldKey)) {
@@ -235,9 +227,9 @@ export class Environment {
 	/**
 	 * Activates this environment, making it the currently selected environment.
 	 *
-	 * WHY: Only one environment can be active at a time. The active environment
-	 * is used for all Power Platform operations (plugin registration, solution
-	 * deployment, etc.). Updates lastUsed timestamp for sorting.
+	 * Only one environment can be active at a time. The active environment is used
+	 * for all Power Platform operations (plugin registration, solution deployment, etc.).
+	 * Updates lastUsed timestamp for sorting.
 	 *
 	 * Note: Caller is responsible for deactivating other environments.
 	 */
@@ -249,7 +241,7 @@ export class Environment {
 	/**
 	 * Deactivates this environment.
 	 *
-	 * WHY: Called when another environment is activated or when explicitly
+	 * Called when another environment is activated or when explicitly
 	 * deactivating current environment.
 	 */
 	public deactivate(): void {
@@ -259,7 +251,7 @@ export class Environment {
 	/**
 	 * Updates the last used timestamp to current time.
 	 *
-	 * WHY: Used for sorting environments by recency in the UI.
+	 * Used for sorting environments by recency in the UI.
 	 */
 	public markAsUsed(): void {
 		this.lastUsed = new Date();
@@ -313,7 +305,6 @@ export class Environment {
 		this.validate();
 	}
 
-	// Getters - Simple accessors for environment properties
 	public getId(): EnvironmentId { return this.id; }
 	public getName(): EnvironmentName { return this.name; }
 	public getDataverseUrl(): DataverseUrl { return this.dataverseUrl; }

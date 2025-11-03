@@ -73,4 +73,20 @@ export class Solution {
   getSortPriority(): number {
     return this.isDefaultSolution() ? 0 : 1;
   }
+
+  /**
+   * Sorts solutions by business rules: Default solution last (by priority), then alphabetically by friendly name.
+   * Creates a defensive copy to avoid mutating the original array.
+   * @param solutions - Array of Solution entities to sort
+   * @returns New sorted array
+   */
+  static sort(solutions: Solution[]): Solution[] {
+    return [...solutions].sort((a, b) => {
+      const priorityDiff = a.getSortPriority() - b.getSortPriority();
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+      return a.friendlyName.localeCompare(b.friendlyName);
+    });
+  }
 }

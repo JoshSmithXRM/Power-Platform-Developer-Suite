@@ -70,7 +70,7 @@ describe('ListImportJobsUseCase', () => {
 			expect(mockLogger.info).toHaveBeenCalledWith('ListImportJobsUseCase completed', { count: 2 });
 		});
 
-		it('should sort in-progress jobs first, then by creation date (most recent first)', async () => {
+		it('should return import jobs in the order provided by repository', async () => {
 			const jobs = [
 				createImportJob({
 					name: 'Oldest Completed',
@@ -86,11 +86,6 @@ describe('ListImportJobsUseCase', () => {
 					name: 'Oldest In-Progress',
 					createdOn: new Date('2024-01-05T10:00:00Z'),
 					statusCode: ImportJobStatus.InProgress
-				}),
-				createImportJob({
-					name: 'Newest In-Progress',
-					createdOn: new Date('2024-01-15T10:00:00Z'),
-					statusCode: ImportJobStatus.InProgress
 				})
 			];
 
@@ -98,41 +93,11 @@ describe('ListImportJobsUseCase', () => {
 
 			const result = await useCase.execute('env-123');
 
-			// In-progress jobs should be first
-			expect(result[0].name).toBe('Newest In-Progress');
-			expect(result[1].name).toBe('Oldest In-Progress');
-			// Then completed jobs by date
-			expect(result[2].name).toBe('Newest Completed');
-			expect(result[3].name).toBe('Oldest Completed');
-		});
-
-		it('should treat queued jobs as in-progress for sorting', async () => {
-			const jobs = [
-				createImportJob({
-					name: 'Completed Job',
-					createdOn: new Date('2024-01-20T10:00:00Z'),
-					statusCode: ImportJobStatus.Completed
-				}),
-				createImportJob({
-					name: 'Queued Job',
-					createdOn: new Date('2024-01-10T10:00:00Z'),
-					statusCode: ImportJobStatus.Queued
-				}),
-				createImportJob({
-					name: 'In-Progress Job',
-					createdOn: new Date('2024-01-05T10:00:00Z'),
-					statusCode: ImportJobStatus.InProgress
-				})
-			];
-
-			mockRepository.findAll.mockResolvedValue(jobs);
-
-			const result = await useCase.execute('env-123');
-
-			// Queued and in-progress should both come first (priority 0)
-			expect(result[0].statusCode).toBe(ImportJobStatus.Queued);
-			expect(result[1].statusCode).toBe(ImportJobStatus.InProgress);
-			expect(result[2].statusCode).toBe(ImportJobStatus.Completed);
+			// Use case should NOT sort - that's a presentation concern handled by the mapper
+			expect(result[0].name).toBe('Oldest Completed');
+			expect(result[1].name).toBe('Newest Completed');
+			expect(result[2].name).toBe('Oldest In-Progress');
+			expect(result.length).toBe(3);
 		});
 
 		it('should not mutate the original array from repository', async () => {
@@ -151,15 +116,11 @@ describe('ListImportJobsUseCase', () => {
 
 			mockRepository.findAll.mockResolvedValue(jobs);
 
-			const result = await useCase.execute('env-123');
+			const originalOrder = jobs.map(j => j.name);
+			await useCase.execute('env-123');
 
-			// Original array should remain unchanged
-			expect(jobs[0].name).toBe('Completed');
-			expect(jobs[1].name).toBe('In-Progress');
-
-			// Result should be sorted
-			expect(result[0].name).toBe('In-Progress');
-			expect(result[1].name).toBe('Completed');
+			// Repository array should remain unchanged
+			expect(jobs.map(j => j.name)).toEqual(originalOrder);
 		});
 
 		it('should handle empty job list', async () => {

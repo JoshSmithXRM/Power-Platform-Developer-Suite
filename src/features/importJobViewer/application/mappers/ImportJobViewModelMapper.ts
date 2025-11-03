@@ -1,5 +1,6 @@
 import { ImportJob } from '../../domain/entities/ImportJob';
 import { ImportJobViewModel } from '../viewModels/ImportJobViewModel';
+import { DateFormatter } from '../../../../shared/application/utils/DateFormatter';
 
 /**
  * Maps ImportJob domain entities to ImportJobViewModel presentation objects.
@@ -7,6 +8,8 @@ import { ImportJobViewModel } from '../viewModels/ImportJobViewModel';
 export class ImportJobViewModelMapper {
 	/**
 	 * Converts a single ImportJob entity to a view model.
+	 * @param job - ImportJob entity to convert
+	 * @returns ImportJobViewModel presentation object
 	 */
 	static toViewModel(job: ImportJob): ImportJobViewModel {
 		return {
@@ -14,11 +17,11 @@ export class ImportJobViewModelMapper {
 			name: job.name,
 			solutionName: job.solutionName,
 			createdBy: job.createdBy,
-			createdOn: job.createdOn.toLocaleString(),
-			completedOn: job.completedOn?.toLocaleString() ?? '',
+			createdOn: DateFormatter.formatDate(job.createdOn),
+			completedOn: DateFormatter.formatDate(job.completedOn),
 			progress: `${job.progress}%`,
 			status: job.getStatusLabel(),
-			duration: this.formatDuration(job.getDuration()),
+			duration: DateFormatter.formatDuration(job.getDuration()),
 			importContext: job.importContext ?? 'N/A',
 			operationContext: job.operationContext ?? 'N/A'
 		};
@@ -26,31 +29,13 @@ export class ImportJobViewModelMapper {
 
 	/**
 	 * Converts an array of ImportJob entities to view models.
+	 * @param jobs - Array of ImportJob entities
+	 * @param sorted - If true, sorts jobs using domain sorting rules before mapping
+	 * @returns Array of view models
 	 */
-	static toViewModels(jobs: ImportJob[]): ImportJobViewModel[] {
-		return jobs.map(job => this.toViewModel(job));
+	static toViewModels(jobs: ImportJob[], sorted = false): ImportJobViewModel[] {
+		const jobsToMap = sorted ? ImportJob.sort(jobs) : jobs;
+		return jobsToMap.map(job => this.toViewModel(job));
 	}
 
-	/**
-	 * Formats duration in milliseconds to a human-readable string.
-	 */
-	private static formatDuration(durationMs: number | null): string {
-		if (durationMs === null) {
-			return '';
-		}
-
-		const seconds = Math.floor(durationMs / 1000);
-		const minutes = Math.floor(seconds / 60);
-		const hours = Math.floor(minutes / 60);
-
-		if (hours > 0) {
-			const remainingMinutes = minutes % 60;
-			return `${hours}h ${remainingMinutes}m`;
-		} else if (minutes > 0) {
-			const remainingSeconds = seconds % 60;
-			return `${minutes}m ${remainingSeconds}s`;
-		} else {
-			return `${seconds}s`;
-		}
-	}
 }

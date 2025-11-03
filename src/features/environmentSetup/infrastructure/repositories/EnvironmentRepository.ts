@@ -23,12 +23,6 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 		private readonly logger: ILogger
 	) {}
 
-	/**
-	 * Retrieves all environments from storage
-	 * @returns Array of all configured environments
-	 *
-	 * Mapper is synchronous - no need for Promise.all.
-	 */
 	public async getAll(): Promise<Environment[]> {
 		this.logger.debug('EnvironmentRepository: Loading all environments');
 
@@ -45,11 +39,6 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 		}
 	}
 
-	/**
-	 * Retrieves a single environment by ID
-	 * @param id Environment ID to retrieve
-	 * @returns Environment if found, null otherwise
-	 */
 	public async getById(id: EnvironmentId): Promise<Environment | null> {
 		this.logger.debug(`EnvironmentRepository: Loading environment ${id.getValue()}`);
 
@@ -109,10 +98,8 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 			const dtos = await this.loadDtos();
 			const existingIndex = dtos.findIndex(d => d.id === envId);
 
-			// Map domain to DTO
 			const dto = this.mapper.toDto(environment);
 
-			// Handle credentials
 			const authMethod = environment.getAuthenticationMethod();
 
 			if (authMethod.requiresClientCredentials()) {
@@ -121,15 +108,12 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 					const secretKey = `${EnvironmentRepository.SECRET_PREFIX_CLIENT}${clientId}`;
 
 					if (clientSecret) {
-						// New or updated secret
 						await this.secrets.store(secretKey, clientSecret);
 						this.logger.debug('Client secret stored');
 					} else if (!preserveExistingCredentials) {
-						// No secret provided and not preserving - delete
 						await this.secrets.delete(secretKey);
 						this.logger.debug('Client secret deleted');
 					}
-					// else: preserving existing secret, do nothing
 				}
 			}
 
@@ -139,19 +123,15 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 					const secretKey = `${EnvironmentRepository.SECRET_PREFIX_PASSWORD}${username}`;
 
 					if (password) {
-						// New or updated password
 						await this.secrets.store(secretKey, password);
 						this.logger.debug('Password stored');
 					} else if (!preserveExistingCredentials) {
-						// No password provided and not preserving - delete
 						await this.secrets.delete(secretKey);
 						this.logger.debug('Password deleted');
 					}
-					// else: preserving existing password, do nothing
 				}
 			}
 
-			// Update or add DTO
 			if (existingIndex >= 0) {
 				dtos[existingIndex] = dto;
 				this.logger.debug(`Updated existing environment at index ${existingIndex}`);
@@ -181,13 +161,11 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 			const environment = await this.getById(id);
 
 			if (environment) {
-				// Delete associated secrets
 				const secretKeys = environment.getRequiredSecretKeys();
 				await this.deleteSecrets(secretKeys);
 				this.logger.debug(`Deleted ${secretKeys.length} secret(s)`);
 			}
 
-			// Remove from storage
 			const filtered = dtos.filter(d => d.id !== id.getValue());
 			await this.saveDtos(filtered);
 
@@ -199,9 +177,9 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 	}
 
 	/**
-	 * Checks if an environment name is unique
+	 * Checks if name is unique across all environments.
 	 * @param name Name to check
-	 * @param excludeId Optional environment ID to exclude from check (for updates)
+	 * @param excludeId Optional ID to exclude (for updates - allows keeping same name)
 	 * @returns True if name is unique, false otherwise
 	 */
 	public async isNameUnique(name: string, excludeId?: EnvironmentId): Promise<boolean> {
@@ -213,21 +191,11 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 		return !existing;
 	}
 
-	/**
-	 * Retrieves client secret from secure storage
-	 * @param clientId Client ID to retrieve secret for
-	 * @returns Client secret if found, undefined otherwise
-	 */
 	public async getClientSecret(clientId: string): Promise<string | undefined> {
 		const secretKey = `${EnvironmentRepository.SECRET_PREFIX_CLIENT}${clientId}`;
 		return await this.secrets.get(secretKey);
 	}
 
-	/**
-	 * Retrieves password from secure storage
-	 * @param username Username to retrieve password for
-	 * @returns Password if found, undefined otherwise
-	 */
 	public async getPassword(username: string): Promise<string | undefined> {
 		const secretKey = `${EnvironmentRepository.SECRET_PREFIX_PASSWORD}${username}`;
 		return await this.secrets.get(secretKey);

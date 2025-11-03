@@ -62,18 +62,15 @@ export class EnvironmentValidationService {
 		const errors: string[] = [];
 		const warnings: string[] = [];
 
-		// Basic configuration validation
 		const configResult = environment.validateConfiguration();
 		if (!configResult.isValid) {
 			errors.push(...configResult.errors);
 		}
 
-		// Check name uniqueness (data provided by use case)
 		if (!isNameUnique) {
 			errors.push('Environment name must be unique');
 		}
 
-		// Validate credentials if required
 		const authMethod = environment.getAuthenticationMethod();
 		if (authMethod.requiresClientCredentials()) {
 			if (!clientSecret && !hasExistingClientSecret) {
@@ -87,8 +84,6 @@ export class EnvironmentValidationService {
 			}
 		}
 
-		// Validate tenant ID for Service Principal (MSAL limitation)
-		// Other auth methods (Interactive, DeviceCode, UsernamePassword) can use "organizations" authority
 		if (authMethod.requiresClientCredentials()) {
 			const tenantId = environment.getTenantId();
 			if (!tenantId.getValue()) {

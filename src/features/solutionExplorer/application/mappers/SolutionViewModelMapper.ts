@@ -1,5 +1,6 @@
 import { Solution } from '../../domain/entities/Solution';
 import { SolutionViewModel } from '../viewModels/SolutionViewModel';
+import { DateFormatter } from '../../../../shared/application/utils/DateFormatter';
 
 /**
  * Maps Solution domain entities to SolutionViewModel presentation DTOs.
@@ -7,6 +8,8 @@ import { SolutionViewModel } from '../viewModels/SolutionViewModel';
 export class SolutionViewModelMapper {
   /**
    * Maps a single Solution entity to a ViewModel.
+   * @param solution - Solution entity to convert
+   * @returns SolutionViewModel presentation object
    */
   static toViewModel(solution: Solution): SolutionViewModel {
     return {
@@ -16,9 +19,9 @@ export class SolutionViewModelMapper {
       version: solution.version,
       isManaged: solution.isManaged ? 'Managed' : 'Unmanaged',
       publisherName: solution.publisherName,
-      installedOn: solution.installedOn?.toLocaleString() ?? '',
+      installedOn: DateFormatter.formatDate(solution.installedOn),
       description: solution.description,
-      modifiedOn: solution.modifiedOn.toLocaleString(),
+      modifiedOn: DateFormatter.formatDate(solution.modifiedOn),
       isVisible: solution.isVisible ? 'Yes' : 'No',
       isApiManaged: solution.isApiManaged ? 'Yes' : 'No',
     };
@@ -26,8 +29,12 @@ export class SolutionViewModelMapper {
 
   /**
    * Maps an array of Solution entities to ViewModels.
+   * @param solutions - Array of Solution entities
+   * @param sorted - If true, sorts solutions using domain sorting rules before mapping
+   * @returns Array of view models
    */
-  static toViewModels(solutions: Solution[]): SolutionViewModel[] {
-    return solutions.map((solution) => this.toViewModel(solution));
+  static toViewModels(solutions: Solution[], sorted = false): SolutionViewModel[] {
+    const solutionsToMap = sorted ? Solution.sort(solutions) : solutions;
+    return solutionsToMap.map((solution) => this.toViewModel(solution));
   }
 }

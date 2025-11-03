@@ -11,6 +11,7 @@ import {
 	type EnvironmentOption,
 	type DataTableConfig
 } from '../../../../shared/infrastructure/ui/DataTablePanel';
+import { isOpenInMakerMessage } from '../../../../infrastructure/ui/utils/TypeGuards';
 
 /**
  * Presentation layer panel for Solution Explorer.
@@ -151,7 +152,7 @@ export class SolutionExplorerPanel extends DataTablePanel {
 				return;
 			}
 
-			const viewModels = SolutionViewModelMapper.toViewModels(this.solutions);
+			const viewModels = SolutionViewModelMapper.toViewModels(this.solutions, true);
 
 			// Add HTML for clickable solution names
 			const enhancedViewModels = viewModels.map(vm => ({
@@ -173,16 +174,11 @@ export class SolutionExplorerPanel extends DataTablePanel {
 	/**
 	 * Handles panel-specific commands from webview.
 	 */
-	protected async handlePanelCommand(command: string, data: unknown): Promise<void> {
-		switch (command) {
-			case 'openInMaker':
-				if (typeof data === 'object' && data !== null && 'solutionId' in data) {
-					await this.handleOpenInMaker((data as { solutionId: string }).solutionId);
-				}
-				break;
-			case 'openMaker':
-				await this.handleOpenMakerSolutionsList();
-				break;
+	protected async handlePanelCommand(message: import('../../../../infrastructure/ui/utils/TypeGuards').WebviewMessage): Promise<void> {
+		if (isOpenInMakerMessage(message)) {
+			await this.handleOpenInMaker(message.data.solutionId);
+		} else if (message.command === 'openMaker') {
+			await this.handleOpenMakerSolutionsList();
 		}
 	}
 

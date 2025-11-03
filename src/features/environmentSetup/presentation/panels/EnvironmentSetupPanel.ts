@@ -57,7 +57,6 @@ export class EnvironmentSetupPanel {
 			environmentId: environmentId || 'new'
 		});
 
-		// Check concurrent edit if loading existing
 		if (environmentId) {
 			const canEdit = this.checkConcurrentEditUseCase.execute({ environmentId });
 			if (!canEdit.canEdit) {
@@ -67,34 +66,28 @@ export class EnvironmentSetupPanel {
 				return;
 			}
 
-			// Register edit session
 			this.checkConcurrentEditUseCase.registerEditSession(environmentId);
 			this.logger.debug('Edit session registered', { environmentId });
 		}
 
-		// Set webview options
 		this.panel.webview.options = {
 			enableScripts: true,
 			localResourceRoots: [this.extensionUri]
 		};
 
-		// Set initial HTML
 		this.panel.webview.html = this.getHtmlContent();
 
-		// Handle messages from webview
 		this.panel.webview.onDidReceiveMessage(
 			message => this.handleMessage(message),
 			null,
 			this.disposables
 		);
 
-		// Handle panel disposal
 		this.panel.onDidDispose(() => {
 			this.logger.debug('EnvironmentSetupPanel: Disposed');
 			this.dispose();
 		}, null, this.disposables);
 
-		// Load environment data if editing
 		if (environmentId) {
 			this.loadEnvironment(environmentId);
 		}
@@ -169,25 +162,24 @@ export class EnvironmentSetupPanel {
 	}
 
 	/**
-	 * Handles messages received from the webview.
-	 * Routes commands to appropriate handler methods.
+	 * Routes webview messages to appropriate handler methods.
+	 *
+	 * Centralized message routing with type guards ensures type safety at the
+	 * boundary between untrusted webview JavaScript and TypeScript.
 	 *
 	 * @param message - Message from webview
 	 */
 	private async handleMessage(message: unknown): Promise<void> {
 		try {
-			// Handle webview logs FIRST (forwarding to logger)
 			if (isWebviewLogMessage(message)) {
 				this.handleWebviewLog(message);
 				return;
 			}
 
-			// Log command being handled
 			if (isWebviewMessage(message)) {
 				this.logger.debug(`Handling webview command: ${message.command}`);
 			}
 
-			// Use type guards for proper type narrowing
 			if (isSaveEnvironmentMessage(message)) {
 				await this.handleSaveEnvironment(message.data);
 			} else if (isTestConnectionMessage(message)) {
@@ -199,7 +191,6 @@ export class EnvironmentSetupPanel {
 			} else if (isCheckUniqueNameMessage(message)) {
 				await this.handleValidateName(message.data);
 			} else if (isWebviewMessage(message)) {
-				// Known webview message but not handled - ignore silently
 				return;
 			} else {
 				this.logger.warn('Received invalid message from webview', message);
@@ -210,16 +201,10 @@ export class EnvironmentSetupPanel {
 		}
 	}
 
-	/**
-	 * Loads environment data and sends it to the webview.
-	 *
-	 * @param environmentId - Environment ID to load
-	 */
 	private async loadEnvironment(environmentId: string): Promise<void> {
 		this.logger.debug('Loading environment for editing', { environmentId });
 
 		try {
-			// Delegate to use case
 			const viewModel = await this.loadEnvironmentByIdUseCase.execute({ environmentId });
 
 			this.logger.info('Environment loaded successfully', {
@@ -227,7 +212,6 @@ export class EnvironmentSetupPanel {
 				name: viewModel.name
 			});
 
-			// Send to webview
 			this.panel.webview.postMessage({
 				command: 'environment-loaded',
 				data: viewModel
@@ -238,11 +222,6 @@ export class EnvironmentSetupPanel {
 		}
 	}
 
-	/**
-	 * Handles save environment request from webview.
-	 *
-	 * @param data - Environment data from webview form
-	 */
 	private async handleSaveEnvironment(data: SaveEnvironmentMessage['data']): Promise<void> {
 		const wasNew = !this.currentEnvironmentId;
 
@@ -252,7 +231,6 @@ export class EnvironmentSetupPanel {
 			isEdit: !wasNew
 		});
 
-		// Delegate to use case - data is already validated by type guard
 		const result = await this.saveEnvironmentUseCase.execute({
 			existingEnvironmentId: this.currentEnvironmentId,
 			name: data.name,
@@ -268,7 +246,6 @@ export class EnvironmentSetupPanel {
 			preserveExistingCredentials: true
 		});
 
-		// Handle validation errors - send to webview for inline display
 		if (!result.success && result.errors) {
 			this.logger.warn('Environment validation failed', {
 				name: data.name,
@@ -285,7 +262,6 @@ export class EnvironmentSetupPanel {
 			return;
 		}
 
-		// Show success message with warnings if any
 		if (result.warnings && result.warnings.length > 0) {
 			this.logger.warn('Environment saved with warnings', {
 				environmentId: result.environmentId,
@@ -300,17 +276,14 @@ export class EnvironmentSetupPanel {
 			vscode.window.showInformationMessage('Environment saved successfully');
 		}
 
-		// Update panel state if new
 		if (wasNew) {
 			this.currentEnvironmentId = result.environmentId;
 			this.checkConcurrentEditUseCase.registerEditSession(this.currentEnvironmentId);
 
-			// Update panel key in map
 			EnvironmentSetupPanel.currentPanels.delete('new');
 			EnvironmentSetupPanel.currentPanels.set(result.environmentId, this);
 		}
 
-		// Notify webview with environment ID
 		this.panel.webview.postMessage({
 			command: 'environment-saved',
 			data: {
@@ -320,28 +293,20 @@ export class EnvironmentSetupPanel {
 			}
 		});
 
-		// Trigger environment list refresh
 		vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
 	}
 
-	/**
-	 * Handles test connection request from webview.
-	 *
-	 * @param data - Connection test data from webview
-	 */
 	private async handleTestConnection(data: TestConnectionMessage['data']): Promise<void> {
 		this.logger.info('User initiated connection test', {
 			name: data.name,
 			authMethod: data.authenticationMethod
 		});
 
-		// Show progress
 		await vscode.window.withProgress({
 			location: vscode.ProgressLocation.Notification,
 			title: "Testing connection...",
 			cancellable: false
 		}, async () => {
-			// Delegate to use case - data is already validated by type guard
 			const result = await this.testConnectionUseCase.execute({
 				existingEnvironmentId: this.currentEnvironmentId,
 				name: data.name,
@@ -367,7 +332,6 @@ export class EnvironmentSetupPanel {
 				vscode.window.showErrorMessage(`Connection test failed: ${result.errorMessage}`);
 			}
 
-			// Notify webview
 			this.panel.webview.postMessage({
 				command: 'test-connection-result',
 				data: result
@@ -375,18 +339,12 @@ export class EnvironmentSetupPanel {
 		});
 	}
 
-	/**
-	 * Handles discover environment ID request from webview.
-	 *
-	 * @param data - Discovery request data from webview
-	 */
 	private async handleDiscoverEnvironmentId(data: DiscoverEnvironmentIdMessage['data']): Promise<void> {
 		this.logger.info('User initiated environment ID discovery', {
 			name: data.name,
 			authMethod: data.authenticationMethod
 		});
 
-		// Show progress
 		let result;
 		try {
 			result = await vscode.window.withProgress({
@@ -394,10 +352,8 @@ export class EnvironmentSetupPanel {
 				title: "Discovering Power Platform Environment ID...",
 				cancellable: true
 			}, async (_progress, token) => {
-				// Adapt VS Code cancellation token to domain abstraction
 				const cancellationToken = token ? new VsCodeCancellationTokenAdapter(token) : undefined;
 
-				// Delegate to use case - data is already validated by type guard
 				const result = await this.discoverEnvironmentIdUseCase.execute({
 					existingEnvironmentId: this.currentEnvironmentId,
 					name: data.name,
@@ -411,11 +367,9 @@ export class EnvironmentSetupPanel {
 					password: data.password
 				}, cancellationToken);
 
-				// Return result from withProgress
 				return result;
 			});
 
-			// Handle results AFTER progress completes
 			if (result.success) {
 				this.logger.info('Environment ID discovered successfully', {
 					environmentId: result.environmentId
@@ -429,7 +383,6 @@ export class EnvironmentSetupPanel {
 				this.logger.warn('Discovery requires interactive auth', {
 					name: data.name
 				});
-				// Service Principal doesn't have BAP API permissions - offer Interactive auth
 				const retry = await vscode.window.showWarningMessage(
 					`Discovery failed: Service Principals typically don't have Power Platform API permissions.\n\nWould you like to use Interactive authentication just for discovery?`,
 					'Use Interactive Auth',
@@ -437,7 +390,6 @@ export class EnvironmentSetupPanel {
 				);
 
 				if (retry === 'Use Interactive Auth') {
-					// Retry with Interactive auth (starts new progress notification)
 					await this.handleDiscoverEnvironmentIdWithInteractive(data);
 				} else {
 					vscode.window.showInformationMessage('You can manually enter the Environment ID from the Power Platform Admin Center.');
@@ -457,40 +409,34 @@ export class EnvironmentSetupPanel {
 				});
 			}
 		} catch (error) {
-			// Handle cancellation - error thrown when user clicks cancel
 			if (error instanceof Error && (error.message.includes('cancelled') || error.message.includes('Authentication cancelled'))) {
 				this.logger.info('Environment ID discovery cancelled by user');
 				vscode.window.showInformationMessage('Environment ID discovery cancelled');
-				// Notify webview of cancellation
 				this.panel.webview.postMessage({
 					command: 'discover-environment-id-result',
 					data: { success: false, errorMessage: 'Cancelled by user' }
 				});
 			} else {
-				throw error; // Re-throw unexpected errors
+				throw error;
 			}
 		}
 	}
 
 	private async handleDiscoverEnvironmentIdWithInteractive(data: DiscoverEnvironmentIdMessage['data']): Promise<void> {
-		// Show progress
 		try {
 			await vscode.window.withProgress({
 				location: vscode.ProgressLocation.Notification,
 				title: "Discovering Power Platform Environment ID with Interactive auth...",
 				cancellable: true
 			}, async (_progress, token) => {
-				// Adapt VS Code cancellation token to domain abstraction
 				const cancellationToken = token ? new VsCodeCancellationTokenAdapter(token) : undefined;
 
-				// Retry discovery with Interactive authentication (temporary, non-cached)
 				const result = await this.discoverEnvironmentIdUseCase.execute({
-					// Use temporary ID to avoid caching credentials
 					existingEnvironmentId: undefined,
 					name: data.name,
 					dataverseUrl: data.dataverseUrl,
 					tenantId: data.tenantId,
-					authenticationMethod: AuthenticationMethodType.Interactive, // Force Interactive for discovery
+					authenticationMethod: AuthenticationMethodType.Interactive,
 					publicClientId: data.publicClientId,
 					clientId: undefined,
 					clientSecret: undefined,
@@ -504,30 +450,24 @@ export class EnvironmentSetupPanel {
 					vscode.window.showErrorMessage(`Failed to discover environment ID: ${result.errorMessage}`);
 				}
 
-				// Notify webview
 				this.panel.webview.postMessage({
 					command: 'discover-environment-id-result',
 					data: result
 				});
 			});
 		} catch (error) {
-			// Handle cancellation - error thrown when user clicks cancel
 			if (error instanceof Error && (error.message.includes('cancelled') || error.message.includes('Authentication cancelled'))) {
 				vscode.window.showInformationMessage('Environment ID discovery cancelled');
-				// Notify webview of cancellation
 				this.panel.webview.postMessage({
 					command: 'discover-environment-id-result',
 					data: { success: false, errorMessage: 'Cancelled by user' }
 				});
 			} else {
-				throw error; // Re-throw unexpected errors
+				throw error;
 			}
 		}
 	}
 
-	/**
-	 * Handles delete environment request from webview.
-	 */
 	private async handleDeleteEnvironment(): Promise<void> {
 		if (!this.currentEnvironmentId) {
 			this.logger.warn('Delete attempted with no environment ID');
@@ -551,7 +491,6 @@ export class EnvironmentSetupPanel {
 			return;
 		}
 
-		// Delegate to use case
 		await this.deleteEnvironmentUseCase.execute({
 			environmentId: this.currentEnvironmentId
 		});
@@ -562,21 +501,17 @@ export class EnvironmentSetupPanel {
 
 		vscode.window.showInformationMessage('Environment deleted successfully');
 
-		// Trigger environment list refresh
 		vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
 
-		// Close panel
 		this.dispose();
 	}
 
 	private async handleValidateName(data: CheckUniqueNameMessage['data']): Promise<void> {
-		// Delegate to use case - data is already validated by type guard
 		const result = await this.validateUniqueNameUseCase.execute({
 			name: data.name,
 			excludeEnvironmentId: this.currentEnvironmentId
 		});
 
-		// Notify webview
 		this.panel.webview.postMessage({
 			command: 'name-validation-result',
 			data: result
@@ -584,8 +519,7 @@ export class EnvironmentSetupPanel {
 	}
 
 	/**
-	 * Forwards webview log messages to the extension host logger.
-	 *
+	 * Forwards webview logs to extension logger.
 	 * @param message - Log message from webview
 	 */
 	private handleWebviewLog(message: WebviewLogMessage): void {
@@ -596,8 +530,7 @@ export class EnvironmentSetupPanel {
 	}
 
 	/**
-	 * Handles errors safely, supporting both Error objects and other thrown values.
-	 *
+	 * Displays error message to user.
 	 * @param error - Unknown error from catch block
 	 * @param message - Contextual error message
 	 */
@@ -609,11 +542,6 @@ export class EnvironmentSetupPanel {
 		vscode.window.showErrorMessage(`${message}: ${errorMessage}`);
 	}
 
-	/**
-	 * Generates the HTML content for the webview panel.
-	 *
-	 * @returns HTML content string
-	 */
 	private getHtmlContent(): string {
 		const styleUri = this.panel.webview.asWebviewUri(
 			vscode.Uri.joinPath(this.extensionUri, 'resources', 'styles', 'environment-setup.css')
@@ -623,34 +551,26 @@ export class EnvironmentSetupPanel {
 			vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'EnvironmentSetupBehavior.js')
 		);
 
-		// Use the view function to generate HTML
 		return renderEnvironmentSetup({
 			styleUri: styleUri.toString(),
 			scriptUri: scriptUri.toString()
 		});
 	}
 
-	/**
-	 * Disposes the panel and cleans up resources.
-	 */
 	public dispose(): void {
 		this.logger.debug('EnvironmentSetupPanel: Disposing', {
 			environmentId: this.currentEnvironmentId || 'new'
 		});
 
-		// Unregister edit session
 		if (this.currentEnvironmentId) {
 			this.checkConcurrentEditUseCase.unregisterEditSession(this.currentEnvironmentId);
 		}
 
-		// Remove from map
 		const panelKey = this.currentEnvironmentId || 'new';
 		EnvironmentSetupPanel.currentPanels.delete(panelKey);
 
-		// Dispose panel
 		this.panel.dispose();
 
-		// Dispose subscriptions
 		this.disposables.forEach((disposable: vscode.Disposable): void => {
 			disposable.dispose();
 		});

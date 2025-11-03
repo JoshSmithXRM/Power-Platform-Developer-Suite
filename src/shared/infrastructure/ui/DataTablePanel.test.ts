@@ -60,8 +60,8 @@ class TestDataTablePanel extends DataTablePanel {
 		await Promise.resolve();
 	}
 
-	protected async handlePanelCommand(command: string, data: unknown): Promise<void> {
-		this.panelCommandsReceived.push({ command, data });
+	protected async handlePanelCommand(message: import('../../../infrastructure/ui/utils/TypeGuards').WebviewMessage): Promise<void> {
+		this.panelCommandsReceived.push({ command: message.command, data: message.data });
 	}
 
 	protected getFilterLogic(): string {
@@ -77,7 +77,7 @@ class TestDataTablePanel extends DataTablePanel {
 		this.setLoading(isLoading);
 	}
 
-	public testSendData(data: unknown[]): void {
+	public testSendData(data: Record<string, unknown>[]): void {
 		this.sendData(data);
 	}
 
