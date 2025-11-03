@@ -26,7 +26,7 @@ export class OpenImportLogUseCase {
 	async execute(
 		environmentId: string,
 		importJobId: string,
-		cancellationToken: ICancellationToken | undefined
+		cancellationToken?: ICancellationToken
 	): Promise<void> {
 		this.logger.debug('OpenImportLogUseCase: Starting import log processing', { environmentId, importJobId });
 

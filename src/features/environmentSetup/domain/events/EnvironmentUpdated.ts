@@ -10,7 +10,7 @@ export class EnvironmentUpdated {
 	constructor(
 		public readonly environmentId: EnvironmentId,
 		public readonly environmentName: string,
-		public readonly previousName: string | undefined,
+		public readonly previousName?: string,
 		public readonly occurredAt: Date = new Date()
 	) {}
 }

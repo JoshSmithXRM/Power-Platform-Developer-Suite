@@ -21,7 +21,7 @@ export class EnvironmentVariableToDeploymentSettingsMapper {
 	 * @param environmentVariable - Domain entity to map
 	 * @returns Deployment settings entry with SchemaName and Value
 	 */
-	static toDeploymentSettingsEntry(environmentVariable: EnvironmentVariable): EnvironmentVariableEntry {
+	toDeploymentSettingsEntry(environmentVariable: EnvironmentVariable): EnvironmentVariableEntry {
 		return {
 			SchemaName: environmentVariable.schemaName,
 			Value: environmentVariable.getEffectiveValue() ?? ''
@@ -34,7 +34,7 @@ export class EnvironmentVariableToDeploymentSettingsMapper {
 	 * @param environmentVariables - Array of domain entities to map
 	 * @returns Array of deployment settings entries
 	 */
-	static toDeploymentSettingsEntries(environmentVariables: EnvironmentVariable[]): EnvironmentVariableEntry[] {
+	toDeploymentSettingsEntries(environmentVariables: EnvironmentVariable[]): EnvironmentVariableEntry[] {
 		return environmentVariables.map(ev => this.toDeploymentSettingsEntry(ev));
 	}
 }

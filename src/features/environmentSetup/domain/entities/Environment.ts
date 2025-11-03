@@ -54,10 +54,10 @@ export class Environment {
 		private authenticationMethod: AuthenticationMethod,
 		private publicClientId: ClientId,
 		private isActive: boolean,
-		private lastUsed: Date | undefined,
-		private powerPlatformEnvironmentId: string | undefined,
-		private clientId: ClientId | undefined,
-		private username: string | undefined
+		private lastUsed?: Date,
+		private powerPlatformEnvironmentId?: string,
+		private clientId?: ClientId,
+		private username?: string
 	) {
 		this.validate();
 	}
@@ -118,7 +118,7 @@ export class Environment {
 		}
 
 		if (this.authenticationMethod.requiresClientCredentials()) {
-			if (!this.clientId || !this.clientId.isValid()) {
+			if (!this.clientId?.isValid()) {
 				errors.push('Client ID is required for Service Principal authentication');
 			}
 		}
@@ -204,7 +204,7 @@ export class Environment {
 	 * @param {string | undefined} previousUsername - Previous username (if Username/Password)
 	 * @returns {string[]} Array of secret storage keys to delete
 	 */
-	public getOrphanedSecretKeys(previousAuthMethod: AuthenticationMethod, previousClientId: ClientId | undefined, previousUsername: string | undefined): string[] {
+	public getOrphanedSecretKeys(previousAuthMethod: AuthenticationMethod, previousClientId?: ClientId, previousUsername?: string): string[] {
 		const orphanedKeys: string[] = [];
 
 		if (previousAuthMethod.requiresClientCredentials() && previousClientId) {
@@ -289,9 +289,9 @@ export class Environment {
 		tenantId: TenantId,
 		authenticationMethod: AuthenticationMethod,
 		publicClientId: ClientId,
-		powerPlatformEnvironmentId: string | undefined,
-		clientId: ClientId | undefined,
-		username: string | undefined
+		powerPlatformEnvironmentId?: string,
+		clientId?: ClientId,
+		username?: string
 	): void {
 		this.name = name;
 		this.dataverseUrl = dataverseUrl;

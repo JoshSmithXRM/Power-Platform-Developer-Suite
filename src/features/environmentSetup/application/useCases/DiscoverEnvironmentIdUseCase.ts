@@ -24,13 +24,13 @@ export class DiscoverEnvironmentIdUseCase {
 
 	/**
 	 * Discovers Power Platform environment ID from Dataverse URL via BAP API
-	 * @param request Environment configuration including Dataverse URL
-	 * @param cancellationToken Optional cancellation token for long-running operation
+	 * @param request - Environment configuration including Dataverse URL
+	 * @param cancellationToken - Optional cancellation token for long-running operation
 	 * @returns Response with environment ID or error details
 	 */
 	public async execute(
 		request: DiscoverEnvironmentIdRequest,
-		cancellationToken: ICancellationToken | undefined
+		cancellationToken?: ICancellationToken
 	): Promise<DiscoverEnvironmentIdResponse> {
 		this.logger.debug('DiscoverEnvironmentIdUseCase: Starting discovery', {
 			dataverseUrl: request.dataverseUrl,

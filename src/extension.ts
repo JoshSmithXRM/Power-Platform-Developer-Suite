@@ -29,6 +29,7 @@ import { EnvironmentUpdated } from './features/environmentSetup/domain/events/En
 import { EnvironmentDeleted } from './features/environmentSetup/domain/events/EnvironmentDeleted';
 import { AuthenticationCacheInvalidationRequested } from './features/environmentSetup/domain/events/AuthenticationCacheInvalidationRequested';
 import { AuthenticationCacheInvalidationHandler } from './features/environmentSetup/infrastructure/eventHandlers/AuthenticationCacheInvalidationHandler';
+import type { QuickPickItemWithEnvId } from './shared/infrastructure/ui/types/QuickPickItemWithEnvId';
 
 /**
  * Creates a factory function for getting all environments.
@@ -60,16 +61,11 @@ function createGetEnvironmentById(
 		if (!environment) {
 			return null;
 		}
-		const result: { id: string; name: string; powerPlatformEnvironmentId: string | undefined } = {
+		return {
 			id: envId,
 			name: environment.getName().getValue(),
-			powerPlatformEnvironmentId: undefined
+			powerPlatformEnvironmentId: environment.getPowerPlatformEnvironmentId()
 		};
-		const ppEnvId = environment.getPowerPlatformEnvironmentId();
-		if (ppEnvId !== undefined) {
-			result.powerPlatformEnvironmentId = ppEnvId;
-		}
-		return result;
 	};
 }
 
@@ -135,7 +131,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		);
 	});
 
-	const editEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.editEnvironment', async (environmentItem: { envId: string } | undefined) => {
+	const editEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.editEnvironment', async (environmentItem?: { envId: string }) => {
 		if (environmentItem) {
 			EnvironmentSetupPanel.createOrShow(
 				context.extensionUri,
@@ -152,7 +148,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	const testEnvironmentConnectionCommand = vscode.commands.registerCommand('power-platform-dev-suite.testEnvironmentConnection', async (environmentItem: { envId: string } | undefined) => {
+	const testEnvironmentConnectionCommand = vscode.commands.registerCommand('power-platform-dev-suite.testEnvironmentConnection', async (environmentItem?: { envId: string }) => {
 		if (!environmentItem?.envId) {
 			vscode.window.showErrorMessage('No environment selected');
 			return;
@@ -203,7 +199,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	const removeEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.removeEnvironment', async (environmentItem: { envId: string; label: string } | undefined) => {
+	const removeEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.removeEnvironment', async (environmentItem?: { envId: string; label: string }) => {
 		if (!environmentItem?.envId) {
 			vscode.window.showErrorMessage('No environment selected');
 			return;
@@ -228,7 +224,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	const openMakerCommand = vscode.commands.registerCommand('power-platform-dev-suite.openMaker', async (environmentItem: { envId: string } | undefined) => {
+	const openMakerCommand = vscode.commands.registerCommand('power-platform-dev-suite.openMaker', async (environmentItem?: { envId: string }) => {
 		if (!environmentItem?.envId) {
 			vscode.window.showErrorMessage('No environment selected');
 			return;
@@ -256,7 +252,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	const openDynamicsCommand = vscode.commands.registerCommand('power-platform-dev-suite.openDynamics', async (environmentItem: { envId: string } | undefined) => {
+	const openDynamicsCommand = vscode.commands.registerCommand('power-platform-dev-suite.openDynamics', async (environmentItem?: { envId: string }) => {
 		if (!environmentItem?.envId) {
 			vscode.window.showErrorMessage('No environment selected');
 			return;
@@ -290,7 +286,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		cacheInvalidationHandler.handle(event);
 	});
 
-	const solutionExplorerCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorer', async (environmentItem: { envId: string } | undefined) => {
+	const solutionExplorerCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorer', async (environmentItem?: { envId: string }) => {
 		try {
 			let initialEnvironmentId: string | undefined;
 
@@ -313,10 +309,6 @@ export function activate(context: vscode.ExtensionContext): void {
 			if (environments.length === 0) {
 				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
 				return;
-			}
-
-			interface QuickPickItemWithEnvId extends vscode.QuickPickItem {
-				envId: string;
 			}
 
 			const quickPickItems: QuickPickItemWithEnvId[] = environments.map(env => {
@@ -346,7 +338,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	const importJobViewerCommand = vscode.commands.registerCommand('power-platform-dev-suite.importJobViewer', async (environmentItem: { envId: string } | undefined) => {
+	const importJobViewerCommand = vscode.commands.registerCommand('power-platform-dev-suite.importJobViewer', async (environmentItem?: { envId: string }) => {
 		try {
 			let initialEnvironmentId: string | undefined;
 
@@ -369,10 +361,6 @@ export function activate(context: vscode.ExtensionContext): void {
 			if (environments.length === 0) {
 				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
 				return;
-			}
-
-			interface QuickPickItemWithEnvId extends vscode.QuickPickItem {
-				envId: string;
 			}
 
 			const quickPickItems: QuickPickItemWithEnvId[] = environments.map(env => {
@@ -402,7 +390,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	const connectionReferencesCommand = vscode.commands.registerCommand('power-platform-dev-suite.connectionReferences', async (environmentItem: { envId: string } | undefined) => {
+	const connectionReferencesCommand = vscode.commands.registerCommand('power-platform-dev-suite.connectionReferences', async (environmentItem?: { envId: string }) => {
 		try {
 			let initialEnvironmentId: string | undefined;
 
@@ -447,7 +435,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	const environmentVariablesCommand = vscode.commands.registerCommand('power-platform-dev-suite.environmentVariables', async (environmentItem: { envId: string } | undefined) => {
+	const environmentVariablesCommand = vscode.commands.registerCommand('power-platform-dev-suite.environmentVariables', async (environmentItem?: { envId: string }) => {
 		try {
 			let initialEnvironmentId: string | undefined;
 
@@ -574,13 +562,15 @@ async function initializeSolutionExplorer(
 	authService: MsalAuthenticationService,
 	environmentRepository: IEnvironmentRepository,
 	logger: ILogger,
-	initialEnvironmentId: string | undefined
+	initialEnvironmentId?: string
 ): Promise<void> {
-	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js') as typeof import('./shared/infrastructure/services/DataverseApiService.js');
-	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js') as typeof import('./shared/infrastructure/services/MakerUrlBuilder.js');
-	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js') as typeof import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js');
-	const { ListSolutionsUseCase } = await import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase.js') as typeof import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase.js');
-	const { SolutionExplorerPanel } = await import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel.js') as typeof import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel.js');
+	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js');
+	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js');
+	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js');
+	const { ListSolutionsUseCase } = await import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase.js');
+	const { SolutionExplorerPanel } = await import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel.js');
+	const { SolutionViewModelMapper } = await import('./features/solutionExplorer/application/mappers/SolutionViewModelMapper.js');
+	const { SolutionCollectionService } = await import('./features/solutionExplorer/domain/services/SolutionCollectionService.js');
 
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
@@ -593,12 +583,16 @@ async function initializeSolutionExplorer(
 
 	const listSolutionsUseCase = new ListSolutionsUseCase(solutionRepository, logger);
 
+	const collectionService = new SolutionCollectionService();
+	const viewModelMapper = new SolutionViewModelMapper(collectionService);
+
 	await SolutionExplorerPanel.createOrShow(
 		context.extensionUri,
 		getEnvironments,
 		getEnvironmentById,
 		listSolutionsUseCase,
 		urlBuilder,
+		viewModelMapper,
 		logger,
 		initialEnvironmentId
 	);
@@ -613,7 +607,7 @@ async function initializeImportJobViewer(
 	authService: MsalAuthenticationService,
 	environmentRepository: IEnvironmentRepository,
 	logger: ILogger,
-	initialEnvironmentId: string | undefined
+	initialEnvironmentId?: string
 ): Promise<void> {
 	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js') as typeof import('./shared/infrastructure/services/DataverseApiService.js');
 	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js') as typeof import('./shared/infrastructure/services/MakerUrlBuilder.js');
@@ -659,7 +653,7 @@ async function initializeConnectionReferences(
 	authService: MsalAuthenticationService,
 	environmentRepository: IEnvironmentRepository,
 	logger: ILogger,
-	initialEnvironmentId: string | undefined
+	initialEnvironmentId?: string
 ): Promise<void> {
 	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js') as typeof import('./shared/infrastructure/services/DataverseApiService.js');
 	const { DataverseApiConnectionReferenceRepository } = await import('./features/connectionReferences/infrastructure/repositories/DataverseApiConnectionReferenceRepository.js') as typeof import('./features/connectionReferences/infrastructure/repositories/DataverseApiConnectionReferenceRepository.js');
@@ -668,11 +662,13 @@ async function initializeConnectionReferences(
 	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js') as typeof import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js');
 	const { FileSystemDeploymentSettingsRepository } = await import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository.js') as typeof import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository.js');
 	const { FlowConnectionRelationshipBuilder } = await import('./features/connectionReferences/domain/services/FlowConnectionRelationshipBuilder.js') as typeof import('./features/connectionReferences/domain/services/FlowConnectionRelationshipBuilder.js');
+	const { FlowConnectionRelationshipCollectionService } = await import('./features/connectionReferences/domain/services/FlowConnectionRelationshipCollectionService.js') as typeof import('./features/connectionReferences/domain/services/FlowConnectionRelationshipCollectionService.js');
 	const { ListConnectionReferencesUseCase } = await import('./features/connectionReferences/application/useCases/ListConnectionReferencesUseCase.js') as typeof import('./features/connectionReferences/application/useCases/ListConnectionReferencesUseCase.js');
 	const { ExportConnectionReferencesToDeploymentSettingsUseCase } = await import('./features/connectionReferences/application/useCases/ExportConnectionReferencesToDeploymentSettingsUseCase.js') as typeof import('./features/connectionReferences/application/useCases/ExportConnectionReferencesToDeploymentSettingsUseCase.js');
 	const { ConnectionReferencesPanel } = await import('./features/connectionReferences/presentation/panels/ConnectionReferencesPanel.js') as typeof import('./features/connectionReferences/presentation/panels/ConnectionReferencesPanel.js');
 	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository.js') as typeof import('./shared/infrastructure/ui/VSCodePanelStateRepository.js');
 	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js') as typeof import('./shared/infrastructure/services/MakerUrlBuilder.js');
+	const { ConnectionReferenceToDeploymentSettingsMapper } = await import('./features/connectionReferences/application/mappers/ConnectionReferenceToDeploymentSettingsMapper.js') as typeof import('./features/connectionReferences/application/mappers/ConnectionReferenceToDeploymentSettingsMapper.js');
 
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
@@ -688,6 +684,7 @@ async function initializeConnectionReferences(
 	const panelStateRepository = new VSCodePanelStateRepository(context.workspaceState, logger);
 	const urlBuilder = new MakerUrlBuilder();
 	const relationshipBuilder = new FlowConnectionRelationshipBuilder();
+	const relationshipCollectionService = new FlowConnectionRelationshipCollectionService();
 	const listConnectionReferencesUseCase = new ListConnectionReferencesUseCase(
 		flowRepository,
 		connectionReferenceRepository,
@@ -695,8 +692,10 @@ async function initializeConnectionReferences(
 		relationshipBuilder,
 		logger
 	);
+	const connectionReferenceMapper = new ConnectionReferenceToDeploymentSettingsMapper();
 	const exportToDeploymentSettingsUseCase = new ExportConnectionReferencesToDeploymentSettingsUseCase(
 		deploymentSettingsRepository,
+		connectionReferenceMapper,
 		logger
 	);
 
@@ -708,6 +707,7 @@ async function initializeConnectionReferences(
 		exportToDeploymentSettingsUseCase,
 		solutionRepository,
 		urlBuilder,
+		relationshipCollectionService,
 		logger,
 		initialEnvironmentId,
 		panelStateRepository
@@ -723,18 +723,20 @@ async function initializeEnvironmentVariables(
 	authService: MsalAuthenticationService,
 	environmentRepository: IEnvironmentRepository,
 	logger: ILogger,
-	initialEnvironmentId: string | undefined
+	initialEnvironmentId?: string
 ): Promise<void> {
 	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js') as typeof import('./shared/infrastructure/services/DataverseApiService.js');
 	const { DataverseApiEnvironmentVariableRepository } = await import('./features/environmentVariables/infrastructure/repositories/DataverseApiEnvironmentVariableRepository.js') as typeof import('./features/environmentVariables/infrastructure/repositories/DataverseApiEnvironmentVariableRepository.js');
 	const { DataverseApiSolutionComponentRepository } = await import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js') as typeof import('./shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js');
 	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js') as typeof import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js');
 	const { FileSystemDeploymentSettingsRepository } = await import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository.js') as typeof import('./shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository.js');
+	const { EnvironmentVariableFactory } = await import('./features/environmentVariables/domain/services/EnvironmentVariableFactory.js') as typeof import('./features/environmentVariables/domain/services/EnvironmentVariableFactory.js');
 	const { ListEnvironmentVariablesUseCase } = await import('./features/environmentVariables/application/useCases/ListEnvironmentVariablesUseCase.js') as typeof import('./features/environmentVariables/application/useCases/ListEnvironmentVariablesUseCase.js');
 	const { ExportEnvironmentVariablesToDeploymentSettingsUseCase } = await import('./features/environmentVariables/application/useCases/ExportEnvironmentVariablesToDeploymentSettingsUseCase.js') as typeof import('./features/environmentVariables/application/useCases/ExportEnvironmentVariablesToDeploymentSettingsUseCase.js');
 	const { EnvironmentVariablesPanel } = await import('./features/environmentVariables/presentation/panels/EnvironmentVariablesPanel.js') as typeof import('./features/environmentVariables/presentation/panels/EnvironmentVariablesPanel.js');
 	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository.js') as typeof import('./shared/infrastructure/ui/VSCodePanelStateRepository.js');
 	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js') as typeof import('./shared/infrastructure/services/MakerUrlBuilder.js');
+	const { EnvironmentVariableToDeploymentSettingsMapper } = await import('./features/environmentVariables/application/mappers/EnvironmentVariableToDeploymentSettingsMapper.js') as typeof import('./features/environmentVariables/application/mappers/EnvironmentVariableToDeploymentSettingsMapper.js');
 
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
@@ -748,13 +750,17 @@ async function initializeEnvironmentVariables(
 	const deploymentSettingsRepository = new FileSystemDeploymentSettingsRepository(logger);
 	const panelStateRepository = new VSCodePanelStateRepository(context.workspaceState, logger);
 	const urlBuilder = new MakerUrlBuilder();
+	const environmentVariableFactory = new EnvironmentVariableFactory();
 	const listEnvironmentVariablesUseCase = new ListEnvironmentVariablesUseCase(
 		environmentVariableRepository,
 		solutionComponentRepository,
+		environmentVariableFactory,
 		logger
 	);
+	const environmentVariableMapper = new EnvironmentVariableToDeploymentSettingsMapper();
 	const exportToDeploymentSettingsUseCase = new ExportEnvironmentVariablesToDeploymentSettingsUseCase(
 		deploymentSettingsRepository,
+		environmentVariableMapper,
 		logger
 	);
 
@@ -913,7 +919,7 @@ class EnvironmentItem extends vscode.TreeItem {
 		public readonly label: string,
 		public readonly description: string,
 		public readonly contextValue: string,
-		public readonly envId: string | undefined
+		public readonly envId?: string
 	) {
 		super(label, vscode.TreeItemCollapsibleState.None);
 		this.description = description;

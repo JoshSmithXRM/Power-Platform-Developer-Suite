@@ -157,44 +157,6 @@ describe('ImportJob', () => {
 		});
 	});
 
-	describe('getStatusLabel', () => {
-		it('should return "In Progress" for InProgress status', () => {
-			const job = createValidImportJob({ statusCode: ImportJobStatus.InProgress });
-
-			expect(job.getStatusLabel()).toBe('In Progress');
-		});
-
-		it('should return "Completed" for Completed status', () => {
-			const job = createValidImportJob({ statusCode: ImportJobStatus.Completed });
-
-			expect(job.getStatusLabel()).toBe('Completed');
-		});
-
-		it('should return "Failed" for Failed status', () => {
-			const job = createValidImportJob({ statusCode: ImportJobStatus.Failed });
-
-			expect(job.getStatusLabel()).toBe('Failed');
-		});
-
-		it('should return "Completed with Errors" for CompletedWithErrors status', () => {
-			const job = createValidImportJob({ statusCode: ImportJobStatus.CompletedWithErrors });
-
-			expect(job.getStatusLabel()).toBe('Completed with Errors');
-		});
-
-		it('should return "Cancelled" for Cancelled status', () => {
-			const job = createValidImportJob({ statusCode: ImportJobStatus.Cancelled });
-
-			expect(job.getStatusLabel()).toBe('Cancelled');
-		});
-
-		it('should return "Queued" for Queued status', () => {
-			const job = createValidImportJob({ statusCode: ImportJobStatus.Queued });
-
-			expect(job.getStatusLabel()).toBe('Queued');
-		});
-	});
-
 	describe('getDuration', () => {
 		it('should return null for jobs not yet completed', () => {
 			const job = createValidImportJob({ completedOn: null });

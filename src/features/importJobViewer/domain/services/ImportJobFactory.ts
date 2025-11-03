@@ -1,14 +1,44 @@
 import { ImportJob, ImportJobStatus } from '../entities/ImportJob';
+import { ValidationError } from '../../../../shared/domain/errors/ValidationError';
 
 /**
- * Domain service responsible for creating ImportJob entities from raw Dataverse data.
+ * Data required to construct an ImportJob entity.
+ * Domain layer defines this contract for infrastructure to implement.
+ */
+export interface ImportJobFactoryData {
+	/** Import job GUID */
+	id: string;
+	/** Import job name */
+	name: string;
+	/** Name of the solution being imported */
+	solutionName: string;
+	/** User who initiated the import */
+	createdBy: string;
+	/** When the import was created */
+	createdOn: Date;
+	/** When the import finished (null if still running) */
+	completedOn: Date | null;
+	/** When the import started (null if not started) */
+	startedOn: Date | null;
+	/** Progress percentage (0-100) */
+	progress: number;
+	/** Import context */
+	importContext: string | null;
+	/** Operation context */
+	operationContext: string | null;
+	/** XML log data (null if not loaded) */
+	importLogXml: string | null;
+}
+
+/**
+ * Domain service responsible for creating ImportJob entities.
  *
- * Handles the business logic of deriving ImportJob status from Dataverse fields
+ * Handles the business logic of deriving ImportJob status from field values
  * because the Dataverse importjobs entity lacks a statuscode field.
  */
 export class ImportJobFactory {
 	/**
-	 * Creates ImportJob entity with status derived from Dataverse raw data.
+	 * Creates ImportJob entity with status derived from provided data.
 	 *
 	 * Dataverse importjobs entity lacks a statuscode field, so status is inferred
 	 * from completedOn, startedOn, and progress fields using business rules:
@@ -18,47 +48,62 @@ export class ImportJobFactory {
 	 * - startedOn set + no completedOn + progress > 0 → InProgress
 	 * - Neither startedOn nor completedOn set → Queued
 	 *
-	 * @param id - Import job GUID
-	 * @param name - Import job name
-	 * @param solutionName - Name of the solution being imported
-	 * @param createdBy - User who initiated the import
-	 * @param createdOn - When the import was created
-	 * @param completedOn - When the import finished (null if still running)
-	 * @param startedOn - When the import started (null if not started)
-	 * @param progress - Progress percentage (0-100)
-	 * @param importContext - Import context
-	 * @param operationContext - Operation context
-	 * @param importLogXml - XML log data (null if not loaded)
+	 * @param data - Data conforming to ImportJobFactoryData contract
 	 * @returns ImportJob with derived status
+	 * @throws {ValidationError} When required fields are missing or progress is out of range
 	 */
-	createFromDataverseData(
-		id: string,
-		name: string,
-		solutionName: string,
-		createdBy: string,
-		createdOn: Date,
-		completedOn: Date | null,
-		startedOn: Date | null,
-		progress: number,
-		importContext: string | null,
-		operationContext: string | null,
-		importLogXml: string | null = null
-	): ImportJob {
-		const status = this.deriveStatusFromFields(completedOn, startedOn, progress);
+	createFromData(data: ImportJobFactoryData): ImportJob {
+		this.validateRequiredFields(data);
+		this.validateProgress(data.progress);
+
+		const status = this.deriveStatusFromFields(data.completedOn, data.startedOn, data.progress);
 
 		return new ImportJob(
-			id,
-			name,
-			solutionName,
-			createdBy,
-			createdOn,
-			completedOn,
-			progress,
+			data.id,
+			data.name,
+			data.solutionName,
+			data.createdBy,
+			data.createdOn,
+			data.completedOn,
+			data.progress,
 			status,
-			importContext,
-			operationContext,
-			importLogXml
+			data.importContext,
+			data.operationContext,
+			data.importLogXml
 		);
+	}
+
+	/**
+	 * Validates that required fields are present and not empty.
+	 * Provides clear error messages at factory level before entity construction.
+	 * @throws {ValidationError} When required fields are missing
+	 */
+	private validateRequiredFields(data: ImportJobFactoryData): void {
+		if (!data.id || data.id.trim() === '') {
+			throw new ValidationError('ImportJobFactory', 'id', data.id, 'Import job ID is required');
+		}
+		if (!data.name || data.name.trim() === '') {
+			throw new ValidationError('ImportJobFactory', 'name', data.name, 'Import job name is required');
+		}
+		if (!data.solutionName || data.solutionName.trim() === '') {
+			throw new ValidationError('ImportJobFactory', 'solutionName', data.solutionName, 'Solution name is required');
+		}
+		if (!data.createdBy || data.createdBy.trim() === '') {
+			throw new ValidationError('ImportJobFactory', 'createdBy', data.createdBy, 'Created by is required');
+		}
+		if (!data.createdOn) {
+			throw new ValidationError('ImportJobFactory', 'createdOn', data.createdOn, 'Created date is required');
+		}
+	}
+
+	/**
+	 * Validates progress is within acceptable range.
+	 * @throws {ValidationError} When progress is out of range
+	 */
+	private validateProgress(progress: number): void {
+		if (progress < 0 || progress > 100) {
+			throw new ValidationError('ImportJobFactory', 'progress', progress, 'Progress must be between 0 and 100');
+		}
 	}
 
 	/**

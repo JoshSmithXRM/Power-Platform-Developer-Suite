@@ -333,50 +333,6 @@ module.exports = {
 		}
 	},
 
-	'prefer-explicit-undefined': {
-		meta: {
-			type: 'suggestion',
-			docs: {
-				description: 'Require explicit "| undefined" instead of optional parameter syntax',
-				category: 'Best Practices',
-				recommended: false
-			},
-			messages: {
-				preferExplicitUndefined: 'Use explicit "| undefined" instead of optional parameter "?". Makes optionality clearer in function signatures.'
-			},
-			schema: []
-		},
-		create(context) {
-			return {
-				'FunctionDeclaration, MethodDefinition, ArrowFunctionExpression': (node) => {
-					const params = node.value?.params || node.params;
-
-					if (!params) {
-						return;
-					}
-
-					params.forEach(param => {
-						// Check if parameter is optional
-						if (param.optional && param.typeAnnotation) {
-							// Check if type annotation already includes undefined
-							const typeAnnotation = param.typeAnnotation.typeAnnotation;
-							const hasExplicitUndefined = typeAnnotation.types?.some(
-								t => t.type === 'TSUndefinedKeyword'
-							);
-
-							if (!hasExplicitUndefined) {
-								context.report({
-									node: param,
-									messageId: 'preferExplicitUndefined'
-								});
-							}
-						}
-					});
-				}
-			};
-		}
-	},
-
 	'no-static-dependency-instantiation': {
 		meta: {
 			type: 'problem',
@@ -409,6 +365,108 @@ module.exports = {
 							messageId: 'staticDependencyInstantiation',
 							data: {
 								propertyName: propertyName
+							}
+						});
+					}
+				}
+			};
+		}
+	},
+
+	'no-presentation-logic-in-application-layer': {
+		meta: {
+			type: 'problem',
+			docs: {
+				description: 'Prevent presentation formatting logic in application layer mappers',
+				category: 'Clean Architecture',
+				recommended: true
+			},
+			messages: {
+				presentationLogicInApplication: '❌ Presentation formatting method "{{methodName}}" in application layer. Move to presentation layer utility. (CLAUDE.md rule #14: Presentation logic belongs in presentation layer)'
+			},
+			schema: []
+		},
+		create(context) {
+			const filename = context.getFilename();
+
+			// Only apply to application layer files (mappers specifically)
+			const isApplicationLayer = filename.includes('/application/') || filename.includes('\\application\\');
+			if (!isApplicationLayer) {
+				return {};
+			}
+
+			return {
+				MethodDefinition(node) {
+					const methodName = node.key.name;
+
+					// Check for formatting methods (format*, get*Label, get*Name for display)
+					const FORBIDDEN_PREFIXES = ['format'];
+					const FORBIDDEN_DISPLAY_METHODS = ['getTypeName', 'getStatusLabel', 'getLabel', 'getDisplayName', 'getDisplayText'];
+
+					const hasForbiddenPrefix = FORBIDDEN_PREFIXES.some(prefix =>
+						methodName.startsWith(prefix)
+					);
+					const isForbiddenMethod = FORBIDDEN_DISPLAY_METHODS.includes(methodName);
+
+					if (hasForbiddenPrefix || isForbiddenMethod) {
+						// Additional check: method should return string and likely contains display formatting
+						context.report({
+							node,
+							messageId: 'presentationLogicInApplication',
+							data: {
+								methodName: methodName
+							}
+						});
+					}
+				}
+			};
+		}
+	},
+
+	'no-static-mapper-methods': {
+		meta: {
+			type: 'suggestion',
+			docs: {
+				description: 'Prevent static methods in mapper classes to enable dependency injection',
+				category: 'Best Practices',
+				recommended: true
+			},
+			messages: {
+				staticMapperMethod: '⚠️ Static method "{{methodName}}" in mapper "{{className}}". Use instance methods with constructor injection for testability and dependency injection.'
+			},
+			schema: []
+		},
+		create(context) {
+			const filename = context.getFilename();
+
+			// Only apply to mapper files
+			const isMapper = filename.endsWith('Mapper.ts') ||
+							 filename.includes('/mappers/') ||
+							 filename.includes('\\mappers\\');
+
+			if (!isMapper) {
+				return {};
+			}
+
+			return {
+				MethodDefinition(node) {
+					const methodName = node.key.name;
+
+					// Allow common factory/utility methods
+					const ALLOWED_STATIC_METHODS = [
+						'create', 'createFrom', 'from', 'fromData', 'empty'
+					];
+
+					if (node.static &&
+						node.kind === 'method' &&
+						!ALLOWED_STATIC_METHODS.includes(methodName)) {
+						const className = node.parent.parent.id?.name || 'Unknown';
+						context.report({
+							node,
+							messageId: 'staticMapperMethod',
+							data: {
+								methodName: methodName,
+								className: className
 							}
 						});
 					}

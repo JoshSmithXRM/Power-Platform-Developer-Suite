@@ -1,13 +1,21 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../infrastructure/logging/ILogger';
-import { Solution } from '../../../features/solutionExplorer/domain/entities/Solution';
+import { DEFAULT_SOLUTION_ID } from '../../domain/constants/SolutionConstants';
 
 import type {
 	IPanelStateRepository,
 	PanelStateKey,
 	PanelState,
 } from './IPanelStateRepository';
+
+/**
+ * Legacy panel state format (before migration to non-null selectedSolutionId)
+ */
+interface LegacyPanelState {
+	selectedSolutionId: string | null;
+	lastUpdated: string;
+}
 
 /**
  * Type guard for storage-related errors (quota exceeded, serialization failures)
@@ -35,41 +43,43 @@ export class VSCodePanelStateRepository implements IPanelStateRepository {
 
 	/**
 	 * Load persisted state for a specific panel and environment.
-	 * Migrates legacy null solution IDs to DEFAULT_SOLUTION_ID.
+	 * Handles migration of legacy null selectedSolutionId to DEFAULT_SOLUTION_ID.
 	 */
 	async load(key: PanelStateKey): Promise<PanelState | null> {
 		try {
 			const storageKey = this.getStorageKey(key.panelType);
-			const allStates = this.workspaceState.get<Record<string, PanelState>>(
+			const allStates = this.workspaceState.get<Record<string, LegacyPanelState>>(
 				storageKey,
 				{}
 			);
-			const state = allStates[key.environmentId] ?? null;
+			const rawState = allStates[key.environmentId];
 
-			if (state === null) {
+			if (!rawState) {
 				return null;
 			}
 
 			// Migration: Legacy null selectedSolutionId becomes DEFAULT_SOLUTION_ID
-			if (state.selectedSolutionId === null) {
+			if (rawState.selectedSolutionId === null || rawState.selectedSolutionId === undefined) {
 				this.logger.warn('Migrating legacy null solution ID to default', {
 					panelType: key.panelType,
 					environmentId: key.environmentId
 				});
 
 				const migratedState: PanelState = {
-					selectedSolutionId: Solution.DEFAULT_SOLUTION_ID,
+					selectedSolutionId: DEFAULT_SOLUTION_ID,
 					lastUpdated: new Date().toISOString()
 				};
 
 				// Persist migrated value back to storage
-				allStates[key.environmentId] = migratedState;
-				await this.workspaceState.update(storageKey, allStates);
+				await this.save(key, migratedState);
 
 				return migratedState;
 			}
 
-			return state;
+			return {
+				selectedSolutionId: rawState.selectedSolutionId,
+				lastUpdated: rawState.lastUpdated
+			};
 		} catch (error) {
 			if (isStorageError(error)) {
 				return null;

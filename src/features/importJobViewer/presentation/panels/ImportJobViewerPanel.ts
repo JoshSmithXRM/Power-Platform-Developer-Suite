@@ -6,6 +6,7 @@ import { OperationCancelledException } from '../../../../shared/domain/errors/Op
 import { ListImportJobsUseCase } from '../../application/useCases/ListImportJobsUseCase';
 import { OpenImportLogUseCase } from '../../application/useCases/OpenImportLogUseCase';
 import { ImportJobViewModelMapper } from '../../application/mappers/ImportJobViewModelMapper';
+import { ImportJobCollectionService } from '../../domain/services/ImportJobCollectionService';
 import { type ImportJob } from '../../domain/entities/ImportJob';
 import {
 	DataTablePanel,
@@ -24,6 +25,7 @@ export class ImportJobViewerPanel extends DataTablePanel {
 	private static panels = new Map<string, ImportJobViewerPanel>();
 
 	private importJobs: ImportJob[] = [];
+	private readonly mapper: ImportJobViewModelMapper;
 
 	private constructor(
 		panel: vscode.WebviewPanel,
@@ -34,9 +36,10 @@ export class ImportJobViewerPanel extends DataTablePanel {
 		private readonly openImportLogUseCase: OpenImportLogUseCase,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId: string | undefined
+		initialEnvironmentId?: string
 	) {
 		super(panel, extensionUri, getEnvironments, getEnvironmentById, logger, initialEnvironmentId);
+		this.mapper = new ImportJobViewModelMapper(new ImportJobCollectionService());
 	}
 
 	/**
@@ -51,7 +54,7 @@ export class ImportJobViewerPanel extends DataTablePanel {
 		openImportLogUseCase: OpenImportLogUseCase,
 		urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId: string | undefined
+		initialEnvironmentId?: string
 	): Promise<ImportJobViewerPanel> {
 		const column = vscode.window.activeTextEditor
 			? vscode.window.activeTextEditor.viewColumn
@@ -164,7 +167,7 @@ export class ImportJobViewerPanel extends DataTablePanel {
 				return;
 			}
 
-			const viewModels = ImportJobViewModelMapper.toViewModels(this.importJobs, true);
+			const viewModels = this.mapper.toViewModels(this.importJobs, true);
 			const enhancedViewModels = enhanceViewModelsWithImportJobLinks(viewModels);
 
 			this.sendData(enhancedViewModels);
@@ -222,9 +225,10 @@ export class ImportJobViewerPanel extends DataTablePanel {
 	}
 
 	/**
-	 * Returns custom JavaScript for import job-specific event handlers.
+	 * Returns import job-specific JavaScript for event handlers.
+	 * Adds click handlers to job name links for viewing import job details.
 	 */
-	protected getCustomJavaScript(): string {
+	protected getPanelSpecificJavaScript(): string {
 		return `
 			// Attach click handlers to job name links
 			document.querySelectorAll('.job-link').forEach(link => {

@@ -36,8 +36,8 @@ export class ListConnectionReferencesUseCase {
 	 */
 	async execute(
 		environmentId: string,
-		solutionId: string | undefined,
-		cancellationToken: ICancellationToken | undefined
+		solutionId?: string,
+		cancellationToken?: ICancellationToken
 	): Promise<ListConnectionReferencesResult> {
 		this.logger.info('ListConnectionReferencesUseCase started', { environmentId, solutionId });
 
@@ -92,7 +92,7 @@ export class ListConnectionReferencesUseCase {
 
 	private async fetchFlowsAndConnectionReferences(
 		environmentId: string,
-		cancellationToken: ICancellationToken | undefined
+		cancellationToken?: ICancellationToken
 	): Promise<[CloudFlow[], ConnectionReference[]]> {
 		return Promise.all([
 			this.flowRepository.findAll(
@@ -114,7 +114,7 @@ export class ListConnectionReferencesUseCase {
 		solutionId: string,
 		flows: CloudFlow[],
 		connectionRefs: ConnectionReference[],
-		cancellationToken: ICancellationToken | undefined
+		cancellationToken?: ICancellationToken
 	): Promise<[CloudFlow[], ConnectionReference[]]> {
 		const [flowComponentIds, crComponentIds] = await Promise.all([
 			this.solutionComponentRepository.findComponentIdsBySolution(

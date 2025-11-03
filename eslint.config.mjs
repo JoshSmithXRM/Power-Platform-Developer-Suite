@@ -39,6 +39,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-argument': 'error',
       '@typescript-eslint/no-non-null-assertion': 'error',
       '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+      '@typescript-eslint/prefer-optional-chain': 'warn',
 
       // ===========================
       // EXPLICIT RETURN TYPES (CLAUDE.md: ALWAYS explicit return types)
@@ -98,8 +99,9 @@ export default tseslint.config(
       'local-rules/no-static-entity-methods': 'error',
       'local-rules/no-presentation-methods-in-domain': 'error',
       'local-rules/no-html-in-typescript': 'error',
-      'local-rules/no-static-dependency-instantiation': 'warn',
-      'local-rules/prefer-explicit-undefined': 'warn',
+      'local-rules/no-static-dependency-instantiation': 'error',
+      'local-rules/no-presentation-logic-in-application-layer': 'error',
+      'local-rules/no-static-mapper-methods': 'warn',
 
       // ===========================
       // ASYNC/PROMISE HANDLING

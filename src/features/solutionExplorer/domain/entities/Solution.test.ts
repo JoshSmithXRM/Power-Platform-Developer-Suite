@@ -1,4 +1,5 @@
 import { ValidationError } from '../../../../shared/domain/errors/ValidationError';
+import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 
 import { Solution } from './Solution';
 
@@ -23,7 +24,7 @@ describe('Solution', () => {
       : null;
 
     return new Solution(
-      overrides?.id ?? 'fd140aaf-4df4-11dd-bd17-0019b9312238',
+      overrides?.id ?? DEFAULT_SOLUTION_ID,
       overrides?.uniqueName ?? 'TestSolution',
       overrides?.friendlyName ?? 'Test Solution',
       overrides?.version ?? '1.0.0.0',

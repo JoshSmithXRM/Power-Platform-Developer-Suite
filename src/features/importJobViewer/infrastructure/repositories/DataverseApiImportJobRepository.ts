@@ -6,31 +6,44 @@ import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../../../../shared/infrastructure/utils/ODataQueryBuilder';
 import { IImportJobRepository } from '../../domain/interfaces/IImportJobRepository';
 import { ImportJob } from '../../domain/entities/ImportJob';
-import { ImportJobFactory } from '../../domain/services/ImportJobFactory';
+import { ImportJobFactory, ImportJobFactoryData } from '../../domain/services/ImportJobFactory';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
- * Dataverse API response for importjobs endpoint
+ * OData response wrapper from Dataverse API importjobs query.
  */
 interface DataverseImportJobsResponse {
 	value: DataverseImportJobDto[];
 }
 
 /**
- * DTO for import job data from Dataverse API
+ * DTO representing an import job entity from Dataverse Web API.
+ * Maps to the importjobs entity schema in Dataverse.
  */
 interface DataverseImportJobDto {
+	/** importjobid field - Primary key */
 	importjobid: string;
+	/** name field - Import job name */
 	name: string;
+	/** solutionname field - Name of solution being imported */
 	solutionname: string;
+	/** createdon field - Creation timestamp */
 	createdon: string;
+	/** startedon field - Import start timestamp */
 	startedon: string | null;
+	/** completedon field - Import completion timestamp */
 	completedon: string | null;
+	/** progress field - Progress percentage (0-100) */
 	progress: number;
+	/** importcontext field - Import operation context */
 	importcontext: string | null;
+	/** operationcontext field - Additional operation metadata */
 	operationcontext: string | null;
-	data?: string; // XML log data (optional - only included when fetching single job)
+	/** data field - XML log data (only included when explicitly selected) */
+	data?: string;
+	/** _createdby_value field - Creator user GUID */
 	_createdby_value: string;
+	/** createdby expanded navigation - Creator user entity */
 	createdby?: {
 		fullname: string;
 	};
@@ -54,8 +67,8 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 	 */
 	async findAll(
 		environmentId: string,
-		options: QueryOptions | undefined,
-		cancellationToken: ICancellationToken | undefined
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
 	): Promise<ImportJob[]> {
 		// Exclude 'data' field to avoid fetching large XML logs in list view
 		const defaultOptions: QueryOptions = {
@@ -110,8 +123,8 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 	async findByIdWithLog(
 		environmentId: string,
 		importJobId: string,
-		options: QueryOptions | undefined,
-		cancellationToken: ICancellationToken | undefined
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
 	): Promise<ImportJob> {
 		// Include 'data' field to fetch XML log for editor display
 		const defaultOptions: QueryOptions = {
@@ -166,37 +179,41 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 	 * Maps Dataverse DTO to ImportJob domain entity without log data.
 	 */
 	private mapToEntity(dto: DataverseImportJobDto): ImportJob {
-		return this.factory.createFromDataverseData(
-			dto.importjobid,
-			dto.name || 'Unnamed Import',
-			dto.solutionname || 'Unknown Solution',
-			dto.createdby?.fullname ?? 'Unknown User',
-			new Date(dto.createdon),
-			dto.completedon ? new Date(dto.completedon) : null,
-			dto.startedon ? new Date(dto.startedon) : null,
-			dto.progress,
-			dto.importcontext,
-			dto.operationcontext,
-			null // No log data for list view
-		);
+		const factoryData: ImportJobFactoryData = {
+			id: dto.importjobid,
+			name: dto.name || 'Unnamed Import',
+			solutionName: dto.solutionname || 'Unknown Solution',
+			createdBy: dto.createdby?.fullname ?? 'Unknown User',
+			createdOn: new Date(dto.createdon),
+			completedOn: dto.completedon ? new Date(dto.completedon) : null,
+			startedOn: dto.startedon ? new Date(dto.startedon) : null,
+			progress: dto.progress,
+			importContext: dto.importcontext,
+			operationContext: dto.operationcontext,
+			importLogXml: null
+		};
+
+		return this.factory.createFromData(factoryData);
 	}
 
 	/**
 	 * Maps Dataverse DTO to ImportJob domain entity with log data included.
 	 */
 	private mapToEntityWithLog(dto: DataverseImportJobDto): ImportJob {
-		return this.factory.createFromDataverseData(
-			dto.importjobid,
-			dto.name || 'Unnamed Import',
-			dto.solutionname || 'Unknown Solution',
-			dto.createdby?.fullname ?? 'Unknown User',
-			new Date(dto.createdon),
-			dto.completedon ? new Date(dto.completedon) : null,
-			dto.startedon ? new Date(dto.startedon) : null,
-			dto.progress,
-			dto.importcontext,
-			dto.operationcontext,
-			dto.data || null // Include log XML data
-		);
+		const factoryData: ImportJobFactoryData = {
+			id: dto.importjobid,
+			name: dto.name || 'Unnamed Import',
+			solutionName: dto.solutionname || 'Unknown Solution',
+			createdBy: dto.createdby?.fullname ?? 'Unknown User',
+			createdOn: new Date(dto.createdon),
+			completedOn: dto.completedon ? new Date(dto.completedon) : null,
+			startedOn: dto.startedon ? new Date(dto.startedon) : null,
+			progress: dto.progress,
+			importContext: dto.importcontext,
+			operationContext: dto.operationcontext,
+			importLogXml: dto.data || null
+		};
+
+		return this.factory.createFromData(factoryData);
 	}
 }

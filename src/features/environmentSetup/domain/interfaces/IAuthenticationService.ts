@@ -9,11 +9,11 @@ import { ICancellationToken } from './ICancellationToken';
 export interface IAuthenticationService {
 	/**
 	 * Get access token for environment
-	 * @param environment Environment configuration
-	 * @param clientSecret Optional client secret (for Service Principal)
-	 * @param password Optional password (for Username/Password)
-	 * @param customScope Optional custom scope (defaults to Dataverse scope)
-	 * @param cancellationToken Optional cancellation token to abort authentication
+	 * @param environment - Environment configuration
+	 * @param clientSecret - Optional client secret (for Service Principal)
+	 * @param password - Optional password (for Username/Password)
+	 * @param customScope - Optional custom scope. Defaults to Dataverse scope if not provided.
+	 * @param cancellationToken - Optional cancellation token to abort authentication
 	 */
 	getAccessTokenForEnvironment(
 		environment: Environment,

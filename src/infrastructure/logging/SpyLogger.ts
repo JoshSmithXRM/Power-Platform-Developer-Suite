@@ -22,7 +22,7 @@ export class SpyLogger implements ILogger {
 		this.warnMessages.push(message);
 	}
 
-	public error(message: string, _error: unknown | undefined): void {
+	public error(message: string, _error?: unknown): void {
 		this.errorMessages.push(message);
 	}
 

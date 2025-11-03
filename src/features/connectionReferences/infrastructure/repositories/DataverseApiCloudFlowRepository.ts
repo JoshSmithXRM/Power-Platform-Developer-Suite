@@ -8,17 +8,32 @@ import { ICloudFlowRepository } from '../../domain/interfaces/ICloudFlowReposito
 import { CloudFlow } from '../../domain/entities/CloudFlow';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
+/**
+ * OData response wrapper from Dataverse API workflows query.
+ */
 interface DataverseWorkflowsResponse {
 	value: DataverseWorkflowDto[];
 }
 
+/**
+ * DTO representing a workflow entity (cloud flow) from Dataverse Web API.
+ * Maps to the workflows entity schema in Dataverse.
+ * Filtered by category eq 5 to retrieve only cloud flows.
+ */
 interface DataverseWorkflowDto {
+	/** workflowid field - Primary key */
 	workflowid: string;
+	/** name field - Flow display name */
 	name: string;
+	/** modifiedon field - Last modification timestamp */
 	modifiedon: string;
+	/** ismanaged field - Whether flow is in managed solution */
 	ismanaged: boolean;
-	clientdata?: string; // Large JSON field - only included when explicitly selected
+	/** clientdata field - Flow definition JSON (only included when explicitly selected) */
+	clientdata?: string;
+	/** _createdby_value field - Creator user GUID */
 	_createdby_value: string;
+	/** createdby expanded navigation - Creator user entity */
 	createdby?: {
 		fullname: string;
 	};
@@ -41,8 +56,8 @@ export class DataverseApiCloudFlowRepository implements ICloudFlowRepository {
 	 */
 	async findAll(
 		environmentId: string,
-		options: QueryOptions | undefined,
-		cancellationToken: ICancellationToken | undefined
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
 	): Promise<CloudFlow[]> {
 		const defaultOptions: QueryOptions = {
 			select: ['workflowid', 'name', 'modifiedon', 'ismanaged', '_createdby_value'],

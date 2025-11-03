@@ -43,7 +43,7 @@ export class EnvironmentSetupPanel {
 		private readonly validateUniqueNameUseCase: ValidateUniqueNameUseCase,
 		private readonly checkConcurrentEditUseCase: CheckConcurrentEditUseCase,
 		private readonly logger: ILogger,
-		environmentId: string | undefined
+		environmentId?: string
 	) {
 		this.panel = panel;
 		if (environmentId !== undefined) {
@@ -136,7 +136,7 @@ export class EnvironmentSetupPanel {
 		validateUniqueNameUseCase: ValidateUniqueNameUseCase,
 		checkConcurrentEditUseCase: CheckConcurrentEditUseCase,
 		logger: ILogger,
-		environmentId: string | undefined
+		environmentId?: string
 	): EnvironmentSetupPanel {
 		const column = vscode.ViewColumn.One;
 

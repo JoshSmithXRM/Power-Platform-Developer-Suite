@@ -11,7 +11,7 @@ export class FlowConnectionRelationshipViewModelMapper {
 	 * @param relationship - FlowConnectionRelationship value object to convert
 	 * @returns FlowConnectionRelationshipViewModel presentation object
 	 */
-	static toViewModel(relationship: FlowConnectionRelationship): FlowConnectionRelationshipViewModel {
+	toViewModel(relationship: FlowConnectionRelationship): FlowConnectionRelationshipViewModel {
 		return {
 			flowId: relationship.flowId ?? '',
 			flowName: relationship.flowName,
@@ -33,23 +33,16 @@ export class FlowConnectionRelationshipViewModelMapper {
 	/**
 	 * Maps an array of FlowConnectionRelationship value objects to ViewModels.
 	 * @param relationships - Array of FlowConnectionRelationship value objects
-	 * @param shouldSort - If true, sorts relationships using domain sorting rules before mapping
 	 * @returns Array of view models
 	 */
-	static toViewModels(
-		relationships: FlowConnectionRelationship[],
-		shouldSort = false
-	): FlowConnectionRelationshipViewModel[] {
-		const relationshipsToMap = shouldSort
-			? FlowConnectionRelationship.sort(relationships)
-			: relationships;
-		return relationshipsToMap.map((rel) => this.toViewModel(rel));
+	toViewModels(relationships: FlowConnectionRelationship[]): FlowConnectionRelationshipViewModel[] {
+		return relationships.map((rel) => this.toViewModel(rel));
 	}
 
 	/**
 	 * Gets user-friendly label for relationship type.
 	 */
-	private static getRelationshipTypeLabel(type: string): string {
+	private getRelationshipTypeLabel(type: string): string {
 		switch (type) {
 			case 'flow-to-cr':
 				return 'Valid';

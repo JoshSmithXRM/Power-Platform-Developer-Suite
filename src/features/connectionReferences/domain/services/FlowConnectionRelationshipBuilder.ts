@@ -15,7 +15,7 @@ export class FlowConnectionRelationshipBuilder {
 		flows: CloudFlow[],
 		connectionRefs: ConnectionReference[]
 	): FlowConnectionRelationship[] {
-		const crByLogicalName = this.createConnectionReferenceMap(connectionRefs);
+		const crByLogicalName = this.createCaseInsensitiveConnectionReferenceMap(connectionRefs);
 		const usedCrLogicalNames = new Set<string>();
 
 		const flowRelationships = this.buildFlowRelationships(
@@ -33,12 +33,9 @@ export class FlowConnectionRelationshipBuilder {
 	}
 
 	/**
-	 * Creates a case-insensitive map of connection references by logical name.
-	 *
-	 * Uses lowercase keys to align with Power Platform's case-insensitive behavior,
-	 * preventing mismatches like "cr_SharePoint" vs "cr_sharepoint".
+	 * Power Platform treats connection reference logical names as case-insensitive.
 	 */
-	private createConnectionReferenceMap(
+	private createCaseInsensitiveConnectionReferenceMap(
 		connectionRefs: ConnectionReference[]
 	): Map<string, ConnectionReference> {
 		return new Map(

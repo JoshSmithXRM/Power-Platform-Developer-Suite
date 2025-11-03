@@ -43,15 +43,15 @@ export class WhoAmIService implements IWhoAmIService {
 
 	/**
 	 * Tests connection to Dataverse environment using WhoAmI API.
-	 * @param environment Environment to test
-	 * @param clientSecret Optional client secret (for service principal auth)
-	 * @param password Optional password (for username/password auth)
+	 * @param environment - Environment to test
+	 * @param clientSecret - Optional client secret (for service principal auth)
+	 * @param password - Optional password (for username/password auth)
 	 * @returns WhoAmI response containing user and organization identifiers
 	 */
 	public async testConnection(
 		environment: Environment,
-		clientSecret: string | undefined,
-		password: string | undefined
+		clientSecret?: string,
+		password?: string
 	): Promise<WhoAmIResponse> {
 		const url = `${environment.getDataverseUrl().getApiBaseUrl()}/WhoAmI`;
 		this.logger.debug(`WhoAmIService: Testing connection to ${url}`, {

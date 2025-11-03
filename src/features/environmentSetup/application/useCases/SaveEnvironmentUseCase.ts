@@ -46,10 +46,7 @@ export class SaveEnvironmentUseCase {
 			if (!environmentResult.success) {
 				return environmentResult;
 			}
-			// Type narrowing: success === true means environment is defined
-			if (!environmentResult.environment) {
-				throw new Error('Unexpected: environment is undefined after successful creation');
-			}
+			// Discriminated union: success === true guarantees environment is defined
 			const environment = environmentResult.environment;
 
 			const validationResult = await this.validateEnvironment(environment, request);
@@ -75,7 +72,7 @@ export class SaveEnvironmentUseCase {
 		}
 	}
 
-	private async loadPreviousEnvironment(existingEnvironmentId: string | undefined): Promise<Environment | null> {
+	private async loadPreviousEnvironment(existingEnvironmentId?: string): Promise<Environment | null> {
 		if (!existingEnvironmentId) {
 			return null;
 		}
@@ -86,7 +83,7 @@ export class SaveEnvironmentUseCase {
 		return environment;
 	}
 
-	private createEnvironmentId(existingEnvironmentId: string | undefined): EnvironmentId {
+	private createEnvironmentId(existingEnvironmentId?: string): EnvironmentId {
 		return existingEnvironmentId
 			? new EnvironmentId(existingEnvironmentId)
 			: EnvironmentId.generate();

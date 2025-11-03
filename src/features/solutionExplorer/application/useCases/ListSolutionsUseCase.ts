@@ -23,7 +23,7 @@ export class ListSolutionsUseCase {
    */
   async execute(
     environmentId: string,
-    cancellationToken: ICancellationToken | undefined
+    cancellationToken?: ICancellationToken
   ): Promise<Solution[]> {
     this.logger.info('ListSolutionsUseCase started', { environmentId });
 

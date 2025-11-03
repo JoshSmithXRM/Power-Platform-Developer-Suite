@@ -32,7 +32,7 @@ export class CloudFlow {
 		}
 	}
 
-	hasClientData(): boolean {
+	hasClientData(): this is CloudFlow & { clientData: string } {
 		return this.clientData !== null && this.clientData.length > 0;
 	}
 
@@ -46,10 +46,6 @@ export class CloudFlow {
 	 */
 	extractConnectionReferenceNames(): string[] {
 		if (!this.hasClientData()) {
-			return [];
-		}
-
-		if (this.clientData === null) {
 			return [];
 		}
 

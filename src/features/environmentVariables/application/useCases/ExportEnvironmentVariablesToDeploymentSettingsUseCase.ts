@@ -1,10 +1,9 @@
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IDeploymentSettingsRepository } from '../../../../shared/domain/interfaces/IDeploymentSettingsRepository';
-import type { DeploymentSettings } from '../../../../shared/domain/entities/DeploymentSettings';
 import type { EnvironmentVariable } from '../../domain/entities/EnvironmentVariable';
 import type { SyncResult } from '../../../../shared/domain/entities/DeploymentSettings';
+import { DeploymentSettings } from '../../../../shared/domain/entities/DeploymentSettings';
 import { EnvironmentVariableToDeploymentSettingsMapper } from '../mappers/EnvironmentVariableToDeploymentSettingsMapper';
-import { DeploymentSettingsFactory } from '../../../../shared/domain/services/DeploymentSettingsFactory';
 
 /**
  * Result of exporting environment variables to deployment settings.
@@ -23,10 +22,9 @@ export interface ExportResult extends SyncResult {
  * 4. Writing updated deployment settings to file
  */
 export class ExportEnvironmentVariablesToDeploymentSettingsUseCase {
-	private readonly deploymentSettingsFactory = new DeploymentSettingsFactory();
-
 	constructor(
 		private readonly deploymentSettingsRepository: IDeploymentSettingsRepository,
+		private readonly mapper: EnvironmentVariableToDeploymentSettingsMapper,
 		private readonly logger: ILogger
 	) {}
 
@@ -39,7 +37,7 @@ export class ExportEnvironmentVariablesToDeploymentSettingsUseCase {
 	 */
 	async execute(
 		environmentVariables: EnvironmentVariable[],
-		suggestedFileName: string | undefined
+		suggestedFileName?: string
 	): Promise<ExportResult | null> {
 		this.logger.info('Exporting environment variables to deployment settings', {
 			count: environmentVariables.length,
@@ -62,14 +60,14 @@ export class ExportEnvironmentVariablesToDeploymentSettingsUseCase {
 			existingSettings = await this.deploymentSettingsRepository.read(filePath);
 		} else {
 			this.logger.debug('Creating new deployment settings file', { filePath });
-			existingSettings = this.deploymentSettingsFactory.createEmpty();
+			existingSettings = new DeploymentSettings([], []);
 		}
 
 		// Export all environment variables as-is, even if they lack values.
 		// This is intentional: the export faithfully represents solution state.
 		// Data quality issues should be addressed in the solution itself, not hidden by filtering.
 		// The export is for pipeline deployment files - if it's in the solution, it goes in the export.
-		const entries = EnvironmentVariableToDeploymentSettingsMapper.toDeploymentSettingsEntries(environmentVariables);
+		const entries = this.mapper.toDeploymentSettingsEntries(environmentVariables);
 
 		// Sync environment variables section
 		const { settings: updatedSettings, syncResult } = existingSettings.syncEnvironmentVariables(entries);

@@ -25,6 +25,20 @@ export interface SyncResult {
 }
 
 /**
+ * Map of entry keys to their preserved values.
+ * Used during sync to preserve existing values when entries exist in both old and new data.
+ */
+type PreservedValueMap = Map<string, unknown>;
+
+/**
+ * Statistics tracking sync operation progress.
+ */
+interface SyncStatistics {
+	added: number;
+	preserved: number;
+}
+
+/**
  * DeploymentSettings entity representing a Power Platform deployment settings file.
  *
  * Responsibilities:
@@ -137,39 +151,43 @@ export class DeploymentSettings {
 		createPreservedEntry: (newEntry: T, preservedValue: unknown) => T,
 		comparator: (a: T, b: T) => number
 	): { synced: T[]; syncResult: SyncResult } {
-		const existingMap = new Map(existing.map(entry => [keySelector(entry), valueExtractor(entry)]));
+		const existingMap: PreservedValueMap = new Map(
+			existing.map(entry => [keySelector(entry), valueExtractor(entry)])
+		);
 
-		let added = 0;
-		let preserved = 0;
+		const stats: SyncStatistics = {
+			added: 0,
+			preserved: 0
+		};
 
 		const synced: T[] = [];
 
 		// Add or preserve existing entries
 		for (const entry of newEntries) {
-			const key = keySelector(entry);
+			const key: string = keySelector(entry);
 			if (existingMap.has(key)) {
 				// Preserve existing value (don't overwrite with environment value)
-				const existingValue = existingMap.get(key);
+				const existingValue: unknown = existingMap.get(key);
 				if (existingValue !== undefined) {
 					synced.push(createPreservedEntry(entry, existingValue));
-					preserved++;
+					stats.preserved++;
 				}
 			} else {
 				// Add new entry with environment value
 				synced.push(entry);
-				added++;
+				stats.added++;
 			}
 		}
 
 		// Calculate removed count
-		const removed = existing.length - preserved;
+		const removed: number = existing.length - stats.preserved;
 
 		// Sort alphabetically
 		synced.sort(comparator);
 
 		return {
 			synced,
-			syncResult: { added, removed, preserved }
+			syncResult: { added: stats.added, removed, preserved: stats.preserved }
 		};
 	}
 }

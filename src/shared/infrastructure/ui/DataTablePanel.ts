@@ -11,9 +11,10 @@ import {
 	type WebviewMessage,
 	type WebviewLogMessage
 } from '../../../infrastructure/ui/utils/TypeGuards';
-import { Solution } from '../../../features/solutionExplorer/domain/entities/Solution';
+import { DEFAULT_SOLUTION_ID } from '../../domain/constants/SolutionConstants';
 
 import { renderDataTable } from './views/dataTable';
+import { renderSyncDeploymentSettingsButton } from './views/syncDeploymentSettingsButton';
 import type { IPanelStateRepository, PanelState } from './IPanelStateRepository';
 
 export interface EnvironmentOption {
@@ -67,7 +68,7 @@ export interface SolutionOption {
 export abstract class DataTablePanel {
 	protected cancellationTokenSource: vscode.CancellationTokenSource | null = null;
 	protected currentEnvironmentId: string | null = null;
-	protected currentSolutionId: string = Solution.DEFAULT_SOLUTION_ID;
+	protected currentSolutionId: string = DEFAULT_SOLUTION_ID;
 	protected environments: EnvironmentOption[] = [];
 	protected solutionFilterOptions: SolutionOption[] = [];
 	protected disposables: vscode.Disposable[] = [];
@@ -127,12 +128,11 @@ export abstract class DataTablePanel {
 
 	/**
 	 * Loads persisted solution filter selection for the current environment.
-	 * Returns Default Solution GUID if no persisted state found (migration from legacy null values).
-	 * @returns The persisted solution ID (never null)
+	 * @returns The persisted solution ID (never null, repository handles migration)
 	 */
 	private async loadPersistedSolutionFilter(): Promise<string> {
 		if (!this.panelStateRepository || !this.currentEnvironmentId) {
-			return Solution.DEFAULT_SOLUTION_ID;
+			return DEFAULT_SOLUTION_ID;
 		}
 
 		try {
@@ -141,11 +141,10 @@ export abstract class DataTablePanel {
 				environmentId: this.currentEnvironmentId
 			});
 
-			// Migration: Legacy null values become Default Solution
-			return state?.selectedSolutionId ?? Solution.DEFAULT_SOLUTION_ID;
+			return state?.selectedSolutionId ?? DEFAULT_SOLUTION_ID;
 		} catch (error) {
 			this.logger.warn('Failed to load persisted solution filter', error);
-			return Solution.DEFAULT_SOLUTION_ID;
+			return DEFAULT_SOLUTION_ID;
 		}
 	}
 
@@ -173,20 +172,49 @@ export abstract class DataTablePanel {
 	}
 
 	/**
-	 * Loads solutions and applies persisted solution filter for the current environment.
+	 * Loads solution options from the data source and updates internal state.
+	 * @returns Promise that resolves when solutions are loaded
+	 */
+	private async loadSolutionOptions(): Promise<void> {
+		this.solutionFilterOptions = await this.loadSolutions();
+	}
+
+	/**
+	 * Applies the persisted solution filter for the current environment.
+	 * @returns Promise that resolves when filter is applied
+	 */
+	private async applySolutionFilter(): Promise<void> {
+		this.currentSolutionId = await this.loadPersistedSolutionFilter();
+	}
+
+	/**
+	 * Sends solution filter data to the webview.
+	 * Sends both the available solution options and the currently selected solution ID.
+	 */
+	private sendSolutionFilterToWebview(): void {
+		this.panel.webview.postMessage({
+			command: 'solutionFilterOptionsData',
+			data: this.solutionFilterOptions
+		});
+		this.panel.webview.postMessage({
+			command: 'setCurrentSolution',
+			solutionId: this.currentSolutionId
+		});
+	}
+
+	/**
+	 * Orchestrates solution filter initialization: loads, applies, and displays solution filter.
 	 * Only executes if solution filtering is enabled in config.
 	 */
-	private async loadAndApplySolutionFilter(): Promise<void> {
+	private async initializeSolutionFilter(): Promise<void> {
 		const config = this.getConfig();
 		if (!config.enableSolutionFilter) {
 			return;
 		}
 
-		this.solutionFilterOptions = await this.loadSolutions();
-		this.panel.webview.postMessage({ command: 'solutionFilterOptionsData', data: this.solutionFilterOptions });
-
-		this.currentSolutionId = await this.loadPersistedSolutionFilter();
-		this.panel.webview.postMessage({ command: 'setCurrentSolution', solutionId: this.currentSolutionId });
+		await this.loadSolutionOptions();
+		await this.applySolutionFilter();
+		this.sendSolutionFilterToWebview();
 	}
 
 	/**
@@ -232,27 +260,58 @@ export abstract class DataTablePanel {
 	/**
 	 * Returns custom JavaScript for panel-specific behavior.
 	 *
-	 * Base implementation handles common Sync Deployment Settings button.
-	 * Override and call super.getCustomJavaScript() to add panel-specific handlers.
+	 * Template Method Pattern: Combines common JavaScript (shared across all panels)
+	 * with panel-specific JavaScript. This method orchestrates the composition.
+	 *
+	 * Do NOT override this method. Instead, override getPanelSpecificJavaScript()
+	 * to add panel-specific event handlers.
 	 *
 	 * Runs after table rendering in webview - safe to query DOM elements.
 	 *
-	 * @returns JavaScript code snippet to execute after rendering
+	 * @returns JavaScript code snippet to execute after rendering (common + panel-specific)
 	 */
 	protected getCustomJavaScript(): string {
 		return `
-			// Add Sync Deployment Settings button to toolbar
-			const toolbarLeft = document.querySelector('.toolbar-left');
-			if (toolbarLeft && !document.getElementById('syncDeploymentSettingsBtn')) {
-				const syncBtn = document.createElement('button');
-				syncBtn.id = 'syncDeploymentSettingsBtn';
-				syncBtn.textContent = 'Sync Deployment Settings';
-				syncBtn.addEventListener('click', () => {
-					vscode.postMessage({ command: 'syncDeploymentSettings' });
-				});
-				toolbarLeft.appendChild(syncBtn);
-			}
+			${this.getCommonJavaScript()}
+			${this.getPanelSpecificJavaScript()}
 		`;
+	}
+
+	/**
+	 * Returns common JavaScript shared by all data table panels.
+	 * Handles sync deployment settings button and shared utilities.
+	 *
+	 * Do NOT override this method unless you need to change base functionality.
+	 *
+	 * @returns JavaScript code for common panel behavior
+	 */
+	protected getCommonJavaScript(): string {
+		return renderSyncDeploymentSettingsButton();
+	}
+
+	/**
+	 * Override this method to add panel-specific event handlers and behavior.
+	 *
+	 * Do NOT call super.getPanelSpecificJavaScript() - base implementation returns empty string.
+	 * Just return your panel's JavaScript code directly.
+	 *
+	 * Example:
+	 * ```typescript
+	 * protected getPanelSpecificJavaScript(): string {
+	 *     return `
+	 *         document.querySelectorAll('.my-link').forEach(link => {
+	 *             link.addEventListener('click', (e) => {
+	 *                 vscode.postMessage({ command: 'myCommand', data: {} });
+	 *             });
+	 *         });
+	 *     `;
+	 * }
+	 * ```
+	 *
+	 * @returns JavaScript code for panel-specific behavior, or empty string if none needed
+	 */
+	protected getPanelSpecificJavaScript(): string {
+		return '';
 	}
 
 	private async initialize(): Promise<void> {
@@ -280,7 +339,7 @@ export abstract class DataTablePanel {
 				enabled: hasPowerPlatformEnvId
 			});
 
-			await this.loadAndApplySolutionFilter();
+			await this.initializeSolutionFilter();
 
 			await this.updateTabTitle();
 			await this.loadData();
@@ -323,7 +382,7 @@ export abstract class DataTablePanel {
 			enabled: hasPowerPlatformEnvId
 		});
 
-		await this.loadAndApplySolutionFilter();
+		await this.initializeSolutionFilter();
 
 		await this.updateTabTitle();
 		await this.loadData();

@@ -145,7 +145,7 @@ export class FileSystemDeploymentSettingsRepository implements IDeploymentSettin
 	/**
 	 * Prompts user to select or create a deployment settings file.
 	 */
-	async promptForFilePath(suggestedName: string | undefined, defaultUri: string | undefined): Promise<string | undefined> {
+	async promptForFilePath(suggestedName?: string, defaultUri?: string): Promise<string | undefined> {
 		this.logger.debug('Prompting for deployment settings file path', { suggestedName, defaultUri });
 
 		const options: vscode.SaveDialogOptions = {

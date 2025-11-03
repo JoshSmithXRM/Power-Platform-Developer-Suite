@@ -14,7 +14,7 @@ export class ConnectionReferenceToDeploymentSettingsMapper {
 	 * @param connectionReference - Domain entity to map
 	 * @returns Deployment settings entry with LogicalName, ConnectionId, and ConnectorId
 	 */
-	static toDeploymentSettingsEntry(connectionReference: ConnectionReference): ConnectionReferenceEntry {
+	toDeploymentSettingsEntry(connectionReference: ConnectionReference): ConnectionReferenceEntry {
 		return {
 			LogicalName: connectionReference.connectionReferenceLogicalName,
 			ConnectionId: connectionReference.connectionId ?? '',
@@ -28,7 +28,7 @@ export class ConnectionReferenceToDeploymentSettingsMapper {
 	 * @param connectionReferences - Array of domain entities to map
 	 * @returns Array of deployment settings entries
 	 */
-	static toDeploymentSettingsEntries(connectionReferences: ConnectionReference[]): ConnectionReferenceEntry[] {
+	toDeploymentSettingsEntries(connectionReferences: ConnectionReference[]): ConnectionReferenceEntry[] {
 		return connectionReferences.map(cr => this.toDeploymentSettingsEntry(cr));
 	}
 }

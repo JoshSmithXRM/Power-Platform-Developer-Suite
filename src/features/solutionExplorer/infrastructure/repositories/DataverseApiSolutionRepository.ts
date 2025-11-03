@@ -8,23 +8,43 @@ import { ISolutionRepository } from '../../domain/interfaces/ISolutionRepository
 import { Solution } from '../../domain/entities/Solution';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
+/**
+ * OData response wrapper from Dataverse API solutions query.
+ */
 interface DataverseSolutionsResponse {
   value: DataverseSolutionDto[];
 }
 
+/**
+ * DTO representing a solution entity from Dataverse Web API.
+ * Maps to the solutions entity schema in Dataverse.
+ */
 interface DataverseSolutionDto {
+  /** solutionid field - Primary key */
   solutionid: string;
+  /** uniquename field - Logical name of the solution */
   uniquename: string;
+  /** friendlyname field - Display name */
   friendlyname: string;
+  /** version field - Solution version (e.g., "1.0.0.0") */
   version: string;
+  /** ismanaged field - Whether solution is managed */
   ismanaged: boolean;
+  /** _publisherid_value field - Publisher GUID */
   _publisherid_value: string;
+  /** installedon field - Installation timestamp */
   installedon: string | null;
+  /** description field - Solution description */
   description: string | null;
+  /** modifiedon field - Last modification timestamp */
   modifiedon: string;
+  /** isvisible field - Whether solution appears in UI */
   isvisible: boolean;
+  /** isapimanaged field - Whether solution is API-managed */
   isapimanaged: boolean;
+  /** solutiontype field - Solution type identifier */
   solutiontype: string | null;
+  /** publisherid expanded navigation - Publisher entity */
   publisherid?: {
     friendlyname: string;
   };
@@ -41,8 +61,8 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
 
   async findAll(
     environmentId: string,
-    options: QueryOptions | undefined,
-    cancellationToken: ICancellationToken | undefined
+    options?: QueryOptions,
+    cancellationToken?: ICancellationToken
   ): Promise<Solution[]> {
     const defaultOptions: QueryOptions = {
       expand: 'publisherid($select=friendlyname)',
@@ -95,7 +115,7 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
    */
   async findAllForDropdown(
     environmentId: string,
-    cancellationToken: ICancellationToken | undefined
+    cancellationToken?: ICancellationToken
   ): Promise<Array<{ id: string; name: string; uniqueName: string }>> {
     const queryString = ODataQueryBuilder.build({
       select: ['solutionid', 'friendlyname', 'uniquename'],

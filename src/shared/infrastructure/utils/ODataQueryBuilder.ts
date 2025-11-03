@@ -9,7 +9,7 @@ export class ODataQueryBuilder {
 	 * @param options Query options
 	 * @returns OData query string
 	 */
-	static build(options: QueryOptions | undefined): string {
+	static build(options?: QueryOptions): string {
 		if (!options) {
 			return '';
 		}

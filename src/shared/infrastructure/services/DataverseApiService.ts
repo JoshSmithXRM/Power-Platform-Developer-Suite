@@ -21,7 +21,7 @@ export class DataverseApiService implements IDataverseApiService {
   async get<T = unknown>(
     environmentId: string,
     endpoint: string,
-    cancellationToken: ICancellationToken | undefined
+    cancellationToken?: ICancellationToken
   ): Promise<T> {
     return this.request<T>('GET', environmentId, endpoint, undefined, cancellationToken);
   }
@@ -33,7 +33,7 @@ export class DataverseApiService implements IDataverseApiService {
     environmentId: string,
     endpoint: string,
     body: unknown,
-    cancellationToken: ICancellationToken | undefined
+    cancellationToken?: ICancellationToken
   ): Promise<T> {
     return this.request<T>('POST', environmentId, endpoint, body, cancellationToken);
   }
@@ -45,7 +45,7 @@ export class DataverseApiService implements IDataverseApiService {
     environmentId: string,
     endpoint: string,
     body: unknown,
-    cancellationToken: ICancellationToken | undefined
+    cancellationToken?: ICancellationToken
   ): Promise<T> {
     return this.request<T>('PATCH', environmentId, endpoint, body, cancellationToken);
   }
@@ -56,7 +56,7 @@ export class DataverseApiService implements IDataverseApiService {
   async delete(
     environmentId: string,
     endpoint: string,
-    cancellationToken: ICancellationToken | undefined
+    cancellationToken?: ICancellationToken
   ): Promise<void> {
     await this.request<void>('DELETE', environmentId, endpoint, undefined, cancellationToken);
   }
@@ -72,7 +72,7 @@ export class DataverseApiService implements IDataverseApiService {
     environmentId: string,
     endpoint: string,
     body: unknown | undefined,
-    cancellationToken: ICancellationToken | undefined
+    cancellationToken?: ICancellationToken
   ): Promise<T> {
     if (cancellationToken?.isCancellationRequested) {
       throw new OperationCancelledException();

@@ -25,7 +25,6 @@ export enum ImportJobStatus {
  * - Validate progress range (0-100)
  * - Determine completion status
  * - Calculate duration
- * - Provide user-friendly status labels
  */
 export class ImportJob {
 	/**
@@ -85,29 +84,6 @@ export class ImportJob {
 	isFailed(): boolean {
 		return this.statusCode === ImportJobStatus.Failed ||
 		       this.statusCode === ImportJobStatus.Cancelled;
-	}
-
-	/**
-	 * Gets a user-friendly status label for display.
-	 * @returns Human-readable status string
-	 */
-	getStatusLabel(): string {
-		switch (this.statusCode) {
-			case ImportJobStatus.InProgress:
-				return 'In Progress';
-			case ImportJobStatus.Completed:
-				return 'Completed';
-			case ImportJobStatus.Failed:
-				return 'Failed';
-			case ImportJobStatus.CompletedWithErrors:
-				return 'Completed with Errors';
-			case ImportJobStatus.Cancelled:
-				return 'Cancelled';
-			case ImportJobStatus.Queued:
-				return 'Queued';
-			default:
-				return 'Unknown';
-		}
 	}
 
 	/**

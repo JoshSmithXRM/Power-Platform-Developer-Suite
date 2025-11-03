@@ -21,17 +21,17 @@ export class PowerPlatformApiService implements IPowerPlatformApiService {
 	/**
 	 * Discovers Power Platform environment ID from Dataverse URL.
 	 * Calls BAP API to list environments and matches by organization name.
-	 * @param environment Environment with Dataverse URL
-	 * @param clientSecret Optional client secret for authentication
-	 * @param password Optional password for authentication
-	 * @param cancellationToken Optional cancellation token
+	 * @param environment - Environment with Dataverse URL
+	 * @param clientSecret - Optional client secret for authentication
+	 * @param password - Optional password for authentication
+	 * @param cancellationToken - Optional cancellation token
 	 * @returns Power Platform environment ID (GUID)
 	 */
 	public async discoverEnvironmentId(
 		environment: Environment,
-		clientSecret: string | undefined,
-		password: string | undefined,
-		cancellationToken: ICancellationToken | undefined
+		clientSecret?: string,
+		password?: string,
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
 		const orgName = environment.getDataverseUrl().getOrganizationName();
 		this.logger.debug('PowerPlatformApiService: Discovering environment ID', {

@@ -11,12 +11,16 @@ import { ILogger } from '../../../../infrastructure/logging/ILogger';
  * Removes all clearable entries while preserving protected system data
  */
 export class ClearAllStorageUseCase {
+	private readonly mapper: ClearAllResultMapper;
+
 	public constructor(
 		private readonly storageClearingService: StorageClearingService,
 		private readonly storageInspectionService: StorageInspectionService,
 		private readonly eventPublisher: IDomainEventPublisher,
 		private readonly logger: ILogger
-	) {}
+	) {
+		this.mapper = new ClearAllResultMapper();
+	}
 
 	/**
 	 * Clears all non-protected storage entries
@@ -40,7 +44,7 @@ export class ClearAllStorageUseCase {
 			);
 
 			// Orchestrate: map to view model
-			return ClearAllResultMapper.toViewModel(result);
+			return this.mapper.toViewModel(result);
 		} catch (error) {
 			this.logger.error('ClearAllStorageUseCase: Failed to clear storage', error);
 			throw error;

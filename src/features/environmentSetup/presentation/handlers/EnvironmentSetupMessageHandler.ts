@@ -16,6 +16,23 @@ import {
 } from '../../../../infrastructure/ui/utils/TypeGuards';
 import { AuthenticationMethodType } from '../../application/types/AuthenticationMethodType';
 import { VsCodeCancellationTokenAdapter } from '../../infrastructure/adapters/VsCodeCancellationTokenAdapter';
+import type { SaveEnvironmentRequest } from '../../application/useCases/SaveEnvironmentUseCase';
+import type { TestConnectionRequest } from '../../application/useCases/TestConnectionUseCase';
+import type { DiscoverEnvironmentIdRequest } from '../../application/useCases/DiscoverEnvironmentIdUseCase';
+import type { ValidateUniqueNameRequest } from '../../application/useCases/ValidateUniqueNameUseCase';
+
+interface BaseEnvironmentData {
+	name: string;
+	dataverseUrl: string;
+	tenantId: string;
+	authenticationMethod: AuthenticationMethodType;
+	publicClientId: string;
+	powerPlatformEnvironmentId?: string;
+	clientId?: string;
+	clientSecret?: string;
+	username?: string;
+	password?: string;
+}
 
 /**
  * Handles all webview messages for EnvironmentSetupPanel
@@ -38,6 +55,118 @@ export class EnvironmentSetupMessageHandler {
 		private readonly disposePanel: () => void
 	) {}
 
+	/**
+	 * Builds a SaveEnvironmentRequest with conditional properties
+	 */
+	private buildSaveEnvironmentRequest(
+		data: BaseEnvironmentData,
+		currentEnvironmentId?: string,
+		preserveExistingCredentials?: boolean
+	): SaveEnvironmentRequest {
+		const request: SaveEnvironmentRequest = {
+			name: data.name,
+			dataverseUrl: data.dataverseUrl,
+			tenantId: data.tenantId,
+			authenticationMethod: data.authenticationMethod,
+			publicClientId: data.publicClientId
+		};
+
+		if (currentEnvironmentId !== undefined) {
+			request.existingEnvironmentId = currentEnvironmentId;
+		}
+		if (data.powerPlatformEnvironmentId !== undefined) {
+			request.powerPlatformEnvironmentId = data.powerPlatformEnvironmentId;
+		}
+		if (data.clientId !== undefined) {
+			request.clientId = data.clientId;
+		}
+		if (data.clientSecret !== undefined) {
+			request.clientSecret = data.clientSecret;
+		}
+		if (data.username !== undefined) {
+			request.username = data.username;
+		}
+		if (data.password !== undefined) {
+			request.password = data.password;
+		}
+		if (preserveExistingCredentials !== undefined) {
+			request.preserveExistingCredentials = preserveExistingCredentials;
+		}
+
+		return request;
+	}
+
+	/**
+	 * Builds a TestConnectionRequest with conditional properties
+	 */
+	private buildTestConnectionRequest(
+		data: BaseEnvironmentData,
+		currentEnvironmentId?: string
+	): TestConnectionRequest {
+		const request: TestConnectionRequest = {
+			name: data.name,
+			dataverseUrl: data.dataverseUrl,
+			tenantId: data.tenantId,
+			authenticationMethod: data.authenticationMethod,
+			publicClientId: data.publicClientId
+		};
+
+		if (currentEnvironmentId !== undefined) {
+			request.existingEnvironmentId = currentEnvironmentId;
+		}
+		if (data.powerPlatformEnvironmentId !== undefined) {
+			request.powerPlatformEnvironmentId = data.powerPlatformEnvironmentId;
+		}
+		if (data.clientId !== undefined) {
+			request.clientId = data.clientId;
+		}
+		if (data.clientSecret !== undefined) {
+			request.clientSecret = data.clientSecret;
+		}
+		if (data.username !== undefined) {
+			request.username = data.username;
+		}
+		if (data.password !== undefined) {
+			request.password = data.password;
+		}
+
+		return request;
+	}
+
+	/**
+	 * Builds a DiscoverEnvironmentIdRequest with conditional properties
+	 */
+	private buildDiscoverEnvironmentIdRequest(
+		data: BaseEnvironmentData,
+		currentEnvironmentId?: string
+	): DiscoverEnvironmentIdRequest {
+		const request: DiscoverEnvironmentIdRequest = {
+			name: data.name,
+			dataverseUrl: data.dataverseUrl,
+			tenantId: data.tenantId,
+			authenticationMethod: data.authenticationMethod,
+			publicClientId: data.publicClientId
+		};
+
+		if (currentEnvironmentId !== undefined) {
+			request.existingEnvironmentId = currentEnvironmentId;
+		}
+		if (data.clientId !== undefined) {
+			request.clientId = data.clientId;
+		}
+		if (data.clientSecret !== undefined) {
+			request.clientSecret = data.clientSecret;
+		}
+		if (data.username !== undefined) {
+			request.username = data.username;
+		}
+		if (data.password !== undefined) {
+			request.password = data.password;
+		}
+
+		return request;
+	}
+
 	public async handleLoadEnvironment(environmentId: string): Promise<void> {
 		this.logger.debug('Loading environment for editing', { environmentId });
 
@@ -59,33 +188,11 @@ export class EnvironmentSetupMessageHandler {
 			isEdit: !wasNew
 		});
 
-		const request: import('../../application/useCases/SaveEnvironmentUseCase').SaveEnvironmentRequest = {
-			name: data.name,
-			dataverseUrl: data.dataverseUrl,
-			tenantId: data.tenantId,
-			authenticationMethod: data.authenticationMethod,
-			publicClientId: data.publicClientId,
-			preserveExistingCredentials: true
-		};
-
-		if (currentEnvironmentId !== undefined) {
-			request.existingEnvironmentId = currentEnvironmentId;
-		}
-		if (data.powerPlatformEnvironmentId !== undefined) {
-			request.powerPlatformEnvironmentId = data.powerPlatformEnvironmentId;
-		}
-		if (data.clientId !== undefined) {
-			request.clientId = data.clientId;
-		}
-		if (data.clientSecret !== undefined) {
-			request.clientSecret = data.clientSecret;
-		}
-		if (data.username !== undefined) {
-			request.username = data.username;
-		}
-		if (data.password !== undefined) {
-			request.password = data.password;
-		}
+		const request = this.buildSaveEnvironmentRequest(
+			data,
+			currentEnvironmentId,
+			true
+		);
 
 		const result = await this.saveEnvironmentUseCase.execute(request);
 
@@ -150,32 +257,10 @@ export class EnvironmentSetupMessageHandler {
 			title: "Testing connection...",
 			cancellable: false
 		}, async () => {
-			const request: import('../../application/useCases/TestConnectionUseCase').TestConnectionRequest = {
-				name: data.name,
-				dataverseUrl: data.dataverseUrl,
-				tenantId: data.tenantId,
-				authenticationMethod: data.authenticationMethod,
-				publicClientId: data.publicClientId
-			};
-
-			if (currentEnvironmentId !== undefined) {
-				request.existingEnvironmentId = currentEnvironmentId;
-			}
-			if (data.powerPlatformEnvironmentId !== undefined) {
-				request.powerPlatformEnvironmentId = data.powerPlatformEnvironmentId;
-			}
-			if (data.clientId !== undefined) {
-				request.clientId = data.clientId;
-			}
-			if (data.clientSecret !== undefined) {
-				request.clientSecret = data.clientSecret;
-			}
-			if (data.username !== undefined) {
-				request.username = data.username;
-			}
-			if (data.password !== undefined) {
-				request.password = data.password;
-			}
+			const request = this.buildTestConnectionRequest(
+				data,
+				currentEnvironmentId
+			);
 
 			const result = await this.testConnectionUseCase.execute(request);
 
@@ -214,29 +299,10 @@ export class EnvironmentSetupMessageHandler {
 			}, async (_progress, token) => {
 				const cancellationToken = token ? new VsCodeCancellationTokenAdapter(token) : undefined;
 
-				const request: import('../../application/useCases/DiscoverEnvironmentIdUseCase').DiscoverEnvironmentIdRequest = {
-					name: data.name,
-					dataverseUrl: data.dataverseUrl,
-					tenantId: data.tenantId,
-					authenticationMethod: data.authenticationMethod,
-					publicClientId: data.publicClientId
-				};
-
-				if (currentEnvironmentId !== undefined) {
-					request.existingEnvironmentId = currentEnvironmentId;
-				}
-				if (data.clientId !== undefined) {
-					request.clientId = data.clientId;
-				}
-				if (data.clientSecret !== undefined) {
-					request.clientSecret = data.clientSecret;
-				}
-				if (data.username !== undefined) {
-					request.username = data.username;
-				}
-				if (data.password !== undefined) {
-					request.password = data.password;
-				}
+				const request = this.buildDiscoverEnvironmentIdRequest(
+					data,
+					currentEnvironmentId
+				);
 
 				const result = await this.discoverEnvironmentIdUseCase.execute(request, cancellationToken);
 
@@ -304,7 +370,7 @@ export class EnvironmentSetupMessageHandler {
 			}, async (_progress, token) => {
 				const cancellationToken = token ? new VsCodeCancellationTokenAdapter(token) : undefined;
 
-				const request: import('../../application/useCases/DiscoverEnvironmentIdUseCase').DiscoverEnvironmentIdRequest = {
+				const request: DiscoverEnvironmentIdRequest = {
 					name: data.name,
 					dataverseUrl: data.dataverseUrl,
 					tenantId: data.tenantId,
@@ -380,7 +446,7 @@ export class EnvironmentSetupMessageHandler {
 	public async handleValidateName(data: CheckUniqueNameMessage['data']): Promise<void> {
 		const currentEnvironmentId = this.getCurrentEnvironmentId();
 
-		const request: import('../../application/useCases/ValidateUniqueNameUseCase').ValidateUniqueNameRequest = {
+		const request: ValidateUniqueNameRequest = {
 			name: data.name
 		};
 

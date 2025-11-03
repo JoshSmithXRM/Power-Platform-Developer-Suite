@@ -1,5 +1,6 @@
 import { Environment } from '../../domain/entities/Environment';
 import { EnvironmentListViewModel } from '../viewModels/EnvironmentListViewModel';
+import { RelativeTimeFormatter } from '../../../../shared/infrastructure/ui/utils/RelativeTimeFormatter';
 
 /**
  * Maps Environment entity to list ViewModel
@@ -25,7 +26,7 @@ export class EnvironmentListViewModelMapper {
 			dataverseUrl: environment.getDataverseUrl().getValue(),
 			authenticationMethod: environment.getAuthenticationMethod().toString(),
 			isActive: environment.getIsActive(),
-			lastUsedDisplay: this.formatLastUsed(lastUsed),
+			lastUsedDisplay: RelativeTimeFormatter.formatRelativeTime(lastUsed),
 			statusBadge: environment.getIsActive() ? 'active' : 'inactive',
 			...(lastUsed !== undefined && { lastUsedTimestamp: lastUsed.getTime() })
 		};
@@ -59,29 +60,5 @@ export class EnvironmentListViewModelMapper {
 			// Neither has last used - sort alphabetically by name
 			return a.name.localeCompare(b.name);
 		});
-	}
-
-	private formatLastUsed(lastUsed: Date | undefined): string {
-		if (!lastUsed) {
-			return 'Never';
-		}
-
-		const now = Date.now();
-		const diffMs = now - lastUsed.getTime();
-		const diffMinutes = Math.floor(diffMs / 60000);
-		const diffHours = Math.floor(diffMinutes / 60);
-		const diffDays = Math.floor(diffHours / 24);
-
-		if (diffMinutes < 1) {
-			return 'Just now';
-		} else if (diffMinutes < 60) {
-			return `${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`;
-		} else if (diffHours < 24) {
-			return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-		} else if (diffDays < 7) {
-			return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-		} else {
-			return lastUsed.toLocaleDateString();
-		}
 	}
 }

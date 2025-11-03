@@ -8,6 +8,7 @@ import {
 } from '../../domain/interfaces/IEnvironmentVariableRepository';
 import { ISolutionComponentRepository } from '../../../../shared/domain/interfaces/ISolutionComponentRepository';
 import { EnvironmentVariable } from '../../domain/entities/EnvironmentVariable';
+import { EnvironmentVariableFactory } from '../../domain/services/EnvironmentVariableFactory';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
@@ -18,6 +19,7 @@ export class ListEnvironmentVariablesUseCase {
 	constructor(
 		private readonly envVarRepository: IEnvironmentVariableRepository,
 		private readonly solutionComponentRepository: ISolutionComponentRepository,
+		private readonly factory: EnvironmentVariableFactory,
 		private readonly logger: ILogger
 	) {}
 
@@ -30,8 +32,8 @@ export class ListEnvironmentVariablesUseCase {
 	 */
 	async execute(
 		environmentId: string,
-		solutionId: string | undefined,
-		cancellationToken: ICancellationToken | undefined
+		solutionId?: string,
+		cancellationToken?: ICancellationToken
 	): Promise<EnvironmentVariable[]> {
 		this.logger.info('ListEnvironmentVariablesUseCase started', { environmentId, solutionId });
 
@@ -52,7 +54,10 @@ export class ListEnvironmentVariablesUseCase {
 				cancellationToken
 			);
 
-			const environmentVariables = this.joinDefinitionsWithValues(filteredDefinitions, values);
+			const environmentVariables = this.factory.createFromDefinitionsAndValues(
+				filteredDefinitions,
+				values
+			);
 
 			this.logger.info('ListEnvironmentVariablesUseCase completed', {
 				count: environmentVariables.length
@@ -75,7 +80,7 @@ export class ListEnvironmentVariablesUseCase {
 
 	private async fetchDefinitionsAndValues(
 		environmentId: string,
-		cancellationToken: ICancellationToken | undefined
+		cancellationToken?: ICancellationToken
 	): Promise<[EnvironmentVariableDefinitionData[], EnvironmentVariableValueData[]]> {
 		return Promise.all([
 			this.envVarRepository.findAllDefinitions(environmentId, undefined, cancellationToken),
@@ -86,8 +91,8 @@ export class ListEnvironmentVariablesUseCase {
 	private async filterBySolution(
 		definitions: EnvironmentVariableDefinitionData[],
 		environmentId: string,
-		solutionId: string | undefined,
-		cancellationToken: ICancellationToken | undefined
+		solutionId?: string,
+		cancellationToken?: ICancellationToken
 	): Promise<EnvironmentVariableDefinitionData[]> {
 		if (!solutionId) {
 			return definitions;
@@ -115,31 +120,5 @@ export class ListEnvironmentVariablesUseCase {
 		});
 
 		return filtered;
-	}
-
-	private joinDefinitionsWithValues(
-		definitions: EnvironmentVariableDefinitionData[],
-		values: EnvironmentVariableValueData[]
-	): EnvironmentVariable[] {
-		const valuesByDefinitionId = new Map(
-			values.map((val) => [val._environmentvariabledefinitionid_value, val])
-		);
-
-		return definitions.map((def) => {
-			const value = valuesByDefinitionId.get(def.environmentvariabledefinitionid);
-
-			return new EnvironmentVariable(
-				def.environmentvariabledefinitionid,
-				def.schemaname,
-				def.displayname,
-				def.type,
-				def.defaultvalue,
-				value?.value ?? null,
-				def.ismanaged,
-				def.description ?? '',
-				new Date(def.modifiedon),
-				value?.environmentvariablevalueid ?? null
-			);
-		});
 	}
 }

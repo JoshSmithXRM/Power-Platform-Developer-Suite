@@ -72,15 +72,15 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 
 	/**
 	 * Saves an environment to storage with optional credentials.
-	 * @param environment Environment domain entity to save
-	 * @param clientSecret Optional client secret (stored in SecretStorage)
-	 * @param password Optional password (stored in SecretStorage)
-	 * @param preserveExistingCredentials If true, keeps existing credentials when new ones not provided
+	 * @param environment - Environment domain entity to save
+	 * @param clientSecret - Optional client secret (stored in SecretStorage)
+	 * @param password - Optional password (stored in SecretStorage)
+	 * @param preserveExistingCredentials - If true, keeps existing credentials when new ones not provided. Defaults to false.
 	 */
 	public async save(
 		environment: Environment,
-		clientSecret: string | undefined,
-		password: string | undefined,
+		clientSecret?: string,
+		password?: string,
 		preserveExistingCredentials: boolean = false
 	): Promise<void> {
 		const envId = environment.getId().getValue();
@@ -179,11 +179,11 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 	/**
 	 * Checks if name is unique across all environments.
 	 * Excludes specified environment ID when checking (allows keeping same name during updates).
-	 * @param name Name to check
-	 * @param excludeId Optional ID to exclude from check
+	 * @param name - Name to check
+	 * @param excludeId - Optional ID to exclude from check
 	 * @returns True if name is unique, false otherwise
 	 */
-	public async isNameUnique(name: string, excludeId: EnvironmentId | undefined): Promise<boolean> {
+	public async isNameUnique(name: string, excludeId?: EnvironmentId): Promise<boolean> {
 		const dtos = await this.loadDtos();
 		const existing = dtos.find(d =>
 			d.name === name &&

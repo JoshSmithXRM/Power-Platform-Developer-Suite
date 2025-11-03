@@ -43,21 +43,21 @@ export class EnvironmentValidationService {
 	 * Entity validates its own invariants; this service validates business rules
 	 * requiring external context.
 	 *
-	 * @param {Environment} environment - Environment to validate
-	 * @param {boolean} isNameUnique - Whether name is unique (provided by use case)
-	 * @param {boolean} hasExistingClientSecret - Whether client secret exists in storage
-	 * @param {boolean} hasExistingPassword - Whether password exists in storage
-	 * @param {string | undefined} clientSecret - New client secret being provided
-	 * @param {string | undefined} password - New password being provided
-	 * @returns {ValidationResult} Result with errors and warnings
+	 * @param environment - Environment to validate
+	 * @param isNameUnique - Whether name is unique (provided by use case)
+	 * @param hasExistingClientSecret - Whether client secret exists in storage
+	 * @param hasExistingPassword - Whether password exists in storage
+	 * @param clientSecret - New client secret being provided (optional)
+	 * @param password - New password being provided (optional)
+	 * @returns Result with errors and warnings
 	 */
 	public validateForSave(
 		environment: Environment,
 		isNameUnique: boolean,
 		hasExistingClientSecret: boolean,
 		hasExistingPassword: boolean,
-		clientSecret: string | undefined,
-		password: string | undefined
+		clientSecret?: string,
+		password?: string
 	): ValidationResult {
 		const errors: string[] = [];
 		const warnings: string[] = [];

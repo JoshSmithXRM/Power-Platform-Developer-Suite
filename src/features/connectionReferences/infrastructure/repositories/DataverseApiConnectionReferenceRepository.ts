@@ -8,17 +8,35 @@ import { IConnectionReferenceRepository } from '../../domain/interfaces/IConnect
 import { ConnectionReference } from '../../domain/entities/ConnectionReference';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
+/**
+ * OData response wrapper from Dataverse API connectionreferences query.
+ * Follows standard Dataverse Web API collection response format.
+ */
 interface DataverseConnectionReferencesResponse {
 	value: DataverseConnectionReferenceDto[];
 }
 
+/**
+ * DTO representing a connection reference entity from Dataverse Web API.
+ * Maps to the connectionreferences entity schema in Dataverse.
+ *
+ * @remarks
+ * External API contract - property names must match Dataverse API exactly.
+ */
 interface DataverseConnectionReferenceDto {
+	/** connectionreferenceid field - Primary key */
 	connectionreferenceid: string;
+	/** connectionreferencelogicalname field - Logical name used in flows/apps */
 	connectionreferencelogicalname: string;
+	/** connectionreferencedisplayname field - Display name */
 	connectionreferencedisplayname: string;
+	/** connectorid field - Connector type ID (null if not configured) */
 	connectorid: string | null;
+	/** connectionid field - Bound connection instance ID (null if unbound) */
 	connectionid: string | null;
+	/** ismanaged field - Whether in managed solution */
 	ismanaged: boolean;
+	/** modifiedon field - Last modification timestamp */
 	modifiedon: string;
 }
 
@@ -33,8 +51,8 @@ export class DataverseApiConnectionReferenceRepository implements IConnectionRef
 
 	async findAll(
 		environmentId: string,
-		options: QueryOptions | undefined,
-		cancellationToken: ICancellationToken | undefined
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
 	): Promise<ConnectionReference[]> {
 		const defaultOptions: QueryOptions = {
 			orderBy: 'connectionreferencelogicalname'

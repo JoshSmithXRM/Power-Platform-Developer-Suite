@@ -8,6 +8,7 @@ import { ExportConnectionReferencesToDeploymentSettingsUseCase } from '../../app
 import { FlowConnectionRelationshipViewModelMapper } from '../../application/mappers/FlowConnectionRelationshipViewModelMapper';
 import { type FlowConnectionRelationship } from '../../domain/valueObjects/FlowConnectionRelationship';
 import { type ConnectionReference } from '../../domain/entities/ConnectionReference';
+import { FlowConnectionRelationshipCollectionService } from '../../domain/services/FlowConnectionRelationshipCollectionService';
 import { enhanceViewModelsWithFlowLinks } from '../views/FlowLinkView';
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
@@ -30,6 +31,8 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 	private relationships: FlowConnectionRelationship[] = [];
 	private connectionReferences: ConnectionReference[] = [];
 
+	private readonly viewModelMapper: FlowConnectionRelationshipViewModelMapper;
+
 	private constructor(
 		panel: vscode.WebviewPanel,
 		extensionUri: vscode.Uri,
@@ -39,11 +42,13 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		private readonly exportToDeploymentSettingsUseCase: ExportConnectionReferencesToDeploymentSettingsUseCase,
 		private readonly solutionRepository: ISolutionRepository,
 		private readonly urlBuilder: IMakerUrlBuilder,
+		private readonly relationshipCollectionService: FlowConnectionRelationshipCollectionService,
 		logger: ILogger,
-		initialEnvironmentId: string | undefined,
-		panelStateRepository: IPanelStateRepository | undefined
+		initialEnvironmentId?: string,
+		panelStateRepository?: IPanelStateRepository
 	) {
 		super(panel, extensionUri, getEnvironments, getEnvironmentById, logger, initialEnvironmentId, panelStateRepository);
+		this.viewModelMapper = new FlowConnectionRelationshipViewModelMapper();
 	}
 
 	/**
@@ -57,9 +62,10 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		exportToDeploymentSettingsUseCase: ExportConnectionReferencesToDeploymentSettingsUseCase,
 		solutionRepository: ISolutionRepository,
 		urlBuilder: IMakerUrlBuilder,
+		relationshipCollectionService: FlowConnectionRelationshipCollectionService,
 		logger: ILogger,
-		initialEnvironmentId: string | undefined,
-		panelStateRepository: IPanelStateRepository | undefined
+		initialEnvironmentId?: string,
+		panelStateRepository?: IPanelStateRepository
 	): Promise<ConnectionReferencesPanel> {
 		const column = vscode.ViewColumn.One;
 
@@ -102,6 +108,7 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 			exportToDeploymentSettingsUseCase,
 			solutionRepository,
 			urlBuilder,
+			relationshipCollectionService,
 			logger,
 			targetEnvironmentId,
 			panelStateRepository
@@ -178,7 +185,8 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 			this.relationships = result.relationships;
 			this.connectionReferences = result.connectionReferences;
 
-			const viewModels = FlowConnectionRelationshipViewModelMapper.toViewModels(this.relationships, true);
+			const sortedRelationships = this.relationshipCollectionService.sort(this.relationships);
+			const viewModels = this.viewModelMapper.toViewModels(sortedRelationships);
 			const enhancedViewModels = enhanceViewModelsWithFlowLinks(viewModels);
 
 			this.sendData(enhancedViewModels);

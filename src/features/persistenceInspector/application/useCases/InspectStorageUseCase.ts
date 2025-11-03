@@ -10,11 +10,15 @@ import { ILogger } from '../../../../infrastructure/logging/ILogger';
  * Retrieves all global state and secrets for diagnostic viewing
  */
 export class InspectStorageUseCase {
+	private readonly mapper: StorageCollectionMapper;
+
 	public constructor(
 		private readonly storageInspectionService: StorageInspectionService,
 		private readonly eventPublisher: IDomainEventPublisher,
 		private readonly logger: ILogger
-	) {}
+	) {
+		this.mapper = StorageCollectionMapper.create();
+	}
 
 	/**
 	 * Inspects all storage entries (global state and secrets)
@@ -39,7 +43,7 @@ export class InspectStorageUseCase {
 			);
 
 			// Orchestrate: map to view model
-			return StorageCollectionMapper.toViewModel(collection);
+			return this.mapper.toViewModel(collection);
 		} catch (error) {
 			this.logger.error('InspectStorageUseCase: Failed to inspect storage', error);
 			throw error;

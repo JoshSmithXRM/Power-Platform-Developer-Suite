@@ -15,6 +15,7 @@ import {
 	type DataTableConfig,
 	type SolutionOption
 } from '../../../../shared/infrastructure/ui/DataTablePanel';
+import { EnvironmentVariableCollectionService } from '../../domain/services/EnvironmentVariableCollectionService';
 
 /**
  * Presentation layer panel for Environment Variables.
@@ -25,6 +26,7 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 	private static panels = new Map<string, EnvironmentVariablesPanel>();
 
 	private environmentVariables: EnvironmentVariable[] = [];
+	private readonly mapper: EnvironmentVariableViewModelMapper;
 
 	private constructor(
 		panel: vscode.WebviewPanel,
@@ -36,10 +38,12 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 		private readonly solutionRepository: ISolutionRepository,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId: string | undefined,
-		panelStateRepository: IPanelStateRepository | undefined
+		initialEnvironmentId?: string,
+		panelStateRepository?: IPanelStateRepository
 	) {
 		super(panel, extensionUri, getEnvironments, getEnvironmentById, logger, initialEnvironmentId, panelStateRepository);
+		const collectionService = new EnvironmentVariableCollectionService();
+		this.mapper = new EnvironmentVariableViewModelMapper(collectionService);
 	}
 
 	/**
@@ -55,8 +59,8 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 		solutionRepository: ISolutionRepository,
 		urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
-		initialEnvironmentId: string | undefined,
-		panelStateRepository: IPanelStateRepository | undefined
+		initialEnvironmentId?: string,
+		panelStateRepository?: IPanelStateRepository
 	): Promise<EnvironmentVariablesPanel> {
 		const column = vscode.ViewColumn.One;
 
@@ -187,7 +191,7 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 				return;
 			}
 
-			const viewModels = EnvironmentVariableViewModelMapper.toViewModels(this.environmentVariables, true);
+			const viewModels = this.mapper.toViewModels(this.environmentVariables, true);
 
 			// Map to plain objects for webview compatibility
 			const dataForWebview = viewModels.map(vm => ({ ...vm }));

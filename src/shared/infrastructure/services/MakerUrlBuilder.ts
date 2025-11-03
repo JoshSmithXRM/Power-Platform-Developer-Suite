@@ -89,7 +89,7 @@ export class MakerUrlBuilder implements IMakerUrlBuilder {
    * @param solutionId - Optional solution GUID for solution-scoped view
    * @returns Maker Portal connection references URL
    */
-  buildConnectionReferencesUrl(environmentId: string, solutionId: string | undefined): string {
+  buildConnectionReferencesUrl(environmentId: string, solutionId?: string): string {
     if (solutionId) {
       return `${this.baseUrl}/environments/${environmentId}/solutions/${solutionId}/objects/connectionreferences`;
     }
@@ -109,7 +109,7 @@ export class MakerUrlBuilder implements IMakerUrlBuilder {
    * @param solutionId - Optional solution GUID for solution-scoped view
    * @returns Maker Portal environment variables URL
    */
-  buildEnvironmentVariablesObjectsUrl(environmentId: string, solutionId: string | undefined): string {
+  buildEnvironmentVariablesObjectsUrl(environmentId: string, solutionId?: string): string {
     if (solutionId) {
       return `${this.baseUrl}/environments/${environmentId}/solutions/${solutionId}/objects/environment%20variables`;
     }

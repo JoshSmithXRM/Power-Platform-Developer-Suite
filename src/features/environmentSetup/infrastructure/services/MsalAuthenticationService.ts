@@ -64,18 +64,18 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	 * Acquires an access token for the specified environment using the configured authentication method
 	 * Supports Service Principal, Username/Password, Interactive, and Device Code flows
 	 * @param environment - Environment containing authentication configuration
-	 * @param clientSecret - Client secret for Service Principal authentication (optional)
-	 * @param password - Password for Username/Password authentication (optional)
-	 * @param customScope - Custom scope to request (optional, defaults to Dataverse scope)
-	 * @param cancellationToken - Token for cancelling long-running auth flows (optional)
+	 * @param clientSecret - Optional client secret for Service Principal authentication
+	 * @param password - Optional password for Username/Password authentication
+	 * @param customScope - Optional custom scope to request. Defaults to Dataverse scope if not provided.
+	 * @param cancellationToken - Optional token for cancelling long-running auth flows
 	 * @returns Access token for the specified scope
 	 */
 	public async getAccessTokenForEnvironment(
 		environment: Environment,
-		clientSecret: string | undefined,
-		password: string | undefined,
-		customScope: string | undefined,
-		cancellationToken: ICancellationToken | undefined
+		clientSecret?: string,
+		password?: string,
+		customScope?: string,
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
 		// Check for cancellation before starting
 		if (cancellationToken?.isCancellationRequested) {
@@ -100,11 +100,11 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 			switch (authMethod) {
 				case AuthenticationMethodType.ServicePrincipal:
-					token = await this.authenticateServicePrincipal(environment, clientSecret, scopes, cancellationToken);
+					token = await this.authenticateServicePrincipal(environment, scopes, clientSecret, cancellationToken);
 					break;
 
 				case AuthenticationMethodType.UsernamePassword:
-					token = await this.authenticateUsernamePassword(environment, password, scopes, cancellationToken);
+					token = await this.authenticateUsernamePassword(environment, scopes, password, cancellationToken);
 					break;
 
 				case AuthenticationMethodType.Interactive:
@@ -148,7 +148,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	 */
 	private async executeWithCancellation<T>(
 		promise: Promise<T>,
-		cancellationToken: ICancellationToken | undefined
+		cancellationToken?: ICancellationToken
 	): Promise<T> {
 		if (!cancellationToken) {
 			return promise;
@@ -175,8 +175,8 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	private async tryAcquireTokenSilent(
 		clientApp: msal.PublicClientApplication,
 		scopes: string[],
-		cancellationToken: ICancellationToken | undefined,
-		flowName: string
+		flowName: string,
+		cancellationToken?: ICancellationToken
 	): Promise<string | undefined> {
 		const accounts = await clientApp.getTokenCache().getAllAccounts();
 		if (accounts.length === 0) {
@@ -225,9 +225,9 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	 */
 	private async authenticateServicePrincipal(
 		environment: Environment,
-		clientSecret: string | undefined,
 		scopes: string[],
-		cancellationToken: ICancellationToken | undefined
+		clientSecret?: string,
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
 		if (cancellationToken?.isCancellationRequested) {
 			throw new Error('Authentication cancelled by user');
@@ -288,9 +288,9 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	 */
 	private async authenticateUsernamePassword(
 		environment: Environment,
-		password: string | undefined,
 		scopes: string[],
-		cancellationToken: ICancellationToken | undefined
+		password?: string,
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
 		if (cancellationToken?.isCancellationRequested) {
 			throw new Error('Authentication cancelled by user');
@@ -354,7 +354,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	private async authenticateInteractive(
 		environment: Environment,
 		scopes: string[],
-		cancellationToken: ICancellationToken | undefined
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
 		if (cancellationToken?.isCancellationRequested) {
 			throw new Error('Authentication cancelled by user');
@@ -368,8 +368,8 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			const cachedToken = await this.tryAcquireTokenSilent(
 				clientApp,
 				scopes,
-				cancellationToken,
-				'interactive flow'
+				'interactive flow',
+				cancellationToken
 			);
 			if (cachedToken) {
 				return cachedToken;
@@ -519,7 +519,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	private async authenticateDeviceCode(
 		environment: Environment,
 		scopes: string[],
-		cancellationToken: ICancellationToken | undefined
+		cancellationToken?: ICancellationToken
 	): Promise<string> {
 		if (cancellationToken?.isCancellationRequested) {
 			throw new Error('Authentication cancelled by user');
@@ -533,8 +533,8 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			const cachedToken = await this.tryAcquireTokenSilent(
 				clientApp,
 				scopes,
-				cancellationToken,
-				'device code flow'
+				'device code flow',
+				cancellationToken
 			);
 			if (cachedToken) {
 				return cachedToken;

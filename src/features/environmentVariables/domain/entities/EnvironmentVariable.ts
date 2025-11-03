@@ -73,28 +73,6 @@ export class EnvironmentVariable {
 	}
 
 	/**
-	 * Returns friendly display name for variable type.
-	 */
-	getTypeName(): string {
-		switch (this.type) {
-			case EnvironmentVariableType.String:
-				return 'String';
-			case EnvironmentVariableType.Number:
-				return 'Number';
-			case EnvironmentVariableType.Boolean:
-				return 'Boolean';
-			case EnvironmentVariableType.JSON:
-				return 'JSON';
-			case EnvironmentVariableType.Secret:
-				return 'Secret';
-			case EnvironmentVariableType.DataSource:
-				return 'Data Source';
-			default:
-				return 'Unknown';
-		}
-	}
-
-	/**
 	 * Determines if this environment variable is a secret type.
 	 * Secrets require special handling in UI (masked display, secure storage).
 	 */

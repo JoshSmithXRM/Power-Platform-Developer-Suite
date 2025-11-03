@@ -54,8 +54,8 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 	async getObjectTypeCode(
 		environmentId: string,
 		entityLogicalName: string,
-		options: QueryOptions | undefined,
-		cancellationToken: ICancellationToken | undefined
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
 	): Promise<number | null> {
 		const defaultOptions: QueryOptions = {
 			select: ['ObjectTypeCode', 'LogicalName'],
@@ -125,8 +125,8 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 		environmentId: string,
 		solutionId: string,
 		entityLogicalName: string,
-		options: QueryOptions | undefined,
-		cancellationToken: ICancellationToken | undefined
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
 	): Promise<string[]> {
 		this.logger.debug('Fetching solution component IDs from Dataverse API', {
 			environmentId,

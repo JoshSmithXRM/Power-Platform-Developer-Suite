@@ -11,5 +11,5 @@ export class NullLogger implements ILogger {
 
 	public warn(_message: string, ..._args: unknown[]): void {}
 
-	public error(_message: string, _error: unknown | undefined): void {}
+	public error(_message: string, _error?: unknown): void {}
 }

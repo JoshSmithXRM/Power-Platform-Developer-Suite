@@ -31,8 +31,9 @@ export class SolutionExplorerPanel extends DataTablePanel {
 		getEnvironmentById: (envId: string) => Promise<{ id: string; name: string } | null>,
 		private readonly listSolutionsUseCase: ListSolutionsUseCase,
 		private readonly urlBuilder: IMakerUrlBuilder,
+		private readonly viewModelMapper: SolutionViewModelMapper,
 		logger: ILogger,
-		initialEnvironmentId: string | undefined
+		initialEnvironmentId?: string
 	) {
 		super(panel, extensionUri, getEnvironments, getEnvironmentById, logger, initialEnvironmentId);
 	}
@@ -47,8 +48,9 @@ export class SolutionExplorerPanel extends DataTablePanel {
 		getEnvironmentById: (envId: string) => Promise<{ id: string; name: string } | null>,
 		listSolutionsUseCase: ListSolutionsUseCase,
 		urlBuilder: IMakerUrlBuilder,
+		viewModelMapper: SolutionViewModelMapper,
 		logger: ILogger,
-		initialEnvironmentId: string | undefined
+		initialEnvironmentId?: string
 	): Promise<SolutionExplorerPanel> {
 		const column = vscode.ViewColumn.One;
 
@@ -93,6 +95,7 @@ export class SolutionExplorerPanel extends DataTablePanel {
 			getEnvironmentById,
 			listSolutionsUseCase,
 			urlBuilder,
+			viewModelMapper,
 			logger,
 			targetEnvironmentId
 		);
@@ -151,7 +154,7 @@ export class SolutionExplorerPanel extends DataTablePanel {
 				return;
 			}
 
-			const viewModels = SolutionViewModelMapper.toViewModels(this.solutions, true);
+			const viewModels = this.viewModelMapper.toViewModels(this.solutions, true);
 			const enhancedViewModels = enhanceViewModelsWithSolutionLinks(viewModels);
 
 			this.sendData(enhancedViewModels);
@@ -184,8 +187,13 @@ export class SolutionExplorerPanel extends DataTablePanel {
 		`;
 	}
 
-	protected getCustomJavaScript(): string {
+	/**
+	 * Returns solution-specific JavaScript for event handlers.
+	 * Adds click handlers to solution links for opening in Maker Portal.
+	 */
+	protected getPanelSpecificJavaScript(): string {
 		return `
+			// Attach click handlers to solution links
 			document.querySelectorAll('.solution-link').forEach(link => {
 				link.addEventListener('click', (e) => {
 					const solutionId = e.target.getAttribute('data-id');

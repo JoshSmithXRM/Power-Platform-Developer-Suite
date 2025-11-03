@@ -60,22 +60,4 @@ export class FlowConnectionRelationship {
 	isOrphanedConnectionReference(): boolean {
 		return this.relationshipType === 'orphaned-cr';
 	}
-
-	/**
-	 * Sorts relationships by flow name, then connection reference logical name.
-	 * Creates a defensive copy to avoid mutating the original array.
-	 * @param relationships - Array of FlowConnectionRelationship to sort
-	 * @returns New sorted array
-	 */
-	static sort(relationships: FlowConnectionRelationship[]): FlowConnectionRelationship[] {
-		return [...relationships].sort((a, b) => {
-			// Sort by flow name first
-			const flowCompare = a.flowName.localeCompare(b.flowName);
-			if (flowCompare !== 0) {
-				return flowCompare;
-			}
-			// Then by connection reference logical name
-			return a.connectionReferenceLogicalName.localeCompare(b.connectionReferenceLogicalName);
-		});
-	}
 }

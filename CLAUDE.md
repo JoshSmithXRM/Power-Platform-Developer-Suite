@@ -75,6 +75,31 @@
 
 ---
 
-**Development:** `npm run compile` (use this for testing)
+## 🔄 Workflow Rules
+
+**When building features:**
+- ✅ Design type contracts BEFORE implementation - Prevents type error cascade (15x rework multiplier)
+- ✅ Compile after EACH layer - `npm run compile` after domain, application, infrastructure, presentation
+- ✅ Review per layer (not all at once) - Catch violations early (5-10 min fixes vs 2+ hour refactors)
+- ✅ Commit per layer - Granular rollback capability
+- ✅ Write clean from start - No cleanup phase needed if following LOGGING_GUIDE.md
+
+**Agent roles (see .claude/AGENT_ROLES.md):**
+- YOU = Implementer (human or builder)
+- clean-architecture-guardian = Designer + Reviewer + Final Approval Gate (NOT implementer)
+- typescript-pro = Type Safety Reviewer (NOT implementer)
+- code-cleanup-implementer = Logging/Comment Fixer + Documenter (IS implementer)
+
+**Never:**
+- ❌ Implement all layers then compile - Type errors compound 15x
+- ❌ Skip type contract review - Leads to downstream type refactoring
+- ❌ Mix feature work with refactoring - Separate concerns, separate commits
+- ❌ Ask reviewers to implement - They review, YOU implement
+
+---
+
+**Development:** `npm run compile` (use this after EVERY layer)
 
 **Remember:** Rich domain models with behavior. Business logic in domain, not use cases or panels.
+
+**Workflows:** See `.claude/WORKFLOW_GUIDE.md` for complete workflows

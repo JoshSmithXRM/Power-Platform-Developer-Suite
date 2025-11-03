@@ -471,6 +471,7 @@ describe('SaveEnvironmentUseCase', () => {
 			mockRepository.getById.mockResolvedValue(existingEnv);
 			mockRepository.isNameUnique.mockResolvedValue(true);
 			mockValidationService.validateForSave.mockReturnValue(ValidationResult.success());
+			mockCacheInvalidationService.shouldInvalidateCache.mockReturnValue(true);
 
 			await useCase.execute(request);
 
@@ -499,6 +500,7 @@ describe('SaveEnvironmentUseCase', () => {
 			mockRepository.getById.mockResolvedValue(existingEnv);
 			mockRepository.isNameUnique.mockResolvedValue(true);
 			mockValidationService.validateForSave.mockReturnValue(ValidationResult.success());
+			mockCacheInvalidationService.shouldInvalidateCache.mockReturnValue(true);
 
 			await useCase.execute(request);
 
@@ -528,6 +530,7 @@ describe('SaveEnvironmentUseCase', () => {
 			mockRepository.getById.mockResolvedValue(existingEnv);
 			mockRepository.isNameUnique.mockResolvedValue(true);
 			mockValidationService.validateForSave.mockReturnValue(ValidationResult.success());
+			mockCacheInvalidationService.shouldInvalidateCache.mockReturnValue(true);
 
 			await useCase.execute(request);
 
@@ -557,6 +560,7 @@ describe('SaveEnvironmentUseCase', () => {
 			mockRepository.isNameUnique.mockResolvedValue(true);
 			mockRepository.getClientSecret.mockResolvedValue('old-secret');
 			mockValidationService.validateForSave.mockReturnValue(ValidationResult.success());
+			mockCacheInvalidationService.shouldInvalidateCache.mockReturnValue(true);
 
 			await useCase.execute(request);
 

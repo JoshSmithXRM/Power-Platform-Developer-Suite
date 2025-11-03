@@ -31,8 +31,8 @@ export interface IDeploymentSettingsRepository {
 
 	/**
 	 * Prompts user to select or create a deployment settings file.
-	 * @param suggestedName - Suggested filename (e.g., "SolutionName.deploymentsettings.json")
-	 * @param defaultUri - Default directory to open file picker in (workspace root if not specified)
+	 * @param suggestedName - Optional suggested filename (e.g., "SolutionName.deploymentsettings.json")
+	 * @param defaultUri - Optional default directory to open file picker in. Defaults to workspace root if not provided.
 	 * @returns Absolute file path selected by user, or undefined if cancelled
 	 */
 	promptForFilePath(suggestedName?: string, defaultUri?: string): Promise<string | undefined>;

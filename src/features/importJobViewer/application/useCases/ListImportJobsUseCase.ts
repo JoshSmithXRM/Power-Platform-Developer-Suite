@@ -24,7 +24,7 @@ export class ListImportJobsUseCase {
 	 */
 	async execute(
 		environmentId: string,
-		cancellationToken: ICancellationToken | undefined
+		cancellationToken?: ICancellationToken
 	): Promise<ImportJob[]> {
 		this.logger.info('ListImportJobsUseCase started', { environmentId });
 

@@ -1,4 +1,5 @@
 import { ValidationError } from '../../../../shared/domain/errors/ValidationError';
+import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 
 /**
  * Solution entity representing a Power Platform solution with rich business behavior.
@@ -11,9 +12,10 @@ import { ValidationError } from '../../../../shared/domain/errors/ValidationErro
 export class Solution {
   /**
    * The GUID of the Default Solution across all Dataverse environments.
-   * This GUID is consistent across all Dataverse instances.
+   * Re-exported from shared domain constants for backward compatibility.
+   * @see {DEFAULT_SOLUTION_ID} in SolutionConstants for full documentation
    */
-  public static readonly DEFAULT_SOLUTION_ID = 'fd140aaf-4df4-11dd-bd17-0019b9312238';
+  public static readonly DEFAULT_SOLUTION_ID = DEFAULT_SOLUTION_ID;
 
   public readonly version: string;
 
