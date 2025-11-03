@@ -97,6 +97,22 @@ export abstract class DataTablePanel {
 	protected abstract handlePanelCommand(message: WebviewMessage): Promise<void>;
 
 	/**
+	 * Registers this panel in the panel tracking map for the given environment.
+	 * Derived classes override this to manage their static panel maps.
+	 *
+	 * @param environmentId - The environment ID to associate with this panel
+	 */
+	protected abstract registerPanelForEnvironment(environmentId: string): void;
+
+	/**
+	 * Unregisters this panel from the panel tracking map for the given environment.
+	 * Derived classes override this to clean up their static panel maps.
+	 *
+	 * @param environmentId - The environment ID to disassociate from this panel
+	 */
+	protected abstract unregisterPanelForEnvironment(environmentId: string): void;
+
+	/**
 	 * Returns filter logic JavaScript for panel-specific filtering.
 	 *
 	 * Each panel has different searchable fields. Override to specify which
@@ -171,6 +187,7 @@ export abstract class DataTablePanel {
 	/**
 	 * Switches to a different environment and reloads data.
 	 * Updates Maker button availability based on whether environment has configured Power Platform Environment ID.
+	 * Handles panel tracking registration/unregistration via abstract methods.
 	 */
 	protected async switchEnvironment(environmentId: string): Promise<void> {
 		if (this.currentEnvironmentId === environmentId) {
@@ -178,7 +195,18 @@ export abstract class DataTablePanel {
 		}
 
 		this.logger.info('Switching environment', { from: this.currentEnvironmentId, to: environmentId });
+
+		const oldEnvironmentId = this.currentEnvironmentId;
+
+		// Unregister from old environment
+		if (oldEnvironmentId) {
+			this.unregisterPanelForEnvironment(oldEnvironmentId);
+		}
+
 		this.currentEnvironmentId = environmentId;
+
+		// Register with new environment
+		this.registerPanelForEnvironment(environmentId);
 
 		const environment = await this.getEnvironmentById(environmentId);
 		const hasPowerPlatformEnvId = !!environment?.powerPlatformEnvironmentId;
@@ -344,6 +372,11 @@ export abstract class DataTablePanel {
 
 
 	public dispose(): void {
+		// Unregister from panel tracking
+		if (this.currentEnvironmentId) {
+			this.unregisterPanelForEnvironment(this.currentEnvironmentId);
+		}
+
 		this.cancellationTokenSource?.cancel();
 		this.cancellationTokenSource?.dispose();
 

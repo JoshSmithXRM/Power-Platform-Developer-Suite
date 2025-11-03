@@ -37,6 +37,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-member-access': 'error',
       '@typescript-eslint/no-unsafe-call': 'error',
       '@typescript-eslint/no-unsafe-argument': 'error',
+      '@typescript-eslint/no-non-null-assertion': 'error',
 
       // ===========================
       // EXPLICIT RETURN TYPES (CLAUDE.md: ALWAYS explicit return types)

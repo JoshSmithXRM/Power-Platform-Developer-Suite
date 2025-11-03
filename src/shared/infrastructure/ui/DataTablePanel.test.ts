@@ -68,6 +68,14 @@ class TestDataTablePanel extends DataTablePanel {
 		return 'filtered = allData.filter(item => item.name.includes(query));';
 	}
 
+	protected registerPanelForEnvironment(_environmentId: string): void {
+		// No-op for tests - panels don't need tracking in test environment
+	}
+
+	protected unregisterPanelForEnvironment(_environmentId: string): void {
+		// No-op for tests - panels don't need tracking in test environment
+	}
+
 	// Expose protected methods for testing
 	public async testSwitchEnvironment(environmentId: string): Promise<void> {
 		return this.switchEnvironment(environmentId);

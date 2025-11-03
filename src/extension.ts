@@ -417,15 +417,20 @@ function createDataverseApiServiceFactory(
 	getAccessToken: (envId: string) => Promise<string>;
 	getDataverseUrl: (envId: string) => Promise<string>;
 } {
+	async function getEnvironmentById(envId: string) {
+		const environments = await environmentRepository.getAll();
+		const environment = environments.find(env => env.getId().getValue() === envId);
+
+		if (!environment) {
+			throw new Error(`Environment not found for ID: ${envId}`);
+		}
+
+		return environment;
+	}
+
 	return {
 		async getAccessToken(envId: string): Promise<string> {
-			const environments = await environmentRepository.getAll();
-			const environment = environments.find(env => env.getId().getValue() === envId);
-
-			if (!environment) {
-				throw new Error(`Environment not found for ID: ${envId}`);
-			}
-
+			const environment = await getEnvironmentById(envId);
 			const authMethod = environment.getAuthenticationMethod();
 			let clientSecret: string | undefined;
 			let password: string | undefined;
@@ -441,13 +446,7 @@ function createDataverseApiServiceFactory(
 			return authService.getAccessTokenForEnvironment(environment, clientSecret, password);
 		},
 		async getDataverseUrl(envId: string): Promise<string> {
-			const environments = await environmentRepository.getAll();
-			const environment = environments.find(env => env.getId().getValue() === envId);
-
-			if (!environment) {
-				throw new Error(`Environment not found for ID: ${envId}`);
-			}
-
+			const environment = await getEnvironmentById(envId);
 			return environment.getDataverseUrl().getValue();
 		}
 	};

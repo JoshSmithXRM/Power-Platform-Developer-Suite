@@ -16,6 +16,10 @@
 8. **Business logic in use cases** - Use cases orchestrate only, no complex logic
 9. **Business logic in panels** - Panels call use cases, no logic
 10. **HTML in panel .ts files** - Extract all HTML to separate view files in `presentation/views/`
+11. **Non-null assertions (`!`)** - Use explicit null checks for type narrowing
+12. **Dynamic import types in signatures** - Use direct imports: `import type { Foo } from '...'`
+13. **Static utility methods on entities** - Put in domain services or collection classes
+14. **Presentation logic in domain** - Display formatting belongs in mappers, not entities
 
 ---
 
@@ -32,6 +36,9 @@
 9. **Abstract methods for enforcement** - Make missing implementations compilation errors
 10. **Refactor on 2nd duplication** - Don't wait for 3rd
 11. **HTML in separate view files** - All panel HTML goes in `presentation/views/` as render functions
+12. **Type narrowing with explicit checks** - `if (x === null) return;` not `x!`
+13. **Domain services for complex logic** - Use case complex logic → domain service
+14. **Mappers transform only** - No sorting params; sort before/after mapping
 
 ---
 

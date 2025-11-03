@@ -294,36 +294,16 @@ export class ImportJobViewerPanel extends DataTablePanel {
 	}
 
 	/**
-	 * Switches to a different environment and reloads data.
-	 * Updates the panel tracking to use the new environment ID.
+	 * Registers this panel in the static panels map for the given environment.
 	 */
-	protected override async switchEnvironment(environmentId: string): Promise<void> {
-		if (this.currentEnvironmentId === environmentId) {
-			return;
-		}
-
-		const oldEnvironmentId = this.currentEnvironmentId;
-
-		// Remove from old environment key
-		if (oldEnvironmentId) {
-			ImportJobViewerPanel.panels.delete(oldEnvironmentId);
-		}
-
-		// Call parent to update environment and reload data
-		await super.switchEnvironment(environmentId);
-
-		// Add to new environment key
+	protected registerPanelForEnvironment(environmentId: string): void {
 		ImportJobViewerPanel.panels.set(environmentId, this);
 	}
 
 	/**
-	 * Disposes the panel and cleans up resources.
+	 * Unregisters this panel from the static panels map for the given environment.
 	 */
-	public override dispose(): void {
-		// Remove from panels map
-		if (this.currentEnvironmentId) {
-			ImportJobViewerPanel.panels.delete(this.currentEnvironmentId);
-		}
-		super.dispose();
+	protected unregisterPanelForEnvironment(environmentId: string): void {
+		ImportJobViewerPanel.panels.delete(environmentId);
 	}
 }
