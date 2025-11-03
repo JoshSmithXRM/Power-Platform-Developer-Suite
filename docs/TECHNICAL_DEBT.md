@@ -262,68 +262,141 @@ Clean Architecture Guardian - Recommendation #4
 
 ---
 
-### Branded Types for Environment IDs
+### getValue() Pattern in Value Objects
 
-**Status**: Will Not Implement
+**Status**: Accepted Technical Debt
 **Priority**: N/A
-**Effort**: Medium (1-2 hours)
+**Effort**: High (6-8 hours for 100+ callsites)
 
-**Why This Was Suggested:**
-TypeScript Pro suggested using branded types to prevent ID confusion:
+**Summary:**
+All value objects in the domain layer use a `getValue()` method that returns primitive types (string, number) without branded type safety. This creates a theoretical risk of accidentally mixing incompatible value objects at compile time.
+
+**Decision: Accept this pattern as-is.** The pragmatic benefits outweigh the theoretical type safety improvement.
+
+**Current Pattern:**
+
+Value objects wrap primitives with validation and expose them via `getValue()`:
 
 ```typescript
-type EnvironmentId = string & { readonly __brand: 'EnvironmentId' };
-type SolutionId = string & { readonly __brand: 'SolutionId' };
-type ImportJobId = string & { readonly __brand: 'ImportJobId' };
+// src/features/environmentSetup/domain/valueObjects/EnvironmentId.ts
+export class EnvironmentId {
+    private readonly value: string;
 
-function switchEnvironment(envId: EnvironmentId) { /* ... */ }
+    constructor(value: string) {
+        if (!value || value.trim() === '') {
+            throw new DomainError('Environment ID cannot be empty');
+        }
+        this.value = value;
+    }
 
-// Type error: can't pass SolutionId where EnvironmentId expected
-switchEnvironment(solutionId); // ❌ Compile error
+    public getValue(): string {
+        return this.value;
+    }
+}
 ```
 
-**Why This Is Overkill:**
+**Scope:**
+- **20 files** use the getValue() pattern across multiple value objects
+- **100+ callsites** across application and infrastructure layers
+- Examples: `EnvironmentId`, `DataverseUrl`, `ClientId`, `TenantId`, `EnvironmentName`, `StorageKey`
 
-1. **No actual bugs found**
-   - Codebase has been in development for months
-   - Zero incidents of passing wrong ID type
-   - Clear naming prevents confusion (`environmentId`, `solutionId`, `importJobId`)
+**The Type Safety Issue:**
 
-2. **Runtime cost with no runtime benefit**
-   - Branded types require helper functions to create branded values
-   - Adds boilerplate at every ID usage site
-   - IDs come from external APIs (Dataverse) as plain strings
-   - Would need to brand at every API boundary
+TypeScript cannot distinguish between different value object types after `getValue()`:
 
-3. **False sense of security**
-   - Branded types are compile-time only (erased at runtime)
-   - User could still send wrong GUID from API
-   - Real safety comes from API validation, not type system
+```typescript
+const envId = new EnvironmentId('env-123');
+const clientId = new ClientId('client-456');
 
-4. **Developer experience penalty**
-   ```typescript
-   // Without branded types (current)
-   const envId = environment.id;
-   await switchEnvironment(envId); // ✅ Works
+// Both return `string` - TypeScript allows this mistake:
+const mixedUp: string = envId.getValue();
+repository.saveClient(mixedUp);  // Runtime bug! Wrong ID type
+```
 
-   // With branded types
-   const envId = createEnvironmentId(environment.id); // Extra ceremony
-   await switchEnvironment(envId);
-   ```
+**Alternative: Branded Types**
 
-**When Branded Types WOULD Help:**
-- Large codebase with 10+ ID types and frequent ID confusion bugs
-- Financial/healthcare apps where passing wrong ID has severe consequences
-- When you're already using branded types extensively (consistency)
+```typescript
+// Branded type pattern
+type Brand<K, T> = K & { __brand: T };
 
-**Codebase Size Matters:**
-- Small codebase (< 50k LOC): Branded types = overkill
-- Medium codebase (50-200k LOC): Evaluate based on actual bugs
-- Large codebase (200k+ LOC): Consider for critical IDs
+export class EnvironmentId {
+    private readonly value: Brand<string, 'EnvironmentId'>;
 
-**Current codebase:** ~15k LOC → **Branded types are premature optimization**
+    public getValue(): Brand<string, 'EnvironmentId'> {
+        return this.value;
+    }
+}
 
-**Verdict:** Clear naming conventions (`environmentId`, `solutionId`) provide 80% of the benefit with 0% of the cost. Not worth the overhead.
+// Now TypeScript prevents mixing:
+saveEnvironment(envId.getValue());     // ✅ OK
+saveEnvironment(clientId.getValue());  // ❌ Compile error!
+```
+
+**Why Not Implement:**
+
+**Effort vs. Benefit Analysis:**
+
+| Factor | Assessment |
+|--------|------------|
+| **Refactoring Scope** | 100+ callsites across 20+ files (6-8 hours) |
+| **Breaking Changes** | All persistence layers, mappers, API services |
+| **Runtime Safety** | No change (same validation, same runtime behavior) |
+| **Compile Safety** | Marginal improvement (catches theoretical bugs only) |
+| **Real Bugs Found** | Zero instances in codebase review |
+| **Code Complexity** | Increases (branded types, type assertions at boundaries) |
+| **Developer Experience** | Degrades (more boilerplate, harder onboarding) |
+
+**Verdict:** 6-8 hours of work for zero observed bugs = not worth it.
+
+**Why This Pattern is Safe:**
+
+1. **Domain Validation Still Works**
+   - Value objects validate on construction
+   - Real-world bugs (empty strings, malformed URLs, invalid UUIDs) are all caught by domain validation, not by branded types
+
+2. **Type Mixing is Rare**
+   - `EnvironmentId` → only used with `IEnvironmentRepository`
+   - `ClientId` → only used with `MsalAuthenticationService`
+   - `DataverseUrl` → only used for API base URLs
+   - The **semantic context prevents mistakes** more than type brands would
+
+3. **Clean Architecture Protects Boundaries**
+   - Infrastructure APIs require primitives
+   - Value objects **must** unwrap to primitives at the boundary
+   - Branded types just add ceremony without runtime benefit
+
+**Accepted Trade-offs:**
+
+| Aspect | Current Pattern | Branded Types |
+|--------|----------------|---------------|
+| **Type Safety** | Runtime (DomainError) | Runtime + Compile |
+| **Bugs Prevented** | Invalid values | Invalid values + type mixing |
+| **Developer Velocity** | Fast (simple pattern) | Slower (type wrangling) |
+| **Refactoring Cost** | Low | High (100+ callsites) |
+| **Bugs Found in Review** | 0 | 0 (theoretical only) |
+
+**Decision: Current pattern wins on pragmatism.**
+
+**When to Revisit:**
+
+Consider branded types only if:
+1. **Multiple bugs** are found due to ID mixing (none found in review)
+2. **Major refactoring** is already planned (e.g., migrating persistence layer)
+3. **New domain model** is being built from scratch (low refactoring cost)
+
+Otherwise, **keep the current pattern indefinitely**.
+
+**Related Review Finding:**
+TypeScript Pro Review - Issue M4
+
+---
+
+### Branded Types for Environment IDs
+
+**Status**: Will Not Implement (See getValue() Pattern above)
+**Priority**: N/A
+
+**Note:** This finding has been superseded by the more comprehensive "getValue() Pattern in Value Objects" section above, which addresses the broader architectural pattern rather than just environment IDs.
 
 **Related Review Finding:**
 TypeScript Pro Review - Low Priority Issue #14
