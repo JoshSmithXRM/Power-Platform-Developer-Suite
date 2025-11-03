@@ -1,0 +1,129 @@
+import { ValidationError } from '../../../../shared/domain/errors/ValidationError';
+
+/**
+ * Environment variable type codes from Dataverse
+ */
+export enum EnvironmentVariableType {
+	String = 100000000,
+	Number = 100000001,
+	Boolean = 100000002,
+	JSON = 100000003,
+	Secret = 100000004,
+	DataSource = 100000005
+}
+
+/**
+ * EnvironmentVariable entity representing a Power Platform environment variable
+ * with its definition and value combined.
+ *
+ * Responsibilities:
+ * - Combine definition and value data
+ * - Calculate effective value (CurrentValue ?? DefaultValue)
+ * - Provide friendly type names for display
+ * - Validate type codes
+ */
+export class EnvironmentVariable {
+	/**
+	 * Creates a new EnvironmentVariable entity.
+	 * @param definitionId - Environment variable definition GUID
+	 * @param schemaName - Schema name (unique identifier)
+	 * @param displayName - Display name for UI
+	 * @param type - Type code from EnvironmentVariableType enum
+	 * @param defaultValue - Default value from definition
+	 * @param currentValue - Current value from value record (null if no value set)
+	 * @param isManaged - Whether the definition is managed
+	 * @param description - Definition description
+	 * @param modifiedOn - Last modified date of definition
+	 * @param valueId - Value record GUID (null if no value set)
+	 * @throws {ValidationError} When type code is invalid
+	 */
+	constructor(
+		public readonly definitionId: string,
+		public readonly schemaName: string,
+		public readonly displayName: string,
+		public readonly type: EnvironmentVariableType,
+		public readonly defaultValue: string | null,
+		public readonly currentValue: string | null,
+		public readonly isManaged: boolean,
+		public readonly description: string,
+		public readonly modifiedOn: Date,
+		public readonly valueId: string | null
+	) {
+		// Validate type code is a known value
+		if (!Object.values(EnvironmentVariableType).includes(type)) {
+			throw new ValidationError(
+				'EnvironmentVariable',
+				'type',
+				type,
+				'Must be a valid EnvironmentVariableType enum value'
+			);
+		}
+	}
+
+	/**
+	 * Gets the effective value for this environment variable.
+	 * Business rule: Current value takes precedence over default value.
+	 * @returns The current value if set, otherwise the default value, or null if neither is set
+	 */
+	getEffectiveValue(): string | null {
+		return this.currentValue ?? this.defaultValue;
+	}
+
+	/**
+	 * Determines if this environment variable has any value set.
+	 * @returns True if either current or default value is set, false otherwise
+	 */
+	hasValue(): boolean {
+		return this.getEffectiveValue() !== null;
+	}
+
+	/**
+	 * Determines if the current value overrides the default value.
+	 * @returns True if current value is set and different from default, false otherwise
+	 */
+	hasOverride(): boolean {
+		return this.currentValue !== null && this.currentValue !== this.defaultValue;
+	}
+
+	/**
+	 * Gets a user-friendly type name for display.
+	 * @returns Human-readable type string
+	 */
+	getTypeName(): string {
+		switch (this.type) {
+			case EnvironmentVariableType.String:
+				return 'String';
+			case EnvironmentVariableType.Number:
+				return 'Number';
+			case EnvironmentVariableType.Boolean:
+				return 'Boolean';
+			case EnvironmentVariableType.JSON:
+				return 'JSON';
+			case EnvironmentVariableType.Secret:
+				return 'Secret';
+			case EnvironmentVariableType.DataSource:
+				return 'Data Source';
+			default:
+				return 'Unknown';
+		}
+	}
+
+	/**
+	 * Determines if this is a secret type environment variable.
+	 * Secrets should be handled carefully in UI (masked display).
+	 * @returns True if type is Secret, false otherwise
+	 */
+	isSecret(): boolean {
+		return this.type === EnvironmentVariableType.Secret;
+	}
+
+	/**
+	 * Sorts environment variables alphabetically by schema name.
+	 * Creates a defensive copy to avoid mutating the original array.
+	 * @param variables - Array of EnvironmentVariable entities to sort
+	 * @returns New sorted array
+	 */
+	static sort(variables: EnvironmentVariable[]): EnvironmentVariable[] {
+		return [...variables].sort((a, b) => a.schemaName.localeCompare(b.schemaName));
+	}
+}
