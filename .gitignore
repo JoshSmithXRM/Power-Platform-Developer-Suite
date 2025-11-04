@@ -7,6 +7,7 @@ dist/
 .DS_Store
 *.tsbuildinfo
 out/
+coverage/
 
 # Extension packaging
 *.vsix

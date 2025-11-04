@@ -204,6 +204,7 @@ module.exports = {
 					const allowedStaticMethods = [
 						'create', 'createFrom', 'createEmpty', 'createGlobal', 'createSecret',
 						'from', 'fromJson', 'fromData', 'fromValue', 'fromSegments',
+						'fromNumber', 'fromMilliseconds', 'default',
 						'generate', 'success', 'failure', 'successWithWarnings',
 						'allowed', 'protected', 'notFound', 'forSecret', 'parsePath',
 						'calculateSize', 'empty'
@@ -256,7 +257,7 @@ module.exports = {
 			const objectType = isEntity ? 'entity' : 'value object';
 
 			const FORBIDDEN_PREFIXES = ['to', 'as', 'serialize', 'deserialize', 'format'];
-			const FORBIDDEN_METHODS = ['getTypeName', 'getStatusLabel', 'getLabel', 'getDisplayName', 'getDisplayText'];
+			const FORBIDDEN_METHODS = ['getTypeName', 'getStatusLabel', 'getLabel', 'getDisplayName', 'getDisplayText', 'getBadgeClass', 'getBadgeVariant'];
 			const ALLOWED_METHODS = ['toString', 'toJSON']; // Standard JavaScript methods
 
 			return {
@@ -347,6 +348,12 @@ module.exports = {
 			schema: []
 		},
 		create(context) {
+			const filename = context.getFilename();
+
+			// Exempt value objects: Type-Safe Enum pattern is legitimate
+			// Example: TraceLevel.Off = new TraceLevel(0)
+			const isValueObject = filename.includes('/domain/valueObjects/') || filename.includes('\\domain\\valueObjects\\');
+
 			return {
 				PropertyDefinition(node) {
 					// Check if property is static and readonly
@@ -359,6 +366,17 @@ module.exports = {
 
 					// Check if value is a NewExpression (new X())
 					if (node.value && node.value.type === 'NewExpression') {
+						// Exempt value objects: They use Type-Safe Enum pattern
+						if (isValueObject) {
+							// Check if instantiating self (e.g., TraceLevel instantiates TraceLevel)
+							const className = node.parent.parent.id?.name;
+							const instantiatedClass = node.value.callee?.name;
+
+							if (className && instantiatedClass && className === instantiatedClass) {
+								return; // Allow Type-Safe Enum pattern
+							}
+						}
+
 						const propertyName = node.key.name || 'unknown';
 						context.report({
 							node,
