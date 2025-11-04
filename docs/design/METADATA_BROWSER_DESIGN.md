@@ -440,6 +440,64 @@
 
 ### Domain Layer Types
 
+> **Note:** Type contracts reviewed and approved by typescript-pro with branded types, union types, and discriminated unions for maximum type safety.
+
+#### Branded Types (Prevent Wrong String Types)
+
+```typescript
+// Prevents passing wrong string types (e.g., passing environmentId where logicalName expected)
+export type EntityLogicalName = string & { readonly __brand: 'EntityLogicalName' };
+export type EnvironmentId = string & { readonly __brand: 'EnvironmentId' };
+
+// Type guards for runtime validation at domain boundaries
+export function isEntityLogicalName(value: string): value is EntityLogicalName {
+  return typeof value === 'string' && value.length > 0 && /^[a-z_][a-z0-9_]*$/.test(value);
+}
+
+export function isEnvironmentId(value: string): value is EnvironmentId {
+  return typeof value === 'string' && value.length > 0;
+}
+```
+
+#### Union Types (Exhaustive Type Checking)
+
+```typescript
+// Attribute types (exhaustive - enables switch exhaustiveness checking)
+export type AttributeType =
+  | 'String'
+  | 'Integer'
+  | 'Boolean'
+  | 'DateTime'
+  | 'Decimal'
+  | 'Money'
+  | 'Lookup'
+  | 'Picklist'
+  | 'MultiSelectPicklist'
+  | 'Memo'
+  | 'Owner'
+  | 'Customer'
+  | 'Status'
+  | 'State'
+  | 'Uniqueidentifier';
+
+// Type guard validates API data at repository boundary
+export function isAttributeType(value: string): value is AttributeType {
+  const validTypes: AttributeType[] = [
+    'String', 'Integer', 'Boolean', 'DateTime', 'Decimal', 'Money',
+    'Lookup', 'Picklist', 'MultiSelectPicklist', 'Memo', 'Owner',
+    'Customer', 'Status', 'State', 'Uniqueidentifier'
+  ];
+  return validTypes.includes(value as AttributeType);
+}
+
+// Relationship types (exhaustive)
+export type RelationshipType = 'OneToMany' | 'ManyToOne' | 'ManyToMany';
+
+export function isRelationshipType(value: string): value is RelationshipType {
+  return value === 'OneToMany' || value === 'ManyToOne' || value === 'ManyToMany';
+}
+```
+
 #### Entities
 
 ```typescript
@@ -447,7 +505,7 @@
 export class EntityMetadata {
   private constructor(
     private readonly metadataId: string,
-    private readonly logicalName: string,
+    private readonly logicalName: EntityLogicalName, // ✅ Branded type
     private readonly displayName: string,
     private readonly isCustomEntity: boolean,
     private readonly isManaged: boolean,
@@ -476,11 +534,7 @@ export class EntityMetadata {
   }
 
   public matchesFilter(options: FilterOptions): boolean {
-    if (!options.getShowCustom() && this.isCustomEntity) return false;
-    if (!options.getShowSystem() && !this.isCustomEntity) return false;
-    if (!options.getShowManaged() && this.isManaged) return false;
-    if (!options.getShowUnmanaged() && !this.isManaged) return false;
-    return true;
+    return FilterOptionsHelper.matches(options, this.isCustomEntity, this.isManaged);
   }
 
   public getMakerUrl(environmentUrl: string): string {
@@ -509,7 +563,7 @@ export class EntityMetadata {
     };
   }
 
-  // Factory method
+  // Factory method with validation
   public static create(params: {
     metadataId: string;
     logicalName: string;
@@ -522,18 +576,18 @@ export class EntityMetadata {
     privileges?: readonly PrivilegeMetadata[];
   }): EntityMetadata {
     if (!params.metadataId?.trim()) {
-      throw new ValidationError('EntityMetadata', 'metadataId', params.metadataId, 'MetadataId is required');
+      throw new Error('MetadataId is required');
     }
-    if (!params.logicalName?.trim()) {
-      throw new ValidationError('EntityMetadata', 'logicalName', params.logicalName, 'LogicalName is required');
+    if (!isEntityLogicalName(params.logicalName)) {
+      throw new Error(`Invalid entity logical name: ${params.logicalName}`);
     }
     if (!params.displayName?.trim()) {
-      throw new ValidationError('EntityMetadata', 'displayName', params.displayName, 'DisplayName is required');
+      throw new Error('DisplayName is required');
     }
 
     return new EntityMetadata(
       params.metadataId,
-      params.logicalName,
+      params.logicalName as EntityLogicalName,
       params.displayName,
       params.isCustomEntity,
       params.isManaged,
@@ -546,7 +600,7 @@ export class EntityMetadata {
 
   // Getters for immutable access
   public getMetadataId(): string { return this.metadataId; }
-  public getLogicalName(): string { return this.logicalName; }
+  public getLogicalName(): EntityLogicalName { return this.logicalName; }
   public getDisplayName(): string { return this.displayName; }
   public getIsManaged(): boolean { return this.isManaged; }
   public getAttributes(): readonly AttributeMetadata[] { return this.attributes; }
@@ -561,7 +615,7 @@ export class AttributeMetadata {
   private constructor(
     private readonly logicalName: string,
     private readonly displayName: string,
-    private readonly attributeType: string,
+    private readonly attributeType: AttributeType, // ✅ Union type (not string)
     private readonly isCustomAttribute: boolean,
     private readonly isManaged: boolean,
     private readonly isPrimaryId: boolean,
@@ -570,7 +624,7 @@ export class AttributeMetadata {
     private readonly isValidForUpdate: boolean,
     private readonly isValidForRead: boolean,
     private readonly requiredLevel: string,
-    private readonly maxLength?: number
+    private readonly maxLength: number | undefined // ✅ undefined (not optional with ?)
   ) {}
 
   public isCustom(): boolean {
@@ -594,8 +648,25 @@ export class AttributeMetadata {
   }
 
   public getAttributeTypeDisplay(): string {
-    // Format attribute type for display (e.g., "String", "Integer", "DateTime")
-    return this.attributeType;
+    // Format attribute type for display (exhaustive switch ensures all types handled)
+    const typeMap: Record<AttributeType, string> = {
+      'String': 'Single Line of Text',
+      'Integer': 'Whole Number',
+      'Boolean': 'Yes/No',
+      'DateTime': 'Date and Time',
+      'Decimal': 'Decimal Number',
+      'Money': 'Currency',
+      'Lookup': 'Lookup',
+      'Picklist': 'Choice',
+      'MultiSelectPicklist': 'Choices',
+      'Memo': 'Multiple Lines of Text',
+      'Owner': 'Owner',
+      'Customer': 'Customer',
+      'Status': 'Status',
+      'State': 'Status Reason',
+      'Uniqueidentifier': 'Unique Identifier'
+    };
+    return typeMap[this.attributeType];
   }
 
   public getRawMetadata(): object {
@@ -615,7 +686,7 @@ export class AttributeMetadata {
   public static create(params: {
     logicalName: string;
     displayName: string;
-    attributeType: string;
+    attributeType: string; // string in, AttributeType out (validated)
     isCustomAttribute: boolean;
     isManaged: boolean;
     isPrimaryId?: boolean;
@@ -627,16 +698,19 @@ export class AttributeMetadata {
     maxLength?: number;
   }): AttributeMetadata {
     if (!params.logicalName?.trim()) {
-      throw new ValidationError('AttributeMetadata', 'logicalName', params.logicalName, 'LogicalName is required');
+      throw new Error('LogicalName is required');
     }
     if (!params.displayName?.trim()) {
-      throw new ValidationError('AttributeMetadata', 'displayName', params.displayName, 'DisplayName is required');
+      throw new Error('DisplayName is required');
+    }
+    if (!isAttributeType(params.attributeType)) {
+      throw new Error(`Invalid attribute type: ${params.attributeType}`);
     }
 
     return new AttributeMetadata(
       params.logicalName,
       params.displayName,
-      params.attributeType,
+      params.attributeType, // ✅ Type guard ensured it's AttributeType
       params.isCustomAttribute,
       params.isManaged,
       params.isPrimaryId ?? false,
@@ -645,13 +719,13 @@ export class AttributeMetadata {
       params.isValidForUpdate ?? true,
       params.isValidForRead ?? true,
       params.requiredLevel ?? 'None',
-      params.maxLength
+      params.maxLength // ✅ undefined if not provided
     );
   }
 
   public getLogicalName(): string { return this.logicalName; }
   public getDisplayName(): string { return this.displayName; }
-  public getAttributeType(): string { return this.attributeType; }
+  public getAttributeType(): AttributeType { return this.attributeType; }
   public getIsManaged(): boolean { return this.isManaged; }
   public getRequiredLevel(): string { return this.requiredLevel; }
   public getMaxLength(): number | undefined { return this.maxLength; }
@@ -703,58 +777,67 @@ export class KeyMetadata {
 export class RelationshipMetadata {
   private constructor(
     private readonly schemaName: string,
-    private readonly relationshipType: RelationshipType,
-    private readonly referencedEntity: string,
-    private readonly referencingEntity: string,
-    private readonly referencedAttribute?: string,
-    private readonly referencingAttribute?: string
+    private readonly relationshipType: RelationshipType, // ✅ Union type (not string)
+    private readonly referencedEntity: EntityLogicalName, // ✅ Branded type
+    private readonly referencingEntity: EntityLogicalName, // ✅ Branded type
+    private readonly referencedAttribute: string | undefined,
+    private readonly referencingAttribute: string | undefined
   ) {}
 
   public isOneToMany(): boolean {
-    return this.relationshipType === RelationshipType.OneToMany;
+    return this.relationshipType === 'OneToMany';
   }
 
   public isManyToOne(): boolean {
-    return this.relationshipType === RelationshipType.ManyToOne;
+    return this.relationshipType === 'ManyToOne';
   }
 
   public isManyToMany(): boolean {
-    return this.relationshipType === RelationshipType.ManyToMany;
+    return this.relationshipType === 'ManyToMany';
   }
 
-  public getRelatedEntityName(): string {
+  public getRelatedEntityName(fromEntity: EntityLogicalName): EntityLogicalName {
     // For the current entity, return the "other" entity in the relationship
-    // This is used for navigation
-    return this.relationshipType === RelationshipType.ManyToOne
-      ? this.referencedEntity
-      : this.referencingEntity;
+    return fromEntity === this.referencedEntity
+      ? this.referencingEntity
+      : this.referencedEntity;
   }
 
   public getRelationshipTypeDisplay(): string {
+    // Exhaustive switch - TypeScript ensures all cases handled
     switch (this.relationshipType) {
-      case RelationshipType.OneToMany: return '1:N';
-      case RelationshipType.ManyToOne: return 'N:1';
-      case RelationshipType.ManyToMany: return 'N:N';
+      case 'OneToMany': return '1:N';
+      case 'ManyToOne': return 'N:1';
+      case 'ManyToMany': return 'N:N';
     }
   }
 
   public static create(params: {
     schemaName: string;
-    relationshipType: RelationshipType;
+    relationshipType: string; // string in, RelationshipType out (validated)
     referencedEntity: string;
     referencingEntity: string;
     referencedAttribute?: string;
     referencingAttribute?: string;
   }): RelationshipMetadata {
     if (!params.schemaName?.trim()) {
-      throw new ValidationError('RelationshipMetadata', 'schemaName', params.schemaName, 'SchemaName is required');
+      throw new Error('SchemaName is required');
+    }
+    if (!isRelationshipType(params.relationshipType)) {
+      throw new Error(`Invalid relationship type: ${params.relationshipType}`);
+    }
+    if (!isEntityLogicalName(params.referencedEntity)) {
+      throw new Error(`Invalid referenced entity: ${params.referencedEntity}`);
+    }
+    if (!isEntityLogicalName(params.referencingEntity)) {
+      throw new Error(`Invalid referencing entity: ${params.referencingEntity}`);
     }
 
     return new RelationshipMetadata(
       params.schemaName,
-      params.relationshipType,
-      params.referencedEntity,
-      params.referencingEntity,
+      params.relationshipType, // ✅ Type guard ensured it's RelationshipType
+      params.referencedEntity as EntityLogicalName,
+      params.referencingEntity as EntityLogicalName,
       params.referencedAttribute,
       params.referencingAttribute
     );
@@ -762,8 +845,8 @@ export class RelationshipMetadata {
 
   public getSchemaName(): string { return this.schemaName; }
   public getRelationshipType(): RelationshipType { return this.relationshipType; }
-  public getReferencedEntity(): string { return this.referencedEntity; }
-  public getReferencingEntity(): string { return this.referencingEntity; }
+  public getReferencedEntity(): EntityLogicalName { return this.referencedEntity; }
+  public getReferencingEntity(): EntityLogicalName { return this.referencingEntity; }
   public getReferencedAttribute(): string | undefined { return this.referencedAttribute; }
   public getReferencingAttribute(): string | undefined { return this.referencingAttribute; }
 }
@@ -878,46 +961,69 @@ export class ChoiceMetadata {
 #### Value Objects
 
 ```typescript
-// Immutable value object for filter options
-export class FilterOptions {
-  private constructor(
-    private readonly showCustom: boolean,
-    private readonly showSystem: boolean,
-    private readonly showManaged: boolean,
-    private readonly showUnmanaged: boolean
-  ) {}
+// ✅ Discriminated union - makes impossible states impossible
+// Cannot be both custom-only AND system-only (mutually exclusive)
+export type FilterOptions =
+  | { type: 'all' }
+  | { type: 'custom-only' }
+  | { type: 'system-only' }
+  | { type: 'managed-only' }
+  | { type: 'unmanaged-only' };
 
-  public static createDefault(): FilterOptions {
-    return new FilterOptions(true, true, true, true);
+// Helper for creating filter options
+export class FilterOptionsFactory {
+  public static all(): FilterOptions {
+    return { type: 'all' };
   }
 
-  public static create(params: {
-    showCustom: boolean;
-    showSystem: boolean;
-    showManaged: boolean;
-    showUnmanaged: boolean;
-  }): FilterOptions {
-    return new FilterOptions(
-      params.showCustom,
-      params.showSystem,
-      params.showManaged,
-      params.showUnmanaged
-    );
+  public static customOnly(): FilterOptions {
+    return { type: 'custom-only' };
   }
 
-  public getShowCustom(): boolean { return this.showCustom; }
-  public getShowSystem(): boolean { return this.showSystem; }
-  public getShowManaged(): boolean { return this.showManaged; }
-  public getShowUnmanaged(): boolean { return this.showUnmanaged; }
+  public static systemOnly(): FilterOptions {
+    return { type: 'system-only' };
+  }
+
+  public static managedOnly(): FilterOptions {
+    return { type: 'managed-only' };
+  }
+
+  public static unmanagedOnly(): FilterOptions {
+    return { type: 'unmanaged-only' };
+  }
+}
+
+// Helper for matching logic (used by entities)
+export class FilterOptionsHelper {
+  public static matches(
+    filter: FilterOptions,
+    isCustom: boolean,
+    isManaged: boolean
+  ): boolean {
+    // Exhaustive switch - TypeScript ensures all cases handled
+    switch (filter.type) {
+      case 'all':
+        return true;
+      case 'custom-only':
+        return isCustom;
+      case 'system-only':
+        return !isCustom;
+      case 'managed-only':
+        return isManaged;
+      case 'unmanaged-only':
+        return !isManaged;
+    }
+  }
 }
 ```
 
 ```typescript
+// ✅ ChoiceOption as value object (not interface)
 export class ChoiceOption {
   private constructor(
     private readonly value: number,
     private readonly label: string,
-    private readonly color?: string
+    private readonly color: string | undefined
   ) {}
 
   public static create(params: {
@@ -926,7 +1032,7 @@ export class ChoiceOption {
     color?: string;
   }): ChoiceOption {
     if (!params.label?.trim()) {
-      throw new ValidationError('ChoiceOption', 'label', params.label, 'Label is required');
+      throw new Error('Label is required');
     }
 
     return new ChoiceOption(
@@ -942,49 +1048,42 @@ export class ChoiceOption {
 }
 ```
 
-```typescript
-export enum RelationshipType {
-  OneToMany = 'OneToMany',
-  ManyToOne = 'ManyToOne',
-  ManyToMany = 'ManyToMany'
-}
-
-export enum PrivilegeType {
-  Create = 'Create',
-  Read = 'Read',
-  Write = 'Write',
-  Delete = 'Delete',
-  Assign = 'Assign',
-  Share = 'Share',
-  Append = 'Append',
-  AppendTo = 'AppendTo'
-}
-```
-
 #### Repository Interfaces
 
 ```typescript
-// Domain defines the contract
+// Domain defines the contract (uses branded types for type safety)
 export interface IMetadataRepository {
   /**
    * Retrieves all entity definitions (basic fields only).
    * Does NOT include attributes, keys, relationships, privileges.
    */
-  findAllEntities(environmentId: string): Promise<readonly EntityMetadata[]>;
+  findAllEntities(environmentId: EnvironmentId): Promise<readonly EntityMetadata[]>;
 
   /**
    * Retrieves a single entity definition WITH all related metadata.
    * Includes attributes, keys, relationships, privileges.
+   *
+   * @returns EntityMetadata if found, null if not found (NOT undefined)
    */
-  findEntityById(
-    environmentId: string,
-    logicalName: string
+  findEntityByLogicalName(
+    environmentId: EnvironmentId,
+    logicalName: EntityLogicalName
   ): Promise<EntityMetadata | null>;
 
   /**
    * Retrieves all global option sets (choices).
    */
-  findAllChoices(environmentId: string): Promise<readonly ChoiceMetadata[]>;
+  findAllChoices(environmentId: EnvironmentId): Promise<readonly ChoiceMetadata[]>;
+
+  /**
+   * Retrieves a single choice by logical name.
+   *
+   * @returns ChoiceMetadata if found, null if not found (NOT undefined)
+   */
+  findChoiceByLogicalName(
+    environmentId: EnvironmentId,
+    logicalName: string
+  ): Promise<ChoiceMetadata | null>;
 }
 ```
 
@@ -993,13 +1092,19 @@ export interface IFilterPreferencesRepository {
   /**
    * Saves filter preferences for a specific environment.
    */
-  save(environmentId: string, options: FilterOptions): Promise<void>;
+  saveFilterPreferences(
+    environmentId: EnvironmentId,
+    filterOptions: FilterOptions
+  ): Promise<void>;
 
   /**
    * Loads filter preferences for a specific environment.
-   * Returns default if no preferences saved.
+   *
+   * @returns FilterOptions if found, null if not found (NOT undefined - use FilterOptionsFactory.all() as default)
    */
-  load(environmentId: string): Promise<FilterOptions>;
+  loadFilterPreferences(
+    environmentId: EnvironmentId
+  ): Promise<FilterOptions | null>;
 }
 ```
 
