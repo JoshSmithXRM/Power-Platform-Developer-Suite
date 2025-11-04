@@ -504,30 +504,164 @@ Reviewed-by: typescript-pro, clean-architecture-guardian ✅"
 
 ---
 
-### Phase 6: Integration & Testing
+### Phase 6: Integration & Registration
 
-**6.1 Manual Testing**
+**CRITICAL: This phase is REQUIRED for all panels/commands** - Do not skip!
+
+**6.1 Update package.json (REQUIRED for panels/commands)**
+```json
+// package.json - "contributes.commands" section
+{
+  "command": "power-platform-dev-suite.[feature]",
+  "title": "[Feature Name]",
+  "category": "Power Platform Developer Suite"
+},
+{
+  "command": "power-platform-dev-suite.[feature]PickEnvironment",
+  "title": "[Feature Name]: Choose Environment",
+  "category": "Power Platform Developer Suite"
+}
+```
+
+Checklist:
+- [ ] Commands added to `"contributes.commands"` array
+- [ ] Activation events added to `"activationEvents"` (if needed)
+- [ ] Command IDs match extension.ts registration (exact string match)
+- [ ] npm run compile ✅
+
+**6.2 Register in extension.ts (REQUIRED for panels/commands)**
+
+Create feature initializer function:
+```typescript
+// src/extension.ts - Add before activate()
+
+async function initialize[Feature](
+    context: vscode.ExtensionContext,
+    authService: MsalAuthenticationService,
+    environmentRepository: IEnvironmentRepository,
+    logger: ILogger,
+    initialEnvironmentId?: string
+): Promise<void> {
+    // Lazy imports
+    const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js');
+    const { [Repository] } = await import('./features/[feature]/infrastructure/repositories/[Repository].js');
+    const { [UseCase] } = await import('./features/[feature]/application/useCases/[UseCase].js');
+    const { [Panel] } = await import('./features/[feature]/presentation/panels/[Panel].js');
+
+    // Setup dependencies
+    const getEnvironments = createGetEnvironments(environmentRepository);
+    const getEnvironmentById = createGetEnvironmentById(environmentRepository);
+    const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
+    const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
+
+    // Create repositories and use cases
+    const repository = new [Repository](dataverseApiService, logger);
+    const useCase = new [UseCase](repository, logger);
+
+    // Show panel
+    await [Panel].createOrShow(
+        context.extensionUri,
+        getEnvironments,
+        getEnvironmentById,
+        useCase,
+        logger,
+        initialEnvironmentId
+    );
+}
+```
+
+Register commands in activate():
+```typescript
+// src/extension.ts - Inside activate() function
+
+const [feature]Command = vscode.commands.registerCommand(
+    'power-platform-dev-suite.[feature]',
+    async (environmentItem?: { envId: string }) => {
+        try {
+            let initialEnvironmentId: string | undefined;
+            if (environmentItem?.envId) {
+                initialEnvironmentId = environmentItem.envId;
+            }
+            void initialize[Feature](context, authService, environmentRepository, logger, initialEnvironmentId);
+        } catch (error) {
+            vscode.window.showErrorMessage(
+                `Failed to open [Feature]: ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+    }
+);
+
+const [feature]PickEnvironmentCommand = vscode.commands.registerCommand(
+    'power-platform-dev-suite.[feature]PickEnvironment',
+    async () => {
+        try {
+            const environments = await environmentRepository.getAll();
+
+            if (environments.length === 0) {
+                vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
+                return;
+            }
+
+            const quickPickItems = environments.map(env => ({
+                label: env.getName().getValue(),
+                description: env.getDataverseUrl().getValue(),
+                envId: env.getId().getValue()
+            }));
+
+            const selected = await vscode.window.showQuickPick(quickPickItems, {
+                placeHolder: 'Select an environment to view [Feature]'
+            });
+
+            if (selected) {
+                void initialize[Feature](context, authService, environmentRepository, logger, selected.envId);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(
+                `Failed to open [Feature]: ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+    }
+);
+
+// Add to subscriptions
+context.subscriptions.push(
+    [feature]Command,
+    [feature]PickEnvironmentCommand
+    // ... other commands
+);
+```
+
+Checklist:
+- [ ] Feature initializer function created
+- [ ] Command handlers registered (both direct and pick-environment)
+- [ ] Commands added to context.subscriptions
+- [ ] Error handling present in command handlers
+- [ ] npm run compile ✅
+
+**6.3 Manual Testing (CRITICAL - verify registration)**
 - [ ] Open VS Code extension (F5)
+- [ ] Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
+- [ ] Type feature name
+- [ ] **VERIFY: Command appears in palette** ⭐ CRITICAL CHECK
+- [ ] Invoke command, verify panel opens
 - [ ] Test happy path
 - [ ] Test error cases
 - [ ] Verify logging in OutputChannel
 - [ ] Test edge cases
+- [ ] Test "Choose Environment" command variant
 
-**6.2 Update Extension Registration (if needed)**
-```typescript
-// src/extension.ts
-const [feature]Panel = new [Feature]Panel(...);
-context.subscriptions.push(
-    vscode.commands.registerCommand('powerplatform.[feature]', () => {
-        [feature]Panel.show();
-    })
-);
-```
-
-**6.3 Final Commit (if changes)**
+**6.4 Commit Registration**
 ```bash
-git add src/extension.ts
-git commit -m "feat: register [feature] command"
+git add package.json src/extension.ts
+git commit -m "feat: register [feature] commands
+
+- Add commands to package.json
+- Register command handlers in extension.ts
+- Initialize[Feature]() function with lazy loading
+- Both direct and pick-environment commands
+
+Tested: Command appears in palette ✅
+Reviewed-by: Manual testing ✅"
 ```
 
 ---

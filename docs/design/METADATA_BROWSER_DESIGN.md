@@ -1,7 +1,8 @@
 # Metadata Browser - Technical Design
 
-**Status:** Draft
+**Status:** Approved
 **Date:** 2025-11-04
+**Approved:** 2025-11-04
 **Complexity:** Complex
 
 ---
@@ -534,7 +535,7 @@ export class EntityMetadata {
   }
 
   public matchesFilter(options: FilterOptions): boolean {
-    return FilterOptionsHelper.matches(options, this.isCustomEntity, this.isManaged);
+    return options.matches(this.isCustomEntity, this.isManaged);
   }
 
   public getMakerUrl(environmentUrl: string): string {
@@ -961,58 +962,47 @@ export class ChoiceMetadata {
 #### Value Objects
 
 ```typescript
-// ✅ Discriminated union - makes impossible states impossible
-// Cannot be both custom-only AND system-only (mutually exclusive)
-export type FilterOptions =
-  | { type: 'all' }
-  | { type: 'custom-only' }
-  | { type: 'system-only' }
-  | { type: 'managed-only' }
-  | { type: 'unmanaged-only' };
+// ✅ Immutable value object with independent boolean flags
+// Supports multiple filters simultaneously (e.g., show custom AND managed)
+export class FilterOptions {
+  private constructor(
+    private readonly showCustom: boolean,
+    private readonly showSystem: boolean,
+    private readonly showManaged: boolean,
+    private readonly showUnmanaged: boolean
+  ) {}
 
-// Helper for creating filter options
-export class FilterOptionsFactory {
-  public static all(): FilterOptions {
-    return { type: 'all' };
+  public static create(params: {
+    showCustom: boolean;
+    showSystem: boolean;
+    showManaged: boolean;
+    showUnmanaged: boolean;
+  }): FilterOptions {
+    return new FilterOptions(
+      params.showCustom,
+      params.showSystem,
+      params.showManaged,
+      params.showUnmanaged
+    );
   }
 
-  public static customOnly(): FilterOptions {
-    return { type: 'custom-only' };
+  public static createDefault(): FilterOptions {
+    return new FilterOptions(true, true, true, true);
   }
 
-  public static systemOnly(): FilterOptions {
-    return { type: 'system-only' };
-  }
+  // Getters for immutable access
+  public getShowCustom(): boolean { return this.showCustom; }
+  public getShowSystem(): boolean { return this.showSystem; }
+  public getShowManaged(): boolean { return this.showManaged; }
+  public getShowUnmanaged(): boolean { return this.showUnmanaged; }
 
-  public static managedOnly(): FilterOptions {
-    return { type: 'managed-only' };
-  }
-
-  public static unmanagedOnly(): FilterOptions {
-    return { type: 'unmanaged-only' };
-  }
-}
-
-// Helper for matching logic (used by entities)
-export class FilterOptionsHelper {
-  public static matches(
-    filter: FilterOptions,
-    isCustom: boolean,
-    isManaged: boolean
-  ): boolean {
-    // Exhaustive switch - TypeScript ensures all cases handled
-    switch (filter.type) {
-      case 'all':
-        return true;
-      case 'custom-only':
-        return isCustom;
-      case 'system-only':
-        return !isCustom;
-      case 'managed-only':
-        return isManaged;
-      case 'unmanaged-only':
-        return !isManaged;
-    }
+  // Business logic: matches filter criteria
+  public matches(isCustom: boolean, isManaged: boolean): boolean {
+    if (!this.showCustom && isCustom) return false;
+    if (!this.showSystem && !isCustom) return false;
+    if (!this.showManaged && isManaged) return false;
+    if (!this.showUnmanaged && !isManaged) return false;
+    return true;
   }
 }
 ```
@@ -2323,6 +2313,40 @@ resources/webview/
 
 ## Testing Strategy
 
+### Test Requirements (BEFORE Implementation Review)
+
+**CRITICAL**: Tests must be written AFTER implementation but BEFORE review request.
+
+**Test Workflow:**
+1. Implement domain layer → Write domain tests → Run `npm test` → Verify pass
+2. Implement application layer → Write application tests → Run `npm test` → Verify pass
+3. Request review ONLY after all tests pass
+
+**Coverage Targets:**
+- Domain entities: **100% coverage target**
+  - All behavior methods tested
+  - Factory validation tested (valid inputs, invalid inputs)
+  - Edge cases tested (empty strings, null values, boundary conditions)
+
+- Application use cases: **90% coverage target**
+  - Happy path tested
+  - Error cases tested (null returns, exceptions)
+  - Filter/search logic tested
+
+**Review Checklist:**
+- [ ] Test files exist for all domain entities (EntityMetadata.test.ts, AttributeMetadata.test.ts, etc.)
+- [ ] Test files exist for all use cases (ListEntitiesUseCase.test.ts, etc.)
+- [ ] `npm test` passes with 0 failures
+- [ ] Coverage meets targets (run `npm run test:coverage`)
+- [ ] No skipped tests without justification (no `it.skip` or `describe.skip`)
+
+**IMPORTANT**: Following CLAUDE.md rules:
+- Write clean from start (no cleanup phase needed)
+- Run `npm test` BEFORE `npm run compile`
+- Include test file paths in commit messages
+
+---
+
 ### Domain Tests (Target: 100% coverage)
 
 ```typescript
@@ -2695,16 +2719,110 @@ describe('DataverseMetadataRepository', () => {
 
 ## Key Architectural Decisions
 
-> **Note:** This section is populated AFTER final approval. During iteration, architect review findings go in separate files under `docs/design/reviews/`.
+> **Note:** Decisions from clean-architecture-guardian final approval review (2025-11-04)
+
+### Decision 1: FilterOptions Implementation
+**Considered:**
+- Option A: Discriminated union (`type: 'all' | 'custom-only' | 'system-only'`)
+- Option B: Class with independent boolean flags (`showCustom`, `showSystem`, `showManaged`, `showUnmanaged`)
+
+**Chosen:** Option B - Class with independent boolean flags
+
+**Rationale:**
+- UI has checkboxes that allow multiple simultaneous filters
+- Users expect to uncheck "System" while keeping "Custom" checked
+- Discriminated union only allows ONE filter at a time (mutually exclusive)
+- Boolean flags support combinations (custom + managed, system + unmanaged, etc.)
+
+**Tradeoffs:**
+- Gave up: Compile-time prevention of impossible states (e.g., custom-only AND system-only)
+- Gained: Flexibility to combine filters as users expect
+- Pattern matches existing PluginTrace implementation
+
+---
+
+### Decision 2: Rich Domain Models with Business Logic
+**Considered:**
+- Option A: Anemic domain models (entities as data classes)
+- Option B: Rich domain models (entities with behavior methods)
+
+**Chosen:** Option B - Rich domain models
+
+**Rationale:**
+- EntityMetadata has 9 behavior methods (isCustom, matchesSearchTerm, matchesFilter, getMakerUrl, etc.)
+- Business logic belongs in domain, not use cases
+- Use cases orchestrate only (no business logic)
+- Enables testability at domain layer (100% coverage)
+
+**Tradeoffs:**
+- Gave up: Simple data classes (less code)
+- Gained: Encapsulated business logic, testable behavior, Clean Architecture compliance
+
+---
+
+### Decision 3: Branded Types for Type Safety
+**Considered:**
+- Option A: Plain strings for IDs and names
+- Option B: Branded types (`EntityLogicalName`, `EnvironmentId`)
+
+**Chosen:** Option B - Branded types
+
+**Rationale:**
+- Prevents passing wrong string type (e.g., `environmentId` where `logicalName` expected)
+- Compile-time error if types mismatch
+- Type guards validate at runtime (repository boundary)
+- Recommended by typescript-pro for maximum type safety
+
+**Tradeoffs:**
+- Gave up: Simplicity of plain strings
+- Gained: Compile-time safety, self-documenting code, fewer runtime bugs
+
+---
+
+### Decision 4: Vertical Slicing (14 Slices)
+**Considered:**
+- Option A: Horizontal slicing (all domain → all application → all infrastructure)
+- Option B: Vertical slicing (MVP slice + 13 enhancement slices)
+
+**Chosen:** Option B - Vertical slicing
+
+**Rationale:**
+- Each slice delivers working software (all layers)
+- Fast feedback (30-60 minute increments)
+- Can stop at any slice if priorities change
+- Slice 1 proves entire stack works (walking skeleton)
+
+**Tradeoffs:**
+- Gave up: Complete each layer once
+- Gained: Continuous delivery, fast feedback, risk reduction
+
+---
+
+### Decision 5: No Caching in MVP
+**Considered:**
+- Option A: Cache metadata responses (5-minute TTL)
+- Option B: No caching, fetch fresh data each time
+
+**Chosen:** Option B - No caching in MVP
+
+**Rationale:**
+- Metadata changes infrequently but stale cache causes confusion
+- Typical environments have <500 entities (<2 second load)
+- User can explicitly refresh when needed
+- Can add caching later as Slice 15 if performance issues reported
+
+**Tradeoffs:**
+- Gave up: Reduced API calls
+- Gained: Always fresh data, simpler implementation, no cache invalidation complexity
 
 ---
 
 ## Review & Approval
 
 ### Design Phase
-- [ ] clean-architecture-guardian design review (all layers)
-- [ ] typescript-pro type contract review
-- [ ] Human approval of design
+- [x] ✅ clean-architecture-guardian design review (all layers) - Completed 2025-11-04
+- [x] ✅ typescript-pro type contract review - Completed 2025-11-04
+- [x] ✅ Human approval of design - Completed 2025-11-04
 
 ### Implementation Phase (per slice)
 - [ ] Slice 1 implemented and reviewed
@@ -2729,18 +2847,47 @@ describe('DataverseMetadataRepository', () => {
 - [ ] Documentation updated (if new patterns)
 - [ ] clean-architecture-guardian final approval
 
-**Status:** Pending
-**Approver:** TBD
-**Date:** TBD
+**Status:** ✅ Approved
+**Approver:** clean-architecture-guardian
+**Date:** 2025-11-04
+**Review Outcome:** APPROVED WITH MINOR RECOMMENDATIONS (all addressed)
 
 ---
 
-## Open Questions
+## Design Decisions (Resolved During Design Phase)
 
-- [ ] Should we cache metadata responses to reduce API calls?
-- [ ] Should we implement lazy loading for large entity lists (virtualization)?
-- [ ] Should we support local/picklist option sets (not just global)?
-- [ ] Should detail panel be collapsible or fixed width?
+### Q1: Should we cache metadata responses to reduce API calls?
+**Decision:** No caching in MVP (Slices 1-14)
+**Rationale:**
+- Metadata changes infrequently but when it does, stale cache causes confusion
+- Typical environments have <500 entities (loads in <2 seconds)
+- User can explicitly refresh when needed
+**Future Enhancement:** Slice 15 could add optional caching with TTL (5 minutes) and invalidation on user refresh
+
+### Q2: Should we implement lazy loading for large entity lists (virtualization)?
+**Decision:** No virtualization in MVP (Slices 1-14)
+**Rationale:**
+- Most environments have <500 entities (acceptable DOM size)
+- Search/filter reduces visible items significantly
+- Complexity not justified for typical use case
+**Future Enhancement:** Slice 16 could add virtualization if performance issues reported (>1000 entities)
+
+### Q3: Should we support local/picklist option sets (not just global)?
+**Decision:** Global option sets only in MVP (Slice 13)
+**Rationale:**
+- Global option sets are reusable across entities (higher value)
+- Local option sets are entity-specific (lower discoverability)
+- Keeps MVP scope manageable
+**Future Enhancement:** Slice 17 could add local option sets under Attributes tab (show picklist values inline)
+
+### Q4: Should detail panel be collapsible or fixed width?
+**Decision:** Collapsible (hidden by default) - Implemented in Slice 11
+**Rationale:**
+- Most users only need tree + tabs (80% use case)
+- Detail panel is power-user feature (Properties + Raw JSON)
+- Hidden by default maximizes middle panel space
+- Context menu "View Details" reveals right panel
+- Close button hides right panel again
 
 ---
 

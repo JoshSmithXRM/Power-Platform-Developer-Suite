@@ -73,6 +73,10 @@ You: "I need to implement a new import job tracking feature"
 - ✅ Check dependency direction
 - ✅ Validate SOLID principles
 - ✅ **Review code quality** (naming, duplication, complexity)
+- ✅ **Verify extension registration** (for presentation layer only):
+  - Commands registered in package.json
+  - Command handlers registered in extension.ts
+  - Manual testing completed (command appears in palette)
 - ✅ **Provide FINAL APPROVAL**: APPROVE / CHANGES REQUESTED / REJECT
 
 **Note**: This agent absorbed the final approval responsibilities from the deprecated `code-reviewer` agent.

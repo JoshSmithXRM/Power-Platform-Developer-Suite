@@ -458,6 +458,34 @@ describe('[UseCase]', () => {
 
 ---
 
+## Extension Integration Checklist
+
+**REQUIRED for all panels/commands** - Ensure these are completed during implementation:
+
+**Commands (for package.json):**
+- [ ] Command ID defined: `power-platform-dev-suite.[feature]`
+- [ ] Command ID (pick environment) defined: `power-platform-dev-suite.[feature]PickEnvironment`
+- [ ] Command titles specified
+- [ ] Activation events defined (if needed)
+- [ ] Commands added to `"contributes.commands"` array
+
+**Extension Registration (for extension.ts):**
+- [ ] Feature initializer function created (`initialize[Feature]()`)
+- [ ] Lazy imports with dynamic `import()` for performance
+- [ ] Command handlers registered (both direct and pick-environment)
+- [ ] Commands added to `context.subscriptions`
+- [ ] Error handling in command handlers
+- [ ] Environment picker logic implemented
+
+**Verification:**
+- [ ] `npm run compile` passes after package.json changes
+- [ ] Command appears in Command Palette (Ctrl+Shift+P)
+- [ ] Manual testing completed (F5, invoke command, panel opens)
+
+> **Critical:** Do NOT skip this section. Missing registration means the feature won't be accessible to users.
+
+---
+
 ## Key Architectural Decisions
 
 > **Note:** This section is populated AFTER final approval. During iteration, architect review findings go in separate files under `docs/design/reviews/`.
