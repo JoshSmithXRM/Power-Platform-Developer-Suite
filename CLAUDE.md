@@ -20,6 +20,7 @@
 12. **Dynamic import types in signatures** - Use direct imports: `import type { Foo } from '...'`
 13. **Static utility methods on entities** - Put in domain services or collection classes
 14. **Presentation logic in domain** - Display formatting belongs in mappers, not entities
+15. **Time/effort estimates in designs** - AI time estimates are consistently wrong; use complexity levels instead
 
 ---
 
@@ -42,6 +43,9 @@
 15. **Write tests for domain and application layers** - Business logic must be tested
 16. **Run tests before review** - `npm run compile` includes tests
 17. **Test-driven bug fixes** - Write failing test, fix bug, verify test passes
+18. **Design docs for complex features** - Use template from `.claude/templates/` for features with 4+ slices
+19. **Complexity over time estimates** - Use Simple/Moderate/Complex + slice count, not hours/days
+20. **Vertical slicing in designs** - Identify MVP slice and enhancement slices explicitly
 
 ---
 
@@ -75,6 +79,34 @@
 - ✅ Infrastructure operations - API calls, auth, storage (debug level)
 - ✅ User actions in panels - Command invocations, lifecycle events
 - ✅ Use NullLogger in tests - Silent by default, SpyLogger for assertions
+
+---
+
+## 📋 Design Documentation Rules
+
+**When to create design docs:**
+- ✅ Complex features (4+ vertical slices, affects multiple domains)
+- ✅ New architectural patterns
+- ✅ Features requiring multi-agent design review
+
+**When to skip design docs:**
+- ❌ Simple features (1-2 slices, <1 hour implementation)
+- ❌ Bug fixes
+- ❌ Small refactorings
+
+**Design doc requirements:**
+- ✅ Use template: `.claude/templates/TECHNICAL_DESIGN_TEMPLATE.md`
+- ✅ Complexity: Simple | Moderate | Complex (NO time estimates)
+- ✅ Implementation slices: Identify MVP slice + enhancements
+- ✅ Business value: 3-4 sentences (Problem → Solution → Value)
+- ✅ Type contracts: Define BEFORE implementation
+- ❌ Version numbers in filename (use git branches for iterations)
+- ❌ Keep old versions after approval (delete drafts, keep final only)
+
+**Review and approval:**
+- ✅ Architect reviews create separate file in `docs/design/reviews/` during iteration
+- ✅ After final approval, add **summary** to design doc under "Key Decisions"
+- ✅ Delete review files after approval (archived in git history)
 
 ---
 
@@ -117,4 +149,15 @@
 
 **Remember:** Rich domain models with behavior. Business logic in domain, not use cases or panels.
 
-**Workflows:** See `.claude/WORKFLOW_GUIDE.md` for complete workflows
+---
+
+## 📚 Workflow References
+
+**For specific workflows, see:**
+- `.claude/WORKFLOW_GUIDE.md` - Master workflow guide with invocation examples
+- `.claude/workflows/DESIGN_WORKFLOW.md` - Technical design documentation process
+- `.claude/workflows/NEW_FEATURE_WORKFLOW.md` - Complete feature implementation
+- `.claude/workflows/VERTICAL_SLICING_GUIDE.md` - How to slice features for fast feedback
+- `.claude/workflows/BUG_FIX_WORKFLOW.md` - Quick bug fix process
+- `.claude/workflows/REFACTORING_WORKFLOW.md` - Safe refactoring process
+- `.claude/AGENT_ROLES.md` - Agent responsibilities (who implements vs who reviews)

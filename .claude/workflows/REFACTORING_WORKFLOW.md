@@ -305,7 +305,7 @@ containing business logic."
 Verify business logic moved from use case to domain entity.
 ```
 
-**Total Time**: ~15 mins, 2 commits
+
 
 ---
 
@@ -401,7 +401,7 @@ const sortedEnvironments = CollectionSorter.sortByCreatedOnDescending(environmen
 
 Compile & test → Commit
 
-**Total Time**: ~20 mins, 4 commits
+
 
 ---
 
@@ -507,7 +507,7 @@ Verify:
 - Type safety improved
 ```
 
-**Total Time**: ~20 mins, 3-4 commits
+
 
 ---
 
@@ -580,7 +580,7 @@ private async handleLoadJobs(): Promise<void> {
 
 Compile → Test → Commit
 
-**Total Time**: ~20 mins, 3 commits
+
 
 **After**: Method is <20 lines, each extracted method has single responsibility
 

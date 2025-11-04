@@ -116,7 +116,7 @@ Create review file: docs/codereview/clean-arch-guardian-review-{YYYY-MM-DD}.md
 ```
 
 **Invoked**:
-- Once at design phase (30 min)
+- Once at design phase
 - Once per layer during review (5 min each)
 
 **Does NOT**:
@@ -182,7 +182,7 @@ Create review file: docs/codereview/typescript-pro-review-{YYYY-MM-DD}.md
 ```
 
 **Invoked**:
-- Once during design for type contracts (10 min)
+- Once during design for type contracts
 - Once per layer during review (5 min each)
 
 **Does NOT**:
@@ -264,22 +264,22 @@ Follow: docs/DOCUMENTATION_STYLE_GUIDE.md
 
 ```
 Phase 1: Design
-├─ clean-architecture-guardian designs all layers (30 min)
-├─ typescript-pro reviews type contracts (10 min)
-└─ Human approves (10 min)
+├─ clean-architecture-guardian designs all layers
+├─ typescript-pro reviews type contracts
+└─ Human approves
 
 Phase 2-5: Implementation (per layer)
-├─ YOU implement layer (30 min)
+├─ YOU implement layer
 ├─ npm run compile ✅
-├─ typescript-pro reviews (5 min) [parallel]
-├─ clean-architecture-guardian reviews (5 min) [parallel]
-├─ clean-architecture-guardian final approval (2 min)
+├─ typescript-pro reviews [parallel]
+├─ clean-architecture-guardian reviews [parallel]
+├─ clean-architecture-guardian final approval
 ├─ YOU fix issues (if any)
 ├─ npm run compile ✅
-└─ YOU commit (3 min)
+└─ YOU commit
 
 Phase 6: Documentation (optional)
-└─ code-cleanup-implementer creates docs (20 min)
+└─ code-cleanup-implementer creates docs
 ```
 
 ---
@@ -288,11 +288,11 @@ Phase 6: Documentation (optional)
 
 ```
 Phase 1: Quick Design
-├─ YOU sketch design (10 min)
-└─ typescript-pro reviews type contracts (5 min)
+├─ YOU sketch design
+└─ typescript-pro reviews type contracts
 
 Phase 2: Domain + Application
-├─ YOU implement (30 min)
+├─ YOU implement
 ├─ npm run compile ✅
 ├─ typescript-pro reviews [parallel]
 ├─ clean-architecture-guardian reviews [parallel]
@@ -300,7 +300,7 @@ Phase 2: Domain + Application
 └─ YOU commit
 
 Phase 3: Infrastructure + Presentation
-├─ YOU implement (20 min)
+├─ YOU implement
 ├─ npm run compile ✅
 ├─ typescript-pro reviews [parallel]
 ├─ clean-architecture-guardian reviews [parallel]
@@ -314,17 +314,17 @@ Phase 3: Infrastructure + Presentation
 
 ```
 Phase 1: Implement
-├─ YOU reproduce bug (5 min)
-├─ YOU fix bug (15 min)
+├─ YOU reproduce bug
+├─ YOU fix bug
 └─ npm run compile ✅
 
 Phase 2: Review (minimal)
-├─ typescript-pro reviews (if type-related) (2 min)
-└─ clean-architecture-guardian final approval (2 min)
+├─ typescript-pro reviews
+└─ clean-architecture-guardian final approval
 
 Phase 3: Commit & Test
-├─ YOU commit (3 min)
-└─ YOU test (5 min)
+├─ YOU commit
+└─ YOU test
 ```
 
 ---
@@ -333,15 +333,15 @@ Phase 3: Commit & Test
 
 ```
 Phase 1: Plan
-└─ YOU create refactoring plan (15 min)
+└─ YOU create refactoring plan
 
 Phase 2: Execute Incrementally
-├─ YOU refactor step 1 (10 min)
+├─ YOU refactor step 1
 ├─ npm run compile ✅
-├─ YOU commit (3 min)
-├─ YOU refactor step 2 (10 min)
+├─ YOU commit
+├─ YOU refactor step 2
 ├─ npm run compile ✅
-├─ YOU commit (3 min)
+├─ YOU commit
 └─ [Repeat for each step]
 
 Phase 3: Review (if significant)

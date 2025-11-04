@@ -29,7 +29,7 @@
 
 ## 🧪 Test-Driven Bug Fix Workflow (RECOMMENDED)
 
-**Total Time**: ~25 mins
+
 
 ### Step 1: Write Failing Test (5 min)
 
@@ -393,7 +393,7 @@ Total: ~20 mins
 - Changing 5+ files
 - Adding new classes/interfaces
 - Refactoring significant code
-- Estimated time >1 hour
+- Feels like substantial work
 
 **Action**: Convert to feature work, use NEW_FEATURE_WORKFLOW.md
 

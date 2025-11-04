@@ -4,6 +4,87 @@
 
 ---
 
+## 🎯 Invocation Examples (What Workflow To Use)
+
+**CRITICAL:** When the user says one of these phrases, use the corresponding workflow:
+
+### Design Phase
+| User Says | Use Workflow | Notes |
+|-----------|--------------|-------|
+| "I want to design a new feature" | `DESIGN_WORKFLOW.md` | Creates technical design doc |
+| "Help me design the metadata browser" | `DESIGN_WORKFLOW.md` | Design before implementation |
+| "Create a design doc for..." | `DESIGN_WORKFLOW.md` | Formal design process |
+| "I need a technical design for..." | `DESIGN_WORKFLOW.md` | Use design template |
+
+### Implementation Phase
+| User Says | Use Workflow | Notes |
+|-----------|--------------|-------|
+| "Implement this feature" | `NEW_FEATURE_WORKFLOW.md` | After design is approved |
+| "Build the import job tracker" | Check slices → `DESIGN_WORKFLOW.md` OR `NEW_FEATURE_WORKFLOW.md` | 4+ slices? Design first. 1-2 slices? Streamlined. |
+| "Add functionality to..." | `NEW_FEATURE_WORKFLOW.md` (Streamlined) | Simple features skip design |
+| "Create a new panel for..." | Check complexity → Design OR Implement | |
+
+### Bug Fixes
+| User Says | Use Workflow | Notes |
+|-----------|--------------|-------|
+| "Fix this bug" | `BUG_FIX_WORKFLOW.md` | Write test, fix, commit |
+| "There's an error in..." | `BUG_FIX_WORKFLOW.md` | Test-driven fix |
+| "This isn't working..." | `BUG_FIX_WORKFLOW.md` | Quick fix workflow |
+
+### Refactoring
+| User Says | Use Workflow | Notes |
+|-----------|--------------|-------|
+| "Refactor this code" | `REFACTORING_WORKFLOW.md` | Safe, incremental |
+| "Clean up this mess" | `REFACTORING_WORKFLOW.md` | Tests must pass before/after |
+| "Move logic to domain layer" | `REFACTORING_WORKFLOW.md` | Layer violation fix |
+| "Remove duplication" | `REFACTORING_WORKFLOW.md` | Extract abstraction |
+
+### Review Only
+| User Says | Action | Notes |
+|-----------|--------|-------|
+| "Review this code" | Invoke `clean-architecture-guardian` | Review only, no implementation |
+| "Is this architecture correct?" | Invoke `clean-architecture-guardian` | Check compliance |
+| "Check my types" | Invoke `typescript-pro` | Type safety review |
+
+---
+
+## 🌳 Decision Tree (Quick Reference)
+
+```
+User Request → Which Workflow?
+
+├─ "Design a new feature"
+│  └─ DESIGN_WORKFLOW.md → creates technical design doc
+│
+├─ "Implement/Build a feature"
+│  ├─ Complex (4+ slices, new patterns)?
+│  │  ├─ Design exists?
+│  │  │  ├─ Yes → NEW_FEATURE_WORKFLOW.md (Comprehensive)
+│  │  │  └─ No → DESIGN_WORKFLOW.md first, then implement
+│  │  └─ Simple (1-2 slices)?
+│  │     └─ NEW_FEATURE_WORKFLOW.md (Streamlined)
+│  │
+│  └─ Check: Is there an approved design doc?
+│     ├─ Yes → Follow NEW_FEATURE_WORKFLOW.md
+│     └─ No → Ask: Complex? → Design first OR Streamlined
+│
+├─ "Fix a bug"
+│  └─ BUG_FIX_WORKFLOW.md
+│
+├─ "Refactor code"
+│  └─ REFACTORING_WORKFLOW.md
+│
+└─ "Review code"
+   └─ Invoke clean-architecture-guardian (review only)
+```
+
+**Key Question to Ask:**
+- "Does a design doc exist for this feature?"
+  - YES → Implement following design
+  - NO → Is it complex (4+ slices)? → Design first
+
+---
+
 ## Architecture Context
 
 This project follows **Clean Architecture** with **feature-first** organization:
@@ -79,31 +160,31 @@ We have **4 specialized agents**:
 
 ```
 Phase 1: Type-Safe Architecture Design
-1. clean-architecture-guardian designs all layers (30 min)
+1. clean-architecture-guardian designs all layers
    ↓ (designs domain, application, infrastructure, presentation layers)
-2. typescript-pro reviews TYPE CONTRACTS (10 min) ← NEW
+2. typescript-pro reviews TYPE CONTRACTS ← NEW
    ↓ (reviews interfaces, types, generics BEFORE implementation)
-3. Human approves design + type contracts (10 min)
+3. Human approves design + type contracts
 
 Phase 2-5: Per-Layer Implementation (repeat for each layer)
-4. YOU implement layer (30 min)
+4. YOU implement layer
    ↓ (domain → application → infrastructure → presentation)
-5. YOU write tests (15 min) ← NEW
+5. YOU write tests ← NEW
    ↓ (domain: 100% target, application: 90% target, infrastructure: optional)
 6. npm test ✅ (30 sec) ← NEW
    ↓ (tests must pass)
 7. npm run compile ✅ (30 sec) ← CRITICAL (includes tests now)
    ↓ (must succeed before review)
-8. typescript-pro reviews type safety (5 min) [parallel]
-   + clean-architecture-guardian reviews architecture (5 min) [parallel]
+8. typescript-pro reviews type safety [parallel]
+   + clean-architecture-guardian reviews architecture [parallel]
    ↓ (both review simultaneously)
-9. clean-architecture-guardian final approval (2 min)
+9. clean-architecture-guardian final approval
    ↓ (APPROVE/CHANGES REQUESTED/REJECT)
 10. YOU fix issues if any → npm run compile ✅
-11. Commit layer with tests (3 min)
+11. Commit layer with tests
     ↓ (one commit per layer, includes test file paths)
 
-Phase 6: Documentation (optional, 20 min)
+Phase 6: Documentation
 12. code-cleanup-implementer documents patterns (if new)
 ```
 
@@ -117,24 +198,24 @@ Phase 6: Documentation (optional, 20 min)
 ### For Bug Fixes
 
 ```
-1. YOU write failing test (5 min) ← NEW (reproduces bug)
+1. YOU write failing test ← NEW (reproduces bug)
    ↓
-2. YOU implement fix (10 min)
+2. YOU implement fix
    ↓
 3. npm test ✅ (30 sec) ← NEW (test passes now)
    ↓
 4. npm run compile ✅ (30 sec) ← CRITICAL (includes tests)
    ↓
-5. typescript-pro reviews (if type-related) (2 min) [optional]
+5. typescript-pro reviews [optional]
    ↓
-6. clean-architecture-guardian reviews (2 min)
+6. clean-architecture-guardian reviews
    ↓ (APPROVE/REJECT)
-7. YOU commit with test (3 min)
+7. YOU commit with test
    ↓
-8. YOU test manually (5 min)
+8. YOU test manually
 ```
 
-**Total Time**: ~30 mins (includes test)
+
 
 See [BUG_FIX_WORKFLOW.md](workflows/BUG_FIX_WORKFLOW.md) for detailed bug fix process.
 
@@ -172,8 +253,6 @@ git commit -m "fix: null reference in ImportJobRepository
 Added null check before accessing jobData property"
 ```
 
-**Total time:** ~15-20 mins
-
 ---
 
 ### Example 2: New Feature (Full Clean Architecture Flow)
@@ -190,7 +269,7 @@ clean-architecture-guardian:
 - Designs presentation layer (ImportJobViewerPanel using use cases)
 - Outputs detailed specification
 
-Time: ~20-30 mins
+
 ```
 
 **Step 2: Builder Implements Domain Layer**
@@ -257,7 +336,7 @@ docs-generator:
 - Shows use case pattern
 - Follows DOCUMENTATION_STYLE_GUIDE.md
 
-Time: ~15-20 mins
+
 ```
 
 **Step 6: You Commit**
@@ -282,8 +361,6 @@ Presentation layer:
 
 Reviewed-by: clean-architecture-guardian ✅"
 ```
-
-**Total time:** ~3-4 hours (complete feature with Clean Architecture)
 
 ---
 
@@ -473,28 +550,28 @@ You commit: "docs: add import job Clean Architecture example"
 **For Feature Development (Clean Architecture):**
 ```
 Hour 1:
-├─ clean-architecture-guardian designs all layers (30 min)
-├─ Review design (15 min)
+├─ clean-architecture-guardian designs all layers
+├─ Review design
 └─ Implement domain layer (15 min start)
 
 Hour 2:
-├─ Finish domain layer (15 min)
-├─ typescript-pro + clean-architecture-guardian review (parallel, ~3 min)
-├─ clean-architecture-guardian final approval (auto, ~2 min)
-├─ Commit domain (3 min)
-├─ Implement application layer (32 min)
-├─ typescript-pro + clean-architecture-guardian review (parallel, ~3 min)
-└─ Commit application (2 min)
+├─ Finish domain layer
+├─ typescript-pro + clean-architecture-guardian review
+├─ clean-architecture-guardian final approval
+├─ Commit domain
+├─ Implement application layer
+├─ typescript-pro + clean-architecture-guardian review
+└─ Commit application
 
 Hour 3:
-├─ Implement infrastructure (20 min)
-├─ typescript-pro + clean-architecture-guardian review (parallel, ~3 min)
-├─ clean-architecture-guardian reviews (auto, ~2 min)
-├─ Commit infrastructure (3 min)
-├─ Implement presentation (22 min)
-├─ typescript-pro + clean-architecture-guardian review (parallel, ~3 min)
-├─ clean-architecture-guardian reviews (auto, ~2 min)
-└─ Commit presentation (3 min)
+├─ Implement infrastructure
+├─ typescript-pro + clean-architecture-guardian review
+├─ clean-architecture-guardian reviews
+├─ Commit infrastructure
+├─ Implement presentation
+├─ typescript-pro + clean-architecture-guardian review
+├─ clean-architecture-guardian reviews
+└─ Commit presentation
 
 Result: 1 design spec, 4 layer commits with multi-agent review
 ```
@@ -502,10 +579,10 @@ Result: 1 design spec, 4 layer commits with multi-agent review
 **For Bug Fixes:**
 ```
 Hour 1:
-├─ Fix bug (20 min)
-├─ typescript-pro reviews type safety if needed (auto, ~2 min)
-├─ clean-architecture-guardian reviews (auto, ~2 min)
-└─ Commit (3 min)
+├─ Fix bug
+├─ typescript-pro reviews type safety if needed
+├─ clean-architecture-guardian reviews
+└─ Commit
 
 Result: 1 bug fix commit
 ```
@@ -597,9 +674,9 @@ docs-generator: [Creates/updates documentation]
 
 ### 🎯 Perfect Task (Layer-by-Layer)
 - **Scope:** One layer at a time (domain → application → infrastructure → presentation)
-- **Time:** 30-60 minutes including review
+- **Size:** Appropriately scoped for single focus
 - **Commits:** One commit per layer
-- **Review:** Can be reviewed in 10-15 minutes
+- **Review:** Reviewable in reasonable time
 
 
 ---
@@ -739,29 +816,29 @@ If "Feeling" is uncertain/confused → STOP, ask questions, don't push forward.
 **The workflow is:**
 
 **For New Features (Clean Architecture):**
-1. clean-architecture-guardian designs all layers (~30 min)
+1. clean-architecture-guardian designs all layers
    - Domain: Entities, value objects, interfaces
    - Application: Use cases, ViewModels, mappers
    - Infrastructure: Repository implementations
    - Presentation: Panels using use cases
-2. Review design and approve (~15 min)
+2. Review design and approve
 3. Implement layer by layer (~30 min per layer)
    - Domain first (rich entities, no dependencies)
    - Application second (use cases orchestrate)
    - Infrastructure third (repositories implement interfaces)
    - Presentation last (panels use use cases)
-4. Parallel multi-agent review each layer (~3-5 min)
+4. Parallel multi-agent review each layer
    - typescript-pro reviews type safety (parallel)
    - clean-architecture-guardian reviews layer separation (parallel)
-   - clean-architecture-guardian final approval (~2 min)
-5. Commit each layer separately (~5 min)
-6. docs-generator documents pattern if new (~20 min)
+   - clean-architecture-guardian final approval
+5. Commit each layer separately
+6. docs-generator documents pattern if new
 
 **For Bug Fixes:**
-1. Implement fix (~20 min)
-2. typescript-pro reviews type safety if needed (~2 min)
-3. clean-architecture-guardian auto-reviews (~2 min)
-4. Commit if approved (~5 min)
+1. Implement fix
+2. typescript-pro reviews type safety if needed
+3. clean-architecture-guardian auto-reviews
+4. Commit if approved
 
 **The keys are:**
 - **Clean Architecture** - Domain → Application → Infrastructure/Presentation
@@ -794,12 +871,12 @@ For step-by-step checklists and comprehensive guides, see:
 
 1. **[NEW_FEATURE_WORKFLOW.md](workflows/NEW_FEATURE_WORKFLOW.md)**
    - Complete checklist for implementing new features
-   - Comprehensive workflow (complex features, 3+ hours)
-   - Streamlined workflow (simple features, <1 hour)
-   - Phase-by-phase breakdown with time estimates
+   - Comprehensive workflow (complex features)
+   - Streamlined workflow (simple features)
+   - Phase-by-phase breakdown
 
 2. **[BUG_FIX_WORKFLOW.md](workflows/BUG_FIX_WORKFLOW.md)**
-   - Quick bug fix process (~30 mins)
+   - Quick bug fix process 
    - When bug fix becomes feature work
    - Hotfix workflow for production bugs
    - Common bug fix patterns

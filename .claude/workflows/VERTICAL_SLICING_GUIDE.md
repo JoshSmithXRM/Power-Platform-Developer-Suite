@@ -6,9 +6,9 @@
 
 ## 🚀 Quick Reference
 
-**Problem**: Large features take 5+ hours before anything works. High risk, late feedback, can't parallelize.
+**Problem**: Large features take too long before anything works. High risk, late feedback, can't parallelize.
 
-**Solution**: Break features into 30-60 minute vertical slices that go through all layers and result in working functionality.
+**Solution**: Break features into small vertical slices (aim for 30-60 minute sizing) that go through all layers and result in working functionality.
 
 **Benefits**:
 - ✅ Working software every hour
@@ -370,7 +370,7 @@ Monday 11am: Feature C, Slice 1 (Environment Sync - Manual sync) (1 hour)
 
 | Aspect | Horizontal Slicing | Vertical Slicing |
 |--------|-------------------|------------------|
-| **Time to first working software** | 5+ hours | 30-60 min |
+| **Time to first working software** | Very long (all layers) | Quick (one small slice) |
 | **Feedback opportunities** | 1 (at end) | Every slice (5-10x more) |
 | **Risk per slice** | High (all-or-nothing) | Low (small increments) |
 | **Can pivot based on feedback** | No (already built everything) | Yes (after each slice) |

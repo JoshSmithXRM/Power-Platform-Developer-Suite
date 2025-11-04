@@ -7,8 +7,12 @@
 ## 🚀 Quick Reference
 
 **Decision Tree**:
-- Simple feature (1-2 entities, <1 hour)? → Use **Streamlined Workflow**
-- Complex feature (5+ entities, 3+ hours)? → Use **Comprehensive Workflow**
+- Simple feature (1-2 slices, <1 hour)? → Use **Streamlined Workflow** (skip design doc)
+- Complex feature (4+ slices)? → Use **DESIGN_WORKFLOW.md first**, then **Comprehensive Workflow**
+
+**Pre-Implementation:**
+- For complex features: See [DESIGN_WORKFLOW.md](DESIGN_WORKFLOW.md) to create technical design document
+- Result: Approved design with type contracts, vertical slices, and architecture defined
 
 **Key Principles**:
 - ✅ Design upfront with clean-architecture-guardian
@@ -28,72 +32,38 @@
 
 ## 📖 Comprehensive Workflow (Complex Features)
 
-**Use when**: 5+ entities, 10+ use cases, 3+ hours estimated
+**Use when**: 4+ vertical slices, new architectural patterns, affects multiple domains
 
-### Phase 1: Type-Safe Architecture Design (50 min)
+**Pre-requisite**: Complete DESIGN_WORKFLOW.md first to create approved technical design
 
-**1.1 Gather Requirements (10 min)**
-- [ ] Document feature requirements
-- [ ] Identify business rules
-- [ ] List acceptance criteria
-- [ ] Sketch data flow
+### Phase 1: Type-Safe Architecture Design (Complete via DESIGN_WORKFLOW.md)
 
-**1.2 Design All Layers (30 min)**
+**For complex features with 4+ slices:**
 
-Invoke clean-architecture-guardian:
-```
-@agent-clean-architecture-guardian - Design a new feature for [DESCRIPTION].
+Follow the complete design workflow documented in [DESIGN_WORKFLOW.md](DESIGN_WORKFLOW.md).
 
-Requirements:
-- [Requirement 1]
-- [Requirement 2]
-- [Requirement 3]
+**Summary:**
+1. Create design document from template
+2. clean-architecture-guardian designs all layers
+3. typescript-pro reviews type contracts
+4. Human review and iteration
+5. clean-architecture-guardian final approval
+6. Post-approval cleanup
 
-Please design all four layers:
-1. Domain: Entities, value objects, domain services, interfaces
-2. Application: Use cases, ViewModels, mappers
-3. Infrastructure: Repository implementations, API clients
-4. Presentation: Panels, views, event handlers
+**Output:**
+- [ ] Approved technical design document in `docs/design/[FEATURE]_DESIGN.md`
+- [ ] Type contracts defined
+- [ ] Vertical slices identified (MVP + enhancements)
+- [ ] File structure mapped out
+- [ ] Status: "Approved"
 
-Ensure:
-- Rich domain models with behavior (not anemic)
-- Use cases orchestrate only (no business logic)
-- Dependencies point inward
-- Repository interfaces in domain layer
-```
-
-**1.3 Review Type Contracts (10 min)**
-
-Invoke typescript-pro:
-```
-@agent-typescript-pro - Review the TYPE CONTRACTS from clean-architecture-guardian's design.
-
-Focus on:
-- Entity interfaces and return types
-- Generic constraints
-- Null handling (null vs undefined consistency)
-- Discriminated unions for type narrowing
-- Type guards for safer access
-
-Provide recommendations for:
-- Better type inference
-- Stronger type safety
-- Advanced TypeScript patterns
-
-Do NOT review implementation yet - only type definitions.
-```
-
-**1.4 Human Approval (10 min)**
-- [ ] Review clean-architecture-guardian's design
-- [ ] Review typescript-pro's type recommendations
-- [ ] Approve design or request changes
-- [ ] Document any exceptions to architectural rules
+**After approval:** Proceed to Phase 2 (Domain Layer implementation)
 
 ---
 
-### Phase 2: Domain Layer (60 min)
+### Phase 2: Domain Layer
 
-**2.1 Implementation (30 min)**
+**2.1 Implementation**
 
 Create domain layer files:
 - [ ] `src/features/[feature]/domain/entities/[Entity].ts` - Rich models with behavior
@@ -109,7 +79,7 @@ Create domain layer files:
 - [ ] No `any` types without explicit justification
 - [ ] Value objects are immutable
 
-**2.2 Write Tests (15 min)**
+**2.2 Write Tests**
 - [ ] Create `[Entity].test.ts` alongside entity
 - [ ] Test all public methods
 - [ ] Test validation rules
@@ -156,7 +126,7 @@ npm run compile  # Now includes tests
 - [ ] Zero TypeScript errors
 - [ ] Zero ESLint errors
 
-**2.5 Type Safety Review (5 min)**
+**2.5 Type Safety Review**
 
 Invoke typescript-pro:
 ```
@@ -173,7 +143,7 @@ Focus on:
 Create review file: docs/codereview/typescript-pro-domain-review-{YYYY-MM-DD}.md
 ```
 
-**2.6 Architecture Review + Final Approval (5 min)**
+**2.6 Architecture Review + Final Approval**
 
 Invoke clean-architecture-guardian (parallel with 2.5):
 ```
@@ -200,7 +170,7 @@ Create review file: docs/codereview/clean-arch-guardian-domain-review-{YYYY-MM-D
 - [ ] Document any accepted minor issues
 - [ ] npm run compile ✅
 
-**2.8 Commit (3 min)**
+**2.8 Commit**
 ```bash
 git add src/features/[feature]/domain/
 git commit -m "feat(domain): add [feature] entities with behavior
@@ -219,9 +189,9 @@ Reviewed-by: typescript-pro, clean-architecture-guardian ✅"
 
 ---
 
-### Phase 3: Application Layer (60 min)
+### Phase 3: Application Layer
 
-**3.1 Implementation (30 min)**
+**3.1 Implementation**
 
 Create application layer files:
 - [ ] `src/features/[feature]/application/useCases/[UseCase].ts` - Orchestrate domain
@@ -236,7 +206,7 @@ Create application layer files:
 - [ ] Logging at use case boundaries (start/completion/failures)
 - [ ] Inject ILogger via constructor (not Logger.getInstance())
 
-**3.2 Write Tests (15 min)**
+**3.2 Write Tests**
 - [ ] Create `[UseCase].test.ts` alongside use case
 - [ ] Test orchestration flow
 - [ ] Test error handling paths
@@ -315,7 +285,7 @@ Focus on:
 Create review file: docs/codereview/clean-arch-guardian-application-review-{YYYY-MM-DD}.md
 ```
 
-**3.6 Final Approval (2 min)**
+**3.6 Final Approval**
 ```
 @agent-clean-architecture-guardian - Review application layer for final approval.
 Provide: APPROVE / CHANGES REQUESTED / REJECT
@@ -325,7 +295,7 @@ Provide: APPROVE / CHANGES REQUESTED / REJECT
 - [ ] Fix issues
 - [ ] npm run compile ✅
 
-**3.8 Commit (3 min)**
+**3.8 Commit**
 ```bash
 git add src/features/[feature]/application/
 git commit -m "feat(app): add [feature] use cases and ViewModels
@@ -344,9 +314,9 @@ Reviewed-by: typescript-pro, clean-architecture-guardian ✅"
 
 ---
 
-### Phase 4: Infrastructure Layer (50-60 min)
+### Phase 4: Infrastructure Layer
 
-**4.1 Implementation (30 min)**
+**4.1 Implementation**
 
 Create infrastructure layer files:
 - [ ] `src/features/[feature]/infrastructure/repositories/[Repository].ts` - Implement domain interfaces
@@ -414,7 +384,7 @@ Focus on:
 Create review file: docs/codereview/clean-arch-guardian-infrastructure-review-{YYYY-MM-DD}.md
 ```
 
-**4.6 Final Approval (2 min)**
+**4.6 Final Approval**
 ```
 @agent-clean-architecture-guardian - Review infrastructure layer for final approval.
 ```
@@ -423,7 +393,7 @@ Create review file: docs/codereview/clean-arch-guardian-infrastructure-review-{Y
 - [ ] Fix issues
 - [ ] npm run compile ✅
 
-**4.8 Commit (3 min)**
+**4.8 Commit**
 ```bash
 git add src/features/[feature]/infrastructure/
 git commit -m "feat(infra): add [feature] repositories
@@ -440,9 +410,9 @@ Reviewed-by: typescript-pro, clean-architecture-guardian ✅"
 
 ---
 
-### Phase 5: Presentation Layer (45-50 min)
+### Phase 5: Presentation Layer
 
-**5.1 Implementation (30 min)**
+**5.1 Implementation**
 
 Create presentation layer files:
 - [ ] `src/features/[feature]/presentation/panels/[Panel].ts` - Panel logic
@@ -508,7 +478,7 @@ Focus on:
 Create review file: docs/codereview/clean-arch-guardian-presentation-review-{YYYY-MM-DD}.md
 ```
 
-**5.6 Final Approval (2 min)**
+**5.6 Final Approval**
 ```
 @agent-clean-architecture-guardian - Review presentation layer for final approval.
 ```
@@ -517,7 +487,7 @@ Create review file: docs/codereview/clean-arch-guardian-presentation-review-{YYY
 - [ ] Fix issues
 - [ ] npm run compile ✅
 
-**5.8 Commit (3 min)**
+**5.8 Commit**
 ```bash
 git add src/features/[feature]/presentation/
 git commit -m "feat(pres): add [feature] panel
@@ -534,7 +504,7 @@ Reviewed-by: typescript-pro, clean-architecture-guardian ✅"
 
 ---
 
-### Phase 6: Integration & Testing (15 min)
+### Phase 6: Integration & Testing
 
 **6.1 Manual Testing**
 - [ ] Open VS Code extension (F5)
@@ -562,7 +532,7 @@ git commit -m "feat: register [feature] command"
 
 ---
 
-### Phase 7: Documentation (Optional, 20 min)
+### Phase 7: Documentation
 
 **Only if new patterns introduced**
 
@@ -593,37 +563,37 @@ git commit -m "docs: add [feature] Clean Architecture example"
 
 ## 🎯 Streamlined Workflow (Simple Features)
 
-**Use when**: 1-2 entities, 1-2 use cases, <1 hour estimated
+**Use when**: 1-2 vertical slices, simple functionality
 
-### Phase 1: Quick Design (15 min)
-1. Sketch domain entities on paper (5 min)
-2. Identify use case orchestration (5 min)
-3. Invoke typescript-pro to review type contracts (5 min)
+**Skip design document for simple features** - No need for formal design doc, just implement directly.
 
-### Phase 2: Domain + Application (55 min)
-1. Implement domain entities + use cases (30 min)
-2. Write tests for entities and use cases (15 min)
+### Phase 1: Quick Design
+1. Sketch domain entities on paper
+2. Identify use case orchestration
+3. Optional: Invoke typescript-pro to review type contracts if complex types
+
+### Phase 2: Domain + Application
+1. Implement domain entities + use cases
+2. Write tests for entities and use cases
 3. npm test ✅
 4. npm run compile ✅
-5. Parallel review: typescript-pro + clean-architecture-guardian (5 min)
-6. code-reviewer final approval (2 min)
-7. Commit with tests (3 min)
+5. Parallel review: typescript-pro + clean-architecture-guardian
+6. code-reviewer final approval
+7. Commit with tests
 
-### Phase 3: Infrastructure + Presentation (35-40 min)
-1. Implement repositories + panels (20 min)
-2. Write tests for complex repository logic (5-10 min, optional)
+### Phase 3: Infrastructure + Presentation
+1. Implement repositories + panels
+2. Write tests for complex repository logic (optional)
 3. npm test ✅
 4. npm run compile ✅
-5. Parallel review: typescript-pro + clean-architecture-guardian (5 min)
-6. code-reviewer final approval (2 min)
-7. Commit with tests (3 min)
+5. Parallel review: typescript-pro + clean-architecture-guardian
+6. code-reviewer final approval
+7. Commit with tests
 
-### Phase 4: Manual Testing (10 min)
+### Phase 4: Manual Testing
 1. F5 in VS Code
 2. Test feature end-to-end
 3. Verify logging
-
-**Total Time**: ~110-115 mins, 2 commits (includes unit tests)
 
 ---
 
