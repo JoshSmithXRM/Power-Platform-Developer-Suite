@@ -15,6 +15,7 @@ import {
 } from '../../../../shared/infrastructure/ui/DataTablePanel';
 import { isViewImportJobMessage } from '../../../../infrastructure/ui/utils/TypeGuards';
 import { enhanceViewModelsWithImportJobLinks } from '../views/ImportJobLinkView';
+import { renderLinkClickHandler } from '../../../../shared/infrastructure/ui/views/clickableLinks';
 
 /**
  * Presentation layer panel for Import Job Viewer.
@@ -229,19 +230,7 @@ export class ImportJobViewerPanel extends DataTablePanel {
 	 * Adds click handlers to job name links for viewing import job details.
 	 */
 	protected getPanelSpecificJavaScript(): string {
-		return `
-			// Attach click handlers to job name links
-			document.querySelectorAll('.job-link').forEach(link => {
-				link.addEventListener('click', (e) => {
-					e.preventDefault();
-					const importJobId = link.getAttribute('data-job-id');
-					vscode.postMessage({
-						command: 'viewImportJob',
-						data: { importJobId }
-					});
-				});
-			});
-		`;
+		return renderLinkClickHandler('.job-link', 'viewImportJob', 'importJobId');
 	}
 
 	/**

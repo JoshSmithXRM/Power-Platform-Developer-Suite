@@ -14,7 +14,7 @@ import {
 import { DEFAULT_SOLUTION_ID } from '../../domain/constants/SolutionConstants';
 
 import { renderDataTable } from './views/dataTable';
-import { renderSyncDeploymentSettingsButton } from './views/syncDeploymentSettingsButton';
+import { renderToolbarButtons } from './views/toolbarButtons';
 import type { IPanelStateRepository, PanelState } from './IPanelStateRepository';
 
 export interface EnvironmentOption {
@@ -29,6 +29,21 @@ export interface DataTableColumn {
 	readonly width?: string; // CSS width value (e.g., '20%', '150px', 'auto')
 }
 
+/**
+ * Configuration for a custom toolbar button.
+ * Buttons are rendered in the toolbar and send commands to the panel when clicked.
+ */
+export interface ToolbarButtonConfig {
+	/** Unique button ID for DOM manipulation */
+	readonly id: string;
+	/** Button display text */
+	readonly label: string;
+	/** Webview command to send when clicked */
+	readonly command: string;
+	/** Button position in toolbar (default: 'left') */
+	readonly position?: 'left' | 'right';
+}
+
 export interface DataTableConfig {
 	readonly viewType: string;
 	readonly title: string;
@@ -41,6 +56,7 @@ export interface DataTableConfig {
 	readonly noDataMessage: string;
 	readonly enableSearch?: boolean; // Default: true
 	readonly enableSolutionFilter?: boolean; // Default: false
+	readonly toolbarButtons?: ReadonlyArray<ToolbarButtonConfig>; // Custom toolbar buttons
 }
 
 /**
@@ -279,14 +295,17 @@ export abstract class DataTablePanel {
 
 	/**
 	 * Returns common JavaScript shared by all data table panels.
-	 * Handles sync deployment settings button and shared utilities.
+	 * Renders toolbar buttons declared in panel config.
 	 *
 	 * Do NOT override this method unless you need to change base functionality.
 	 *
 	 * @returns JavaScript code for common panel behavior
 	 */
 	protected getCommonJavaScript(): string {
-		return renderSyncDeploymentSettingsButton();
+		const config = this.getConfig();
+		const toolbarButtons = config.toolbarButtons || [];
+
+		return renderToolbarButtons(toolbarButtons);
 	}
 
 	/**

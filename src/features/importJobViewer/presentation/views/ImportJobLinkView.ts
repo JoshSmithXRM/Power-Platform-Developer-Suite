@@ -1,5 +1,5 @@
 import type { ImportJobViewModel } from '../../application/viewModels/ImportJobViewModel';
-import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
+import { renderDataTableLink } from '../../../../shared/infrastructure/ui/views/clickableLinks';
 
 /**
  * View model with HTML-enhanced solution name for rendering.
@@ -33,7 +33,7 @@ function getStatusClass(status: string): string {
  * @returns HTML anchor element as string
  */
 export function renderImportJobLink(jobId: string, solutionName: string): string {
-	return `<a href="#" class="job-link" data-job-id="${jobId}">${escapeHtml(solutionName)}</a>`;
+	return renderDataTableLink('job-link', jobId, solutionName);
 }
 
 /**

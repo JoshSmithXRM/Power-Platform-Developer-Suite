@@ -1,5 +1,6 @@
 import type { FlowConnectionRelationshipViewModel } from '../../application/viewModels/FlowConnectionRelationshipViewModel';
 import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
+import { renderDataTableLink } from '../../../../shared/infrastructure/ui/views/clickableLinks';
 
 export interface FlowConnectionRelationshipViewModelWithHtml extends FlowConnectionRelationshipViewModel {
 	readonly flowNameHtml: string;
@@ -12,7 +13,7 @@ export interface FlowConnectionRelationshipViewModelWithHtml extends FlowConnect
  * @returns HTML anchor element as string
  */
 export function renderFlowLink(flowId: string, flowName: string): string {
-	return `<a class="flow-link" data-id="${flowId}">${escapeHtml(flowName)}</a>`;
+	return renderDataTableLink('flow-link', flowId, flowName);
 }
 
 /**

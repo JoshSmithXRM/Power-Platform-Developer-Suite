@@ -1,5 +1,5 @@
 import type { SolutionViewModel } from '../../application/viewModels/SolutionViewModel';
-import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
+import { renderDataTableLink } from '../../../../shared/infrastructure/ui/views/clickableLinks';
 
 /**
  * View model with HTML-enhanced solution friendly name for rendering.
@@ -15,7 +15,7 @@ export interface SolutionViewModelWithHtml extends SolutionViewModel {
  * @returns HTML anchor element as string
  */
 export function renderSolutionLink(solutionId: string, friendlyName: string): string {
-	return `<a class="solution-link" data-id="${solutionId}">${escapeHtml(friendlyName)}</a>`;
+	return renderDataTableLink('solution-link', solutionId, friendlyName);
 }
 
 /**

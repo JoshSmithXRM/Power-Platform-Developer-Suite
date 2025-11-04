@@ -7,6 +7,7 @@ import { ListSolutionsUseCase } from '../../application/useCases/ListSolutionsUs
 import { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
 import { type Solution } from '../../domain/entities/Solution';
 import { enhanceViewModelsWithSolutionLinks } from '../views/SolutionLinkView';
+import { renderLinkClickHandler } from '../../../../shared/infrastructure/ui/views/clickableLinks';
 import {
 	DataTablePanel,
 	type EnvironmentOption,
@@ -192,15 +193,7 @@ export class SolutionExplorerPanel extends DataTablePanel {
 	 * Adds click handlers to solution links for opening in Maker Portal.
 	 */
 	protected getPanelSpecificJavaScript(): string {
-		return `
-			// Attach click handlers to solution links
-			document.querySelectorAll('.solution-link').forEach(link => {
-				link.addEventListener('click', (e) => {
-					const solutionId = e.target.getAttribute('data-id');
-					vscode.postMessage({ command: 'openInMaker', data: { solutionId } });
-				});
-			});
-		`;
+		return renderLinkClickHandler('.solution-link', 'openInMaker', 'solutionId');
 	}
 
 	/**

@@ -139,7 +139,15 @@ export class EnvironmentVariablesPanel extends DataTablePanel {
 			searchPlaceholder: '🔍 Search environment variables...',
 			openMakerButtonText: 'Open in Maker',
 			noDataMessage: 'No environment variables found.',
-			enableSolutionFilter: true
+			enableSolutionFilter: true,
+			toolbarButtons: [
+				{
+					id: 'syncDeploymentSettingsBtn',
+					label: 'Sync Deployment Settings',
+					command: 'syncDeploymentSettings',
+					position: 'left'
+				}
+			]
 		};
 	}
 

@@ -714,5 +714,34 @@ describe('DataTablePanel', () => {
 
 			expect(mockWebview.html).toContain('Open in Maker');
 		});
+
+		it('should accept toolbarButtons in config', () => {
+			// Test that the interface accepts toolbarButtons config
+			// The rendering logic is tested in toolbarButtons.test.ts
+			const config: DataTableConfig = {
+				viewType: 'test',
+				title: 'Test',
+				dataCommand: 'test',
+				defaultSortColumn: 'name',
+				defaultSortDirection: 'asc',
+				columns: [{ key: 'name', label: 'Name' }],
+				searchPlaceholder: 'Search',
+				openMakerButtonText: 'Open',
+				noDataMessage: 'No data',
+				toolbarButtons: [
+					{
+						id: 'testBtn',
+						label: 'Test',
+						command: 'test'
+					}
+				]
+			};
+
+			expect(config.toolbarButtons).toBeDefined();
+			expect(config.toolbarButtons).toHaveLength(1);
+			if (config.toolbarButtons && config.toolbarButtons.length > 0) {
+				expect(config.toolbarButtons[0]?.id).toBe('testBtn');
+			}
+		});
 	});
 });

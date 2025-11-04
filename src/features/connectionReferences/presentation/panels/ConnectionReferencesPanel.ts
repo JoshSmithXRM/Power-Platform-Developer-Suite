@@ -10,6 +10,7 @@ import { type FlowConnectionRelationship } from '../../domain/valueObjects/FlowC
 import { type ConnectionReference } from '../../domain/entities/ConnectionReference';
 import { FlowConnectionRelationshipCollectionService } from '../../domain/services/FlowConnectionRelationshipCollectionService';
 import { enhanceViewModelsWithFlowLinks } from '../views/FlowLinkView';
+import { renderLinkClickHandler } from '../../../../shared/infrastructure/ui/views/clickableLinks';
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { isOpenFlowMessage } from '../../../../infrastructure/ui/utils/TypeGuards';
@@ -139,7 +140,15 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 			searchPlaceholder: '🔍 Search flows and connection references...',
 			openMakerButtonText: 'Open in Maker',
 			noDataMessage: 'No connection references found.',
-			enableSolutionFilter: true
+			enableSolutionFilter: true,
+			toolbarButtons: [
+				{
+					id: 'syncDeploymentSettingsBtn',
+					label: 'Sync Deployment Settings',
+					command: 'syncDeploymentSettings',
+					position: 'left'
+				}
+			]
 		};
 	}
 
@@ -234,18 +243,8 @@ export class ConnectionReferencesPanel extends DataTablePanel {
 		`;
 	}
 
-	protected getCustomJavaScript(): string {
-		return `
-			${super.getCustomJavaScript()}
-
-			// Attach click handlers to flow links
-			document.querySelectorAll('.flow-link').forEach(link => {
-				link.addEventListener('click', (e) => {
-					const flowId = e.target.getAttribute('data-id');
-					vscode.postMessage({ command: 'openFlow', data: { flowId } });
-				});
-			});
-		`;
+	protected getPanelSpecificJavaScript(): string {
+		return renderLinkClickHandler('.flow-link', 'openFlow', 'flowId');
 	}
 
 	private async handleOpenFlow(flowId: string): Promise<void> {
