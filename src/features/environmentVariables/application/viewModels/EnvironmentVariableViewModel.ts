@@ -4,6 +4,7 @@
  * Readonly ensures immutability - ViewModels are snapshots, not mutable state.
  */
 export interface EnvironmentVariableViewModel {
+	[key: string]: unknown;
 	readonly definitionId: string;
 	readonly schemaName: string;
 	readonly displayName: string;

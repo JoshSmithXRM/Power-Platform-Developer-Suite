@@ -14,17 +14,15 @@ This document tracks known technical debt and future improvement opportunities t
 ### Documentation (1 issue)
 2. **CLEAN_ARCHITECTURE_GUIDE.md Length** - Documentation exceeds 1,708 lines (limit: 1,200). Wait until Data Panel Suite is complete before splitting into 3 separate guides.
 
-### Architecture & Design (2 issues)
-3. **DataTablePanel SRP Violation** - Base class handles 8+ responsibilities (environment, search, sort, error, loading, HTML, routing, cancellation). Template Method pattern eliminates 950 lines of duplication across 4 panels, acceptable trade-off.
+### Architecture & Design (1 issue)
+3. **IXmlFormatter Interface** - Suggested interface extraction unnecessary. XmlFormatter is infrastructure using concrete class correctly, no polymorphism needed.
 
-4. **IXmlFormatter Interface** - Suggested interface extraction unnecessary. XmlFormatter is infrastructure using concrete class correctly, no polymorphism needed.
-
-5. **getValue() Pattern Without Branded Types** - Value objects return primitives without compile-time type branding. Zero bugs found in 100+ callsites, 6-8 hour refactor not justified.
+4. **getValue() Pattern Without Branded Types** - Value objects return primitives without compile-time type branding. Zero bugs found in 100+ callsites, 6-8 hour refactor not justified.
 
 ### Deferred Refactoring (2 issues)
-6. **Business Logic in Command Handlers** - extension.ts commands contain orchestration that belongs in use cases. Use cases exist but need integration work, defer until command testing sprint.
+5. **Business Logic in Command Handlers** - extension.ts commands contain orchestration that belongs in use cases. Use cases exist but need integration work, defer until command testing sprint.
 
-7. **Unsafe Type Assertions in API Service** - DataverseApiService uses `as T` without runtime validation. Repositories validate at mapping layer, external API contracts stable, zero bugs found.
+6. **Unsafe Type Assertions in API Service** - DataverseApiService uses `as T` without runtime validation. Repositories validate at mapping layer, external API contracts stable, zero bugs found.
 
 ---
 
@@ -108,67 +106,6 @@ Split into 3 documents (~500-600 lines each):
 ---
 
 ## Architecture & Design Patterns
-
-### DataTablePanel SRP Violation (Template Method Pattern Trade-off)
-
-**Status**: Ready to Address - Deferred Condition Met
-**Priority**: High
-**Effort**: High (8-12 hours)
-
-**Issue:**
-`DataTablePanel` violates Single Responsibility Principle by handling 8+ responsibilities:
-- Environment management
-- Search functionality
-- Sorting
-- Error handling
-- Loading states
-- HTML generation
-- Message routing
-- Cancellation token management
-
-**Current State:**
-```typescript
-// DataTablePanel.ts (584 lines, was 365)
-export abstract class DataTablePanel {
-    // Handles all table-related responsibilities
-}
-```
-
-**Update:** Now have **4 panels** (ImportJobViewer, SolutionExplorer, ConnectionReferences, EnvironmentVariables)
-- Base class grew from 365 → 584 lines
-- **Deferred condition met**: "When a 3rd panel type emerges" - we now have 4 panels
-- Still maintains **950 lines** of DRY benefit
-
-**Decision:** Refactor to composition-based approach (approved by clean-architecture-guardian)
-
-**Recommended Solution:**
-Refactor to composition-based approach:
-
-```typescript
-// Behavior components
-interface ISearchBehavior {
-    filter(data: unknown[], query: string): unknown[];
-}
-
-interface ISortBehavior {
-    sort(data: unknown[], column: string, direction: 'asc' | 'desc'): unknown[];
-}
-
-interface IEnvironmentSwitchBehavior {
-    switchEnvironment(environmentId: string): Promise<void>;
-}
-
-// Composable panel base
-export abstract class BasePanelWithBehaviors {
-    constructor(
-        private searchBehavior?: ISearchBehavior,
-        private sortBehavior?: ISortBehavior,
-        private environmentBehavior?: IEnvironmentSwitchBehavior
-    ) {}
-}
-```
-
----
 
 ### IXmlFormatter Interface Extraction
 

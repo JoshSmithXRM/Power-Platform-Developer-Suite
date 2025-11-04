@@ -91,7 +91,11 @@ export function renderDataTable(resources: DataTableViewResources): string {
 			border: 1px solid var(--vscode-dropdown-border);
 			padding: 4px 8px;
 			font-size: 13px;
-			min-width: 200px;
+			min-width: 150px;
+			max-width: 300px;
+		}
+		#solutionSelect {
+			max-width: 400px;
 		}
 		.table-wrapper {
 			display: flex;
@@ -145,8 +149,9 @@ export function renderDataTable(resources: DataTableViewResources): string {
 <body>
 	<div class="toolbar">
 		<div class="toolbar-left">
-			<button id="openMakerBtn">${config.openMakerButtonText}</button>
-			<button id="refreshBtn">Refresh</button>
+			${config.toolbarButtons.filter(btn => !btn.position || btn.position === 'left').map(btn =>
+				`<button id="${btn.id}">${btn.label}</button>`
+			).join('')}
 			<label for="solutionSelect" id="solutionSelectLabel" style="display: none;">Solution:</label>
 			<select id="solutionSelect" style="display: none;">
 			</select>
@@ -156,6 +161,9 @@ export function renderDataTable(resources: DataTableViewResources): string {
 			<select id="environmentSelect">
 				<option value="">Loading...</option>
 			</select>
+			${config.toolbarButtons.filter(btn => btn.position === 'right').map(btn =>
+				`<button id="${btn.id}">${btn.label}</button>`
+			).join('')}
 		</div>
 	</div>
 
@@ -188,6 +196,18 @@ export function renderDataTable(resources: DataTableViewResources): string {
 		document.getElementById('openMakerBtn').addEventListener('click', () => {
 			vscode.postMessage({ command: 'openMaker' });
 		});
+
+		// Custom toolbar button handlers
+		if (config.toolbarButtons) {
+			config.toolbarButtons.forEach(btn => {
+				const element = document.getElementById(btn.id);
+				if (element) {
+					element.addEventListener('click', () => {
+						vscode.postMessage({ command: btn.command });
+					});
+				}
+			});
+		}
 
 		document.getElementById('environmentSelect').addEventListener('change', (e) => {
 			saveState({ currentEnvironmentId: e.target.value });

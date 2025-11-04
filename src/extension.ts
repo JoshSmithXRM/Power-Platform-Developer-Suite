@@ -535,7 +535,7 @@ async function initializeSolutionExplorer(
 	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js');
 	const { DataverseApiSolutionRepository } = await import('./features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js');
 	const { ListSolutionsUseCase } = await import('./features/solutionExplorer/application/useCases/ListSolutionsUseCase.js');
-	const { SolutionExplorerPanel } = await import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanel.js');
+	const { SolutionExplorerPanelComposed } = await import('./features/solutionExplorer/presentation/panels/SolutionExplorerPanelComposed.js');
 	const { SolutionViewModelMapper } = await import('./features/solutionExplorer/application/mappers/SolutionViewModelMapper.js');
 	const { SolutionCollectionService } = await import('./features/solutionExplorer/domain/services/SolutionCollectionService.js');
 
@@ -553,7 +553,7 @@ async function initializeSolutionExplorer(
 	const collectionService = new SolutionCollectionService();
 	const viewModelMapper = new SolutionViewModelMapper(collectionService);
 
-	await SolutionExplorerPanel.createOrShow(
+	await SolutionExplorerPanelComposed.createOrShow(
 		context.extensionUri,
 		getEnvironments,
 		getEnvironmentById,
@@ -583,7 +583,7 @@ async function initializeImportJobViewer(
 	const { DataverseApiImportJobRepository } = await import('./features/importJobViewer/infrastructure/repositories/DataverseApiImportJobRepository.js');
 	const { ListImportJobsUseCase } = await import('./features/importJobViewer/application/useCases/ListImportJobsUseCase.js');
 	const { OpenImportLogUseCase } = await import('./features/importJobViewer/application/useCases/OpenImportLogUseCase.js');
-	const { ImportJobViewerPanel } = await import('./features/importJobViewer/presentation/panels/ImportJobViewerPanel.js');
+	const { ImportJobViewerPanelComposed } = await import('./features/importJobViewer/presentation/panels/ImportJobViewerPanelComposed.js');
 
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
@@ -599,7 +599,7 @@ async function initializeImportJobViewer(
 	const listImportJobsUseCase = new ListImportJobsUseCase(importJobRepository, logger);
 	const openImportLogUseCase = new OpenImportLogUseCase(importJobRepository, editorService, logger);
 
-	await ImportJobViewerPanel.createOrShow(
+	await ImportJobViewerPanelComposed.createOrShow(
 		context.extensionUri,
 		getEnvironments,
 		getEnvironmentById,
@@ -632,7 +632,7 @@ async function initializeConnectionReferences(
 	const { FlowConnectionRelationshipCollectionService } = await import('./features/connectionReferences/domain/services/FlowConnectionRelationshipCollectionService.js');
 	const { ListConnectionReferencesUseCase } = await import('./features/connectionReferences/application/useCases/ListConnectionReferencesUseCase.js');
 	const { ExportConnectionReferencesToDeploymentSettingsUseCase } = await import('./features/connectionReferences/application/useCases/ExportConnectionReferencesToDeploymentSettingsUseCase.js');
-	const { ConnectionReferencesPanel } = await import('./features/connectionReferences/presentation/panels/ConnectionReferencesPanel.js');
+	const { ConnectionReferencesPanelComposed } = await import('./features/connectionReferences/presentation/panels/ConnectionReferencesPanelComposed.js');
 	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository.js');
 	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js');
 	const { ConnectionReferenceToDeploymentSettingsMapper } = await import('./features/connectionReferences/application/mappers/ConnectionReferenceToDeploymentSettingsMapper.js');
@@ -666,7 +666,7 @@ async function initializeConnectionReferences(
 		logger
 	);
 
-	await ConnectionReferencesPanel.createOrShow(
+	await ConnectionReferencesPanelComposed.createOrShow(
 		context.extensionUri,
 		getEnvironments,
 		getEnvironmentById,
@@ -700,7 +700,7 @@ async function initializeEnvironmentVariables(
 	const { EnvironmentVariableFactory } = await import('./features/environmentVariables/domain/services/EnvironmentVariableFactory.js');
 	const { ListEnvironmentVariablesUseCase } = await import('./features/environmentVariables/application/useCases/ListEnvironmentVariablesUseCase.js');
 	const { ExportEnvironmentVariablesToDeploymentSettingsUseCase } = await import('./features/environmentVariables/application/useCases/ExportEnvironmentVariablesToDeploymentSettingsUseCase.js');
-	const { EnvironmentVariablesPanel } = await import('./features/environmentVariables/presentation/panels/EnvironmentVariablesPanel.js');
+	const { EnvironmentVariablesPanelComposed } = await import('./features/environmentVariables/presentation/panels/EnvironmentVariablesPanelComposed.js');
 	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository.js');
 	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js');
 	const { EnvironmentVariableToDeploymentSettingsMapper } = await import('./features/environmentVariables/application/mappers/EnvironmentVariableToDeploymentSettingsMapper.js');
@@ -731,7 +731,7 @@ async function initializeEnvironmentVariables(
 		logger
 	);
 
-	await EnvironmentVariablesPanel.createOrShow(
+	await EnvironmentVariablesPanelComposed.createOrShow(
 		context.extensionUri,
 		getEnvironments,
 		getEnvironmentById,
