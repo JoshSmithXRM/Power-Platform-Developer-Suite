@@ -190,30 +190,43 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		traceIds: readonly string[]
 	): Promise<number> {
 		this.logger.debug(
-			`Deleting ${traceIds.length} plugin traces from Dataverse`,
+			`Deleting ${traceIds.length} plugin traces from Dataverse using batch API`,
 			{ environmentId }
 		);
 
-		let deletedCount = 0;
+		const batchSize = 100;
+		let totalDeleted = 0;
 
-		for (const traceId of traceIds) {
+		for (let i = 0; i < traceIds.length; i += batchSize) {
+			const batch = traceIds.slice(i, i + batchSize);
+
 			try {
-				await this.deleteTrace(environmentId, traceId);
-				deletedCount++;
+				const deletedCount = await this.apiService.batchDelete(
+					environmentId,
+					DataversePluginTraceRepository.ENTITY_SET,
+					batch
+				);
+
+				totalDeleted += deletedCount;
+
+				this.logger.debug(
+					`Batch delete progress: ${totalDeleted}/${traceIds.length}`,
+					{ environmentId }
+				);
 			} catch (error) {
 				this.logger.error(
-					`Failed to delete trace ${traceId}, continuing with remaining traces`,
+					`Batch delete failed for ${batch.length} traces, continuing with remaining batches`,
 					error
 				);
 			}
 		}
 
 		this.logger.debug(
-			`Deleted ${deletedCount} of ${traceIds.length} plugin traces`,
+			`Deleted ${totalDeleted} of ${traceIds.length} plugin traces`,
 			{ environmentId }
 		);
 
-		return deletedCount;
+		return totalDeleted;
 	}
 
 	async deleteAllTraces(environmentId: string): Promise<number> {

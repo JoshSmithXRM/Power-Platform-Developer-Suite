@@ -17,6 +17,10 @@ export class DataverseApiService implements IDataverseApiService {
 
   /**
    * Performs a GET request to the Dataverse Web API.
+   * @param environmentId - Power Platform environment GUID
+   * @param endpoint - Relative endpoint path (e.g., '/api/data/v9.2/solutions')
+   * @param cancellationToken - Optional token to cancel the operation
+   * @returns Promise resolving to the JSON response
    */
   async get<T = unknown>(
     environmentId: string,
@@ -28,6 +32,11 @@ export class DataverseApiService implements IDataverseApiService {
 
   /**
    * Performs a POST request to the Dataverse Web API.
+   * @param environmentId - Power Platform environment GUID
+   * @param endpoint - Relative endpoint path
+   * @param body - Request body
+   * @param cancellationToken - Optional token to cancel the operation
+   * @returns Promise resolving to the JSON response
    */
   async post<T = unknown>(
     environmentId: string,
@@ -40,6 +49,11 @@ export class DataverseApiService implements IDataverseApiService {
 
   /**
    * Performs a PATCH request to the Dataverse Web API.
+   * @param environmentId - Power Platform environment GUID
+   * @param endpoint - Relative endpoint path
+   * @param body - Request body
+   * @param cancellationToken - Optional token to cancel the operation
+   * @returns Promise resolving to the JSON response
    */
   async patch<T = unknown>(
     environmentId: string,
@@ -52,6 +66,10 @@ export class DataverseApiService implements IDataverseApiService {
 
   /**
    * Performs a DELETE request to the Dataverse Web API.
+   * @param environmentId - Power Platform environment GUID
+   * @param endpoint - Relative endpoint path
+   * @param cancellationToken - Optional token to cancel the operation
+   * @returns Promise resolving when deletion is complete
    */
   async delete(
     environmentId: string,
@@ -62,20 +80,27 @@ export class DataverseApiService implements IDataverseApiService {
   }
 
   /**
-   * Internal method to perform HTTP requests with authentication.
-   *
-   * Centralized request handling with proper type validation.
-   * Type parameter T should match expected API response structure.
+   * Performs batch DELETE operations using OData $batch API.
+   * Deletes multiple records in a single HTTP request for better performance.
+   * Batch size limited to 100 operations (Dataverse supports up to 1000, but 100 is safer).
+   * @param environmentId - Power Platform environment GUID
+   * @param entitySetName - Entity set name (e.g., 'plugintracelogs', 'solutions')
+   * @param entityIds - Array of entity IDs to delete
+   * @param cancellationToken - Optional token to cancel the operation
+   * @returns Promise resolving to the number of successfully deleted records
    */
-  private async request<T>(
-    method: string,
+  async batchDelete(
     environmentId: string,
-    endpoint: string,
-    body: unknown | undefined,
+    entitySetName: string,
+    entityIds: readonly string[],
     cancellationToken?: ICancellationToken
-  ): Promise<T> {
+  ): Promise<number> {
     if (cancellationToken?.isCancellationRequested) {
       throw new OperationCancelledException();
+    }
+
+    if (entityIds.length === 0) {
+      return 0;
     }
 
     try {
@@ -88,65 +113,223 @@ export class DataverseApiService implements IDataverseApiService {
         throw new OperationCancelledException();
       }
 
-      const url = `${environmentUrl}${endpoint}`;
-      this.logger.debug(`DataverseApiService: ${method} ${endpoint}`, { environmentId });
+      const batchBoundary = `batch_${Date.now()}`;
+      const changesetBoundary = `changeset_${Date.now()}`;
 
-      const headers: Record<string, string> = {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json',
-        'OData-MaxVersion': '4.0',
-        'OData-Version': '4.0'
-      };
+      let batchBody = `--${batchBoundary}\r\n`;
+      batchBody += `Content-Type: multipart/mixed; boundary=${changesetBoundary}\r\n\r\n`;
 
-      const fetchOptions: RequestInit = {
-        method,
-        headers
-      };
+      entityIds.forEach((entityId, index) => {
+        batchBody += `--${changesetBoundary}\r\n`;
+        batchBody += `Content-Type: application/http\r\n`;
+        batchBody += `Content-Transfer-Encoding: binary\r\n`;
+        batchBody += `Content-ID: ${index + 1}\r\n\r\n`;
+        batchBody += `DELETE ${environmentUrl}/api/data/v9.2/${entitySetName}(${entityId}) HTTP/1.1\r\n`;
+        batchBody += `Content-Type: application/json\r\n\r\n`;
+      });
 
-      if (body !== undefined) {
-        headers['Content-Type'] = 'application/json';
-        fetchOptions.body = JSON.stringify(body);
-      }
+      batchBody += `--${changesetBoundary}--\r\n`;
+      batchBody += `--${batchBoundary}--\r\n`;
 
-      const response = await fetch(url, fetchOptions);
+      const batchUrl = `${environmentUrl}/api/data/v9.2/$batch`;
+
+      this.logger.debug(`DataverseApiService: Batch DELETE ${entityIds.length} ${entitySetName}`, { environmentId });
+
+      const response = await fetch(batchUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': `multipart/mixed; boundary=${batchBoundary}`,
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0'
+        },
+        body: batchBody
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
-        this.logger.error(`Dataverse API request failed: ${response.status} ${response.statusText}`, {
-          method,
-          endpoint,
+        this.logger.error(`Batch delete failed: ${response.status} ${response.statusText}`, {
           status: response.status,
           errorText
         });
         throw new Error(
-          `Dataverse API request failed: ${response.status} ${response.statusText} - ${errorText}`
+          `Batch delete failed: ${response.status} ${response.statusText} - ${errorText}`
         );
       }
 
-      if (method === 'DELETE' || response.status === 204) {
-        // No content response - safe for void return type
-        return undefined as T;
-      }
+      const responseText = await response.text();
+      const successCount = (responseText.match(/HTTP\/1\.1 204/g) || []).length;
 
-      const data: unknown = await response.json();
+      this.logger.debug(`DataverseApiService: Batch DELETE succeeded (${successCount}/${entityIds.length})`, { environmentId });
 
-      // Basic runtime validation - ensure response is an object
-      if (typeof data !== 'object' || data === null) {
-        this.logger.error('Invalid API response: expected object', { data });
-        throw new Error('Invalid API response structure: expected object');
-      }
-
-      this.logger.debug(`DataverseApiService: ${method} ${endpoint} succeeded`);
-
-      return data as T;
+      return successCount;
     } catch (error) {
       if (error instanceof OperationCancelledException) {
         throw error;
       }
 
       const normalizedError = normalizeError(error);
-      this.logger.error('DataverseApiService request failed', normalizedError);
+      this.logger.error('DataverseApiService batch delete failed', normalizedError);
       throw normalizedError;
     }
+  }
+
+  /**
+   * Internal method to perform HTTP requests with authentication.
+   * Includes retry logic with exponential backoff for transient failures.
+   * Retries up to 3 times for retryable errors (429, 503, 504, network failures).
+   */
+  private async request<T>(
+    method: string,
+    environmentId: string,
+    endpoint: string,
+    body: unknown | undefined,
+    cancellationToken?: ICancellationToken,
+    retries = 3
+  ): Promise<T> {
+    if (cancellationToken?.isCancellationRequested) {
+      throw new OperationCancelledException();
+    }
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        return await this.executeRequest<T>(
+          method,
+          environmentId,
+          endpoint,
+          body,
+          cancellationToken,
+          attempt,
+          retries
+        );
+      } catch (error) {
+        if (error instanceof OperationCancelledException) {
+          throw error;
+        }
+
+        const isLastAttempt = attempt === retries;
+        const status = (error as Error & { status?: number }).status || 0;
+        const isRetryable = this.isRetryableError(status, error);
+
+        if (!isRetryable || isLastAttempt) {
+          const normalizedError = normalizeError(error);
+          this.logger.error('DataverseApiService request failed', normalizedError);
+          throw normalizedError;
+        }
+
+        const delay = this.calculateBackoff(attempt);
+        this.logger.warn(
+          `Retrying request after ${delay}ms (attempt ${attempt}/${retries})`,
+          { method, endpoint, error: String(error), status }
+        );
+        await this.sleep(delay);
+      }
+    }
+
+    throw new Error('Request failed after all retry attempts');
+  }
+
+  private async executeRequest<T>(
+    method: string,
+    environmentId: string,
+    endpoint: string,
+    body: unknown | undefined,
+    cancellationToken: ICancellationToken | undefined,
+    attempt: number,
+    retries: number
+  ): Promise<T> {
+    const [accessToken, environmentUrl] = await Promise.all([
+      this.getAccessToken(environmentId),
+      this.getEnvironmentUrl(environmentId)
+    ]);
+
+    if (cancellationToken?.isCancellationRequested) {
+      throw new OperationCancelledException();
+    }
+
+    const url = `${environmentUrl}${endpoint}`;
+    this.logger.debug(`DataverseApiService: ${method} ${endpoint} (attempt ${attempt}/${retries})`, { environmentId });
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${accessToken}`,
+      'Accept': 'application/json',
+      'OData-MaxVersion': '4.0',
+      'OData-Version': '4.0'
+    };
+
+    const fetchOptions: RequestInit = {
+      method,
+      headers
+    };
+
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      fetchOptions.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(url, fetchOptions);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      this.logger.error(`Dataverse API request failed: ${response.status} ${response.statusText}`, {
+        method,
+        endpoint,
+        status: response.status,
+        errorText,
+        attempt,
+        retries
+      });
+
+      const error = new Error(
+        `Dataverse API request failed: ${response.status} ${response.statusText} - ${errorText}`
+      );
+      (error as Error & { status?: number }).status = response.status;
+      throw error;
+    }
+
+    if (method === 'DELETE' || response.status === 204) {
+      return undefined as T;
+    }
+
+    const data: unknown = await response.json();
+
+    if (typeof data !== 'object' || data === null) {
+      this.logger.error('Invalid API response: expected object', { data });
+      throw new Error('Invalid API response structure: expected object');
+    }
+
+    this.logger.debug(`DataverseApiService: ${method} ${endpoint} succeeded`);
+
+    return data as T;
+  }
+
+  /**
+   * Determines if an error should trigger a retry.
+   * Retryable: 429 (rate limit), 503/504 (service unavailable), network errors.
+   */
+  private isRetryableError(status: number, error: unknown): boolean {
+    if (status === 429 || status === 503 || status === 504) {
+      return true;
+    }
+
+    const errorStr = String(error).toLowerCase();
+    return (
+      errorStr.includes('timeout') ||
+      errorStr.includes('econnreset') ||
+      errorStr.includes('network') ||
+      errorStr.includes('fetch failed')
+    );
+  }
+
+  /**
+   * Calculates exponential backoff delay in milliseconds.
+   * Formula: 2^(attempt-1) * 1000ms = 1s, 2s, 4s for attempts 1, 2, 3.
+   */
+  private calculateBackoff(attempt: number): number {
+    return Math.pow(2, attempt - 1) * 1000;
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

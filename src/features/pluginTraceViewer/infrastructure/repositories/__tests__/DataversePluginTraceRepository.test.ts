@@ -36,6 +36,7 @@ describe('DataversePluginTraceRepository', () => {
 			post: jest.fn(),
 			patch: jest.fn(),
 			delete: jest.fn(),
+			batchDelete: jest.fn(),
 		};
 
 		mockLogger = {
@@ -187,7 +188,7 @@ describe('DataversePluginTraceRepository', () => {
 			const environmentId = 'env-123';
 			const traceIds = ['trace-1', 'trace-2', 'trace-3'];
 
-			mockApiService.delete.mockResolvedValue();
+			mockApiService.batchDelete.mockResolvedValue(3);
 
 			const deletedCount = await repository.deleteTraces(
 				environmentId,
@@ -195,17 +196,19 @@ describe('DataversePluginTraceRepository', () => {
 			);
 
 			expect(deletedCount).toBe(3);
-			expect(mockApiService.delete).toHaveBeenCalledTimes(3);
+			expect(mockApiService.batchDelete).toHaveBeenCalledTimes(1);
+			expect(mockApiService.batchDelete).toHaveBeenCalledWith(
+				environmentId,
+				'plugintracelogs',
+				traceIds
+			);
 		});
 
 		it('should continue on partial failures', async () => {
 			const environmentId = 'env-123';
 			const traceIds = ['trace-1', 'trace-2', 'trace-3'];
 
-			mockApiService.delete
-				.mockResolvedValueOnce()
-				.mockRejectedValueOnce(new Error('Failed'))
-				.mockResolvedValueOnce();
+			mockApiService.batchDelete.mockResolvedValue(2);
 
 			const deletedCount = await repository.deleteTraces(
 				environmentId,
@@ -226,7 +229,7 @@ describe('DataversePluginTraceRepository', () => {
 					{ plugintracelogid: 'trace-2' },
 				],
 			});
-			mockApiService.delete.mockResolvedValue();
+			mockApiService.batchDelete.mockResolvedValue(2);
 
 			const deletedCount =
 				await repository.deleteAllTraces(environmentId);
@@ -247,7 +250,7 @@ describe('DataversePluginTraceRepository', () => {
 			mockApiService.get.mockResolvedValue({
 				value: [{ plugintracelogid: 'trace-old' }],
 			});
-			mockApiService.delete.mockResolvedValue();
+			mockApiService.batchDelete.mockResolvedValue(1);
 
 			const deletedCount = await repository.deleteOldTraces(
 				environmentId,

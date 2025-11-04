@@ -17,7 +17,8 @@ describe('DataverseApiSolutionRepository', () => {
 			get: jest.fn(),
 			post: jest.fn(),
 			patch: jest.fn(),
-			delete: jest.fn()
+			delete: jest.fn(),
+			batchDelete: jest.fn()
 		};
 
 		mockLogger = {

@@ -60,4 +60,20 @@ export interface IDataverseApiService {
     endpoint: string,
     cancellationToken?: ICancellationToken
   ): Promise<void>;
+
+  /**
+   * Performs batch DELETE operations using OData $batch API.
+   * Deletes multiple records in a single HTTP request for better performance.
+   * @param environmentId - Power Platform environment GUID
+   * @param entitySetName - Entity set name (e.g., 'plugintracelogs', 'solutions')
+   * @param entityIds - Array of entity IDs to delete
+   * @param cancellationToken - Optional token to cancel the operation
+   * @returns Promise resolving to the number of successfully deleted records
+   */
+  batchDelete(
+    environmentId: string,
+    entitySetName: string,
+    entityIds: readonly string[],
+    cancellationToken?: ICancellationToken
+  ): Promise<number>;
 }
