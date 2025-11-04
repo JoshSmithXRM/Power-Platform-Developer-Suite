@@ -1,6 +1,6 @@
 # Universal Panel Framework - Technical Design
 
-**Status:** Draft
+**Status:** Draft - Revision 2
 **Date:** 2025-11-04
 **Complexity:** Moderate
 
@@ -11,13 +11,127 @@
 **User Problem:** Current `DataTablePanelCoordinator` has a narrow name implying "data tables only," hard-coded button assumptions causing runtime errors, and inconsistent guidance on when to use framework vs direct implementation. Developers are confused about which approach to use for new panels.
 
 **Solution:** Refactor to a **Universal Panel Framework** with:
-- Rename: `DataTablePanelCoordinator` → `PanelCoordinator` (universal, not table-specific)
+- New implementation: `PanelCoordinator` (universal, extensible) alongside existing `DataTablePanelCoordinator` (deprecated)
 - Section-based composition (supports tables, trees, split views, filters, custom UI)
+- Replace `HtmlRenderingBehavior` with `SectionCompositionBehavior` (fundamental shift from template-based to component-based)
 - Optional behaviors (EnvironmentBehavior is opt-in, not required)
 - Eliminate "Pattern 1 vs Pattern 2" terminology in favor of "Framework Approach (default) vs Direct Implementation (rare)"
 - Extract TreeViewSection from PersistenceInspectorPanel (validates non-table use case)
 
 **Value:** Provides a clear, extensible default framework for ALL panel development. Eliminates confusion, reduces code duplication, and establishes consistent UX across all panels. Resolves technical debt (hard-coded buttons) at root cause rather than patching symptoms.
+
+---
+
+## Current State Analysis
+
+### Existing Architecture (DataTablePanelCoordinator)
+
+**Current Pattern: Behavior Registry**
+
+```typescript
+// Current coordinator constructor
+export class DataTablePanelCoordinator implements IDataTablePanelCoordinator {
+  constructor(
+    private readonly registry: IDataTableBehaviorRegistry,  // Behavior registry
+    private readonly dependencies: CoordinatorDependencies
+  ) {}
+}
+
+// Behavior registry interface
+export interface IDataTableBehaviorRegistry {
+  readonly environmentBehavior: IEnvironmentBehavior;
+  readonly solutionFilterBehavior: ISolutionFilterBehavior;
+  readonly dataBehavior: IDataBehavior;
+  readonly messageRoutingBehavior: IMessageRoutingBehavior;
+  readonly htmlRenderingBehavior: IHtmlRenderingBehavior;  // ← HTML is a behavior!
+  readonly panelTrackingBehavior: IPanelTrackingBehavior;
+  dispose(): void;
+}
+```
+
+**Initialization Flow:**
+```typescript
+public async initialize(): Promise<void> {
+  // 1. Register panel tracking
+  const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
+  if (envId) {
+    this.registry.panelTrackingBehavior.registerPanel(envId, panel);
+  }
+
+  // 2. Set up HTML rendering (TEMPLATE-BASED)
+  panel.webview.html = this.registry.htmlRenderingBehavior.renderHtml();
+
+  // 3. Register command handlers
+  this.registerCommandHandlers();
+
+  // 4. Initialize message routing
+  this.registry.messageRoutingBehavior.initialize();
+
+  // 5. Initialize environment behavior
+  await this.registry.environmentBehavior.initialize();
+
+  // 6. Initialize solution filter
+  await this.registry.solutionFilterBehavior.initialize();
+
+  // 7. Load initial data
+  await this.registry.dataBehavior.initialize();
+}
+```
+
+**Key Observation:** `HtmlRenderingBehavior` generates HTML from a **fixed base template** (`src/shared/infrastructure/ui/views/dataTable.ts`). This template has hard-coded button assumptions causing runtime errors.
+
+### Problems with Current Architecture
+
+1. **Template-Based Rendering** - Single base template with placeholders, not composable
+2. **Hard-Coded Assumptions** - Base template assumes `refreshBtn` and `openMakerBtn` exist (lines 192-198)
+3. **Narrow Naming** - "DataTable" implies tables only, but framework could support trees, split views, etc.
+4. **Tight Coupling** - 6 behaviors tightly coupled through registry interface
+5. **Limited Extensibility** - Adding new UI sections requires modifying base template
+
+### Proposed Architecture (PanelCoordinator)
+
+**New Pattern: Section Composition**
+
+```typescript
+// NEW coordinator constructor
+export class PanelCoordinator implements IPanelCoordinator {
+  constructor(config: PanelCoordinatorConfig) {}
+}
+
+export interface PanelCoordinatorConfig {
+  panel: vscode.WebviewPanel;
+  extensionUri: vscode.Uri;
+  behaviors: IPanelBehavior[];           // Behaviors as array
+  sections: ISection[];                  // Sections REPLACE template
+  layout: PanelLayout;
+  logger: ILogger;
+}
+```
+
+**Fundamental Shift:**
+- **Old:** `HtmlRenderingBehavior` generates HTML from fixed template
+- **New:** `SectionCompositionBehavior` composes sections into layout
+
+**Key Difference:**
+```typescript
+// OLD (Template-Based)
+htmlRenderingBehavior.renderHtml()
+  → Base template with placeholders
+  → Replace placeholders with data
+  → Return complete HTML
+
+// NEW (Component-Based)
+sectionCompositionBehavior.compose(data)
+  → Get layout template
+  → For each section: render(data)
+  → Inject section HTML into layout
+  → Return complete HTML
+```
+
+**Backwards Compatibility:**
+- `DataTablePanelCoordinator` continues to exist (deprecated, unchanged)
+- `PanelCoordinator` is NEW implementation (different constructor)
+- Gradual migration, no breaking changes
 
 ---
 
@@ -34,12 +148,19 @@
 - [x] Sections are stateless (coordinator orchestrates)
 - [x] Message routing handled by MessageRoutingBehavior
 - [x] All 7 existing panels migrate to new framework
+- [x] HTML extracted to view files (CLAUDE.md Rule #10 compliance)
 
 ### Non-Functional Requirements
-- [x] **Backwards Compatible (Phase 1):** Existing panels work unchanged during rename
+- [x] **Backwards Compatible (Phase 1):** Existing panels work unchanged (using DataTablePanelCoordinator)
 - [x] **Performance:** No performance degradation (section composition is efficient)
 - [x] **Testability:** Sections and coordinator are independently testable
 - [x] **Extensibility:** Easy to add new sections without modifying framework
+
+### Test Coverage Targets
+- [x] **Sections:** 90% coverage (pure functions, easy to test)
+- [x] **Behaviors:** 80% coverage (some VS Code API mocking needed)
+- [x] **Coordinator:** 85% coverage (integration layer)
+- [x] **View Functions:** 90% coverage (HTML generation logic)
 
 ### Success Criteria
 - [x] All 7 panels use PanelCoordinator (no "legacy code")
@@ -48,51 +169,176 @@
 - [x] Plugin Trace Viewer implements with custom sections
 - [x] Hard-coded button technical debt resolved (sections register handlers dynamically)
 - [x] Documentation updated (Framework Approach vs Direct Implementation)
-- [x] Tests pass for all panels
+- [x] Tests pass for all panels with required coverage targets
+
+---
+
+## Event Handling Pattern
+
+**Approach:** Stateless sections, panel registers handlers by ID convention.
+
+### How It Works
+
+1. **Sections render elements with predictable IDs:**
+   ```typescript
+   export class ActionButtonsSection implements ISection {
+     render(data: SectionRenderData): string {
+       return renderActionButtons(this.config.buttons);  // Delegates to view
+     }
+   }
+
+   // View file renders buttons with IDs
+   export function renderActionButtons(buttons: ButtonConfig[]): string {
+     return buttons.map(btn => `
+       <button id="${btn.id}">${btn.label}</button>
+     `).join('');
+   }
+   ```
+
+2. **Panel registers handlers for those IDs:**
+   ```typescript
+   const sections = [
+     new ActionButtonsSection({
+       buttons: [
+         { id: 'refresh', label: 'Refresh' },
+         { id: 'delete', label: 'Delete' }
+       ]
+     })
+   ];
+
+   // Coordinator handles message routing
+   messageRoutingBehavior.registerHandler('refresh', async () => {
+     await dataBehavior.loadData();
+   });
+
+   messageRoutingBehavior.registerHandler('delete', async () => {
+     await deleteSelectedUseCase.execute();
+   });
+   ```
+
+3. **Webview JavaScript sends messages by button ID:**
+   ```javascript
+   // webview.js (generated by view)
+   document.getElementById('refresh')?.addEventListener('click', () => {
+     vscode.postMessage({ command: 'refresh' });
+   });
+
+   document.getElementById('delete')?.addEventListener('click', () => {
+     vscode.postMessage({ command: 'delete' });
+   });
+   ```
+
+### Key Principles
+
+- ✅ **Sections are stateless** - No event handling logic in sections
+- ✅ **Convention over configuration** - Button ID = message command
+- ✅ **Panel owns handlers** - Coordinator/panel registers handlers, not sections
+- ✅ **Type safety** - Button IDs defined in config, handlers reference same IDs
+
+### Example: Custom Section with Event Handling
+
+```typescript
+// TraceLevelControlsSection.ts (section)
+export class TraceLevelControlsSection implements ISection {
+  readonly position = SectionPosition.Header;
+
+  constructor(private currentLevel: string) {}
+
+  render(data: SectionRenderData): string {
+    return renderTraceLevelControls(
+      data.customData?.traceLevel || this.currentLevel
+    );
+  }
+}
+
+// traceLevelControlsView.ts (view - HTML generation)
+export function renderTraceLevelControls(currentLevel: string): string {
+  return `
+    <div class="trace-level-controls">
+      <span>Current Trace Level: <strong>${escapeHtml(currentLevel)}</strong></span>
+      <button id="changeTraceLevel">Change Level</button>
+    </div>
+  `;
+}
+
+// PluginTraceViewerPanel.ts (panel - event handling)
+messageRoutingBehavior.registerHandler('changeTraceLevel', async () => {
+  const newLevel = await vscode.window.showQuickPick(['Off', 'Exception', 'All']);
+  if (newLevel) {
+    await setTraceLevelUseCase.execute(environmentId, TraceLevel.fromString(newLevel));
+  }
+});
+```
 
 ---
 
 ## Implementation Slices (Vertical Slicing)
 
-### MVP Slice (Slice 1): "Rename + Backwards Compatibility"
-**Goal:** Rename `DataTablePanelCoordinator` → `PanelCoordinator`, verify existing panels work unchanged.
+### MVP Slice (Slice 1): "Implement PanelCoordinator (New) Alongside DataTablePanelCoordinator (Existing)"
+**Goal:** Create NEW coordinator with section support, keep existing coordinator unchanged.
 
 **Shared Infrastructure:**
-- Rename `DataTablePanelCoordinator.ts` → `PanelCoordinator.ts`
-- Update class name: `export class PanelCoordinator<TEntity, TViewModel>`
-- Add deprecated export: `export { PanelCoordinator as DataTablePanelCoordinator }`
-- Update all imports in existing panels (automated find/replace)
+- Create `PanelCoordinator.ts` (new file, new class)
+  - Constructor takes `PanelCoordinatorConfig` (different from DataTablePanelCoordinator)
+  - Implements basic lifecycle: `initialize()`, `dispose()`, `reveal()`
+- Create `IPanelCoordinator.ts` interface
+- Create `SectionCompositionBehavior.ts` (replaces HtmlRenderingBehavior for new coordinator)
+- Keep `DataTablePanelCoordinator.ts` UNCHANGED (deprecated but functional)
+- Update `PANEL_DEVELOPMENT_GUIDE.md` to reference PanelCoordinator
 
 **Testing:**
+- All existing panels continue using `DataTablePanelCoordinator` (NO changes)
+- Create ONE proof-of-concept test panel using `PanelCoordinator`
 - Run `npm run compile` - should succeed
 - Run `npm test` - all tests should pass
-- Manually test all 6 existing panels - should work identically
+- Test coverage: 85% for PanelCoordinator
 
-**Result:** WORKING RENAME ✅ (proves backward compatibility)
+**Result:** NEW FRAMEWORK AVAILABLE, OLD FRAMEWORK STILL WORKS ✅
 
-**Complexity:** Simple (1-2 hours)
+**Complexity:** Moderate
 
 ---
 
-### Slice 2: "Section System Foundation"
+### Slice 2: "Section Interface + View Extraction"
 **Builds on:** Slice 1
 
-**Goal:** Implement section interface and stateless rendering pattern.
+**Goal:** Define section contract and extract HTML to view files (CLAUDE.md Rule #10).
 
 **Domain/Application (Shared):**
 ```typescript
 // src/shared/infrastructure/ui/sections/ISection.ts
+export enum SectionPosition {
+  Toolbar = 'toolbar',
+  Header = 'header',
+  Filters = 'filters',
+  Main = 'main',
+  Detail = 'detail',
+  Footer = 'footer'
+}
+
 export interface ISection {
+  readonly position: SectionPosition;
   render(data: SectionRenderData): string;
 }
 
 // src/shared/infrastructure/ui/types/SectionRenderData.ts
 export interface SectionRenderData {
+  // Table data (for DataTableSection)
   tableData?: Record<string, unknown>[];
+
+  // Detail data (for DetailPanelSection)
   detailData?: unknown;
+
+  // Filter state (for FilterControlsSection)
   filterState?: Record<string, unknown>;
+
+  // Loading state (for all sections)
   isLoading?: boolean;
+
+  // Error message (for all sections)
   errorMessage?: string;
+
+  // Custom data (for feature-specific sections)
   customData?: Record<string, unknown>;
 }
 ```
@@ -101,30 +347,70 @@ export interface SectionRenderData {
 ```typescript
 // src/shared/infrastructure/ui/sections/DataTableSection.ts
 export class DataTableSection implements ISection {
+  readonly position = SectionPosition.Main;
+
   constructor(private config: DataTableConfig) {}
 
   render(data: SectionRenderData): string {
     const tableData = data.tableData || [];
-    return this.generateTableHtml(tableData, this.config);
+    return renderDataTable(tableData, this.config);  // ← Delegates to view
   }
+}
 
-  private generateTableHtml(data: Record<string, unknown>[], config: DataTableConfig): string {
-    // Extract existing HTML generation from base template
-  }
+// src/shared/infrastructure/ui/views/dataTableView.ts
+export function renderDataTable(
+  data: Record<string, unknown>[],
+  config: DataTableConfig
+): string {
+  // ALL HTML GENERATION HERE (not in .ts section file)
+  return `
+    <table class="data-table">
+      <thead>
+        <tr>
+          ${config.columns.map(col => `<th>${escapeHtml(col.label)}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${data.map(row => renderTableRow(row, config.columns)).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderTableRow(row: Record<string, unknown>, columns: DataTableColumn[]): string {
+  return `
+    <tr>
+      ${columns.map(col => `<td>${escapeHtml(String(row[col.id] || ''))}</td>`).join('')}
+    </tr>
+  `;
 }
 ```
 
+**File Structure (NEW):**
+```
+src/shared/infrastructure/ui/
+├── sections/
+│   ├── ISection.ts                      # NEW
+│   └── DataTableSection.ts              # NEW (delegates to view)
+└── views/
+    ├── dataTableView.ts                 # NEW (HTML generation)
+    └── htmlHelpers.ts                   # NEW (escapeHtml, etc.)
+```
+
 **Testing:**
-- Unit test DataTableSection with sample data
-- Verify HTML output matches existing template
+- Unit test `ISection` interface compliance
+- Unit test `DataTableSection.render()` with sample data
+- Unit test `renderDataTable()` HTML output
+- Verify HTML output matches existing base template table
+- Test coverage: 90% for view functions, 90% for sections
 
-**Result:** SECTION INTERFACE DEFINED ✅
+**Result:** SECTION INTERFACE DEFINED + HTML EXTRACTED ✅
 
-**Complexity:** Moderate (3-4 hours)
+**Complexity:** Moderate
 
 ---
 
-### Slice 3: "SectionCompositionBehavior"
+### Slice 3: "SectionCompositionBehavior + Layout System"
 **Builds on:** Slice 2
 
 **Goal:** Create behavior to compose sections into layouts.
@@ -132,7 +418,7 @@ export class DataTableSection implements ISection {
 **Infrastructure (Shared):**
 ```typescript
 // src/shared/infrastructure/ui/behaviors/SectionCompositionBehavior.ts
-export class SectionCompositionBehavior {
+export class SectionCompositionBehavior implements IPanelBehavior {
   constructor(
     private sections: ISection[],
     private layout: PanelLayout = PanelLayout.SingleColumn
@@ -166,40 +452,152 @@ export class SectionCompositionBehavior {
     `;
   }
 
+  private splitHorizontalTemplate(): string {
+    return `
+      <div class="panel-container split-horizontal">
+        <div class="toolbar-section"><!-- TOOLBAR --></div>
+        <div class="header-section"><!-- HEADER --></div>
+        <div class="filters-section"><!-- FILTERS --></div>
+        <div class="content-split">
+          <div class="main-section"><!-- MAIN --></div>
+          <div class="detail-section hidden"><!-- DETAIL --></div>
+        </div>
+        <div class="footer-section"><!-- FOOTER --></div>
+      </div>
+    `;
+  }
+
   private injectSectionsIntoLayout(template: string, data: SectionRenderData): string {
     let html = template;
 
     // Group sections by position
-    this.sections.forEach(section => {
-      const sectionHtml = section.render(data);
-      const position = section.position || SectionPosition.Main;
+    const sectionsByPosition = this.groupSectionsByPosition();
+
+    // Inject each position
+    for (const [position, sections] of sectionsByPosition.entries()) {
       const placeholder = `<!-- ${position.toUpperCase()} -->`;
+      const sectionHtml = sections.map(s => s.render(data)).join('\n');
       html = html.replace(placeholder, sectionHtml);
-    });
+    }
 
     return html;
   }
+
+  private groupSectionsByPosition(): Map<SectionPosition, ISection[]> {
+    const map = new Map<SectionPosition, ISection[]>();
+
+    for (const section of this.sections) {
+      const position = section.position;
+      if (!map.has(position)) {
+        map.set(position, []);
+      }
+      map.get(position)!.push(section);
+    }
+
+    return map;
+  }
+}
+
+// src/shared/infrastructure/ui/types/PanelLayout.ts
+export enum PanelLayout {
+  SingleColumn = 'single-column',
+  SplitHorizontal = 'split-horizontal',
+  SplitVertical = 'split-vertical',
+  ThreePanel = 'three-panel'  // Future
 }
 ```
 
 **Testing:**
-- Test composition with multiple sections
-- Verify layout template injection works correctly
+- Test composition with single section
+- Test composition with multiple sections at different positions
+- Test single-column layout
+- Test split-horizontal layout (for future Plugin Trace Viewer)
+- Verify HTML output is correct
+- Test coverage: 80% for SectionCompositionBehavior
 
 **Result:** SECTION COMPOSITION WORKING ✅
 
-**Complexity:** Moderate (3-4 hours)
+**Complexity:** Moderate
 
 ---
 
-### Slice 4: "Migrate EnvironmentSetupPanel (No EnvironmentBehavior)"
+### Slice 4: "Migrate SolutionPanel (Simple Validation)"
 **Builds on:** Slice 3
 
-**Goal:** Prove EnvironmentBehavior is optional by migrating EnvironmentSetupPanel without it.
+**Goal:** Migrate simplest real panel to validate framework with minimal risk.
+
+**Presentation (Solution Feature):**
+```typescript
+// Create sections
+const filterSection = new FilterControlsSection({
+  filters: [
+    { id: 'solutionType', type: 'select', label: 'Type', options: ['All', 'Managed', 'Unmanaged'] }
+  ]
+});
+
+const tableSection = new DataTableSection({
+  columns: [
+    { id: 'displayName', label: 'Name' },
+    { id: 'version', label: 'Version' },
+    { id: 'publisher', label: 'Publisher' }
+  ]
+});
+
+const actionSection = new ActionButtonsSection({
+  buttons: [
+    { id: 'refresh', label: 'Refresh' },
+    { id: 'export', label: 'Export' }
+  ]
+});
+
+// Create coordinator (NEW PanelCoordinator)
+this.coordinator = new PanelCoordinator({
+  panel,
+  extensionUri,
+  behaviors: [
+    new EnvironmentBehavior(environmentService),  // ✅ Include
+    new DataBehavior(solutionDataLoader),
+    new SectionCompositionBehavior(
+      [filterSection, tableSection, actionSection],
+      PanelLayout.SingleColumn
+    ),
+    new MessageRoutingBehavior()
+  ],
+  logger
+});
+
+// Register event handlers
+this.coordinator.registerHandler('refresh', async () => {
+  await dataBehavior.loadData();
+});
+
+this.coordinator.registerHandler('export', async () => {
+  await exportSolutionsUseCase.execute();
+});
+```
+
+**Testing:**
+- Solution panel opens
+- Environment dropdown works (EnvironmentBehavior included)
+- Filter controls render and work
+- Data table populates
+- Refresh and export buttons work
+- Compare UX with old DataTablePanelCoordinator version
+- Test coverage: 85% for SolutionPanel coordinator
+
+**Result:** SIMPLE PANEL MIGRATED ✅ (Framework validated with real panel)
+
+**Complexity:** Simple
+
+---
+
+### Slice 5: "Migrate EnvironmentSetupPanel (No EnvironmentBehavior)"
+**Builds on:** Slice 4
+
+**Goal:** Prove EnvironmentBehavior is optional.
 
 **Presentation (Environment Setup Feature):**
 ```typescript
-// Migrate EnvironmentSetupPanel to use new section system
 const sections = [
   new DataTableSection({
     columns: [
@@ -210,10 +608,10 @@ const sections = [
   }),
   new ActionButtonsSection({
     buttons: [
-      { id: 'add', label: 'Add Environment', icon: 'add' },
-      { id: 'edit', label: 'Edit', icon: 'edit' },
-      { id: 'delete', label: 'Delete', icon: 'trash' },
-      { id: 'testConnection', label: 'Test Connection', icon: 'debug' }
+      { id: 'add', label: 'Add Environment' },
+      { id: 'edit', label: 'Edit' },
+      { id: 'delete', label: 'Delete' },
+      { id: 'testConnection', label: 'Test Connection' }
     ]
   })
 ];
@@ -224,68 +622,211 @@ this.coordinator = new PanelCoordinator({
   behaviors: [
     // NO EnvironmentBehavior - this panel manages environments, doesn't operate within one
     new DataBehavior(environmentDataLoader),
-    new SectionCompositionBehavior(sections, PanelLayout.SingleColumn)
+    new SectionCompositionBehavior(sections, PanelLayout.SingleColumn),
+    new MessageRoutingBehavior()
   ],
   logger
 });
+
+// Register CRUD handlers
+this.coordinator.registerHandler('add', async () => {
+  await addEnvironmentUseCase.execute();
+});
+
+this.coordinator.registerHandler('edit', async () => {
+  await editEnvironmentUseCase.execute();
+});
+
+// ... other handlers
 ```
 
 **Testing:**
 - Environment Setup panel opens correctly
-- No environment dropdown shown (correct behavior)
+- NO environment dropdown shown (correct behavior)
 - CRUD operations work
 - Panel doesn't crash without EnvironmentBehavior
+- Test coverage: 85% for EnvironmentSetupPanel coordinator
 
 **Result:** OPTIONAL ENVIRONMENT BEHAVIOR PROVEN ✅
 
-**Complexity:** Moderate (2-3 hours)
+**Complexity:** Simple
 
 ---
 
-### Slice 5: "Extract TreeViewSection + Migrate PersistenceInspectorPanel"
-**Builds on:** Slice 4
+### Slice 6: "Implement Core Shared Sections + Views"
+**Builds on:** Slice 5
 
-**Goal:** Extract TreeViewSection, prove framework supports non-table UI.
+**Goal:** Implement remaining core sections for reuse.
+
+**Infrastructure (Shared):**
+
+1. **FilterControlsSection + View**
+   ```typescript
+   // FilterControlsSection.ts
+   export class FilterControlsSection implements ISection {
+     readonly position = SectionPosition.Filters;
+
+     constructor(private config: FilterControlsConfig) {}
+
+     render(data: SectionRenderData): string {
+       return renderFilterControls(this.config, data.filterState || {});
+     }
+   }
+
+   // filterControlsView.ts
+   export function renderFilterControls(
+     config: FilterControlsConfig,
+     state: Record<string, unknown>
+   ): string {
+     return `
+       <div class="filter-controls">
+         ${config.filters.map(filter => renderFilter(filter, state)).join('')}
+         <div class="filter-actions">
+           <button id="applyFilters" class="primary">Apply Filters</button>
+           <button id="clearFilters">Clear</button>
+         </div>
+       </div>
+     `;
+   }
+   ```
+
+2. **ActionButtonsSection + View**
+   ```typescript
+   // ActionButtonsSection.ts
+   export class ActionButtonsSection implements ISection {
+     readonly position = SectionPosition.Footer;
+
+     constructor(private config: ActionButtonsConfig) {}
+
+     render(data: SectionRenderData): string {
+       return renderActionButtons(this.config.buttons);
+     }
+   }
+
+   // actionButtonsView.ts
+   export function renderActionButtons(buttons: ButtonConfig[]): string {
+     return `
+       <div class="action-buttons">
+         ${buttons.map(btn => renderButton(btn)).join('')}
+       </div>
+     `;
+   }
+   ```
+
+3. **DetailPanelSection + View**
+   ```typescript
+   // DetailPanelSection.ts
+   export class DetailPanelSection implements ISection {
+     readonly position = SectionPosition.Detail;
+
+     constructor(private config: DetailPanelConfig) {}
+
+     render(data: SectionRenderData): string {
+       return renderDetailPanel(this.config, data.detailData);
+     }
+   }
+
+   // detailPanelView.ts
+   export function renderDetailPanel(
+     config: DetailPanelConfig,
+     detailData: unknown
+   ): string {
+     if (!detailData) {
+       return ''; // Hidden by default
+     }
+
+     return `
+       <div class="detail-panel">
+         <div class="detail-header">
+           <h2>Details</h2>
+           <button id="closeDetail">Close</button>
+         </div>
+         <div class="detail-content">
+           ${renderDetailContent(detailData, config)}
+         </div>
+       </div>
+     `;
+   }
+   ```
+
+**File Structure:**
+```
+src/shared/infrastructure/ui/
+├── sections/
+│   ├── ISection.ts
+│   ├── DataTableSection.ts
+│   ├── FilterControlsSection.ts         # NEW
+│   ├── ActionButtonsSection.ts          # NEW
+│   └── DetailPanelSection.ts            # NEW
+└── views/
+    ├── dataTableView.ts
+    ├── filterControlsView.ts            # NEW
+    ├── actionButtonsView.ts             # NEW
+    ├── detailPanelView.ts               # NEW
+    └── htmlHelpers.ts
+```
+
+**Testing:**
+- Unit test each section with various configs
+- Unit test each view function's HTML output
+- Test with edge cases (empty data, missing config)
+- Test coverage: 90% for all sections and views
+
+**Result:** CORE SECTIONS COMPLETE ✅
+
+**Complexity:** Moderate
+
+---
+
+### Slice 7: "Extract TreeViewSection + Migrate PersistenceInspectorPanel"
+**Builds on:** Slice 6
+
+**Goal:** Validate framework supports non-table UI (tree views).
+
+**Note on Complexity:** PersistenceInspectorPanel has complex stateful tree interactions. This migration proves framework flexibility but may be deferred if too complex.
 
 **Infrastructure (Shared):**
 ```typescript
-// src/shared/infrastructure/ui/sections/TreeViewSection.ts
+// TreeViewSection.ts
 export class TreeViewSection implements ISection {
+  readonly position = SectionPosition.Main;
+
   constructor(private config: TreeViewConfig) {}
 
   render(data: SectionRenderData): string {
-    const treeData = data.customData?.treeData || [];
-    return this.generateTreeHtml(treeData, this.config);
+    const treeData = data.customData?.treeData as TreeNode[] || [];
+    return renderTreeView(treeData, this.config);
   }
+}
 
-  private generateTreeHtml(nodes: TreeNode[], config: TreeViewConfig): string {
-    // Extract HTML generation from PersistenceInspectorPanel
-    return `
-      <div class="tree-view">
-        ${this.renderNodes(nodes, 0)}
-      </div>
-    `;
-  }
+// treeViewView.ts
+export function renderTreeView(nodes: TreeNode[], config: TreeViewConfig): string {
+  return `
+    <div class="tree-view">
+      ${renderTreeNodes(nodes, 0, config)}
+    </div>
+  `;
+}
 
-  private renderNodes(nodes: TreeNode[], depth: number): string {
-    return nodes.map(node => `
-      <div class="tree-node" style="padding-left: ${depth * 20}px">
-        <span class="tree-icon">${node.hasChildren ? '▶' : ''}</span>
-        <span class="tree-label">${escapeHtml(node.label)}</span>
-      </div>
-      ${node.children ? this.renderNodes(node.children, depth + 1) : ''}
-    `).join('');
-  }
+function renderTreeNodes(nodes: TreeNode[], depth: number, config: TreeViewConfig): string {
+  return nodes.map(node => `
+    <div class="tree-node" style="padding-left: ${depth * 20}px" data-node-id="${node.id}">
+      ${node.children ? `<span class="tree-icon expandable">▶</span>` : ''}
+      <span class="tree-label">${escapeHtml(node.label)}</span>
+      ${node.actions ? renderNodeActions(node.actions) : ''}
+    </div>
+    ${node.children && node.expanded ? renderTreeNodes(node.children, depth + 1, config) : ''}
+  `).join('');
 }
 ```
 
 **Presentation (Persistence Inspector Feature):**
 ```typescript
-// Migrate PersistenceInspectorPanel to use TreeViewSection
+// Simplified - may keep Direct Implementation if tree state management too complex
 const sections = [
   new TreeViewSection({
     expandable: true,
-    selectable: true
+    selectable: false
   })
 ];
 
@@ -293,231 +834,95 @@ this.coordinator = new PanelCoordinator({
   panel,
   extensionUri,
   behaviors: [
-    // NO EnvironmentBehavior (debug tool, not environment-scoped)
+    // NO EnvironmentBehavior (debug tool)
     // NO DataBehavior (custom data loading)
-    new SectionCompositionBehavior(sections, PanelLayout.SingleColumn)
+    new SectionCompositionBehavior(sections, PanelLayout.SingleColumn),
+    new MessageRoutingBehavior()
   ],
   logger
 });
 ```
 
+**Risk Mitigation:** If tree state management proves too complex, defer this migration and keep PersistenceInspectorPanel as Direct Implementation. Framework is already validated with tables (Slice 4-5).
+
 **Testing:**
-- Persistence Inspector opens correctly
-- Tree view renders
-- No environment dropdown (correct)
+- Tree view renders correctly
 - Expand/collapse works
+- Actions per node work
+- Test coverage: 90% for TreeViewSection and view
 
 **Result:** TREE VIEW SECTION WORKING ✅ (Framework supports non-table UI)
 
-**Complexity:** Moderate (4-5 hours)
+**Complexity:** Moderate (HIGH RISK - may defer)
 
 ---
 
-### Slice 6: "Implement Core Shared Sections"
-**Builds on:** Slice 5
+### Slice 8A: "Implement Plugin Trace Viewer (Single Column, No Detail Panel)"
+**Builds on:** Slice 6
 
-**Goal:** Implement FilterControlsSection, ActionButtonsSection, DetailPanelSection for reuse.
+**Goal:** Implement Plugin Trace Viewer WITHOUT detail panel to reduce complexity. Validates custom sections.
 
-**Infrastructure (Shared):**
+**Presentation (Plugin Trace Viewer Feature):**
+
+**Custom Sections:**
 ```typescript
-// FilterControlsSection.ts
-export class FilterControlsSection implements ISection {
-  constructor(private config: FilterControlsConfig) {}
+// TraceLevelControlsSection.ts
+export class TraceLevelControlsSection implements ISection {
+  readonly position = SectionPosition.Header;
+
+  constructor(
+    private getTraceLevelUseCase: GetTraceLevelUseCase,
+    private setTraceLevelUseCase: SetTraceLevelUseCase,
+    private logger: ILogger
+  ) {}
 
   render(data: SectionRenderData): string {
-    const filterState = data.filterState || {};
-    return `
-      <div class="filter-controls">
-        ${this.config.filters.map(filter => this.renderFilter(filter, filterState)).join('')}
-        <div class="filter-actions">
-          <button id="applyFilters" class="primary">Apply Filters</button>
-          <button id="clearFilters">Clear</button>
-        </div>
-      </div>
-    `;
-  }
-
-  private renderFilter(filter: FilterConfig, state: Record<string, unknown>): string {
-    switch (filter.type) {
-      case 'text':
-        return `<input type="text" id="${filter.id}" placeholder="${filter.label}" value="${state[filter.id] || ''}" />`;
-      case 'select':
-        return `<select id="${filter.id}">
-          ${filter.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
-        </select>`;
-      default:
-        return '';
-    }
+    const currentLevel = data.customData?.traceLevel || 'Off';
+    return renderTraceLevelControls(currentLevel);
   }
 }
 
-// ActionButtonsSection.ts
-export class ActionButtonsSection implements ISection {
-  constructor(private config: ActionButtonsConfig) {}
-
-  render(data: SectionRenderData): string {
-    return `
-      <div class="action-buttons">
-        ${this.config.buttons.map(btn => `
-          <button id="${btn.id}" class="${btn.variant || 'default'}">
-            ${btn.icon ? `<span class="icon">${btn.icon}</span>` : ''}
-            ${btn.label}
-          </button>
-        `).join('')}
-      </div>
-    `;
-  }
-}
-
-// DetailPanelSection.ts
-export class DetailPanelSection implements ISection {
-  constructor(private config: DetailPanelConfig) {}
-
-  render(data: SectionRenderData): string {
-    const detailData = data.detailData;
-
-    if (!detailData) {
-      return '<div class="detail-panel hidden"></div>';
-    }
-
-    return `
-      <div class="detail-panel">
-        <div class="detail-header">
-          <h2>Details</h2>
-          <button id="closeDetail">Close</button>
-        </div>
-        <div class="detail-content">
-          ${this.renderDetailContent(detailData)}
-        </div>
-      </div>
-    `;
-  }
-
-  private renderDetailContent(data: unknown): string {
-    // Render detail content based on config
-    return '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-  }
+// traceLevelControlsView.ts
+export function renderTraceLevelControls(currentLevel: string): string {
+  return `
+    <div class="trace-level-controls">
+      <span>Current Trace Level: <strong>${escapeHtml(currentLevel)}</strong></span>
+      <button id="changeTraceLevel">Change Level</button>
+    </div>
+  `;
 }
 ```
 
-**Testing:**
-- Unit test each section
-- Verify HTML output is correct
-- Test with various config options
-
-**Result:** CORE SECTIONS COMPLETE ✅
-
-**Complexity:** Moderate (5-6 hours)
-
----
-
-### Slice 7: "Migrate SolutionPanel"
-**Builds on:** Slice 6
-
-**Goal:** Migrate SolutionPanel to use FilterControlsSection + DataTableSection.
-
-**Presentation (Solution Feature):**
+**Panel Setup:**
 ```typescript
 const sections = [
+  new TraceLevelControlsSection(getTraceLevelUseCase, setTraceLevelUseCase, logger),
   new FilterControlsSection({
     filters: [
-      { id: 'solutionType', type: 'select', label: 'Type', options: ['All', 'Managed', 'Unmanaged'] }
+      { id: 'pluginName', type: 'text', label: 'Plugin Name' },
+      { id: 'entityName', type: 'text', label: 'Entity Name' },
+      { id: 'status', type: 'select', label: 'Status', options: ['All', 'Success', 'Exception'] }
     ]
   }),
   new DataTableSection({
     columns: [
-      { id: 'displayName', label: 'Name' },
-      { id: 'version', label: 'Version' },
-      { id: 'publisher', label: 'Publisher' }
+      { id: 'status', label: 'Status' },
+      { id: 'createdOn', label: 'Created On' },
+      { id: 'pluginName', label: 'Plugin Name' },
+      { id: 'entityName', label: 'Entity' },
+      { id: 'messageName', label: 'Message' },
+      { id: 'mode', label: 'Mode' },
+      { id: 'duration', label: 'Duration' }
     ]
   }),
   new ActionButtonsSection({
     buttons: [
-      { id: 'refresh', label: 'Refresh', icon: 'refresh' },
-      { id: 'export', label: 'Export', icon: 'export' }
+      { id: 'refresh', label: 'Refresh' },
+      { id: 'deleteSelected', label: 'Delete Selected' },
+      { id: 'deleteAll', label: 'Delete All' },
+      { id: 'exportCsv', label: 'Export CSV' }
     ]
   })
-];
-
-this.coordinator = new PanelCoordinator({
-  panel,
-  extensionUri,
-  behaviors: [
-    new EnvironmentBehavior(environmentService),  // ✅ Include
-    new DataBehavior(solutionDataLoader),
-    new SectionCompositionBehavior(sections, PanelLayout.SingleColumn)
-  ],
-  logger
-});
-```
-
-**Testing:**
-- Solution panel opens
-- Environment dropdown works
-- Filter controls work
-- Data table populates
-- Refresh and export buttons work
-
-**Result:** SOLUTION PANEL MIGRATED ✅
-
-**Complexity:** Simple (2-3 hours)
-
----
-
-### Slice 8: "Implement Plugin Trace Viewer with Custom Sections"
-**Builds on:** Slice 7
-
-**Goal:** Implement Plugin Trace Viewer with all custom sections (complex validation).
-
-**Presentation (Plugin Trace Viewer Feature):**
-```typescript
-// Custom sections
-const traceLevelSection = new TraceLevelControlsSection(
-  getTraceLevelUseCase,
-  setTraceLevelUseCase,
-  logger
-);
-
-const traceDetailSection = new TraceDetailPanelSection({
-  tabs: ['Overview', 'Exception', 'Configuration', 'Message Block']
-});
-
-// Shared sections
-const filterSection = new FilterControlsSection({
-  filters: [
-    { id: 'pluginName', type: 'text', label: 'Plugin Name' },
-    { id: 'entityName', type: 'text', label: 'Entity Name' },
-    { id: 'status', type: 'select', label: 'Status', options: ['All', 'Success', 'Exception'] }
-  ]
-});
-
-const tableSection = new DataTableSection({
-  columns: [
-    { id: 'status', label: 'Status' },
-    { id: 'createdOn', label: 'Created On' },
-    { id: 'pluginName', label: 'Plugin Name' },
-    { id: 'entityName', label: 'Entity' },
-    { id: 'messageName', label: 'Message' },
-    { id: 'mode', label: 'Mode' },
-    { id: 'duration', label: 'Duration' }
-  ]
-});
-
-const actionSection = new ActionButtonsSection({
-  buttons: [
-    { id: 'refresh', label: 'Refresh' },
-    { id: 'deleteSelected', label: 'Delete Selected' },
-    { id: 'deleteAll', label: 'Delete All' },
-    { id: 'exportCsv', label: 'Export CSV' }
-  ]
-});
-
-const sections = [
-  traceLevelSection,   // Custom (header position)
-  filterSection,       // Shared (filters position)
-  tableSection,        // Shared (main position)
-  traceDetailSection,  // Custom (detail position)
-  actionSection        // Shared (footer position)
 ];
 
 this.coordinator = new PanelCoordinator({
@@ -526,98 +931,232 @@ this.coordinator = new PanelCoordinator({
   behaviors: [
     new EnvironmentBehavior(environmentService),
     new DataBehavior(pluginTracesDataLoader),
-    new SectionCompositionBehavior(sections, PanelLayout.SplitHorizontal)
+    new SectionCompositionBehavior(sections, PanelLayout.SingleColumn),
+    new MessageRoutingBehavior()
   ],
   logger
 });
+
+// Register handlers
+this.coordinator.registerHandler('changeTraceLevel', async () => { /* ... */ });
+this.coordinator.registerHandler('refresh', async () => { /* ... */ });
+this.coordinator.registerHandler('deleteSelected', async () => { /* ... */ });
+// ... other handlers
 ```
 
 **Testing:**
 - Plugin Trace Viewer opens
-- All sections render correctly
 - Trace level controls work
 - Filter controls work
 - Data table populates
-- Detail panel shows/hides
+- All action buttons work
+- Test coverage: 85% for panel coordinator
+
+**Result:** PLUGIN TRACE VIEWER (SIMPLE VERSION) COMPLETE ✅
+
+**Complexity:** Moderate
+
+---
+
+### Slice 8B: "Add Detail Panel + Split View to Plugin Trace Viewer"
+**Builds on:** Slice 8A
+
+**Goal:** Add detail panel with split view layout. Completes Plugin Trace Viewer feature.
+
+**Presentation (Plugin Trace Viewer Feature):**
+
+**Custom Section:**
+```typescript
+// TraceDetailPanelSection.ts
+export class TraceDetailPanelSection implements ISection {
+  readonly position = SectionPosition.Detail;
+
+  constructor(private config: TraceDetailPanelConfig) {}
+
+  render(data: SectionRenderData): string {
+    const detailData = data.detailData as PluginTraceDetailViewModel | undefined;
+    return renderTraceDetailPanel(detailData, this.config);
+  }
+}
+
+// traceDetailPanelView.ts
+export function renderTraceDetailPanel(
+  traceDetail: PluginTraceDetailViewModel | undefined,
+  config: TraceDetailPanelConfig
+): string {
+  if (!traceDetail) {
+    return ''; // Hidden when no selection
+  }
+
+  return `
+    <div class="trace-detail-panel">
+      <div class="detail-header">
+        <h2>${escapeHtml(traceDetail.pluginName)}</h2>
+        <span class="status-badge ${traceDetail.status}">${traceDetail.status}</span>
+        <button id="closeDetail">Close</button>
+      </div>
+
+      <div class="tabs">
+        ${config.tabs.map((tab, idx) => `
+          <button class="tab ${idx === 0 ? 'active' : ''}" data-tab="${tab}">${tab}</button>
+        `).join('')}
+      </div>
+
+      <div class="tab-content">
+        ${renderTabContent(traceDetail, config.tabs[0])}
+      </div>
+    </div>
+  `;
+}
+```
+
+**Panel Update:**
+```typescript
+// Add detail section
+const detailSection = new TraceDetailPanelSection({
+  tabs: ['Overview', 'Exception', 'Configuration', 'Message Block']
+});
+
+const sections = [
+  traceLevelSection,
+  filterSection,
+  tableSection,
+  detailSection,        // NEW
+  actionSection
+];
+
+// Change layout to split horizontal
+this.coordinator = new PanelCoordinator({
+  panel,
+  extensionUri,
+  behaviors: [
+    new EnvironmentBehavior(environmentService),
+    new DataBehavior(pluginTracesDataLoader),
+    new SectionCompositionBehavior(sections, PanelLayout.SplitHorizontal),  // Changed
+    new MessageRoutingBehavior()
+  ],
+  logger
+});
+
+// Add row selection handler
+this.coordinator.registerHandler('rowSelected', async (payload: { id: string }) => {
+  const trace = await getPluginTraceDetailUseCase.execute(environmentId, payload.id);
+  this.currentDetailData = viewModelMapper.toDetailViewModel(trace);
+  await this.render(); // Re-render with detail data
+  await this.panel.webview.postMessage({ command: 'showDetailSection' });
+});
+
+this.coordinator.registerHandler('closeDetail', async () => {
+  this.currentDetailData = null;
+  await this.render();
+  await this.panel.webview.postMessage({ command: 'hideDetailSection' });
+});
+```
+
+**Testing:**
+- Click row → detail panel shows
 - Split view layout works
-- All buttons work
+- Tabs in detail panel work
+- Close button hides detail panel
+- Detail content renders correctly
+- Test coverage: 85% for panel coordinator, 90% for detail section
 
-**Result:** COMPLEX PANEL COMPLETE ✅ (Framework validated)
+**Result:** PLUGIN TRACE VIEWER (COMPLETE) ✅
 
-**Complexity:** Moderate (6-8 hours)
+**Complexity:** Moderate
 
 ---
 
 ### Slice 9: "Implement Remaining Panels (WebResource, PluginAssembly, Component)"
-**Builds on:** Slice 8
+**Builds on:** Slice 8A
 
 **Goal:** Implement 3 unimplemented panels using sections from start.
 
-**Presentation (Web Resource, Plugin Assembly, Component Features):**
+**Presentation (All 3 Features):**
 - All use similar structure: DataTableSection + ActionButtonsSection
 - All include EnvironmentBehavior
 - All use DataBehavior with feature-specific DataLoader
+- Simple single-column layout
 
 **Testing:**
 - Each panel opens correctly
 - Environment dropdown works
 - Data loads and displays
 - Actions work
+- Test coverage: 85% for each panel coordinator
 
-**Result:** ALL PANELS MIGRATED ✅
+**Result:** ALL PANELS IMPLEMENTED WITH FRAMEWORK ✅
 
-**Complexity:** Simple (3-4 hours total for all 3)
+**Complexity:** Simple
 
 ---
 
-### Slice 10: "Documentation + Cleanup"
+### Slice 10: "Documentation + Deprecation Cleanup"
 **Builds on:** Slice 9
 
-**Goal:** Update all documentation, remove deprecated code.
+**Goal:** Complete documentation, deprecate old coordinator, remove technical debt.
 
 **Documentation:**
 - ✅ Update `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` (already done)
 - ✅ Update `CLAUDE.md` rule #22 (already done)
 - ✅ Update `docs/TECHNICAL_DEBT.md` (already done)
-- Create migration guide for future panels
-- Add JSDoc to all sections
+- Create migration guide: `docs/MIGRATION_GUIDE_PANEL_FRAMEWORK.md`
+- Add JSDoc to all sections, views, and coordinator
+
+**Deprecation:**
+- Add `@deprecated` JSDoc to `DataTablePanelCoordinator`
+  ```typescript
+  /**
+   * @deprecated Use PanelCoordinator instead. This will be removed in v2.0.
+   * See docs/MIGRATION_GUIDE_PANEL_FRAMEWORK.md for migration instructions.
+   */
+  export class DataTablePanelCoordinator { }
+  ```
+- Add deprecation notice in constructor (logged once)
+- Update all existing panels to use `PanelCoordinator` (automated refactor)
 
 **Cleanup:**
-- Remove deprecated `DataTablePanelCoordinator` export (after all imports updated)
-- Remove old base template HTML generation code (replaced by sections)
-- Remove hard-coded button event listeners (replaced by section handlers)
+- Remove hard-coded button event listeners from old base template (now unused)
+- Archive old base template (keep for reference, not used by new coordinator)
+- Remove `HtmlRenderingBehavior` (replaced by SectionCompositionBehavior)
 
 **Testing:**
 - Final `npm run compile` - should succeed
-- Final `npm test` - all tests should pass
-- All 7 panels tested manually
+- Final `npm test` - all tests should pass (ALL coverage targets met)
+- All 7 panels tested manually - should work correctly
+- Performance testing - no degradation
 
-**Result:** FRAMEWORK COMPLETE + DOCUMENTED ✅
+**Result:** FRAMEWORK COMPLETE + DOCUMENTED + CLEAN ✅
 
-**Complexity:** Simple (2-3 hours)
+**Complexity:** Simple
 
 ---
 
 ## Total Effort Estimate
 
-| Slice | Complexity | Estimated Hours |
-|-------|-----------|----------------|
-| 1. Rename + Backwards Compatibility | Simple | 1-2 |
-| 2. Section System Foundation | Moderate | 3-4 |
-| 3. SectionCompositionBehavior | Moderate | 3-4 |
-| 4. Migrate EnvironmentSetupPanel | Moderate | 2-3 |
-| 5. TreeViewSection + PersistenceInspector | Moderate | 4-5 |
-| 6. Core Shared Sections | Moderate | 5-6 |
-| 7. Migrate SolutionPanel | Simple | 2-3 |
-| 8. Plugin Trace Viewer | Moderate | 6-8 |
-| 9. Remaining Panels (3 panels) | Simple | 3-4 |
-| 10. Documentation + Cleanup | Simple | 2-3 |
-| **TOTAL** | **Moderate** | **31-42 hours** |
+| Slice | Complexity |
+|-------|-----------|
+| 1. Implement PanelCoordinator (New) | Moderate |
+| 2. Section Interface + View Extraction | Moderate |
+| 3. SectionCompositionBehavior + Layouts | Moderate |
+| 4. Migrate SolutionPanel (Simple) | Simple |
+| 5. Migrate EnvironmentSetupPanel (No Env) | Simple |
+| 6. Core Shared Sections + Views | Moderate |
+| 7. TreeViewSection + PersistenceInspector | Moderate (HIGH RISK) |
+| 8A. Plugin Trace Viewer (Single Column) | Moderate |
+| 8B. Plugin Trace Viewer (Detail + Split) | Moderate |
+| 9. Remaining Panels (3 panels) | Simple |
+| 10. Documentation + Cleanup | Simple |
+| **TOTAL** | **Moderate** |
+
+**Note:** Time estimates removed per CLAUDE.md Rule #15. Use complexity labels to assess effort.
 
 **Phased Delivery:**
-- **Phase 1:** Slices 1-3 (Framework Foundation) - 7-10 hours - **MVP WORKING**
-- **Phase 2:** Slices 4-6 (Core Sections + Migrations) - 11-14 hours - **PROVEN EXTENSIBLE**
-- **Phase 3:** Slices 7-10 (Complete Migration) - 13-18 hours - **ALL PANELS COMPLETE**
+- **Phase 1:** Slices 1-3 (Framework Foundation) - **MVP WORKING**
+- **Phase 2:** Slices 4-6 (Core Sections + Simple Migrations) - **PROVEN WITH REAL PANELS**
+- **Phase 3:** Slices 7-10 (Complex Migrations + Completion) - **ALL PANELS COMPLETE**
+
+**Risk Mitigation:** Slice 7 (PersistenceInspector) may be deferred if tree state complexity too high. Framework is already validated without it.
 
 ---
 
@@ -632,8 +1171,8 @@ this.coordinator = new PanelCoordinator({
 │ Panel (Factory)                                             │
 │ - createOrShow() factory (singleton pattern)               │
 │ - Constructs PanelCoordinator with sections + behaviors    │
-│ - Handles panel-specific message routing                   │
-│ - NO HTML generation (delegated to sections)               │
+│ - Registers message handlers by button ID                  │
+│ - NO HTML generation (delegated to sections/views)         │
 │ - NO business logic (delegated to use cases)               │
 └─────────────────────────────────────────────────────────────┘
                           ↓ uses ↓
@@ -652,20 +1191,28 @@ this.coordinator = new PanelCoordinator({
 │ - EnvironmentBehavior: Environment dropdown (OPTIONAL)     │
 │ - DataBehavior: Load data via IDataLoader (OPTIONAL)       │
 │                                                              │
-│ Sections (UI Components)                                    │
-│ - ISection: interface { render(data): string }             │
-│ - DataTableSection: Generates table HTML                   │
-│ - TreeViewSection: Generates tree HTML                     │
-│ - FilterControlsSection: Generates filter controls HTML    │
-│ - ActionButtonsSection: Generates buttons HTML             │
-│ - DetailPanelSection: Generates detail pane HTML           │
+│ Sections (UI Components - Stateless)                        │
+│ - ISection: interface { position, render(data) }           │
+│ - DataTableSection: Delegates to renderDataTable()         │
+│ - TreeViewSection: Delegates to renderTreeView()           │
+│ - FilterControlsSection: Delegates to renderFilterControls()│
+│ - ActionButtonsSection: Delegates to renderActionButtons() │
+│ - DetailPanelSection: Delegates to renderDetailPanel()     │
+│                                                              │
+│ Views (HTML Generation - Pure Functions)                    │
+│ - renderDataTable(): Generate table HTML                   │
+│ - renderTreeView(): Generate tree HTML                     │
+│ - renderFilterControls(): Generate filter controls HTML    │
+│ - renderActionButtons(): Generate buttons HTML             │
+│ - renderDetailPanel(): Generate detail pane HTML           │
+│ - All in separate .ts files (CLAUDE.md Rule #10)           │
 └─────────────────────────────────────────────────────────────┘
                           ↓ uses ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ Feature-Specific (Custom Sections)                          │
+│ Feature-Specific (Custom Sections + Views)                  │
 ├─────────────────────────────────────────────────────────────┤
-│ TraceLevelControlsSection (Plugin Trace Viewer)            │
-│ TraceDetailPanelSection (Plugin Trace Viewer)              │
+│ TraceLevelControlsSection → renderTraceLevelControls()     │
+│ TraceDetailPanelSection → renderTraceDetailPanel()         │
 │ [Future custom sections as needed]                          │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -676,12 +1223,53 @@ this.coordinator = new PanelCoordinator({
 - Panels → PanelCoordinator (shared infrastructure)
 - PanelCoordinator → Behaviors (composition)
 - PanelCoordinator → Sections (composition)
+- Sections → Views (delegation)
 - Sections → ISection interface (abstraction)
-- Feature sections → ISection interface (abstraction)
+- Views → HTML helpers (pure functions)
+- Feature sections → Shared section interfaces (abstraction)
 
 ❌ **NEVER:**
 - Shared sections → Feature code
 - Framework → Feature code
+- Views → Sections (views are pure functions, no dependencies)
+- Sections → Behaviors (sections are stateless)
+
+### Behavior vs Section: What's the Difference?
+
+**Behaviors:** Orchestrate panel lifecycle and cross-cutting concerns.
+- Examples: EnvironmentBehavior, DataBehavior, MessageRoutingBehavior, SectionCompositionBehavior
+- Lifecycle: `initialize()`, `dispose()`, event subscriptions
+- Stateful (hold references, manage subscriptions, coordinate actions)
+- Implement `IPanelBehavior` interface
+
+**Sections:** Render UI components.
+- Examples: DataTableSection, TreeViewSection, FilterControlsSection, custom sections
+- Lifecycle: `render(data)` only (called each re-render)
+- Stateless (pure functions that transform data → HTML)
+- Implement `ISection` interface
+
+**Views:** Generate HTML.
+- Examples: renderDataTable(), renderTreeView(), renderFilterControls()
+- Pure functions: `(data, config) => HTML string`
+- Zero dependencies (just htmlHelpers for escaping)
+- Located in `presentation/views/` (CLAUDE.md Rule #10)
+
+**Relationship:**
+- Sections use views (delegation)
+- Behaviors use sections (composition)
+- SectionCompositionBehavior composes sections into layouts
+- Sections are used BY behaviors, not the other way around
+
+**Why separate Sections from Behaviors?**
+- Behaviors manage state and lifecycle, sections render views
+- Sections are easier to test (pure functions via views)
+- Sections are reusable across features (behaviors are feature-specific)
+- Sections can be composed dynamically (behaviors are fixed per panel)
+
+**Why separate Sections from Views?**
+- Sections coordinate (which view to call, with what data)
+- Views generate HTML (pure functions, testable in isolation)
+- CLAUDE.md Rule #10: HTML must be in separate view files
 
 ---
 
@@ -703,7 +1291,7 @@ export enum SectionPosition {
 }
 
 export interface ISection {
-  readonly position?: SectionPosition;
+  readonly position: SectionPosition;  // Required - where to inject in layout
   render(data: SectionRenderData): string;
 }
 ```
@@ -712,6 +1300,15 @@ export interface ISection {
 ```typescript
 // src/shared/infrastructure/ui/types/SectionRenderData.ts
 
+/**
+ * Data passed to sections during rendering.
+ *
+ * NOTE: This is a union type with optional fields for all section types.
+ * Trade-off: Couples sections via shared contract, but pragmatic for <10 section types.
+ * If section types exceed 10, refactor to discriminated union.
+ *
+ * YAGNI: Keep simple for MVP, refactor if needed later.
+ */
 export interface SectionRenderData {
   // Table data (for DataTableSection)
   tableData?: Record<string, unknown>[];
@@ -729,6 +1326,7 @@ export interface SectionRenderData {
   errorMessage?: string;
 
   // Custom data (for feature-specific sections)
+  // Escape hatch for unique section needs
   customData?: Record<string, unknown>;
 }
 ```
@@ -741,14 +1339,14 @@ export enum PanelLayout {
   SingleColumn = 'single-column',
   SplitHorizontal = 'split-horizontal',
   SplitVertical = 'split-vertical',
-  ThreePanel = 'three-panel'
+  ThreePanel = 'three-panel'  // Future - for Metadata Browser
 }
 ```
 
-#### DataTableConfig
-```typescript
-// src/shared/infrastructure/ui/sections/DataTableSection.ts
+#### Section Configs
 
+```typescript
+// DataTableSection
 export interface DataTableColumn {
   id: string;
   label: string;
@@ -760,12 +1358,8 @@ export interface DataTableConfig {
   selectable?: boolean;
   emptyMessage?: string;
 }
-```
 
-#### FilterControlsConfig
-```typescript
-// src/shared/infrastructure/ui/sections/FilterControlsSection.ts
-
+// FilterControlsSection
 export interface FilterConfig {
   id: string;
   type: 'text' | 'select' | 'date';
@@ -777,12 +1371,8 @@ export interface FilterConfig {
 export interface FilterControlsConfig {
   filters: FilterConfig[];
 }
-```
 
-#### ActionButtonsConfig
-```typescript
-// src/shared/infrastructure/ui/sections/ActionButtonsSection.ts
-
+// ActionButtonsSection
 export interface ButtonConfig {
   id: string;
   label: string;
@@ -793,17 +1383,21 @@ export interface ButtonConfig {
 export interface ActionButtonsConfig {
   buttons: ButtonConfig[];
 }
-```
 
-#### TreeViewConfig
-```typescript
-// src/shared/infrastructure/ui/sections/TreeViewSection.ts
-
+// TreeViewSection
 export interface TreeNode {
   id: string;
   label: string;
   icon?: string;
+  expanded?: boolean;
   children?: TreeNode[];
+  actions?: NodeAction[];
+}
+
+export interface NodeAction {
+  id: string;
+  label: string;
+  icon?: string;
 }
 
 export interface TreeViewConfig {
@@ -821,7 +1415,8 @@ export interface PanelCoordinatorConfig {
   panel: vscode.WebviewPanel;
   extensionUri: vscode.Uri;
   behaviors: IPanelBehavior[];
-  sections?: ISection[];
+  sections: ISection[];
+  layout: PanelLayout;
   logger: ILogger;
 }
 ```
@@ -829,23 +1424,26 @@ export interface PanelCoordinatorConfig {
 ### Coordinator Methods
 
 ```typescript
-export class PanelCoordinator<TEntity, TViewModel> {
+export class PanelCoordinator implements IPanelCoordinator {
   constructor(config: PanelCoordinatorConfig);
 
   // Lifecycle
+  public async initialize(): Promise<void>;
   public reveal(): void;
   public dispose(): void;
 
   // State management
-  public async handleDataLoaded(data: TEntity[]): Promise<void>;
+  public async handleDataLoaded(data: unknown[]): Promise<void>;
   public async handleFilterChanged(filters: Record<string, unknown>): Promise<void>;
   public async handleRowSelected(id: string): Promise<void>;
 
-  // Rendering
-  private async render(): Promise<void>;
-
-  // Message handling (delegates to MessageRoutingBehavior)
+  // Message handling
+  public registerHandler(command: string, handler: (payload?: unknown) => Promise<void>): void;
   public async handleMessage(message: WebviewMessage): Promise<void>;
+
+  // Rendering (private)
+  private async render(): Promise<void>;
+  private getRenderData(): SectionRenderData;
 }
 ```
 
@@ -858,14 +1456,19 @@ export class PanelCoordinator<TEntity, TViewModel> {
 ```
 src/shared/infrastructure/ui/
 ├── coordinators/
-│   └── PanelCoordinator.ts                      # Renamed from DataTablePanelCoordinator
+│   ├── PanelCoordinator.ts                      # NEW (universal coordinator)
+│   ├── IPanelCoordinator.ts                     # NEW
+│   ├── DataTablePanelCoordinator.ts             # DEPRECATED (kept for backwards compat)
+│   └── IDataTablePanelCoordinator.ts            # DEPRECATED
 ├── behaviors/
 │   ├── IPanelBehavior.ts
-│   ├── SectionCompositionBehavior.ts            # NEW
+│   ├── SectionCompositionBehavior.ts            # NEW (replaces HtmlRenderingBehavior)
 │   ├── MessageRoutingBehavior.ts
 │   ├── EnvironmentBehavior.ts                   # OPTIONAL
 │   ├── DataBehavior.ts                          # OPTIONAL
-│   └── SolutionFilterBehavior.ts                # OPTIONAL
+│   ├── SolutionFilterBehavior.ts                # OPTIONAL
+│   ├── HtmlRenderingBehavior.ts                 # DEPRECATED (old template-based)
+│   └── ...
 ├── sections/
 │   ├── ISection.ts                              # NEW
 │   ├── DataTableSection.ts                      # NEW
@@ -874,6 +1477,14 @@ src/shared/infrastructure/ui/
 │   ├── ActionButtonsSection.ts                  # NEW
 │   ├── DetailPanelSection.ts                    # NEW
 │   └── EmptyStateSection.ts                     # NEW
+├── views/                                        # NEW (CLAUDE.md Rule #10)
+│   ├── dataTableView.ts                         # NEW (HTML generation)
+│   ├── treeViewView.ts                          # NEW (HTML generation)
+│   ├── filterControlsView.ts                    # NEW (HTML generation)
+│   ├── actionButtonsView.ts                     # NEW (HTML generation)
+│   ├── detailPanelView.ts                       # NEW (HTML generation)
+│   ├── htmlHelpers.ts                           # NEW (escapeHtml, etc.)
+│   └── dataTable.ts                             # OLD (archived for reference)
 └── types/
     ├── SectionRenderData.ts                     # NEW
     ├── PanelLayout.ts                           # NEW
@@ -881,10 +1492,13 @@ src/shared/infrastructure/ui/
 
 src/features/pluginTraceViewer/presentation/
 ├── panels/
-│   └── PluginTraceViewerPanel.ts
+│   └── PluginTraceViewerPanel.ts                # MIGRATED (uses PanelCoordinator)
 ├── sections/
 │   ├── TraceLevelControlsSection.ts             # NEW (custom)
 │   └── TraceDetailPanelSection.ts               # NEW (custom)
+├── views/
+│   ├── traceLevelControlsView.ts                # NEW (HTML generation)
+│   └── traceDetailPanelView.ts                  # NEW (HTML generation)
 └── dataLoaders/
     └── PluginTracesDataLoader.ts
 
@@ -898,7 +1512,188 @@ src/features/persistenceInspector/presentation/
 ├── panels/
 │   └── PersistenceInspectorPanel.ts             # MIGRATED (uses TreeViewSection)
 └── [No data loader - custom loading]
+
+docs/
+├── design/
+│   └── UNIVERSAL_PANEL_FRAMEWORK_DESIGN.md      # This document
+└── MIGRATION_GUIDE_PANEL_FRAMEWORK.md           # NEW (migration instructions)
 ```
+
+---
+
+## Key Decisions
+
+### Decision 1: New Implementation vs Rename
+**Decision:** Implement `PanelCoordinator` (new) alongside `DataTablePanelCoordinator` (deprecated).
+
+**Rationale:**
+- True backwards compatibility - existing panels continue working unchanged
+- Different constructor signatures prevent simple rename
+- Gradual migration reduces risk
+
+**Trade-off:**
+- Temporary duplication (both coordinators exist during migration)
+- Must maintain two coordinators briefly
+- After migration complete, deprecate and eventually remove old coordinator
+
+**Alternative Considered:** Rename with constructor overloading
+**Why Rejected:** Overloading complex, error-prone. Clean separation is clearer.
+
+---
+
+### Decision 2: HTML in Sections vs Separate Views
+**Decision:** Sections delegate to view functions in separate files (CLAUDE.md Rule #10 compliance).
+
+**Rationale:**
+- CLAUDE.md Rule #10: "HTML in panel .ts files - Extract all HTML to separate view files"
+- Separates rendering logic (views) from composition logic (sections)
+- Views are pure functions, easier to test in isolation
+- Consistent with existing pattern (see `dataTable.ts` view file)
+
+**Trade-off:**
+- More files (each section has corresponding view file)
+- Extra indirection (section calls view function)
+- But: Clearer separation of concerns, better testability
+
+**Implementation:**
+```typescript
+// Section (composition logic)
+export class DataTableSection implements ISection {
+  render(data: SectionRenderData): string {
+    return renderDataTable(data.tableData || [], this.config);  // Delegates
+  }
+}
+
+// View (HTML generation)
+export function renderDataTable(
+  data: Record<string, unknown>[],
+  config: DataTableConfig
+): string {
+  // ALL HTML HERE
+}
+```
+
+---
+
+### Decision 3: SectionRenderData as Union Type
+**Decision:** Use shared data contract with optional fields + `customData` escape hatch.
+
+**Rationale:**
+- Pragmatic for MVP - easy for sections to access data
+- Avoids complex discriminated unions early
+- Escape hatch (`customData`) allows custom sections without modifying contract
+
+**Trade-off:**
+- Couples sections via shared contract (violates Open/Closed Principle)
+- Adding new section type may require modifying `SectionRenderData`
+- Acceptable for <10 section types
+
+**Future Consideration:**
+If section types exceed 10, refactor to discriminated union:
+```typescript
+export type SectionRenderData =
+  | { type: 'table'; tableData: Record<string, unknown>[]; isLoading?: boolean }
+  | { type: 'tree'; treeData: TreeNode[]; isLoading?: boolean }
+  | { type: 'detail'; detailData: unknown; isLoading?: boolean };
+```
+
+**YAGNI:** Keep simple for now, refactor if needed.
+
+---
+
+### Decision 4: Stateless Sections + Panel Registers Handlers
+**Decision:** Sections are pure render functions. Panel registers message handlers by button ID.
+
+**Rationale:**
+- Simpler testing (sections are pure functions)
+- Clear separation (rendering vs logic)
+- Sections don't know about webview messages (lower coupling)
+
+**Trade-off:**
+- Panel must know button IDs (convention: button id = message command)
+- If button ID changes, must update both section config and handler registration
+- Acceptable - IDs are defined in same config object
+
+**Implementation:**
+```typescript
+// Section config defines IDs
+const actionSection = new ActionButtonsSection({
+  buttons: [
+    { id: 'refresh', label: 'Refresh' },
+    { id: 'delete', label: 'Delete' }
+  ]
+});
+
+// Panel registers handlers for those IDs
+coordinator.registerHandler('refresh', async () => { /* ... */ });
+coordinator.registerHandler('delete', async () => { /* ... */ });
+```
+
+**Alternative Considered:** Sections register handlers
+**Why Rejected:** Makes sections stateful, harder to test, tighter coupling.
+
+---
+
+### Decision 5: Migration Risk Order
+**Decision:** Migrate simple panels first (Solution, EnvironmentSetup), complex panels last (PluginTraceViewer).
+
+**Rationale:**
+- Build confidence with simple panels before tackling high-risk migrations
+- Validate framework incrementally, not all at once
+- If complex migration fails, simple panels already migrated
+
+**Trade-off:**
+- Framework not fully validated until complex panels complete
+- But: Risk mitigation more important than speed
+
+**Migration Order:**
+1. SolutionPanel (simple - table + filter)
+2. EnvironmentSetupPanel (simple - no environment behavior)
+3. WebResource, PluginAssembly, Component (simple - similar to Solution)
+4. PersistenceInspectorPanel (moderate - tree view, may defer)
+5. PluginTraceViewer (complex - custom sections + split view)
+
+---
+
+### Decision 6: PersistenceInspectorPanel May Stay Direct Implementation
+**Decision:** Attempt migration to TreeViewSection, but defer if tree state complexity too high.
+
+**Rationale:**
+- Framework already validated with tables (Solution, EnvironmentSetup)
+- TreeViewSection proves framework supports non-table UI
+- BUT: PersistenceInspectorPanel has complex stateful interactions (expand/collapse, reveal secrets)
+- Forcing migration may be more complex than beneficial
+
+**Acceptance Criteria for Migration:**
+- Tree state (expanded/collapsed nodes) manageable via `customData`
+- "Reveal Secret" per-node actions work cleanly
+- "Clear Entry" action integrates well with tree selection
+- Total complexity ≤ Direct Implementation complexity
+
+**If Migration Too Complex:**
+- Keep PersistenceInspectorPanel as Direct Implementation
+- Extract `TreeViewSection` for future panels (Metadata Browser, etc.)
+- Framework is already proven without this migration
+
+---
+
+### Decision 7: Replace HtmlRenderingBehavior, Not Extend It
+**Decision:** `SectionCompositionBehavior` is a NEW behavior that replaces `HtmlRenderingBehavior`.
+
+**Rationale:**
+- HtmlRenderingBehavior uses fixed base template (template-based)
+- SectionCompositionBehavior composes sections (component-based)
+- Fundamental architectural difference - not an extension
+
+**Trade-off:**
+- Cannot reuse HtmlRenderingBehavior code
+- Must implement layout templates from scratch
+- But: Clean separation, no legacy template constraints
+
+**Implementation:**
+- Old: `HtmlRenderingBehavior` used by `DataTablePanelCoordinator`
+- New: `SectionCompositionBehavior` used by `PanelCoordinator`
+- After migration: Deprecate and remove `HtmlRenderingBehavior`
 
 ---
 
@@ -908,20 +1703,24 @@ src/features/persistenceInspector/presentation/
 
 **Shared Infrastructure:**
 - ✅ PanelCoordinator orchestrates (NO business logic)
-- ✅ Behaviors handle cross-cutting concerns (environment, data loading, message routing)
-- ✅ Sections generate HTML (stateless, pure functions)
+- ✅ Behaviors handle cross-cutting concerns (environment, data loading, message routing, composition)
+- ✅ Sections coordinate rendering (stateless, NO HTML in .ts files)
+- ✅ Views generate HTML (pure functions in separate files, CLAUDE.md Rule #10)
 - ✅ No dependencies on feature code
 
 **Feature Presentation:**
 - ✅ Panels create coordinator with feature-specific config
 - ✅ Custom sections in feature layer (if not reusable)
+- ✅ Custom views in feature layer (HTML generation)
 - ✅ NO business logic (delegates to use cases)
-- ✅ NO HTML in .ts files (delegated to sections)
+- ✅ NO HTML in .ts files (delegated to views)
 
 **Dependency Direction:**
 - ✅ Panels → PanelCoordinator (shared infrastructure)
 - ✅ PanelCoordinator → Behaviors (composition)
-- ✅ PanelCoordinator → Sections (composition)
+- ✅ Behaviors → Sections (composition)
+- ✅ Sections → Views (delegation)
+- ✅ Views → HTML helpers (pure functions)
 - ✅ All dependencies point inward or sideways (never outward to features)
 
 ### ✅ SOLID Principles
@@ -932,10 +1731,11 @@ src/features/persistenceInspector/presentation/
 - ✅ MessageRoutingBehavior: Routes webview messages
 - ✅ EnvironmentBehavior: Manages environment dropdown
 - ✅ DataBehavior: Loads data via IDataLoader
-- ✅ Each section: Generates HTML for one UI component
+- ✅ Each section: Coordinates rendering for one UI component
+- ✅ Each view: Generates HTML for one UI component
 
 **Open/Closed:**
-- ✅ Framework open for extension (new sections, new behaviors)
+- ✅ Framework open for extension (new sections, new behaviors, new layouts)
 - ✅ Framework closed for modification (don't edit PanelCoordinator to add features)
 
 **Liskov Substitution:**
@@ -943,12 +1743,15 @@ src/features/persistenceInspector/presentation/
 - ✅ All behaviors implement IPanelBehavior (interchangeable)
 
 **Interface Segregation:**
-- ✅ ISection is minimal (render only)
+- ✅ ISection is minimal (position + render only)
 - ✅ Sections don't depend on unused methods
+- ✅ Views are pure functions (no interface needed)
 
 **Dependency Inversion:**
 - ✅ PanelCoordinator depends on ISection (abstraction), not concrete sections
+- ✅ PanelCoordinator depends on IPanelBehavior (abstraction), not concrete behaviors
 - ✅ Sections can be mocked in tests
+- ✅ Behaviors can be mocked in tests
 
 ---
 
@@ -956,7 +1759,7 @@ src/features/persistenceInspector/presentation/
 
 ### Unit Tests
 
-**Sections (Isolated):**
+**Sections (Isolated - 90% coverage target):**
 ```typescript
 describe('DataTableSection', () => {
   it('should render table with data', () => {
@@ -989,28 +1792,35 @@ describe('DataTableSection', () => {
     expect(html).toContain('No data');
   });
 });
+```
 
-describe('TreeViewSection', () => {
-  it('should render tree with nested nodes', () => {
-    const section = new TreeViewSection({ expandable: true });
+**Views (Isolated - 90% coverage target):**
+```typescript
+describe('renderDataTable', () => {
+  it('should generate table HTML with columns', () => {
+    const html = renderDataTable(
+      [{ name: 'Foo', value: 'Bar' }],
+      { columns: [{ id: 'name', label: 'Name' }, { id: 'value', label: 'Value' }] }
+    );
 
-    const html = section.render({
-      customData: {
-        treeData: [
-          { id: '1', label: 'Root', children: [
-            { id: '2', label: 'Child' }
-          ]}
-        ]
-      }
-    });
+    expect(html).toContain('<table');
+    expect(html).toContain('<th>Name</th>');
+    expect(html).toContain('<td>Foo</td>');
+  });
 
-    expect(html).toContain('Root');
-    expect(html).toContain('Child');
+  it('should escape HTML in data', () => {
+    const html = renderDataTable(
+      [{ name: '<script>alert("xss")</script>' }],
+      { columns: [{ id: 'name', label: 'Name' }] }
+    );
+
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
   });
 });
 ```
 
-**Behaviors (Isolated):**
+**Behaviors (Isolated - 80% coverage target):**
 ```typescript
 describe('SectionCompositionBehavior', () => {
   it('should compose sections into single-column layout', () => {
@@ -1023,13 +1833,29 @@ describe('SectionCompositionBehavior', () => {
     const html = behavior.compose({ tableData: [] });
 
     expect(html).toContain('panel-container');
+    expect(html).toContain('main-section');
+    expect(html).toContain('footer-section');
+  });
+
+  it('should inject sections at correct positions', () => {
+    const tableSection = new DataTableSection({ columns: [] });
+    const actionSection = new ActionButtonsSection({ buttons: [{ id: 'test', label: 'Test' }] });
+
+    const behavior = new SectionCompositionBehavior([tableSection, actionSection], PanelLayout.SingleColumn);
+    const html = behavior.compose({ tableData: [] });
+
+    // Table in main section
+    expect(html.indexOf('<table')).toBeLessThan(html.indexOf('footer-section'));
+
+    // Actions in footer section
+    expect(html.indexOf('footer-section')).toBeLessThan(html.indexOf('test'));
   });
 });
 ```
 
 ### Integration Tests
 
-**PanelCoordinator:**
+**PanelCoordinator (85% coverage target):**
 ```typescript
 describe('PanelCoordinator', () => {
   it('should render panel with sections', async () => {
@@ -1044,76 +1870,104 @@ describe('PanelCoordinator', () => {
       panel: mockPanel,
       extensionUri: vscode.Uri.file('/test'),
       behaviors: [
-        new SectionCompositionBehavior(sections)
+        new SectionCompositionBehavior(sections, PanelLayout.SingleColumn)
       ],
+      sections,
+      layout: PanelLayout.SingleColumn,
       logger: mockLogger
     });
 
-    await coordinator.render();
+    await coordinator.initialize();
 
     expect(mockPanel.webview.html).toContain('<table');
+  });
+
+  it('should re-render on data change', async () => {
+    const coordinator = createTestCoordinator();
+
+    await coordinator.handleDataLoaded([{ name: 'Test' }]);
+
+    expect(coordinator.panel.webview.html).toContain('Test');
   });
 });
 ```
 
 ### Manual Testing
 
-**All 7 Panels:**
+**All 7 Panels (Complete walkthrough):**
 - [ ] EnvironmentSetupPanel opens and works (no environment dropdown)
 - [ ] PersistenceInspectorPanel opens and shows tree view
 - [ ] SolutionPanel opens with environment dropdown and filter
-- [ ] PluginTraceViewerPanel opens with all sections
+- [ ] PluginTraceViewerPanel opens with all sections (trace level, filters, table, detail, actions)
+- [ ] PluginTraceViewerPanel detail panel shows/hides correctly
+- [ ] PluginTraceViewerPanel split view layout works
 - [ ] WebResourcePanel opens (when implemented)
 - [ ] PluginAssemblyPanel opens (when implemented)
 - [ ] ComponentPanel opens (when implemented)
+
+**Coverage Validation:**
+- [ ] Run `npm test -- --coverage`
+- [ ] Verify sections ≥90% coverage
+- [ ] Verify views ≥90% coverage
+- [ ] Verify coordinator ≥85% coverage
+- [ ] Verify behaviors ≥80% coverage
 
 ---
 
 ## Migration Checklist
 
 ### Phase 1: Framework Foundation
-- [ ] Rename DataTablePanelCoordinator → PanelCoordinator
-- [ ] Update all imports (automated find/replace)
+- [ ] Implement `PanelCoordinator.ts` (new file, different from DataTablePanelCoordinator)
+- [ ] Implement `IPanelCoordinator.ts` interface
+- [ ] Keep `DataTablePanelCoordinator.ts` unchanged (deprecated)
+- [ ] Define `ISection` interface with `position` property
+- [ ] Implement `DataTableSection` (delegates to view)
+- [ ] Create `renderDataTable()` view function (HTML generation)
+- [ ] Implement `SectionCompositionBehavior`
+- [ ] Test section composition with sample data
 - [ ] Run `npm run compile` - should succeed
 - [ ] Run `npm test` - should pass
-- [ ] Define ISection interface
-- [ ] Implement DataTableSection (extract from base template)
-- [ ] Implement SectionCompositionBehavior
-- [ ] Test section composition with sample data
+- [ ] Coverage: Sections 90%, Views 90%, Coordinator 85%
 
-### Phase 2: Core Sections + Migrations
+### Phase 2: Core Sections + Simple Migrations
+- [ ] Implement `FilterControlsSection` + view
+- [ ] Implement `ActionButtonsSection` + view
+- [ ] Implement `DetailPanelSection` + view
+- [ ] Unit test all sections and views (90% coverage)
+- [ ] Migrate SolutionPanel to PanelCoordinator
+- [ ] Test SolutionPanel works correctly
 - [ ] Migrate EnvironmentSetupPanel (no EnvironmentBehavior)
 - [ ] Test EnvironmentSetupPanel works correctly
-- [ ] Extract TreeViewSection from PersistenceInspectorPanel
-- [ ] Migrate PersistenceInspectorPanel to use TreeViewSection
-- [ ] Test PersistenceInspectorPanel works correctly
-- [ ] Implement FilterControlsSection
-- [ ] Implement ActionButtonsSection
-- [ ] Implement DetailPanelSection
-- [ ] Unit test all sections
+- [ ] Coverage: All targets met
 
-### Phase 3: Complete Migration
-- [ ] Migrate SolutionPanel with sections
-- [ ] Test SolutionPanel works correctly
-- [ ] Implement Plugin Trace Viewer custom sections
-- [ ] Implement Plugin Trace Viewer with all sections
-- [ ] Test Plugin Trace Viewer works correctly
+### Phase 3: Complex Migrations + Completion
+- [ ] Extract `TreeViewSection` + view
+- [ ] Attempt PersistenceInspectorPanel migration
+- [ ] If too complex, defer and keep Direct Implementation
+- [ ] Test TreeViewSection works (if migrated)
+- [ ] Implement TraceLevelControlsSection + view (custom)
+- [ ] Implement Plugin Trace Viewer (single column)
+- [ ] Test Plugin Trace Viewer (single column) works
+- [ ] Implement TraceDetailPanelSection + view (custom)
+- [ ] Add detail panel + split view to Plugin Trace Viewer
+- [ ] Test Plugin Trace Viewer (complete) works
 - [ ] Implement WebResourcePanel with sections
 - [ ] Implement PluginAssemblyPanel with sections
 - [ ] Implement ComponentPanel with sections
 - [ ] Test all 3 new panels work correctly
+- [ ] Coverage: All targets met
 
 ### Phase 4: Documentation + Cleanup
-- [ ] Update PANEL_DEVELOPMENT_GUIDE.md ✅ (already done)
-- [ ] Update CLAUDE.md ✅ (already done)
-- [ ] Update TECHNICAL_DEBT.md ✅ (already done)
-- [ ] Create migration guide for future panels
-- [ ] Add JSDoc to all sections and behaviors
-- [ ] Remove deprecated DataTablePanelCoordinator export
-- [ ] Remove old base template HTML generation code
-- [ ] Remove hard-coded button event listeners
+- [ ] Create `docs/MIGRATION_GUIDE_PANEL_FRAMEWORK.md`
+- [ ] Add JSDoc to all sections, views, behaviors, coordinator
+- [ ] Add `@deprecated` to `DataTablePanelCoordinator`
+- [ ] Add deprecation warning in DataTablePanelCoordinator constructor
+- [ ] Update all panels to use `PanelCoordinator` (if not already migrated)
+- [ ] Archive old base template (`dataTable.ts` moved to `dataTable.legacy.ts`)
+- [ ] Mark `HtmlRenderingBehavior` as deprecated
+- [ ] Remove hard-coded button event listeners from old template
 - [ ] Final `npm run compile` - should succeed
-- [ ] Final `npm test` - should pass
+- [ ] Final `npm test -- --coverage` - should pass with all targets met
 - [ ] Manual test all 7 panels
 
 ---
@@ -1123,15 +1977,15 @@ describe('PanelCoordinator', () => {
 ### Functional Success
 - ✅ All 7 panels work correctly with new framework
 - ✅ EnvironmentSetupPanel works without EnvironmentBehavior
-- ✅ PersistenceInspectorPanel uses TreeViewSection (no HTML in .ts)
+- ✅ PersistenceInspectorPanel uses TreeViewSection (OR kept as Direct Implementation if too complex)
 - ✅ Plugin Trace Viewer has all required features
 - ✅ No runtime errors (hard-coded buttons issue resolved)
 
 ### Code Quality Success
-- ✅ No HTML in panel .ts files (rule #11 enforced)
+- ✅ No HTML in .ts files (CLAUDE.md Rule #10 enforced - all HTML in view files)
 - ✅ Sections are reusable across features
 - ✅ Framework is extensible (easy to add new sections)
-- ✅ All tests pass
+- ✅ All tests pass with coverage targets met (90% sections/views, 85% coordinator, 80% behaviors)
 - ✅ Documentation is complete and accurate
 
 ### Developer Experience Success
@@ -1147,36 +2001,45 @@ describe('PanelCoordinator', () => {
 ### Risk 1: Breaking Existing Panels During Migration
 
 **Mitigation:**
-- Phase 1 is backwards compatible (rename only)
+- Phase 1 implements NEW coordinator (no changes to existing)
+- DataTablePanelCoordinator stays unchanged (deprecated but functional)
 - Test after each migration (don't batch)
-- Keep old code until migration verified
 - Each phase delivers working software
 
 ### Risk 2: Framework Too Complex for Simple Panels
 
 **Mitigation:**
-- Simple panels (EnvironmentSetupPanel) are simpler with framework (less code)
-- Sections are optional (can use just one section)
-- Framework provides value even for simple panels (message routing, lifecycle)
+- Simple panels (SolutionPanel, EnvironmentSetup) are actually SIMPLER with framework
+- Sections reduce code volume vs Direct Implementation
+- Framework provides value even for simple panels (message routing, lifecycle, composition)
+- Validate with SolutionPanel first (Slice 4)
 
 ### Risk 3: Section Interface Too Rigid
 
 **Mitigation:**
-- ISection is minimal (just render method)
-- SectionRenderData is flexible (customData field for anything)
-- Custom sections can extend base sections if needed
-- Direct Implementation still available for edge cases
+- ISection is minimal (just position + render)
+- SectionRenderData is flexible (customData escape hatch)
+- Custom sections can implement ISection directly (no inheritance required)
+- Direct Implementation still available for truly one-off panels
+
+### Risk 4: PersistenceInspectorPanel Migration Too Complex
+
+**Mitigation:**
+- Attempt migration in Slice 7
+- If tree state management too complex, defer
+- Framework already validated without it (tables proven in Slices 4-5)
+- TreeViewSection extracted for future panels regardless
 
 ---
 
 ## Future Enhancements (Out of Scope)
 
 **Not included in this refactor (implement when needed):**
-- SplitViewSection (three-panel layout) - Wait for Metadata Browser panel
+- ThreePanel layout (for Metadata Browser) - Wait until Metadata Browser panel
 - QueryBuilderSection (query UI) - Wait for Data Explorer panel
 - ChartSection (data visualization) - Wait for analytics features
 - FormSection (dynamic forms) - Wait for settings panels
-- TabsSection (tabbed content) - May extend DetailPanelSection
+- Advanced TabsSection (tabbed content) - May extend DetailPanelSection when needed
 
 **YAGNI Principle:** Extract sections when building 2nd panel that needs them (Three Strikes Rule).
 
@@ -1186,12 +2049,28 @@ describe('PanelCoordinator', () => {
 
 Before proceeding to implementation:
 - [ ] User approves approach
-- [ ] Architect (clean-architecture-guardian) approves design
+- [ ] Architect (clean-architecture-guardian) approves design (FINAL APPROVAL)
 - [ ] Type contracts reviewed and approved
 - [ ] Vertical slicing strategy reviewed and approved
-- [ ] Testing strategy reviewed and approved
+- [ ] Testing strategy with coverage targets reviewed and approved
 - [ ] Migration plan reviewed and approved
+- [ ] Event handling pattern reviewed and approved
+- [ ] Key decisions documented with trade-offs
 
 ---
 
-**Ready for review.**
+**Ready for architect re-review.**
+
+**Changes Made (Revision 2):**
+1. ✅ Added "Current State Analysis" section explaining behavior registry pattern
+2. ✅ Extracted HTML to view files (all sections delegate to view functions)
+3. ✅ Removed all time estimates (complexity labels only)
+4. ✅ Added "Event Handling Pattern" section with examples
+5. ✅ Revised Slice 1 to implement NEW coordinator (not rename existing)
+6. ✅ Added test coverage targets to all slices (90% sections/views, 85% coordinator, 80% behaviors)
+7. ✅ Added "Key Decisions" section with 7 documented decisions and trade-offs
+8. ✅ Fixed SectionPosition implementation (added to interface and all sections)
+9. ✅ Split Slice 8 into 8A (single column) and 8B (detail + split) - complexity accurate
+10. ✅ Added "Behavior vs Section" explanation in Architecture Design
+11. ✅ Documented SectionRenderData trade-off (union type acceptable for <10 types)
+12. ✅ Clarified PersistenceInspectorPanel may stay Direct Implementation (risk mitigation)
