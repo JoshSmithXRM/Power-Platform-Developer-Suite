@@ -613,6 +613,29 @@ Use this matrix to choose the correct pattern:
 **If Pattern 1 Score > Pattern 2 Score → Use Pattern 1**
 **If Pattern 2 Score > Pattern 1 Score → Use Pattern 2**
 
+### Tiebreaker Rule
+
+**If Pattern 1 Score = Pattern 2 Score**, ask:
+
+> "Would I need to override more than 50% of the HTML structure to achieve my UI?"
+
+- ✅ **YES** (replacing content area, adding panels/tree/tabs) → Use **Pattern 2** (fighting the template)
+- ❌ **NO** (supplementary UI like buttons, detail toggle) → Use **Pattern 1** (customization)
+
+**Examples of >50% structural override:**
+- Replacing single table with multiple tables
+- Adding tree view or split panels
+- Replacing content area with custom layout (three-panel, etc.)
+- Adding tab controls for primary navigation
+
+**Examples of supplementary customization (<50%):**
+- Adding custom buttons above the table
+- Adding a detail panel that toggles visibility
+- Custom filtering/sorting logic
+- Custom styling or badges
+
+---
+
 ### Example: Plugin Trace Viewer
 
 | Criteria | Pattern 1 | Pattern 2 |
@@ -628,6 +651,30 @@ Use this matrix to choose the correct pattern:
 | **Total** | **10** | **0** |
 
 **Decision:** Pattern 1 (DataTablePanelCoordinator)
+
+---
+
+### Example: Metadata Browser
+
+| Criteria | Pattern 1 | Pattern 2 |
+|----------|-----------|-----------|
+| Needs data table | ✅ +3 (multiple tables) | 0 |
+| Needs environment dropdown | ✅ +3 | 0 |
+| Needs solution filter | ❌ 0 | 0 |
+| Needs export | ❌ 0 | 0 |
+| Custom UI < 30% | 0 | ❌ 0 |
+| Custom UI > 70% | 0 | ✅ +3 (tree + tabs + detail = ~90%) |
+| Developer tool | 0 | ✅ +1 |
+| Unique interactions | 0 | ✅ +2 (tree navigation, tab switching) |
+| **Total** | **6** | **6** |
+
+**Tiebreaker Applied:** Would need to replace entire content structure with three-panel layout (tree + tabbed tables + detail panel). This is >50% structural override.
+
+**Decision:** Pattern 2 (Direct Implementation)
+
+**Key Differences from Plugin Trace Viewer:**
+- Plugin Traces: Single table + supplementary UI (15% custom) = Pattern 1 ✅
+- Metadata Browser: Tree + multiple tables + detail (90% custom) = Pattern 2 ✅
 
 ---
 
