@@ -6,7 +6,6 @@
  */
 
 .table-container {
-	overflow: auto;
 	flex: 1;
 }
 
