@@ -48,6 +48,7 @@
 20. **Vertical slicing in designs** - Identify MVP slice and enhancement slices explicitly
 
 21. **VS Code panel singleton** - `private static currentPanel` + `createOrShow()` factory (framework standard)
+22. **Panel pattern selection** - Use DataTablePanelCoordinator (Pattern 1) for data tables with environment dropdown; Direct Implementation (Pattern 2) for custom UI (> 70%) or developer tools (see `.claude/templates/PANEL_PATTERN_GUIDE.md`)
 
 ---
 
@@ -163,3 +164,4 @@
 - `.claude/workflows/BUG_FIX_WORKFLOW.md` - Quick bug fix process
 - `.claude/workflows/REFACTORING_WORKFLOW.md` - Safe refactoring process
 - `.claude/AGENT_ROLES.md` - Agent responsibilities (who implements vs who reviews)
+- `.claude/templates/PANEL_PATTERN_GUIDE.md` - Panel implementation pattern selection (Pattern 1 vs Pattern 2)
