@@ -15,6 +15,7 @@ import { LoadEnvironmentByIdUseCase } from './features/environmentSetup/applicat
 import { SaveEnvironmentUseCase } from './features/environmentSetup/application/useCases/SaveEnvironmentUseCase';
 import { DeleteEnvironmentUseCase } from './features/environmentSetup/application/useCases/DeleteEnvironmentUseCase';
 import { TestConnectionUseCase } from './features/environmentSetup/application/useCases/TestConnectionUseCase';
+import { TestExistingEnvironmentConnectionUseCase } from './features/environmentSetup/application/useCases/TestExistingEnvironmentConnectionUseCase';
 import { DiscoverEnvironmentIdUseCase } from './features/environmentSetup/application/useCases/DiscoverEnvironmentIdUseCase';
 import { ValidateUniqueNameUseCase } from './features/environmentSetup/application/useCases/ValidateUniqueNameUseCase';
 import { CheckConcurrentEditUseCase } from './features/environmentSetup/application/useCases/CheckConcurrentEditUseCase';
@@ -101,14 +102,14 @@ export function activate(context: vscode.ExtensionContext): void {
 	const saveEnvironmentUseCase = new SaveEnvironmentUseCase(environmentRepository, environmentValidationService, eventPublisher, authCacheInvalidationService, logger);
 	const deleteEnvironmentUseCase = new DeleteEnvironmentUseCase(environmentRepository, eventPublisher, logger);
 	const testConnectionUseCase = new TestConnectionUseCase(whoAmIService, environmentRepository, logger);
+	const testExistingEnvironmentConnectionUseCase = new TestExistingEnvironmentConnectionUseCase(environmentRepository, whoAmIService, logger);
 	const discoverEnvironmentIdUseCase = new DiscoverEnvironmentIdUseCase(powerPlatformApiService, environmentRepository, logger);
 	const validateUniqueNameUseCase = new ValidateUniqueNameUseCase(environmentRepository, logger);
 	const checkConcurrentEditUseCase = new CheckConcurrentEditUseCase(logger);
 
 	// Command Handlers (Presentation Layer)
 	const testEnvironmentConnectionCommandHandler = new TestEnvironmentConnectionCommandHandler(
-		testConnectionUseCase,
-		loadEnvironmentByIdUseCase,
+		testExistingEnvironmentConnectionUseCase,
 		logger
 	);
 

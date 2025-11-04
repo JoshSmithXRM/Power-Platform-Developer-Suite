@@ -1,10 +1,8 @@
 import * as vscode from 'vscode';
 
 import { ICommandHandler } from '../../../../shared/presentation/commands/ICommandHandler';
-import { LoadEnvironmentByIdUseCase } from '../../application/useCases/LoadEnvironmentByIdUseCase';
-import { TestConnectionUseCase, TestConnectionRequest } from '../../application/useCases/TestConnectionUseCase';
-import { EnvironmentFormViewModel } from '../../application/viewModels/EnvironmentFormViewModel';
-import { AuthenticationMethodType } from '../../application/types/AuthenticationMethodType';
+import { TestExistingEnvironmentConnectionUseCase } from '../../application/useCases/TestExistingEnvironmentConnectionUseCase';
+import { EnvironmentId } from '../../application/types/EnvironmentId';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 export interface TestEnvironmentConnectionInput {
@@ -12,13 +10,15 @@ export interface TestEnvironmentConnectionInput {
 }
 
 /**
- * Command handler for testing environment connections.
+ * Command handler for testing existing environment connections.
  * Thin adapter: handles UI concerns only, delegates business logic to use case.
+ *
+ * Uses TestExistingEnvironmentConnectionUseCase which accepts EnvironmentId value object
+ * instead of primitive strings, providing stronger type safety.
  */
 export class TestEnvironmentConnectionCommandHandler implements ICommandHandler<TestEnvironmentConnectionInput, void> {
 	constructor(
-		private readonly testConnectionUseCase: TestConnectionUseCase,
-		private readonly loadEnvironmentUseCase: LoadEnvironmentByIdUseCase,
+		private readonly testExistingEnvironmentConnectionUseCase: TestExistingEnvironmentConnectionUseCase,
 		private readonly logger: ILogger
 	) {}
 
@@ -29,23 +29,21 @@ export class TestEnvironmentConnectionCommandHandler implements ICommandHandler<
 		}
 
 		try {
-			// Load environment via application layer (avoids domain imports in presentation)
-			const environmentViewModel = await this.loadEnvironmentUseCase.execute({
-				environmentId: input.environmentId
-			});
+			// Create domain value object from primitive string
+			const environmentId = new EnvironmentId(input.environmentId);
 
 			// Show progress notification (UI concern)
 			await vscode.window.withProgress(
 				{
 					location: vscode.ProgressLocation.Notification,
-					title: `Testing connection to ${environmentViewModel.name}...`,
+					title: `Testing connection...`,
 					cancellable: false
 				},
 				async () => {
 					// Delegate to use case (business logic)
-					const result = await this.testConnectionUseCase.execute(
-						this.buildTestConnectionRequest(environmentViewModel)
-					);
+					const result = await this.testExistingEnvironmentConnectionUseCase.execute({
+						environmentId
+					});
 
 					// Display result (UI concern)
 					if (result.success) {
@@ -66,34 +64,5 @@ export class TestEnvironmentConnectionCommandHandler implements ICommandHandler<
 				`Connection test failed: ${error instanceof Error ? error.message : String(error)}`
 			);
 		}
-	}
-
-	/**
-	 * Builds test connection request from environment view model.
-	 * Use case will load credentials from storage as fallback.
-	 */
-	private buildTestConnectionRequest(viewModel: EnvironmentFormViewModel): TestConnectionRequest {
-		const request: TestConnectionRequest = {
-			existingEnvironmentId: viewModel.id,
-			name: viewModel.name,
-			dataverseUrl: viewModel.dataverseUrl,
-			tenantId: viewModel.tenantId,
-			authenticationMethod: viewModel.authenticationMethod as AuthenticationMethodType,
-			publicClientId: viewModel.publicClientId
-			// Note: clientSecret and password not provided - use case will load from storage
-		};
-
-		// Conditionally add optional properties to satisfy exactOptionalPropertyTypes
-		if (viewModel.powerPlatformEnvironmentId) {
-			request.powerPlatformEnvironmentId = viewModel.powerPlatformEnvironmentId;
-		}
-		if (viewModel.clientId) {
-			request.clientId = viewModel.clientId;
-		}
-		if (viewModel.username) {
-			request.username = viewModel.username;
-		}
-
-		return request;
 	}
 }
