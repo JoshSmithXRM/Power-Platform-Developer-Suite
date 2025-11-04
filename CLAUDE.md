@@ -47,6 +47,8 @@
 19. **Complexity over time estimates** - Use Simple/Moderate/Complex + slice count, not hours/days
 20. **Vertical slicing in designs** - Identify MVP slice and enhancement slices explicitly
 
+21. **VS Code panel singleton** - `private static currentPanel` + `createOrShow()` factory (framework standard)
+
 ---
 
 ## 💬 Commenting Rules
