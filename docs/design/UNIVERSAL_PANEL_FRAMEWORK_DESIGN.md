@@ -1,6 +1,6 @@
 # Universal Panel Framework - Technical Design
 
-**Status:** Draft - Revision 2
+**Status:** Draft - Revision 4 (Implementing TypeScript-Pro Recommendations)
 **Date:** 2025-11-04
 **Complexity:** Moderate
 
@@ -101,9 +101,7 @@ export class PanelCoordinator implements IPanelCoordinator {
 export interface PanelCoordinatorConfig {
   panel: vscode.WebviewPanel;
   extensionUri: vscode.Uri;
-  behaviors: IPanelBehavior[];           // Behaviors as array
-  sections: ISection[];                  // Sections REPLACE template
-  layout: PanelLayout;
+  behaviors: IPanelBehavior[];           // SectionCompositionBehavior contains sections + layout
   logger: ILogger;
 }
 ```
@@ -488,10 +486,13 @@ export class SectionCompositionBehavior implements IPanelBehavior {
 
     for (const section of this.sections) {
       const position = section.position;
-      if (!map.has(position)) {
-        map.set(position, []);
+      const sections = map.get(position);
+
+      if (sections === undefined) {
+        map.set(position, [section]);
+      } else {
+        sections.push(section);
       }
-      map.get(position)!.push(section);
     }
 
     return map;
@@ -528,6 +529,9 @@ export enum PanelLayout {
 
 **Presentation (Solution Feature):**
 ```typescript
+// Define panel commands (Command Registry Pattern)
+type SolutionPanelCommands = 'refresh' | 'export';
+
 // Create sections
 const filterSection = new FilterControlsSection({
   filters: [
@@ -545,13 +549,13 @@ const tableSection = new DataTableSection({
 
 const actionSection = new ActionButtonsSection({
   buttons: [
-    { id: 'refresh', label: 'Refresh' },
-    { id: 'export', label: 'Export' }
+    { id: createButtonId('refresh'), label: 'Refresh' },  // Branded type
+    { id: createButtonId('export'), label: 'Export' }
   ]
 });
 
-// Create coordinator (NEW PanelCoordinator)
-this.coordinator = new PanelCoordinator({
+// Create coordinator (NEW PanelCoordinator with command registry)
+this.coordinator = new PanelCoordinator<SolutionPanelCommands>({
   panel,
   extensionUri,
   behaviors: [
@@ -566,14 +570,16 @@ this.coordinator = new PanelCoordinator({
   logger
 });
 
-// Register event handlers
-this.coordinator.registerHandler('refresh', async () => {
+// Register event handlers (type-safe commands)
+this.coordinator.registerHandler('refresh', async () => {  // ✅ Autocomplete + type check
   await dataBehavior.loadData();
 });
 
-this.coordinator.registerHandler('export', async () => {
+this.coordinator.registerHandler('export', async () => {  // ✅ Autocomplete + type check
   await exportSolutionsUseCase.execute();
 });
+
+// this.coordinator.registerHandler('typo', ...);  // ❌ Compile error!
 ```
 
 **Testing:**
@@ -877,7 +883,10 @@ export class TraceLevelControlsSection implements ISection {
   ) {}
 
   render(data: SectionRenderData): string {
-    const currentLevel = data.customData?.traceLevel || 'Off';
+    // Use type guard instead of type assertion (Recommendation #1)
+    const currentLevel = isTraceLevel(data.customData?.traceLevel)
+      ? data.customData.traceLevel
+      : 'Off';
     return renderTraceLevelControls(currentLevel);
   }
 }
@@ -887,7 +896,7 @@ export function renderTraceLevelControls(currentLevel: string): string {
   return `
     <div class="trace-level-controls">
       <span>Current Trace Level: <strong>${escapeHtml(currentLevel)}</strong></span>
-      <button id="changeTraceLevel">Change Level</button>
+      <button id="${createButtonId('changeTraceLevel')}">Change Level</button>
     </div>
   `;
 }
@@ -895,6 +904,14 @@ export function renderTraceLevelControls(currentLevel: string): string {
 
 **Panel Setup:**
 ```typescript
+// Define panel commands (Command Registry Pattern)
+type PluginTracePanelCommands =
+  | 'refresh'
+  | 'deleteSelected'
+  | 'deleteAll'
+  | 'exportCsv'
+  | 'changeTraceLevel';
+
 const sections = [
   new TraceLevelControlsSection(getTraceLevelUseCase, setTraceLevelUseCase, logger),
   new FilterControlsSection({
@@ -917,15 +934,15 @@ const sections = [
   }),
   new ActionButtonsSection({
     buttons: [
-      { id: 'refresh', label: 'Refresh' },
-      { id: 'deleteSelected', label: 'Delete Selected' },
-      { id: 'deleteAll', label: 'Delete All' },
-      { id: 'exportCsv', label: 'Export CSV' }
+      { id: createButtonId('refresh'), label: 'Refresh' },
+      { id: createButtonId('deleteSelected'), label: 'Delete Selected' },
+      { id: createButtonId('deleteAll'), label: 'Delete All' },
+      { id: createButtonId('exportCsv'), label: 'Export CSV' }
     ]
   })
 ];
 
-this.coordinator = new PanelCoordinator({
+this.coordinator = new PanelCoordinator<PluginTracePanelCommands>({
   panel,
   extensionUri,
   behaviors: [
@@ -937,7 +954,7 @@ this.coordinator = new PanelCoordinator({
   logger
 });
 
-// Register handlers
+// Register handlers (type-safe commands)
 this.coordinator.registerHandler('changeTraceLevel', async () => { /* ... */ });
 this.coordinator.registerHandler('refresh', async () => { /* ... */ });
 this.coordinator.registerHandler('deleteSelected', async () => { /* ... */ });
@@ -950,7 +967,10 @@ this.coordinator.registerHandler('deleteSelected', async () => { /* ... */ });
 - Filter controls work
 - Data table populates
 - All action buttons work
-- Test coverage: 85% for panel coordinator
+- Test coverage targets:
+  - TraceLevelControlsSection: 90% coverage
+  - renderTraceLevelControls view: 90% coverage
+  - Panel coordinator integration: 85% coverage
 
 **Result:** PLUGIN TRACE VIEWER (SIMPLE VERSION) COMPLETE ✅
 
@@ -1059,7 +1079,11 @@ this.coordinator.registerHandler('closeDetail', async () => {
 - Tabs in detail panel work
 - Close button hides detail panel
 - Detail content renders correctly
-- Test coverage: 85% for panel coordinator, 90% for detail section
+- Test coverage targets:
+  - TraceDetailPanelSection: 90% coverage
+  - renderTraceDetailPanel view: 90% coverage
+  - Panel coordinator integration: 85% coverage
+  - Split view layout: 85% coverage
 
 **Result:** PLUGIN TRACE VIEWER (COMPLETE) ✅
 
@@ -1307,9 +1331,12 @@ export interface ISection {
  * Trade-off: Couples sections via shared contract, but pragmatic for <10 section types.
  * If section types exceed 10, refactor to discriminated union.
  *
- * YAGNI: Keep simple for MVP, refactor if needed later.
+ * Optional discriminant added for future type narrowing (zero-cost now).
  */
 export interface SectionRenderData {
+  // Optional discriminant for type narrowing (Recommendation #3)
+  sectionType?: 'table' | 'tree' | 'detail' | 'filter' | 'custom';
+
   // Table data (for DataTableSection)
   tableData?: Record<string, unknown>[];
 
@@ -1343,67 +1370,82 @@ export enum PanelLayout {
 }
 ```
 
+#### Branded Types
+```typescript
+// src/shared/infrastructure/ui/types/BrandedTypes.ts
+
+/**
+ * Branded type for button IDs to prevent typos at compile time.
+ * Recommendation #2: Type-safe button ID references.
+ */
+export type ButtonId = string & { readonly __brand: 'ButtonId' };
+
+export function createButtonId(id: string): ButtonId {
+  return id as ButtonId;
+}
+```
+
 #### Section Configs
 
 ```typescript
 // DataTableSection
 export interface DataTableColumn {
-  id: string;
-  label: string;
-  width?: string;
+  readonly id: string;
+  readonly label: string;
+  readonly width?: string;
 }
 
 export interface DataTableConfig {
-  columns: DataTableColumn[];
-  selectable?: boolean;
-  emptyMessage?: string;
+  readonly columns: ReadonlyArray<DataTableColumn>;  // Recommendation #5
+  readonly selectable?: boolean;
+  readonly emptyMessage?: string;
 }
 
 // FilterControlsSection
 export interface FilterConfig {
-  id: string;
-  type: 'text' | 'select' | 'date';
-  label: string;
-  options?: string[];
-  placeholder?: string;
+  readonly id: string;
+  readonly type: 'text' | 'select' | 'date';
+  readonly label: string;
+  readonly options?: ReadonlyArray<string>;  // Recommendation #5
+  readonly placeholder?: string;
 }
 
 export interface FilterControlsConfig {
-  filters: FilterConfig[];
+  readonly filters: ReadonlyArray<FilterConfig>;  // Recommendation #5
 }
 
 // ActionButtonsSection
 export interface ButtonConfig {
-  id: string;
-  label: string;
-  icon?: string;
-  variant?: 'default' | 'primary' | 'danger';
+  readonly id: ButtonId;  // Recommendation #2: Branded type
+  readonly label: string;
+  readonly icon?: string;
+  readonly variant?: 'default' | 'primary' | 'danger';
 }
 
 export interface ActionButtonsConfig {
-  buttons: ButtonConfig[];
+  readonly buttons: ReadonlyArray<ButtonConfig>;  // Recommendation #5
 }
 
 // TreeViewSection
 export interface TreeNode {
-  id: string;
-  label: string;
-  icon?: string;
-  expanded?: boolean;
-  children?: TreeNode[];
-  actions?: NodeAction[];
+  readonly id: string;
+  readonly label: string;
+  readonly icon?: string;
+  readonly expanded?: boolean;
+  readonly children?: ReadonlyArray<TreeNode>;  // Recommendation #5
+  readonly actions?: ReadonlyArray<NodeAction>;  // Recommendation #5
 }
 
 export interface NodeAction {
-  id: string;
-  label: string;
-  icon?: string;
+  readonly id: ButtonId;  // Recommendation #2: Branded type
+  readonly label: string;
+  readonly icon?: string;
 }
 
 export interface TreeViewConfig {
-  expandable?: boolean;
-  selectable?: boolean;
-  icons?: boolean;
+  readonly expandable?: boolean;
+  readonly selectable?: boolean;
+  readonly icons?: boolean;
 }
 ```
 
@@ -1411,21 +1453,70 @@ export interface TreeViewConfig {
 ```typescript
 // src/shared/infrastructure/ui/coordinators/PanelCoordinator.ts
 
-export interface PanelCoordinatorConfig {
+export interface PanelCoordinatorConfig<TCommands extends string = string> {
   panel: vscode.WebviewPanel;
   extensionUri: vscode.Uri;
-  behaviors: IPanelBehavior[];
-  sections: ISection[];
-  layout: PanelLayout;
+  behaviors: IPanelBehavior[];  // SectionCompositionBehavior contains sections + layout
   logger: ILogger;
+}
+```
+
+#### WebviewMessage Type Guard
+```typescript
+// src/shared/infrastructure/ui/types/WebviewMessage.ts
+
+/**
+ * Message received from webview.
+ * Recommendation #6: Type guard for runtime validation.
+ */
+export interface WebviewMessage {
+  readonly command: string;
+  readonly payload?: unknown;
+}
+
+export function isWebviewMessage(value: unknown): value is WebviewMessage {
+  return typeof value === 'object' &&
+         value !== null &&
+         'command' in value &&
+         typeof (value as { command: unknown }).command === 'string';
+}
+```
+
+#### Type Guards for CustomData
+```typescript
+// src/shared/infrastructure/ui/types/TypeGuards.ts
+
+/**
+ * Type guards for SectionRenderData.customData access.
+ * Recommendation #1: Eliminates type assertions, provides runtime validation.
+ */
+
+export function isTreeNodeArray(value: unknown): value is TreeNode[] {
+  return Array.isArray(value) &&
+    value.every(node => typeof node === 'object' &&
+                        node !== null &&
+                        'id' in node &&
+                        'label' in node);
+}
+
+export function isTraceLevel(value: unknown): value is string {
+  return typeof value === 'string' &&
+    ['Off', 'Exception', 'All'].includes(value);
+}
+
+export function isPluginTraceDetailViewModel(value: unknown): value is PluginTraceDetailViewModel {
+  return typeof value === 'object' &&
+         value !== null &&
+         'id' in value &&
+         'pluginName' in value;
 }
 ```
 
 ### Coordinator Methods
 
 ```typescript
-export class PanelCoordinator implements IPanelCoordinator {
-  constructor(config: PanelCoordinatorConfig);
+export class PanelCoordinator<TCommands extends string = string> implements IPanelCoordinator<TCommands> {
+  constructor(config: PanelCoordinatorConfig<TCommands>);
 
   // Lifecycle
   public async initialize(): Promise<void>;
@@ -1437,8 +1528,12 @@ export class PanelCoordinator implements IPanelCoordinator {
   public async handleFilterChanged(filters: Record<string, unknown>): Promise<void>;
   public async handleRowSelected(id: string): Promise<void>;
 
-  // Message handling
-  public registerHandler(command: string, handler: (payload?: unknown) => Promise<void>): void;
+  // Message handling (Command Registry Pattern)
+  public registerHandler<T extends TCommands>(
+    command: T,
+    handler: (payload?: unknown) => Promise<void>
+  ): void;
+
   public async handleMessage(message: WebviewMessage): Promise<void>;
 
   // Rendering (private)
@@ -1872,8 +1967,6 @@ describe('PanelCoordinator', () => {
       behaviors: [
         new SectionCompositionBehavior(sections, PanelLayout.SingleColumn)
       ],
-      sections,
-      layout: PanelLayout.SingleColumn,
       logger: mockLogger
     });
 
@@ -2059,8 +2152,6 @@ Before proceeding to implementation:
 
 ---
 
-**Ready for architect re-review.**
-
 **Changes Made (Revision 2):**
 1. ✅ Added "Current State Analysis" section explaining behavior registry pattern
 2. ✅ Extracted HTML to view files (all sections delegate to view functions)
@@ -2074,3 +2165,20 @@ Before proceeding to implementation:
 10. ✅ Added "Behavior vs Section" explanation in Architecture Design
 11. ✅ Documented SectionRenderData trade-off (union type acceptable for <10 types)
 12. ✅ Clarified PersistenceInspectorPanel may stay Direct Implementation (risk mitigation)
+
+**Changes Made (Revision 3):**
+1. ✅ Implemented Architect Recommendation #1 (Option B): Removed `sections` and `layout` from `PanelCoordinatorConfig` - sections now passed ONLY to `SectionCompositionBehavior` constructor for better encapsulation and extensibility
+2. ✅ Implemented Architect Recommendation #2: Added explicit test coverage targets to Slices 8A and 8B for custom sections (TraceLevelControlsSection, TraceDetailPanelSection) - 90% coverage for sections/views, 85% for coordinator integration
+
+**Changes Made (Revision 4):**
+1. ✅ **TypeScript Critical Fix**: Fixed non-null assertion in `groupSectionsByPosition()` - replaced `map.get(position)!.push(section)` with explicit undefined check (CLAUDE.md Rule #12 compliance)
+2. ✅ **Command Registry Pattern**: Added generic type parameter `<TCommands extends string>` to `PanelCoordinator` and `registerHandler()` for compile-time command validation, autocomplete, and typo prevention
+3. ✅ **Branded Types for Button IDs**: Added `ButtonId` branded type and `createButtonId()` helper to prevent typos between button configs and handler registrations at compile time
+4. ✅ **Type Guards for CustomData**: Added `isTreeNodeArray()`, `isTraceLevel()`, and `isPluginTraceDetailViewModel()` type guards to eliminate type assertions (CLAUDE.md Rule #12) with runtime validation
+5. ✅ **WebviewMessage Type Guard**: Added `isWebviewMessage()` type guard for runtime validation of messages from webview, preventing crashes from malformed data
+6. ✅ **Union Discriminant**: Added optional `sectionType` discriminant to `SectionRenderData` for future type narrowing (zero-cost now, enables easier migration later)
+7. ✅ **Readonly Arrays**: Changed all config interfaces to use `ReadonlyArray<T>` instead of mutable arrays, preventing accidental mutation bugs
+8. ✅ **Readonly Properties**: Added `readonly` modifiers to all config interface properties for immutability
+9. ✅ **Updated Examples**: All usage examples now demonstrate command registry pattern, branded types, and type guards in practice
+
+**Ready for final architect approval.**

@@ -386,13 +386,13 @@
 
 ## Panel Pattern Selection
 
-**Pattern Chosen:** Pattern 2 (Direct Implementation)
+**Pattern Chosen:** Direct Implementation
 
-**Reference:** See `.claude/templates/PANEL_PATTERN_GUIDE.md` for detailed pattern definitions.
+**Reference:** See `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` for detailed pattern definitions.
 
 ### Decision Matrix Score
 
-| Criteria | Pattern 1 Score | Pattern 2 Score | Analysis |
+| Criteria | Framework Approach Score | Direct Implementation Score | Analysis |
 |----------|-----------------|-----------------|----------|
 | Needs data table | +3 | 0 | ✅ Multiple tables (one per tab) |
 | Needs environment dropdown | +3 | 0 | ✅ Standard environment selector |
@@ -404,56 +404,56 @@
 | Unique interactions | 0 | +2 | ✅ Tree navigation, tab switching |
 | **Total** | **6** | **6** | **TIE** |
 
-**Tiebreaker Applied:** Would need to replace entire content structure with three-panel layout (tree view + tabbed tables + collapsible detail panel). This constitutes >50% structural override of Pattern 1's template.
+**Tiebreaker Applied:** Would need to replace entire content structure with three-panel layout (tree view + tabbed tables + collapsible detail panel). This constitutes >50% structural override of Framework Approach's template.
 
-**Decision:** Pattern 2 (Direct Implementation) wins on tiebreaker.
+**Decision:** Direct Implementation wins on tiebreaker.
 
 ### Key Architectural Factors
 
-1. **Three-panel layout** (tree + content + detail) requires custom HTML structure not supported by Pattern 1
+1. **Three-panel layout** (tree + content + detail) requires custom HTML structure not supported by Framework Approach
 2. **Multiple data tables** (Attributes, Keys, Relationships, Privileges) in tabs, not single table
-3. **Tree view component** on left panel (not a standard Pattern 1 feature)
+3. **Tree view component** on left panel (not a standard Framework Approach feature)
 4. **Complex state management**: Selected entity, active tab, detail panel visibility, tree expansion, filter state
-5. **Pattern 1's HtmlCustomization is for supplementary UI**, not structural replacement
+5. **Framework Approach's HtmlCustomization is for supplementary UI**, not structural replacement
 
 ### Comparison with Plugin Trace Viewer
 
-**Why Plugin Traces uses Pattern 1:**
+**Why Plugin Traces uses Framework Approach:**
 - Single data table (primary content) = 85% of UI
 - Supplementary custom UI (trace level buttons + detail panel) = 15% of UI
-- Pattern 1 Score: 10 points → Clear winner
+- Framework Approach Score: 10 points → Clear winner
 
-**Why Metadata Browser uses Pattern 2:**
+**Why Metadata Browser uses Direct Implementation:**
 - Three-panel layout + tree + multiple tables + detail = 90% of UI
 - Standard features (environment dropdown) = 10% of UI
-- Pattern 1 Score: 6, Pattern 2 Score: 6 → Tiebreaker (>50% override) → Pattern 2 wins
+- Framework Approach Score: 6, Direct Implementation Score: 6 → Tiebreaker (>50% override) → Direct Implementation wins
 
-**Principle:** Pattern 1 = single table + supplementary UI. Pattern 2 = custom layouts + unique structures.
+**Principle:** Framework Approach = single table + supplementary UI. Direct Implementation = custom layouts + unique structures.
 
 ### Implementation Approach
 
-**Using Pattern 2 (Direct Implementation):**
+**Using Direct Implementation:**
 - Panel file (~500 lines): Orchestrates use cases, handles webview messages, manages state
 - View file (~700 lines): Complete HTML structure (tree + tabs + tables + detail panel)
 - Manual environment dropdown implementation (~30 lines)
 - Full control over layout, no fighting against template assumptions
 
 **Shared Component Reuse:**
-- ✅ Environment dropdown helper (extract for reuse in Pattern 2 panels)
+- ✅ Environment dropdown helper (extract for reuse in Direct Implementation panels)
 - ✅ Data table rendering utility (DRY across 4 tabs)
 - ✅ Error handling patterns
 - ✅ Cancellation token adapters
 - ✅ HTML escaping utilities
 
 **What NOT to reuse:**
-- ❌ DataTablePanelCoordinator (Pattern 1 specific)
-- ❌ Behavior classes (Pattern 1 composition framework)
+- ❌ DataTablePanelCoordinator (Framework Approach specific)
+- ❌ Behavior classes (Framework Approach composition framework)
 
 ### Future: Shared Component Extraction
 
 After implementing Metadata Browser, consider extracting these reusable utilities:
 
-**1. EnvironmentDropdownHelper** (for Pattern 2 panels)
+**1. EnvironmentDropdownHelper** (for Direct Implementation panels)
 ```typescript
 // src/shared/infrastructure/ui/utils/EnvironmentDropdownHelper.ts
 export class EnvironmentDropdownHelper {

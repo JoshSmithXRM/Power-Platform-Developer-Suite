@@ -8,7 +8,7 @@
 
 ## Revision History
 
-- **2025-11-04 (V6 - Pattern Change):** Changed from Pattern 2 (Direct Implementation) to Pattern 1 (DataTablePanelCoordinator) based on architectural review. 95% feature overlap with existing data table panels.
+- **2025-11-04 (V6 - Pattern Change):** Changed from Direct Implementation to Framework Approach (DataTablePanelCoordinator) based on architectural review. 95% feature overlap with existing data table panels.
 - **2025-11-04 (V5 - Final):** Final approved version. See git history for detailed iteration history (V1 → V5).
 
 ---
@@ -33,7 +33,7 @@
 
 **Phase 4 Goal:** Implement the presentation layer for Plugin Trace Viewer following clean architecture principles with security & validation best practices.
 
-**PATTERN CHANGE (V6):** After architectural review, changed from Pattern 2 (Direct Implementation) to **Pattern 1 (DataTablePanelCoordinator)**. Rationale:
+**PATTERN CHANGE (V6):** After architectural review, changed from Direct Implementation to **Framework Approach (DataTablePanelCoordinator)**. Rationale:
 - ✅ 95% feature overlap with existing data table panels (Connection References, Solutions, etc.)
 - ✅ Built-in environment dropdown, data table, filtering, export, loading states
 - ✅ Reduces implementation from ~900 lines to ~400 lines
@@ -41,8 +41,8 @@
 - ⚠️ Requires custom sections for trace level controls + detail panel (~25% custom UI)
 
 **Key Requirements:**
-- ~~Panel implements direct pattern (like `PersistenceInspectorPanel`)~~ **Changed:** Panel implements DataTablePanelCoordinator (Pattern 1)
-- VS Code singleton pattern (per CLAUDE.md #21) - **Using panel tracking per environment (Pattern 1 standard)**
+- ~~Panel implements direct pattern (like `PersistenceInspectorPanel`)~~ **Changed:** Panel implements DataTablePanelCoordinator (Framework Approach)
+- VS Code singleton pattern (per CLAUDE.md #21) - **Using panel tracking per environment (Framework Approach standard)**
 - Use cases + mapper injected via constructor
 - **Use cases return domain entities** (panel does mapping via DataLoader)
 - **Mapper uses instance methods** (injected, not static)
