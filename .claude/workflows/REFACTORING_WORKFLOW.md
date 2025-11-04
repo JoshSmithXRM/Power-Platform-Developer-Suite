@@ -15,10 +15,11 @@
 **Core Principle**: **Incremental changes with continuous validation**
 
 **Safety Rules**:
+- ✅ Tests pass BEFORE starting refactoring (baseline behavior)
+- ✅ Tests pass AFTER each refactoring step (behavior unchanged)
 - ✅ Compile after every incremental change
 - ✅ Commit working state before next refactor
 - ✅ Keep refactors small (30-60 min per commit)
-- ✅ Test after each commit
 - ❌ Don't refactor multiple concerns at once
 - ❌ Don't mix feature work with refactoring
 
@@ -70,7 +71,13 @@ Steps:
 git checkout -b refactor/[description]
 ```
 
-**2.2 Execute One Refactoring Step at a Time**
+**2.2 Ensure Tests Pass BEFORE Refactoring**
+```bash
+npm test
+```
+- [ ] All tests pass ✅ (establishes baseline behavior)
+
+**2.3 Execute One Refactoring Step at a Time**
 
 For each step in your plan:
 
@@ -78,27 +85,37 @@ For each step in your plan:
    - Edit files
    - Keep changes minimal
 
-2. **Compile immediately**
+2. **Run tests immediately**
    ```bash
-   npm run compile
+   npm test
+   ```
+   - [ ] All tests still pass ✅ (behavior unchanged)
+   - [ ] No new test failures
+
+3. **Compile**
+   ```bash
+   npm run compile  # Includes tests + lint
    ```
    - [ ] Zero errors
    - [ ] Zero new warnings
+   - [ ] Tests pass ✅
 
-3. **Test if significant**
+4. **Manual test (if touching UI)**
    - F5 in VS Code
    - Quick manual test
    - Verify behavior unchanged
 
-4. **Commit if stable**
+5. **Commit if stable**
    ```bash
    git add .
    git commit -m "refactor: [specific change]
 
-   [Brief explanation of what changed and why]"
+   [Brief explanation of what changed and why]
+
+   Tests: All existing tests pass (behavior unchanged)"
    ```
 
-**2.3 Repeat Until Refactoring Complete**
+**2.4 Repeat Until Refactoring Complete**
 
 Continue incremental steps until target state achieved.
 

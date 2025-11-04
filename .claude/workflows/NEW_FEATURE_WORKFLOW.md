@@ -91,7 +91,7 @@ Do NOT review implementation yet - only type definitions.
 
 ---
 
-### Phase 2: Domain Layer (45 min)
+### Phase 2: Domain Layer (60 min)
 
 **2.1 Implementation (30 min)**
 
@@ -109,15 +109,54 @@ Create domain layer files:
 - [ ] No `any` types without explicit justification
 - [ ] Value objects are immutable
 
-**2.2 Compilation (30 sec)**
+**2.2 Write Tests (15 min)**
+- [ ] Create `[Entity].test.ts` alongside entity
+- [ ] Test all public methods
+- [ ] Test validation rules
+- [ ] Test state transitions
+- [ ] Test value object immutability
+- [ ] Test domain service complex logic
+- [ ] Target: 100% coverage for entities
+
+**Test Structure**:
+```typescript
+describe('[EntityName]', () => {
+  // Test data factory
+  function createValid[Entity](): [Entity] { ... }
+
+  describe('[methodName]', () => {
+    it('should [expected behavior]', () => {
+      // Arrange
+      const entity = createValid[Entity]();
+
+      // Act
+      const result = entity.method();
+
+      // Assert
+      expect(result).toBe(expected);
+    });
+  });
+});
+```
+
+**2.3 Run Tests (30 sec)**
 ```bash
-npm run compile
+npm test
+```
+- [ ] All tests pass ✅
+- [ ] No test failures
+- [ ] Coverage for new code visible
+
+**2.4 Compilation (30 sec)**
+```bash
+npm run compile  # Now includes tests
 ```
 - [ ] Compilation succeeds ✅
+- [ ] Tests pass ✅
 - [ ] Zero TypeScript errors
 - [ ] Zero ESLint errors
 
-**2.3 Type Safety Review (5 min)**
+**2.5 Type Safety Review (5 min)**
 
 Invoke typescript-pro:
 ```
@@ -134,9 +173,9 @@ Focus on:
 Create review file: docs/codereview/typescript-pro-domain-review-{YYYY-MM-DD}.md
 ```
 
-**2.4 Architecture Review + Final Approval (5 min)**
+**2.6 Architecture Review + Final Approval (5 min)**
 
-Invoke clean-architecture-guardian (parallel with 2.3):
+Invoke clean-architecture-guardian (parallel with 2.5):
 ```
 @agent-clean-architecture-guardian - Review domain layer and provide FINAL APPROVAL:
 - src/features/[feature]/domain/
@@ -148,19 +187,20 @@ Focus on:
 - Repository interfaces in domain
 - SOLID principles
 - Code quality (naming, duplication, complexity)
+- Tests present for entities and domain services
 
 Provide: APPROVE / CHANGES REQUESTED / REJECT
 
 Create review file: docs/codereview/clean-arch-guardian-domain-review-{YYYY-MM-DD}.md
 ```
 
-**2.5 Address Review Findings**
+**2.7 Address Review Findings**
 - [ ] Fix critical issues
 - [ ] Fix moderate issues
 - [ ] Document any accepted minor issues
 - [ ] npm run compile ✅
 
-**2.6 Commit (3 min)**
+**2.8 Commit (3 min)**
 ```bash
 git add src/features/[feature]/domain/
 git commit -m "feat(domain): add [feature] entities with behavior
@@ -170,12 +210,16 @@ git commit -m "feat(domain): add [feature] entities with behavior
 - [DomainService] for complex logic
 - I[Repository] interface (domain contract)
 
+Tests:
+- [Entity1].test.ts (100% coverage)
+- [DomainService].test.ts
+
 Reviewed-by: typescript-pro, clean-architecture-guardian ✅"
 ```
 
 ---
 
-### Phase 3: Application Layer (45 min)
+### Phase 3: Application Layer (60 min)
 
 **3.1 Implementation (30 min)**
 
@@ -192,13 +236,55 @@ Create application layer files:
 - [ ] Logging at use case boundaries (start/completion/failures)
 - [ ] Inject ILogger via constructor (not Logger.getInstance())
 
-**3.2 Compilation (30 sec)**
+**3.2 Write Tests (15 min)**
+- [ ] Create `[UseCase].test.ts` alongside use case
+- [ ] Test orchestration flow
+- [ ] Test error handling paths
+- [ ] Test mapper transformations
+- [ ] Mock repositories and dependencies
+- [ ] Target: 90% coverage for use cases
+
+**Test Structure**:
+```typescript
+describe('[UseCaseName]', () => {
+  let useCase: [UseCaseName];
+  let mockRepository: jest.Mocked<I[Repository]>;
+  let mockLogger: jest.Mocked<ILogger>;
+
+  beforeEach(() => {
+    mockRepository = { ... } as jest.Mocked<I[Repository]>;
+    mockLogger = { ... } as jest.Mocked<ILogger>;
+    useCase = new [UseCaseName](mockRepository, mockLogger);
+  });
+
+  it('should orchestrate domain logic successfully', async () => {
+    // Arrange
+    const entity = createValidEntity();
+    mockRepository.getById.mockResolvedValue(entity);
+
+    // Act
+    await useCase.execute('id');
+
+    // Assert
+    expect(mockRepository.save).toHaveBeenCalledWith(entity);
+  });
+});
+```
+
+**3.3 Run Tests (30 sec)**
 ```bash
-npm run compile
+npm test
+```
+- [ ] All tests pass ✅
+
+**3.4 Compilation (30 sec)**
+```bash
+npm run compile  # Includes tests
 ```
 - [ ] Compilation succeeds ✅
+- [ ] Tests pass ✅
 
-**3.3 Parallel Review (5 min each, run simultaneously)**
+**3.5 Parallel Review (5 min each, run simultaneously)**
 
 Invoke typescript-pro:
 ```
@@ -224,21 +310,22 @@ Focus on:
 - ViewModels have no behavior
 - Mappers transform only
 - Logging at boundaries
+- Tests present for use cases
 
 Create review file: docs/codereview/clean-arch-guardian-application-review-{YYYY-MM-DD}.md
 ```
 
-**3.4 Final Approval (2 min)**
+**3.6 Final Approval (2 min)**
 ```
 @agent-clean-architecture-guardian - Review application layer for final approval.
 Provide: APPROVE / CHANGES REQUESTED / REJECT
 ```
 
-**3.5 Address Review Findings**
+**3.7 Address Review Findings**
 - [ ] Fix issues
 - [ ] npm run compile ✅
 
-**3.6 Commit (3 min)**
+**3.8 Commit (3 min)**
 ```bash
 git add src/features/[feature]/application/
 git commit -m "feat(app): add [feature] use cases and ViewModels
@@ -248,12 +335,16 @@ git commit -m "feat(app): add [feature] use cases and ViewModels
 - [ViewModel] DTO for presentation
 - [Mapper] maps domain → ViewModel
 
-Reviewed-by: typescript-pro, clean-architecture-guardian, code-reviewer ✅"
+Tests:
+- [UseCase1].test.ts (90% coverage)
+- [Mapper].test.ts
+
+Reviewed-by: typescript-pro, clean-architecture-guardian ✅"
 ```
 
 ---
 
-### Phase 4: Infrastructure Layer (45 min)
+### Phase 4: Infrastructure Layer (50-60 min)
 
 **4.1 Implementation (30 min)**
 
@@ -270,13 +361,31 @@ Create infrastructure layer files:
 - [ ] Inject ILogger via constructor
 - [ ] Explicit return types
 
-**4.2 Compilation (30 sec)**
+**4.2 Write Tests (10-15 min, optional)**
+- [ ] Test complex query logic in repositories
+- [ ] Test DTO → Domain entity transformations
+- [ ] Test error handling for API failures
+- [ ] Target: 70% coverage for complex logic only
+
+**Note**: Simple repositories with direct pass-through logic don't need tests. Focus on:
+- Complex data transformations
+- Complex query building
+- Error mapping logic
+
+**4.3 Run Tests (30 sec)**
 ```bash
-npm run compile
+npm test
+```
+- [ ] All tests pass ✅
+
+**4.4 Compilation (30 sec)**
+```bash
+npm run compile  # Includes tests
 ```
 - [ ] Compilation succeeds ✅
+- [ ] Tests pass ✅
 
-**4.3 Parallel Review (5 min each)**
+**4.5 Parallel Review (5 min each)**
 
 Invoke typescript-pro:
 ```
@@ -300,20 +409,21 @@ Focus on:
 - Repositories implement domain interfaces
 - Dependencies point inward
 - No business logic in repositories
+- Tests present for complex transformations (if applicable)
 
 Create review file: docs/codereview/clean-arch-guardian-infrastructure-review-{YYYY-MM-DD}.md
 ```
 
-**4.4 Final Approval (2 min)**
+**4.6 Final Approval (2 min)**
 ```
 @agent-clean-architecture-guardian - Review infrastructure layer for final approval.
 ```
 
-**4.5 Address Review Findings**
+**4.7 Address Review Findings**
 - [ ] Fix issues
 - [ ] npm run compile ✅
 
-**4.6 Commit (3 min)**
+**4.8 Commit (3 min)**
 ```bash
 git add src/features/[feature]/infrastructure/
 git commit -m "feat(infra): add [feature] repositories
@@ -322,12 +432,15 @@ git commit -m "feat(infra): add [feature] repositories
 - API integration for [feature]
 - Logging for API calls
 
-Reviewed-by: typescript-pro, clean-architecture-guardian, code-reviewer ✅"
+Tests:
+- [Repository].test.ts (if complex logic present)
+
+Reviewed-by: typescript-pro, clean-architecture-guardian ✅"
 ```
 
 ---
 
-### Phase 5: Presentation Layer (45 min)
+### Phase 5: Presentation Layer (45-50 min)
 
 **5.1 Implementation (30 min)**
 
@@ -344,13 +457,30 @@ Create presentation layer files:
 - [ ] Inject ILogger via constructor
 - [ ] Explicit return types
 
-**5.2 Compilation (30 sec)**
+**5.2 Write Tests (5-10 min, optional)**
+- [ ] Test view render functions (HTML generation)
+- [ ] Test complex event handler logic (if any)
+- [ ] Target: <50% coverage (manual testing preferred)
+
+**Note**: Presentation layer tests are optional. Prefer manual testing (F5 in VS Code) for UI verification. Only write tests for:
+- Complex view rendering logic
+- Reusable UI components
+- View helpers with business logic (should be refactored to domain)
+
+**5.3 Run Tests (30 sec)**
 ```bash
-npm run compile
+npm test
+```
+- [ ] All tests pass ✅
+
+**5.4 Compilation (30 sec)**
+```bash
+npm run compile  # Includes tests
 ```
 - [ ] Compilation succeeds ✅
+- [ ] Tests pass ✅
 
-**5.3 Parallel Review (5 min each)**
+**5.5 Parallel Review (5 min each)**
 
 Invoke typescript-pro:
 ```
@@ -378,16 +508,16 @@ Focus on:
 Create review file: docs/codereview/clean-arch-guardian-presentation-review-{YYYY-MM-DD}.md
 ```
 
-**5.4 Final Approval (2 min)**
+**5.6 Final Approval (2 min)**
 ```
 @agent-clean-architecture-guardian - Review presentation layer for final approval.
 ```
 
-**5.5 Address Review Findings**
+**5.7 Address Review Findings**
 - [ ] Fix issues
 - [ ] npm run compile ✅
 
-**5.6 Commit (3 min)**
+**5.8 Commit (3 min)**
 ```bash
 git add src/features/[feature]/presentation/
 git commit -m "feat(pres): add [feature] panel
@@ -396,7 +526,10 @@ git commit -m "feat(pres): add [feature] panel
 - HTML extracted to view files
 - Event handlers call use cases only
 
-Reviewed-by: typescript-pro, clean-architecture-guardian, code-reviewer ✅"
+Tests:
+- View tests (if applicable)
+
+Reviewed-by: typescript-pro, clean-architecture-guardian ✅"
 ```
 
 ---
@@ -467,26 +600,30 @@ git commit -m "docs: add [feature] Clean Architecture example"
 2. Identify use case orchestration (5 min)
 3. Invoke typescript-pro to review type contracts (5 min)
 
-### Phase 2: Domain + Application (40 min)
+### Phase 2: Domain + Application (55 min)
 1. Implement domain entities + use cases (30 min)
-2. npm run compile ✅
-3. Parallel review: typescript-pro + clean-architecture-guardian (5 min)
-4. code-reviewer final approval (2 min)
-5. Commit (3 min)
+2. Write tests for entities and use cases (15 min)
+3. npm test ✅
+4. npm run compile ✅
+5. Parallel review: typescript-pro + clean-architecture-guardian (5 min)
+6. code-reviewer final approval (2 min)
+7. Commit with tests (3 min)
 
-### Phase 3: Infrastructure + Presentation (30 min)
+### Phase 3: Infrastructure + Presentation (35-40 min)
 1. Implement repositories + panels (20 min)
-2. npm run compile ✅
-3. Parallel review: typescript-pro + clean-architecture-guardian (5 min)
-4. code-reviewer final approval (2 min)
-5. Commit (3 min)
+2. Write tests for complex repository logic (5-10 min, optional)
+3. npm test ✅
+4. npm run compile ✅
+5. Parallel review: typescript-pro + clean-architecture-guardian (5 min)
+6. code-reviewer final approval (2 min)
+7. Commit with tests (3 min)
 
-### Phase 4: Testing (10 min)
+### Phase 4: Manual Testing (10 min)
 1. F5 in VS Code
 2. Test feature end-to-end
 3. Verify logging
 
-**Total Time**: ~95 mins, 2 commits
+**Total Time**: ~110-115 mins, 2 commits (includes unit tests)
 
 ---
 
@@ -548,6 +685,9 @@ After completing the workflow, verify:
 
 - [ ] All layers compile without errors
 - [ ] Zero ESLint violations
+- [ ] All tests pass (npm test)
+- [ ] Domain entities have tests (100% coverage target)
+- [ ] Use cases have tests (90% coverage target)
 - [ ] All review agents approved (APPROVE status)
 - [ ] Manual testing passed
 - [ ] Domain layer has zero external dependencies
@@ -555,6 +695,7 @@ After completing the workflow, verify:
 - [ ] Panels have no business logic
 - [ ] Logging only at boundaries (not in domain)
 - [ ] 4-5 commits (one per layer) for complex features
+- [ ] Each commit includes test file paths
 - [ ] Feature works end-to-end in VS Code
 
 ---

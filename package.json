@@ -231,8 +231,10 @@
     },
     "scripts": {
         "vscode:prepublish": "npm run package",
-        "compile": "npm run lint:all && npm run build:extension && npm run build:webview",
-        "compile:no-lint": "npm run build:extension && npm run build:webview",
+        "compile": "npm run lint:all && npm test && npm run build:extension && npm run build:webview",
+        "compile:no-lint": "npm test && npm run build:extension && npm run build:webview",
+        "compile:no-test": "npm run lint:all && npm run build:extension && npm run build:webview",
+        "compile:fast": "npm run build:extension && npm run build:webview",
         "build:extension": "webpack --config webpack.config.js",
         "build:webview": "webpack --mode development --config webpack.webview.config.js",
         "watch": "npm run watch:extension & npm run watch:webview",

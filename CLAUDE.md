@@ -39,6 +39,9 @@
 12. **Type narrowing with explicit checks** - `if (x === null) return;` not `x!`
 13. **Domain services for complex logic** - Use case complex logic → domain service
 14. **Mappers transform only** - No sorting params; sort before/after mapping
+15. **Write tests for domain and application layers** - Business logic must be tested
+16. **Run tests before review** - `npm run compile` includes tests
+17. **Test-driven bug fixes** - Write failing test, fix bug, verify test passes
 
 ---
 
@@ -83,6 +86,18 @@
 - ✅ Review per layer (not all at once) - Catch violations early (5-10 min fixes vs 2+ hour refactors)
 - ✅ Commit per layer - Granular rollback capability
 - ✅ Write clean from start - No cleanup phase needed if following LOGGING_GUIDE.md
+- ✅ Write tests AFTER implementation, BEFORE review - Domain entities (100% target), use cases (90% target)
+- ✅ Run `npm test` before `npm run compile` - Tests must pass before review
+- ✅ Include test file paths in commit messages - Document test coverage
+
+**When fixing bugs:**
+- ✅ Write failing test first - Reproduces bug
+- ✅ Fix bug - Test passes
+- ✅ Commit includes test - Prevents regression
+
+**When refactoring:**
+- ✅ Tests must pass BEFORE refactoring - Baseline behavior established
+- ✅ Tests must pass AFTER refactoring - Behavior unchanged
 
 **Agent roles (see .claude/AGENT_ROLES.md):**
 - YOU = Implementer (human or builder)

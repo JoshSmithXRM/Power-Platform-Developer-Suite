@@ -6,22 +6,148 @@
 
 ## 🚀 Quick Reference
 
-**Time Estimate**: 20-30 minutes per bug
+**Time Estimate**: 25-30 minutes per bug (with test)
 
 **Process**:
-1. Reproduce bug (5 min)
+1. Write failing test (5 min) ← NEW
 2. Implement fix (15 min)
-3. Compile (30 sec)
-4. Review (2-5 min)
-5. Commit (3 min)
-6. Manual test (5 min)
+3. Verify test passes (30 sec)
+4. Compile (30 sec)
+5. Review (2-5 min)
+6. Commit with test (3 min)
+7. Manual test (5 min)
 
 **Key Principles**:
-- ✅ Reproduce before fixing
+- ✅ Write failing test first (reproduces bug)
+- ✅ Fix makes test pass
+- ✅ Test prevents regression
 - ✅ Compile immediately after fix
 - ✅ Minimal reviews (skip architecture review if not changing layers)
-- ✅ Test the specific bug scenario
 - ❌ Don't add new features during bug fixes
+
+---
+
+## 🧪 Test-Driven Bug Fix Workflow (RECOMMENDED)
+
+**Total Time**: ~25 mins
+
+### Step 1: Write Failing Test (5 min)
+
+**1.1 Reproduce Bug with Test**
+- [ ] Create/update test file for buggy component
+- [ ] Write test that reproduces exact bug scenario
+- [ ] Run test - should FAIL for same reason bug occurs
+- [ ] Document expected vs actual behavior in test
+
+**Example**:
+```typescript
+describe('Environment.activate', () => {
+  it('should not throw when activating environment twice', () => {
+    const env = createValidEnvironment();
+    env.activate();
+
+    // Bug: This throws error, should not
+    expect(() => env.activate()).not.toThrow();
+  });
+});
+```
+
+**1.2 Verify Test Fails**
+```bash
+npm test
+```
+- [ ] Test fails ❌ (reproduces bug)
+- [ ] Failure message matches bug behavior
+
+---
+
+### Step 2: Fix Bug (10 min)
+
+**2.1 Implement Fix**
+- [ ] Edit the specific file(s) causing the issue
+- [ ] Keep changes minimal (fix bug only)
+- [ ] Follow Clean Architecture rules for the layer
+
+**2.2 Verify Test Passes**
+```bash
+npm test
+```
+- [ ] Test passes ✅ (bug fixed)
+- [ ] All other tests still pass ✅
+
+---
+
+### Step 3: Compile & Review (3 min)
+
+```bash
+npm run compile  # Includes tests + lint
+```
+
+**3.1 Compile**
+- [ ] Zero TypeScript errors
+- [ ] Zero ESLint errors
+- [ ] All tests pass ✅
+
+**3.2 Review (Optional)**
+
+For simple fixes, skip review. For complex fixes:
+```
+@agent-clean-architecture-guardian - Quick review of bug fix:
+- [file paths]
+
+Verify:
+- Bug fixed correctly
+- No architecture violations introduced
+- Test verifies bug is fixed
+```
+
+---
+
+### Step 4: Commit with Test (3 min)
+
+```bash
+git add [files]
+git commit -m "fix: [bug description]
+
+Previous behavior: [what was wrong]
+New behavior: [expected behavior]
+Root cause: [why bug occurred]
+
+Test: [TestFile.test.ts] - '[test description]'
+
+Reviewed-by: clean-architecture-guardian ✅"
+```
+
+**Example**:
+```bash
+git commit -m "fix: allow multiple environment activations
+
+Previous behavior: Threw error on second activation
+New behavior: Idempotent activation (no error)
+Root cause: Missing check for already-active state
+
+Test: Environment.test.ts - 'should not throw when activating twice'
+
+Reviewed-by: clean-architecture-guardian ✅"
+```
+
+---
+
+### Step 5: Manual Test (5 min)
+
+- [ ] F5 in VS Code
+- [ ] Reproduce original bug scenario
+- [ ] Verify bug is fixed
+- [ ] Check OutputChannel for proper logging
+
+---
+
+**Why This Approach**:
+- ✅ Test proves bug exists
+- ✅ Test proves bug is fixed
+- ✅ Test prevents regression (bug won't come back)
+- ✅ Test documents expected behavior
+- ✅ Confidence in fix
 
 ---
 

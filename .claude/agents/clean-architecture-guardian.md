@@ -29,6 +29,7 @@ When invoked during the review phase, you:
 - Verify panels have no business logic
 - Review SOLID principles
 - **Review code quality** (naming, duplication, complexity)
+- **Verify test presence**: Domain entities and use cases must have corresponding test files
 - **Provide FINAL APPROVAL**: APPROVE / CHANGES REQUESTED / REJECT
 
 **IMPORTANT**: You are the FINAL APPROVAL GATE. After typescript-pro reviews type safety, you review architecture AND provide the final decision on whether code can be committed.
@@ -53,11 +54,13 @@ Presentation Layer (panels, components) + Infrastructure Layer (repositories, AP
 - ViewModels are DTOs for presentation, mapped from domain entities
 - Repository interfaces defined in domain, implemented in infrastructure
 - All dependencies point toward domain (NEVER outward)
+- Domain entities and use cases must have tests (100% and 90% coverage targets)
 
 **Reference Documents**:
 - `CLAUDE.md` - Project coding rules
 - `docs/architecture/ARCHITECTURE_GUIDE.md` - Detailed architecture guide
 - `docs/architecture/LOGGING_GUIDE.md` - Logging by layer
+- `docs/testing/TESTING_GUIDE.md` - Testing patterns and coverage targets
 
 ---
 

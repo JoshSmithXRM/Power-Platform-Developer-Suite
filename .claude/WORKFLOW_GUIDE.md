@@ -86,48 +86,55 @@ Phase 1: Type-Safe Architecture Design
 3. Human approves design + type contracts (10 min)
 
 Phase 2-5: Per-Layer Implementation (repeat for each layer)
-4. YOU implement layer (30-45 min)
+4. YOU implement layer (30 min)
    ↓ (domain → application → infrastructure → presentation)
-5. npm run compile ✅ (30 sec) ← CRITICAL
+5. YOU write tests (15 min) ← NEW
+   ↓ (domain: 100% target, application: 90% target, infrastructure: optional)
+6. npm test ✅ (30 sec) ← NEW
+   ↓ (tests must pass)
+7. npm run compile ✅ (30 sec) ← CRITICAL (includes tests now)
    ↓ (must succeed before review)
-6. typescript-pro reviews type safety (5 min) [parallel]
+8. typescript-pro reviews type safety (5 min) [parallel]
    + clean-architecture-guardian reviews architecture (5 min) [parallel]
    ↓ (both review simultaneously)
-7. clean-architecture-guardian final approval (2 min)
+9. clean-architecture-guardian final approval (2 min)
    ↓ (APPROVE/CHANGES REQUESTED/REJECT)
-8. YOU fix issues if any → npm run compile ✅
-9. Commit layer (3 min)
-   ↓ (one commit per layer)
+10. YOU fix issues if any → npm run compile ✅
+11. Commit layer with tests (3 min)
+    ↓ (one commit per layer, includes test file paths)
 
 Phase 6: Documentation (optional, 20 min)
-10. code-cleanup-implementer documents patterns (if new)
+12. code-cleanup-implementer documents patterns (if new)
 ```
 
 **Key Differences from Old Workflow**:
 - ✅ Type contracts reviewed BEFORE implementation (prevents type error cascade)
+- ✅ Tests written AFTER implementation, BEFORE review ← NEW
 - ✅ Compile after EACH layer (not just at end)
 - ✅ Review per layer (not all at once)
-- ✅ Commit per layer (granular rollback capability)
+- ✅ Commit per layer with tests (granular rollback capability)
 
 ### For Bug Fixes
 
 ```
-1. YOU reproduce bug (5 min)
+1. YOU write failing test (5 min) ← NEW (reproduces bug)
    ↓
-2. YOU implement fix (15 min)
+2. YOU implement fix (10 min)
    ↓
-3. npm run compile ✅ (30 sec) ← CRITICAL
+3. npm test ✅ (30 sec) ← NEW (test passes now)
    ↓
-4. typescript-pro reviews (if type-related) (2 min) [optional]
+4. npm run compile ✅ (30 sec) ← CRITICAL (includes tests)
    ↓
-5. clean-architecture-guardian reviews (2 min)
+5. typescript-pro reviews (if type-related) (2 min) [optional]
+   ↓
+6. clean-architecture-guardian reviews (2 min)
    ↓ (APPROVE/REJECT)
-6. YOU commit (3 min)
+7. YOU commit with test (3 min)
    ↓
-7. YOU test manually (5 min)
+8. YOU test manually (5 min)
 ```
 
-**Total Time**: ~30 mins
+**Total Time**: ~30 mins (includes test)
 
 See [BUG_FIX_WORKFLOW.md](workflows/BUG_FIX_WORKFLOW.md) for detailed bug fix process.
 
@@ -761,11 +768,13 @@ If "Feeling" is uncertain/confused → STOP, ask questions, don't push forward.
 - **Rich domain models** - Entities with behavior (not anemic)
 - **Use cases orchestrate** - No business logic in use cases
 - **Layer by layer** - Commit domain, then application, then infra/presentation
+- **Tests per layer** - Domain (100% target), Application (90% target), Infrastructure (optional)
 - **Multi-agent review** - typescript-pro (types) + clean-architecture-guardian (layers) + clean-architecture-guardian (final)
 - **Type safety** - No `any`, explicit return types, proper generics
 - **Manual test after commit** - F5 in VS Code, verify it works
 
 **Current Validation:**
+- ✅ Unit tests (`npm test` - part of compile)
 - ✅ TypeScript compilation (`npm run compile`)
 - ✅ ESLint rules (part of compile)
 - ✅ Manual testing (F5 in VS Code)
