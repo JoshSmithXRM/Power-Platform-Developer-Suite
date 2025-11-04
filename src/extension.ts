@@ -447,6 +447,51 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	const pluginTraceViewerCommand = vscode.commands.registerCommand('power-platform-dev-suite.pluginTraceViewer', async (environmentItem?: { envId: string }) => {
+		try {
+			let initialEnvironmentId: string | undefined;
+
+			if (environmentItem?.envId) {
+				initialEnvironmentId = environmentItem.envId;
+			}
+
+			void initializePluginTraceViewer(context, authService, environmentRepository, logger, initialEnvironmentId);
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Plugin Trace Viewer: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	const pluginTraceViewerPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.pluginTraceViewerPickEnvironment', async () => {
+		try {
+			const environments = await environmentRepository.getAll();
+
+			if (environments.length === 0) {
+				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
+				return;
+			}
+
+			const quickPickItems = environments.map(env => ({
+				label: env.getName().getValue(),
+				description: env.getDataverseUrl().getValue(),
+				envId: env.getId().getValue()
+			}));
+
+			const selected = await vscode.window.showQuickPick(quickPickItems, {
+				placeHolder: 'Select an environment to view Plugin Traces'
+			});
+
+			if (selected) {
+				void initializePluginTraceViewer(context, authService, environmentRepository, logger, selected.envId);
+			}
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Plugin Trace Viewer: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
 	context.subscriptions.push(
 		outputChannel,
 		addEnvironmentCommand,
@@ -460,6 +505,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		connectionReferencesPickEnvironmentCommand,
 		environmentVariablesCommand,
 		environmentVariablesPickEnvironmentCommand,
+		pluginTraceViewerCommand,
+		pluginTraceViewerPickEnvironmentCommand,
 		removeEnvironmentCommand,
 		openMakerCommand,
 		openDynamicsCommand,
@@ -746,6 +793,64 @@ async function initializeEnvironmentVariables(
 }
 
 /**
+ * Lazy-loads and initializes Plugin Trace Viewer panel.
+ * Dynamic imports reduce initial extension activation time by deferring feature-specific code until needed.
+ */
+async function initializePluginTraceViewer(
+	context: vscode.ExtensionContext,
+	authService: MsalAuthenticationService,
+	environmentRepository: IEnvironmentRepository,
+	logger: ILogger,
+	initialEnvironmentId?: string
+): Promise<void> {
+	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js');
+	const { DataversePluginTraceRepository } = await import('./features/pluginTraceViewer/infrastructure/repositories/DataversePluginTraceRepository.js');
+	const { FileSystemPluginTraceExporter } = await import('./features/pluginTraceViewer/infrastructure/exporters/FileSystemPluginTraceExporter.js');
+	const { GetPluginTracesUseCase } = await import('./features/pluginTraceViewer/application/useCases/GetPluginTracesUseCase.js');
+	const { DeleteTracesUseCase } = await import('./features/pluginTraceViewer/application/useCases/DeleteTracesUseCase.js');
+	const { ExportTracesUseCase } = await import('./features/pluginTraceViewer/application/useCases/ExportTracesUseCase.js');
+	const { GetTraceLevelUseCase } = await import('./features/pluginTraceViewer/application/useCases/GetTraceLevelUseCase.js');
+	const { SetTraceLevelUseCase } = await import('./features/pluginTraceViewer/application/useCases/SetTraceLevelUseCase.js');
+	const { PluginTraceViewModelMapper } = await import('./features/pluginTraceViewer/presentation/mappers/PluginTraceViewModelMapper.js');
+	const { PluginTraceViewerPanelComposed } = await import('./features/pluginTraceViewer/presentation/panels/PluginTraceViewerPanelComposed.js');
+
+	const getEnvironments = createGetEnvironments(environmentRepository);
+	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
+
+	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
+	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
+
+	const pluginTraceRepository = new DataversePluginTraceRepository(dataverseApiService, logger);
+	const pluginTraceExporter = new FileSystemPluginTraceExporter(logger);
+
+	const getPluginTracesUseCase = new GetPluginTracesUseCase(pluginTraceRepository, logger);
+	const deleteTracesUseCase = new DeleteTracesUseCase(pluginTraceRepository, logger);
+	const exportTracesUseCase = new ExportTracesUseCase(pluginTraceExporter, logger);
+	const getTraceLevelUseCase = new GetTraceLevelUseCase(pluginTraceRepository, logger);
+	const setTraceLevelUseCase = new SetTraceLevelUseCase(pluginTraceRepository, logger);
+
+	const viewModelMapper = new PluginTraceViewModelMapper();
+
+	// Panel state repository for persisting UI state (optional)
+	const panelStateRepository = undefined; // Can be added later for state persistence
+
+	await PluginTraceViewerPanelComposed.createOrShow(
+		context.extensionUri,
+		getEnvironments,
+		getEnvironmentById,
+		getPluginTracesUseCase,
+		deleteTracesUseCase,
+		exportTracesUseCase,
+		getTraceLevelUseCase,
+		setTraceLevelUseCase,
+		viewModelMapper,
+		logger,
+		initialEnvironmentId,
+		panelStateRepository
+	);
+}
+
+/**
  * Lazy-loads and initializes Persistence Inspector (development mode only).
  * Dynamic imports ensure production builds exclude this development-only feature entirely.
  */
@@ -816,7 +921,8 @@ class ToolsTreeProvider implements vscode.TreeDataProvider<ToolItem> {
 			new ToolItem('Solutions', 'Browse and manage solutions', 'solutionExplorer', 'power-platform-dev-suite.solutionExplorerPickEnvironment'),
 			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewerPickEnvironment'),
 			new ToolItem('Connection References', 'View connection references and flows', 'connectionReferences', 'power-platform-dev-suite.connectionReferencesPickEnvironment'),
-			new ToolItem('Environment Variables', 'View environment variables', 'environmentVariables', 'power-platform-dev-suite.environmentVariablesPickEnvironment')
+			new ToolItem('Environment Variables', 'View environment variables', 'environmentVariables', 'power-platform-dev-suite.environmentVariablesPickEnvironment'),
+			new ToolItem('Plugin Traces', 'View and manage plugin trace logs', 'pluginTraceViewer', 'power-platform-dev-suite.pluginTraceViewerPickEnvironment')
 		];
 	}
 }

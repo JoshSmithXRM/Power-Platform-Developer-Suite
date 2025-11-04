@@ -32,14 +32,37 @@ export class TraceLevel {
 		}
 	}
 
+	/**
+	 * Creates TraceLevel from string representation.
+	 * Factory method for value object construction (legitimate pattern).
+	 * @throws Error if value is not a valid trace level string
+	 */
+	// eslint-disable-next-line local-rules/no-static-entity-methods
+	static fromString(value: string): TraceLevel {
+		switch (value) {
+			case 'Off':
+				return TraceLevel.Off;
+			case 'Exception':
+				return TraceLevel.Exception;
+			case 'All':
+				return TraceLevel.All;
+			default:
+				throw new Error(`Invalid trace level string: ${value}`);
+		}
+	}
+
 	equals(other: TraceLevel | null): boolean {
 		return other !== null && this.value === other.value;
 	}
 
 	/**
-	 * "All" level can impact performance and should warn.
+	 * Determines if this trace level may impact system performance.
+	 * TraceLevel.All logs every plugin execution, which can generate
+	 * significant data volume and affect system performance.
+	 *
+	 * @returns true if this level may impact performance
 	 */
-	requiresWarning(): boolean {
-		return this.value === 2; // All
+	isPerformanceIntensive(): boolean {
+		return this.value === TraceLevel.All.value;
 	}
 }

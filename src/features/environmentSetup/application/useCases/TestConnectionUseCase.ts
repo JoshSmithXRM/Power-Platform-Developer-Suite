@@ -7,7 +7,6 @@ import { DataverseUrl } from '../../domain/valueObjects/DataverseUrl';
 import { TenantId } from '../../domain/valueObjects/TenantId';
 import { ClientId } from '../../domain/valueObjects/ClientId';
 import { AuthenticationMethod, AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
-import { ApplicationError } from '../errors/ApplicationError';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 /**
@@ -132,7 +131,11 @@ export class TestConnectionUseCase {
 
 		// Domain guarantees clientId exists when requiresClientCredentials() is true.
 		// Environment constructor validates this invariant (Environment.ts lines 114-124).
-		const clientId = environment.getClientId()!.getValue();
+		const clientIdObj = environment.getClientId();
+		if (!clientIdObj) {
+			throw new Error('Client ID is required for client credentials authentication');
+		}
+		const clientId = clientIdObj.getValue();
 
 		const secret = await this.repository.getClientSecret(clientId);
 		if (secret) {
@@ -159,7 +162,10 @@ export class TestConnectionUseCase {
 
 		// Domain guarantees username exists when requiresUsernamePassword() is true.
 		// Environment constructor validates this invariant (Environment.ts lines 126-136).
-		const username = environment.getUsername()!;
+		const username = environment.getUsername();
+		if (!username) {
+			throw new Error('Username is required for username/password authentication');
+		}
 
 		const password = await this.repository.getPassword(username);
 		if (password) {

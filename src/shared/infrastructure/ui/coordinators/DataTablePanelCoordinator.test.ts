@@ -281,9 +281,6 @@ describe('DataTablePanelCoordinator', () => {
 		});
 
 		it('should dispose all disposable subscriptions', () => {
-			const disposableMock = { dispose: jest.fn() };
-
-			// Access private disposables array through the coordinator instance
 			// The onDidDispose subscription is added in constructor
 			coordinator.dispose();
 

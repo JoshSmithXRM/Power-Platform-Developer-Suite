@@ -40,6 +40,31 @@ describe('TraceLevel', () => {
 		});
 	});
 
+	describe('fromString', () => {
+		it('should create Off from "Off"', () => {
+			const level = TraceLevel.fromString('Off');
+			expect(level).toBe(TraceLevel.Off);
+		});
+
+		it('should create Exception from "Exception"', () => {
+			const level = TraceLevel.fromString('Exception');
+			expect(level).toBe(TraceLevel.Exception);
+		});
+
+		it('should create All from "All"', () => {
+			const level = TraceLevel.fromString('All');
+			expect(level).toBe(TraceLevel.All);
+		});
+
+		it('should throw error for invalid string', () => {
+			expect(() => TraceLevel.fromString('Invalid')).toThrow('Invalid trace level string: Invalid');
+		});
+
+		it('should throw error for lowercase string', () => {
+			expect(() => TraceLevel.fromString('all')).toThrow('Invalid trace level string: all');
+		});
+	});
+
 	describe('equals', () => {
 		it('should return true for same trace level', () => {
 			expect(TraceLevel.Off.equals(TraceLevel.Off)).toBe(true);
@@ -58,17 +83,17 @@ describe('TraceLevel', () => {
 		});
 	});
 
-	describe('requiresWarning', () => {
+	describe('isPerformanceIntensive', () => {
 		it('should return true for All level', () => {
-			expect(TraceLevel.All.requiresWarning()).toBe(true);
+			expect(TraceLevel.All.isPerformanceIntensive()).toBe(true);
 		});
 
 		it('should return false for Off level', () => {
-			expect(TraceLevel.Off.requiresWarning()).toBe(false);
+			expect(TraceLevel.Off.isPerformanceIntensive()).toBe(false);
 		});
 
 		it('should return false for Exception level', () => {
-			expect(TraceLevel.Exception.requiresWarning()).toBe(false);
+			expect(TraceLevel.Exception.isPerformanceIntensive()).toBe(false);
 		});
 	});
 });

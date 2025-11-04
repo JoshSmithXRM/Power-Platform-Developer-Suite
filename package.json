@@ -156,6 +156,16 @@
                 "category": "Power Platform Developer Suite"
             },
             {
+                "command": "power-platform-dev-suite.pluginTraceViewer",
+                "title": "Plugin Traces",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.pluginTraceViewerPickEnvironment",
+                "title": "Plugin Traces: Choose Environment",
+                "category": "Power Platform Developer Suite"
+            },
+            {
                 "command": "power-platform-dev-suite.openPersistenceInspector",
                 "title": "Persistence Inspector (Dev Only)",
                 "category": "Power Platform Developer Suite",

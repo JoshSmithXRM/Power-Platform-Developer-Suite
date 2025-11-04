@@ -14,15 +14,17 @@ This document tracks known technical debt and future improvement opportunities t
 ### Documentation (1 issue)
 2. **CLEAN_ARCHITECTURE_GUIDE.md Length** - Documentation exceeds 1,708 lines (limit: 1,200). Wait until Data Panel Suite is complete before splitting into 3 separate guides.
 
-### Architecture & Design (1 issue)
+### Architecture & Design (2 issues)
 3. **IXmlFormatter Interface** - Suggested interface extraction unnecessary. XmlFormatter is infrastructure using concrete class correctly, no polymorphism needed.
 
 4. **getValue() Pattern Without Branded Types** - Value objects return primitives without compile-time type branding. Zero bugs found in 100+ callsites, 6-8 hour refactor not justified.
 
-### Deferred Refactoring (2 issues)
-5. **Business Logic in Command Handlers** - extension.ts commands contain orchestration that belongs in use cases. Use cases exist but need integration work, defer until command testing sprint.
+5. **Hard-coded Button Event Listeners in Base Template** - dataTable.ts base template assumes refreshBtn and openMakerBtn exist without null checks, causing runtime errors when panels don't include these buttons.
 
-6. **Unsafe Type Assertions in API Service** - DataverseApiService uses `as T` without runtime validation. Repositories validate at mapping layer, external API contracts stable, zero bugs found.
+### Deferred Refactoring (2 issues)
+6. **Business Logic in Command Handlers** - extension.ts commands contain orchestration that belongs in use cases. Use cases exist but need integration work, defer until command testing sprint.
+
+7. **Unsafe Type Assertions in API Service** - DataverseApiService uses `as T` without runtime validation. Repositories validate at mapping layer, external API contracts stable, zero bugs found.
 
 ---
 
@@ -269,6 +271,76 @@ Consider branded types only if:
 3. **New domain model** is being built from scratch (low refactoring cost)
 
 Otherwise, **keep the current pattern indefinitely**.
+
+---
+
+## Hard-coded Button Event Listeners in Base Template
+
+**Status**: Deferred
+**Priority**: Low
+**Effort**: Low (1-2 hours)
+
+**Issue:**
+The base template (`src/shared/infrastructure/ui/views/dataTable.ts` lines 192-198) contains hard-coded event listeners for `refreshBtn` and `openMakerBtn` that assume these buttons exist in the DOM. These buttons are only rendered if explicitly included in the panel's `toolbarButtons` configuration, causing runtime errors when panels don't include them.
+
+**Current State:**
+```javascript
+// dataTable.ts lines 192-198
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  vscode.postMessage({ command: 'refresh' });
+});
+
+document.getElementById('openMakerBtn').addEventListener('click', () => {
+  vscode.postMessage({ command: 'openMaker' });
+});
+```
+
+**Problem:**
+- Configuration suggests buttons are optional (toolbarButtons array)
+- Code requires buttons to exist (no null checks)
+- Error: `Cannot read properties of null (reading 'addEventListener')`
+- Violates least surprise principle
+- Lines 201-209 already have a generic loop that handles all buttons safely, making the hard-coded handlers redundant
+
+**Why Deferred:**
+- Simple workaround exists: Include both buttons in all panel configs
+- Only discovered when Plugin Trace Viewer omitted openMakerBtn
+- Fix requires testing all 6 existing panels to ensure no regressions
+- Low priority since workaround is trivial
+
+**When to Address:**
+- During shared infrastructure refactoring sprint
+- When adding 7th+ panel that doesn't need these buttons
+- When standardizing button configuration patterns
+
+**Recommended Solution:**
+Option 1 (preferred): Remove lines 192-198 entirely - the generic loop at lines 201-209 already handles all buttons safely.
+
+Option 2: Add defensive null checks:
+```javascript
+const refreshBtn = document.getElementById('refreshBtn');
+if (refreshBtn) {
+  refreshBtn.addEventListener('click', () => {
+    vscode.postMessage({ command: 'refresh' });
+  });
+}
+
+const openMakerBtn = document.getElementById('openMakerBtn');
+if (openMakerBtn) {
+  openMakerBtn.addEventListener('click', () => {
+    vscode.postMessage({ command: 'openMaker' });
+  });
+}
+```
+
+**Affected Panels:**
+All panels using DataTablePanelCoordinator (Pattern 1):
+- EnvironmentSetupPanel
+- PluginTraceViewerPanel
+- SolutionPanel
+- WebResourcePanel
+- PluginAssemblyPanel
+- ComponentPanel
 
 ---
 
