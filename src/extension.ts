@@ -22,6 +22,7 @@ import { EnvironmentListViewModelMapper } from './features/environmentSetup/appl
 import { EnvironmentListViewModel } from './features/environmentSetup/application/viewModels/EnvironmentListViewModel';
 import { EnvironmentFormViewModelMapper } from './features/environmentSetup/application/mappers/EnvironmentFormViewModelMapper';
 import { EnvironmentSetupPanel } from './features/environmentSetup/presentation/panels/EnvironmentSetupPanel';
+import { TestEnvironmentConnectionCommandHandler } from './features/environmentSetup/presentation/commands/TestEnvironmentConnectionCommandHandler';
 import { EnvironmentId } from './features/environmentSetup/domain/valueObjects/EnvironmentId';
 import { Environment } from './features/environmentSetup/domain/entities/Environment';
 import { EnvironmentCreated } from './features/environmentSetup/domain/events/EnvironmentCreated';
@@ -104,6 +105,13 @@ export function activate(context: vscode.ExtensionContext): void {
 	const validateUniqueNameUseCase = new ValidateUniqueNameUseCase(environmentRepository, logger);
 	const checkConcurrentEditUseCase = new CheckConcurrentEditUseCase(logger);
 
+	// Command Handlers (Presentation Layer)
+	const testEnvironmentConnectionCommandHandler = new TestEnvironmentConnectionCommandHandler(
+		testConnectionUseCase,
+		loadEnvironmentByIdUseCase,
+		logger
+	);
+
 	const isDevelopment = context.extensionMode === vscode.ExtensionMode.Development;
 	void vscode.commands.executeCommand('setContext', 'powerPlatformDevSuite.isDevelopment', isDevelopment);
 
@@ -148,56 +156,14 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	const testEnvironmentConnectionCommand = vscode.commands.registerCommand('power-platform-dev-suite.testEnvironmentConnection', async (environmentItem?: { envId: string }) => {
-		if (!environmentItem?.envId) {
-			vscode.window.showErrorMessage('No environment selected');
-			return;
-		}
-
-		try {
-			const environment = await environmentRepository.getById(new EnvironmentId(environmentItem.envId));
-
-			if (!environment) {
-				vscode.window.showErrorMessage('Environment not found');
-				return;
-			}
-			const authMethod = environment.getAuthenticationMethod();
-			let clientSecret: string | undefined;
-			let password: string | undefined;
-
-			if (authMethod.requiresClientCredentials()) {
-				clientSecret = await environmentRepository.getClientSecret(environment.getClientId()?.getValue() || '');
-				if (!clientSecret) {
-					vscode.window.showErrorMessage('Client secret not found. Please edit the environment and re-enter credentials.');
-					return;
-				}
-			}
-
-			if (authMethod.requiresUsernamePassword()) {
-				password = await environmentRepository.getPassword(environment.getUsername() || '');
-				if (!password) {
-					vscode.window.showErrorMessage('Password not found. Please edit the environment and re-enter credentials.');
-					return;
-				}
-			}
-
-			await vscode.window.withProgress({
-				location: vscode.ProgressLocation.Notification,
-				title: `Testing connection to ${environment.getName().getValue()}...`,
-				cancellable: false
-			}, async () => {
-				const result = await whoAmIService.testConnection(environment, clientSecret, password);
-
-				vscode.window.showInformationMessage(
-					`Connection successful! User ID: ${result.userId}`
-				);
+	const testEnvironmentConnectionCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.testEnvironmentConnection',
+		async (environmentItem?: { envId: string }) => {
+			await testEnvironmentConnectionCommandHandler.execute({
+				environmentId: environmentItem?.envId || ''
 			});
-		} catch (error) {
-			vscode.window.showErrorMessage(
-				`Connection test failed: ${error instanceof Error ? error.message : String(error)}`
-			);
 		}
-	});
+	);
 
 	const removeEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.removeEnvironment', async (environmentItem?: { envId: string; label: string }) => {
 		if (!environmentItem?.envId) {
