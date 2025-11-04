@@ -276,9 +276,9 @@ Otherwise, **keep the current pattern indefinitely**.
 
 ## Hard-coded Button Event Listeners in Base Template
 
-**Status**: Deferred
-**Priority**: Low
-**Effort**: Low (1-2 hours)
+**Status**: Will Be Resolved by Universal Panel Framework Refactor
+**Priority**: Low (being addressed in planned refactor)
+**Effort**: Low (1-2 hours standalone, OR part of framework refactor)
 
 **Issue:**
 The base template (`src/shared/infrastructure/ui/views/dataTable.ts` lines 192-198) contains hard-coded event listeners for `refreshBtn` and `openMakerBtn` that assume these buttons exist in the DOM. These buttons are only rendered if explicitly included in the panel's `toolbarButtons` configuration, causing runtime errors when panels don't include them.
@@ -302,45 +302,33 @@ document.getElementById('openMakerBtn').addEventListener('click', () => {
 - Violates least surprise principle
 - Lines 201-209 already have a generic loop that handles all buttons safely, making the hard-coded handlers redundant
 
-**Why Deferred:**
-- Simple workaround exists: Include both buttons in all panel configs
-- Only discovered when Plugin Trace Viewer omitted openMakerBtn
-- Fix requires testing all 6 existing panels to ensure no regressions
-- Low priority since workaround is trivial
+**Current Workaround:**
+- Include both `refreshBtn` and `openMakerBtn` in all panel configs (temporary fix)
 
-**When to Address:**
-- During shared infrastructure refactoring sprint
-- When adding 7th+ panel that doesn't need these buttons
-- When standardizing button configuration patterns
+**Resolution Plan:**
+This will be resolved as part of the **Universal Panel Framework refactor** (see design doc in progress):
+- Section-based architecture replaces base template approach
+- Sections define their own event handlers (no hard-coded assumptions)
+- ActionButtonsSection dynamically registers only the buttons it renders
+- Eliminates the root cause rather than patching symptoms
 
-**Recommended Solution:**
+**If Fixing Standalone (Not Recommended):**
 Option 1 (preferred): Remove lines 192-198 entirely - the generic loop at lines 201-209 already handles all buttons safely.
 
-Option 2: Add defensive null checks:
-```javascript
-const refreshBtn = document.getElementById('refreshBtn');
-if (refreshBtn) {
-  refreshBtn.addEventListener('click', () => {
-    vscode.postMessage({ command: 'refresh' });
-  });
-}
-
-const openMakerBtn = document.getElementById('openMakerBtn');
-if (openMakerBtn) {
-  openMakerBtn.addEventListener('click', () => {
-    vscode.postMessage({ command: 'openMaker' });
-  });
-}
-```
+Option 2: Add defensive null checks (but this will be replaced by section-based architecture anyway).
 
 **Affected Panels:**
-All panels using DataTablePanelCoordinator (Pattern 1):
+All panels using PanelCoordinator (Framework Approach):
 - EnvironmentSetupPanel
 - PluginTraceViewerPanel
 - SolutionPanel
 - WebResourcePanel
 - PluginAssemblyPanel
 - ComponentPanel
+
+**Related:**
+- See `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` for new framework approach
+- Design doc: `docs/design/UNIVERSAL_PANEL_FRAMEWORK_DESIGN.md` (in progress)
 
 ---
 
