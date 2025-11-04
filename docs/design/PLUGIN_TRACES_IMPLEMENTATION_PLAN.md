@@ -481,6 +481,115 @@ Infrastructure (Repositories + Exporters + Mappers)
 
 ## Interface Definitions
 
+### Common Interfaces
+
+These interfaces are used across multiple layers:
+
+```typescript
+// src/infrastructure/logging/ILogger.ts
+
+export interface ILogger {
+  /**
+   * Logs debug information (development only).
+   */
+  debug(message: string, context?: Record<string, unknown>): void;
+
+  /**
+   * Logs informational messages.
+   */
+  info(message: string, context?: Record<string, unknown>): void;
+
+  /**
+   * Logs warning messages.
+   */
+  warn(message: string, context?: Record<string, unknown>): void;
+
+  /**
+   * Logs error messages with optional error object.
+   */
+  error(message: string, error?: Error | unknown, context?: Record<string, unknown>): void;
+}
+```
+
+```typescript
+// src/domain/errors/ValidationError.ts
+
+/**
+ * Domain error for validation failures.
+ * Thrown when entity/value object construction fails validation.
+ */
+export class ValidationError extends Error {
+  constructor(
+    public readonly entityName: string,
+    public readonly fieldName: string,
+    public readonly value: unknown,
+    message: string
+  ) {
+    super(message);
+    this.name = 'ValidationError';
+
+    // Maintains proper stack trace for where error was thrown (V8 only)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ValidationError);
+    }
+  }
+}
+```
+
+### Type Safety Helpers
+
+```typescript
+// src/types/BrandedTypes.ts
+
+/**
+ * Branded type for TraceId (prevents mixing with other string IDs).
+ */
+export type TraceId = string & { readonly __brand: 'TraceId' };
+
+/**
+ * Branded type for EnvironmentId (prevents mixing with other string IDs).
+ */
+export type EnvironmentId = string & { readonly __brand: 'EnvironmentId' };
+
+/**
+ * Helper to create branded TraceId from string.
+ */
+export function createTraceId(id: string): TraceId {
+  return id as TraceId;
+}
+
+/**
+ * Helper to create branded EnvironmentId from string.
+ */
+export function createEnvironmentId(id: string): EnvironmentId {
+  return id as EnvironmentId;
+}
+```
+
+```typescript
+// src/types/ExportFormat.ts
+
+/**
+ * Supported export formats.
+ */
+export type ExportFormat = 'csv' | 'json';
+```
+
+```typescript
+// src/types/PipelineStage.ts
+
+/**
+ * Power Platform plugin pipeline stages.
+ * https://docs.microsoft.com/en-us/power-apps/developer/data-platform/event-framework
+ */
+export enum PipelineStage {
+  PreValidation = 10,
+  PreOperation = 20,
+  PostOperation = 30,
+  PostOperationDeprecated = 40
+}
+```
+
 ### Domain Layer
 
 #### PluginTrace Entity (Rich Model)
@@ -588,8 +697,12 @@ export class PluginTrace {
 
   /**
    * Factory method: Creates PluginTrace with validation.
+   *
+   * Optional parameters: Can be omitted from params object.
+   * Nullable parameters: Must be provided but can be null.
    */
   static create(params: {
+    // Required fields
     id: string;
     createdOn: Date;
     pluginName: string;
@@ -597,10 +710,14 @@ export class PluginTrace {
     messageName: string;
     operationType: OperationType;
     mode: ExecutionMode;
-    stage?: number;
-    depth?: number;
     duration: Duration;
     constructorDuration: Duration;
+
+    // Optional fields with defaults
+    stage?: number;               // Default: 0
+    depth?: number;               // Default: 1
+
+    // Nullable fields (can be undefined or null, normalized to null)
     exceptionDetails?: string | null;
     messageBlock?: string | null;
     configuration?: string | null;
@@ -615,12 +732,20 @@ export class PluginTrace {
       throw new ValidationError('PluginTrace', 'id', params.id, 'ID is required');
     }
 
+    if (!params.pluginName || params.pluginName.trim().length === 0) {
+      throw new ValidationError('PluginTrace', 'pluginName', params.pluginName, 'Plugin name is required');
+    }
+
+    if (!params.messageName || params.messageName.trim().length === 0) {
+      throw new ValidationError('PluginTrace', 'messageName', params.messageName, 'Message name is required');
+    }
+
     return new PluginTrace(
       params.id,
       params.createdOn,
-      params.pluginName || '',
-      params.entityName || null,
-      params.messageName || '',
+      params.pluginName,
+      params.entityName,
+      params.messageName,
       params.operationType,
       params.mode,
       params.stage ?? 0,
@@ -725,6 +850,141 @@ export class Duration {
 }
 ```
 
+```typescript
+// src/features/pluginTraceViewer/domain/valueObjects/TraceStatus.ts
+
+export class TraceStatus {
+  private constructor(public readonly value: string) {}
+
+  static readonly Success = new TraceStatus('Success');
+  static readonly Exception = new TraceStatus('Exception');
+
+  /**
+   * Gets display name for UI.
+   */
+  getDisplayName(): string {
+    return this.value;
+  }
+
+  /**
+   * Gets CSS class for badge styling.
+   * Used by ViewModels for presentation.
+   */
+  getBadgeClass(): string {
+    switch (this.value) {
+      case 'Success': return 'badge-success';
+      case 'Exception': return 'badge-error';
+      default: return 'badge-default';
+    }
+  }
+
+  /**
+   * Business logic: Checks if status represents error.
+   */
+  isError(): boolean {
+    return this.value === 'Exception';
+  }
+
+  equals(other: TraceStatus | null): boolean {
+    return other !== null && this.value === other.value;
+  }
+}
+```
+
+```typescript
+// src/features/pluginTraceViewer/domain/valueObjects/ExecutionMode.ts
+
+export class ExecutionMode {
+  private constructor(public readonly value: number) {}
+
+  static readonly Synchronous = new ExecutionMode(0);
+  static readonly Asynchronous = new ExecutionMode(1);
+
+  static fromNumber(value: number): ExecutionMode {
+    switch (value) {
+      case 0: return ExecutionMode.Synchronous;
+      case 1: return ExecutionMode.Asynchronous;
+      default: throw new Error(`Invalid execution mode: ${value}`);
+    }
+  }
+
+  getDisplayName(): string {
+    switch (this.value) {
+      case 0: return 'Synchronous';
+      case 1: return 'Asynchronous';
+      default: return 'Unknown';
+    }
+  }
+
+  isSynchronous(): boolean {
+    return this.value === 0;
+  }
+
+  equals(other: ExecutionMode | null): boolean {
+    return other !== null && this.value === other.value;
+  }
+}
+```
+
+```typescript
+// src/features/pluginTraceViewer/domain/valueObjects/OperationType.ts
+
+export class OperationType {
+  private constructor(public readonly value: number) {}
+
+  static readonly Plugin = new OperationType(1);
+  static readonly Workflow = new OperationType(2);
+
+  static fromNumber(value: number): OperationType {
+    switch (value) {
+      case 1: return OperationType.Plugin;
+      case 2: return OperationType.Workflow;
+      default: throw new Error(`Invalid operation type: ${value}`);
+    }
+  }
+
+  getDisplayName(): string {
+    switch (this.value) {
+      case 1: return 'Plugin';
+      case 2: return 'Workflow';
+      default: return 'Unknown';
+    }
+  }
+
+  equals(other: OperationType | null): boolean {
+    return other !== null && this.value === other.value;
+  }
+}
+```
+
+```typescript
+// src/features/pluginTraceViewer/domain/valueObjects/CorrelationId.ts
+
+export class CorrelationId {
+  private constructor(public readonly value: string) {
+    if (!value || value.trim().length === 0) {
+      throw new ValidationError('CorrelationId', 'value', value, 'Cannot be empty');
+    }
+  }
+
+  static create(value: string): CorrelationId {
+    return new CorrelationId(value);
+  }
+
+  equals(other: CorrelationId | null): boolean {
+    return other !== null && this.value === other.value;
+  }
+
+  toString(): string {
+    return this.value;
+  }
+
+  isEmpty(): boolean {
+    return this.value.trim().length === 0;
+  }
+}
+```
+
 #### Repository Interfaces
 
 ```typescript
@@ -737,8 +997,9 @@ import { TraceLevel } from '../valueObjects/TraceLevel';
 export interface IPluginTraceRepository {
   /**
    * Retrieves plugin traces from environment with optional filtering.
+   * Returns readonly array to prevent accidental mutation.
    */
-  getTraces(environmentId: string, filter: TraceFilter): Promise<PluginTrace[]>;
+  getTraces(environmentId: string, filter: TraceFilter): Promise<readonly PluginTrace[]>;
 
   /**
    * Retrieves a single trace by ID.
@@ -752,9 +1013,10 @@ export interface IPluginTraceRepository {
 
   /**
    * Deletes multiple traces by IDs (uses batch API).
+   * Accepts readonly array to allow passing immutable arrays.
    * @returns Number of traces successfully deleted
    */
-  deleteTraces(environmentId: string, traceIds: string[]): Promise<number>;
+  deleteTraces(environmentId: string, traceIds: readonly string[]): Promise<number>;
 
   /**
    * Deletes all traces in environment.
@@ -788,15 +1050,17 @@ import { PluginTrace } from '../entities/PluginTrace';
 export interface IPluginTraceExporter {
   /**
    * Converts traces to CSV format.
+   * Accepts readonly array to allow passing immutable arrays.
    * @returns CSV string with proper escaping
    */
-  exportToCsv(traces: PluginTrace[]): string;
+  exportToCsv(traces: readonly PluginTrace[]): string;
 
   /**
    * Converts traces to JSON format.
+   * Accepts readonly array to allow passing immutable arrays.
    * @returns Pretty-printed JSON array
    */
-  exportToJson(traces: PluginTrace[]): string;
+  exportToJson(traces: readonly PluginTrace[]): string;
 
   /**
    * Shows save dialog and writes content to file.
@@ -811,24 +1075,46 @@ export interface IPluginTraceExporter {
 ```typescript
 // src/features/pluginTraceViewer/domain/services/PluginTraceFilterService.ts
 
+import { PluginTrace } from '../entities/PluginTrace';
 import { TraceFilter } from '../entities/TraceFilter';
+
+/**
+ * Type-safe filter operators for OData queries.
+ */
+export type FilterOperator =
+  | 'contains'
+  | 'eq'
+  | 'startswith'
+  | 'endswith'
+  | 'gt'
+  | 'lt'
+  | 'ge'
+  | 'le'
+  | 'isNull'
+  | 'isNotNull';
 
 export interface FilterCondition {
   field: string;
-  operator: string;
+  operator: FilterOperator;
   value: string | number;
 }
 
+/**
+ * Domain service for building OData filters and client-side search.
+ *
+ * Note: Uses static methods for pure transformation logic (no state).
+ * Documented exception to CLAUDE.md preference for instance methods.
+ */
 export class PluginTraceFilterService {
   /**
    * Business logic: Builds OData $filter query from conditions.
    *
    * Supports operators:
    * - contains, eq, startswith, endswith (strings)
-   * - gt, lt, ge, le, between (numbers/dates)
+   * - gt, lt, ge, le (numbers/dates)
    * - isNull, isNotNull (nullability)
    *
-   * Combines with AND/OR logic based on condition grouping.
+   * Combines with AND logic.
    */
   static buildODataFilter(conditions: FilterCondition[]): string {
     if (conditions.length === 0) {
@@ -858,7 +1144,8 @@ export class PluginTraceFilterService {
         case 'isNotNull':
           return `${c.field} ne null`;
         default:
-          throw new Error(`Unsupported operator: ${c.operator}`);
+          const exhaustiveCheck: never = c.operator;
+          throw new Error(`Unsupported operator: ${exhaustiveCheck}`);
       }
     });
 
@@ -868,8 +1155,12 @@ export class PluginTraceFilterService {
   /**
    * Business logic: Applies client-side search filter.
    * Searches across all text fields in loaded traces.
+   * Accepts and returns readonly arrays to prevent mutation.
    */
-  static applyClientSideSearch(traces: PluginTrace[], searchTerm: string): PluginTrace[] {
+  static applyClientSideSearch(
+    traces: readonly PluginTrace[],
+    searchTerm: string
+  ): readonly PluginTrace[] {
     if (!searchTerm || searchTerm.trim().length === 0) {
       return traces;
     }
@@ -917,12 +1208,12 @@ export class GetPluginTracesUseCase {
    * 1. Log operation start
    * 2. Call repository
    * 3. Log operation completion
-   * 4. Return domain entities
+   * 4. Return domain entities (readonly array)
    */
   async execute(params: {
     environmentId: string;
     filter?: TraceFilter;
-  }): Promise<PluginTrace[]> {
+  }): Promise<readonly PluginTrace[]> {
     this.logger.info('Getting plugin traces', {
       environmentId: params.environmentId
     });
@@ -975,6 +1266,226 @@ export class SetTraceLevelUseCase {
     );
 
     this.logger.info('Trace level updated successfully');
+  }
+}
+```
+
+```typescript
+// src/features/pluginTraceViewer/application/useCases/GetTraceLevelUseCase.ts
+
+import { TraceLevel } from '../../domain/valueObjects/TraceLevel';
+import { IPluginTraceRepository } from '../../domain/repositories/IPluginTraceRepository';
+import { ILogger } from '../../../../infrastructure/logging/ILogger';
+
+export class GetTraceLevelUseCase {
+  constructor(
+    private readonly repository: IPluginTraceRepository,
+    private readonly logger: ILogger
+  ) {}
+
+  /**
+   * Orchestrates querying organization trace level.
+   */
+  async execute(params: {
+    environmentId: string;
+  }): Promise<TraceLevel> {
+    this.logger.info('Getting trace level', {
+      environmentId: params.environmentId
+    });
+
+    const level = await this.repository.getTraceLevel(params.environmentId);
+
+    this.logger.info('Retrieved trace level', {
+      level: level.getDisplayName()
+    });
+
+    return level;
+  }
+}
+```
+
+```typescript
+// src/features/pluginTraceViewer/application/useCases/DeleteTracesUseCase.ts
+
+import { IPluginTraceRepository } from '../../domain/repositories/IPluginTraceRepository';
+import { ILogger } from '../../../../infrastructure/logging/ILogger';
+
+/**
+ * Result of a delete operation.
+ * Used for operations that can partially succeed.
+ */
+export interface DeleteResult {
+  requested: number;
+  deleted: number;
+  failed: number;
+  errors: Array<{ traceId: string; error: string }>;
+}
+
+export class DeleteTracesUseCase {
+  constructor(
+    private readonly repository: IPluginTraceRepository,
+    private readonly logger: ILogger
+  ) {}
+
+  /**
+   * Orchestrates deleting a single trace.
+   */
+  async deleteSingle(params: {
+    environmentId: string;
+    traceId: string;
+  }): Promise<void> {
+    this.logger.info('Deleting single trace', {
+      environmentId: params.environmentId,
+      traceId: params.traceId
+    });
+
+    await this.repository.deleteTrace(
+      params.environmentId,
+      params.traceId
+    );
+
+    this.logger.info('Trace deleted successfully');
+  }
+
+  /**
+   * Orchestrates deleting multiple traces (uses batch API).
+   * Returns result with success/failure counts.
+   */
+  async deleteMultiple(params: {
+    environmentId: string;
+    traceIds: readonly string[];
+  }): Promise<DeleteResult> {
+    this.logger.info('Deleting multiple traces', {
+      environmentId: params.environmentId,
+      count: params.traceIds.length
+    });
+
+    const requested = params.traceIds.length;
+    let deleted = 0;
+    const errors: Array<{ traceId: string; error: string }> = [];
+
+    try {
+      deleted = await this.repository.deleteTraces(
+        params.environmentId,
+        params.traceIds
+      );
+    } catch (error) {
+      this.logger.error('Batch delete failed', error, {
+        environmentId: params.environmentId
+      });
+
+      // If batch fails, attempt individual deletes
+      for (const traceId of params.traceIds) {
+        try {
+          await this.repository.deleteTrace(params.environmentId, traceId);
+          deleted++;
+        } catch (err) {
+          errors.push({
+            traceId,
+            error: err instanceof Error ? err.message : String(err)
+          });
+        }
+      }
+    }
+
+    const failed = requested - deleted;
+
+    this.logger.info('Deleted multiple traces', {
+      requested,
+      deleted,
+      failed
+    });
+
+    return { requested, deleted, failed, errors };
+  }
+
+  /**
+   * Orchestrates deleting all traces in environment.
+   */
+  async deleteAll(params: {
+    environmentId: string;
+  }): Promise<number> {
+    this.logger.info('Deleting all traces', {
+      environmentId: params.environmentId
+    });
+
+    const count = await this.repository.deleteAllTraces(params.environmentId);
+
+    this.logger.info('Deleted all traces', { count });
+
+    return count;
+  }
+
+  /**
+   * Orchestrates deleting traces older than specified days.
+   */
+  async deleteOldTraces(params: {
+    environmentId: string;
+    olderThanDays: number;
+  }): Promise<number> {
+    this.logger.info('Deleting old traces', {
+      environmentId: params.environmentId,
+      olderThanDays: params.olderThanDays
+    });
+
+    const count = await this.repository.deleteOldTraces(
+      params.environmentId,
+      params.olderThanDays
+    );
+
+    this.logger.info('Deleted old traces', { count });
+
+    return count;
+  }
+}
+```
+
+```typescript
+// src/features/pluginTraceViewer/application/useCases/ExportTracesUseCase.ts
+
+import { PluginTrace } from '../../domain/entities/PluginTrace';
+import { IPluginTraceExporter } from '../../domain/repositories/IPluginTraceExporter';
+import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import { ExportFormat } from '../../../../types/ExportFormat';
+
+export class ExportTracesUseCase {
+  constructor(
+    private readonly exporter: IPluginTraceExporter,
+    private readonly logger: ILogger
+  ) {}
+
+  /**
+   * Orchestrates exporting traces to file.
+   *
+   * @returns Absolute path to saved file
+   */
+  async execute(params: {
+    traces: readonly PluginTrace[];
+    format: ExportFormat;
+    suggestedFilename: string;
+  }): Promise<string> {
+    this.logger.info('Exporting traces', {
+      count: params.traces.length,
+      format: params.format
+    });
+
+    // Convert to requested format
+    const content = params.format === 'csv'
+      ? this.exporter.exportToCsv(params.traces)
+      : this.exporter.exportToJson(params.traces);
+
+    // Save to file (shows save dialog)
+    const filePath = await this.exporter.saveToFile(
+      content,
+      params.suggestedFilename
+    );
+
+    this.logger.info('Traces exported successfully', {
+      filePath,
+      format: params.format
+    });
+
+    return filePath;
   }
 }
 ```
@@ -1165,6 +1676,40 @@ export class PluginTraceViewModelMapper {
 
 ### Infrastructure Layer
 
+#### DTOs (Data Transfer Objects)
+
+```typescript
+// src/features/pluginTraceViewer/infrastructure/dtos/DataversePluginTraceLogDto.ts
+
+/**
+ * DTO matching Dataverse plugintracelog table schema.
+ * Maps to OData response from plugintracelogs endpoint.
+ */
+export interface DataversePluginTraceLogDto {
+  plugintracelogid: string;
+  createdon: string;                              // ISO 8601 date string
+  typename: string;
+  primaryentity: string | null;
+  messagename: string;
+  operationtype: number;                          // 1 = Plugin, 2 = Workflow
+  mode: number;                                   // 0 = Sync, 1 = Async
+  stage?: number;                                 // Pipeline stage (10, 20, 30, 40)
+  depth: number;
+  performanceexecutionduration: number;           // milliseconds
+  performanceconstructorduration: number;         // milliseconds
+  exceptiondetails: string | null;
+  messageblock: string | null;
+  configuration: string | null;
+  secureconfiguration: string | null;
+  correlationid: string | null;
+  requestid: string | null;
+  pluginstepid: string | null;
+  persistencekey: string | null;
+}
+```
+
+#### Repositories
+
 ```typescript
 // src/features/pluginTraceViewer/infrastructure/repositories/DataversePluginTraceRepository.ts
 
@@ -1175,6 +1720,7 @@ import { TraceLevel } from '../../domain/valueObjects/TraceLevel';
 import { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { PluginTraceMapper } from '../mappers/PluginTraceMapper';
+import { DataversePluginTraceLogDto } from '../dtos/DataversePluginTraceLogDto';
 
 export class DataversePluginTraceRepository implements IPluginTraceRepository {
   constructor(
@@ -1197,8 +1743,11 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
     }
 
     try {
-      const response = await this.apiService.get(environmentId, query);
-      const traces = response.value.map((dto: any) =>
+      const response = await this.apiService.get<{ value: DataversePluginTraceLogDto[] }>(
+        environmentId,
+        query
+      );
+      const traces = response.value.map((dto: DataversePluginTraceLogDto) =>
         PluginTraceMapper.toDomain(dto)
       );
 

@@ -12,23 +12,19 @@ This document tracks known technical debt and future improvement opportunities t
 1. **Cross-Feature DTO Coupling** - Persistence Inspector imports EnvironmentConnectionDto from environmentSetup feature. Infrastructure-to-infrastructure coupling is acceptable but could be improved with shared DTOs.
 
 ### Documentation (1 issue)
-2. **CLEAN_ARCHITECTURE_GUIDE.md Length** - Documentation exceeds 1,403 lines (limit: 1,200). Wait until Data Panel Suite is complete before splitting into 3 separate guides.
+2. **CLEAN_ARCHITECTURE_GUIDE.md Length** - Documentation exceeds 1,708 lines (limit: 1,200). Wait until Data Panel Suite is complete before splitting into 3 separate guides.
 
-### Architecture & Design (4 issues)
-3. **DataTablePanel SRP Violation** - Base class handles 8+ responsibilities (environment, search, sort, error, loading, HTML, routing, cancellation). Template Method pattern eliminates 950 lines of duplication across 2 panels, acceptable trade-off.
+### Architecture & Design (2 issues)
+3. **DataTablePanel SRP Violation** - Base class handles 8+ responsibilities (environment, search, sort, error, loading, HTML, routing, cancellation). Template Method pattern eliminates 950 lines of duplication across 4 panels, acceptable trade-off.
 
-4. **DataTablePanel Generic Types** - Panel could use `<TData>` generic for stronger type safety. Current `unknown[]` works fine with zero bugs found, complexity not justified.
+4. **IXmlFormatter Interface** - Suggested interface extraction unnecessary. XmlFormatter is infrastructure using concrete class correctly, no polymorphism needed.
 
-5. **IXmlFormatter Interface** - Suggested interface extraction unnecessary. XmlFormatter is infrastructure using concrete class correctly, no polymorphism needed.
-
-6. **getValue() Pattern Without Branded Types** - Value objects return primitives without compile-time type branding. Zero bugs found in 100+ callsites, 6-8 hour refactor not justified.
-
-7. **CSS Extraction from HTML Templates** - 451 lines of CSS embedded in TypeScript strings. Standard VS Code pattern, not causing bugs, defer until 5+ webview templates exist.
+5. **getValue() Pattern Without Branded Types** - Value objects return primitives without compile-time type branding. Zero bugs found in 100+ callsites, 6-8 hour refactor not justified.
 
 ### Deferred Refactoring (2 issues)
-8. **Business Logic in Command Handlers** - extension.ts commands contain orchestration that belongs in use cases. Use cases exist but need integration work, defer until command testing sprint.
+6. **Business Logic in Command Handlers** - extension.ts commands contain orchestration that belongs in use cases. Use cases exist but need integration work, defer until command testing sprint.
 
-9. **Unsafe Type Assertions in API Service** - DataverseApiService uses `as T` without runtime validation. Repositories validate at mapping layer, external API contracts stable, zero bugs found.
+7. **Unsafe Type Assertions in API Service** - DataverseApiService uses `as T` without runtime validation. Repositories validate at mapping layer, external API contracts stable, zero bugs found.
 
 ---
 
@@ -115,8 +111,8 @@ Split into 3 documents (~500-600 lines each):
 
 ### DataTablePanel SRP Violation (Template Method Pattern Trade-off)
 
-**Status**: Accepted Trade-off
-**Priority**: Low
+**Status**: Ready to Address - Deferred Condition Met
+**Priority**: High
 **Effort**: High (8-12 hours)
 
 **Issue:**
@@ -132,21 +128,18 @@ Split into 3 documents (~500-600 lines each):
 
 **Current State:**
 ```typescript
-// DataTablePanel.ts (365 lines)
+// DataTablePanel.ts (584 lines, was 365)
 export abstract class DataTablePanel {
     // Handles all table-related responsibilities
 }
 ```
 
-**Why Deferred:**
-- **Massive DRY benefit**: Eliminated 950 lines of duplication across panels
-- Only 2 panel types currently exist (ImportJobViewer, SolutionExplorer)
-- Both panels have identical needs (search, sort, environment switching)
-- Template Method pattern is working well for current use cases
-- Code explicitly documents this trade-off with TODO comment
+**Update:** Now have **4 panels** (ImportJobViewer, SolutionExplorer, ConnectionReferences, EnvironmentVariables)
+- Base class grew from 365 → 584 lines
+- **Deferred condition met**: "When a 3rd panel type emerges" - we now have 4 panels
+- Still maintains **950 lines** of DRY benefit
 
-**When to Address:**
-When a 3rd panel type emerges that doesn't fit the current pattern (e.g., panel without search/sort, or with fundamentally different table behavior).
+**Decision:** Refactor to composition-based approach (approved by clean-architecture-guardian)
 
 **Recommended Solution:**
 Refactor to composition-based approach:
@@ -174,55 +167,6 @@ export abstract class BasePanelWithBehaviors {
     ) {}
 }
 ```
-
----
-
-### Generic Type Parameters on DataTablePanel
-
-**Status**: Deferred
-**Priority**: Low
-**Effort**: Medium (3-4 hours)
-
-**Issue:**
-DataTablePanel could use generic type parameters for stronger compile-time type safety:
-
-**Current State:**
-```typescript
-export abstract class DataTablePanel {
-    protected abstract loadData(): Promise<void>;
-    protected sendData(data: unknown[]): void { /* ... */ }
-}
-```
-
-**Proposed Enhancement:**
-```typescript
-export abstract class DataTablePanel<TData = unknown> {
-    protected abstract loadData(): Promise<TData[]>;
-    protected sendData(data: TData[]): void { /* ... */ }
-}
-
-// Usage
-export class ImportJobViewerPanel extends DataTablePanel<ImportJobViewModel> {
-    // Now type-safe! TypeScript enforces return type of loadData()
-}
-```
-
-**Why Deferred:**
-- **Adds complexity**: Generic type parameters increase cognitive load for developers
-- **Minimal benefit**: Current `unknown[]` approach is working fine with proper type narrowing at usage sites
-- **Type safety exists**: Derived classes already have type-safe implementations (they call their mappers which return typed ViewModels)
-- **No bugs found**: The lack of generics hasn't caused any runtime errors or confusion
-
-**Trade-off Analysis:**
-- ✅ **Benefit**: Stronger compile-time guarantees, better IntelliSense
-- ❌ **Cost**: More complex base class signature, harder to understand for new developers
-- ❌ **Cost**: Refactoring effort across all derived classes
-- **Verdict**: Cost > Benefit for current codebase
-
-**When to Address:**
-- When we have 5+ panel types and type confusion becomes an actual problem
-- During a broader TypeScript enhancement initiative
-- When developers report confusion or bugs related to data typing
 
 ---
 
@@ -391,87 +335,30 @@ Otherwise, **keep the current pattern indefinitely**.
 
 ---
 
-### CSS Extraction from DataTablePanel
-
-**Status**: Deferred
-**Priority**: Low
-**Effort**: Medium (2-3 hours)
-
-**Issue:**
-DataTablePanel embeds 451 lines of HTML/CSS/JavaScript in TypeScript string literals (extracted to separate view file at `src/shared/infrastructure/ui/views/dataTable.ts`).
-
-**Current State:**
-```typescript
-// src/shared/infrastructure/ui/views/dataTable.ts (451 lines total)
-export function renderDataTableHtml(...): string {
-    return `<!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                /* Inline CSS styles */
-            </style>
-        </head>
-        <body>
-            <!-- HTML -->
-            <script>
-                /* JavaScript */
-            </script>
-        </body>
-        </html>`;
-}
-```
-
-**Problems:**
-- No syntax highlighting for HTML/CSS/JS
-- Hard to maintain mixed concerns (TypeScript + HTML + CSS + JS)
-- No HTML/CSS validation during development
-- Difficult to see diffs in code reviews
-
-**Why Deferred:**
-- **Standard VS Code pattern**: Embedding HTML in TypeScript is the recommended approach for webview panels
-- **Not causing bugs**: Current approach works reliably (451 lines is still manageable)
-- **Other priorities**: Architecture improvements more valuable than HTML extraction
-- **Minimal team**: Setup cost not justified for solo/small team
-
-**When to Address:**
-- When HTML grows beyond 1000 lines (currently 451)
-- When we have 5+ different webview templates (currently 1-2)
-- When frontend developer joins team (they'll want separate files)
-- During major webview refactoring initiative
-
-**Recommended Solution (if implemented):**
-Build-time template injection with webpack raw-loader
-
----
-
-
 ## Business Logic in Command Handlers
 
-**Status**: Deferred
+**Status**: Ready to Address
 **Priority**: Medium
 **Effort**: Medium (4-6 hours)
 
 **Issue:** `extension.ts` command handlers contain orchestration logic that belongs in use cases.
 
 **Examples:**
-- `testEnvironmentConnectionCommand` (lines 183-236): Loads credentials, handles auth methods
-- `openMakerCommand` (lines 264-292): Builds URLs based on environment presence
-- `createGetEnvironments`/`createGetEnvironmentById` (lines 38-70): Mapping logic in composition root
+- `testEnvironmentConnectionCommand` (lines 184-239): Loads credentials, handles auth methods
+- `openMakerCommand` (lines 227-264): Builds URLs based on environment presence
+- Command handlers mix UI concerns (prompts, progress) with business logic
 
-**Why Deferred:**
-- Use cases already exist and contain the logic (`TestConnectionUseCase`, etc.)
-- Refactoring requires careful integration to avoid breaking existing functionality
-- Lower priority than architectural violations (which are now fixed via ESLint)
+**Current Violation:**
+Commands orchestrate domain logic instead of delegating to use cases. Use cases exist but are not integrated.
 
-**When to Address:**
-- When adding tests for command handlers
-- When refactoring `extension.ts` for length issues
-- During next sprint focused on command layer cleanup
+**Decision:** Refactor to thin adapter pattern (approved by clean-architecture-guardian)
 
 **Fix Strategy:**
-1. Refactor `testEnvironmentConnectionCommand` to call `TestConnectionUseCase.execute()` directly
-2. Create `GetMakerUrlUseCase` for URL building logic
-3. Create `GetEnvironmentListUseCase` that returns ViewModels (not mapping in composition root)
+1. Create `ICommandHandler` interface for command layer
+2. Create `ICredentialPrompter` to extract credential input logic
+3. Refactor commands to handle UI concerns only (progress, prompts, error messages)
+4. Delegate business logic to use cases (`TestConnectionUseCase`, etc.)
+5. Move auth method determination and token logic to domain services
 
 ---
 
