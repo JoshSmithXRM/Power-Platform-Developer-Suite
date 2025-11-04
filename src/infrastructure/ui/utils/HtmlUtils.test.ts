@@ -2,7 +2,7 @@
  * Unit tests for HtmlUtils
  */
 
-import { escapeHtml, html, raw, each, fragment, attrs } from './HtmlUtils';
+import { escapeHtml, html, raw, each, fragment, attrs, escapeAttribute } from './HtmlUtils';
 
 describe('HtmlUtils', () => {
 	describe('escapeHtml', () => {
@@ -287,6 +287,69 @@ describe('HtmlUtils', () => {
 			expect(result.__html).toContain('&lt;b&gt;Item 1&lt;/b&gt;');
 			expect(result.__html).toContain('class="safe"');
 			expect(result.__html).toContain('class="unsafe"');
+		});
+
+		it('should handle plain string array interpolations', () => {
+			const items = ['Apple', 'Banana', 'Orange'];
+			const result = html`<div>${items}</div>`;
+
+			expect(result.__html).toBe('<div>AppleBananaOrange</div>');
+		});
+
+		it('should escape HTML in plain string arrays', () => {
+			const items = ['<script>xss1</script>', '<b>bold</b>'];
+			const result = html`<div>${items}</div>`;
+
+			expect(result.__html).not.toContain('<script>');
+			expect(result.__html).not.toContain('<b>');
+			expect(result.__html).toContain('&lt;script&gt;');
+			expect(result.__html).toContain('&lt;b&gt;');
+		});
+	});
+
+	describe('each with plain string returns', () => {
+		it('should handle render function that returns plain strings', () => {
+			const items = ['Apple', 'Banana'];
+			const result = html`<ul>${each(items, item => `<li>${item}</li>`)}</ul>`;
+
+			// Plain strings from render function are not escaped in each()
+			// but would be if interpolated directly
+			expect(result.__html).toBe('<ul><li>Apple</li><li>Banana</li></ul>');
+		});
+
+		it('should handle mix of RawHtml and plain string returns', () => {
+			const items = ['First', 'Second'];
+			const result = html`<ul>${each(items, (item, index) => {
+				if (index === 0) {
+					return html`<li>${item}</li>`;
+				}
+				return `<li>${item}</li>`;
+			})}</ul>`;
+
+			expect(result.__html).toBe('<ul><li>First</li><li>Second</li></ul>');
+		});
+	});
+
+	describe('escapeAttribute', () => {
+		it('should escape HTML special characters in attributes', () => {
+			expect(escapeAttribute('<script>alert("xss")</script>'))
+				.toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
+		});
+
+		it('should escape quotes in attribute values', () => {
+			expect(escapeAttribute('He said "hello"')).toBe('He said &quot;hello&quot;');
+		});
+
+		it('should handle null and return empty string', () => {
+			expect(escapeAttribute(null)).toBe('');
+		});
+
+		it('should handle undefined and return empty string', () => {
+			expect(escapeAttribute(undefined)).toBe('');
+		});
+
+		it('should escape ampersands in attributes', () => {
+			expect(escapeAttribute('Tom & Jerry')).toBe('Tom &amp; Jerry');
 		});
 	});
 });

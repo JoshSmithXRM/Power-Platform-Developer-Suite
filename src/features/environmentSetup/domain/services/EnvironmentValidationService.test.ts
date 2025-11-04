@@ -5,6 +5,7 @@ import { DataverseUrl } from '../valueObjects/DataverseUrl';
 import { TenantId } from '../valueObjects/TenantId';
 import { ClientId } from '../valueObjects/ClientId';
 import { AuthenticationMethod, AuthenticationMethodType } from '../valueObjects/AuthenticationMethod';
+import { ValidationResult } from '../valueObjects/ValidationResult';
 
 import { EnvironmentValidationService } from './EnvironmentValidationService';
 
@@ -360,6 +361,42 @@ describe('EnvironmentValidationService', () => {
 			// Empty string is falsy, so it fails the check
 			expect(result.isValid).toBe(false);
 			expect(result.errors).toContain('Client secret is required for Service Principal authentication');
+		});
+
+		it('should propagate entity validation errors when configuration is invalid', () => {
+			// Create a valid ServicePrincipal environment with all required fields
+			const env = new Environment(
+				new EnvironmentId('env-test-123'),
+				new EnvironmentName('Test Environment'),
+				new DataverseUrl('https://org.crm.dynamics.com'),
+				new TenantId('00000000-0000-0000-0000-000000000000'),
+				new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal),
+				new ClientId('22222222-2222-2222-2222-222222222222'),
+				false,
+				undefined,
+				undefined,
+				new ClientId('11111111-1111-1111-1111-111111111111'),
+				undefined
+			);
+
+			// Mock validateConfiguration to return invalid result
+			jest.spyOn(env, 'validateConfiguration').mockReturnValue(
+				new ValidationResult(false, ['Mock entity validation error'], [])
+			);
+
+			const isNameUnique = true;
+
+			const result = service.validateForSave(
+				env,
+				isNameUnique,
+				true, // Has existing secret
+				false,
+				undefined,
+				undefined
+			);
+
+			expect(result.isValid).toBe(false);
+			expect(result.errors).toContain('Mock entity validation error');
 		});
 	});
 });

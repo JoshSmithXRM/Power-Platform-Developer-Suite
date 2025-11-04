@@ -11,6 +11,16 @@ import {
 	isDeleteEnvironmentMessage,
 	isDiscoverEnvironmentIdMessage,
 	isCheckUniqueNameMessage,
+	isWebviewLogMessage,
+	isRefreshDataMessage,
+	isEnvironmentChangedMessage,
+	isRevealSecretMessage,
+	isClearEntryMessage,
+	isClearPropertyMessage,
+	isViewImportJobMessage,
+	isOpenInMakerMessage,
+	isOpenFlowMessage,
+	isSolutionChangedMessage,
 	AUTHENTICATION_METHODS
 } from './TypeGuards';
 
@@ -415,6 +425,428 @@ describe('TypeGuards', () => {
 			};
 
 			expect(isSaveEnvironmentMessage(message)).toBe(false);
+		});
+	});
+
+	describe('isWebviewLogMessage', () => {
+		const validMessage = {
+			command: 'webview-log',
+			level: 'info',
+			message: 'Log message',
+			componentName: 'TestComponent',
+			timestamp: '2024-01-01T00:00:00.000Z'
+		};
+
+		it('should return true for valid webview log message', () => {
+			expect(isWebviewLogMessage(validMessage)).toBe(true);
+		});
+
+		it('should return true with optional data', () => {
+			const messageWithData = {
+				...validMessage,
+				data: { key: 'value' }
+			};
+			expect(isWebviewLogMessage(messageWithData)).toBe(true);
+		});
+
+		it('should validate all log levels', () => {
+			const levels = ['debug', 'info', 'warn', 'error'];
+			levels.forEach(level => {
+				const message = { ...validMessage, level };
+				expect(isWebviewLogMessage(message)).toBe(true);
+			});
+		});
+
+		it('should return false for invalid log level', () => {
+			const message = { ...validMessage, level: 'invalid' };
+			expect(isWebviewLogMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-string level', () => {
+			const message = { ...validMessage, level: 123 };
+			expect(isWebviewLogMessage(message)).toBe(false);
+		});
+
+		it('should return false for missing message', () => {
+			const message = { ...validMessage, message: undefined };
+			expect(isWebviewLogMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-string componentName', () => {
+			const message = { ...validMessage, componentName: 123 };
+			expect(isWebviewLogMessage(message)).toBe(false);
+		});
+
+		it('should return false for missing timestamp', () => {
+			const message = { ...validMessage, timestamp: undefined };
+			expect(isWebviewLogMessage(message)).toBe(false);
+		});
+
+		it('should return false for invalid command', () => {
+			const message = { ...validMessage, command: 'log' };
+			expect(isWebviewLogMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-message', () => {
+			expect(isWebviewLogMessage(null)).toBe(false);
+		});
+	});
+
+	describe('isRefreshDataMessage', () => {
+		it('should return true for valid refresh message', () => {
+			const message = { command: 'refresh' };
+			expect(isRefreshDataMessage(message)).toBe(true);
+		});
+
+		it('should return true even with data', () => {
+			const message = { command: 'refresh', data: {} };
+			expect(isRefreshDataMessage(message)).toBe(true);
+		});
+
+		it('should return false for invalid command', () => {
+			const message = { command: 'reload' };
+			expect(isRefreshDataMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-message', () => {
+			expect(isRefreshDataMessage(null)).toBe(false);
+		});
+	});
+
+	describe('isEnvironmentChangedMessage', () => {
+		const validMessage = {
+			command: 'environmentChanged',
+			data: {
+				environmentId: 'env-123'
+			}
+		};
+
+		it('should return true for valid environment changed message', () => {
+			expect(isEnvironmentChangedMessage(validMessage)).toBe(true);
+		});
+
+		it('should return false for invalid command', () => {
+			const message = { ...validMessage, command: 'envChanged' };
+			expect(isEnvironmentChangedMessage(message)).toBe(false);
+		});
+
+		it('should return false for missing environmentId', () => {
+			const message = {
+				command: 'environmentChanged',
+				data: {}
+			};
+			expect(isEnvironmentChangedMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-string environmentId', () => {
+			const message = {
+				command: 'environmentChanged',
+				data: { environmentId: 123 }
+			};
+			expect(isEnvironmentChangedMessage(message)).toBe(false);
+		});
+
+		it('should return false for null data', () => {
+			const message = {
+				command: 'environmentChanged',
+				data: null
+			};
+			expect(isEnvironmentChangedMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-message', () => {
+			expect(isEnvironmentChangedMessage(null)).toBe(false);
+		});
+	});
+
+	describe('isRevealSecretMessage', () => {
+		const validMessage = {
+			command: 'revealSecret',
+			key: 'secret-key'
+		};
+
+		it('should return true for valid reveal secret message', () => {
+			expect(isRevealSecretMessage(validMessage)).toBe(true);
+		});
+
+		it('should return false for invalid command', () => {
+			const message = { ...validMessage, command: 'reveal' };
+			expect(isRevealSecretMessage(message)).toBe(false);
+		});
+
+		it('should return false for missing key', () => {
+			const message = { command: 'revealSecret' };
+			expect(isRevealSecretMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-string key', () => {
+			const message = { command: 'revealSecret', key: 123 };
+			expect(isRevealSecretMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-message', () => {
+			expect(isRevealSecretMessage(null)).toBe(false);
+		});
+	});
+
+	describe('isClearEntryMessage', () => {
+		const validMessage = {
+			command: 'clearEntry',
+			key: 'entry-key'
+		};
+
+		it('should return true for valid clear entry message', () => {
+			expect(isClearEntryMessage(validMessage)).toBe(true);
+		});
+
+		it('should return false for invalid command', () => {
+			const message = { ...validMessage, command: 'clear' };
+			expect(isClearEntryMessage(message)).toBe(false);
+		});
+
+		it('should return false for missing key', () => {
+			const message = { command: 'clearEntry' };
+			expect(isClearEntryMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-string key', () => {
+			const message = { command: 'clearEntry', key: 123 };
+			expect(isClearEntryMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-message', () => {
+			expect(isClearEntryMessage(null)).toBe(false);
+		});
+	});
+
+	describe('isClearPropertyMessage', () => {
+		const validMessage = {
+			command: 'clearProperty',
+			key: 'property-key',
+			path: 'property.path'
+		};
+
+		it('should return true for valid clear property message', () => {
+			expect(isClearPropertyMessage(validMessage)).toBe(true);
+		});
+
+		it('should return false for invalid command', () => {
+			const message = { ...validMessage, command: 'clear' };
+			expect(isClearPropertyMessage(message)).toBe(false);
+		});
+
+		it('should return false for missing key', () => {
+			const message = {
+				command: 'clearProperty',
+				path: 'property.path'
+			};
+			expect(isClearPropertyMessage(message)).toBe(false);
+		});
+
+		it('should return false for missing path', () => {
+			const message = {
+				command: 'clearProperty',
+				key: 'property-key'
+			};
+			expect(isClearPropertyMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-string key', () => {
+			const message = { ...validMessage, key: 123 };
+			expect(isClearPropertyMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-string path', () => {
+			const message = { ...validMessage, path: 123 };
+			expect(isClearPropertyMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-message', () => {
+			expect(isClearPropertyMessage(null)).toBe(false);
+		});
+	});
+
+	describe('isViewImportJobMessage', () => {
+		const validMessage = {
+			command: 'viewImportJob',
+			data: {
+				importJobId: 'job-123'
+			}
+		};
+
+		it('should return true for valid view import job message', () => {
+			expect(isViewImportJobMessage(validMessage)).toBe(true);
+		});
+
+		it('should return false for invalid command', () => {
+			const message = { ...validMessage, command: 'viewJob' };
+			expect(isViewImportJobMessage(message)).toBe(false);
+		});
+
+		it('should return false for missing importJobId', () => {
+			const message = {
+				command: 'viewImportJob',
+				data: {}
+			};
+			expect(isViewImportJobMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-string importJobId', () => {
+			const message = {
+				command: 'viewImportJob',
+				data: { importJobId: 123 }
+			};
+			expect(isViewImportJobMessage(message)).toBe(false);
+		});
+
+		it('should return false for null data', () => {
+			const message = {
+				command: 'viewImportJob',
+				data: null
+			};
+			expect(isViewImportJobMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-message', () => {
+			expect(isViewImportJobMessage(null)).toBe(false);
+		});
+	});
+
+	describe('isOpenInMakerMessage', () => {
+		const validMessage = {
+			command: 'openInMaker',
+			data: {
+				solutionId: 'solution-123'
+			}
+		};
+
+		it('should return true for valid open in maker message', () => {
+			expect(isOpenInMakerMessage(validMessage)).toBe(true);
+		});
+
+		it('should return false for invalid command', () => {
+			const message = { ...validMessage, command: 'open' };
+			expect(isOpenInMakerMessage(message)).toBe(false);
+		});
+
+		it('should return false for missing solutionId', () => {
+			const message = {
+				command: 'openInMaker',
+				data: {}
+			};
+			expect(isOpenInMakerMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-string solutionId', () => {
+			const message = {
+				command: 'openInMaker',
+				data: { solutionId: 123 }
+			};
+			expect(isOpenInMakerMessage(message)).toBe(false);
+		});
+
+		it('should return false for null data', () => {
+			const message = {
+				command: 'openInMaker',
+				data: null
+			};
+			expect(isOpenInMakerMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-message', () => {
+			expect(isOpenInMakerMessage(null)).toBe(false);
+		});
+	});
+
+	describe('isOpenFlowMessage', () => {
+		const validMessage = {
+			command: 'openFlow',
+			data: {
+				flowId: 'flow-123'
+			}
+		};
+
+		it('should return true for valid open flow message', () => {
+			expect(isOpenFlowMessage(validMessage)).toBe(true);
+		});
+
+		it('should return false for invalid command', () => {
+			const message = { ...validMessage, command: 'open' };
+			expect(isOpenFlowMessage(message)).toBe(false);
+		});
+
+		it('should return false for missing flowId', () => {
+			const message = {
+				command: 'openFlow',
+				data: {}
+			};
+			expect(isOpenFlowMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-string flowId', () => {
+			const message = {
+				command: 'openFlow',
+				data: { flowId: 123 }
+			};
+			expect(isOpenFlowMessage(message)).toBe(false);
+		});
+
+		it('should return false for null data', () => {
+			const message = {
+				command: 'openFlow',
+				data: null
+			};
+			expect(isOpenFlowMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-message', () => {
+			expect(isOpenFlowMessage(null)).toBe(false);
+		});
+	});
+
+	describe('isSolutionChangedMessage', () => {
+		const validMessage = {
+			command: 'solutionChanged',
+			data: {
+				solutionId: 'solution-123'
+			}
+		};
+
+		it('should return true for valid solution changed message', () => {
+			expect(isSolutionChangedMessage(validMessage)).toBe(true);
+		});
+
+		it('should return false for invalid command', () => {
+			const message = { ...validMessage, command: 'changed' };
+			expect(isSolutionChangedMessage(message)).toBe(false);
+		});
+
+		it('should return false for missing solutionId', () => {
+			const message = {
+				command: 'solutionChanged',
+				data: {}
+			};
+			expect(isSolutionChangedMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-string solutionId', () => {
+			const message = {
+				command: 'solutionChanged',
+				data: { solutionId: 123 }
+			};
+			expect(isSolutionChangedMessage(message)).toBe(false);
+		});
+
+		it('should return false for null data', () => {
+			const message = {
+				command: 'solutionChanged',
+				data: null
+			};
+			expect(isSolutionChangedMessage(message)).toBe(false);
+		});
+
+		it('should return false for non-message', () => {
+			expect(isSolutionChangedMessage(null)).toBe(false);
 		});
 	});
 });

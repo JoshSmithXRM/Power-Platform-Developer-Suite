@@ -19,6 +19,8 @@ jest.mock('fs/promises', () => ({
 }));
 
 import { FileSystemPluginTraceExporter } from '../FileSystemPluginTraceExporter';
+import * as vscode from 'vscode';
+import * as fsPromises from 'fs/promises';
 
 describe('FileSystemPluginTraceExporter', () => {
 	let exporter: FileSystemPluginTraceExporter;
@@ -239,6 +241,105 @@ describe('FileSystemPluginTraceExporter', () => {
 			await expect(
 				exporter.saveToFile(content, filename)
 			).rejects.toThrow('Save dialog cancelled');
+		});
+
+		it('should successfully save file and return path', async () => {
+			const mockShowSaveDialog = vscode.window.showSaveDialog as jest.Mock;
+			const mockWriteFile = fsPromises.writeFile as jest.Mock;
+
+			mockShowSaveDialog.mockResolvedValueOnce({
+				fsPath: '/test/path/file.csv',
+			});
+
+			mockWriteFile.mockResolvedValueOnce(undefined);
+
+			const content = 'test content';
+			const filename = 'test.csv';
+
+			const result = await exporter.saveToFile(content, filename);
+
+			expect(result).toBe('/test/path/file.csv');
+			expect(mockWriteFile).toHaveBeenCalledWith(
+				'/test/path/file.csv',
+				content,
+				'utf-8'
+			);
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				'Saved file successfully',
+				{
+					path: '/test/path/file.csv',
+				}
+			);
+		});
+
+		it('should handle file write errors', async () => {
+			const mockShowSaveDialog = vscode.window.showSaveDialog as jest.Mock;
+			const mockWriteFile = fsPromises.writeFile as jest.Mock;
+
+			mockShowSaveDialog.mockResolvedValueOnce({
+				fsPath: '/test/path/file.csv',
+			});
+
+			mockWriteFile.mockRejectedValueOnce(
+				new Error('Permission denied')
+			);
+
+			const content = 'test content';
+			const filename = 'test.csv';
+
+			await expect(
+				exporter.saveToFile(content, filename)
+			).rejects.toThrow('Permission denied');
+
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to save file',
+				expect.objectContaining({
+					message: 'Permission denied',
+				})
+			);
+		});
+
+		it('should use JSON file filter for .json extension', async () => {
+			const mockShowSaveDialog = vscode.window.showSaveDialog as jest.Mock;
+
+			mockShowSaveDialog.mockResolvedValueOnce(null);
+
+			const content = '{"test": "data"}';
+			const filename = 'test.json';
+
+			await expect(
+				exporter.saveToFile(content, filename)
+			).rejects.toThrow('Save dialog cancelled');
+
+			expect(mockShowSaveDialog).toHaveBeenCalledWith(
+				expect.objectContaining({
+					filters: {
+						JSON: ['json'],
+						'All Files': ['*'],
+					},
+				})
+			);
+		});
+
+		it('should use default file filter for unknown extension', async () => {
+			const mockShowSaveDialog = vscode.window.showSaveDialog as jest.Mock;
+
+			mockShowSaveDialog.mockResolvedValueOnce(null);
+
+			const content = 'test content';
+			const filename = 'test.txt';
+
+			await expect(
+				exporter.saveToFile(content, filename)
+			).rejects.toThrow('Save dialog cancelled');
+
+			expect(mockShowSaveDialog).toHaveBeenCalledWith(
+				expect.objectContaining({
+					filters: {
+						'All Files': ['*'],
+					},
+				})
+			);
 		});
 	});
 });

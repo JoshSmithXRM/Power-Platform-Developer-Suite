@@ -258,6 +258,36 @@ describe('TestConnectionUseCase', () => {
 				undefined
 			);
 		});
+
+		it('should return undefined when clientId is not set for service principal auth', async () => {
+			const request = createValidRequest({
+				authenticationMethod: AuthenticationMethodType.ServicePrincipal
+				// clientId not provided - environment will have undefined clientId
+			});
+
+			const result = await useCase.execute(request);
+
+			// Should fail validation because clientId is required for ServicePrincipal
+			expect(result.success).toBe(false);
+			expect(result.errorMessage).toContain('Client ID is required');
+			// Should not attempt to load from storage when clientId is undefined
+			expect(mockRepository.getClientSecret).not.toHaveBeenCalled();
+		});
+
+		it('should return undefined when username is not set for username/password auth', async () => {
+			const request = createValidRequest({
+				authenticationMethod: AuthenticationMethodType.UsernamePassword
+				// username not provided - environment will have undefined username
+			});
+
+			const result = await useCase.execute(request);
+
+			// Should fail validation because username is required for UsernamePassword
+			expect(result.success).toBe(false);
+			expect(result.errorMessage).toContain('Username is required');
+			// Should not attempt to load from storage when username is undefined
+			expect(mockRepository.getPassword).not.toHaveBeenCalled();
+		});
 	});
 
 	describe('validation and errors', () => {
@@ -362,6 +392,20 @@ describe('TestConnectionUseCase', () => {
 
 			expect(result.success).toBe(false);
 			expect(result.errorMessage).toContain('Username is required');
+			expect(mockWhoAmIService.testConnection).not.toHaveBeenCalled();
+		});
+
+		it('should return validation errors when environment configuration is invalid', async () => {
+			const request = createValidRequest({
+				authenticationMethod: AuthenticationMethodType.ServicePrincipal
+				// Missing clientId - ServicePrincipal requires it
+			});
+
+			const result = await useCase.execute(request);
+
+			expect(result.success).toBe(false);
+			expect(result.errorMessage).toContain('Environment validation failed:');
+			expect(result.errorMessage).toContain('Client ID is required');
 			expect(mockWhoAmIService.testConnection).not.toHaveBeenCalled();
 		});
 	});

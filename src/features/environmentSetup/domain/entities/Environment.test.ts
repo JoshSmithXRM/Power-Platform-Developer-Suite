@@ -43,6 +43,66 @@ describe('Environment', () => {
 			expect(result.errors).toHaveLength(0);
 		});
 
+		it('should fail validation when name is invalid', () => {
+			expect(() => {
+				new Environment(
+					new EnvironmentId('env-test-123'),
+					new EnvironmentName(''), // Invalid: empty name
+					new DataverseUrl('https://org.crm.dynamics.com'),
+					new TenantId('00000000-0000-0000-0000-000000000000'),
+					new AuthenticationMethod(AuthenticationMethodType.Interactive),
+					new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'),
+					false
+				);
+			}).toThrow(/Environment name cannot be empty/);
+		});
+
+		it('should fail validation when dataverse URL is invalid', () => {
+			expect(() => {
+				new Environment(
+					new EnvironmentId('env-test-123'),
+					new EnvironmentName('Test Environment'),
+					new DataverseUrl('invalid-url'), // Invalid URL
+					new TenantId('00000000-0000-0000-0000-000000000000'),
+					new AuthenticationMethod(AuthenticationMethodType.Interactive),
+					new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'),
+					false
+				);
+			}).toThrow(/Invalid Dataverse URL format/);
+		});
+
+		it('should fail validation when tenant ID is invalid format', () => {
+			expect(() => {
+				new Environment(
+					new EnvironmentId('env-test-123'),
+					new EnvironmentName('Test Environment'),
+					new DataverseUrl('https://org.crm.dynamics.com'),
+					new TenantId('not-a-guid'), // Invalid GUID format
+					new AuthenticationMethod(AuthenticationMethodType.Interactive),
+					new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'),
+					false
+				);
+			}).toThrow(/Invalid Tenant ID format/);
+		});
+
+		it('should fail validation when ServicePrincipal missing tenant ID', () => {
+			expect(() => {
+				new Environment(
+					new EnvironmentId('env-test-123'),
+					new EnvironmentName('Test Environment'),
+					new DataverseUrl('https://org.crm.dynamics.com'),
+					new TenantId(''), // Empty tenant ID - not provided
+					new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal),
+					new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'),
+					false,
+					undefined,
+					undefined,
+					new ClientId('11111111-1111-1111-1111-111111111111'),
+					undefined
+				);
+			}).toThrow(/Tenant ID is required for Service Principal authentication/);
+		});
+
 		it('should fail validation when ServicePrincipal missing clientId', () => {
 			// Constructor throws on invalid config, so we test that it throws
 			expect(() => {
@@ -98,6 +158,24 @@ describe('Environment', () => {
 					undefined,
 					undefined,
 					undefined // Missing username for UsernamePassword
+				);
+			}).toThrow(/Username is required for Username\/Password authentication/);
+		});
+
+		it('should fail validation when UsernamePassword has empty/whitespace username', () => {
+			expect(() => {
+				new Environment(
+					new EnvironmentId('env-test-123'),
+					new EnvironmentName('Test Environment'),
+					new DataverseUrl('https://org.crm.dynamics.com'),
+					new TenantId('00000000-0000-0000-0000-000000000000'),
+					new AuthenticationMethod(AuthenticationMethodType.UsernamePassword),
+					new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'),
+					false,
+					undefined,
+					undefined,
+					undefined,
+					'   ' // Whitespace-only username
 				);
 			}).toThrow(/Username is required for Username\/Password authentication/);
 		});
@@ -510,6 +588,47 @@ describe('Environment', () => {
 					undefined
 				);
 			}).toThrow(/Client ID is required for Service Principal authentication/);
+		});
+	});
+
+	describe('getters', () => {
+		it('should return environment ID', () => {
+			const id = new EnvironmentId('env-test-123');
+			const env = new Environment(
+				id,
+				new EnvironmentName('Test Environment'),
+				new DataverseUrl('https://org.crm.dynamics.com'),
+				new TenantId('00000000-0000-0000-0000-000000000000'),
+				new AuthenticationMethod(AuthenticationMethodType.Interactive),
+				new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'),
+				false
+			);
+
+			expect(env.getId()).toBe(id);
+		});
+
+		it('should return username for UsernamePassword auth', () => {
+			const username = 'user@example.com';
+			const env = new Environment(
+				new EnvironmentId('env-test-123'),
+				new EnvironmentName('Test Environment'),
+				new DataverseUrl('https://org.crm.dynamics.com'),
+				new TenantId('00000000-0000-0000-0000-000000000000'),
+				new AuthenticationMethod(AuthenticationMethodType.UsernamePassword),
+				new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'),
+				false,
+				undefined,
+				undefined,
+				undefined,
+				username
+			);
+
+			expect(env.getUsername()).toBe(username);
+		});
+
+		it('should return undefined username for Interactive auth', () => {
+			const env = createValidEnvironment(AuthenticationMethodType.Interactive);
+			expect(env.getUsername()).toBeUndefined();
 		});
 	});
 });

@@ -380,4 +380,286 @@ describe('DataverseApiImportJobRepository', () => {
 			);
 		});
 	});
+
+	describe('findByIdWithLog', () => {
+		it('should fetch single import job with log data from Dataverse API', async () => {
+			const mockDto = {
+				importjobid: 'job-1',
+				name: 'Test Import',
+				solutionname: 'TestSolution',
+				createdon: '2024-01-15T10:00:00Z',
+				startedon: '2024-01-15T10:00:00Z',
+				completedon: '2024-01-15T11:00:00Z',
+				progress: 100,
+				importcontext: null,
+				operationcontext: null,
+				data: '<importlog>Test log XML</importlog>',
+				_createdby_value: 'user-1',
+				createdby: {
+					fullname: 'Test User'
+				}
+			};
+
+			mockApiService.get.mockResolvedValue(mockDto);
+
+			const result = await repository.findByIdWithLog('env-123', 'job-1', undefined, undefined);
+
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				'env-123',
+				expect.stringContaining('/api/data/v9.2/importjobs(job-1)?'),
+				undefined
+			);
+			expect(result).toBeInstanceOf(ImportJob);
+			expect(result.id).toBe('job-1');
+			expect(result.name).toBe('Test Import');
+			expect(result.solutionName).toBe('TestSolution');
+			expect(result.hasLog()).toBe(true);
+			expect(result.importLogXml).toBe('<importlog>Test log XML</importlog>');
+		});
+
+		it('should handle import job without log data', async () => {
+			const mockDto = {
+				importjobid: 'job-1',
+				name: 'Test Import',
+				solutionname: 'TestSolution',
+				createdon: '2024-01-15T10:00:00Z',
+				startedon: '2024-01-15T10:00:00Z',
+				completedon: '2024-01-15T11:00:00Z',
+				progress: 100,
+				importcontext: null,
+				operationcontext: null,
+				_createdby_value: 'user-1',
+				createdby: {
+					fullname: 'Test User'
+				}
+			};
+
+			mockApiService.get.mockResolvedValue(mockDto);
+
+			const result = await repository.findByIdWithLog('env-123', 'job-1', undefined, undefined);
+
+			expect(result.hasLog()).toBe(false);
+			expect(result.importLogXml).toBeNull();
+		});
+
+		it('should handle missing job name with default value', async () => {
+			const mockDto = {
+				importjobid: 'job-1',
+				name: null,
+				solutionname: 'TestSolution',
+				createdon: '2024-01-15T10:00:00Z',
+				startedon: null,
+				completedon: null,
+				progress: 0,
+				importcontext: null,
+				operationcontext: null,
+				data: '<log></log>',
+				_createdby_value: 'user-1',
+				createdby: {
+					fullname: 'Test User'
+				}
+			};
+
+			mockApiService.get.mockResolvedValue(mockDto);
+
+			const result = await repository.findByIdWithLog('env-123', 'job-1', undefined, undefined);
+
+			expect(result.name).toBe('Unnamed Import');
+		});
+
+		it('should handle missing solution name with default value', async () => {
+			const mockDto = {
+				importjobid: 'job-1',
+				name: 'Test Import',
+				solutionname: null,
+				createdon: '2024-01-15T10:00:00Z',
+				startedon: null,
+				completedon: null,
+				progress: 0,
+				importcontext: null,
+				operationcontext: null,
+				data: null,
+				_createdby_value: 'user-1',
+				createdby: {
+					fullname: 'Test User'
+				}
+			};
+
+			mockApiService.get.mockResolvedValue(mockDto);
+
+			const result = await repository.findByIdWithLog('env-123', 'job-1', undefined, undefined);
+
+			expect(result.solutionName).toBe('Unknown Solution');
+		});
+
+		it('should handle missing createdby fullname with default value', async () => {
+			const mockDto = {
+				importjobid: 'job-1',
+				name: 'Test Import',
+				solutionname: 'TestSolution',
+				createdon: '2024-01-15T10:00:00Z',
+				startedon: null,
+				completedon: null,
+				progress: 0,
+				importcontext: null,
+				operationcontext: null,
+				data: null,
+				_createdby_value: 'user-1'
+			};
+
+			mockApiService.get.mockResolvedValue(mockDto);
+
+			const result = await repository.findByIdWithLog('env-123', 'job-1', undefined, undefined);
+
+			expect(result.createdBy).toBe('Unknown User');
+		});
+
+		it('should throw OperationCancelledException if cancelled before API call', async () => {
+			const mockCancellationToken: ICancellationToken = {
+				isCancellationRequested: true,
+				onCancellationRequested: jest.fn()
+			};
+
+			await expect(repository.findByIdWithLog('env-123', 'job-1', undefined, mockCancellationToken))
+				.rejects.toThrow(OperationCancelledException);
+
+			expect(mockApiService.get).not.toHaveBeenCalled();
+			expect(mockLogger.debug).toHaveBeenCalledWith('Repository operation cancelled before API call');
+		});
+
+		it('should throw OperationCancelledException if cancelled after API call', async () => {
+			let cancelled = false;
+			const mockCancellationToken: ICancellationToken = {
+				get isCancellationRequested() { return cancelled; },
+				onCancellationRequested: jest.fn()
+			};
+
+			const mockDto = {
+				importjobid: 'job-1',
+				name: 'Test',
+				solutionname: 'Solution',
+				createdon: '2024-01-15T10:00:00Z',
+				startedon: null,
+				completedon: null,
+				progress: 0,
+				importcontext: null,
+				operationcontext: null,
+				data: null,
+				_createdby_value: 'user-1',
+				createdby: { fullname: 'User' }
+			};
+
+			mockApiService.get.mockImplementation(async () => {
+				cancelled = true;
+				return mockDto;
+			});
+
+			await expect(repository.findByIdWithLog('env-123', 'job-1', undefined, mockCancellationToken))
+				.rejects.toThrow(OperationCancelledException);
+
+			expect(mockLogger.debug).toHaveBeenCalledWith('Repository operation cancelled after API call');
+		});
+
+		it('should log and rethrow API service errors', async () => {
+			const error = new Error('API request failed');
+			mockApiService.get.mockRejectedValue(error);
+
+			await expect(repository.findByIdWithLog('env-123', 'job-1', undefined, undefined))
+				.rejects.toThrow('API request failed');
+
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to fetch import job with log from Dataverse API',
+				error
+			);
+		});
+
+		it('should log successful fetch with hasLog status', async () => {
+			const mockDto = {
+				importjobid: 'job-1',
+				name: 'Test',
+				solutionname: 'Solution',
+				createdon: '2024-01-15T10:00:00Z',
+				startedon: null,
+				completedon: null,
+				progress: 0,
+				importcontext: null,
+				operationcontext: null,
+				data: '<log></log>',
+				_createdby_value: 'user-1',
+				createdby: { fullname: 'User' }
+			};
+
+			mockApiService.get.mockResolvedValue(mockDto);
+
+			await repository.findByIdWithLog('env-123', 'job-1', undefined, undefined);
+
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				'Fetching import job with log from Dataverse API',
+				{ environmentId: 'env-123', importJobId: 'job-1' }
+			);
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				'Fetched import job with log from Dataverse',
+				{ environmentId: 'env-123', importJobId: 'job-1', hasLog: true }
+			);
+		});
+
+		it('should use correct endpoint with query parameters', async () => {
+			const mockDto = {
+				importjobid: 'job-1',
+				name: 'Test',
+				solutionname: 'Solution',
+				createdon: '2024-01-15T10:00:00Z',
+				startedon: null,
+				completedon: null,
+				progress: 0,
+				importcontext: null,
+				operationcontext: null,
+				data: null,
+				_createdby_value: 'user-1',
+				createdby: { fullname: 'User' }
+			};
+
+			mockApiService.get.mockResolvedValue(mockDto);
+
+			await repository.findByIdWithLog('env-123', 'job-1', undefined, undefined);
+
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				'env-123',
+				expect.stringMatching(/\/api\/data\/v9\.2\/importjobs\(job-1\)\?.*\$select=.*data.*\$expand=.*/),
+				undefined
+			);
+		});
+
+		it('should pass cancellation token to API service', async () => {
+			const mockCancellationToken: ICancellationToken = {
+				isCancellationRequested: false,
+				onCancellationRequested: jest.fn()
+			};
+
+			const mockDto = {
+				importjobid: 'job-1',
+				name: 'Test',
+				solutionname: 'Solution',
+				createdon: '2024-01-15T10:00:00Z',
+				startedon: null,
+				completedon: null,
+				progress: 0,
+				importcontext: null,
+				operationcontext: null,
+				data: null,
+				_createdby_value: 'user-1',
+				createdby: { fullname: 'User' }
+			};
+
+			mockApiService.get.mockResolvedValue(mockDto);
+
+			await repository.findByIdWithLog('env-123', 'job-1', undefined, mockCancellationToken);
+
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				'env-123',
+				expect.any(String),
+				mockCancellationToken
+			);
+		});
+	});
 });

@@ -321,4 +321,245 @@ describe('DataverseApiSolutionRepository', () => {
 			);
 		});
 	});
+
+	describe('findAllForDropdown', () => {
+		it('should fetch minimal solution data for dropdown', async () => {
+			const mockResponse = {
+				value: [
+					{
+						solutionid: 'sol-1',
+						friendlyname: 'Test Solution',
+						uniquename: 'TestSolution',
+						version: '1.0.0.0',
+						ismanaged: false,
+						_publisherid_value: 'pub-1',
+						installedon: null,
+						description: null,
+						modifiedon: '2024-01-15T10:00:00Z',
+						isvisible: true,
+						isapimanaged: false,
+						solutiontype: null
+					}
+				]
+			};
+
+			mockApiService.get.mockResolvedValue(mockResponse);
+
+			const result = await repository.findAllForDropdown('env-123', undefined);
+
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				'env-123',
+				expect.stringContaining('/api/data/v9.2/solutions?'),
+				undefined
+			);
+			expect(result).toHaveLength(1);
+			expect(result[0]).toEqual({
+				id: 'sol-1',
+				name: 'Test Solution',
+				uniqueName: 'TestSolution'
+			});
+		});
+
+		it('should filter to visible solutions only', async () => {
+			const mockResponse = {
+				value: [
+					{
+						solutionid: 'sol-1',
+						friendlyname: 'Visible Solution',
+						uniquename: 'VisibleSolution',
+						version: '1.0.0.0',
+						ismanaged: false,
+						_publisherid_value: 'pub-1',
+						installedon: null,
+						description: null,
+						modifiedon: '2024-01-15T10:00:00Z',
+						isvisible: true,
+						isapimanaged: false,
+						solutiontype: null
+					}
+				]
+			};
+
+			mockApiService.get.mockResolvedValue(mockResponse);
+
+			await repository.findAllForDropdown('env-123', undefined);
+
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				'env-123',
+				expect.stringMatching(/.*\$filter=isvisible%20eq%20true.*/),
+				undefined
+			);
+		});
+
+		it('should select only required fields', async () => {
+			const mockResponse = { value: [] };
+			mockApiService.get.mockResolvedValue(mockResponse);
+
+			await repository.findAllForDropdown('env-123', undefined);
+
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				'env-123',
+				expect.stringMatching(/.*\$select=solutionid,friendlyname,uniquename.*/),
+				undefined
+			);
+		});
+
+		it('should handle multiple solutions', async () => {
+			const mockResponse = {
+				value: [
+					{
+						solutionid: 'sol-1',
+						friendlyname: 'Solution 1',
+						uniquename: 'Solution1',
+						version: '1.0',
+						ismanaged: false,
+						_publisherid_value: 'pub-1',
+						installedon: null,
+						description: null,
+						modifiedon: '2024-01-15T10:00:00Z',
+						isvisible: true,
+						isapimanaged: false,
+						solutiontype: null
+					},
+					{
+						solutionid: 'sol-2',
+						friendlyname: 'Solution 2',
+						uniquename: 'Solution2',
+						version: '2.0',
+						ismanaged: true,
+						_publisherid_value: 'pub-2',
+						installedon: '2024-02-01T10:00:00Z',
+						description: 'Test',
+						modifiedon: '2024-02-01T10:00:00Z',
+						isvisible: true,
+						isapimanaged: false,
+						solutiontype: null
+					}
+				]
+			};
+
+			mockApiService.get.mockResolvedValue(mockResponse);
+
+			const result = await repository.findAllForDropdown('env-123', undefined);
+
+			expect(result).toHaveLength(2);
+			expect(result[0]).toEqual({
+				id: 'sol-1',
+				name: 'Solution 1',
+				uniqueName: 'Solution1'
+			});
+			expect(result[1]).toEqual({
+				id: 'sol-2',
+				name: 'Solution 2',
+				uniqueName: 'Solution2'
+			});
+		});
+
+		it('should handle empty solution list', async () => {
+			const mockResponse = { value: [] };
+			mockApiService.get.mockResolvedValue(mockResponse);
+
+			const result = await repository.findAllForDropdown('env-123', undefined);
+
+			expect(result).toHaveLength(0);
+		});
+
+		it('should throw OperationCancelledException if cancelled before API call', async () => {
+			const mockCancellationToken: ICancellationToken = {
+				isCancellationRequested: true,
+				onCancellationRequested: jest.fn()
+			};
+
+			await expect(repository.findAllForDropdown('env-123', mockCancellationToken))
+				.rejects.toThrow(OperationCancelledException);
+
+			expect(mockApiService.get).not.toHaveBeenCalled();
+			expect(mockLogger.debug).toHaveBeenCalledWith('Repository operation cancelled before API call');
+		});
+
+		it('should throw OperationCancelledException if cancelled after API call', async () => {
+			let cancelled = false;
+			const mockCancellationToken: ICancellationToken = {
+				get isCancellationRequested() { return cancelled; },
+				onCancellationRequested: jest.fn()
+			};
+
+			const mockResponse = { value: [] };
+
+			mockApiService.get.mockImplementation(async () => {
+				cancelled = true;
+				return mockResponse;
+			});
+
+			await expect(repository.findAllForDropdown('env-123', mockCancellationToken))
+				.rejects.toThrow(OperationCancelledException);
+
+			expect(mockLogger.debug).toHaveBeenCalledWith('Repository operation cancelled after API call');
+		});
+
+		it('should log and rethrow API service errors', async () => {
+			const error = new Error('API request failed');
+			mockApiService.get.mockRejectedValue(error);
+
+			await expect(repository.findAllForDropdown('env-123', undefined))
+				.rejects.toThrow('API request failed');
+
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to fetch solutions for dropdown from Dataverse API',
+				error
+			);
+		});
+
+		it('should log successful fetch', async () => {
+			const mockResponse = {
+				value: [
+					{
+						solutionid: 'sol-1',
+						friendlyname: 'Test',
+						uniquename: 'Test',
+						version: '1.0',
+						ismanaged: false,
+						_publisherid_value: 'pub-1',
+						installedon: null,
+						description: null,
+						modifiedon: '2024-01-15T10:00:00Z',
+						isvisible: true,
+						isapimanaged: false,
+						solutiontype: null
+					}
+				]
+			};
+
+			mockApiService.get.mockResolvedValue(mockResponse);
+
+			await repository.findAllForDropdown('env-123', undefined);
+
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				'Fetching solutions for dropdown from Dataverse API',
+				{ environmentId: 'env-123' }
+			);
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				'Fetched 1 visible solution(s) for dropdown',
+				{ environmentId: 'env-123' }
+			);
+		});
+
+		it('should pass cancellation token to API service', async () => {
+			const mockCancellationToken: ICancellationToken = {
+				isCancellationRequested: false,
+				onCancellationRequested: jest.fn()
+			};
+
+			const mockResponse = { value: [] };
+			mockApiService.get.mockResolvedValue(mockResponse);
+
+			await repository.findAllForDropdown('env-123', mockCancellationToken);
+
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				'env-123',
+				expect.any(String),
+				mockCancellationToken
+			);
+		});
+	});
 });

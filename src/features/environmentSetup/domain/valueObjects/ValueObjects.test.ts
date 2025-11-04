@@ -6,6 +6,7 @@ import { ClientId } from './ClientId';
 import { EnvironmentName } from './EnvironmentName';
 import { EnvironmentId } from './EnvironmentId';
 import { AuthenticationMethod, AuthenticationMethodType } from './AuthenticationMethod';
+import { ValidationResult } from './ValidationResult';
 
 describe('ValueObjects', () => {
 	describe('DataverseUrl', () => {
@@ -56,6 +57,98 @@ describe('ValueObjects', () => {
 			it('should return API base URL', () => {
 				const url = new DataverseUrl('https://org.crm.dynamics.com');
 				expect(url.getApiBaseUrl()).toBe('https://org.crm.dynamics.com/api/data/v9.2');
+			});
+
+			it('should return API base URL for regional instances', () => {
+				const url1 = new DataverseUrl('https://myorg.crm4.dynamics.com');
+				expect(url1.getApiBaseUrl()).toBe('https://myorg.crm4.dynamics.com/api/data/v9.2');
+
+				const url2 = new DataverseUrl('https://myorg.crm.uk.dynamics.com');
+				expect(url2.getApiBaseUrl()).toBe('https://myorg.crm.uk.dynamics.com/api/data/v9.2');
+			});
+		});
+
+		describe('getOrganizationName', () => {
+			it('should extract organization name from US URL', () => {
+				const url = new DataverseUrl('https://contoso.crm.dynamics.com');
+				expect(url.getOrganizationName()).toBe('contoso');
+			});
+
+			it('should extract organization name from regional URLs', () => {
+				const url1 = new DataverseUrl('https://contoso.crm4.dynamics.com');
+				expect(url1.getOrganizationName()).toBe('contoso');
+
+				const url2 = new DataverseUrl('https://fabrikam.crm.uk.dynamics.com');
+				expect(url2.getOrganizationName()).toBe('fabrikam');
+
+				const url3 = new DataverseUrl('https://adventureworks.crm11.de.dynamics.com');
+				expect(url3.getOrganizationName()).toBe('adventureworks');
+			});
+
+			it('should extract organization name with hyphens', () => {
+				const url = new DataverseUrl('https://my-org-name.crm.dynamics.com');
+				expect(url.getOrganizationName()).toBe('my-org-name');
+			});
+
+			it('should extract organization name with numbers', () => {
+				const url = new DataverseUrl('https://org123.crm.dynamics.com');
+				expect(url.getOrganizationName()).toBe('org123');
+			});
+
+			it('should throw error if organization name cannot be extracted', () => {
+				// Create a valid URL then manipulate internal state to test error path
+				const url = new DataverseUrl('https://org.crm.dynamics.com');
+
+				// Override the value to simulate a URL that passes validation but has no hostname parts
+				// This tests the error path where parts.length === 0 or parts[0] is empty
+				Object.defineProperty(url, 'value', {
+					get: () => 'https://.crm.dynamics.com',
+					configurable: true
+				});
+
+				expect(() => url.getOrganizationName()).toThrow(DomainError);
+				expect(() => url.getOrganizationName()).toThrow('Unable to extract organization name from Dataverse URL');
+			});
+
+			it('should throw error if URL parsing fails', () => {
+				const url = new DataverseUrl('https://org.crm.dynamics.com');
+
+				// Override value to an invalid URL that would cause URL constructor to throw
+				Object.defineProperty(url, 'value', {
+					get: () => 'not-a-valid-url-scheme',
+					configurable: true
+				});
+
+				expect(() => url.getOrganizationName()).toThrow(DomainError);
+				expect(() => url.getOrganizationName()).toThrow('Invalid Dataverse URL format');
+			});
+		});
+
+		describe('edge cases', () => {
+			it('should normalize URL with trailing slash', () => {
+				const url = new DataverseUrl('https://org.crm.dynamics.com/');
+				expect(url.getValue()).toBe('https://org.crm.dynamics.com');
+			});
+
+			it('should handle URL with whitespace', () => {
+				const url = new DataverseUrl('  https://org.crm.dynamics.com  ');
+				expect(url.getValue()).toBe('https://org.crm.dynamics.com');
+			});
+
+			it('should throw for URL without protocol', () => {
+				expect(() => new DataverseUrl('org.crm.dynamics.com')).toThrow(DomainError);
+			});
+
+			it('should throw for non-dynamics.com domain', () => {
+				expect(() => new DataverseUrl('https://org.crm.microsoft.com')).toThrow(DomainError);
+			});
+
+			it('should throw for URL with path segments', () => {
+				expect(() => new DataverseUrl('https://org.crm.dynamics.com/some/path')).toThrow(DomainError);
+			});
+
+			it('should throw for URL with query parameters', () => {
+				expect(() => new DataverseUrl('https://org.crm.dynamics.com?param=value')).toThrow(DomainError);
 			});
 		});
 	});
@@ -342,6 +435,202 @@ describe('ValueObjects', () => {
 			it('should return string representation', () => {
 				const method = new AuthenticationMethod(AuthenticationMethodType.Interactive);
 				expect(method.toString()).toBe('Interactive');
+			});
+
+			it('should return string representation for all auth types', () => {
+				const sp = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
+				expect(sp.toString()).toBe('ServicePrincipal');
+
+				const upw = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
+				expect(upw.toString()).toBe('UsernamePassword');
+
+				const deviceCode = new AuthenticationMethod(AuthenticationMethodType.DeviceCode);
+				expect(deviceCode.toString()).toBe('DeviceCode');
+			});
+		});
+
+		describe('equals', () => {
+			it('should return true for same auth method types', () => {
+				const method1 = new AuthenticationMethod(AuthenticationMethodType.Interactive);
+				const method2 = new AuthenticationMethod(AuthenticationMethodType.Interactive);
+				expect(method1.equals(method2)).toBe(true);
+			});
+
+			it('should return false for different auth method types', () => {
+				const interactive = new AuthenticationMethod(AuthenticationMethodType.Interactive);
+				const sp = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
+				expect(interactive.equals(sp)).toBe(false);
+			});
+
+			it('should work for ServicePrincipal comparison', () => {
+				const sp1 = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
+				const sp2 = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
+				expect(sp1.equals(sp2)).toBe(true);
+			});
+
+			it('should work for UsernamePassword comparison', () => {
+				const upw1 = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
+				const upw2 = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
+				expect(upw1.equals(upw2)).toBe(true);
+			});
+
+			it('should work for DeviceCode comparison', () => {
+				const dc1 = new AuthenticationMethod(AuthenticationMethodType.DeviceCode);
+				const dc2 = new AuthenticationMethod(AuthenticationMethodType.DeviceCode);
+				expect(dc1.equals(dc2)).toBe(true);
+			});
+
+			it('should return false when comparing different non-interactive types', () => {
+				const sp = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
+				const upw = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
+				expect(sp.equals(upw)).toBe(false);
+			});
+		});
+
+		describe('requiresClientCredentials - comprehensive coverage', () => {
+			it('should return false for DeviceCode', () => {
+				const deviceCode = new AuthenticationMethod(AuthenticationMethodType.DeviceCode);
+				expect(deviceCode.requiresClientCredentials()).toBe(false);
+			});
+		});
+	});
+
+	describe('ValidationResult', () => {
+		describe('success', () => {
+			it('should create valid success result', () => {
+				const result = ValidationResult.success();
+
+				expect(result.isValid).toBe(true);
+				expect(result.errors).toEqual([]);
+				expect(result.warnings).toEqual([]);
+			});
+		});
+
+		describe('failure', () => {
+			it('should create invalid result with errors', () => {
+				const errors = ['Error 1', 'Error 2'];
+				const result = ValidationResult.failure(errors);
+
+				expect(result.isValid).toBe(false);
+				expect(result.errors).toEqual(errors);
+				expect(result.warnings).toEqual([]);
+			});
+
+			it('should create result with single error', () => {
+				const result = ValidationResult.failure(['Single error']);
+
+				expect(result.isValid).toBe(false);
+				expect(result.errors).toEqual(['Single error']);
+			});
+
+			it('should create result with empty error array', () => {
+				const result = ValidationResult.failure([]);
+
+				expect(result.isValid).toBe(false);
+				expect(result.errors).toEqual([]);
+			});
+		});
+
+		describe('successWithWarnings', () => {
+			it('should create valid result with warnings', () => {
+				const warnings = ['Warning 1', 'Warning 2'];
+				const result = ValidationResult.successWithWarnings(warnings);
+
+				expect(result.isValid).toBe(true);
+				expect(result.errors).toEqual([]);
+				expect(result.warnings).toEqual(warnings);
+			});
+
+			it('should create result with single warning', () => {
+				const result = ValidationResult.successWithWarnings(['Single warning']);
+
+				expect(result.isValid).toBe(true);
+				expect(result.warnings).toEqual(['Single warning']);
+			});
+
+			it('should create result with empty warning array', () => {
+				const result = ValidationResult.successWithWarnings([]);
+
+				expect(result.isValid).toBe(true);
+				expect(result.warnings).toEqual([]);
+			});
+		});
+
+		describe('getFirstError', () => {
+			it('should return first error when errors exist', () => {
+				const result = ValidationResult.failure(['First error', 'Second error']);
+
+				expect(result.getFirstError()).toBe('First error');
+			});
+
+			it('should return undefined when no errors', () => {
+				const result = ValidationResult.success();
+
+				expect(result.getFirstError()).toBeUndefined();
+			});
+
+			it('should return undefined for empty error array', () => {
+				const result = ValidationResult.failure([]);
+
+				expect(result.getFirstError()).toBeUndefined();
+			});
+		});
+
+		describe('hasWarnings', () => {
+			it('should return true when warnings exist', () => {
+				const result = ValidationResult.successWithWarnings(['Warning']);
+
+				expect(result.hasWarnings()).toBe(true);
+			});
+
+			it('should return false when no warnings', () => {
+				const result = ValidationResult.success();
+
+				expect(result.hasWarnings()).toBe(false);
+			});
+
+			it('should return false for empty warning array', () => {
+				const result = ValidationResult.successWithWarnings([]);
+
+				expect(result.hasWarnings()).toBe(false);
+			});
+
+			it('should return false for failure result without warnings', () => {
+				const result = ValidationResult.failure(['Error']);
+
+				expect(result.hasWarnings()).toBe(false);
+			});
+		});
+
+		describe('immutability', () => {
+			it('should have readonly properties at compile time', () => {
+				const result = ValidationResult.failure(['Error']);
+
+				// TypeScript enforces readonly at compile time
+				// Note: @ts-expect-error doesn't prevent runtime assignment in JS
+				// but TypeScript will catch this during compilation
+
+				// Verify properties are set correctly
+				expect(result.isValid).toBe(false);
+				expect(result.errors).toEqual(['Error']);
+				expect(result.warnings).toEqual([]);
+			});
+
+			it('should expose errors array directly', () => {
+				const errors = ['Error 1'];
+				const result = ValidationResult.failure(errors);
+
+				// Note: Array is not defensively copied in current implementation
+				// Modifying original array WILL affect result
+				errors.push('Error 2');
+				expect(result.errors).toEqual(['Error 1', 'Error 2']);
+			});
+
+			it('should create independent results', () => {
+				const result1 = ValidationResult.failure(['Error 1']);
+				const result2 = ValidationResult.failure(['Error 2']);
+
+				expect(result1.errors).not.toEqual(result2.errors);
 			});
 		});
 	});

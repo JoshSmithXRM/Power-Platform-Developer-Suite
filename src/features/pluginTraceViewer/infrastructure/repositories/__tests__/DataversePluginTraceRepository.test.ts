@@ -147,6 +147,23 @@ describe('DataversePluginTraceRepository', () => {
 
 			expect(trace).toBeNull();
 		});
+
+		it('should log and rethrow on non-404 errors', async () => {
+			const environmentId = 'env-123';
+			const traceId = 'trace-1';
+			const error = new Error('API error');
+
+			mockApiService.get.mockRejectedValue(error);
+
+			await expect(
+				repository.getTraceById(environmentId, traceId)
+			).rejects.toThrow('API error');
+
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to fetch plugin trace from Dataverse',
+				expect.any(Error)
+			);
+		});
 	});
 
 	describe('deleteTrace', () => {
@@ -217,6 +234,25 @@ describe('DataversePluginTraceRepository', () => {
 
 			expect(deletedCount).toBe(2);
 		});
+
+		it('should log errors and continue with remaining batches', async () => {
+			const environmentId = 'env-123';
+			const traceIds = ['trace-1', 'trace-2', 'trace-3'];
+			const error = new Error('Batch delete failed');
+
+			mockApiService.batchDelete.mockRejectedValue(error);
+
+			const deletedCount = await repository.deleteTraces(
+				environmentId,
+				traceIds
+			);
+
+			expect(deletedCount).toBe(0);
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				expect.stringContaining('Batch delete failed'),
+				error
+			);
+		});
 	});
 
 	describe('deleteAllTraces', () => {
@@ -240,6 +276,22 @@ describe('DataversePluginTraceRepository', () => {
 				expect.stringContaining('$select=plugintracelogid')
 			);
 		});
+
+		it('should log and rethrow on error', async () => {
+			const environmentId = 'env-123';
+			const error = new Error('API error');
+
+			mockApiService.get.mockRejectedValue(error);
+
+			await expect(
+				repository.deleteAllTraces(environmentId)
+			).rejects.toThrow('API error');
+
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to delete all plugin traces from Dataverse',
+				expect.any(Error)
+			);
+		});
 	});
 
 	describe('deleteOldTraces', () => {
@@ -261,6 +313,23 @@ describe('DataversePluginTraceRepository', () => {
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				environmentId,
 				expect.stringContaining('$filter=')
+			);
+		});
+
+		it('should log and rethrow on error', async () => {
+			const environmentId = 'env-123';
+			const olderThanDays = 30;
+			const error = new Error('API error');
+
+			mockApiService.get.mockRejectedValue(error);
+
+			await expect(
+				repository.deleteOldTraces(environmentId, olderThanDays)
+			).rejects.toThrow('API error');
+
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to delete old plugin traces from Dataverse',
+				expect.any(Error)
 			);
 		});
 	});
@@ -290,6 +359,22 @@ describe('DataversePluginTraceRepository', () => {
 			await expect(
 				repository.getTraceLevel(environmentId)
 			).rejects.toThrow('Organization settings not found');
+		});
+
+		it('should log and rethrow on API error', async () => {
+			const environmentId = 'env-123';
+			const error = new Error('API error');
+
+			mockApiService.get.mockRejectedValue(error);
+
+			await expect(
+				repository.getTraceLevel(environmentId)
+			).rejects.toThrow('API error');
+
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to fetch trace level from Dataverse',
+				expect.any(Error)
+			);
 		});
 	});
 
@@ -321,6 +406,23 @@ describe('DataversePluginTraceRepository', () => {
 			await expect(
 				repository.setTraceLevel(environmentId, level)
 			).rejects.toThrow('Organization not found');
+		});
+
+		it('should log and rethrow on API error', async () => {
+			const environmentId = 'env-123';
+			const level = TraceLevel.All;
+			const error = new Error('API error');
+
+			mockApiService.get.mockRejectedValue(error);
+
+			await expect(
+				repository.setTraceLevel(environmentId, level)
+			).rejects.toThrow('API error');
+
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to set trace level in Dataverse',
+				expect.any(Error)
+			);
 		});
 	});
 });

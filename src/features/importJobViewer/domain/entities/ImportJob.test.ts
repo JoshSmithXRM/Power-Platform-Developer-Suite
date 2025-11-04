@@ -242,5 +242,92 @@ describe('ImportJob', () => {
 
 			expect(job.completedOn).toBeNull();
 		});
+
+		it('should default importLogXml to null when not provided', () => {
+			const job = createValidImportJob();
+
+			expect(job.importLogXml).toBeNull();
+		});
+
+		it('should accept importLogXml when provided', () => {
+			const xmlLog = '<log><entry>test</entry></log>';
+			const job = new ImportJob(
+				'job-789',
+				'Test Import',
+				'TestSolution',
+				'Test User',
+				new Date('2024-01-15T10:00:00Z'),
+				null,
+				50,
+				ImportJobStatus.InProgress,
+				'Import',
+				'New',
+				xmlLog
+			);
+
+			expect(job.importLogXml).toBe(xmlLog);
+		});
+	});
+
+	describe('hasLog', () => {
+		it('should return false when importLogXml is null', () => {
+			const job = createValidImportJob();
+
+			expect(job.hasLog()).toBe(false);
+		});
+
+		it('should return false when importLogXml is empty string', () => {
+			const job = new ImportJob(
+				'job-empty',
+				'Test Import',
+				'TestSolution',
+				'Test User',
+				new Date('2024-01-15T10:00:00Z'),
+				null,
+				50,
+				ImportJobStatus.InProgress,
+				'Import',
+				'New',
+				''
+			);
+
+			expect(job.hasLog()).toBe(false);
+		});
+
+		it('should return true when importLogXml has content', () => {
+			const job = new ImportJob(
+				'job-with-log',
+				'Test Import',
+				'TestSolution',
+				'Test User',
+				new Date('2024-01-15T10:00:00Z'),
+				null,
+				50,
+				ImportJobStatus.InProgress,
+				'Import',
+				'New',
+				'<log><entry>test</entry></log>'
+			);
+
+			expect(job.hasLog()).toBe(true);
+		});
+
+		it('should return true even for short non-empty log strings', () => {
+			const job = new ImportJob(
+				'job-minimal-log',
+				'Test Import',
+				'TestSolution',
+				'Test User',
+				new Date('2024-01-15T10:00:00Z'),
+				null,
+				50,
+				ImportJobStatus.InProgress,
+				'Import',
+				'New',
+				'x'
+			);
+
+			expect(job.hasLog()).toBe(true);
+		});
 	});
 });

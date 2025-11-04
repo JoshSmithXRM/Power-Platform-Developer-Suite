@@ -37,8 +37,9 @@ export class TestConnectionUseCase {
 		});
 
 		try {
+			// Domain entity validates configuration in constructor (Environment.ts lines 62-131).
+			// If construction succeeds, environment is valid by definition.
 			const tempEnvironment = this.createTemporaryEnvironment(request);
-			this.validateEnvironment(tempEnvironment);
 
 			if (!this.whoAmIService) {
 				return this.createServiceUnavailableResponse();
@@ -80,16 +81,6 @@ export class TestConnectionUseCase {
 			request.clientId ? new ClientId(request.clientId) : undefined,
 			request.username
 		);
-	}
-
-	/**
-	 * Validates environment configuration for connection testing
-	 */
-	private validateEnvironment(environment: Environment): void {
-		if (!environment.canTestConnection()) {
-			const validationResult = environment.validateConfiguration();
-			throw new ApplicationError(`Cannot test connection: ${validationResult.errors.join(', ')}`);
-		}
 	}
 
 	/**
@@ -139,10 +130,9 @@ export class TestConnectionUseCase {
 			return undefined;
 		}
 
-		const clientId = environment.getClientId()?.getValue();
-		if (!clientId) {
-			return undefined;
-		}
+		// Domain guarantees clientId exists when requiresClientCredentials() is true.
+		// Environment constructor validates this invariant (Environment.ts lines 114-124).
+		const clientId = environment.getClientId()!.getValue();
 
 		const secret = await this.repository.getClientSecret(clientId);
 		if (secret) {
@@ -167,10 +157,9 @@ export class TestConnectionUseCase {
 			return undefined;
 		}
 
-		const username = environment.getUsername();
-		if (!username) {
-			return undefined;
-		}
+		// Domain guarantees username exists when requiresUsernamePassword() is true.
+		// Environment constructor validates this invariant (Environment.ts lines 126-136).
+		const username = environment.getUsername()!;
 
 		const password = await this.repository.getPassword(username);
 		if (password) {

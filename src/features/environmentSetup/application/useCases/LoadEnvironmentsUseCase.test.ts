@@ -157,5 +157,13 @@ describe('LoadEnvironmentsUseCase', () => {
 			expect(viewModel!.isActive).toBe(true);
 			expect(viewModel!.statusBadge).toBe('active');
 		});
+
+		it('should throw error when repository fails to load environments', async () => {
+			const repositoryError = new Error('Failed to read from storage');
+			mockRepository.getAll.mockRejectedValue(repositoryError);
+
+			await expect(useCase.execute()).rejects.toThrow('Failed to read from storage');
+			expect(mockRepository.getAll).toHaveBeenCalledTimes(1);
+		});
 	});
 });
