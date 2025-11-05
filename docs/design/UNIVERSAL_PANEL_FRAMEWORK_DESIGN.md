@@ -598,65 +598,963 @@ this.coordinator.registerHandler('export', async () => {  // ✅ Autocomplete + 
 
 ---
 
-### Slice 5: "Migrate EnvironmentSetupPanel (No EnvironmentBehavior)"
+### Slice 5: "Migrate EnvironmentSetupPanel (Form-Based, No EnvironmentBehavior)"
 **Builds on:** Slice 4
 
-**Goal:** Prove EnvironmentBehavior is optional.
+**Goal:** Prove EnvironmentBehavior is optional AND prove framework supports form-based panels (not just data tables).
+
+**Current Implementation:** EnvironmentSetupPanel is a form panel with:
+- Basic Information section: Name, Dataverse URL, Environment ID (with Discover button)
+- Authentication section: Tenant ID, Auth Method dropdown, conditional fields (Service Principal, Username/Password)
+- Header buttons: Save, Test Connection, Delete (conditionally shown)
+- Uses EnvironmentSetupBehavior.js for client-side form logic
+- Has dynamic fields that show/hide based on auth method selection
+
+**Domain (Environment Setup Feature):**
+
+Create domain entities and services for validation and business rules:
+
+```typescript
+// src/features/environmentSetup/domain/entities/EnvironmentConfig.ts
+export class EnvironmentConfig {
+  private constructor(
+    public readonly id: string,
+    public readonly name: string,
+    public readonly dataverseUrl: URL,
+    public readonly authMethod: AuthenticationMethod,
+    public readonly tenantId: string | null,
+    public readonly publicClientId: string,
+    public readonly powerPlatformEnvironmentId: string | null,
+    public readonly credentials: AuthenticationCredentials
+  ) {}
+
+  /**
+   * Factory method with validation.
+   * Enforces business rules at entity creation.
+   */
+  static create(data: EnvironmentFormData): EnvironmentConfig {
+    // Validate required fields
+    if (!data.name || data.name.trim() === '') {
+      throw new Error('Environment name is required');
+    }
+
+    if (!data.dataverseUrl || !this.isValidUrl(data.dataverseUrl)) {
+      throw new Error('Valid Dataverse URL is required');
+    }
+
+    if (!data.authenticationMethod) {
+      throw new Error('Authentication method is required');
+    }
+
+    // Validate auth-method-specific requirements
+    const authMethod = AuthenticationMethod.fromString(data.authenticationMethod);
+    const credentials = this.createCredentials(authMethod, data);
+
+    // Validate Tenant ID requirement
+    if (authMethod === AuthenticationMethod.ServicePrincipal && !data.tenantId) {
+      throw new Error('Tenant ID is required for Service Principal authentication');
+    }
+
+    return new EnvironmentConfig(
+      data.id || this.generateId(),
+      data.name.trim(),
+      new URL(data.dataverseUrl),
+      authMethod,
+      data.tenantId || null,
+      data.publicClientId || '51f81489-12ee-4a9e-aaae-a2591f45987d',
+      data.powerPlatformEnvironmentId || null,
+      credentials
+    );
+  }
+
+  private static createCredentials(
+    authMethod: AuthenticationMethod,
+    data: EnvironmentFormData
+  ): AuthenticationCredentials {
+    if (authMethod === AuthenticationMethod.ServicePrincipal) {
+      if (!data.clientId || !data.clientSecret) {
+        throw new Error('Service Principal requires Client ID and Client Secret');
+      }
+      return new ServicePrincipalCredentials(data.clientId, data.clientSecret);
+    }
+
+    if (authMethod === AuthenticationMethod.UsernamePassword) {
+      if (!data.username || !data.password) {
+        throw new Error('Username/Password authentication requires username and password');
+      }
+      return new UsernamePasswordCredentials(data.username, data.password);
+    }
+
+    return new InteractiveCredentials();
+  }
+
+  private static isValidUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'https:' && parsed.hostname.includes('dynamics.com');
+    } catch {
+      return false;
+    }
+  }
+
+  private static generateId(): string {
+    return crypto.randomUUID();
+  }
+
+  /**
+   * Rich behavior: Update authentication method.
+   * Returns new instance (immutable entity).
+   */
+  updateAuthMethod(
+    newMethod: AuthenticationMethod,
+    newCredentials: AuthenticationCredentials
+  ): EnvironmentConfig {
+    return new EnvironmentConfig(
+      this.id,
+      this.name,
+      this.dataverseUrl,
+      newMethod,
+      this.tenantId,
+      this.publicClientId,
+      this.powerPlatformEnvironmentId,
+      newCredentials
+    );
+  }
+
+  /**
+   * Rich behavior: Validate if environment can be saved.
+   */
+  canSave(): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (this.authMethod === AuthenticationMethod.ServicePrincipal && !this.tenantId) {
+      errors.push('Tenant ID is required for Service Principal');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+}
+
+// src/features/environmentSetup/domain/services/EnvironmentFormRules.ts
+/**
+ * Domain service: Business rules for environment form fields.
+ * Determines which fields are visible/required based on authentication method.
+ */
+export class EnvironmentFormRules {
+  /**
+   * Returns fields that should be visible for the given authentication method.
+   * Business rules:
+   * - Service Principal requires: clientId, clientSecret
+   * - Username/Password requires: username, password
+   * - Interactive/DeviceCode: no additional fields
+   */
+  getVisibleFields(
+    authMethod: AuthenticationMethod,
+    allFields: ReadonlyArray<FormFieldConfig>
+  ): ReadonlyArray<FormFieldConfig> {
+    return allFields.filter(field => {
+      // Fields without conditional display are always visible
+      if (!field.conditionalDisplay) {
+        return true;
+      }
+
+      const { dependsOn, showWhen } = field.conditionalDisplay;
+
+      // Business rule: Show Service Principal fields
+      if (authMethod === AuthenticationMethod.ServicePrincipal && showWhen === 'ServicePrincipal') {
+        return true;
+      }
+
+      // Business rule: Show Username/Password fields
+      if (authMethod === AuthenticationMethod.UsernamePassword && showWhen === 'UsernamePassword') {
+        return true;
+      }
+
+      return false;
+    });
+  }
+
+  /**
+   * Returns validation rules for a field based on context.
+   */
+  getFieldValidationRules(
+    field: FormFieldConfig,
+    authMethod: AuthenticationMethod
+  ): ReadonlyArray<ValidationRule> {
+    const rules: ValidationRule[] = [];
+
+    // Required field validation
+    if (field.required) {
+      rules.push({
+        type: 'required',
+        message: `${field.label} is required`
+      });
+    }
+
+    // URL validation
+    if (field.type === 'url') {
+      rules.push({
+        type: 'pattern',
+        pattern: /^https:\/\/.+\.dynamics\.com/,
+        message: 'Must be a valid Dynamics 365 URL (https://...dynamics.com)'
+      });
+    }
+
+    // Tenant ID validation for Service Principal
+    if (field.id === 'tenantId' && authMethod === AuthenticationMethod.ServicePrincipal) {
+      rules.push({
+        type: 'required',
+        message: 'Tenant ID is required for Service Principal'
+      });
+    }
+
+    return rules;
+  }
+}
+```
+
+**Infrastructure (Shared):**
+
+Create `LoadingStateBehavior` for automatic button state management:
+
+```typescript
+// src/shared/infrastructure/ui/behaviors/LoadingStateBehavior.ts
+export class LoadingStateBehavior implements IPanelBehavior {
+  private buttonStates = new Map<string, ButtonState>();
+  private panel: vscode.WebviewPanel | null = null;
+  private onStateChanged: (() => Promise<void>) | null = null;
+
+  async initialize(panel: vscode.WebviewPanel): Promise<void> {
+    this.panel = panel;
+  }
+
+  /**
+   * Register callback to trigger re-render when state changes.
+   */
+  setRenderCallback(callback: () => Promise<void>): void {
+    this.onStateChanged = callback;
+  }
+
+  /**
+   * Wraps async operation with automatic state tracking.
+   * Shows loading spinner, then success/error state, then resets.
+   */
+  async trackOperation<T>(
+    buttonId: ButtonId,
+    operation: () => Promise<T>,
+    defaultVariant: ButtonVariant = 'primary'
+  ): Promise<T> {
+    try {
+      // Set loading state
+      this.setState(buttonId, { loading: true, variant: defaultVariant });
+      await this.notifyStateChanged();
+
+      // Execute operation
+      const result = await operation();
+
+      // Set success state
+      this.setState(buttonId, { variant: 'success' });
+      await this.notifyStateChanged();
+
+      // Reset after 2s
+      setTimeout(() => {
+        this.setState(buttonId, { variant: defaultVariant });
+        this.notifyStateChanged();
+      }, 2000);
+
+      return result;
+    } catch (error) {
+      // Set error state
+      this.setState(buttonId, { variant: 'danger' });
+      await this.notifyStateChanged();
+
+      // Reset after 2s
+      setTimeout(() => {
+        this.setState(buttonId, { variant: defaultVariant });
+        this.notifyStateChanged();
+      }, 2000);
+
+      throw error;
+    }
+  }
+
+  /**
+   * Get current button states for rendering.
+   */
+  getButtonStates(): Record<string, ButtonState> {
+    return Object.fromEntries(this.buttonStates);
+  }
+
+  private setState(buttonId: ButtonId, state: ButtonState): void {
+    this.buttonStates.set(buttonId, state);
+  }
+
+  private async notifyStateChanged(): Promise<void> {
+    if (this.onStateChanged) {
+      await this.onStateChanged();
+    }
+  }
+
+  dispose(): void {
+    this.buttonStates.clear();
+    this.panel = null;
+    this.onStateChanged = null;
+  }
+}
+```
+
+**Infrastructure (Shared):**
+
+Create `ButtonState` value object in domain types:
+
+```typescript
+// src/shared/domain/types/ButtonState.ts
+export type ButtonVariant = 'default' | 'primary' | 'secondary' | 'danger' | 'success';
+
+/**
+ * Value object representing the visual state of a button.
+ * Immutable - changes create new instances.
+ */
+export class ButtonState {
+  constructor(
+    public readonly loading: boolean = false,
+    public readonly disabled: boolean = false,
+    public readonly variant: ButtonVariant = 'default',
+    public readonly hidden: boolean = false
+  ) {
+    // Validation: loading buttons should be disabled
+    if (loading && !disabled) {
+      throw new Error('Loading buttons must be disabled');
+    }
+  }
+
+  /**
+   * Create loading state.
+   */
+  static loading(variant: ButtonVariant = 'default'): ButtonState {
+    return new ButtonState(true, true, variant, false);
+  }
+
+  /**
+   * Create success state.
+   */
+  static success(): ButtonState {
+    return new ButtonState(false, false, 'success', false);
+  }
+
+  /**
+   * Create error state.
+   */
+  static error(): ButtonState {
+    return new ButtonState(false, false, 'danger', false);
+  }
+
+  /**
+   * Create default state.
+   */
+  static default(variant: ButtonVariant = 'default'): ButtonState {
+    return new ButtonState(false, false, variant, false);
+  }
+
+  /**
+   * Create hidden state.
+   */
+  static hidden(): ButtonState {
+    return new ButtonState(false, true, 'default', true);
+  }
+
+  /**
+   * Convert to plain object for serialization.
+   */
+  toPlainObject(): {
+    loading: boolean;
+    disabled: boolean;
+    variant: ButtonVariant;
+    hidden: boolean;
+  } {
+    return {
+      loading: this.loading,
+      disabled: this.disabled,
+      variant: this.variant,
+      hidden: this.hidden
+    };
+  }
+}
+```
+
+**Infrastructure (Shared):**
+
+Update `SectionRenderData` with typed properties:
+
+```typescript
+// src/shared/infrastructure/ui/types/SectionRenderData.ts
+/**
+ * Standardized data passed to sections during rendering.
+ * All properties are typed and documented.
+ */
+export interface SectionRenderData {
+  // Optional discriminant for type narrowing
+  sectionType?: 'table' | 'tree' | 'detail' | 'filter' | 'form' | 'custom';
+
+  // Table data (for DataTableSection)
+  tableData?: ReadonlyArray<Record<string, unknown>>;
+
+  // Detail data (for DetailPanelSection)
+  detailData?: unknown;
+
+  // Filter state (for FilterControlsSection)
+  filterState?: Record<string, unknown>;
+
+  // Form data (for FormSection) - TYPED
+  formData?: Record<string, unknown>;
+
+  // Button states (for ButtonWithStateSection) - TYPED
+  buttonStates?: Record<string, ButtonState>;
+
+  // Validation errors (for FormSection)
+  validationErrors?: Record<string, string[]>;
+
+  // Loading state (for all sections)
+  isLoading?: boolean;
+
+  // Error message (for all sections)
+  errorMessage?: string;
+
+  // Custom data (escape hatch for feature-specific sections)
+  customData?: Record<string, unknown>;
+}
+```
+
+**Infrastructure (Shared):**
+
+Create `FormSection` for form-based panels:
+
+```typescript
+// src/shared/infrastructure/ui/sections/FormSection.ts
+export class FormSection implements ISection {
+  readonly position = SectionPosition.Main;
+
+  constructor(private config: FormSectionConfig) {}
+
+  render(data: SectionRenderData): string {
+    const formData = data.customData?.formData as Record<string, unknown> || {};
+    return renderForm(this.config, formData);
+  }
+}
+
+// src/shared/infrastructure/ui/types/FormSectionConfig.ts
+export interface FormFieldConfig {
+  readonly id: string;
+  readonly name: string;
+  readonly label: string;
+  readonly type: 'text' | 'url' | 'password' | 'select';
+  readonly placeholder?: string;
+  readonly helpText?: string;
+  readonly required?: boolean;
+  readonly defaultValue?: string;
+  readonly options?: ReadonlyArray<{ value: string; label: string }>;
+  readonly conditionalDisplay?: {
+    readonly dependsOn: string;
+    readonly showWhen: string;
+  };
+}
+
+export interface FormFieldGroupConfig {
+  readonly title: string;
+  readonly fields: ReadonlyArray<FormFieldConfig>;
+}
+
+export interface FormSectionConfig {
+  readonly id: string;
+  readonly fieldGroups: ReadonlyArray<FormFieldGroupConfig>;
+}
+
+// src/shared/infrastructure/ui/views/formView.ts
+export function renderForm(
+  config: FormSectionConfig,
+  formData: Record<string, unknown>
+): string {
+  return `
+    <form id="${config.id}">
+      ${config.fieldGroups.map(group => renderFieldGroup(group, formData)).join('\n')}
+    </form>
+  `;
+}
+
+function renderFieldGroup(
+  group: FormFieldGroupConfig,
+  formData: Record<string, unknown>
+): string {
+  return `
+    <div class="form-group-section">
+      <h2>${escapeHtml(group.title)}</h2>
+      ${group.fields.map(field => renderFormField(field, formData)).join('\n')}
+    </div>
+  `;
+}
+
+function renderFormField(
+  field: FormFieldConfig,
+  formData: Record<string, unknown>
+): string {
+  const value = formData[field.name] || field.defaultValue || '';
+  const displayStyle = shouldShowField(field, formData) ? '' : 'display: none;';
+  const dataAttr = field.conditionalDisplay
+    ? `data-depends-on="${field.conditionalDisplay.dependsOn}" data-show-when="${field.conditionalDisplay.showWhen}"`
+    : '';
+
+  return `
+    <div class="form-field" ${dataAttr} style="${displayStyle}">
+      <label for="${field.id}">${escapeHtml(field.label)}${field.required ? ' *' : ''}</label>
+      ${renderFieldInput(field, value)}
+      ${field.helpText ? `<span class="help-text">${escapeHtml(field.helpText)}</span>` : ''}
+    </div>
+  `;
+}
+
+function renderFieldInput(field: FormFieldConfig, value: unknown): string {
+  const valueStr = String(value || '');
+
+  if (field.type === 'select' && field.options) {
+    return `
+      <select id="${field.id}" name="${field.name}" ${field.required ? 'required' : ''}>
+        ${field.options.map(opt => `
+          <option value="${escapeHtml(opt.value)}" ${opt.value === valueStr ? 'selected' : ''}>
+            ${escapeHtml(opt.label)}
+          </option>
+        `).join('')}
+      </select>
+    `;
+  }
+
+  return `
+    <input
+      type="${field.type}"
+      id="${field.id}"
+      name="${field.name}"
+      value="${escapeHtml(valueStr)}"
+      placeholder="${escapeHtml(field.placeholder || '')}"
+      ${field.required ? 'required' : ''}
+    />
+  `;
+}
+
+function shouldShowField(
+  field: FormFieldConfig,
+  formData: Record<string, unknown>
+): boolean {
+  if (!field.conditionalDisplay) {
+    return true;
+  }
+
+  const dependentValue = formData[field.conditionalDisplay.dependsOn];
+  return dependentValue === field.conditionalDisplay.showWhen;
+}
+```
+
+**Infrastructure (Shared):**
+
+Create `ButtonWithStateSection` for buttons with loading states and visual feedback:
+
+```typescript
+// src/shared/infrastructure/ui/sections/ButtonWithStateSection.ts
+export class ButtonWithStateSection implements ISection {
+  readonly position = SectionPosition.Header;
+
+  constructor(private config: ButtonWithStateConfig) {}
+
+  render(data: SectionRenderData): string {
+    const buttonStates = data.customData?.buttonStates as Record<string, ButtonState> || {};
+    return renderButtonsWithState(this.config, buttonStates);
+  }
+}
+
+// src/shared/infrastructure/ui/types/ButtonWithStateConfig.ts
+export interface ButtonState {
+  readonly loading?: boolean;
+  readonly disabled?: boolean;
+  readonly variant?: 'default' | 'primary' | 'secondary' | 'danger' | 'success';
+  readonly hidden?: boolean;
+}
+
+export interface ButtonWithStateConfig {
+  readonly buttons: ReadonlyArray<{
+    readonly id: ButtonId;
+    readonly label: string;
+    readonly defaultState?: ButtonState;
+  }>;
+}
+
+// src/shared/infrastructure/ui/views/buttonWithStateView.ts
+export function renderButtonsWithState(
+  config: ButtonWithStateConfig,
+  states: Record<string, ButtonState>
+): string {
+  return `
+    <div class="button-group">
+      ${config.buttons.map(btn => {
+        const state = states[btn.id] || btn.defaultState || {};
+        const variant = state.variant || 'default';
+        const loading = state.loading ? 'loading' : '';
+        const disabled = state.disabled || state.loading ? 'disabled' : '';
+        const hidden = state.hidden ? 'display: none;' : '';
+
+        return `
+          <button
+            id="${btn.id}"
+            class="btn btn-${variant} ${loading}"
+            ${disabled ? 'disabled' : ''}
+            style="${hidden}"
+          >
+            ${state.loading ? '<span class="spinner"></span>' : ''}
+            ${escapeHtml(btn.label)}
+          </button>
+        `;
+      }).join('\n')}
+    </div>
+  `;
+}
+```
 
 **Presentation (Environment Setup Feature):**
-```typescript
-const sections = [
-  new DataTableSection({
-    columns: [
-      { id: 'name', label: 'Environment Name' },
-      { id: 'url', label: 'URL' },
-      { id: 'status', label: 'Status' }
-    ]
-  }),
-  new ActionButtonsSection({
-    buttons: [
-      { id: 'add', label: 'Add Environment' },
-      { id: 'edit', label: 'Edit' },
-      { id: 'delete', label: 'Delete' },
-      { id: 'testConnection', label: 'Test Connection' }
-    ]
-  })
-];
 
-this.coordinator = new PanelCoordinator({
+Define panel commands:
+```typescript
+type EnvironmentSetupPanelCommands =
+  | 'save'
+  | 'testConnection'
+  | 'delete'
+  | 'discoverEnvironmentId'
+  | 'validateName'
+  | 'authMethodChanged';
+```
+
+Create sections:
+```typescript
+const headerSection = new ButtonWithStateSection({
+  buttons: [
+    { id: createButtonId('save'), label: 'Save Environment', defaultState: { variant: 'primary' } },
+    { id: createButtonId('testConnection'), label: 'Test Connection', defaultState: { variant: 'secondary' } },
+    { id: createButtonId('delete'), label: 'Delete Environment', defaultState: { variant: 'danger', hidden: !isEditMode } }
+  ]
+});
+
+const formSection = new FormSection({
+  id: 'environmentForm',
+  fieldGroups: [
+    {
+      title: 'Basic Information',
+      fields: [
+        {
+          id: 'name',
+          name: 'name',
+          label: 'Environment Name',
+          type: 'text',
+          placeholder: 'e.g., DEV',
+          helpText: 'A friendly name to identify this environment',
+          required: true
+        },
+        {
+          id: 'dataverseUrl',
+          name: 'dataverseUrl',
+          label: 'Dataverse URL',
+          type: 'url',
+          placeholder: 'https://org.crm.dynamics.com',
+          helpText: 'The URL of your Dataverse organization',
+          required: true
+        },
+        {
+          id: 'environmentId',
+          name: 'powerPlatformEnvironmentId',
+          label: 'Environment ID (Optional)',
+          type: 'text',
+          placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+          helpText: 'Optional: The unique GUID for this environment'
+        }
+      ]
+    },
+    {
+      title: 'Authentication',
+      fields: [
+        {
+          id: 'tenantId',
+          name: 'tenantId',
+          label: 'Tenant ID (Optional)',
+          type: 'text',
+          placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+          helpText: 'Your Azure AD tenant ID. Optional for Interactive/DeviceCode/UsernamePassword. Required for Service Principal.',
+          required: false
+        },
+        {
+          id: 'authenticationMethod',
+          name: 'authenticationMethod',
+          label: 'Authentication Method',
+          type: 'select',
+          required: true,
+          helpText: 'Select how you want to authenticate to this environment',
+          options: [
+            { value: 'Interactive', label: 'Interactive (Browser)' },
+            { value: 'ServicePrincipal', label: 'Service Principal (Client Secret)' },
+            { value: 'UsernamePassword', label: 'Username/Password' },
+            { value: 'DeviceCode', label: 'Device Code' }
+          ]
+        },
+        {
+          id: 'publicClientId',
+          name: 'publicClientId',
+          label: 'Public Client ID',
+          type: 'text',
+          defaultValue: '51f81489-12ee-4a9e-aaae-a2591f45987d',
+          placeholder: '51f81489-12ee-4a9e-aaae-a2591f45987d',
+          helpText: "Application (client) ID for Interactive/DeviceCode flows. Default is Microsoft's official public client ID.",
+          required: true
+        },
+        // Service Principal conditional fields
+        {
+          id: 'clientId',
+          name: 'clientId',
+          label: 'Client ID',
+          type: 'text',
+          placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+          helpText: 'Application ID for service principal',
+          conditionalDisplay: {
+            dependsOn: 'authenticationMethod',
+            showWhen: 'ServicePrincipal'
+          }
+        },
+        {
+          id: 'clientSecret',
+          name: 'clientSecret',
+          label: 'Client Secret',
+          type: 'password',
+          placeholder: 'Enter client secret',
+          helpText: 'Secret value (stored securely)',
+          conditionalDisplay: {
+            dependsOn: 'authenticationMethod',
+            showWhen: 'ServicePrincipal'
+          }
+        },
+        // Username/Password conditional fields
+        {
+          id: 'username',
+          name: 'username',
+          label: 'Username',
+          type: 'text',
+          placeholder: 'user@domain.com',
+          helpText: 'Dataverse username',
+          conditionalDisplay: {
+            dependsOn: 'authenticationMethod',
+            showWhen: 'UsernamePassword'
+          }
+        },
+        {
+          id: 'password',
+          name: 'password',
+          label: 'Password',
+          type: 'password',
+          placeholder: 'Enter password',
+          helpText: 'Password (stored securely)',
+          conditionalDisplay: {
+            dependsOn: 'authenticationMethod',
+            showWhen: 'UsernamePassword'
+          }
+        }
+      ]
+    }
+  ]
+});
+
+// Custom section for Discover button (inline with Environment ID field)
+const discoverButtonSection = new CustomInlineButtonSection({
+  position: SectionPosition.Main, // Rendered after environmentId field
+  buttonId: createButtonId('discoverEnvironmentId'),
+  label: 'Discover ID',
+  targetFieldId: 'environmentId'
+});
+```
+
+Create coordinator:
+```typescript
+this.coordinator = new PanelCoordinator<EnvironmentSetupPanelCommands>({
   panel,
   extensionUri,
   behaviors: [
     // NO EnvironmentBehavior - this panel manages environments, doesn't operate within one
-    new DataBehavior(environmentDataLoader),
-    new SectionCompositionBehavior(sections, PanelLayout.SingleColumn),
+    new SectionCompositionBehavior(
+      [headerSection, formSection, discoverButtonSection],
+      PanelLayout.SingleColumn
+    ),
     new MessageRoutingBehavior()
   ],
   logger
 });
 
-// Register CRUD handlers
-this.coordinator.registerHandler('add', async () => {
-  await addEnvironmentUseCase.execute();
+// Track button states for visual feedback
+let buttonStates: Record<string, ButtonState> = {};
+
+// Register handlers with button state management
+this.coordinator.registerHandler('save', async (payload) => {
+  const formData = payload as EnvironmentFormData;
+
+  try {
+    // Show loading state
+    buttonStates.save = { loading: true, variant: 'primary' };
+    await this.render(buttonStates);
+
+    await saveEnvironmentUseCase.execute(formData);
+
+    // Success state (green)
+    buttonStates.save = { variant: 'success' };
+    await this.render(buttonStates);
+
+    // Reset after 2s
+    setTimeout(() => {
+      buttonStates.save = { variant: 'primary' };
+      this.render(buttonStates);
+    }, 2000);
+  } catch (error) {
+    // Error state (red)
+    buttonStates.save = { variant: 'danger' };
+    await this.render(buttonStates);
+
+    // Reset after 2s
+    setTimeout(() => {
+      buttonStates.save = { variant: 'primary' };
+      this.render(buttonStates);
+    }, 2000);
+
+    throw error;
+  }
 });
 
-this.coordinator.registerHandler('edit', async () => {
-  await editEnvironmentUseCase.execute();
+this.coordinator.registerHandler('testConnection', async (payload) => {
+  const formData = payload as EnvironmentFormData;
+
+  try {
+    buttonStates.testConnection = { loading: true, variant: 'secondary' };
+    await this.render(buttonStates);
+
+    await testConnectionUseCase.execute(formData);
+
+    buttonStates.testConnection = { variant: 'success' };
+    await this.render(buttonStates);
+
+    setTimeout(() => {
+      buttonStates.testConnection = { variant: 'secondary' };
+      this.render(buttonStates);
+    }, 2000);
+  } catch (error) {
+    buttonStates.testConnection = { variant: 'danger' };
+    await this.render(buttonStates);
+
+    setTimeout(() => {
+      buttonStates.testConnection = { variant: 'secondary' };
+      this.render(buttonStates);
+    }, 2000);
+
+    throw error;
+  }
 });
 
-// ... other handlers
+this.coordinator.registerHandler('discoverEnvironmentId', async (payload) => {
+  const dataverseUrl = payload as { dataverseUrl: string };
+
+  try {
+    buttonStates.discoverEnvironmentId = { loading: true };
+    await this.render(buttonStates);
+
+    const environmentId = await discoverEnvironmentIdUseCase.execute(dataverseUrl);
+
+    // Success - update form field
+    await this.panel.webview.postMessage({
+      command: 'updateField',
+      data: { fieldId: 'environmentId', value: environmentId }
+    });
+
+    buttonStates.discoverEnvironmentId = { variant: 'success' };
+    await this.render(buttonStates);
+
+    setTimeout(() => {
+      buttonStates.discoverEnvironmentId = {};
+      this.render(buttonStates);
+    }, 2000);
+  } catch (error) {
+    buttonStates.discoverEnvironmentId = { variant: 'danger' };
+    await this.render(buttonStates);
+
+    setTimeout(() => {
+      buttonStates.discoverEnvironmentId = {};
+      this.render(buttonStates);
+    }, 2000);
+
+    throw error;
+  }
+});
+
+this.coordinator.registerHandler('delete', async () => {
+  const confirmed = await vscode.window.showWarningMessage(
+    'Are you sure you want to delete this environment?',
+    { modal: true },
+    'Delete'
+  );
+
+  if (confirmed) {
+    await deleteEnvironmentUseCase.execute(environmentId);
+    this.dispose();
+  }
+});
+
+this.coordinator.registerHandler('validateName', async (payload) => {
+  const name = payload as { name: string };
+  const isUnique = await validateUniqueNameUseCase.execute(name.name, environmentId);
+
+  await this.panel.webview.postMessage({
+    command: 'validationResult',
+    data: { fieldId: 'name', valid: isUnique, message: isUnique ? '' : 'Name already exists' }
+  });
+});
+
+this.coordinator.registerHandler('authMethodChanged', async (payload) => {
+  const authMethod = payload as { authMethod: string };
+
+  // Re-render form with conditional fields shown/hidden
+  await this.render({
+    ...buttonStates,
+    formData: { authenticationMethod: authMethod.authMethod }
+  });
+});
 ```
 
+**Client-side behavior (webview):**
+- Reuse existing `EnvironmentSetupBehavior.js` for form logic
+- Handles conditional field display/hide based on auth method
+- Sends messages to panel for validation, save, test, etc.
+
 **Testing:**
-- Environment Setup panel opens correctly
-- NO environment dropdown shown (correct behavior)
-- CRUD operations work
-- Panel doesn't crash without EnvironmentBehavior
-- Test coverage: 85% for EnvironmentSetupPanel coordinator
+- Environment Setup panel opens correctly (form mode, not table)
+- NO environment dropdown shown (correct - no EnvironmentBehavior)
+- Form fields render correctly with proper layout
+- Conditional fields show/hide based on auth method selection
+- Save button: Shows spinner → green on success / red on failure
+- Test Connection button: Shows spinner → green on success / red on failure
+- Discover ID button: Shows spinner → green on success / red on failure
+- Delete button only shown when editing existing environment
+- Name validation works (real-time check for duplicate names)
+- All form data saves correctly
+- Panel look and feel matches current implementation
+- Test coverage:
+  - FormSection: 90% coverage
+  - ButtonWithStateSection: 90% coverage
+  - renderForm view: 90% coverage
+  - renderButtonsWithState view: 90% coverage
+  - EnvironmentSetupPanel coordinator: 85% coverage
 
-**Result:** OPTIONAL ENVIRONMENT BEHAVIOR PROVEN ✅
+**Result:** OPTIONAL ENVIRONMENT BEHAVIOR PROVEN ✅ + FORM-BASED PANELS SUPPORTED ✅
 
-**Complexity:** Simple
+**Complexity:** Moderate (more complex than originally estimated - requires new FormSection + ButtonWithStateSection + state management for visual feedback)
 
 ---
 
