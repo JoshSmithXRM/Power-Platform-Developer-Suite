@@ -5,153 +5,172 @@
  * Handles form interactions, validation, and message passing to the extension host.
  */
 
-import { WebviewLogger } from '../utils/WebviewLogger.js';
-
-const vscode = acquireVsCodeApi();
-const logger = new WebviewLogger(vscode, 'EnvironmentSetup');
-
-// DOM elements
-const form = document.getElementById('environmentForm');
-const nameInput = document.getElementById('name');
-const authMethodSelect = document.getElementById('authenticationMethod');
-const saveButton = document.getElementById('saveButton');
-const testButton = document.getElementById('testButton');
-const discoverButton = document.getElementById('discoverButton');
-const deleteButton = document.getElementById('deleteButton');
-
-// Track last saved auth method to detect changes
-let lastSavedAuthMethod = authMethodSelect.value;
-
-// Event listeners for messages from extension host
-window.addEventListener('message', event => {
-	const message = event.data;
-
-	switch (message.command) {
-		case 'environment-loaded':
-			loadEnvironmentData(message.data);
-			break;
-
-		case 'environment-saved':
-			handleSaveComplete(message.data);
-			break;
-
-		case 'test-connection-result':
-			handleTestResult(message.data);
-			break;
-
-		case 'discover-environment-id-result':
-			handleDiscoverResult(message.data);
-			break;
-
-		case 'name-validation-result':
-			handleNameValidation(message.data);
-			break;
-	}
-});
-
-// Save button click
-saveButton.addEventListener('click', () => {
-	logger.debug('Save button clicked');
-
-	if (form.checkValidity()) {
-		saveEnvironment();
-	} else {
-		logger.warn('Form validation failed on save attempt');
-		form.reportValidity();
-	}
-});
-
-// Test connection button click
-testButton.addEventListener('click', () => {
-	logger.debug('Test connection button clicked');
-
-	if (form.checkValidity()) {
-		testConnection();
-	} else {
-		logger.warn('Form validation failed on test connection attempt');
-		form.reportValidity();
-	}
-});
-
-// Discover Environment ID button click
-discoverButton.addEventListener('click', () => {
-	logger.debug('Discover environment ID button clicked');
-
-	if (form.checkValidity()) {
-		discoverEnvironmentId();
-	} else {
-		logger.warn('Form validation failed on discover ID attempt');
-		form.reportValidity();
-	}
-});
-
-// Delete button click
-deleteButton.addEventListener('click', () => {
-	logger.info('User initiated environment deletion');
-
-	vscode.postMessage({
-		command: 'delete-environment'
-	});
-});
-
-// Auth method change - show/hide conditional fields
-authMethodSelect.addEventListener('change', () => {
-	updateConditionalFields();
-});
-
-// Name validation (debounced)
+// Module-level variables (accessed by helper functions)
+let form;
+let nameInput;
+let authMethodSelect;
+let saveButton;
+let testButton;
+let discoverButton;
+let deleteButton;
+let lastSavedAuthMethod;
 let nameValidationTimeout;
-nameInput.addEventListener('input', () => {
-	clearTimeout(nameValidationTimeout);
-	nameValidationTimeout = setTimeout(() => {
-		validateName();
-	}, 500);
-});
 
-// Clear save validation errors when user starts typing in any field
-// (name validation errors are managed separately and clear on their own)
-form.addEventListener('input', () => {
-	clearSaveValidationErrors();
+window.createBehavior({
+	initialize() {
+		// Get DOM elements
+		form = document.getElementById('environmentForm');
+		nameInput = document.getElementById('name');
+		authMethodSelect = document.getElementById('authenticationMethod');
+		saveButton = document.getElementById('saveEnvironment');
+		testButton = document.getElementById('testConnection');
+		discoverButton = document.getElementById('discoverEnvironmentId');
+		deleteButton = document.getElementById('deleteEnvironment');
+
+		if (authMethodSelect) {
+			lastSavedAuthMethod = authMethodSelect.value;
+		}
+
+		// Register event listeners
+		if (saveButton) {
+			saveButton.addEventListener('click', () => {
+				if (form && form.checkValidity()) {
+					saveEnvironment();
+				} else if (form) {
+					form.reportValidity();
+				}
+			});
+		}
+
+		if (testButton) {
+			testButton.addEventListener('click', () => {
+				if (form && form.checkValidity()) {
+					testConnection();
+				} else if (form) {
+					form.reportValidity();
+				}
+			});
+		}
+
+		if (discoverButton) {
+			discoverButton.addEventListener('click', () => {
+				if (form && form.checkValidity()) {
+					discoverEnvironmentId();
+				} else if (form) {
+					form.reportValidity();
+				}
+			});
+		}
+
+		if (deleteButton) {
+			deleteButton.addEventListener('click', () => {
+				window.vscode.postMessage({
+					command: 'deleteEnvironment'
+				});
+			});
+		}
+
+		if (authMethodSelect) {
+			authMethodSelect.addEventListener('change', () => {
+				updateConditionalFields();
+			});
+		}
+
+		if (nameInput) {
+			nameInput.addEventListener('input', () => {
+				clearTimeout(nameValidationTimeout);
+				nameValidationTimeout = setTimeout(() => {
+					validateName();
+				}, 500);
+			});
+		}
+
+		if (form) {
+			form.addEventListener('input', () => {
+				clearSaveValidationErrors();
+			});
+		}
+
+		// Initialize conditional fields
+		updateConditionalFields();
+	},
+
+	handleMessage(message) {
+		switch (message.command) {
+			case 'environment-loaded':
+				loadEnvironmentData(message.data);
+				break;
+
+			case 'environment-saved':
+				handleSaveComplete(message.data);
+				break;
+
+			case 'test-connection-result':
+				// VS Code shows notification, no UI update needed
+				break;
+
+			case 'discover-environment-id-result':
+				if (message.data.success) {
+					const envIdInput = document.getElementById('environmentId');
+					if (envIdInput && message.data.environmentId) {
+						envIdInput.value = message.data.environmentId;
+					}
+				}
+				break;
+
+			case 'name-validation-result':
+				handleNameValidation(message.data);
+				break;
+		}
+	}
 });
 
 function loadEnvironmentData(data) {
 	if (!data) return;
 
-	document.getElementById('name').value = data.name || '';
-	document.getElementById('dataverseUrl').value = data.dataverseUrl || '';
-	document.getElementById('tenantId').value = data.tenantId || '';
-	document.getElementById('authenticationMethod').value = data.authenticationMethod || 'Interactive';
-	document.getElementById('publicClientId').value = data.publicClientId || '';
-	document.getElementById('environmentId').value = data.powerPlatformEnvironmentId || '';
-	document.getElementById('clientId').value = data.clientId || '';
-	document.getElementById('username').value = data.username || '';
+	const nameInput = document.getElementById('name');
+	const urlInput = document.getElementById('dataverseUrl');
+	const tenantInput = document.getElementById('tenantId');
+	const authSelect = document.getElementById('authenticationMethod');
+	const publicClientInput = document.getElementById('publicClientId');
+	const envIdInput = document.getElementById('environmentId');
+	const clientIdInput = document.getElementById('clientId');
+	const usernameInput = document.getElementById('username');
+	const clientSecretInput = document.getElementById('clientSecret');
+	const passwordInput = document.getElementById('password');
+
+	if (nameInput) nameInput.value = data.name || '';
+	if (urlInput) urlInput.value = data.dataverseUrl || '';
+	if (tenantInput) tenantInput.value = data.tenantId || '';
+	if (authSelect) authSelect.value = data.authenticationMethod || 'Interactive';
+	if (publicClientInput) publicClientInput.value = data.publicClientId || '';
+	if (envIdInput) envIdInput.value = data.powerPlatformEnvironmentId || '';
+	if (clientIdInput) clientIdInput.value = data.clientId || '';
+	if (usernameInput) usernameInput.value = data.username || '';
 
 	// Show credential placeholders for stored secrets
-	if (data.hasStoredClientSecret && data.clientSecretPlaceholder) {
-		document.getElementById('clientSecret').placeholder = data.clientSecretPlaceholder;
+	if (data.hasStoredClientSecret && data.clientSecretPlaceholder && clientSecretInput) {
+		clientSecretInput.placeholder = data.clientSecretPlaceholder;
 	}
-	if (data.hasStoredPassword && data.passwordPlaceholder) {
-		document.getElementById('password').placeholder = data.passwordPlaceholder;
+	if (data.hasStoredPassword && data.passwordPlaceholder && passwordInput) {
+		passwordInput.placeholder = data.passwordPlaceholder;
 	}
 
 	// Track the loaded auth method
 	lastSavedAuthMethod = data.authenticationMethod || 'Interactive';
 
 	updateConditionalFields();
-	deleteButton.style.display = 'inline-block';
+	if (deleteButton) {
+		deleteButton.style.display = 'inline-block';
+	}
 }
 
 function saveEnvironment() {
 	const formData = new FormData(form);
 	const data = Object.fromEntries(formData.entries());
 
-	logger.info('User initiated save', {
-		authMethod: data.authenticationMethod,
-		hasDataverseUrl: !!data.dataverseUrl
-	});
-
-	vscode.postMessage({
-		command: 'save-environment',
+	window.vscode.postMessage({
+		command: 'saveEnvironment',
 		data: data
 	});
 }
@@ -160,15 +179,13 @@ function testConnection() {
 	const formData = new FormData(form);
 	const data = Object.fromEntries(formData.entries());
 
-	logger.info('User initiated connection test', {
-		authMethod: data.authenticationMethod
-	});
+	if (testButton) {
+		testButton.disabled = true;
+		testButton.textContent = 'Testing...';
+	}
 
-	testButton.disabled = true;
-	testButton.textContent = 'Testing...';
-
-	vscode.postMessage({
-		command: 'test-connection',
+	window.vscode.postMessage({
+		command: 'testConnection',
 		data: data
 	});
 }
@@ -177,15 +194,13 @@ function discoverEnvironmentId() {
 	const formData = new FormData(form);
 	const data = Object.fromEntries(formData.entries());
 
-	logger.info('User initiated environment ID discovery', {
-		authMethod: data.authenticationMethod
-	});
+	if (discoverButton) {
+		discoverButton.disabled = true;
+		discoverButton.textContent = 'Discovering...';
+	}
 
-	discoverButton.disabled = true;
-	discoverButton.textContent = 'Discovering...';
-
-	vscode.postMessage({
-		command: 'discover-environment-id',
+	window.vscode.postMessage({
+		command: 'discoverEnvironmentId',
 		data: data
 	});
 }
@@ -194,8 +209,8 @@ function validateName() {
 	const name = nameInput.value.trim();
 	if (name.length === 0) return;
 
-	vscode.postMessage({
-		command: 'validate-name',
+	window.vscode.postMessage({
+		command: 'validateName',
 		data: { name }
 	});
 }
@@ -205,24 +220,34 @@ function validateName() {
  * Called after successful save to clean up orphaned credentials.
  */
 function clearOrphanedCredentials() {
+	if (!authMethodSelect) return;
 	const authMethod = authMethodSelect.value;
 
 	// Clear Service Principal credentials if not using Service Principal
 	if (authMethod !== 'ServicePrincipal') {
-		document.getElementById('clientId').value = '';
-		document.getElementById('clientSecret').value = '';
-		document.getElementById('clientSecret').placeholder = '';
+		const clientIdInput = document.getElementById('clientId');
+		const clientSecretInput = document.getElementById('clientSecret');
+		if (clientIdInput) clientIdInput.value = '';
+		if (clientSecretInput) {
+			clientSecretInput.value = '';
+			clientSecretInput.placeholder = '';
+		}
 	}
 
 	// Clear Username/Password credentials if not using Username/Password
 	if (authMethod !== 'UsernamePassword') {
-		document.getElementById('username').value = '';
-		document.getElementById('password').value = '';
-		document.getElementById('password').placeholder = '';
+		const usernameInput = document.getElementById('username');
+		const passwordInput = document.getElementById('password');
+		if (usernameInput) usernameInput.value = '';
+		if (passwordInput) {
+			passwordInput.value = '';
+			passwordInput.placeholder = '';
+		}
 	}
 }
 
 function updateConditionalFields() {
+	if (!authMethodSelect) return;
 	const authMethod = authMethodSelect.value;
 	const conditionalFields = document.querySelectorAll('.conditional-field');
 
@@ -234,34 +259,30 @@ function updateConditionalFields() {
 
 function handleSaveComplete(data) {
 	if (data.success) {
-		logger.info('Environment saved successfully', {
-			isNew: data.isNewEnvironment
-		});
-
 		// Clear any existing validation errors
 		clearAllValidationErrors();
 
 		// Clear credentials only if auth method changed
-		const currentAuthMethod = authMethodSelect.value;
-		if (currentAuthMethod !== lastSavedAuthMethod) {
-			clearOrphanedCredentials();
-			lastSavedAuthMethod = currentAuthMethod;
+		if (authMethodSelect) {
+			const currentAuthMethod = authMethodSelect.value;
+			if (currentAuthMethod !== lastSavedAuthMethod) {
+				clearOrphanedCredentials();
+				lastSavedAuthMethod = currentAuthMethod;
+			}
 		}
 
-		saveButton.textContent = 'Saved!';
-		setTimeout(() => {
-			saveButton.textContent = 'Save Environment';
-		}, 2000);
+		if (saveButton) {
+			saveButton.textContent = 'Saved!';
+			setTimeout(() => {
+				saveButton.textContent = 'Save Environment';
+			}, 2000);
+		}
 
 		// Show delete button if newly created
-		if (data.isNewEnvironment && data.environmentId) {
+		if (data.isNewEnvironment && data.environmentId && deleteButton) {
 			deleteButton.style.display = 'inline-block';
 		}
 	} else if (data.errors && data.errors.length > 0) {
-		logger.warn('Environment save validation failed', {
-			errorCount: data.errors.length
-		});
-
 		// Display validation errors inline
 		displayValidationErrors(data.errors);
 	}
@@ -321,7 +342,7 @@ function showFieldError(fieldId, errorMessage) {
 
 	// Create error message element
 	const errorElement = document.createElement('div');
-	errorElement.className = 'validation-error save-error'; // Mark as save error
+	errorElement.className = 'validation-error save-error';
 	errorElement.textContent = errorMessage;
 	errorElement.style.cssText = 'color: var(--vscode-inputValidation-errorForeground); background: var(--vscode-inputValidation-errorBackground); border: 1px solid var(--vscode-inputValidation-errorBorder); padding: 4px 8px; margin-top: 4px; font-size: 12px; border-radius: 2px;';
 
@@ -334,10 +355,8 @@ function showFieldError(fieldId, errorMessage) {
 	}
 }
 
-/**
- * Clears only save validation errors (not name validation errors).
- */
 function clearSaveValidationErrors() {
+	if (!form) return;
 	// Remove only save-generated error messages
 	const errorMessages = form.querySelectorAll('.validation-error.save-error');
 	errorMessages.forEach(error => error.remove());
@@ -355,6 +374,7 @@ function clearSaveValidationErrors() {
 }
 
 function clearAllValidationErrors() {
+	if (!form) return;
 	// Remove all field error messages
 	const errorMessages = form.querySelectorAll('.validation-error');
 	errorMessages.forEach(error => error.remove());
@@ -368,73 +388,65 @@ function clearAllValidationErrors() {
 }
 
 function handleTestResult(data) {
-	testButton.disabled = false;
-	testButton.textContent = 'Test Connection';
+	if (testButton) {
+		testButton.disabled = false;
+		testButton.textContent = 'Test Connection';
 
-	if (data.success) {
-		logger.info('Connection test succeeded');
-
-		testButton.classList.add('success');
-		setTimeout(() => {
-			testButton.classList.remove('success');
-		}, 3000);
-	} else {
-		logger.warn('Connection test failed', {
-			errorMessage: data.errorMessage
-		});
-
-		testButton.classList.add('error');
-		setTimeout(() => {
-			testButton.classList.remove('error');
-		}, 3000);
+		if (data.success) {
+			testButton.classList.add('success');
+			setTimeout(() => {
+				testButton.classList.remove('success');
+			}, 3000);
+		} else {
+			testButton.classList.add('error');
+			setTimeout(() => {
+				testButton.classList.remove('error');
+			}, 3000);
+		}
 	}
 }
 
 function handleDiscoverResult(data) {
-	discoverButton.disabled = false;
-	discoverButton.textContent = 'Discover ID';
+	if (discoverButton) {
+		discoverButton.disabled = false;
+		discoverButton.textContent = 'Discover ID';
 
-	if (data.success && data.environmentId) {
-		logger.info('Environment ID discovered successfully', {
-			environmentId: data.environmentId
-		});
-
-		// Populate the environment ID field
-		document.getElementById('environmentId').value = data.environmentId;
-		discoverButton.classList.add('success');
-		setTimeout(() => {
-			discoverButton.classList.remove('success');
-		}, 3000);
-	} else {
-		logger.warn('Environment ID discovery failed', {
-			errorMessage: data.errorMessage
-		});
-
-		discoverButton.classList.add('error');
-		setTimeout(() => {
-			discoverButton.classList.remove('error');
-		}, 3000);
+		if (data.success && data.environmentId) {
+			// Populate the environment ID field
+			const envIdInput = document.getElementById('environmentId');
+			if (envIdInput) {
+				envIdInput.value = data.environmentId;
+			}
+			discoverButton.classList.add('success');
+			setTimeout(() => {
+				discoverButton.classList.remove('success');
+			}, 3000);
+		} else {
+			discoverButton.classList.add('error');
+			setTimeout(() => {
+				discoverButton.classList.remove('error');
+			}, 3000);
+		}
 	}
 }
 
 function handleNameValidation(data) {
+	if (!nameInput) return;
 	const nameField = nameInput.parentElement;
+	if (!nameField) return;
 	const existingError = nameField.querySelector('.validation-error');
 
 	if (existingError) {
 		existingError.remove();
 	}
 
-	if (!data.isUnique) {
+	if (!data.isValid) {
 		const error = document.createElement('div');
 		error.className = 'validation-error';
-		error.textContent = data.message;
+		error.textContent = data.message || 'Name must be unique';
 		nameField.appendChild(error);
 		nameInput.classList.add('invalid');
 	} else {
 		nameInput.classList.remove('invalid');
 	}
 }
-
-// Initialize on load
-updateConditionalFields();

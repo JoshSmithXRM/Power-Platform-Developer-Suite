@@ -13,6 +13,47 @@
 	// Make available globally for other scripts
 	window.vscode = vscode;
 
+	/**
+	 * Helper for creating behavior modules.
+	 * Handles common boilerplate: vscode API access, DOM ready detection, message handling.
+	 *
+	 * @param {Object} config - Behavior configuration
+	 * @param {Function} config.initialize - Called when DOM is ready
+	 * @param {Function} [config.handleMessage] - Optional message handler
+	 *
+	 * @example
+	 * window.createBehavior({
+	 *   initialize() {
+	 *     // Setup your behavior
+	 *     const form = document.getElementById('myForm');
+	 *   },
+	 *   handleMessage(message) {
+	 *     // Handle messages from extension
+	 *     if (message.command === 'data-loaded') { ... }
+	 *   }
+	 * });
+	 */
+	window.createBehavior = function(config) {
+		if (!config || typeof config.initialize !== 'function') {
+			console.error('createBehavior requires an initialize function');
+			return;
+		}
+
+		// Register message handler if provided
+		if (typeof config.handleMessage === 'function') {
+			window.addEventListener('message', event => {
+				config.handleMessage(event.data);
+			});
+		}
+
+		// Initialize when DOM is ready
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', config.initialize);
+		} else {
+			config.initialize();
+		}
+	};
+
 	// Track original button content for restoration
 	const buttonOriginalContent = new Map();
 
