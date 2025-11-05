@@ -31,11 +31,6 @@ export function renderDataTableSection(viewData: DataTableViewData): string {
 		return renderLoading();
 	}
 
-	// If no data and no search query, show empty state message
-	if (data.length === 0 && !searchQuery) {
-		return renderEmptyState(config.noDataMessage);
-	}
-
 	const sortColumn = viewData.sortColumn || config.defaultSortColumn;
 	const sortDirection = viewData.sortDirection || config.defaultSortDirection;
 
@@ -43,7 +38,7 @@ export function renderDataTableSection(viewData: DataTableViewData): string {
 		<div class="table-wrapper">
 			${config.enableSearch !== false ? renderSearchBox(config.searchPlaceholder, viewData.searchQuery) : ''}
 			<div class="table-content">
-				${renderTable(data, config, sortColumn, sortDirection)}
+				${renderTable(data, config, sortColumn, sortDirection, searchQuery)}
 			</div>
 			${renderFooter(data.length)}
 		</div>
@@ -73,7 +68,8 @@ function renderTable(
 	data: ReadonlyArray<Record<string, unknown>>,
 	config: DataTableConfig,
 	sortColumn: string,
-	sortDirection: 'asc' | 'desc'
+	sortDirection: 'asc' | 'desc',
+	searchQuery?: string
 ): string {
 	return `
 		<div class="table-container">
@@ -85,7 +81,7 @@ function renderTable(
 				</thead>
 				<tbody>
 					${data.length === 0
-						? renderNoResults(config.columns.length)
+						? renderNoDataRow(config.columns.length, config.noDataMessage, searchQuery)
 						: data.map(row => renderTableRow(row, config.columns)).join('')
 					}
 				</tbody>
@@ -129,13 +125,15 @@ function renderTableRow(
 }
 
 /**
- * Renders "No matching records" message in table.
+ * Renders "No data" message in table.
+ * Shows different message for search results vs empty data.
  */
-function renderNoResults(columnCount: number): string {
+function renderNoDataRow(columnCount: number, noDataMessage: string, searchQuery?: string): string {
+	const message = searchQuery ? 'No matching records found' : noDataMessage;
 	return `
 		<tr>
 			<td colspan="${columnCount}" style="text-align: center; padding: 24px; color: var(--vscode-descriptionForeground);">
-				No matching records found
+				${escapeHtml(message)}
 			</td>
 		</tr>
 	`;
@@ -170,11 +168,4 @@ function renderError(message: string): string {
 			${escapeHtml(message)}
 		</div>
 	`;
-}
-
-/**
- * Renders empty state message.
- */
-function renderEmptyState(message: string): string {
-	return `<p style="padding: 16px;">${escapeHtml(message)}</p>`;
 }

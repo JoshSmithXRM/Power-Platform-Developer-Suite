@@ -142,10 +142,17 @@ export class SolutionExplorerPanelComposed {
 	}
 
 	private async initializeAndLoadData(): Promise<void> {
-		// Initialize coordinator (sets up HTML)
-		await this.coordinator.initialize();
+		// Load environments first so they appear on initial render
+		const environments = await this.getEnvironments();
 
-		// Load initial data
+		// Initialize coordinator with environments
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			tableData: []
+		});
+
+		// Load solutions data
 		await this.handleRefresh();
 	}
 

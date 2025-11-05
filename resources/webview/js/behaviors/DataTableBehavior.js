@@ -58,6 +58,7 @@
 		searchInput.addEventListener('input', () => {
 			const query = searchInput.value.toLowerCase();
 			const rows = document.querySelectorAll('tbody tr');
+			const totalCount = rows.length;
 
 			// Filter rows
 			rows.forEach(row => {
@@ -72,12 +73,18 @@
 			// Re-apply striping to visible rows
 			applyRowStriping(table);
 
-			// Update record count
+			// Update record count with "X of Y" format when filtering
 			const visibleCount = Array.from(rows).filter(row => row.style.display !== 'none').length;
 			const footer = document.querySelector('.table-footer');
 			if (footer) {
-				const recordText = visibleCount === 1 ? 'record' : 'records';
-				footer.textContent = `${visibleCount} ${recordText}`;
+				const recordText = totalCount === 1 ? 'record' : 'records';
+				if (visibleCount === totalCount) {
+					// No filtering active
+					footer.textContent = `${totalCount} ${recordText}`;
+				} else {
+					// Filtering active - show "X of Y records"
+					footer.textContent = `${visibleCount} of ${totalCount} ${recordText}`;
+				}
 			}
 		});
 
