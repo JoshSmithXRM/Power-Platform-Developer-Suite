@@ -116,15 +116,20 @@
 
 ## 🔄 Workflow Rules
 
+**Workflow Philosophy:**
+- **Design outside-in** (user perspective: panel → ViewModels → use cases → domain)
+- **Implement inside-out** (technical: domain → application → infrastructure → presentation)
+- **Review once per feature** (after all 4 layers implemented, not per layer)
+
 **When building features:**
 - ✅ Design type contracts BEFORE implementation - Prevents type error cascade (15x rework multiplier)
 - ✅ Compile after EACH layer - `npm run compile` after domain, application, infrastructure, presentation
-- ✅ Review per layer (not all at once) - Catch violations early (5-10 min fixes vs 2+ hour refactors)
-- ✅ Commit per layer - Granular rollback capability
-- ✅ Write clean from start - No cleanup phase needed if following LOGGING_GUIDE.md
+- ✅ Commit per layer - Granular rollback capability (domain → app → infra → presentation)
 - ✅ Write tests AFTER implementation, BEFORE review - Domain entities (100% target), use cases (90% target)
-- ✅ Run `npm test` before `npm run compile` - Tests must pass before review
+- ✅ Run `npm test` and `npm run compile` - Tests must pass before review
+- ✅ Manual test (F5) - Feature must work end-to-end before review
 - ✅ Include test file paths in commit messages - Document test coverage
+- ✅ Review ONCE after all layers complete - Comprehensive review, not per-layer
 
 **When fixing bugs:**
 - ✅ Write failing test first - Reproduces bug
@@ -135,16 +140,17 @@
 - ✅ Tests must pass BEFORE refactoring - Baseline behavior established
 - ✅ Tests must pass AFTER refactoring - Behavior unchanged
 
-**Agent roles (see .claude/AGENT_ROLES.md):**
+**Agent roles (see .claude/AGENTS.md):**
 - YOU = Implementer (human or builder)
-- clean-architecture-guardian = Designer + Reviewer + Final Approval Gate (NOT implementer)
-- typescript-pro = Type Safety Reviewer (NOT implementer)
-- code-cleanup-implementer = Logging/Comment Fixer + Documenter (IS implementer)
+- design-architect = Feature designer (BEFORE implementation, complex features only)
+- code-guardian = Comprehensive reviewer + Final Approval Gate (AFTER implementation)
+- docs-generator = Documentation creator (OPTIONAL, when needed)
 
 **Never:**
 - ❌ Implement all layers then compile - Type errors compound 15x
 - ❌ Skip type contract review - Leads to downstream type refactoring
 - ❌ Mix feature work with refactoring - Separate concerns, separate commits
+- ❌ Review during implementation - Wait until feature complete
 - ❌ Ask reviewers to implement - They review, YOU implement
 
 ---
@@ -158,11 +164,7 @@
 ## 📚 Workflow References
 
 **For specific workflows, see:**
-- `.claude/WORKFLOW_GUIDE.md` - Master workflow guide with invocation examples
-- `.claude/workflows/DESIGN_WORKFLOW.md` - Technical design documentation process
-- `.claude/workflows/NEW_FEATURE_WORKFLOW.md` - Complete feature implementation
-- `.claude/workflows/VERTICAL_SLICING_GUIDE.md` - How to slice features for fast feedback
-- `.claude/workflows/BUG_FIX_WORKFLOW.md` - Quick bug fix process
-- `.claude/workflows/REFACTORING_WORKFLOW.md` - Safe refactoring process
-- `.claude/AGENT_ROLES.md` - Agent responsibilities (who implements vs who reviews)
+- `.claude/WORKFLOW.md` - All workflows in one place (feature dev, bug fixes, refactoring, testing)
+- `.claude/AGENTS.md` - Agent guide (design-architect, code-guardian, docs-generator)
+- `.claude/templates/TECHNICAL_DESIGN_TEMPLATE.md` - Design document template
 - `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` - Panel development guide (Framework Approach vs Direct Implementation)
