@@ -49,9 +49,14 @@ export class StorageInspectionService {
 			entries.push(StorageEntry.create(key, value, 'global'));
 		}
 
-		// Add secret entries (values hidden)
+		// Add secret entries (values hidden) - only if they actually exist
 		for (const key of secretKeys) {
-			entries.push(StorageEntry.create(key, '***', 'secret'));
+			// Verify secret exists before adding to list
+			// This filters out deleted secrets that may still be referenced in configs
+			const secretValue = await this.storageReader.revealSecret(key);
+			if (secretValue !== undefined) {
+				entries.push(StorageEntry.create(key, '***', 'secret'));
+			}
 		}
 
 		const protectedPatterns = this.protectedKeyProvider.getProtectedKeyPatterns();

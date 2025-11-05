@@ -870,7 +870,7 @@ async function initializePersistenceInspector(
 	const { ClearStoragePropertyUseCase } = await import('./features/persistenceInspector/application/useCases/ClearStoragePropertyUseCase.js');
 	const { ClearAllStorageUseCase } = await import('./features/persistenceInspector/application/useCases/ClearAllStorageUseCase.js');
 	const { GetClearAllConfirmationMessageUseCase } = await import('./features/persistenceInspector/application/useCases/GetClearAllConfirmationMessageUseCase.js');
-	const { PersistenceInspectorPanel } = await import('./features/persistenceInspector/presentation/panels/PersistenceInspectorPanel.js');
+	const { PersistenceInspectorPanelComposed } = await import('./features/persistenceInspector/presentation/panels/PersistenceInspectorPanelComposed.js');
 
 	const storageReader = new VsCodeStorageReader(context.globalState, context.secrets);
 	const storageClearer = new VsCodeStorageClearer(context.globalState, context.secrets);
@@ -886,7 +886,7 @@ async function initializePersistenceInspector(
 	const getClearAllConfirmationMessageUseCase = new GetClearAllConfirmationMessageUseCase(storageInspectionService, logger);
 
 	const openPersistenceInspectorCommand = vscode.commands.registerCommand('power-platform-dev-suite.openPersistenceInspector', () => {
-		PersistenceInspectorPanel.createOrShow(
+		PersistenceInspectorPanelComposed.createOrShow(
 			context.extensionUri,
 			inspectStorageUseCase,
 			revealSecretUseCase,
