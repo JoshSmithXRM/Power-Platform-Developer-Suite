@@ -1,0 +1,25 @@
+/**
+ * Action Buttons Section Styles
+ *
+ * Layout and composition for ActionButtonsSection.
+ */
+
+.action-buttons {
+	display: flex;
+	gap: 8px;
+	padding: 8px 16px;
+	background: var(--vscode-editor-background);
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.action-buttons.align-left {
+	justify-content: flex-start;
+}
+
+.action-buttons.align-right {
+	justify-content: flex-end;
+}
+
+.action-buttons.align-center {
+	justify-content: center;
+}

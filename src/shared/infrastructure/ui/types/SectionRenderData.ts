@@ -50,4 +50,16 @@ export interface SectionRenderData {
 	 * Use type guards (TypeGuards.ts) to safely access custom data.
 	 */
 	readonly customData?: Record<string, unknown>;
+
+	/**
+	 * Available environments (for EnvironmentSelectorSection).
+	 * List of environments to populate dropdown.
+	 */
+	readonly environments?: Array<{ readonly id: string; readonly name: string }>;
+
+	/**
+	 * Current environment ID (for EnvironmentSelectorSection).
+	 * The currently selected environment.
+	 */
+	readonly currentEnvironmentId?: string;
 }

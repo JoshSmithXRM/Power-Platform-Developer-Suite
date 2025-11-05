@@ -17,6 +17,7 @@ function createMockPanel(): import('vscode').WebviewPanel {
 			onDidReceiveMessage: jest.fn((_callback) => {
 				return { dispose: jest.fn() };
 			}),
+			postMessage: jest.fn(),
 		},
 		onDidDispose: jest.fn((_callback) => {
 			return { dispose: jest.fn() };
@@ -250,7 +251,7 @@ describe('PanelCoordinator', () => {
 			coordinator.registerHandler('refresh', handler);
 
 			const payload = { id: '123' };
-			await coordinator.handleMessage({ command: 'refresh', payload });
+			await coordinator.handleMessage({ command: 'refresh', data: payload });
 
 			expect(handler).toHaveBeenCalledTimes(1);
 			expect(handler).toHaveBeenCalledWith(payload);
@@ -287,6 +288,76 @@ describe('PanelCoordinator', () => {
 			).resolves.toBeUndefined();
 
 			expect(handler).toHaveBeenCalledTimes(1);
+		});
+
+		it('should send loading state messages before and after handler', async () => {
+			const coordinator = new PanelCoordinator<TestCommands>({
+				panel: mockPanel,
+				extensionUri: mockExtensionUri,
+				behaviors: [],
+				logger,
+			});
+
+			const handler = jest.fn();
+			coordinator.registerHandler('refresh', handler);
+
+			await coordinator.handleMessage({ command: 'refresh' });
+
+			// Should send setButtonState messages
+			expect(mockPanel.webview.postMessage).toHaveBeenCalledTimes(2);
+			expect(mockPanel.webview.postMessage).toHaveBeenNthCalledWith(1, {
+				command: 'setButtonState',
+				buttonId: 'refresh',
+				disabled: true,
+				showSpinner: true,
+			});
+			expect(mockPanel.webview.postMessage).toHaveBeenNthCalledWith(2, {
+				command: 'setButtonState',
+				buttonId: 'refresh',
+				disabled: false,
+				showSpinner: false,
+			});
+		});
+
+		it('should restore button state even if handler throws', async () => {
+			const coordinator = new PanelCoordinator<TestCommands>({
+				panel: mockPanel,
+				extensionUri: mockExtensionUri,
+				behaviors: [],
+				logger,
+			});
+
+			const error = new Error('Handler failed');
+			const handler = jest.fn().mockRejectedValue(error);
+			coordinator.registerHandler('refresh', handler);
+
+			await coordinator.handleMessage({ command: 'refresh' });
+
+			// Should still send both messages (restore in finally block)
+			expect(mockPanel.webview.postMessage).toHaveBeenCalledTimes(2);
+			expect(mockPanel.webview.postMessage).toHaveBeenNthCalledWith(2, {
+				command: 'setButtonState',
+				buttonId: 'refresh',
+				disabled: false,
+				showSpinner: false,
+			});
+		});
+
+		it('should skip loading state when disableOnExecute is false', async () => {
+			const coordinator = new PanelCoordinator<TestCommands>({
+				panel: mockPanel,
+				extensionUri: mockExtensionUri,
+				behaviors: [],
+				logger,
+			});
+
+			const handler = jest.fn();
+			coordinator.registerHandler('refresh', handler, { disableOnExecute: false });
+
+			await coordinator.handleMessage({ command: 'refresh' });
+
+			// Should NOT send any setButtonState messages
+			expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
 		});
 	});
 

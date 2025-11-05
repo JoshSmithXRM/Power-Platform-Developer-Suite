@@ -15,10 +15,14 @@ export class SolutionViewModelMapper {
    * @returns SolutionViewModel presentation object
    */
   toViewModel(solution: Solution): SolutionViewModel {
+    const escapedName = this.escapeHtml(solution.friendlyName);
+    const escapedId = this.escapeHtml(solution.id);
+
     return {
       id: solution.id,
       uniqueName: solution.uniqueName,
       friendlyName: solution.friendlyName,
+      friendlyNameHtml: `<a href="#" class="solution-link" data-command="openInMaker" data-solution-id="${escapedId}">${escapedName}</a>`,
       version: solution.version,
       isManaged: solution.isManaged ? 'Managed' : 'Unmanaged',
       publisherName: solution.publisherName,
@@ -28,6 +32,20 @@ export class SolutionViewModelMapper {
       isVisible: solution.isVisible ? 'Yes' : 'No',
       isApiManaged: solution.isApiManaged ? 'Yes' : 'No',
     };
+  }
+
+  /**
+   * Escapes HTML to prevent XSS attacks.
+   */
+  private escapeHtml(text: string): string {
+    const map: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, char => map[char] || char);
   }
 
   /**

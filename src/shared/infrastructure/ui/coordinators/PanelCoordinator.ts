@@ -8,6 +8,14 @@ import { isWebviewMessage } from '../types/WebviewMessage';
 import type { IPanelCoordinator, PanelCoordinatorConfig } from './IPanelCoordinator';
 
 /**
+ * Configuration options for command handlers.
+ */
+export interface CommandHandlerOptions {
+	/** Whether to disable button and show loading state during execution. Defaults to true. */
+	readonly disableOnExecute?: boolean;
+}
+
+/**
  * Universal panel coordinator that orchestrates panel lifecycle and behaviors.
  *
  * Replaces DataTablePanelCoordinator with more flexible, composable architecture:
@@ -49,7 +57,10 @@ export class PanelCoordinator<TCommands extends string = string>
 	private readonly logger: ILogger;
 	private readonly messageHandlers = new Map<
 		TCommands,
-		(payload?: unknown) => Promise<void>
+		{
+			handler: (payload?: unknown) => Promise<void>;
+			options: CommandHandlerOptions;
+		}
 	>();
 	private disposables: vscode.Disposable[] = [];
 
@@ -129,14 +140,17 @@ export class PanelCoordinator<TCommands extends string = string>
 
 	/**
 	 * Registers a message handler for a specific command.
+	 * Automatically manages button loading state during execution.
 	 * Command is type-checked at compile time.
 	 *
 	 * @param command - Command name (must be one of TCommands)
 	 * @param handler - Handler function
+	 * @param options - Configuration options (disableOnExecute defaults to true)
 	 */
 	public registerHandler<T extends TCommands>(
 		command: T,
-		handler: (payload?: unknown) => Promise<void>
+		handler: (payload?: unknown) => Promise<void>,
+		options: CommandHandlerOptions = { disableOnExecute: true }
 	): void {
 		if (this.messageHandlers.has(command)) {
 			this.logger.warn('Overwriting existing handler for command', {
@@ -144,33 +158,60 @@ export class PanelCoordinator<TCommands extends string = string>
 			});
 		}
 
-		this.messageHandlers.set(command, handler);
-		this.logger.debug('Registered message handler', { command });
+		this.messageHandlers.set(command, { handler, options });
+		this.logger.debug('Registered message handler', { command, options });
 	}
 
 	/**
 	 * Handles a message from the webview.
-	 * Routes to registered handler or logs warning.
+	 * Routes to registered handler and manages loading state automatically.
 	 */
 	public async handleMessage(message: WebviewMessage): Promise<void> {
-		const { command, payload } = message;
+		const { command, data } = message;
 
-		const handler = this.messageHandlers.get(command as TCommands);
-		if (handler === undefined) {
+		const handlerConfig = this.messageHandlers.get(command as TCommands);
+		if (handlerConfig === undefined) {
 			this.logger.warn('No handler registered for command', {
 				command,
 			});
 			return;
 		}
 
-		this.logger.debug('Handling message', { command });
+		const { handler, options } = handlerConfig;
+		this.logger.debug('Handling message', { command, data });
 
 		try {
-			await handler(payload);
+			// Set button to loading state if enabled
+			if (options.disableOnExecute) {
+				this.setButtonLoading(command, true);
+			}
+
+			await handler(data);
 		} catch (error: unknown) {
 			this.logger.error(`Error handling message '${command}'`, error);
 			// Don't rethrow - log and continue
+		} finally {
+			// Restore button state
+			if (options.disableOnExecute) {
+				this.setButtonLoading(command, false);
+			}
 		}
+	}
+
+	/**
+	 * Sets button loading state via webview message.
+	 * Sends message to client-side to disable/enable button by ID.
+	 *
+	 * @param buttonId - Button element ID (same as command name)
+	 * @param isLoading - True to disable and show spinner, false to enable
+	 */
+	private setButtonLoading(buttonId: string, isLoading: boolean): void {
+		this.panel.webview.postMessage({
+			command: 'setButtonState',
+			buttonId,
+			disabled: isLoading,
+			showSpinner: isLoading,
+		});
 	}
 
 	/**

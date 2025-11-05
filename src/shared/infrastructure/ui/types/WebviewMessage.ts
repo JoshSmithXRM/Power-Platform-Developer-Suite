@@ -2,9 +2,9 @@
  * Message received from webview.
  * Provides runtime validation for untrusted input from webview context.
  */
-export interface WebviewMessage {
+export interface WebviewMessage<T = unknown> {
 	readonly command: string;
-	readonly payload?: unknown;
+	readonly data?: T;
 }
 
 /**

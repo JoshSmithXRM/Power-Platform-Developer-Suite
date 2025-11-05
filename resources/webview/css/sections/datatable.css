@@ -1,9 +1,16 @@
 /**
- * Shared Data Table Styles
+ * Data Table Section Styles
  *
- * Reusable styles for all data table panels (Solutions, Import Jobs, etc.)
- * Provides consistent visual styling across all data views.
+ * Table-specific composition and layout for DataTableSection.
  */
+
+.table-wrapper {
+	padding: 16px;
+}
+
+.search-container {
+	margin-bottom: 12px;
+}
 
 .table-container {
 	flex: 1;
@@ -44,11 +51,12 @@ th:hover {
 }
 
 /* Alternating row colors for better readability */
-tbody tr:nth-child(even) {
+/* Applied via JavaScript (DataTableBehavior.js) for filtered rows */
+tbody tr.row-even {
 	background: var(--vscode-list-inactiveSelectionBackground);
 }
 
-tbody tr:nth-child(odd) {
+tbody tr.row-odd {
 	background: transparent;
 }
 

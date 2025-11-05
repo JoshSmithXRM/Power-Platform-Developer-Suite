@@ -1,0 +1,34 @@
+/**
+ * Environment Selector Section Styles
+ *
+ * Styles for environment dropdown selector.
+ * Positioned on the right side of the toolbar.
+ */
+
+.environment-selector {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: auto;
+}
+
+.environment-selector label {
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-foreground);
+}
+
+.environment-selector select {
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	background: var(--vscode-dropdown-background);
+	color: var(--vscode-dropdown-foreground);
+	border: 1px solid var(--vscode-dropdown-border);
+	padding: 4px 8px;
+	border-radius: 2px;
+	cursor: pointer;
+}
+
+.environment-selector select:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}

@@ -6,26 +6,11 @@
  */
 
 import { AuthenticationMethodType } from '../../../features/environmentSetup/domain/valueObjects/AuthenticationMethod';
+import type { WebviewMessage } from '../../../shared/infrastructure/ui/types/WebviewMessage';
+import { isWebviewMessage } from '../../../shared/infrastructure/ui/types/WebviewMessage';
 
-/**
- * Base message structure from webview.
- */
-export interface WebviewMessage<T = unknown> {
-	command: string;
-	data?: T;
-}
-
-/**
- * Narrows type without assertions for safer runtime validation.
- */
-export function isWebviewMessage(message: unknown): message is WebviewMessage {
-	if (typeof message !== 'object' || message === null) {
-		return false;
-	}
-
-	const obj = message as Record<string, unknown>;
-	return 'command' in obj && typeof obj['command'] === 'string';
-}
+export type { WebviewMessage };
+export { isWebviewMessage };
 
 /**
  * Valid authentication methods for environment setup.
@@ -345,6 +330,32 @@ export function isEnvironmentChangedMessage(message: unknown): message is Enviro
 	}
 
 	if (message.command !== 'environmentChanged') {
+		return false;
+	}
+
+	const data = message.data;
+
+	return (
+		typeof data === 'object' &&
+		data !== null &&
+		'environmentId' in data &&
+		typeof (data as { environmentId: string }).environmentId === 'string'
+	);
+}
+
+export interface EnvironmentChangeMessage {
+	command: 'environmentChange';
+	data: {
+		environmentId: string;
+	};
+}
+
+export function isEnvironmentChangeMessage(message: unknown): message is EnvironmentChangeMessage {
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	if (message.command !== 'environmentChange') {
 		return false;
 	}
 

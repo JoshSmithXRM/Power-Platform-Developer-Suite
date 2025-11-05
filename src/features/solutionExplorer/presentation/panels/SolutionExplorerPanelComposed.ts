@@ -1,32 +1,37 @@
 import * as vscode from 'vscode';
 
-import { ILogger } from '../../../../infrastructure/logging/ILogger';
-import { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
-import type { EnvironmentOption, DataTableConfig } from '../../../../shared/infrastructure/ui/DataTablePanel';
-import { PanelTrackingBehavior } from '../../../../shared/infrastructure/ui/behaviors/PanelTrackingBehavior';
-import { HtmlRenderingBehavior, type HtmlCustomization } from '../../../../shared/infrastructure/ui/behaviors/HtmlRenderingBehavior';
-import { DataBehavior } from '../../../../shared/infrastructure/ui/behaviors/DataBehavior';
-import { EnvironmentBehavior } from '../../../../shared/infrastructure/ui/behaviors/EnvironmentBehavior';
-import { SolutionFilterBehavior } from '../../../../shared/infrastructure/ui/behaviors/SolutionFilterBehavior';
-import { MessageRoutingBehavior } from '../../../../shared/infrastructure/ui/behaviors/MessageRoutingBehavior';
-import { DataTableBehaviorRegistry } from '../../../../shared/infrastructure/ui/behaviors/DataTableBehaviorRegistry';
-import { DataTablePanelCoordinator, type CoordinatorDependencies } from '../../../../shared/infrastructure/ui/coordinators/DataTablePanelCoordinator';
-import { ListSolutionsUseCase } from '../../application/useCases/ListSolutionsUseCase';
-import { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
-import { SolutionDataLoader } from '../dataLoaders/SolutionDataLoader';
-import { isOpenInMakerMessage } from '../../../../infrastructure/ui/utils/TypeGuards';
-import { renderLinkClickHandler } from '../../../../shared/infrastructure/ui/views/clickableLinks';
+import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
+import type { DataTableConfig, EnvironmentOption } from '../../../../shared/infrastructure/ui/DataTablePanel';
+import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
+import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
+import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
+import { DataTableSection } from '../../../../shared/infrastructure/ui/sections/DataTableSection';
+import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
+import { EnvironmentSelectorSection } from '../../../../shared/infrastructure/ui/sections/EnvironmentSelectorSection';
+import { PanelLayout } from '../../../../shared/infrastructure/ui/types/PanelLayout';
+import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
+import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
+import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
+import type { ListSolutionsUseCase } from '../../application/useCases/ListSolutionsUseCase';
+import type { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
 
 /**
- * Presentation layer panel for Solution Explorer.
- * Uses composition pattern with specialized behaviors instead of inheritance.
+ * Commands supported by Solution Explorer panel.
+ */
+type SolutionExplorerCommands = 'refresh' | 'openMaker' | 'openInMaker' | 'environmentChange';
+
+/**
+ * Solution Explorer panel using new PanelCoordinator architecture.
+ * Displays list of solutions for a specific environment.
  */
 export class SolutionExplorerPanelComposed {
 	public static readonly viewType = 'powerPlatformDevSuite.solutionExplorer';
 	private static panels = new Map<string, SolutionExplorerPanelComposed>();
 
-	private readonly coordinator: DataTablePanelCoordinator;
-	private readonly registry: DataTableBehaviorRegistry;
+	private readonly coordinator: PanelCoordinator<SolutionExplorerCommands>;
+	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private currentEnvironmentId: string;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -43,7 +48,8 @@ export class SolutionExplorerPanelComposed {
 		private readonly logger: ILogger,
 		environmentId: string
 	) {
-		logger.debug('SolutionExplorerPanel: Initialized');
+		this.currentEnvironmentId = environmentId;
+		logger.debug('SolutionExplorerPanel: Initialized with new architecture');
 
 		// Configure webview
 		panel.webview.options = {
@@ -51,15 +57,16 @@ export class SolutionExplorerPanelComposed {
 			localResourceRoots: [extensionUri]
 		};
 
-		// Create behaviors
-		this.registry = this.createBehaviorRegistry(environmentId);
-		this.coordinator = this.createCoordinator();
+		// Create coordinator with new architecture
+		const result = this.createCoordinator();
+		this.coordinator = result.coordinator;
+		this.scaffoldingBehavior = result.scaffoldingBehavior;
 
-		// Register panel-specific command handlers
-		this.registerPanelCommands();
+		// Register command handlers
+		this.registerCommandHandlers();
 
-		// Initialize panel asynchronously
-		void this.coordinator.initialize();
+		// Initialize panel and load data asynchronously
+		void this.initializeAndLoadData();
 	}
 
 	public static async createOrShow(
@@ -125,99 +132,115 @@ export class SolutionExplorerPanelComposed {
 
 		SolutionExplorerPanelComposed.panels.set(targetEnvironmentId, newPanel);
 
+		// Handle panel disposal
+		const envId = targetEnvironmentId; // Capture for closure
+		panel.onDidDispose(() => {
+			SolutionExplorerPanelComposed.panels.delete(envId);
+		});
+
 		return newPanel;
 	}
 
-	private createBehaviorRegistry(environmentId: string): DataTableBehaviorRegistry {
-		const config = this.getConfig();
-		const customization = this.getCustomization();
+	private async initializeAndLoadData(): Promise<void> {
+		// Initialize coordinator (sets up HTML)
+		await this.coordinator.initialize();
 
-		const panelTrackingBehavior = new PanelTrackingBehavior(
-			SolutionExplorerPanelComposed.panels
-		);
-
-		const htmlRenderingBehavior = new HtmlRenderingBehavior(
-			this.panel.webview,
-			this.extensionUri,
-			config,
-			customization
-		);
-
-		const messageRoutingBehavior = new MessageRoutingBehavior(
-			this.panel.webview,
-			this.logger
-		);
-
-		const environmentBehavior = new EnvironmentBehavior(
-			this.panel.webview,
-			this.getEnvironments,
-			this.getEnvironmentById,
-			async () => { /* Coordinator handles reload */ },
-			this.logger,
-			environmentId
-		);
-
-		// Solution filter behavior (disabled - this IS the solution list)
-		const solutionFilterBehavior = new SolutionFilterBehavior(
-			this.panel.webview,
-			'solutions',
-			environmentBehavior,
-			async () => [],
-			undefined,
-			async () => { /* No solution filtering */ },
-			this.logger,
-			false
-		);
-
-		const dataLoader = new SolutionDataLoader(
-			() => environmentBehavior.getCurrentEnvironmentId(),
-			this.listSolutionsUseCase,
-			this.viewModelMapper,
-			this.logger
-		);
-
-		const dataBehavior = new DataBehavior(
-			this.panel.webview,
-			config,
-			dataLoader,
-			this.logger
-		);
-
-		return new DataTableBehaviorRegistry(
-			environmentBehavior,
-			solutionFilterBehavior,
-			dataBehavior,
-			messageRoutingBehavior,
-			htmlRenderingBehavior,
-			panelTrackingBehavior
-		);
+		// Load initial data
+		await this.handleRefresh();
 	}
 
-	private createCoordinator(): DataTablePanelCoordinator {
-		const dependencies: CoordinatorDependencies = {
-			panel: this.panel,
-			getEnvironmentById: this.getEnvironmentById,
-			logger: this.logger
+	private createCoordinator(): { coordinator: PanelCoordinator<SolutionExplorerCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
+		const config = this.getTableConfig();
+
+		// Create sections
+		const environmentSelector = new EnvironmentSelectorSection();
+		const tableSection = new DataTableSection(config);
+		// Note: Button IDs must match command names registered in registerCommandHandlers()
+		const actionButtons = new ActionButtonsSection({
+			buttons: [
+				{ id: 'openMaker', label: 'Open in Maker' },
+				{ id: 'refresh', label: 'Refresh' }
+			]
+		}, SectionPosition.Toolbar);
+
+		// Create section composition behavior
+		const compositionBehavior = new SectionCompositionBehavior(
+			[actionButtons, environmentSelector, tableSection],
+			PanelLayout.SingleColumn
+		);
+
+		// Resolve CSS module paths to webview URIs
+		const cssUris = resolveCssModules(
+			{
+				base: true,
+				components: ['buttons', 'inputs'],
+				sections: ['environment-selector', 'action-buttons', 'datatable']
+			},
+			this.extensionUri,
+			this.panel.webview
+		);
+
+		// Create HTML scaffolding behavior
+		const scaffoldingConfig: HtmlScaffoldingConfig = {
+			cssUris,
+			jsUris: [
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
+				).toString()
+			],
+			cspNonce: getNonce(),
+			title: 'Solutions'
 		};
 
-		return new DataTablePanelCoordinator(this.registry, dependencies);
+		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
+			this.panel.webview,
+			compositionBehavior,
+			scaffoldingConfig
+		);
+
+		// Create coordinator
+		const coordinator = new PanelCoordinator<SolutionExplorerCommands>({
+			panel: this.panel,
+			extensionUri: this.extensionUri,
+			behaviors: [scaffoldingBehavior],
+			logger: this.logger
+		});
+
+		return { coordinator, scaffoldingBehavior };
 	}
 
-	private registerPanelCommands(): void {
-		// Open individual solution in Maker
-		this.registry.messageRoutingBehavior.registerHandler('openInMaker', async (message) => {
-			if (isOpenInMakerMessage(message)) {
-				await this.handleOpenInMaker(message.data.solutionId);
-			}
+	private registerCommandHandlers(): void {
+		// Refresh solutions
+		this.coordinator.registerHandler('refresh', async () => {
+			await this.handleRefresh();
 		});
 
 		// Open solutions list in Maker
-		this.registry.messageRoutingBehavior.registerHandler('openMaker', async () => {
+		this.coordinator.registerHandler('openMaker', async () => {
 			await this.handleOpenMakerSolutionsList();
+		});
+
+		// Open individual solution in Maker
+		this.coordinator.registerHandler('openInMaker', async (data) => {
+			const solutionId = (data as { solutionId?: string })?.solutionId;
+			if (solutionId) {
+				await this.handleOpenInMaker(solutionId);
+			}
+		});
+
+		// Environment change
+		this.coordinator.registerHandler('environmentChange', async (data) => {
+			const environmentId = (data as { environmentId?: string })?.environmentId;
+			if (environmentId) {
+				await this.handleEnvironmentChange(environmentId);
+			}
 		});
 	}
 
-	private getConfig(): DataTableConfig {
+	private getTableConfig(): DataTableConfig {
 		return {
 			viewType: SolutionExplorerPanelComposed.viewType,
 			title: 'Solutions',
@@ -237,36 +260,41 @@ export class SolutionExplorerPanelComposed {
 			],
 			searchPlaceholder: '🔍 Search...',
 			noDataMessage: 'No solutions found.',
-			toolbarButtons: [
-				{ id: 'openMakerBtn', label: 'Open in Maker', command: 'openMaker', position: 'left' },
-				{ id: 'refreshBtn', label: 'Refresh', command: 'refresh', position: 'left' }
-			]
+			toolbarButtons: []
 		};
 	}
 
-	private getCustomization(): HtmlCustomization {
-		return {
-			customCss: '',
-			filterLogic: `
-				filtered = allData.filter(s =>
-					s.friendlyName.toLowerCase().includes(query) ||
-					s.uniqueName.toLowerCase().includes(query) ||
-					s.publisherName.toLowerCase().includes(query) ||
-					s.description.toLowerCase().includes(query)
-				);
-			`,
-			customJavaScript: renderLinkClickHandler('.solution-link', 'openInMaker', 'solutionId')
-		};
+	private async handleRefresh(): Promise<void> {
+		this.logger.debug('Refreshing solutions');
+
+		try {
+			const solutions = await this.listSolutionsUseCase.execute(this.currentEnvironmentId);
+
+			// Sort view models alphabetically by friendlyName for initial render
+			// Client-side sorting (DataTableBehavior.js) handles user interactions
+			const viewModels = solutions
+				.map(s => this.viewModelMapper.toViewModel(s))
+				.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName));
+
+			const environments = await this.getEnvironments();
+
+			this.logger.info('Solutions loaded successfully', { count: viewModels.length });
+
+			// Refresh HTML with sorted data
+			await this.scaffoldingBehavior.refresh({
+				tableData: viewModels,
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId
+			});
+		} catch (error: unknown) {
+			this.logger.error('Error refreshing solutions', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			vscode.window.showErrorMessage(`Failed to refresh solutions: ${errorMessage}`);
+		}
 	}
 
 	private async handleOpenInMaker(solutionId: string): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
-			this.logger.warn('Cannot open solution: No environment selected');
-			return;
-		}
-
-		const environment = await this.getEnvironmentById(envId);
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 		if (!environment?.powerPlatformEnvironmentId) {
 			this.logger.warn('Cannot open solution: Environment ID not configured');
 			vscode.window.showErrorMessage('Cannot open in Maker Portal: Environment ID not configured. Edit environment to add one.');
@@ -279,13 +307,7 @@ export class SolutionExplorerPanelComposed {
 	}
 
 	private async handleOpenMakerSolutionsList(): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
-			this.logger.warn('Cannot open Maker Portal: No environment selected');
-			return;
-		}
-
-		const environment = await this.getEnvironmentById(envId);
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 		if (!environment?.powerPlatformEnvironmentId) {
 			this.logger.warn('Cannot open Maker Portal: Environment ID not configured');
 			vscode.window.showErrorMessage('Cannot open in Maker Portal: Environment ID not configured. Edit environment to add one.');
@@ -294,6 +316,39 @@ export class SolutionExplorerPanelComposed {
 
 		const url = this.urlBuilder.buildSolutionsListUrl(environment.powerPlatformEnvironmentId);
 		await vscode.env.openExternal(vscode.Uri.parse(url));
-		this.logger.info('Opened solutions list in Maker Portal', { environmentId: envId });
+		this.logger.info('Opened solutions list in Maker Portal');
+	}
+
+	private async handleEnvironmentChange(environmentId: string): Promise<void> {
+		this.logger.debug('Environment changed', { environmentId });
+
+		// Disable refresh button during operation
+		this.setButtonLoading('refresh', true);
+
+		try {
+			// Update current environment
+			this.currentEnvironmentId = environmentId;
+
+			// Update panel title
+			const environment = await this.getEnvironmentById(environmentId);
+			if (environment) {
+				this.panel.title = `Solutions - ${environment.name}`;
+			}
+
+			// Refresh data
+			await this.handleRefresh();
+		} finally {
+			// Re-enable refresh button
+			this.setButtonLoading('refresh', false);
+		}
+	}
+
+	private setButtonLoading(buttonId: string, isLoading: boolean): void {
+		this.panel.webview.postMessage({
+			command: 'setButtonState',
+			buttonId,
+			disabled: isLoading,
+			showSpinner: isLoading,
+		});
 	}
 }

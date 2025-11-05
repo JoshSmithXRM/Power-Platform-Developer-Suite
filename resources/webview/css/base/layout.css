@@ -1,0 +1,32 @@
+/**
+ * Base Layout Styles
+ *
+ * Panel structure and container layouts.
+ */
+
+.panel-container {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+}
+
+.toolbar-section {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 8px 16px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-editor-background);
+	gap: 12px;
+}
+
+.header-section,
+.filters-section,
+.footer-section {
+	flex-shrink: 0;
+}
+
+.main-section {
+	flex: 1;
+	overflow: auto;
+}

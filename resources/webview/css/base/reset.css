@@ -1,0 +1,25 @@
+/**
+ * Base Reset Styles
+ *
+ * Foundation styles applied to all panels.
+ * Provides consistent starting point across browsers.
+ */
+
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+html,
+body {
+	height: 100%;
+	overflow: hidden;
+}
+
+body {
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-foreground);
+	background: var(--vscode-editor-background);
+}

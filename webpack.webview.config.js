@@ -12,7 +12,8 @@ module.exports = (env, argv) => {
 		entry: {
 			// Add webview behavior entry points here
 			// WebviewLogger is imported as a dependency, not a separate entry
-			EnvironmentSetupBehavior: './resources/webview/js/behaviors/EnvironmentSetupBehavior.js'
+			EnvironmentSetupBehavior: './resources/webview/js/behaviors/EnvironmentSetupBehavior.js',
+			DataTableBehavior: './resources/webview/js/behaviors/DataTableBehavior.js'
 		},
 
 		output: {

@@ -1,0 +1,89 @@
+/**
+ * HtmlScaffoldingBehavior - Wraps section HTML in full HTML document and sets webview HTML.
+ * Handles HTML scaffolding (<html>, <head>, CSS, JS) and webview rendering.
+ */
+
+import type * as vscode from 'vscode';
+
+import type { SectionRenderData } from '../types/SectionRenderData';
+
+import type { IPanelBehavior } from './IPanelBehavior';
+import type { SectionCompositionBehavior } from './SectionCompositionBehavior';
+
+/**
+ * Configuration for HTML scaffolding (CSS, JS, CSP).
+ * CSS URIs should be pre-resolved webview URIs.
+ */
+export interface HtmlScaffoldingConfig {
+	readonly cssUris: ReadonlyArray<string>;
+	readonly jsUris: ReadonlyArray<string>;
+	readonly cspNonce: string;
+	readonly title: string;
+}
+
+/**
+ * Behavior that wraps section composition in full HTML document.
+ * Handles webview HTML rendering and re-rendering.
+ */
+export class HtmlScaffoldingBehavior implements IPanelBehavior {
+	constructor(
+		private readonly webview: vscode.Webview,
+		private readonly composer: SectionCompositionBehavior,
+		private readonly config: HtmlScaffoldingConfig
+	) {}
+
+	/**
+	 * Initializes the webview with initial HTML.
+	 */
+	public async initialize(): Promise<void> {
+		await this.refresh({});
+	}
+
+	/**
+	 * Re-renders the entire webview HTML with new data.
+	 * @param data - Data to pass to sections for rendering
+	 */
+	public async refresh(data: SectionRenderData): Promise<void> {
+		const bodyHtml = this.composer.compose(data);
+		const fullHtml = this.wrapInHtmlScaffolding(bodyHtml);
+		this.webview.html = fullHtml;
+	}
+
+	/**
+	 * Wraps body HTML in full HTML document structure.
+	 * Includes <html>, <head>, CSS, JS, and CSP.
+	 */
+	private wrapInHtmlScaffolding(bodyHtml: string): string {
+		const { cssUris, jsUris, cspNonce, title } = this.config;
+		const cspSource = this.webview.cspSource;
+
+		return `<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${cspNonce}';">
+	<title>${this.escapeHtml(title)}</title>
+	${cssUris.map(uri => `<link rel="stylesheet" href="${uri}">`).join('\n\t')}
+</head>
+<body>
+${bodyHtml}
+${jsUris.map(uri => `<script nonce="${cspNonce}" src="${uri}"></script>`).join('\n')}
+</body>
+</html>`;
+	}
+
+	/**
+	 * Escapes HTML to prevent injection attacks.
+	 */
+	private escapeHtml(text: string): string {
+		const map: Record<string, string> = {
+			'&': '&amp;',
+			'<': '&lt;',
+			'>': '&gt;',
+			'"': '&quot;',
+			"'": '&#039;'
+		};
+		return text.replace(/[&<>"']/g, char => map[char] || char);
+	}
+}

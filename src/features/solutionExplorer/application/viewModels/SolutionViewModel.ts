@@ -8,6 +8,7 @@ export interface SolutionViewModel {
   readonly id: string;
   readonly uniqueName: string;
   readonly friendlyName: string;
+  readonly friendlyNameHtml: string;
   readonly version: string;
   readonly isManaged: string;
   readonly publisherName: string;
