@@ -591,387 +591,194 @@ This document outlines integration tests needed for the Solution Explorer panel.
 
 ---
 
-## Architect Review - Decisions & Open Discussion
+## Architect Review - Open Decisions
 
 **Review Date**: 2025-01-04
 **Reviewed By**: clean-architecture-guardian
-**Status**: 4 of 5 decisions approved, 1 under discussion
+**Status**: 2 open architectural decisions (user will decide later)
 
-### 1. ⚠️ Panel Singleton vs Instance Pattern - UNDER DISCUSSION
+### 1. ⚠️ Singleton vs Instance Pattern
 
-**Current Implementation:**
-- Uses singleton pattern with static map: `private static panels = new Map<string, SolutionExplorerPanelComposed>()`
-- Map keyed by **initial** environment ID only
-- When user changes environment via dropdown, `currentEnvironmentId` updates but map does NOT
+**Current Implementation:** Singleton per environment (`Map<envId, Panel>`)
 
-**Confirmed Bug (if singleton is desired):**
-1. User opens panel for `env-A` → map: `{ 'env-A': panelInstance }`
-2. User switches to `env-B` via dropdown → `currentEnvironmentId = 'env-B'`, map unchanged
-3. User opens new panel for `env-A` → creates **second** panel (violates singleton if intended)
-4. User opens new panel for `env-B` → creates new panel (could reuse existing if singleton intended)
+**Confirmed Bug:** Singleton map not updated when environment changes (allows duplicates)
 
-**Architect Recommendation:**
-Update map on environment change to preserve singleton semantics:
+#### **Option A: Singleton Pattern (Architect Recommendation)**
+
+**Pros:**
+- Prevents accidental duplication (500MB → 50MB if user clicks 5 times)
+- Single source of truth (no stale data across multiple panels)
+- Matches VS Code pattern (one editor per file)
+
+**Cons:**
+- Blocks side-by-side comparison (user can't compare solutions in parallel)
+- Adds 20 lines boilerplate per panel (×30 panels = 600 lines)
+- Prevents advanced workflows (Data Explorer showing 2 entities simultaneously)
+
+**Implementation:**
 ```typescript
-// Remove old key, add new key when environment changes
-SolutionExplorerPanelComposed.panels.delete(oldEnvironmentId);
-SolutionExplorerPanelComposed.panels.set(newEnvironmentId, this);
+// Update map on environment change
+private async handleEnvironmentChange(envId: string): Promise<void> {
+  SolutionExplorerPanelComposed.panels.delete(this.currentEnvironmentId);
+  this.currentEnvironmentId = envId;
+  SolutionExplorerPanelComposed.panels.set(envId, this);
+  await this.handleRefresh();
+}
 ```
 
-**Rationale Given:**
-- Memory efficiency (webviews are heavy - full browser instances)
-- State synchronization (prevent multiple panels showing different states)
-- User confusion prevention (one view per resource)
-- VS Code best practice pattern
+#### **Option B: Instance Pattern (Remove Singleton)**
 
-**User Concerns:**
-- **"Why can't I have two tabs for same environment?"** - What prevents this requirement?
-- **"We're creating instances, not singletons"** - Is singleton actually needed?
-- **Lack of explicit requirement** - Who requested singleton pattern?
+**Pros:**
+- Enables side-by-side comparison (user can compare 2 solutions/entities)
+- Simpler code (remove 20 lines per panel, no map management)
+- Natural multi-environment workflow (open panel for env-A and env-B simultaneously)
 
-**Need to Understand:**
-1. **WHY singleton?** What is the actual requirement driving this?
-2. **Pros/Cons of Singleton:**
-   - What specific problems does singleton solve?
-   - What user capabilities does singleton prevent?
-3. **Pros/Cons of Instance (no singleton):**
-   - What flexibility does instance pattern provide?
-   - What problems does instance pattern create?
-4. **User scenarios:**
-   - Why would user want 2 panels for same environment?
-   - What breaks if we allow multiple panels?
+**Cons:**
+- User can accidentally create duplicates (clicks 5 times = 500MB vs 50MB)
+- No state sync between instances (refresh one, other shows stale data)
+- More memory if user opens many duplicates
 
-**Decision Status:** 🚫 **NOT APPROVED - NEEDS DISCUSSION**
-
-**Action Required:**
-- Document specific use cases for multiple panels of same environment
-- Analyze memory/performance impact of multiple webview instances
-- Evaluate state synchronization complexity with multiple panels
-- Consider hybrid: singleton by default, allow override for specific user actions
-- Review VS Code extension examples to see how they handle this
-
-**Impact on Tests:**
-- Cannot finalize singleton behavior tests until pattern is decided
-- May need separate test suites for singleton vs instance patterns
-- Test spec lines 87-104, 150-161 depend on this decision
-
----
-
-### 2. ✅ Panel Behavior with No Environments - APPROVED
-
-**Current Behavior:**
-- `createOrShow()` throws `Error('No environments available')` if no environments exist
-- Panel does not open, user sees error notification
-
-**Architect Decision:** Show empty state (not error)
-
-**Approved Implementation:**
-- Allow `currentEnvironmentId: string | null`
-- Use sentinel key `'__no_environment__'` for singleton/instance map (if kept)
-- Render empty state with message: "No environments configured. Configure an environment to view solutions."
-- Hide environment selector when 0 environments
-- Disable action buttons (Refresh, Open in Maker)
-
-**Rationale:**
-- **Consistency**: Environment Setup panel MUST open with 0 environments (migration requirement)
-- **User guidance**: Panel shows helpful message directing user to next steps
-- **No dead end**: User sees UI and understands prerequisites
-- **Progressive disclosure**: Panel exists but features disabled until prerequisites met
-
-**Panel-Specific Behavior:**
-Each panel decides its prerequisites:
-- Solution Explorer: Can show empty state (not useful without environment)
-- Environment Setup: MUST show with 0 environments (this is where user adds first environment)
-- Plugin Registration: Requires environment + solution (multiple prerequisites)
-
-**Decision Status:** ✅ **APPROVED**
-
-**Impact on Tests:**
-- Test spec line 68-75: Update to expect empty state (not error)
-- Add tests for empty state rendering
-- Add tests for disabled buttons with no environment
-
----
-
-### 3. ✅ Environment Selector Visibility - APPROVED
-
-**Current Behavior:**
-- Environment selector always visible, regardless of environment count
-
-**Architect Decision:** Automatic visibility based on count
-
-**Approved Implementation:**
+**Implementation:**
 ```typescript
-// In EnvironmentSelectorSection.render()
-public render(context: SectionRenderContext): string {
-    const environments = context.data.environments || [];
+// Remove static map entirely
+public static async create(envId: string): Promise<Panel> {
+  const panel = vscode.window.createWebviewPanel(...);
+  return new Panel(panel, envId, ...);
+}
+```
 
-    // Hide selector if 0 or 1 environments (user has no choice)
-    if (environments.length <= 1) {
-        return ''; // Render nothing
+#### **Option C: Hybrid Pattern (Per-Panel-Type Decision)**
+
+Different panels have different needs:
+- **Solution Explorer**: Singleton (user rarely compares solutions)
+- **Data Explorer**: Instance (comparison-heavy workflow)
+- **Metadata Browser**: Instance (browse multiple entities)
+- **Environment Setup**: Global singleton (manages environments)
+
+#### **Option D: Smart Singleton (User Choice)**
+
+Prompt user on duplicate:
+```typescript
+const existing = Panel.panels.get(envId);
+if (existing) {
+  const choice = await vscode.window.showInformationMessage(
+    'Panel already open. Open anyway?',
+    'Show Existing', 'Open New'
+  );
+  // User decides
+}
+```
+
+**Decision:** USER WILL DECIDE LATER
+
+---
+
+### 2. ⚠️ Memory Management: `retainContextWhenHidden` vs Extension Cache
+
+**Current Implementation:** `retainContextWhenHidden: true` (50MB per panel, forever)
+
+**User Concern:** "If we implement `retainContextWhenHidden: false`, that means whatever we've loaded in memory (entire metadata browser) is gone and now I'm stuck loading all that shit again"
+
+#### **Option A: Keep `retainContextWhenHidden: true` (Current)**
+
+**Pros:**
+- Instant panel show (no reload)
+- Simple implementation (no cache management)
+
+**Cons:**
+- 50MB per panel, even when hidden
+- 20 panels = 1GB minimum (just webview overhead, before data)
+- Memory never released until panel closed
+
+#### **Option B: Extension-Level Data Cache (Architect Recommendation)**
+
+**Pattern:**
+```typescript
+class MetadataBrowserPanel {
+  private static dataCache = new Map<string, EntityMetadata[]>(); // Extension memory
+
+  async initialize() {
+    const cached = MetadataBrowserPanel.dataCache.get(this.envId);
+    if (cached) {
+      this.render(cached); // INSTANT - no API call
+    } else {
+      const data = await this.fetchMetadata();
+      MetadataBrowserPanel.dataCache.set(this.envId, data);
+      this.render(data);
     }
-
-    // Render dropdown for 2+ environments
-    return renderEnvironmentSelectorView({ environments, currentEnvironmentId });
+  }
 }
+
+// Set retainContextWhenHidden: false (dispose webview when hidden)
 ```
 
-**Visibility Rules:**
-- **0 environments**: Hide selector (panel shows empty state)
-- **1 environment**: Hide selector (no choice, show environment name in title)
-- **2+ environments**: Show selector
+**Pros:**
+- Hidden panel: 0MB (webview disposed)
+- Data cached in extension: ~1-5MB (vs 50MB webview)
+- Show panel: Instant (render from cache, no API call)
+- 20 panels hidden + 3 visible = ~150MB vs 1GB+
 
-**Logic Location:** `EnvironmentSelectorSection.render()` (encapsulation)
+**Cons:**
+- Need to implement cache invalidation (on refresh)
+- Data persists for extension lifetime (not per-webview)
 
-**Title Behavior with 1 Environment:**
-```typescript
-if (environments.length === 1) {
-    this.panel.title = `Solutions - ${environments[0].name}`;
-} else {
-    this.panel.title = 'Solutions'; // Dropdown makes it obvious
-}
-```
+#### **Memory Limits - Real Numbers:**
 
-**Rationale:**
-- **Automatic is simpler**: No configuration burden on panel developers
-- **Consistent UX**: All panels behave the same (user learns once)
-- **Logic belongs in section**: Section knows when it has nothing useful to show
-- **Encapsulation**: Panel doesn't need to know about environment count
+- **VS Code warning zone**: Extension using 1-2GB total
+- **Practical limit**: Design for 20 panels max
+- **With extension cache**: 20 panels = ~150-300MB (acceptable)
+- **With `retainContextWhenHidden: true`**: 20 panels = 1GB+ (problematic)
 
-**Decision Status:** ✅ **APPROVED**
+#### **Per-Panel Strategy:**
 
-**Impact on Tests:**
-- Test spec line 162-169: Update to expect automatic visibility
-- Add test for selector hidden with 0 environments
-- Add test for selector hidden with 1 environment
-- Add test for title showing environment name when selector hidden
+| Panel Type | Pattern | Hidden Memory | Show Speed |
+|------------|---------|---------------|------------|
+| **Metadata Browser** | Extension cache | 0MB | Instant |
+| **Plugin Registration** | Extension cache | 0MB | Instant |
+| **Solutions** | Re-fetch on show | 0MB | <1s |
+| **Import Jobs** | Re-fetch on show | 0MB | <1s |
+
+**Decision:** USER WILL DECIDE LATER
 
 ---
 
-### 4. ✅ Search Box Disabled State - APPROVED
+## Approved Decisions (No Further Action Needed)
 
-**Current Behavior:**
-- Search input always enabled, even when no data
+### ✅ Empty State for No Environments
 
-**Architect Decision:** Keep search enabled always
+- Show empty state message (not error)
+- Hide environment selector when 0 environments
+- Disable action buttons
 
-**Approved Implementation:**
-- No changes needed (current behavior is correct)
-- Search box always enabled regardless of data state
+### ✅ Environment Selector Visibility
 
-**Rationale:**
-- **Simpler implementation**: No enable/disable state management
-- **No confusing transitions**: Disabled → enabled state change is jarring
-- **Harmless**: User can type, sees "0 records found", no harm done
-- **Faster UX**: User can type search query while data loads (filters immediately when data arrives)
+- Hide when ≤1 environments
+- Auto-show when 2+ environments
+- Logic in `EnvironmentSelectorSection.render()`
 
-**Behavior:**
-- Empty table + user types search → shows "0 records found"
-- Empty table + user clears search → shows "0 records" (empty state message)
+### ✅ Search Box Always Enabled
 
-**Decision Status:** ✅ **APPROVED**
-
-**Impact on Tests:**
-- Test spec line 82-88: Remove expectation for disabled state
-- Search always enabled, no tests needed for disabled state
+- No disabled state (simpler, better UX)
+- Current behavior is correct
 
 ---
 
-### 5. ⚠️ Singleton Pattern Rationale - REQUIRES DEEPER DISCUSSION
+## Impact on Tests
 
-**Architect Position:** Keep singleton pattern (VS Code best practice)
+**Tests blocked pending decisions:**
+- Singleton behavior tests (depends on singleton decision)
+- Panel disposal/reveal tests (depends on singleton decision)
+- Memory management tests (depends on cache decision)
 
-**Architect's Rationale:**
-1. **Memory efficiency**: Webviews are heavy (full browser instances)
-2. **State synchronization**: Prevents multiple panels showing different states
-3. **User confusion prevention**: One view per resource (like one editor per file)
-4. **VS Code pattern**: Recommended in webview documentation
+**Tests ready to implement:**
+- Empty state rendering
+- Environment selector visibility
+- Search functionality
+- Column sorting
+- Button state management
+- XSS protection
+- Boolean/date formatting
 
-**Pros/Cons Analysis (from Architect):**
-
-| Aspect | Singleton | Multiple Instances |
-|--------|-----------|-------------------|
-| **Memory** | ✅ Lower (1 webview per env) | ❌ Higher (N webviews per env) |
-| **State Sync** | ✅ No sync issues | ❌ Complex (must broadcast) |
-| **UX Clarity** | ✅ User knows where to look | ⚠️ User must track multiple |
-| **Flexibility** | ⚠️ Can't compare side-by-side | ✅ Multiple views |
-| **Implementation** | ⚠️ Must update map on env change | ✅ Simpler (no map) |
-
-**User's Concerns:**
-- **"Why can't I have two tabs for same environment?"** - User wants this capability
-- **"We're creating instances, not singletons"** - Questioning the pattern itself
-- **No explicit requirement** - Who decided singleton is necessary?
-
-**Open Questions:**
-1. **What is the actual user requirement?** Why would user want 2 panels for same environment?
-   - Compare solutions in 2 different sorted orders?
-   - Reference one panel while working in another?
-   - Keep one panel stable while refreshing another?
-
-2. **Memory impact - is it significant?**
-   - How much memory does 1 webview use? (need actual numbers)
-   - Is 2 webviews for same environment actually a problem?
-   - Do we have performance constraints that require singleton?
-
-3. **State sync - is it actually complex?**
-   - If panels are read-only (no edits), what state needs syncing?
-   - Refresh button only affects the panel where it's clicked
-   - Is there actual sync complexity or theoretical concern?
-
-4. **What do other VS Code extensions do?**
-   - Do they enforce singleton for data panels?
-   - Or do they allow multiple instances?
-   - Examples to research
-
-5. **Hybrid approach possible?**
-   - Default behavior: reveal existing panel (singleton-like)
-   - User option: "Open in new panel" (instance-like)
-   - Best of both worlds?
-
-**Decision Status:** 🚫 **NOT APPROVED - REQUIRES DISCUSSION**
-
-**Next Steps:**
-1. User provides specific use cases for wanting multiple panels
-2. Research actual memory footprint of VS Code webviews
-3. Evaluate if state synchronization is real concern for read-only panels
-4. Review VS Code extension examples (GitHub, GitLens, etc.)
-5. Consider hybrid approach with user control
-6. Reconvene to decide: singleton, instance, or hybrid
-
-**Impact on Tests:**
-- Cannot write singleton behavior tests until pattern is decided
-- May need separate test suites depending on decision
-- Test infrastructure (PanelTestHarness) should support both patterns
-
----
-
-## 🗣️ Singleton Pattern Discussion - User & Architect Alignment Needed
-
-**Current Status:** Architecture decision blocked - need consensus before proceeding with implementation
-
-### User's Position: Remove or Make Optional
-
-**Use Cases for Multiple Panels:**
-> *User: Please provide specific scenarios where you want 2+ panels for same environment*
-
-*Placeholder for user's use cases - to be filled in discussion*
-
-**Concerns About Singleton:**
-1. **Limitation without justification**: "Why can't I have two tabs for same environment?"
-2. **Semantic mismatch**: "We're creating instances, not singletons really"
-3. **No explicit requirement**: Who originally decided singleton was necessary?
-4. **Complexity**: Singleton map management adds complexity (update on env change, disposal, etc.)
-
-**Preference:** Allow multiple instances unless there's compelling reason not to
-
----
-
-### Architect's Position: Keep Singleton Pattern
-
-**VS Code Best Practice:**
-- Webview panel documentation recommends singleton for resource-based panels
-- Pattern: one editor per file, one panel per resource
-
-**Technical Concerns:**
-1. **Memory**: Each webview = full browser instance (Chromium)
-2. **State sync**: If user refreshes one panel, other panels show stale data
-3. **User confusion**: "Which panel am I looking at?" cognitive overhead
-
-**Recommendation:** Singleton per environment, update map on environment change
-
----
-
-### Questions to Resolve
-
-**1. What are the actual use cases?**
-- Why would user want 2 panels showing same environment's solutions?
-- Is it for comparison (2 different sorts)?
-- Is it for reference (keep one stable while interacting with another)?
-- Is it for workflow (solutions panel + plugin registration panel both showing same env)?
-
-**2. What is the actual memory impact?**
-- Need measurements: How much memory does 1 webview use?
-- Is 2-3 webviews for same environment actually a problem?
-- Do we have performance constraints?
-
-**3. Is state synchronization a real concern?**
-- Current panels are **read-only** (no edit operations)
-- Refresh button only affects the panel where clicked
-- User can manually refresh other panels if needed
-- Is automatic sync actually required?
-
-**4. What do similar extensions do?**
-Research needed:
-- GitHub extension: How does it handle multiple PR panels?
-- GitLens extension: Multiple file history panels?
-- Azure extension: Multiple resource panels?
-
-**5. Could we do hybrid?**
-Options:
-- **A) Default singleton, user can override**: Command "Open Solutions" reveals existing, "Open Solutions in New Panel" creates new instance
-- **B) Always instance**: Remove singleton map entirely, simplest code
-- **C) Configurable**: User setting "allowMultiplePanels: true/false"
-
----
-
-### Proposed Resolution Process
-
-**Option 1: User Provides Compelling Use Cases**
-- If use cases are strong → remove singleton, allow instances
-- Update test spec to test instance behavior (no singleton map)
-- Simpler implementation (remove static map, remove map updates)
-
-**Option 2: Architect's Concerns are Compelling**
-- If memory/state sync are real problems → keep singleton
-- Implement architect's recommendation (update map on env change)
-- Add tests for singleton behavior
-
-**Option 3: Compromise (Hybrid)**
-- Default behavior reveals existing panel (feels like singleton)
-- User can explicitly request new panel (instances allowed)
-- Best of both worlds, slightly more complex
-
-**Option 4: Research First**
-- Measure actual memory footprint
-- Review other VS Code extensions
-- Make data-driven decision
-
----
-
-### Impact on Test Specification
-
-**If Singleton (Architect's recommendation):**
-- Add tests for singleton map behavior
-- Add tests for map updates on environment change
-- Add tests for panel disposal removing from map
-- Add tests for revealing existing panel
-
-**If Instance (User's preference):**
-- Remove all singleton-related tests
-- Simplify panel creation (no map checks)
-- Test that multiple panels can exist for same environment
-- Test that panels are independent (refresh one doesn't affect others)
-
-**If Hybrid:**
-- Add tests for both behaviors
-- Test default command reveals existing
-- Test "new panel" command creates instance
-- Test user setting toggles behavior
-
----
-
-### Next Steps
-
-1. **User**: Provide specific use cases for wanting multiple panels
-2. **Research**: Measure webview memory, review other extensions
-3. **Discussion**: Evaluate use cases vs. technical concerns
-4. **Decision**: Choose option 1, 2, 3, or 4 above
-5. **Update Tests**: Revise test specification based on decision
-6. **Implement**: Write tests (TDD), then fix bugs
-
-**IMPORTANT:** Do NOT implement singleton bug fix until pattern is decided and tests are written
-
----
 
 ## Test Implementation Priority
 
@@ -1280,89 +1087,7 @@ describe('SolutionExplorerPanel Integration Tests', () => {
 ---
 
 **Next Steps:**
-1. ✅ **Architect Review Complete** - 4 of 5 decisions approved, 1 requires user/architect discussion
-2. **BLOCKED: Resolve Singleton Pattern** - See "Singleton Pattern Discussion" section
-3. **Create Test Infrastructure** (can start while singleton is discussed):
-   - `PanelTestHarness.ts` helper class (support both singleton and instance patterns)
-   - `MockWebviewPanel.ts` mock implementation
-   - `fixtures/solutions.ts` and `fixtures/environments.ts`
-4. **Implement Phase 1 Tests** (after singleton decision) - 7 tests covering core functionality
-5. **Implement Approved Fixes** (TDD - tests first!):
-   - Empty state for no environments
-   - Environment selector visibility
-6. **Implement Phase 2-4 Tests** - Data integrity, edge cases, polish
-
----
-
-## Document Summary & Recommendations
-
-### Test Coverage Statistics
-- **Total integration tests specified**: 60+ test cases
-- **Categories**: 13 test categories covering full panel lifecycle
-- **Current implementation coverage**: 0 tests (no integration tests exist)
-- **Estimated implementation effort**:
-  - Phase 1 (MVP): Simple (7 tests, critical path only)
-  - Phase 2 (Data Integrity): Moderate (8 tests, contracts + formatting)
-  - Phase 3-4 (Complete): Complex (45+ tests, full coverage)
-
-### Key Findings from Review
-
-**✅ Correctly Implemented:**
-- Client-side sorting with locale-aware comparison
-- Client-side search with row striping
-- XSS protection via HTML escaping
-- Boolean/date field formatting in mapper
-- Button state management via PanelCoordinator
-- WebviewMessage contract with `data` property
-
-**⚠️ Architecture Decisions:**
-1. ✅ **APPROVED**: Panel behavior when no environments configured (show empty state)
-2. ✅ **APPROVED**: Environment selector visibility (hide when ≤1 environments)
-3. ✅ **APPROVED**: Search box disabled state (keep enabled always)
-4. 🚫 **BLOCKED**: Singleton pattern - requires user/architect alignment (see discussion section)
-
-**❌ Missing Implementation (Approved for Implementation):**
-1. Empty state support when no environments configured
-2. Environment selector conditional visibility (hide when ≤1 environments)
-
-**🐛 Confirmed Bugs (DO NOT FIX until tests written):**
-1. **Panel throws error with 0 environments** - Should show empty state instead
-2. **Environment selector always shows** - Should hide when ≤1 environments
-3. **Singleton map not updated on env change** - Bug only if singleton pattern is kept (under discussion)
-
-**⚠️ Known Limitations (Not Bugs):**
-1. **Sort state lost on refresh** - Client-side sorting, expected behavior
-2. **Search + Sort interaction** - Needs verification test
-
-### Recommendations
-
-1. ✅ **Architect consultation complete** - 4 of 5 decisions approved
-   - **BLOCKED**: Singleton pattern discussion required (see discussion section above)
-   - **APPROVED**: Empty state, selector visibility, search enabled
-
-2. **Resolve singleton pattern decision FIRST**
-   - User to provide specific use cases for multiple panels
-   - Research webview memory footprint and other extensions
-   - Choose: singleton, instance, or hybrid approach
-   - This decision blocks singleton-related test implementation
-
-3. **Implement PanelTestHarness as reusable infrastructure** (can start now)
-   - Design harness to support both singleton and instance patterns
-   - Will be needed for all future panel integration tests
-   - Investment now pays off for Environment Setup, Plugin Registration, etc.
-
-4. **Follow TDD strictly for bug fixes**
-   - ❌ **DO NOT fix bugs until tests are written**
-   - Write failing test first (proves bug exists)
-   - Implement fix (test passes)
-   - Prevents regression
-
-5. **Start with Phase 1 tests** (after singleton decision)
-   - Happy path tests easier to implement
-   - Proves out harness design before complex edge cases
-   - Excludes singleton tests (blocked)
-
-6. **Document "known limitations"** for client-side sorting
-   - Sort state lost on refresh (expected, not a bug)
-   - No server-side sort order persistence
-   - Users may expect sort to persist (UX consideration)
+1. **User decides** on singleton pattern and memory management
+2. **Create Test Infrastructure**: `PanelTestHarness.ts`, `MockWebviewPanel.ts`, fixtures
+3. **Implement Phase 1 Tests** (critical path, excluding blocked tests)
+4. **Implement Approved Fixes** (TDD - tests first): Empty state, selector visibility
