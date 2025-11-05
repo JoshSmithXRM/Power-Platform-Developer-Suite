@@ -9,18 +9,19 @@
 1. **`any` without explicit type** - Use proper interfaces or `unknown` with narrowing
 2. **`eslint-disable` without permission** - Fix root cause. Ask if rule seems wrong
 3. **Technical debt shortcuts** - No "quick fixes". Do it right or discuss tradeoffs
-4. **Duplicate code 3+ times** - Stop at 2nd copy. Create abstraction (Three Strikes Rule)
-5. **Business logic outside domain layer** - Business logic belongs in domain entities/services
-6. **Anemic domain models (entities without behavior)** - Use rich models with methods, not just data
-7. **Domain depending on outer layers** - Domain has ZERO dependencies
-8. **Business logic in use cases** - Use cases orchestrate only, no complex logic
-9. **Business logic in panels** - Panels call use cases, no logic
-10. **HTML in panel .ts files** - Extract all HTML to separate view files in `presentation/views/`
-11. **Non-null assertions (`!`)** - Use explicit null checks for type narrowing
-12. **Dynamic import types in signatures** - Use direct imports: `import type { Foo } from '...'`
-13. **Static utility methods on entities** - Put in domain services or collection classes
-14. **Presentation logic in domain** - Display formatting belongs in mappers, not entities
-15. **Time/effort estimates in designs** - AI time estimates are consistently wrong; use complexity levels instead
+4. **"Quick fix" solutions** - Provide proper architectural guidance using best practices, Clean Architecture, and SOLID principles. Never offer band-aids or workarounds without explaining the root cause and proper solution
+5. **Duplicate code 3+ times** - Stop at 2nd copy. Create abstraction (Three Strikes Rule)
+6. **Business logic outside domain layer** - Business logic belongs in domain entities/services
+7. **Anemic domain models (entities without behavior)** - Use rich models with methods, not just data
+8. **Domain depending on outer layers** - Domain has ZERO dependencies
+9. **Business logic in use cases** - Use cases orchestrate only, no complex logic
+10. **Business logic in panels** - Panels call use cases, no logic
+11. **HTML in panel .ts files** - Extract all HTML to separate view files in `presentation/views/`
+12. **Non-null assertions (`!`)** - Use explicit null checks for type narrowing
+13. **Dynamic import types in signatures** - Use direct imports: `import type { Foo } from '...'`
+14. **Static utility methods on entities** - Put in domain services or collection classes
+15. **Presentation logic in domain** - Display formatting belongs in mappers, not entities
+16. **Time/effort estimates in designs** - AI time estimates are consistently wrong; use complexity levels instead
 
 ---
 

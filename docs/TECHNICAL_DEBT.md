@@ -21,10 +21,13 @@ This document tracks known technical debt and future improvement opportunities t
 
 5. **Hard-coded Button Event Listeners in Base Template** - dataTable.ts base template assumes refreshBtn and openMakerBtn exist without null checks, causing runtime errors when panels don't include these buttons.
 
-### Deferred Refactoring (2 issues)
-6. **Business Logic in Command Handlers** - extension.ts commands contain orchestration that belongs in use cases. Use cases exist but need integration work, defer until command testing sprint.
+### Framework Architecture Issues (1 issue)
+6. **Full Page Refresh Flash in PanelCoordinator Panels** - Environment selector flashes when switching environments because HtmlScaffoldingBehavior regenerates entire HTML document instead of updating only dynamic sections. Deferred as architectural limitation (low priority UX polish).
 
-7. **Unsafe Type Assertions in API Service** - DataverseApiService uses `as T` without runtime validation. Repositories validate at mapping layer, external API contracts stable, zero bugs found.
+### Deferred Refactoring (2 issues)
+7. **Business Logic in Command Handlers** - extension.ts commands contain orchestration that belongs in use cases. Use cases exist but need integration work, defer until command testing sprint.
+
+8. **Unsafe Type Assertions in API Service** - DataverseApiService uses `as T` without runtime validation. Repositories validate at mapping layer, external API contracts stable, zero bugs found.
 
 ---
 
@@ -329,6 +332,58 @@ All panels using PanelCoordinator (Framework Approach):
 **Related:**
 - See `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` for new framework approach
 - Design doc: `docs/design/UNIVERSAL_PANEL_FRAMEWORK_DESIGN.md` (in progress)
+
+---
+
+## Framework Architecture Issues
+
+### Full Page Refresh Flash in PanelCoordinator Panels
+
+**Status**: Architectural Limitation - Enhancement Deferred
+**Priority**: Low (UX polish)
+**Effort**: High (requires framework redesign)
+
+**Issue:**
+When switching environments or refreshing data in panels using the Framework Approach (`PanelCoordinator` + `HtmlScaffoldingBehavior`), the entire HTML document is regenerated and replaced, causing a visible flash as static UI chrome (toolbar, environment selector) gets destroyed and recreated even though only the data table changed.
+
+**Root Cause:**
+`HtmlScaffoldingBehavior.refresh()` doesn't distinguish between:
+- **Static sections** (toolbar, environment selector) - should render once and persist in DOM
+- **Dynamic sections** (data table) - should update on data changes
+
+This is a **separation of concerns violation**: we're mixing static chrome with dynamic content, then re-rendering everything together.
+
+**Current Behavior:**
+1. User selects environment → `environmentChange` command
+2. Backend loads new solutions data
+3. `scaffoldingBehavior.refresh()` replaces `webview.html` with completely new HTML
+4. Environment selector re-renders (flash) even though only table data changed
+
+**Clean Architecture Solution:**
+Would require framework-level changes:
+1. **Section metadata** - Add `isStatic: boolean` property to `ISection` interface
+2. **Separate render passes** - Initial render: all sections; subsequent refreshes: dynamic sections only
+3. **Client-side coordinator** - Receives data via `postMessage`, updates specific DOM sections without full page replacement
+4. **State preservation** - Static sections persist in DOM, maintain event listeners and state
+
+**Why Deferred:**
+- Current design optimizes for **simplicity** (stateless, full refresh) over granular updates
+- Flash is brief and indicates loading is happening
+- Fixing requires architectural redesign of section rendering system
+- No functional impact, purely UX polish
+
+**When to Address:**
+- If pattern repeats across multiple panels and becomes user complaint
+- During major framework refactoring sprint
+- When building real-time data panels that update frequently
+
+**Recommendation:**
+Accept as known limitation. Document in framework guide. If this becomes priority, elevate to architect for framework enhancement design.
+
+**Related:**
+- See `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` for Framework Approach architecture
+- `HtmlScaffoldingBehavior.ts:46-50` - Full page refresh implementation
+- `SectionCompositionBehavior.ts:38-41` - Section composition without static/dynamic distinction
 
 ---
 
