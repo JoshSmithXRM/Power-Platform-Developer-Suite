@@ -537,6 +537,50 @@ Files changed:
 
 **Duration:** 30 min - 2 hours
 
+---
+
+### ⚡ Special Case: Refactoring to Existing Pattern
+
+**If you're porting/migrating code to an existing, documented pattern:**
+
+**Examples:**
+- "Port Environment Setup panel to universal panel pattern"
+- "Migrate Connection References to PanelCoordinator"
+- "Refactor Persistence Inspector to use existing framework"
+
+**Streamlined Process:**
+
+1. **Study reference implementation**
+   - Read pattern guide (e.g., `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md`)
+   - Study working example (e.g., `SolutionsPanel.ts`)
+   - Understand the pattern
+
+2. **Map existing → new structure**
+   ```
+   Old manual routing → PanelCoordinator
+   Old handlers → Registered commands
+   Old view → Section
+   ```
+
+3. **Implement incrementally**
+   - Small steps, test after each
+   - Keep old file until new version works
+   - Easy rollback if needed
+
+4. **Skip design-architect**
+   - Pattern already documented
+   - Design would be redundant
+   - Follow cookbook instead
+
+5. **Invoke code-guardian for final review**
+   - After refactoring complete
+   - Verify pattern compliance
+   - Get approval before deleting old file
+
+**This is NOT standard refactoring - it's following an existing recipe.**
+
+---
+
 ### Step 1: Tests Pass Before Refactoring
 
 **Baseline behavior:**

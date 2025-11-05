@@ -40,6 +40,52 @@ We have **3 specialized agents**:
 - ❌ Bug fixes
 - ❌ Small refactorings
 - ❌ Adding button/column to existing panel
+- ❌ **Refactoring to existing patterns** (see below)
+
+**IMPORTANT: Refactoring to Existing Patterns**
+
+When refactoring/porting/migrating code to an **existing, documented pattern**, skip design-architect:
+
+**Skip design-architect when:**
+- ✅ Pattern already documented (e.g., PanelCoordinator in PANEL_DEVELOPMENT_GUIDE.md)
+- ✅ Reference implementation exists (e.g., SolutionsPanel.ts)
+- ✅ You're following a "cookbook" (established recipe)
+- ✅ Task is "Port X to pattern Y" or "Migrate X to Y"
+
+**Instead:**
+1. Study reference implementation
+2. Map existing structure → new structure
+3. Implement incrementally
+4. Test after each step
+5. Invoke code-guardian for final review
+
+**Recommended prompt for refactorings:**
+```
+Refactor {ComponentName} to use {ExistingPattern} pattern.
+
+Reference:
+- Pattern guide: .claude/templates/{PATTERN_GUIDE}.md
+- Working example: {ReferenceFile}.ts
+
+This is a refactoring to an existing pattern - skip design phase.
+Follow the refactoring workflow in .claude/WORKFLOW.md.
+```
+
+**Examples:**
+
+❌ **Don't invoke for:**
+```
+"Port Environment Setup panel to universal panel pattern (follow SolutionsPanel.ts)"
+"Migrate Connection References to PanelCoordinator pattern"
+"Refactor Persistence Inspector to use universal pattern"
+```
+
+✅ **Do invoke for:**
+```
+"Design a new universal panel pattern for all panels to follow"
+"Design Import Job Viewer feature (new functionality)"
+"Design metadata caching architecture (new pattern)"
+```
 
 **How to invoke:**
 ```
