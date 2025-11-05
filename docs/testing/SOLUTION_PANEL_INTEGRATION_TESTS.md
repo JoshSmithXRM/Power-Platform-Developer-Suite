@@ -175,46 +175,49 @@ This document outlines integration tests needed for the Solution Explorer panel.
 
 #### Test: Clicking column header sorts ascending
 ```typescript
-// GIVEN: Panel displays 10 solutions sorted by Solution Name (default)
+// GIVEN: Panel displays 10 solutions (unsorted or default sort)
 // WHEN: User clicks "Version" column header
-// THEN: Solutions re-render sorted by Version ascending
+// THEN: Table rows re-ordered by Version ascending (DOM manipulation)
 // AND: Version header shows ▲ indicator
-// AND: TableSortingBehavior.handleSortRequest('version') called
-// AND: Panel refreshes with sorted data
+// AND: Other column headers lose sort indicators
+// AND: No backend request made
 ```
 
 #### Test: Clicking same column header toggles sort direction
 ```typescript
 // GIVEN: Solutions sorted by Version ascending (▲)
 // WHEN: User clicks "Version" column header again
-// THEN: Solutions re-render sorted by Version descending
+// THEN: Table rows re-ordered by Version descending
 // AND: Version header shows ▼ indicator
-// AND: Sort direction toggles asc -> desc
+// AND: Client-side state: currentDirection toggles asc -> desc
 ```
 
 #### Test: Clicking different column resets to ascending
 ```typescript
 // GIVEN: Solutions sorted by Version descending (▼)
 // WHEN: User clicks "Publisher" column header
-// THEN: Solutions sorted by Publisher ascending
+// THEN: Table rows re-ordered by Publisher ascending
 // AND: Publisher header shows ▲ indicator
-// AND: Version header loses sort indicator
+// AND: Version header loses ▼ indicator
+// AND: Client-side state: currentColumn = 'publisher', currentDirection = 'asc'
 ```
 
-#### Test: Sort state persists across refresh
+#### Test: Sort state lost on refresh (client-side limitation)
 ```typescript
-// GIVEN: Solutions sorted by Publisher descending
+// GIVEN: Solutions sorted by Publisher descending (client-side)
 // WHEN: User clicks Refresh button
-// THEN: Refreshed data maintains Publisher descending sort
-// AND: TableSortingBehavior retains sort state
+// THEN: Refreshed data rendered in default sort order
+// AND: Client-side sort state is NOT preserved across refresh
+// NOTE: This is expected behavior for client-side sorting
 ```
 
-#### Test: Sort handles null/undefined values
+#### Test: Sort handles empty cell values
 ```typescript
-// GIVEN: 5 solutions, 2 have null installedOn dates
+// GIVEN: 5 solutions, 2 have empty/blank installedOn cells
 // WHEN: User sorts by Installed On ascending
-// THEN: Solutions with dates appear first (sorted)
-// AND: Solutions with null dates appear last
+// THEN: Solutions with text content appear first (sorted)
+// AND: Solutions with empty cells appear last
+// AND: Empty cells detected via textContent.trim()
 ```
 
 #### Test: Sort uses locale-aware string comparison
@@ -225,22 +228,42 @@ This document outlines integration tests needed for the Solution Explorer panel.
 // AND: Accented characters sort correctly per locale
 ```
 
-#### Test: Sort button does not trigger loading state
+#### Test: Sort does not trigger loading state
 ```typescript
 // GIVEN: Panel is open
 // WHEN: User clicks column header to sort
 // THEN: Refresh button is NOT disabled
 // AND: No loading spinner shown
-// AND: Sort command registered with { disableOnExecute: false }
+// AND: No webview message sent to backend
+// AND: Sorting happens instantly (DOM only)
 ```
 
-#### Test: Sort persists when environment changed
+#### Test: Sort reapplies row striping
 ```typescript
-// GIVEN: Solutions sorted by Version descending
-// WHEN: User changes environment
-// THEN: New environment's solutions loaded
-// AND: Sort state resets to default (Solution Name ascending)
-// NOTE: Current behavior - may want to persist sort across environments
+// GIVEN: Table has alternating row colors (even/odd classes)
+// WHEN: User sorts by any column
+// THEN: Rows re-ordered in DOM
+// AND: applyRowStriping() recalculates even/odd classes
+// AND: Visible rows maintain alternating colors
+```
+
+#### Test: Sort works with search filtering
+```typescript
+// GIVEN: User searches to show 5 of 10 solutions
+// AND: 5 hidden rows have display:none
+// WHEN: User clicks column header to sort
+// THEN: All rows (including hidden) are sorted
+// AND: Visible rows maintain search filter (display:none preserved)
+// AND: Row striping applied to visible rows only
+```
+
+#### Test: Initial sort indicator from server-rendered HTML
+```typescript
+// GIVEN: Server renders table with Solution Name ▲ indicator
+// WHEN: DataTableBehavior initializes
+// THEN: Client-side state: currentColumn = 'friendlyName', currentDirection = 'asc'
+// AND: Clicking Solution Name toggles to descending
+// NOTE: Client reads ▲/▼ from header textContent on page load
 ```
 
 ---
@@ -286,7 +309,7 @@ This document outlines integration tests needed for the Solution Explorer panel.
 
 ---
 
-### 5. Solution Link Click Tests
+### 6. Solution Link Click Tests
 
 #### Test: Clicking solution name opens in Maker Portal
 ```typescript
@@ -315,9 +338,19 @@ This document outlines integration tests needed for the Solution Explorer panel.
 // AND: Handler receives solutionId correctly
 ```
 
+#### Test: Solution link XSS protection
+```typescript
+// GIVEN: Solution with malicious name: "<script>alert('xss')</script>"
+// WHEN: Panel renders solution name as link
+// THEN: friendlyNameHtml contains escaped HTML: "&lt;script&gt;alert('xss')&lt;/script&gt;"
+// AND: Script tag does not execute
+// AND: Link text displays as plain text, not executed code
+// AND: SolutionViewModelMapper.escapeHtml() sanitizes input
+```
+
 ---
 
-### 6. Action Button Tests
+### 7. Action Button Tests
 
 #### Test: Refresh button reloads solutions
 ```typescript
@@ -356,7 +389,7 @@ This document outlines integration tests needed for the Solution Explorer panel.
 
 ---
 
-### 7. Table Rendering Tests
+### 8. Table Rendering Tests
 
 #### Test: Table shows all configured columns
 ```typescript
@@ -378,22 +411,27 @@ This document outlines integration tests needed for the Solution Explorer panel.
 
 #### Test: Boolean fields formatted as strings
 ```typescript
-// GIVEN: Solution has isManaged=true, isVisible=false
+// GIVEN: Solution has isManaged=true, isVisible=false, isApiManaged=true
 // WHEN: Table renders
-// THEN: Type column shows "Managed"
-// AND: Visible column shows "No"
+// THEN: Type column shows "Managed" (not "true")
+// AND: Visible column shows "No" (not "false")
+// AND: API Managed column shows "Yes" (not "true")
+// AND: SolutionViewModelMapper formats booleans to user-friendly strings
 ```
 
 #### Test: Date fields formatted for display
 ```typescript
-// GIVEN: Solution has installedOn="2024-01-15T10:30:00Z"
+// GIVEN: Solution has installedOn="2024-01-15T10:30:00Z", modifiedOn="2024-02-20T14:45:30Z"
 // WHEN: Table renders
-// THEN: Installed On column shows formatted date (not ISO string)
+// THEN: Installed On column shows formatted date via DateFormatter.formatDate()
+// AND: Modified On column shows formatted date
+// AND: Dates are NOT displayed as ISO 8601 strings
+// AND: Format matches user's locale (e.g., "1/15/2024, 10:30 AM" or "15/01/2024 10:30")
 ```
 
 ---
 
-### 8. Message Routing Tests
+### 9. Message Routing Tests
 
 #### Test: Button click sends correct command
 ```typescript
@@ -428,7 +466,7 @@ This document outlines integration tests needed for the Solution Explorer panel.
 
 ---
 
-### 9. WebviewMessage Contract Tests
+### 10. WebviewMessage Contract Tests
 
 #### Test: Webview message uses 'data' property (not 'payload')
 ```typescript
@@ -448,7 +486,7 @@ This document outlines integration tests needed for the Solution Explorer panel.
 
 ---
 
-### 10. Button State Management Tests
+### 11. Button State Management Tests
 
 #### Test: Button disabled during async operation
 ```typescript
@@ -473,14 +511,38 @@ This document outlines integration tests needed for the Solution Explorer panel.
 #### Test: Multiple button clicks ignored during operation
 ```typescript
 // GIVEN: User clicks Refresh button (operation takes 2 seconds)
+// WHEN: PanelCoordinator sends setButtonState message to disable button
+// AND: Webview applies disabled attribute to button
 // WHEN: User clicks Refresh again 500ms later
-// THEN: Second click has no effect (button disabled)
+// THEN: Second click has no effect (button is disabled in DOM)
 // AND: Only one API call is made
+// AND: Button re-enables after first operation completes
+```
+
+#### Test: Button state message sent from backend to webview
+```typescript
+// GIVEN: Panel is open
+// WHEN: Backend calls coordinator.registerHandler('refresh', handler)
+// AND: User clicks refresh button
+// THEN: PanelCoordinator sends { command: 'setButtonState', buttonId: 'refresh', disabled: true, showSpinner: true }
+// AND: Webview receives message and disables button
+// WHEN: Handler completes
+// THEN: PanelCoordinator sends { command: 'setButtonState', buttonId: 'refresh', disabled: false, showSpinner: false }
+// AND: Webview re-enables button
+```
+
+#### Test: Button disabled attribute prevents duplicate clicks
+```typescript
+// GIVEN: Webview receives setButtonState message with disabled: true
+// WHEN: Button element gets disabled attribute applied
+// THEN: Clicking button has no effect (browser prevents event)
+// AND: No additional webview messages sent
+// NOTE: Integration test verifies client-side button handling
 ```
 
 ---
 
-### 11. Panel Disposal Tests
+### 12. Panel Disposal Tests
 
 #### Test: Panel removed from singleton map on close
 ```typescript
@@ -500,7 +562,7 @@ This document outlines integration tests needed for the Solution Explorer panel.
 
 ---
 
-### 12. CSS and Styling Tests
+### 13. CSS and Styling Tests
 
 #### Test: Table rows have alternating colors
 ```typescript
@@ -529,32 +591,162 @@ This document outlines integration tests needed for the Solution Explorer panel.
 
 ---
 
+## Questions for Architect Review
+
+### 1. Panel Singleton Behavior on Environment Change
+
+**Current Behavior:**
+- Singleton map keyed by **initial** environment ID only
+- When user changes environment via dropdown, `currentEnvironmentId` updates but map does NOT
+- Bug scenario:
+  - User opens panel for `env-A` → map stores `{ 'env-A': panelInstance }`
+  - User switches to `env-B` via dropdown → `currentEnvironmentId = 'env-B'`, map unchanged
+  - User opens new panel for `env-A` → creates **second** panel (violates singleton)
+  - User opens new panel for `env-B` → creates panel (should it reuse existing showing `env-B`?)
+
+**Questions:**
+1. Should singleton map be updated when environment changes?
+2. Should singleton be based on "currently displayed environment" or "initial environment"?
+3. What is the desired behavior when user has panel for env-A, switches to env-B, then opens new panel for env-A?
+4. Should we remove the panel from singleton map when environment changes?
+5. Alternative: Should we prevent environment changes and force users to open separate panels?
+
+**Impact on Tests:**
+- Integration tests need to verify correct singleton behavior
+- May need to add/modify `handleEnvironmentChange()` logic
+- Test spec line 150-160 needs clarification
+
+---
+
+### 2. Panel Behavior with No Environments Configured
+
+**Current Behavior:**
+- `createOrShow()` throws `Error('No environments available')` if no environments exist
+- Panel does not open, user sees error notification
+
+**Alternative Behavior:**
+- Show panel with empty state message: "No environments configured"
+- Hide environment selector section
+- Disable all action buttons
+- Display helpful message: "Configure an environment to view solutions"
+
+**Questions:**
+1. Should Solution Explorer panel show empty state or throw error when no environments?
+2. Note: Environment Setup panel (to be migrated) MUST open with 0 environments
+3. Should this be panel-specific behavior or configurable?
+4. If showing empty state, should refresh/open buttons be hidden or just disabled?
+
+**Impact on Tests:**
+- Test spec line 68-75 currently expects empty state
+- Current implementation throws error
+- Need to decide expected behavior before writing tests
+
+---
+
+### 3. Environment Selector Visibility Configuration
+
+**Current Behavior:**
+- Environment selector always visible, regardless of environment count
+- No conditional logic based on number of environments
+
+**Desired Behavior (from test spec):**
+- Hide selector when 0 environments (or maybe this triggers error, see question 2)
+- Hide selector when 1 environment (user has no choice)
+- Show selector when 2+ environments
+
+**Questions:**
+1. Should visibility be automatic based on count, or configurable per panel?
+2. Where should this logic live?
+   - In `EnvironmentSelectorSection.render()` with environment count check?
+   - In panel's `createCoordinator()` to conditionally include section?
+   - In `SectionCompositionBehavior` with visibility rules?
+3. If hidden with 1 environment, should panel title show environment name?
+
+**Impact on Tests:**
+- Test spec line 162-169 expects configurability
+- Need to implement visibility logic before testing
+
+---
+
+### 4. Search Box Disabled State
+
+**Current Behavior:**
+- Search input always enabled, even when no data
+
+**Test Spec Expectation (line 87):**
+- Search input should be "visible but disabled" when no solutions
+
+**Questions:**
+1. Should search box be disabled when table is empty?
+2. Or should it remain enabled (but do nothing since no rows to filter)?
+3. Should this be configurable per panel?
+
+**Recommendation:**
+- Keep search enabled always (current behavior)
+- User can type but sees "0 records" until they clear search
+- Less confusing than toggling disabled state
+
+---
+
+### 5. Singleton Pattern for Panels - General Design Question
+
+**Background:**
+- Current implementation uses static singleton map per environment
+- Follows VS Code webview panel pattern from documentation
+- Prevents duplicate panels for same resource
+
+**Concerns:**
+1. **Why do we need singleton?** Is it a VS Code requirement or our design choice?
+2. **What are the pros/cons** of allowing multiple panels for same environment?
+   - Pro: User can have 2 views of solutions side-by-side
+   - Con: State synchronization issues (one panel refreshes, other doesn't)
+   - Con: Resource usage (2 webviews for same data)
+3. **What about persistence?** User might "mess up persistence" with multiple panels
+4. **Is singleton appropriate for all panels?** Or just certain ones?
+
+**Request:**
+- Architect to clarify design rationale for singleton pattern
+- Document pros/cons of allowing duplicate panels
+- Provide guidance on when singleton is required vs optional
+
+---
+
 ## Test Implementation Priority
 
-### Phase 1: Critical Path (MVP)
+### Phase 1: Critical Path (MVP) - Core Functionality
 1. Panel initialization with valid environment
 2. Solutions load on panel open
 3. Refresh button reloads solutions
 4. Clicking solution name opens in Maker Portal
 5. Search filters solutions client-side
+6. Column sorting (client-side) with direction toggle
+7. Row striping maintained during search/sort
 
-### Phase 2: Data Integrity
-6. WebviewMessage contract (data vs payload)
-7. Message routing for all commands
-8. Environment selector changes environment
-9. Button state management during operations
+### Phase 2: Data Integrity & Contracts
+8. WebviewMessage contract (data vs payload)
+9. Message routing for all commands
+10. Environment selector changes environment
+11. Button state management during operations
+12. Button disabled attribute prevents duplicate clicks
+13. Boolean field formatting (Managed/Unmanaged, Yes/No)
+14. Date field formatting (locale-aware display)
+15. XSS protection for solution names
 
-### Phase 3: Edge Cases
-10. Panel with no environments configured
-11. Empty state when environment has no solutions
-12. Error handling for API failures
-13. Environment selector hidden when only one environment
+### Phase 3: Edge Cases & Error Handling
+16. Empty state when environment has no solutions
+17. Error handling for API failures
+18. Solution link requires environment ID
+19. Open in Maker requires environment ID
+20. Panel with no environments (pending architect decision)
+21. Environment selector visibility (pending implementation)
 
-### Phase 4: Polish
-14. Table rendering (all columns, formatting)
-15. CSS and styling (striping, hover)
-16. Panel disposal and cleanup
-17. Singleton behavior per environment
+### Phase 4: Advanced Features & Polish
+22. Sort works with search filtering (combined behavior)
+23. Sort reapplies row striping
+24. Table shows all configured columns
+25. CSS and styling (striping, hover)
+26. Panel disposal and cleanup
+27. Singleton behavior (pending architect guidance)
 
 ---
 
@@ -568,17 +760,64 @@ This document outlines integration tests needed for the Solution Explorer panel.
 
 ### Test Helpers
 ```typescript
-// File: src/shared/testing/PanelTestHarness.ts
+// File: src/shared/testing/helpers/PanelTestHarness.ts
 
+/**
+ * Test harness for integration testing webview panels.
+ * Provides utilities to simulate user interactions and verify panel state.
+ */
 export class PanelTestHarness {
+  // Panel creation
   createMockPanel(): vscode.WebviewPanel
   createMockEnvironment(): Environment
+
+  // User interactions
   simulateButtonClick(buttonId: string): void
   simulateLinkClick(linkElement: HTMLElement): void
   simulateEnvironmentChange(environmentId: string): void
+  simulateColumnHeaderClick(columnKey: string): void
+  simulateSearchInput(query: string): void
+
+  // State inspection
   getVisibleRows(): HTMLTableRowElement[]
   getRecordCount(): string
+  getSortIndicator(columnKey: string): '▲' | '▼' | null
+  getButtonState(buttonId: string): { disabled: boolean; hasSpinner: boolean }
+  getEnvironmentSelectorValue(): string
+
+  // Async helpers
   waitForOperation(operation: Promise<void>): Promise<void>
+  waitForPanelUpdate(): Promise<void>
+
+  // Message interception
+  getLastWebviewMessage(): WebviewMessage | null
+  getAllWebviewMessages(): WebviewMessage[]
+  clearMessageHistory(): void
+
+  // Cleanup
+  dispose(): void
+}
+```
+
+### Mock Implementations
+```typescript
+// File: src/shared/testing/mocks/MockWebviewPanel.ts
+
+/**
+ * Mock implementation of vscode.WebviewPanel for testing.
+ * Captures postMessage calls and simulates webview lifecycle.
+ */
+export class MockWebviewPanel implements vscode.WebviewPanel {
+  // Track messages sent to webview
+  public readonly messagesSent: unknown[] = [];
+
+  // Simulate webview message handlers
+  public readonly onDidReceiveMessage: vscode.Event<unknown>;
+
+  // Trigger simulated user actions
+  public simulateMessage(message: WebviewMessage): void;
+
+  // ... other vscode.WebviewPanel members
 }
 ```
 
@@ -586,6 +825,10 @@ export class PanelTestHarness {
 ```typescript
 // File: src/shared/testing/fixtures/solutions.ts
 
+/**
+ * Mock solution data for integration tests.
+ * Covers edge cases: Default solution, managed/unmanaged, null dates, special characters.
+ */
 export const mockSolutions = [
   {
     id: 'solution-1',
@@ -593,11 +836,71 @@ export const mockSolutions = [
     friendlyName: 'Default Solution',
     version: '1.0.0.0',
     isManaged: false,
+    isVisible: true,
+    isApiManaged: false,
     publisherName: 'Default Publisher',
-    // ... other fields
+    installedOn: '2024-01-15T10:30:00Z',
+    modifiedOn: '2024-02-20T14:45:30Z',
+    description: 'System default solution',
   },
-  // ... more solutions
-]
+  {
+    id: 'solution-2',
+    uniqueName: 'CommonDataServices',
+    friendlyName: 'Common Data Services',
+    version: '9.2.24011.00174',
+    isManaged: true,
+    isVisible: true,
+    isApiManaged: true,
+    publisherName: 'Microsoft',
+    installedOn: '2024-01-10T08:00:00Z',
+    modifiedOn: '2024-02-15T12:00:00Z',
+    description: 'Core platform components',
+  },
+  {
+    id: 'solution-3',
+    uniqueName: 'CustomSolution',
+    friendlyName: 'Custom Solution with Spëcial Çhars',
+    version: '1.0.0.1',
+    isManaged: false,
+    isVisible: false,
+    isApiManaged: false,
+    publisherName: 'Contoso',
+    installedOn: null, // Test null date handling
+    modifiedOn: '2024-03-01T09:15:00Z',
+    description: '',
+  },
+  {
+    id: 'solution-4',
+    uniqueName: 'XSSTestSolution',
+    friendlyName: '<script>alert("xss")</script>',
+    version: '1.0.0.0',
+    isManaged: false,
+    isVisible: true,
+    isApiManaged: false,
+    publisherName: 'Security Test',
+    installedOn: '2024-01-20T11:00:00Z',
+    modifiedOn: '2024-01-20T11:00:00Z',
+    description: 'Tests XSS protection',
+  },
+];
+
+export const mockEnvironments = [
+  {
+    id: 'env-dev',
+    name: 'Development',
+    powerPlatformEnvironmentId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+  },
+  {
+    id: 'env-test',
+    name: 'Test',
+    powerPlatformEnvironmentId: 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff',
+  },
+  {
+    id: 'env-prod',
+    name: 'Production',
+    powerPlatformEnvironmentId: undefined, // Test missing environment ID
+  },
+];
 ```
 
 ---
@@ -715,8 +1018,73 @@ describe('SolutionExplorerPanel Integration Tests', () => {
 ---
 
 **Next Steps:**
-1. Create `PanelTestHarness.ts` helper class
-2. Create solution fixtures in `fixtures/solutions.ts`
-3. Implement Phase 1 tests (Critical Path)
-4. Add integration tests to CI/CD pipeline
-5. Expand to Phase 2-4 tests
+1. **Architect Review** - Get answers to questions in "Questions for Architect Review" section
+2. **Create Test Infrastructure:**
+   - `PanelTestHarness.ts` helper class
+   - `MockWebviewPanel.ts` mock implementation
+   - `fixtures/solutions.ts` and `fixtures/environments.ts`
+3. **Implement Phase 1 Tests** (Critical Path) - 7 tests covering core functionality
+4. **Implement Phase 2 Tests** (Data Integrity) - 8 tests covering contracts and formatting
+5. **Add Integration Tests to CI/CD** - Ensure tests run on every commit
+6. **Implement Phase 3-4 Tests** - Edge cases and polish (pending architect decisions)
+
+---
+
+## Document Summary & Recommendations
+
+### Test Coverage Statistics
+- **Total integration tests specified**: 60+ test cases
+- **Categories**: 13 test categories covering full panel lifecycle
+- **Current implementation coverage**: 0 tests (no integration tests exist)
+- **Estimated implementation effort**:
+  - Phase 1 (MVP): Simple (7 tests, critical path only)
+  - Phase 2 (Data Integrity): Moderate (8 tests, contracts + formatting)
+  - Phase 3-4 (Complete): Complex (45+ tests, full coverage)
+
+### Key Findings from Review
+
+**✅ Correctly Implemented:**
+- Client-side sorting with locale-aware comparison
+- Client-side search with row striping
+- XSS protection via HTML escaping
+- Boolean/date field formatting in mapper
+- Button state management via PanelCoordinator
+- WebviewMessage contract with `data` property
+
+**⚠️ Needs Architect Decision:**
+1. Singleton map behavior on environment change (potential duplicate panel bug)
+2. Panel behavior when no environments configured (error vs empty state)
+3. Environment selector visibility logic (hide with 0/1 envs?)
+4. Singleton pattern rationale (why enforce? pros/cons of duplicates?)
+
+**❌ Missing Implementation:**
+- Search box disabled state (recommendation: keep enabled always)
+- Environment selector conditional visibility
+
+**🐛 Potential Bugs Identified:**
+1. **Singleton violation**: Changing environment allows duplicate panels for initial environment
+2. **Sort state loss**: Client-side sort resets on refresh (expected, but may confuse users)
+3. **Search + Sort interaction**: Need to verify hidden rows maintain search filter after sort
+
+### Recommendations
+
+1. **Prioritize architect consultation** before implementing Phase 3-4 tests
+   - Singleton behavior impacts 3+ test cases
+   - Empty state behavior changes test expectations significantly
+
+2. **Implement PanelTestHarness as reusable infrastructure**
+   - Will be needed for all future panel integration tests
+   - Investment now pays off for Environment Setup, Plugin Registration, etc.
+
+3. **Start with Phase 1 tests** to validate test infrastructure
+   - Happy path tests easier to implement
+   - Proves out harness design before complex edge cases
+
+4. **Consider documenting "known limitations"** for client-side sorting
+   - Sort state lost on refresh
+   - No server-side sort order persistence
+   - Users may expect sort to persist (UX consideration)
+
+5. **Add explicit test for search + sort interaction**
+   - Current spec has separate search and sort tests
+   - Combined behavior needs verification (hidden rows + DOM reordering)
