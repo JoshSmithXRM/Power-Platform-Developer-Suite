@@ -52,6 +52,12 @@ export interface SectionRenderData {
 	readonly customData?: Record<string, unknown>;
 
 	/**
+	 * Form data (for form sections).
+	 * Used by environment setup and other form-based sections.
+	 */
+	readonly formData?: Record<string, string>;
+
+	/**
 	 * Available environments (for EnvironmentSelectorSection).
 	 * List of environments to populate dropdown.
 	 */

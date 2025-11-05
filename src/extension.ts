@@ -22,7 +22,7 @@ import { CheckConcurrentEditUseCase } from './features/environmentSetup/applicat
 import { EnvironmentListViewModelMapper } from './features/environmentSetup/application/mappers/EnvironmentListViewModelMapper';
 import { EnvironmentListViewModel } from './features/environmentSetup/application/viewModels/EnvironmentListViewModel';
 import { EnvironmentFormViewModelMapper } from './features/environmentSetup/application/mappers/EnvironmentFormViewModelMapper';
-import { EnvironmentSetupPanel } from './features/environmentSetup/presentation/panels/EnvironmentSetupPanel';
+import { EnvironmentSetupPanelComposed } from './features/environmentSetup/presentation/panels/EnvironmentSetupPanelComposed';
 import { TestEnvironmentConnectionCommandHandler } from './features/environmentSetup/presentation/commands/TestEnvironmentConnectionCommandHandler';
 import { EnvironmentId } from './features/environmentSetup/domain/valueObjects/EnvironmentId';
 import { Environment } from './features/environmentSetup/domain/entities/Environment';
@@ -126,7 +126,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	vscode.window.registerTreeDataProvider('power-platform-dev-suite-environments', environmentsProvider);
 
 	const addEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.addEnvironment', () => {
-		EnvironmentSetupPanel.createOrShow(
+		EnvironmentSetupPanelComposed.createOrShow(
 			context.extensionUri,
 			loadEnvironmentByIdUseCase,
 			saveEnvironmentUseCase,
@@ -142,7 +142,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const editEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.editEnvironment', async (environmentItem?: { envId: string }) => {
 		if (environmentItem) {
-			EnvironmentSetupPanel.createOrShow(
+			EnvironmentSetupPanelComposed.createOrShow(
 				context.extensionUri,
 				loadEnvironmentByIdUseCase,
 				saveEnvironmentUseCase,

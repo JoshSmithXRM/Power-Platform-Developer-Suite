@@ -19,6 +19,7 @@ export interface HtmlScaffoldingConfig {
 	readonly jsUris: ReadonlyArray<string>;
 	readonly cspNonce: string;
 	readonly title: string;
+	readonly customCss?: string;
 }
 
 /**
@@ -54,7 +55,7 @@ export class HtmlScaffoldingBehavior implements IPanelBehavior {
 	 * Includes <html>, <head>, CSS, JS, and CSP.
 	 */
 	private wrapInHtmlScaffolding(bodyHtml: string): string {
-		const { cssUris, jsUris, cspNonce, title } = this.config;
+		const { cssUris, jsUris, cspNonce, title, customCss } = this.config;
 		const cspSource = this.webview.cspSource;
 
 		return `<!DOCTYPE html>
@@ -65,6 +66,7 @@ export class HtmlScaffoldingBehavior implements IPanelBehavior {
 	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${cspNonce}';">
 	<title>${this.escapeHtml(title)}</title>
 	${cssUris.map(uri => `<link rel="stylesheet" href="${uri}">`).join('\n\t')}
+	${customCss ? `<style>${customCss}</style>` : ''}
 </head>
 <body>
 ${bodyHtml}
