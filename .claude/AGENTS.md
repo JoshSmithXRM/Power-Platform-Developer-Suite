@@ -129,6 +129,7 @@ Please create a comprehensive design covering all four layers.
 - Reviews code quality (logging, comments, duplication)
 - Verifies manual testing completed
 - Provides **APPROVE** or **CHANGES REQUESTED** decision
+- **Returns results to main session** (user handles commits manually)
 
 **Invoke for:**
 - ✅ Every feature (before committing)
@@ -154,7 +155,7 @@ Files changed:
 Manual testing: ✅ Completed (feature works end-to-end)
 ```
 
-**Output:** APPROVE ✅ or CHANGES REQUESTED ⚠️
+**Output:** APPROVE ✅ or CHANGES REQUESTED ⚠️ with detailed findings
 
 **Example:**
 ```
@@ -169,15 +170,12 @@ Files changed:
 Manual testing: ✅ Completed (feature works end-to-end)
 ```
 
-**If APPROVED:**
-- ✅ Commit the code
-- ✅ Move to next feature
-
-**If CHANGES REQUESTED:**
-1. Fix critical issues
-2. Run `npm run compile` ✅
-3. Re-invoke code-guardian for approval
-4. Get APPROVE ✅ before committing
+**After Review:**
+- Agent returns verdict and findings to main session
+- Main session presents results to user
+- User reviews feedback
+- If APPROVED: User commits manually
+- If CHANGES REQUESTED: User fixes issues, then decides whether to re-review
 
 ---
 
@@ -281,10 +279,16 @@ Update:
 │ code-guardian:                              │
 │ ├─ Reviews all 4 layers                    │
 │ ├─ Checks architecture, types, tests       │
+│ ├─ Returns verdict + findings              │
 │ └─ Decision: APPROVE or CHANGES REQUESTED  │
 │                                             │
-│ If APPROVED: ✅ Done!                       │
-│ If CHANGES REQUESTED: Fix → Re-review      │
+│ Main session:                               │
+│ └─ Presents findings to user               │
+│                                             │
+│ You (user):                                 │
+│ ├─ Review feedback                          │
+│ ├─ If APPROVED: Commit manually             │
+│ └─ If CHANGES: Fix → Re-review (optional)  │
 └─────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────┐
@@ -340,11 +344,13 @@ Update:
 - ✅ Reviews architecture compliance
 - ✅ Reviews type safety
 - ✅ Reviews tests and quality
-- ✅ Provides final APPROVE/REJECT
+- ✅ Provides final APPROVE or CHANGES REQUESTED verdict
+- ✅ Returns findings to main session
 - ❌ Does NOT implement code
 - ❌ Does NOT design features
+- ❌ Does NOT commit or create commit messages
 
-**Tools:** Read, Grep, Glob (review only, no editing)
+**Tools:** Read, Grep, Glob (review only, no editing or git commands)
 
 ### docs-generator
 - ✅ Creates documentation files
