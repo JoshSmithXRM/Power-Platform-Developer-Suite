@@ -1283,7 +1283,7 @@ export function renderMetadataBrowser(options: {
   <div class="metadata-browser">
     <!-- Top Actions -->
     <div class="top-actions">
-      <button id="refresh-btn">🔄 Refresh</button>
+      <button id="refresh-btn">Refresh</button>
       <button id="open-maker-btn">Open in Maker</button>
       <select id="environment-selector">
         <!-- Populated by JavaScript -->
