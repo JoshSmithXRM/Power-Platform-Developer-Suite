@@ -194,7 +194,20 @@ export class PersistenceInspectorPanelComposed {
 		);
 
 		const scaffoldingConfig: HtmlScaffoldingConfig = {
-			cssUris,
+			cssUris: [
+				...cssUris,
+				// Add InputDialog component CSS
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(
+						this.extensionUri,
+						'resources',
+						'webview',
+						'css',
+						'components',
+						'input-dialog.css'
+					)
+				).toString()
+			],
 			jsUris: [
 				// Load messaging.js first (acquires vscode API and wires up buttons)
 				this.panel.webview.asWebviewUri(
@@ -206,7 +219,18 @@ export class PersistenceInspectorPanelComposed {
 						'messaging.js'
 					)
 				).toString(),
-				// Load panel-specific behavior second (uses window.vscode from messaging.js)
+				// Load InputDialog component (required by behavior)
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(
+						this.extensionUri,
+						'resources',
+						'webview',
+						'js',
+						'components',
+						'InputDialog.js'
+					)
+				).toString(),
+				// Load panel-specific behavior last (uses InputDialog component)
 				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(
 						this.extensionUri,
@@ -312,9 +336,11 @@ export class PersistenceInspectorPanelComposed {
 		this.coordinator.registerHandler(
 			'revealSecret',
 			async (data) => {
-				if (isRevealSecretMessage(data)) {
-					await this.handleRevealSecret(data.key);
+				if (!isRevealSecretMessage(data)) {
+					this.logger.warn('Invalid reveal secret data', { data });
+					return;
 				}
+				await this.handleRevealSecret(data.key);
 			},
 			{ disableOnExecute: false }
 		);
@@ -323,9 +349,11 @@ export class PersistenceInspectorPanelComposed {
 		this.coordinator.registerHandler(
 			'clearEntry',
 			async (data) => {
-				if (isClearEntryMessage(data)) {
-					await this.handleClearEntry(data.key);
+				if (!isClearEntryMessage(data)) {
+					this.logger.warn('Invalid clear entry data', { data });
+					return;
 				}
+				await this.handleClearEntry(data.key);
 			},
 			{ disableOnExecute: false }
 		);
@@ -334,9 +362,11 @@ export class PersistenceInspectorPanelComposed {
 		this.coordinator.registerHandler(
 			'clearProperty',
 			async (data) => {
-				if (isClearPropertyMessage(data)) {
-					await this.handleClearProperty(data.key, data.path);
+				if (!isClearPropertyMessage(data)) {
+					this.logger.warn('Invalid clear property data', { data });
+					return;
 				}
+				await this.handleClearProperty(data.key, data.path);
 			},
 			{ disableOnExecute: false }
 		);

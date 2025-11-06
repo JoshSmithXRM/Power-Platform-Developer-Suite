@@ -25,6 +25,24 @@ window.createBehavior({
 	}
 });
 
+/**
+ * Shows a dialog for entering property path to clear.
+ * Uses reusable InputDialog component.
+ */
+function showClearPropertyDialog(entryKey) {
+	window.showInputDialog({
+		title: 'Clear Property',
+		label: 'Enter property path (e.g., settings.dataverseUrl or [0].name):',
+		placeholder: 'e.g., [0].name',
+		onSubmit: (path) => {
+			window.vscode.postMessage({
+				command: 'clearProperty',
+				data: { key: entryKey, path: path }
+			});
+		}
+	});
+}
+
 function renderStorageData(data) {
 	renderEntries(data.globalStateEntries, 'globalStateEntries');
 	renderEntries(data.secretEntries, 'secretEntries');
@@ -102,13 +120,7 @@ function renderEntries(entries, containerId) {
 			const clearPropBtn = document.createElement('button');
 			clearPropBtn.textContent = 'Clear Property';
 			clearPropBtn.onclick = () => {
-				const path = prompt('Enter property path to clear (e.g., settings.dataverseUrl or [0].name):');
-				if (path) {
-					window.vscode.postMessage({
-						command: 'clearProperty',
-						data: { key: entry.key, path: path }
-					});
-				}
+				showClearPropertyDialog(entry.key);
 			};
 			actions.appendChild(clearPropBtn);
 		}

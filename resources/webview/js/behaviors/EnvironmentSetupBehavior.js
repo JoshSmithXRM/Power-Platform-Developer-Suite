@@ -31,43 +31,47 @@ window.createBehavior({
 			lastSavedAuthMethod = authMethodSelect.value;
 		}
 
-		// Register event listeners
+		// Register event listeners in capture phase to prevent generic messaging.js handlers
 		if (saveButton) {
-			saveButton.addEventListener('click', () => {
+			saveButton.addEventListener('click', (e) => {
+				e.stopPropagation();
 				if (form && form.checkValidity()) {
 					saveEnvironment();
 				} else if (form) {
 					form.reportValidity();
 				}
-			});
+			}, true);
 		}
 
 		if (testButton) {
-			testButton.addEventListener('click', () => {
+			testButton.addEventListener('click', (e) => {
+				e.stopPropagation();
 				if (form && form.checkValidity()) {
 					testConnection();
 				} else if (form) {
 					form.reportValidity();
 				}
-			});
+			}, true);
 		}
 
 		if (discoverButton) {
-			discoverButton.addEventListener('click', () => {
+			discoverButton.addEventListener('click', (e) => {
+				e.stopPropagation();
 				if (form && form.checkValidity()) {
 					discoverEnvironmentId();
 				} else if (form) {
 					form.reportValidity();
 				}
-			});
+			}, true);
 		}
 
 		if (deleteButton) {
-			deleteButton.addEventListener('click', () => {
+			deleteButton.addEventListener('click', (e) => {
+				e.stopPropagation();
 				window.vscode.postMessage({
 					command: 'deleteEnvironment'
 				});
-			});
+			}, true);
 		}
 
 		if (authMethodSelect) {
