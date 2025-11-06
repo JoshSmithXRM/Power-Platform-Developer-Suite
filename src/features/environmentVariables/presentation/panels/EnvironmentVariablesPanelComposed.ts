@@ -67,15 +67,12 @@ export class EnvironmentVariablesPanelComposed {
 			localResourceRoots: [extensionUri]
 		};
 
-		// Create coordinator with new architecture
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
 
-		// Register command handlers
 		this.registerCommandHandlers();
 
-		// Initialize panel and load data asynchronously
 		void this.initializeAndLoadData();
 	}
 
@@ -116,7 +113,6 @@ export class EnvironmentVariablesPanelComposed {
 			return existingPanel;
 		}
 
-		// Get environment name for title
 		const environment = await getEnvironmentById(targetEnvironmentId);
 		const environmentName = environment?.name || 'Unknown';
 
@@ -148,7 +144,6 @@ export class EnvironmentVariablesPanelComposed {
 
 		EnvironmentVariablesPanelComposed.panels.set(targetEnvironmentId, newPanel);
 
-		// Handle panel disposal
 		const envId = targetEnvironmentId; // Capture for closure
 		panel.onDidDispose(() => {
 			EnvironmentVariablesPanelComposed.panels.delete(envId);
@@ -192,7 +187,6 @@ export class EnvironmentVariablesPanelComposed {
 	private createCoordinator(): { coordinator: PanelCoordinator<EnvironmentVariablesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
 		const config = this.getTableConfig();
 
-		// Create sections
 		const environmentSelector = new EnvironmentSelectorSection();
 		const solutionFilter = new SolutionFilterSection();
 		const tableSection = new DataTableSection(config);
@@ -205,14 +199,12 @@ export class EnvironmentVariablesPanelComposed {
 			]
 		}, SectionPosition.Toolbar);
 
-		// Create section composition behavior
 		// Order: action buttons, solution filter, environment selector (far right), then table
 		const compositionBehavior = new SectionCompositionBehavior(
 			[actionButtons, solutionFilter, environmentSelector, tableSection],
 			PanelLayout.SingleColumn
 		);
 
-		// Resolve CSS module paths to webview URIs
 		const cssUris = resolveCssModules(
 			{
 				base: true,
@@ -228,7 +220,6 @@ export class EnvironmentVariablesPanelComposed {
 			vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'environment-variables.css')
 		).toString();
 
-		// Create HTML scaffolding behavior
 		const scaffoldingConfig: HtmlScaffoldingConfig = {
 			cssUris: [...cssUris, featureCssUri],
 			jsUris: [
@@ -249,7 +240,6 @@ export class EnvironmentVariablesPanelComposed {
 			scaffoldingConfig
 		);
 
-		// Create coordinator
 		const coordinator = new PanelCoordinator<EnvironmentVariablesCommands>({
 			panel: this.panel,
 			extensionUri: this.extensionUri,
@@ -417,27 +407,21 @@ export class EnvironmentVariablesPanelComposed {
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		// Disable refresh button during operation
 		this.setButtonLoading('refresh', true);
 
 		try {
-			// Update current environment
 			this.currentEnvironmentId = environmentId;
 			this.currentSolutionId = undefined; // Reset solution filter
 
-			// Update panel title
 			const environment = await this.getEnvironmentById(environmentId);
 			if (environment) {
 				this.panel.title = `Environment Variables - ${environment.name}`;
 			}
 
-			// Load solutions for new environment
 			this.solutionOptions = await this.loadSolutions();
 
-			// Refresh data
 			await this.handleRefresh();
 		} finally {
-			// Re-enable refresh button
 			this.setButtonLoading('refresh', false);
 		}
 	}
@@ -445,11 +429,9 @@ export class EnvironmentVariablesPanelComposed {
 	private async handleSolutionChange(solutionId: string | undefined): Promise<void> {
 		this.logger.debug('Solution filter changed', { solutionId });
 
-		// Disable refresh button during operation
 		this.setButtonLoading('refresh', true);
 
 		try {
-			// Update current solution filter
 			this.currentSolutionId = solutionId;
 
 			// Save solution selection to panel state
@@ -473,10 +455,8 @@ export class EnvironmentVariablesPanelComposed {
 				}
 			}
 
-			// Refresh data
 			await this.handleRefresh();
 		} finally {
-			// Re-enable refresh button
 			this.setButtonLoading('refresh', false);
 		}
 	}

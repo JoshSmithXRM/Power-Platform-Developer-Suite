@@ -181,7 +181,6 @@ export class PanelCoordinator<TCommands extends string = string>
 		this.logger.debug('Handling message', { command, data });
 
 		try {
-			// Set button to loading state if enabled
 			if (options.disableOnExecute) {
 				this.setButtonLoading(command, true);
 			}

@@ -57,15 +57,12 @@ export class SolutionExplorerPanelComposed {
 			localResourceRoots: [extensionUri]
 		};
 
-		// Create coordinator with new architecture
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
 
-		// Register command handlers
 		this.registerCommandHandlers();
 
-		// Initialize panel and load data asynchronously
 		void this.initializeAndLoadData();
 	}
 
@@ -103,7 +100,6 @@ export class SolutionExplorerPanelComposed {
 			return existingPanel;
 		}
 
-		// Get environment name for title
 		const environment = await getEnvironmentById(targetEnvironmentId);
 		const environmentName = environment?.name || 'Unknown';
 
@@ -132,7 +128,6 @@ export class SolutionExplorerPanelComposed {
 
 		SolutionExplorerPanelComposed.panels.set(targetEnvironmentId, newPanel);
 
-		// Handle panel disposal
 		const envId = targetEnvironmentId; // Capture for closure
 		panel.onDidDispose(() => {
 			SolutionExplorerPanelComposed.panels.delete(envId);
@@ -159,7 +154,6 @@ export class SolutionExplorerPanelComposed {
 	private createCoordinator(): { coordinator: PanelCoordinator<SolutionExplorerCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
 		const config = this.getTableConfig();
 
-		// Create sections
 		const environmentSelector = new EnvironmentSelectorSection();
 		const tableSection = new DataTableSection(config);
 		// Note: Button IDs must match command names registered in registerCommandHandlers()
@@ -170,13 +164,11 @@ export class SolutionExplorerPanelComposed {
 			]
 		}, SectionPosition.Toolbar);
 
-		// Create section composition behavior
 		const compositionBehavior = new SectionCompositionBehavior(
 			[actionButtons, environmentSelector, tableSection],
 			PanelLayout.SingleColumn
 		);
 
-		// Resolve CSS module paths to webview URIs
 		const cssUris = resolveCssModules(
 			{
 				base: true,
@@ -192,7 +184,6 @@ export class SolutionExplorerPanelComposed {
 			vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'solutions.css')
 		).toString();
 
-		// Create HTML scaffolding behavior
 		const scaffoldingConfig: HtmlScaffoldingConfig = {
 			cssUris: [...cssUris, featureCssUri],
 			jsUris: [
@@ -213,7 +204,6 @@ export class SolutionExplorerPanelComposed {
 			scaffoldingConfig
 		);
 
-		// Create coordinator
 		const coordinator = new PanelCoordinator<SolutionExplorerCommands>({
 			panel: this.panel,
 			extensionUri: this.extensionUri,
@@ -334,23 +324,18 @@ export class SolutionExplorerPanelComposed {
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		// Disable refresh button during operation
 		this.setButtonLoading('refresh', true);
 
 		try {
-			// Update current environment
 			this.currentEnvironmentId = environmentId;
 
-			// Update panel title
 			const environment = await this.getEnvironmentById(environmentId);
 			if (environment) {
 				this.panel.title = `Solutions - ${environment.name}`;
 			}
 
-			// Refresh data
 			await this.handleRefresh();
 		} finally {
-			// Re-enable refresh button
 			this.setButtonLoading('refresh', false);
 		}
 	}

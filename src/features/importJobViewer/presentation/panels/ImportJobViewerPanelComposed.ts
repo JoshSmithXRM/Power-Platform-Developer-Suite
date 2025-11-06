@@ -60,15 +60,12 @@ export class ImportJobViewerPanelComposed {
 			localResourceRoots: [extensionUri]
 		};
 
-		// Create coordinator with new architecture
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
 
-		// Register command handlers
 		this.registerCommandHandlers();
 
-		// Initialize panel and load data asynchronously
 		void this.initializeAndLoadData();
 	}
 
@@ -107,7 +104,6 @@ export class ImportJobViewerPanelComposed {
 			return existingPanel;
 		}
 
-		// Get environment name for title
 		const environment = await getEnvironmentById(targetEnvironmentId);
 		const environmentName = environment?.name || 'Unknown';
 
@@ -137,7 +133,6 @@ export class ImportJobViewerPanelComposed {
 
 		ImportJobViewerPanelComposed.panels.set(targetEnvironmentId, newPanel);
 
-		// Handle panel disposal
 		const envId = targetEnvironmentId; // Capture for closure
 		panel.onDidDispose(() => {
 			ImportJobViewerPanelComposed.panels.delete(envId);
@@ -150,7 +145,6 @@ export class ImportJobViewerPanelComposed {
 		// Load environments first so they appear on initial render
 		const environments = await this.getEnvironments();
 
-		// Initialize coordinator with environments
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
@@ -164,7 +158,6 @@ export class ImportJobViewerPanelComposed {
 	private createCoordinator(): { coordinator: PanelCoordinator<ImportJobViewerCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
 		const config = this.getTableConfig();
 
-		// Create sections
 		const environmentSelector = new EnvironmentSelectorSection();
 		const tableSection = new DataTableSection(config);
 		// Note: Button IDs must match command names registered in registerCommandHandlers()
@@ -175,13 +168,11 @@ export class ImportJobViewerPanelComposed {
 			]
 		}, SectionPosition.Toolbar);
 
-		// Create section composition behavior
 		const compositionBehavior = new SectionCompositionBehavior(
 			[actionButtons, environmentSelector, tableSection],
 			PanelLayout.SingleColumn
 		);
 
-		// Resolve CSS module paths to webview URIs
 		const cssUris = resolveCssModules(
 			{
 				base: true,
@@ -197,7 +188,6 @@ export class ImportJobViewerPanelComposed {
 			vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'import-jobs.css')
 		).toString();
 
-		// Create HTML scaffolding behavior
 		const scaffoldingConfig: HtmlScaffoldingConfig = {
 			cssUris: [...cssUris, featureCssUri],
 			jsUris: [
@@ -218,7 +208,6 @@ export class ImportJobViewerPanelComposed {
 			scaffoldingConfig
 		);
 
-		// Create coordinator
 		const coordinator = new PanelCoordinator<ImportJobViewerCommands>({
 			panel: this.panel,
 			extensionUri: this.extensionUri,
@@ -338,23 +327,18 @@ export class ImportJobViewerPanelComposed {
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		// Disable refresh button during operation
 		this.setButtonLoading('refresh', true);
 
 		try {
-			// Update current environment
 			this.currentEnvironmentId = environmentId;
 
-			// Update panel title
 			const environment = await this.getEnvironmentById(environmentId);
 			if (environment) {
 				this.panel.title = `Import Jobs - ${environment.name}`;
 			}
 
-			// Refresh data
 			await this.handleRefresh();
 		} finally {
-			// Re-enable refresh button
 			this.setButtonLoading('refresh', false);
 		}
 	}

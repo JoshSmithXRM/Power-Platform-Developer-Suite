@@ -153,7 +153,6 @@ export class ConnectionReferencesPanelComposed {
 	}
 
 	private createCoordinator(): { coordinator: PanelCoordinator<ConnectionReferencesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
-		// Create sections
 		const environmentSelector = new EnvironmentSelectorSection();
 		const solutionFilter = new SolutionFilterSection();
 
@@ -212,7 +211,6 @@ export class ConnectionReferencesPanelComposed {
 			vscodeImpl.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'connection-references.css')
 		).toString();
 
-		// Create HTML scaffolding behavior
 		const scaffoldingConfig: HtmlScaffoldingConfig = {
 			cssUris: [...cssUris, featureCssUri],
 			jsUris: [
@@ -233,7 +231,6 @@ export class ConnectionReferencesPanelComposed {
 			scaffoldingConfig
 		);
 
-		// Create coordinator
 		const coordinator = new PanelCoordinator<ConnectionReferencesCommands>({
 			panel: this.panel,
 			extensionUri: this.extensionUri,
@@ -385,7 +382,6 @@ export class ConnectionReferencesPanelComposed {
 		// Add new panel to registry
 		ConnectionReferencesPanelComposed.panels.set(this.currentEnvironmentId, this);
 
-		// Update panel title
 		const environment = await this.getEnvironmentById(environmentId);
 		this.panel.title = `Connection References - ${environment?.name || 'Unknown'}`;
 

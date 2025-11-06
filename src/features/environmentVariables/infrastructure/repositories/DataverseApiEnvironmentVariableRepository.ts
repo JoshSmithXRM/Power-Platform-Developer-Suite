@@ -74,8 +74,9 @@ export class DataverseApiEnvironmentVariableRepository implements IEnvironmentVa
 				throw new OperationCancelledException();
 			}
 
-			this.logger.debug(`Fetched ${response.value.length} environment variable definition(s) from Dataverse`, {
-				environmentId
+			this.logger.debug('Fetched environment variable definitions from Dataverse', {
+				environmentId,
+				count: response.value.length
 			});
 
 			return response.value;
@@ -124,8 +125,9 @@ export class DataverseApiEnvironmentVariableRepository implements IEnvironmentVa
 				throw new OperationCancelledException();
 			}
 
-			this.logger.debug(`Fetched ${response.value.length} environment variable value(s) from Dataverse`, {
-				environmentId
+			this.logger.debug('Fetched environment variable values from Dataverse', {
+				environmentId,
+				count: response.value.length
 			});
 
 			return response.value;

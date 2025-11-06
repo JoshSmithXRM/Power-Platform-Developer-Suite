@@ -34,7 +34,6 @@ export class DataTablePanelCoordinator implements IDataTablePanelCoordinator {
 		const { panel, logger } = dependencies;
 		logger.debug('DataTablePanelCoordinator: Initialized');
 
-		// Set up panel disposal
 		panel.onDidDispose(() => {
 			logger.debug('DataTablePanelCoordinator: Panel disposed');
 			this.dispose();
@@ -145,16 +144,12 @@ export class DataTablePanelCoordinator implements IDataTablePanelCoordinator {
 		// Switch environment
 		await this.registry.environmentBehavior.switchEnvironment(newEnvironmentId);
 
-		// Register with new environment
 		this.registry.panelTrackingBehavior.registerPanel(newEnvironmentId, this.dependencies.panel);
 
-		// Reload solution filter (if enabled)
 		await this.registry.solutionFilterBehavior.initialize();
 
-		// Update tab title
 		await this.updateTabTitle();
 
-		// Reload data
 		await this.registry.dataBehavior.loadData();
 	}
 
