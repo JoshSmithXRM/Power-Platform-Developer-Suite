@@ -107,13 +107,6 @@
 				}
 			}
 
-			console.log('DEBUG: Click on element', {
-				tagName: element.tagName,
-				command: commandName,
-				attributes: Array.from(element.attributes).map(a => `${a.name}="${a.value}"`),
-				data: data
-			});
-
 			vscode.postMessage({
 				command: commandName,
 				data: Object.keys(data).length > 0 ? data : undefined

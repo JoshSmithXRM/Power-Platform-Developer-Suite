@@ -2,13 +2,11 @@ import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
-import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
+import { HtmlScaffoldingBehavior } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
 import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
 import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
 import { PanelLayout } from '../../../../shared/infrastructure/ui/types/PanelLayout';
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
-import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
-import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
 import { LoadEnvironmentByIdUseCase } from '../../application/useCases/LoadEnvironmentByIdUseCase';
 import { SaveEnvironmentUseCase, type SaveEnvironmentRequest } from '../../application/useCases/SaveEnvironmentUseCase';
 import { DeleteEnvironmentUseCase } from '../../application/useCases/DeleteEnvironmentUseCase';
@@ -16,9 +14,17 @@ import { TestConnectionUseCase, type TestConnectionRequest } from '../../applica
 import { DiscoverEnvironmentIdUseCase, type DiscoverEnvironmentIdRequest } from '../../application/useCases/DiscoverEnvironmentIdUseCase';
 import { ValidateUniqueNameUseCase, type ValidateUniqueNameRequest } from '../../application/useCases/ValidateUniqueNameUseCase';
 import { CheckConcurrentEditUseCase } from '../../application/useCases/CheckConcurrentEditUseCase';
-import { EnvironmentFormSection } from '../sections/EnvironmentFormSection';
-import { VsCodeCancellationTokenAdapter } from '../../infrastructure/adapters/VsCodeCancellationTokenAdapter';
 import { AuthenticationMethodType } from '../../application/types/AuthenticationMethodType';
+import { VsCodeCancellationTokenAdapter } from '../../infrastructure/adapters/VsCodeCancellationTokenAdapter';
+import { EnvironmentFormSection } from '../sections/EnvironmentFormSection';
+
+import { createEnvironmentSetupScaffoldingConfig } from './EnvironmentSetupPanelStyles';
+import {
+	isSaveEnvironmentData,
+	isTestConnectionData,
+	isDiscoverEnvironmentIdData,
+	isValidateNameData
+} from './EnvironmentSetupTypeGuards';
 
 /**
  * Commands supported by Environment Setup panel.
@@ -168,93 +174,7 @@ export class EnvironmentSetupPanelComposed {
 			PanelLayout.SingleColumn
 		);
 
-		const cssUris = resolveCssModules(
-			{
-				base: true,
-				components: ['buttons', 'inputs'],
-				sections: ['action-buttons']
-			},
-			this.extensionUri,
-			this.panel.webview
-		);
-
-		const scaffoldingConfig: HtmlScaffoldingConfig = {
-			cssUris,
-			jsUris: [
-				this.panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
-				).toString(),
-				this.panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'EnvironmentSetupBehavior.js')
-				).toString()
-			],
-			cspNonce: getNonce(),
-			title: 'Environment Setup',
-			customCss: `
-				.form-container {
-					max-width: 800px;
-					margin: 0 auto;
-					padding: 24px;
-				}
-
-				.form-section {
-					margin-bottom: 24px;
-				}
-
-				.form-section h2 {
-					font-size: 16px;
-					font-weight: 600;
-					margin-bottom: 16px;
-					color: var(--vscode-foreground);
-				}
-
-				.form-group {
-					margin-bottom: 16px;
-				}
-
-				.form-group label {
-					display: block;
-					margin-bottom: 6px;
-					font-size: 13px;
-					color: var(--vscode-foreground);
-				}
-
-				.form-group input,
-				.form-group select {
-					width: 100%;
-				}
-
-				.help-text {
-					font-size: 12px;
-					color: var(--vscode-descriptionForeground);
-					margin-top: 4px;
-				}
-
-				.conditional-field {
-					margin-top: 16px;
-				}
-
-				input,
-				select {
-					font-family: var(--vscode-font-family);
-					font-size: var(--vscode-font-size);
-					background: var(--vscode-input-background);
-					color: var(--vscode-input-foreground);
-					border: 1px solid var(--vscode-input-border);
-					padding: 6px 12px;
-					border-radius: 2px;
-					width: 100%;
-					box-sizing: border-box;
-				}
-
-				input:focus,
-				select:focus {
-					outline: 1px solid var(--vscode-focusBorder);
-					outline-offset: -1px;
-				}
-			`
-		};
-
+		const scaffoldingConfig = createEnvironmentSetupScaffoldingConfig(this.extensionUri, this.panel.webview);
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
 			this.panel.webview,
 			compositionBehavior,
@@ -273,7 +193,7 @@ export class EnvironmentSetupPanelComposed {
 
 	private registerCommandHandlers(): void {
 		this.coordinator.registerHandler('saveEnvironment', async (data?: unknown) => {
-			if (!this.isSaveEnvironmentData(data)) {
+			if (!isSaveEnvironmentData(data)) {
 				this.logger.warn('Invalid save environment data');
 				return;
 			}
@@ -281,7 +201,7 @@ export class EnvironmentSetupPanelComposed {
 		}, { disableOnExecute: true });
 
 		this.coordinator.registerHandler('testConnection', async (data?: unknown) => {
-			if (!this.isTestConnectionData(data)) {
+			if (!isTestConnectionData(data)) {
 				this.logger.warn('Invalid test connection data');
 				return;
 			}
@@ -293,7 +213,7 @@ export class EnvironmentSetupPanelComposed {
 		}, { disableOnExecute: true });
 
 		this.coordinator.registerHandler('discoverEnvironmentId', async (data?: unknown) => {
-			if (!this.isDiscoverEnvironmentIdData(data)) {
+			if (!isDiscoverEnvironmentIdData(data)) {
 				this.logger.warn('Invalid discover environment ID data');
 				return;
 			}
@@ -301,69 +221,12 @@ export class EnvironmentSetupPanelComposed {
 		}, { disableOnExecute: true });
 
 		this.coordinator.registerHandler('validateName', async (data?: unknown) => {
-			if (!this.isValidateNameData(data)) {
+			if (!isValidateNameData(data)) {
 				this.logger.warn('Invalid validate name data');
 				return;
 			}
 			await this.handleValidateName(data);
 		}, { disableOnExecute: false });
-	}
-
-	/**
-	 * Type guard for save environment data.
-	 */
-	private isSaveEnvironmentData(data: unknown): data is SaveEnvironmentRequest {
-		return (
-			typeof data === 'object' &&
-			data !== null &&
-			'name' in data &&
-			'dataverseUrl' in data &&
-			'tenantId' in data &&
-			'authenticationMethod' in data &&
-			'publicClientId' in data
-		);
-	}
-
-	/**
-	 * Type guard for test connection data.
-	 */
-	private isTestConnectionData(data: unknown): data is TestConnectionRequest {
-		return (
-			typeof data === 'object' &&
-			data !== null &&
-			'name' in data &&
-			'dataverseUrl' in data &&
-			'tenantId' in data &&
-			'authenticationMethod' in data &&
-			'publicClientId' in data
-		);
-	}
-
-	/**
-	 * Type guard for discover environment ID data.
-	 */
-	private isDiscoverEnvironmentIdData(data: unknown): data is DiscoverEnvironmentIdRequest {
-		return (
-			typeof data === 'object' &&
-			data !== null &&
-			'name' in data &&
-			'dataverseUrl' in data &&
-			'tenantId' in data &&
-			'authenticationMethod' in data &&
-			'publicClientId' in data
-		);
-	}
-
-	/**
-	 * Type guard for validate name data.
-	 */
-	private isValidateNameData(data: unknown): data is { name: string } {
-		return (
-			typeof data === 'object' &&
-			data !== null &&
-			'name' in data &&
-			typeof (data as { name: string }).name === 'string'
-		);
 	}
 
 	/**
@@ -445,7 +308,12 @@ export class EnvironmentSetupPanelComposed {
 		if (wasNew) {
 			this.currentEnvironmentId = result.environmentId;
 			this.checkConcurrentEditUseCase.registerEditSession(result.environmentId);
-			this.updatePanelMapping('new', result.environmentId);
+
+			const panel = EnvironmentSetupPanelComposed.currentPanels.get('new');
+			if (panel) {
+				EnvironmentSetupPanelComposed.currentPanels.delete('new');
+				EnvironmentSetupPanelComposed.currentPanels.set(result.environmentId, panel);
+			}
 		}
 
 		this.panel.webview.postMessage({
@@ -698,17 +566,6 @@ export class EnvironmentSetupPanelComposed {
 			command: 'name-validation-result',
 			data: result
 		});
-	}
-
-	/**
-	 * Updates panel mapping when a new environment gets an ID.
-	 */
-	private updatePanelMapping(oldKey: string, newKey: string): void {
-		const panel = EnvironmentSetupPanelComposed.currentPanels.get(oldKey);
-		if (panel) {
-			EnvironmentSetupPanelComposed.currentPanels.delete(oldKey);
-			EnvironmentSetupPanelComposed.currentPanels.set(newKey, panel);
-		}
 	}
 
 }
