@@ -2,11 +2,13 @@ import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
-import { HtmlScaffoldingBehavior } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
+import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
 import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
 import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
 import { PanelLayout } from '../../../../shared/infrastructure/ui/types/PanelLayout';
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
+import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
+import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
 import { LoadEnvironmentByIdUseCase } from '../../application/useCases/LoadEnvironmentByIdUseCase';
 import { SaveEnvironmentUseCase, type SaveEnvironmentRequest } from '../../application/useCases/SaveEnvironmentUseCase';
 import { DeleteEnvironmentUseCase } from '../../application/useCases/DeleteEnvironmentUseCase';
@@ -18,7 +20,6 @@ import { AuthenticationMethodType } from '../../application/types/Authentication
 import { VsCodeCancellationTokenAdapter } from '../../infrastructure/adapters/VsCodeCancellationTokenAdapter';
 import { EnvironmentFormSection } from '../sections/EnvironmentFormSection';
 
-import { createEnvironmentSetupScaffoldingConfig } from './EnvironmentSetupPanelStyles';
 import {
 	isSaveEnvironmentData,
 	isTestConnectionData,
@@ -174,7 +175,36 @@ export class EnvironmentSetupPanelComposed {
 			PanelLayout.SingleColumn
 		);
 
-		const scaffoldingConfig = createEnvironmentSetupScaffoldingConfig(this.extensionUri, this.panel.webview);
+		// Resolve CSS module paths to webview URIs
+		const cssUris = resolveCssModules(
+			{
+				base: true,
+				components: ['buttons', 'inputs'],
+				sections: ['action-buttons']
+			},
+			this.extensionUri,
+			this.panel.webview
+		);
+
+		// Add feature-specific CSS
+		const featureCssUri = this.panel.webview.asWebviewUri(
+			vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'environment-setup.css')
+		).toString();
+
+		const scaffoldingConfig: HtmlScaffoldingConfig = {
+			cssUris: [...cssUris, featureCssUri],
+			jsUris: [
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'EnvironmentSetupBehavior.js')
+				).toString()
+			],
+			cspNonce: getNonce(),
+			title: 'Environment Setup'
+		};
+
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
 			this.panel.webview,
 			compositionBehavior,

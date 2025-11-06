@@ -187,9 +187,14 @@ export class SolutionExplorerPanelComposed {
 			this.panel.webview
 		);
 
+		// Add feature-specific CSS
+		const featureCssUri = this.panel.webview.asWebviewUri(
+			vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'solutions.css')
+		).toString();
+
 		// Create HTML scaffolding behavior
 		const scaffoldingConfig: HtmlScaffoldingConfig = {
-			cssUris,
+			cssUris: [...cssUris, featureCssUri],
 			jsUris: [
 				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')

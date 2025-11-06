@@ -23,12 +23,13 @@ interface MutableRecord {
 
 /**
  * Infrastructure implementation of storage clearing using VS Code APIs
- * Provides write access to clear VS Code's global state and secret storage
+ * Provides write access to clear VS Code's global state, workspace state, and secret storage
  */
 export class VsCodeStorageClearer implements IStorageClearer {
 	public constructor(
 		private readonly globalState: vscode.Memento,
-		private readonly secrets: vscode.SecretStorage
+		private readonly secrets: vscode.SecretStorage,
+		private readonly workspaceState: vscode.Memento
 	) {}
 
 	/**
@@ -37,6 +38,14 @@ export class VsCodeStorageClearer implements IStorageClearer {
 	 */
 	public async clearGlobalStateKey(key: string): Promise<void> {
 		await this.globalState.update(key, undefined);
+	}
+
+	/**
+	 * Clears a workspace state key by setting it to undefined
+	 * @param key - Workspace state key to clear
+	 */
+	public async clearWorkspaceStateKey(key: string): Promise<void> {
+		await this.workspaceState.update(key, undefined);
 	}
 
 	/**
@@ -72,7 +81,31 @@ export class VsCodeStorageClearer implements IStorageClearer {
 	}
 
 	/**
-	 * Clears all non-protected keys from global state
+	 * Clears a specific property within a workspace state value
+	 * Supports nested paths like "panelPreferences.sortOrder"
+	 * @param key - Workspace state key containing the property
+	 * @param path - Dot-separated path to the property to clear
+	 */
+	public async clearWorkspaceStateProperty(
+		key: string,
+		path: PropertyPath
+	): Promise<void> {
+		const currentValue = this.workspaceState.get(key);
+
+		if (currentValue === undefined) {
+			throw new Error(`Key not found: ${key}`);
+		}
+
+		const updatedValue = this.deletePropertyAtPath(
+			currentValue,
+			path.segments
+		);
+
+		await this.workspaceState.update(key, updatedValue);
+	}
+
+	/**
+	 * Clears all non-protected keys from global state and workspace state
 	 * Protected keys are preserved (e.g., environment configurations)
 	 * @param protectedKeys - Array of key patterns to preserve
 	 * @returns Result containing counts of cleared keys and any errors
@@ -81,6 +114,7 @@ export class VsCodeStorageClearer implements IStorageClearer {
 		protectedKeys: string[]
 	): Promise<ClearAllResult> {
 		let clearedGlobalKeys = 0;
+		let clearedWorkspaceKeys = 0;
 		const clearedSecretKeys = 0;
 		const errors: Array<{ key: string; error: string }> = [];
 
@@ -100,12 +134,32 @@ export class VsCodeStorageClearer implements IStorageClearer {
 			}
 		}
 
+		// Clear workspace state
+		const workspaceKeys = this.workspaceState.keys();
+		for (const key of workspaceKeys) {
+			if (!this.isKeyProtected(key, protectedKeys)) {
+				try {
+					await this.clearWorkspaceStateKey(key);
+					clearedWorkspaceKeys++;
+				} catch (error) {
+					errors.push({
+						key,
+						error: error instanceof Error ? error.message : String(error)
+					});
+				}
+			}
+		}
+
 		// Note: We don't clear secrets in "clear all" because we would need to
 		// re-read the environments to get the secret keys, but we may have just
 		// cleared other global state. For now, secrets are only cleared when
 		// the specific entry is cleared.
 
-		return new ClearAllResult(clearedGlobalKeys, clearedSecretKeys, errors);
+		return new ClearAllResult(
+			clearedGlobalKeys + clearedWorkspaceKeys,
+			clearedSecretKeys,
+			errors
+		);
 	}
 
 	/**

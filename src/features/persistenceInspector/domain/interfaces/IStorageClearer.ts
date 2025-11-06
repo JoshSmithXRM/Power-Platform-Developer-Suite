@@ -12,7 +12,7 @@ import { ClearAllResult } from '../results/ClearAllResult';
  * contract using actual VS Code storage.
  *
  * Responsibilities:
- * - Clear individual keys (global or secret)
+ * - Clear individual keys (global, workspace, or secret)
  * - Clear nested properties within complex values
  * - Clear all non-protected entries (bulk operation)
  */
@@ -23,6 +23,13 @@ export interface IStorageClearer {
 	 * @param {string} key - Global state key to clear
 	 */
 	clearGlobalStateKey(key: string): Promise<void>;
+
+	/**
+	 * Clears a specific key from workspace state.
+	 *
+	 * @param {string} key - Workspace state key to clear
+	 */
+	clearWorkspaceStateKey(key: string): Promise<void>;
 
 	/**
 	 * Clears a specific key from secret storage.
@@ -43,7 +50,18 @@ export interface IStorageClearer {
 	clearGlobalStateProperty(key: string, path: PropertyPath): Promise<void>;
 
 	/**
-	 * Clears all non-protected entries from both storage types.
+	 * Clears a specific property within a workspace state entry.
+	 *
+	 * Allows fine-grained clearing without removing entire entry.
+	 * Example: Remove one panel preference without clearing all preferences.
+	 *
+	 * @param {string} key - Workspace state key containing the property
+	 * @param {PropertyPath} path - Path to property within the value
+	 */
+	clearWorkspaceStateProperty(key: string, path: PropertyPath): Promise<void>;
+
+	/**
+	 * Clears all non-protected entries from all storage types.
 	 *
 	 * Provides "nuclear option" for clearing extension storage while
 	 * protecting critical data.

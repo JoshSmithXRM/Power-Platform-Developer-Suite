@@ -183,6 +183,7 @@ export class PersistenceInspectorPanelComposed {
 			PanelLayout.SingleColumn
 		);
 
+		// Resolve CSS module paths to webview URIs
 		const cssUris = resolveCssModules(
 			{
 				base: true,
@@ -193,21 +194,32 @@ export class PersistenceInspectorPanelComposed {
 			this.panel.webview
 		);
 
+		// Add InputDialog component CSS
+		const inputDialogCssUri = this.panel.webview.asWebviewUri(
+			vscode.Uri.joinPath(
+				this.extensionUri,
+				'resources',
+				'webview',
+				'css',
+				'components',
+				'input-dialog.css'
+			)
+		).toString();
+
+		// Add feature-specific CSS
+		const featureCssUri = this.panel.webview.asWebviewUri(
+			vscode.Uri.joinPath(
+				this.extensionUri,
+				'resources',
+				'webview',
+				'css',
+				'features',
+				'persistence-inspector.css'
+			)
+		).toString();
+
 		const scaffoldingConfig: HtmlScaffoldingConfig = {
-			cssUris: [
-				...cssUris,
-				// Add InputDialog component CSS
-				this.panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(
-						this.extensionUri,
-						'resources',
-						'webview',
-						'css',
-						'components',
-						'input-dialog.css'
-					)
-				).toString()
-			],
+			cssUris: [...cssUris, inputDialogCssUri, featureCssUri],
 			jsUris: [
 				// Load messaging.js first (acquires vscode API and wires up buttons)
 				this.panel.webview.asWebviewUri(
@@ -243,8 +255,7 @@ export class PersistenceInspectorPanelComposed {
 				).toString()
 			],
 			cspNonce: getNonce(),
-			title: 'Persistence Inspector',
-			customCss: this.getCustomCss()
+			title: 'Persistence Inspector'
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
@@ -261,65 +272,6 @@ export class PersistenceInspectorPanelComposed {
 		});
 
 		return { coordinator, scaffoldingBehavior };
-	}
-
-	/**
-	 * Returns custom CSS for storage entry styling.
-	 */
-	private getCustomCss(): string {
-		return `
-			.section {
-				margin-bottom: 30px;
-			}
-			.section-title {
-				font-weight: bold;
-				font-size: 16px;
-				margin-bottom: 10px;
-			}
-			.entry {
-				border: 1px solid var(--vscode-panel-border);
-				padding: 10px;
-				margin-bottom: 10px;
-				border-radius: 4px;
-			}
-			.entry-header {
-				display: flex;
-				justify-content: space-between;
-				align-items: center;
-				margin-bottom: 8px;
-			}
-			.entry-key {
-				font-weight: bold;
-				font-family: var(--vscode-editor-font-family);
-			}
-			.entry-actions {
-				display: flex;
-				gap: 5px;
-			}
-			.entry-actions button {
-				padding: 4px 8px;
-				font-size: 12px;
-			}
-			.entry-value {
-				font-family: var(--vscode-editor-font-family);
-				white-space: pre-wrap;
-				background-color: var(--vscode-editor-background);
-				padding: 8px;
-				border-radius: 4px;
-				font-size: 12px;
-			}
-			.entry-meta {
-				font-size: 11px;
-				color: var(--vscode-descriptionForeground);
-				margin-top: 5px;
-			}
-			.protected {
-				border-left: 3px solid var(--vscode-charts-yellow);
-			}
-			.secret {
-				border-left: 3px solid var(--vscode-charts-red);
-			}
-		`;
 	}
 
 	private registerCommandHandlers(): void {

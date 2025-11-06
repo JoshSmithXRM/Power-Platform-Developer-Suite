@@ -102,6 +102,15 @@ export class StorageEntry {
 	}
 
 	/**
+	 * Determines if this entry is stored in workspace state.
+	 *
+	 * @returns {boolean} True if stored in VS Code WorkspaceState
+	 */
+	public isWorkspace(): boolean {
+		return this._storageType.isWorkspace();
+	}
+
+	/**
 	 * Determines if this entry can be cleared.
 	 *
 	 * Business Rule: Protected entries cannot be cleared.

@@ -30,7 +30,7 @@ export class StorageInspectionService {
 	/**
 	 * Inspects all storage and builds a StorageCollection aggregate.
 	 *
-	 * Reads from both global state and secret storage, combining them into
+	 * Reads from global state, workspace state, and secret storage, combining them into
 	 * a single collection with protection rules applied.
 	 *
 	 * Provides unified view of all extension storage for debugging
@@ -40,6 +40,7 @@ export class StorageInspectionService {
 	 */
 	public async inspectStorage(): Promise<StorageCollection> {
 		const globalState = await this.storageReader.readAllGlobalState();
+		const workspaceState = await this.storageReader.readAllWorkspaceState();
 		const secretKeys = await this.storageReader.readAllSecretKeys();
 
 		const entries: StorageEntry[] = [];
@@ -47,6 +48,11 @@ export class StorageInspectionService {
 		// Add global state entries
 		for (const [key, value] of globalState) {
 			entries.push(StorageEntry.create(key, value, 'global'));
+		}
+
+		// Add workspace state entries
+		for (const [key, value] of workspaceState) {
+			entries.push(StorageEntry.create(key, value, 'workspace'));
 		}
 
 		// Add secret entries (values hidden) - only if they actually exist

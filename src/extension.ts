@@ -757,6 +757,8 @@ async function initializeEnvironmentVariables(
 	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository.js');
 	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js');
 	const { EnvironmentVariableToDeploymentSettingsMapper } = await import('./features/environmentVariables/application/mappers/EnvironmentVariableToDeploymentSettingsMapper.js');
+	const { EnvironmentVariableViewModelMapper } = await import('./features/environmentVariables/application/mappers/EnvironmentVariableViewModelMapper.js');
+	const { EnvironmentVariableCollectionService } = await import('./features/environmentVariables/domain/services/EnvironmentVariableCollectionService.js');
 
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
@@ -778,6 +780,8 @@ async function initializeEnvironmentVariables(
 		logger
 	);
 	const environmentVariableMapper = new EnvironmentVariableToDeploymentSettingsMapper();
+	const environmentVariableCollectionService = new EnvironmentVariableCollectionService();
+	const viewModelMapper = new EnvironmentVariableViewModelMapper(environmentVariableCollectionService);
 	const exportToDeploymentSettingsUseCase = new ExportEnvironmentVariablesToDeploymentSettingsUseCase(
 		deploymentSettingsRepository,
 		environmentVariableMapper,
@@ -792,6 +796,7 @@ async function initializeEnvironmentVariables(
 		exportToDeploymentSettingsUseCase,
 		solutionRepository,
 		urlBuilder,
+		viewModelMapper,
 		logger,
 		initialEnvironmentId,
 		panelStateRepository
@@ -878,8 +883,8 @@ async function initializePersistenceInspector(
 	const { GetClearAllConfirmationMessageUseCase } = await import('./features/persistenceInspector/application/useCases/GetClearAllConfirmationMessageUseCase.js');
 	const { PersistenceInspectorPanelComposed } = await import('./features/persistenceInspector/presentation/panels/PersistenceInspectorPanelComposed.js');
 
-	const storageReader = new VsCodeStorageReader(context.globalState, context.secrets);
-	const storageClearer = new VsCodeStorageClearer(context.globalState, context.secrets);
+	const storageReader = new VsCodeStorageReader(context.globalState, context.secrets, context.workspaceState);
+	const storageClearer = new VsCodeStorageClearer(context.globalState, context.secrets, context.workspaceState);
 	const protectedKeyProvider = new HardcodedProtectedKeyProvider();
 
 	const storageInspectionService = new StorageInspectionService(storageReader, protectedKeyProvider);

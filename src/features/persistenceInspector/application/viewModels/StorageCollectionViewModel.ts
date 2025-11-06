@@ -8,5 +8,6 @@ export interface StorageCollectionViewModel {
 	readonly totalEntries: number;
 	readonly totalSize: number;
 	readonly globalStateEntries: ReadonlyArray<StorageEntryViewModel>;
+	readonly workspaceStateEntries: ReadonlyArray<StorageEntryViewModel>;
 	readonly secretEntries: ReadonlyArray<StorageEntryViewModel>;
 }

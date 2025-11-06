@@ -68,4 +68,16 @@ export interface SectionRenderData {
 	 * The currently selected environment.
 	 */
 	readonly currentEnvironmentId?: string;
+
+	/**
+	 * Available solutions (for SolutionFilterSection).
+	 * List of solutions to populate dropdown.
+	 */
+	readonly solutions?: Array<{ readonly id: string; readonly name: string; readonly uniqueName: string }>;
+
+	/**
+	 * Current solution ID (for SolutionFilterSection).
+	 * The currently selected solution filter.
+	 */
+	readonly currentSolutionId?: string | undefined;
 }

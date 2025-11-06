@@ -1,40 +1,51 @@
-import * as vscode from 'vscode';
+import type * as vscode from 'vscode';
+import * as vscodeImpl from 'vscode';
 
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 import { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
-import type { IDataLoader } from '../../../../shared/infrastructure/ui/behaviors/IDataLoader';
-import type { EnvironmentOption, DataTableConfig, SolutionOption } from '../../../../shared/infrastructure/ui/DataTablePanel';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
-import { PanelTrackingBehavior } from '../../../../shared/infrastructure/ui/behaviors/PanelTrackingBehavior';
-import { HtmlRenderingBehavior, type HtmlCustomization } from '../../../../shared/infrastructure/ui/behaviors/HtmlRenderingBehavior';
-import { DataBehavior } from '../../../../shared/infrastructure/ui/behaviors/DataBehavior';
-import { EnvironmentBehavior } from '../../../../shared/infrastructure/ui/behaviors/EnvironmentBehavior';
-import { SolutionFilterBehavior } from '../../../../shared/infrastructure/ui/behaviors/SolutionFilterBehavior';
-import { MessageRoutingBehavior } from '../../../../shared/infrastructure/ui/behaviors/MessageRoutingBehavior';
-import { DataTableBehaviorRegistry } from '../../../../shared/infrastructure/ui/behaviors/DataTableBehaviorRegistry';
-import { DataTablePanelCoordinator, type CoordinatorDependencies } from '../../../../shared/infrastructure/ui/coordinators/DataTablePanelCoordinator';
+import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
+import { HtmlScaffoldingBehavior } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
+import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
+import { PanelLayout } from '../../../../shared/infrastructure/ui/types/PanelLayout';
+import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
+import { EnvironmentSelectorSection } from '../../../../shared/infrastructure/ui/sections/EnvironmentSelectorSection';
+import { SolutionFilterSection } from '../../../../shared/infrastructure/ui/sections/SolutionFilterSection';
+import { DataTableSection } from '../../../../shared/infrastructure/ui/sections/DataTableSection';
+import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
+import type { EnvironmentOption, SolutionOption, DataTableColumn, DataTableConfig } from '../../../../shared/infrastructure/ui/DataTablePanel';
 import { ListConnectionReferencesUseCase } from '../../application/useCases/ListConnectionReferencesUseCase';
 import { ExportConnectionReferencesToDeploymentSettingsUseCase } from '../../application/useCases/ExportConnectionReferencesToDeploymentSettingsUseCase';
 import { FlowConnectionRelationshipCollectionService } from '../../domain/services/FlowConnectionRelationshipCollectionService';
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { ConnectionReference } from '../../domain/entities/ConnectionReference';
-import { ConnectionReferencesDataLoader } from '../dataLoaders/ConnectionReferencesDataLoader';
-import { isOpenFlowMessage } from '../../../../infrastructure/ui/utils/TypeGuards';
-import { renderLinkClickHandler } from '../../../../shared/infrastructure/ui/views/clickableLinks';
+import { FlowConnectionRelationshipViewModelMapper } from '../../application/mappers/FlowConnectionRelationshipViewModelMapper';
+import { enhanceViewModelsWithFlowLinks } from '../views/FlowLinkView';
+import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
+import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
+import type { HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
+
+/**
+ * Commands that the Connection References panel can receive from the webview.
+ */
+type ConnectionReferencesCommands = 'refresh' | 'openMaker' | 'syncDeploymentSettings' | 'openFlow' | 'environmentChange' | 'solutionChange';
 
 /**
  * Presentation layer panel for Connection References.
- * Uses composition pattern with specialized behaviors instead of inheritance.
+ * Uses universal panel pattern with section composition.
  */
 export class ConnectionReferencesPanelComposed {
 	public static readonly viewType = 'powerPlatformDevSuite.connectionReferences';
 	private static panels = new Map<string, ConnectionReferencesPanelComposed>();
 
-	private readonly coordinator: DataTablePanelCoordinator;
-	private readonly registry: DataTableBehaviorRegistry;
+	private coordinator!: PanelCoordinator<ConnectionReferencesCommands>;
+	private scaffoldingBehavior!: HtmlScaffoldingBehavior;
+	private currentEnvironmentId: string;
+	private currentSolutionId: string | undefined;
 	private connectionReferences: ConnectionReference[] = [];
 	private solutionOptions: SolutionOption[] = [];
+	private readonly viewModelMapper: FlowConnectionRelationshipViewModelMapper;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -54,6 +65,8 @@ export class ConnectionReferencesPanelComposed {
 		environmentId: string,
 		private readonly panelStateRepository: IPanelStateRepository | undefined
 	) {
+		this.currentEnvironmentId = environmentId;
+		this.viewModelMapper = new FlowConnectionRelationshipViewModelMapper();
 		logger.debug('ConnectionReferencesPanel: Initialized');
 
 		panel.webview.options = {
@@ -61,11 +74,13 @@ export class ConnectionReferencesPanelComposed {
 			localResourceRoots: [extensionUri]
 		};
 
-		this.registry = this.createBehaviorRegistry(environmentId);
-		this.coordinator = this.createCoordinator();
+		const { coordinator, scaffoldingBehavior } = this.createCoordinator();
+		this.coordinator = coordinator;
+		this.scaffoldingBehavior = scaffoldingBehavior;
+
 		this.registerPanelCommands();
 
-		void this.coordinator.initialize();
+		void this.initialize();
 	}
 
 	public static async createOrShow(
@@ -85,7 +100,7 @@ export class ConnectionReferencesPanelComposed {
 		initialEnvironmentId?: string,
 		panelStateRepository?: IPanelStateRepository
 	): Promise<ConnectionReferencesPanelComposed> {
-		const column = vscode.ViewColumn.One;
+		const column = vscodeImpl.ViewColumn.One;
 
 		let targetEnvironmentId = initialEnvironmentId;
 		if (!targetEnvironmentId) {
@@ -106,7 +121,7 @@ export class ConnectionReferencesPanelComposed {
 		const environment = await getEnvironmentById(targetEnvironmentId);
 		const environmentName = environment?.name || 'Unknown';
 
-		const panel = vscode.window.createWebviewPanel(
+		const panel = vscodeImpl.window.createWebviewPanel(
 			ConnectionReferencesPanelComposed.viewType,
 			`Connection References - ${environmentName}`,
 			column,
@@ -137,121 +152,176 @@ export class ConnectionReferencesPanelComposed {
 		return newPanel;
 	}
 
-	private createBehaviorRegistry(environmentId: string): DataTableBehaviorRegistry {
-		const config = this.getConfig();
-		const customization = this.getCustomization();
+	private createCoordinator(): { coordinator: PanelCoordinator<ConnectionReferencesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
+		// Create sections
+		const environmentSelector = new EnvironmentSelectorSection();
+		const solutionFilter = new SolutionFilterSection();
 
-		const panelTrackingBehavior = new PanelTrackingBehavior(
-			ConnectionReferencesPanelComposed.panels
+		const columns: DataTableColumn[] = [
+			{ key: 'flowName', label: 'Flow Name' },
+			{ key: 'connectionReferenceLogicalName', label: 'Connection Reference' },
+			{ key: 'connectionReferenceDisplayName', label: 'CR Display Name' },
+			{ key: 'relationshipType', label: 'Status' },
+			{ key: 'flowIsManaged', label: 'Flow Managed' },
+			{ key: 'flowModifiedOn', label: 'Flow Modified' },
+			{ key: 'connectionReferenceIsManaged', label: 'CR Managed' },
+			{ key: 'connectionReferenceModifiedOn', label: 'CR Modified' }
+		];
+
+		const tableConfig: DataTableConfig = {
+			viewType: ConnectionReferencesPanelComposed.viewType,
+			title: 'Connection References',
+			dataCommand: 'connectionReferencesData',
+			defaultSortColumn: 'flowName',
+			defaultSortDirection: 'asc',
+			columns,
+			searchPlaceholder: '🔍 Search flows and connection references...',
+			noDataMessage: 'No connection references found.',
+			toolbarButtons: []
+		};
+
+		const tableSection = new DataTableSection(tableConfig);
+
+		const actionButtons = new ActionButtonsSection({
+			buttons: [
+				{ id: 'openMaker', label: 'Open in Maker' },
+				{ id: 'refresh', label: 'Refresh' },
+				{ id: 'syncDeploymentSettings', label: 'Sync Deployment Settings' }
+			]
+		}, SectionPosition.Toolbar);
+
+		// Order: action buttons, solution filter, environment selector (far right), then table
+		const compositionBehavior = new SectionCompositionBehavior(
+			[actionButtons, solutionFilter, environmentSelector, tableSection],
+			PanelLayout.SingleColumn
 		);
 
-		const htmlRenderingBehavior = new HtmlRenderingBehavior(
-			this.panel.webview,
+		// Resolve CSS module paths to webview URIs
+		const cssUris = resolveCssModules(
+			{
+				base: true,
+				components: ['buttons', 'inputs'],
+				sections: ['environment-selector', 'solution-filter', 'action-buttons', 'datatable']
+			},
 			this.extensionUri,
-			config,
-			customization
+			this.panel.webview
 		);
 
-		const messageRoutingBehavior = new MessageRoutingBehavior(
-			this.panel.webview,
-			this.logger
-		);
+		// Add feature-specific CSS
+		const featureCssUri = this.panel.webview.asWebviewUri(
+			vscodeImpl.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'connection-references.css')
+		).toString();
 
-		const environmentBehavior = new EnvironmentBehavior(
-			this.panel.webview,
-			this.getEnvironments,
-			this.getEnvironmentById,
-			async () => { /* Coordinator handles reload */ },
-			this.logger,
-			environmentId
-		);
-
-		// Solution filter behavior (enabled)
-		const solutionFilterBehavior = new SolutionFilterBehavior(
-			this.panel.webview,
-			'connectionReferences',
-			environmentBehavior,
-			async () => this.loadSolutions(),
-			this.panelStateRepository,
-			async () => { /* Coordinator handles reload */ },
-			this.logger,
-			true
-		);
-
-		const dataLoader = new ConnectionReferencesDataLoader(
-			() => environmentBehavior.getCurrentEnvironmentId(),
-			() => solutionFilterBehavior.getCurrentSolutionId(),
-			this.listConnectionReferencesUseCase,
-			this.relationshipCollectionService,
-			this.logger
-		);
-
-		// Wrap data loader to capture connection references
-		const wrappedDataLoader: IDataLoader = {
-			load: async (cancellationToken: ICancellationToken): Promise<Record<string, unknown>[]> => {
-				const result = await this.listConnectionReferencesUseCase.execute(
-					environmentBehavior.getCurrentEnvironmentId() || '',
-					solutionFilterBehavior.getCurrentSolutionId() || undefined,
-					cancellationToken
-				);
-				this.connectionReferences = result.connectionReferences;
-
-				// Use the actual data loader for transformation
-				return dataLoader.load(cancellationToken);
-			}
+		// Create HTML scaffolding behavior
+		const scaffoldingConfig: HtmlScaffoldingConfig = {
+			cssUris: [...cssUris, featureCssUri],
+			jsUris: [
+				this.panel.webview.asWebviewUri(
+					vscodeImpl.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscodeImpl.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
+				).toString()
+			],
+			cspNonce: getNonce(),
+			title: 'Connection References'
 		};
 
-		const dataBehavior = new DataBehavior(
+		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
 			this.panel.webview,
-			config,
-			wrappedDataLoader,
-			this.logger
+			compositionBehavior,
+			scaffoldingConfig
 		);
 
-		return new DataTableBehaviorRegistry(
-			environmentBehavior,
-			solutionFilterBehavior,
-			dataBehavior,
-			messageRoutingBehavior,
-			htmlRenderingBehavior,
-			panelTrackingBehavior
-		);
-	}
-
-	private createCoordinator(): DataTablePanelCoordinator {
-		const dependencies: CoordinatorDependencies = {
+		// Create coordinator
+		const coordinator = new PanelCoordinator<ConnectionReferencesCommands>({
 			panel: this.panel,
-			getEnvironmentById: this.getEnvironmentById,
+			extensionUri: this.extensionUri,
+			behaviors: [scaffoldingBehavior],
 			logger: this.logger
-		};
+		});
 
-		return new DataTablePanelCoordinator(this.registry, dependencies);
+		return { coordinator, scaffoldingBehavior };
 	}
 
 	private registerPanelCommands(): void {
-		this.registry.messageRoutingBehavior.registerHandler('openFlow', async (message) => {
-			if (isOpenFlowMessage(message)) {
-				await this.handleOpenFlow(message.data.flowId);
+		this.coordinator.registerHandler('refresh', async () => {
+			await this.handleRefresh();
+		});
+
+		this.coordinator.registerHandler('environmentChange', async (data) => {
+			const environmentId = (data as { environmentId?: string })?.environmentId;
+			if (environmentId) {
+				await this.handleEnvironmentChange(environmentId);
 			}
 		});
 
-		this.registry.messageRoutingBehavior.registerHandler('openMaker', async () => {
+		this.coordinator.registerHandler('solutionChange', async (data) => {
+			const solutionId = (data as { solutionId?: string })?.solutionId;
+			await this.handleSolutionChange(solutionId || undefined);
+		});
+
+		this.coordinator.registerHandler('openMaker', async () => {
 			await this.handleOpenMaker();
 		});
 
-		this.registry.messageRoutingBehavior.registerHandler('syncDeploymentSettings', async () => {
+		this.coordinator.registerHandler('syncDeploymentSettings', async () => {
 			await this.handleSyncDeploymentSettings();
+		});
+
+		this.coordinator.registerHandler('openFlow', async (data) => {
+			const flowId = (data as { flowId?: string })?.flowId;
+			if (flowId) {
+				await this.handleOpenFlow(flowId);
+			}
+		});
+
+		// Panel disposal
+		this.panel.onDidDispose(() => {
+			ConnectionReferencesPanelComposed.panels.delete(this.currentEnvironmentId);
+		});
+	}
+
+	private async initialize(): Promise<void> {
+		// Load saved solution selection from panel state
+		if (this.panelStateRepository) {
+			try {
+				const state = await this.panelStateRepository.load({
+					panelType: 'connectionReferences',
+					environmentId: this.currentEnvironmentId
+				});
+				if (state && typeof state === 'object' && 'selectedSolutionId' in state) {
+					this.currentSolutionId = state.selectedSolutionId as string | undefined;
+				}
+			} catch (error) {
+				this.logger.warn('Failed to load panel state', error);
+			}
+		}
+
+		await this.render();
+	}
+
+	private async render(): Promise<void> {
+		const environments = await this.getEnvironments();
+		const solutions = await this.loadSolutions();
+		const data = await this.loadData();
+
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			solutions,
+			currentSolutionId: this.currentSolutionId,
+			tableData: data
 		});
 	}
 
 	private async loadSolutions(): Promise<SolutionOption[]> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
+		if (!this.currentEnvironmentId) {
 			return [];
 		}
 
 		try {
-			this.solutionOptions = await this.solutionRepository.findAllForDropdown(envId);
+			this.solutionOptions = await this.solutionRepository.findAllForDropdown(this.currentEnvironmentId);
 			return this.solutionOptions;
 		} catch (error) {
 			this.logger.error('Failed to load solutions', error);
@@ -259,121 +329,162 @@ export class ConnectionReferencesPanelComposed {
 		}
 	}
 
-	private getConfig(): DataTableConfig {
-		return {
-			viewType: ConnectionReferencesPanelComposed.viewType,
-			title: 'Connection References',
-			dataCommand: 'connectionReferencesData',
-			defaultSortColumn: 'flowName',
-			defaultSortDirection: 'asc',
-			columns: [
-				{ key: 'flowName', label: 'Flow Name' },
-				{ key: 'connectionReferenceLogicalName', label: 'Connection Reference' },
-				{ key: 'connectionReferenceDisplayName', label: 'CR Display Name' },
-				{ key: 'relationshipType', label: 'Status' },
-				{ key: 'flowIsManaged', label: 'Flow Managed' },
-				{ key: 'flowModifiedOn', label: 'Flow Modified' },
-				{ key: 'connectionReferenceIsManaged', label: 'CR Managed' },
-				{ key: 'connectionReferenceModifiedOn', label: 'CR Modified' }
-			],
-			searchPlaceholder: '🔍 Search flows and connection references...',
-			noDataMessage: 'No connection references found.',
-			enableSolutionFilter: true,
-			toolbarButtons: [
-				{ id: 'openMakerBtn', label: 'Open in Maker', command: 'openMaker', position: 'left' },
-				{ id: 'refreshBtn', label: 'Refresh', command: 'refresh', position: 'left' },
-				{ id: 'syncDeploymentSettingsBtn', label: 'Sync Deployment Settings', command: 'syncDeploymentSettings', position: 'left' }
-			]
+	private async loadData(): Promise<Record<string, unknown>[]> {
+		if (!this.currentEnvironmentId) {
+			this.logger.warn('Cannot load connection references: No environment selected');
+			return [];
+		}
+
+		this.logger.info('Loading connection references', {
+			environmentId: this.currentEnvironmentId,
+			solutionId: this.currentSolutionId
+		});
+
+		const cancellationToken: ICancellationToken = {
+			isCancellationRequested: false,
+			onCancellationRequested: (): vscode.Disposable => ({ dispose: (): void => {} })
 		};
+
+		try {
+			const result = await this.listConnectionReferencesUseCase.execute(
+				this.currentEnvironmentId,
+				this.currentSolutionId || undefined,
+				cancellationToken
+			);
+
+			this.connectionReferences = result.connectionReferences;
+
+			if (cancellationToken.isCancellationRequested) {
+				return [];
+			}
+
+			const sortedRelationships = this.relationshipCollectionService.sort(result.relationships);
+			const viewModels = this.viewModelMapper.toViewModels(sortedRelationships);
+			const enhancedViewModels = enhanceViewModelsWithFlowLinks(viewModels);
+
+			this.logger.info('Connection references loaded successfully', { count: result.relationships.length });
+
+			return enhancedViewModels;
+		} catch (error) {
+			this.logger.error('Failed to load connection references', error);
+			return [];
+		}
 	}
 
-	private getCustomization(): HtmlCustomization {
-		return {
-			customCss: `
-				/* Highlight orphaned relationships */
-				td:has(> span[data-status="Missing CR"]),
-				td:has(> span[data-status="Unused CR"]) {
-					color: #f48771;
+	private async handleRefresh(): Promise<void> {
+		await this.render();
+	}
+
+	private async handleEnvironmentChange(environmentId: string): Promise<void> {
+		// Remove old panel from registry
+		ConnectionReferencesPanelComposed.panels.delete(this.currentEnvironmentId);
+
+		this.currentEnvironmentId = environmentId;
+		this.currentSolutionId = undefined;
+
+		// Add new panel to registry
+		ConnectionReferencesPanelComposed.panels.set(this.currentEnvironmentId, this);
+
+		// Update panel title
+		const environment = await this.getEnvironmentById(environmentId);
+		this.panel.title = `Connection References - ${environment?.name || 'Unknown'}`;
+
+		// Load saved solution selection for new environment
+		if (this.panelStateRepository) {
+			try {
+				const state = await this.panelStateRepository.load({
+					panelType: 'connectionReferences',
+					environmentId: this.currentEnvironmentId
+				});
+				if (state && typeof state === 'object' && 'selectedSolutionId' in state) {
+					this.currentSolutionId = state.selectedSolutionId as string | undefined;
 				}
-				td:has(> span[data-status="Valid"]) {
-					color: #89d185;
-				}
-			`,
-			filterLogic: `
-				filtered = allData.filter(rel =>
-					(rel.flowName || '').toLowerCase().includes(query) ||
-					(rel.connectionReferenceLogicalName || '').toLowerCase().includes(query) ||
-					(rel.connectionReferenceDisplayName || '').toLowerCase().includes(query) ||
-					(rel.relationshipType || '').toLowerCase().includes(query)
+			} catch (error) {
+				this.logger.warn('Failed to load panel state for new environment', error);
+			}
+		}
+
+		await this.handleRefresh();
+	}
+
+	private async handleSolutionChange(solutionId: string | undefined): Promise<void> {
+		this.currentSolutionId = solutionId;
+
+		// Save solution selection to panel state
+		if (this.panelStateRepository) {
+			if (solutionId) {
+				await this.panelStateRepository.save(
+					{ panelType: 'connectionReferences', environmentId: this.currentEnvironmentId },
+					{ selectedSolutionId: solutionId, lastUpdated: new Date().toISOString() }
 				);
-			`,
-			customJavaScript: renderLinkClickHandler('.flow-link', 'openFlow', 'flowId')
-		};
+			} else {
+				await this.panelStateRepository.clear({
+					panelType: 'connectionReferences',
+					environmentId: this.currentEnvironmentId
+				});
+			}
+		}
+
+		await this.handleRefresh();
 	}
 
 	private async handleOpenFlow(flowId: string): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
+		if (!this.currentEnvironmentId) {
 			this.logger.warn('Cannot open flow: No environment selected');
 			return;
 		}
 
-		const environment = await this.getEnvironmentById(envId);
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 		if (!environment?.powerPlatformEnvironmentId) {
 			this.logger.warn('Cannot open flow: Environment ID not configured');
-			vscode.window.showErrorMessage('Cannot open in Maker Portal: Environment ID not configured. Edit environment to add one.');
+			vscodeImpl.window.showErrorMessage('Cannot open in Maker Portal: Environment ID not configured. Edit environment to add one.');
 			return;
 		}
 
-		const solutionId = this.registry.solutionFilterBehavior.getCurrentSolutionId();
-		if (!solutionId) {
+		if (!this.currentSolutionId) {
 			this.logger.warn('Cannot open flow: No solution selected');
-			vscode.window.showWarningMessage('Please select a solution to open flows.');
+			vscodeImpl.window.showWarningMessage('Please select a solution to open flows.');
 			return;
 		}
 
-		const url = this.urlBuilder.buildFlowUrl(environment.powerPlatformEnvironmentId, solutionId, flowId);
-		await vscode.env.openExternal(vscode.Uri.parse(url));
-		this.logger.info('Opened flow in Maker Portal', { flowId, solutionId });
+		const url = this.urlBuilder.buildFlowUrl(environment.powerPlatformEnvironmentId, this.currentSolutionId, flowId);
+		await vscodeImpl.env.openExternal(vscodeImpl.Uri.parse(url));
+		this.logger.info('Opened flow in Maker Portal', { flowId, solutionId: this.currentSolutionId });
 	}
 
 	private async handleOpenMaker(): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
+		if (!this.currentEnvironmentId) {
 			this.logger.warn('Cannot open Maker Portal: No environment selected');
 			return;
 		}
 
-		const environment = await this.getEnvironmentById(envId);
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 		if (!environment?.powerPlatformEnvironmentId) {
 			this.logger.warn('Cannot open Maker Portal: Environment ID not configured');
-			vscode.window.showErrorMessage('Cannot open in Maker Portal: Environment ID not configured. Edit environment to add one.');
+			vscodeImpl.window.showErrorMessage('Cannot open in Maker Portal: Environment ID not configured. Edit environment to add one.');
 			return;
 		}
 
-		const solutionId = this.registry.solutionFilterBehavior.getCurrentSolutionId();
 		const url = this.urlBuilder.buildConnectionReferencesUrl(
 			environment.powerPlatformEnvironmentId,
-			solutionId || undefined
+			this.currentSolutionId || undefined
 		);
-		await vscode.env.openExternal(vscode.Uri.parse(url));
-		this.logger.info('Opened connection references in Maker Portal', { environmentId: envId, solutionId });
+		await vscodeImpl.env.openExternal(vscodeImpl.Uri.parse(url));
+		this.logger.info('Opened connection references in Maker Portal', { environmentId: this.currentEnvironmentId, solutionId: this.currentSolutionId });
 	}
 
 	private async handleSyncDeploymentSettings(): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
+		if (!this.currentEnvironmentId) {
 			this.logger.warn('Cannot sync deployment settings: No environment selected');
 			return;
 		}
 
 		if (this.connectionReferences.length === 0) {
-			vscode.window.showWarningMessage('No connection references to export.');
+			vscodeImpl.window.showWarningMessage('No connection references to export.');
 			return;
 		}
 
-		const solutionId = this.registry.solutionFilterBehavior.getCurrentSolutionId();
-		const currentSolution = this.solutionOptions.find(sol => sol.id === solutionId);
+		const currentSolution = this.solutionOptions.find(sol => sol.id === this.currentSolutionId);
 		const filename = currentSolution
 			? `${currentSolution.uniqueName}.deploymentsettings.json`
 			: 'deploymentsettings.json';
@@ -392,11 +503,11 @@ export class ConnectionReferencesPanelComposed {
 			if (result) {
 				const message = `Synced deployment settings: ${result.added} added, ${result.removed} removed, ${result.preserved} preserved`;
 				this.logger.info(message);
-				vscode.window.showInformationMessage(message);
+				vscodeImpl.window.showInformationMessage(message);
 			}
 		} catch (error) {
 			this.logger.error('Failed to sync deployment settings', error);
-			vscode.window.showErrorMessage(`Failed to sync deployment settings: ${error instanceof Error ? error.message : String(error)}`);
+			vscodeImpl.window.showErrorMessage(`Failed to sync deployment settings: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
 }

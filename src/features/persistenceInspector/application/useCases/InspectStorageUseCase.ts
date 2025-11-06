@@ -34,12 +34,13 @@ export class InspectStorageUseCase {
 			// Orchestrate: raise domain event
 			const entries = collection.getAllEntries();
 			const globalCount = collection.getEntriesByType('global').length;
+			const workspaceCount = collection.getEntriesByType('workspace').length;
 			const secretCount = collection.getEntriesByType('secret').length;
 
-			this.logger.info(`Storage inspected: ${entries.length} total entries (${globalCount} global, ${secretCount} secrets)`);
+			this.logger.info(`Storage inspected: ${entries.length} total entries (${globalCount} global, ${workspaceCount} workspace, ${secretCount} secrets)`);
 
 			this.eventPublisher.publish(
-				new StorageInspected(entries.length, globalCount, secretCount)
+				new StorageInspected(entries.length, globalCount, workspaceCount, secretCount)
 			);
 
 			// Orchestrate: map to view model

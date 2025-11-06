@@ -7,7 +7,6 @@
 .action-buttons {
 	display: flex;
 	gap: 8px;
-	width: 100%;
 }
 
 .action-buttons.align-left {

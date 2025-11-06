@@ -14,11 +14,13 @@ export class VsCodeStorageReader implements IStorageReader {
 
 	public constructor(
 		private readonly globalState: vscode.Memento,
-		private readonly secrets: vscode.SecretStorage
+		private readonly secrets: vscode.SecretStorage,
+		private readonly workspaceState: vscode.Memento
 	) {}
 
 	/**
-	 * Reads all entries from VS Code global state storage
+	 * Reads all entries from VS Code global state storage.
+	 * Global state persists across all workspaces.
 	 * @returns Map of all key-value pairs in global state
 	 */
 	public async readAllGlobalState(): Promise<Map<string, unknown>> {
@@ -27,6 +29,23 @@ export class VsCodeStorageReader implements IStorageReader {
 
 		for (const key of keys) {
 			const value = this.globalState.get(key);
+			entries.set(key, value);
+		}
+
+		return entries;
+	}
+
+	/**
+	 * Reads all entries from VS Code workspace state storage.
+	 * Workspace state is specific to the current workspace (e.g., panel UI preferences).
+	 * @returns Map of all key-value pairs in workspace state
+	 */
+	public async readAllWorkspaceState(): Promise<Map<string, unknown>> {
+		const entries = new Map<string, unknown>();
+		const keys: readonly string[] = this.workspaceState.keys();
+
+		for (const key of keys) {
+			const value: unknown = this.workspaceState.get(key);
 			entries.set(key, value);
 		}
 

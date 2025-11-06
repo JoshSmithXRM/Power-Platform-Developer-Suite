@@ -4,7 +4,7 @@ import type { SectionRenderData } from '../../../../shared/infrastructure/ui/typ
 
 /**
  * Section that renders the persistence inspector storage tree view.
- * Displays global state and secrets with interactive controls.
+ * Displays global state, workspace state, and secrets with interactive controls.
  * Client-side behavior is loaded from PersistenceInspectorBehavior.js
  */
 export class PersistenceInspectorSection implements ISection {
@@ -15,6 +15,11 @@ export class PersistenceInspectorSection implements ISection {
 			<div id="globalStateSection" class="section">
 				<div class="section-title">Global State</div>
 				<div id="globalStateEntries"></div>
+			</div>
+
+			<div id="workspaceStateSection" class="section">
+				<div class="section-title">Workspace State</div>
+				<div id="workspaceStateEntries"></div>
 			</div>
 
 			<div id="secretsSection" class="section">

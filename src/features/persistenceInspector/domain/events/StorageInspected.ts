@@ -10,6 +10,7 @@ export class StorageInspected extends DomainEvent {
 	public constructor(
 		public readonly totalEntries: number,
 		public readonly globalEntries: number,
+		public readonly workspaceEntries: number,
 		public readonly secretEntries: number
 	) {
 		super();

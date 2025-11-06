@@ -192,9 +192,14 @@ export class ImportJobViewerPanelComposed {
 			this.panel.webview
 		);
 
+		// Add feature-specific CSS
+		const featureCssUri = this.panel.webview.asWebviewUri(
+			vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'import-jobs.css')
+		).toString();
+
 		// Create HTML scaffolding behavior
 		const scaffoldingConfig: HtmlScaffoldingConfig = {
-			cssUris,
+			cssUris: [...cssUris, featureCssUri],
 			jsUris: [
 				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
@@ -204,8 +209,7 @@ export class ImportJobViewerPanelComposed {
 				).toString()
 			],
 			cspNonce: getNonce(),
-			title: 'Import Jobs',
-			customCss: this.getCustomCss()
+			title: 'Import Jobs'
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
@@ -273,23 +277,6 @@ export class ImportJobViewerPanelComposed {
 			noDataMessage: 'No import jobs found.',
 			toolbarButtons: []
 		};
-	}
-
-	/**
-	 * Returns custom CSS for import job status styling.
-	 */
-	private getCustomCss(): string {
-		return `
-			.status-completed {
-				color: var(--vscode-terminal-ansiGreen);
-			}
-			.status-failed {
-				color: var(--vscode-terminal-ansiRed);
-			}
-			.status-in-progress {
-				color: var(--vscode-terminal-ansiYellow);
-			}
-		`;
 	}
 
 	private async handleRefresh(): Promise<void> {

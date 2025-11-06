@@ -1,0 +1,63 @@
+/* Environment Setup Panel Styles */
+
+.form-container {
+	max-width: 800px;
+	margin: 0 auto;
+	padding: 24px;
+}
+
+.form-section {
+	margin-bottom: 24px;
+}
+
+.form-section h2 {
+	font-size: 16px;
+	font-weight: 600;
+	margin-bottom: 16px;
+	color: var(--vscode-foreground);
+}
+
+.form-group {
+	margin-bottom: 16px;
+}
+
+.form-group label {
+	display: block;
+	margin-bottom: 6px;
+	font-size: 13px;
+	color: var(--vscode-foreground);
+}
+
+.form-group input,
+.form-group select {
+	width: 100%;
+}
+
+.help-text {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	margin-top: 4px;
+}
+
+.conditional-field {
+	margin-top: 16px;
+}
+
+input,
+select {
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	padding: 6px 12px;
+	border-radius: 2px;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+input:focus,
+select:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}

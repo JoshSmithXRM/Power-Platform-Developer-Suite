@@ -1,0 +1,34 @@
+/**
+ * Connection References Feature Custom Styles
+ *
+ * Feature-specific styles for connection references panel.
+ * Includes status highlighting for flow-connection reference relationships.
+ */
+
+/* Highlight orphaned relationships (Missing CR, Unused CR) */
+td:has(> span[data-status="Missing CR"]),
+td:has(> span[data-status="Unused CR"]) {
+	color: #f48771;
+}
+
+/* Highlight valid relationships */
+td:has(> span[data-status="Valid"]) {
+	color: #89d185;
+}
+
+/* Flow link styling */
+.flow-link {
+	color: var(--vscode-textLink-foreground);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.flow-link:hover {
+	text-decoration: underline;
+	color: var(--vscode-textLink-activeForeground);
+}
+
+.flow-link:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}

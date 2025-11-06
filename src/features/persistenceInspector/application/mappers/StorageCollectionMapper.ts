@@ -12,12 +12,14 @@ export class StorageCollectionMapper {
 
 	public toViewModel(collection: StorageCollection): StorageCollectionViewModel {
 		const globalEntries = collection.getEntriesByType('global');
+		const workspaceEntries = collection.getEntriesByType('workspace');
 		const secretEntries = collection.getEntriesByType('secret');
 
 		return {
 			totalEntries: collection.getAllEntries().length,
 			totalSize: collection.getTotalSize(),
 			globalStateEntries: globalEntries.map(e => this.entryMapper.toViewModel(e)),
+			workspaceStateEntries: workspaceEntries.map(e => this.entryMapper.toViewModel(e)),
 			secretEntries: secretEntries.map(e => this.entryMapper.toViewModel(e))
 		};
 	}

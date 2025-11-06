@@ -15,7 +15,7 @@ export class StorageEntryMapper {
 			key: entry.key,
 			value: entry.value,
 			displayValue: StorageValueFormatter.formatDisplayValue(entry.value, entry.isSecret()),
-			storageType: entry.storageType as 'global' | 'secret',
+			storageType: entry.storageType as 'global' | 'workspace' | 'secret',
 			metadata: this.metadataMapper.toViewModel(entry.metadata),
 			isProtected: entry.isProtected(),
 			isSecret: entry.isSecret(),

@@ -1,19 +1,20 @@
 import type { FlowConnectionRelationshipViewModel } from '../../application/viewModels/FlowConnectionRelationshipViewModel';
 import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
-import { renderDataTableLink } from '../../../../shared/infrastructure/ui/views/clickableLinks';
 
 export interface FlowConnectionRelationshipViewModelWithHtml extends FlowConnectionRelationshipViewModel {
 	readonly flowNameHtml: string;
 }
 
 /**
- * Renders a clickable flow link HTML string.
+ * Renders a clickable flow link HTML string using data-command pattern.
  * @param flowId - GUID of the flow
  * @param flowName - Display name of the flow
  * @returns HTML anchor element as string
  */
 export function renderFlowLink(flowId: string, flowName: string): string {
-	return renderDataTableLink('flow-link', flowId, flowName);
+	const escapedId = escapeHtml(flowId);
+	const escapedName = escapeHtml(flowName);
+	return `<a href="#" class="flow-link" data-command="openFlow" data-flow-id="${escapedId}">${escapedName}</a>`;
 }
 
 /**

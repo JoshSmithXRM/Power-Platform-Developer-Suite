@@ -9,17 +9,27 @@
  * using actual VS Code storage.
  *
  * Responsibilities:
- * - Read all global state entries
+ * - Read all global state entries (extension-wide settings)
+ * - Read all workspace state entries (workspace-specific settings like panel state)
  * - Read all secret keys (values hidden by default)
  * - Reveal specific secret values on demand
  */
 export interface IStorageReader {
 	/**
 	 * Reads all global state keys and their values.
+	 * Global state persists across all workspaces.
 	 *
 	 * @returns {Promise<Map<string, unknown>>} Map of keys to values
 	 */
 	readAllGlobalState(): Promise<Map<string, unknown>>;
+
+	/**
+	 * Reads all workspace state keys and their values.
+	 * Workspace state is specific to the current workspace (e.g., panel UI preferences).
+	 *
+	 * @returns {Promise<Map<string, unknown>>} Map of keys to values
+	 */
+	readAllWorkspaceState(): Promise<Map<string, unknown>>;
 
 	/**
 	 * Reads all secret storage keys.

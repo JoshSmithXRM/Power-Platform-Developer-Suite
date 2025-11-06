@@ -144,6 +144,25 @@
 	}
 
 	/**
+	 * Wires up solution filter dropdown.
+	 */
+	function wireSolutionSelector() {
+		const solutionSelect = document.getElementById('solutionSelect');
+		if (!solutionSelect) {
+			return;
+		}
+
+		solutionSelect.addEventListener('change', () => {
+			vscode.postMessage({
+				command: 'solutionChange',
+				data: {
+					solutionId: solutionSelect.value || undefined
+				}
+			});
+		});
+	}
+
+	/**
 	 * Handles messages from extension to update button states.
 	 */
 	window.addEventListener('message', event => {
@@ -183,10 +202,12 @@
 			wireButtons();
 			wireDataCommands();
 			wireEnvironmentSelector();
+			wireSolutionSelector();
 		});
 	} else {
 		wireButtons();
 		wireDataCommands();
 		wireEnvironmentSelector();
+		wireSolutionSelector();
 	}
 })();

@@ -44,7 +44,7 @@ export class StorageClearingService {
 	 *
 	 * Business Rules:
 	 * - Validates entry can be cleared (not protected)
-	 * - Routes to correct storage type (global vs secret)
+	 * - Routes to correct storage type (global, workspace, or secret)
 	 *
 	 * Validation before clearing prevents accidental deletion of
 	 * critical data. StorageCollection aggregates validation logic.
@@ -65,6 +65,8 @@ export class StorageClearingService {
 
 		if (entry.isSecret()) {
 			await this.storageClearer.clearSecretKey(entry.key);
+		} else if (entry.isWorkspace()) {
+			await this.storageClearer.clearWorkspaceStateKey(entry.key);
 		} else {
 			await this.storageClearer.clearGlobalStateKey(entry.key);
 		}
@@ -108,7 +110,11 @@ export class StorageClearingService {
 			throw new PropertyNotFoundError(`Property ${path.toString()} not found`);
 		}
 
-		await this.storageClearer.clearGlobalStateProperty(entry.key, path);
+		if (entry.isWorkspace()) {
+			await this.storageClearer.clearWorkspaceStateProperty(entry.key, path);
+		} else {
+			await this.storageClearer.clearGlobalStateProperty(entry.key, path);
+		}
 	}
 
 	/**

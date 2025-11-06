@@ -1,0 +1,212 @@
+/* Persistence Inspector Panel Styles */
+
+.section {
+	margin-bottom: 30px;
+}
+
+.section-title {
+	font-weight: bold;
+	font-size: 16px;
+	margin-bottom: 10px;
+}
+
+.entry {
+	border: 1px solid var(--vscode-panel-border);
+	padding: 10px;
+	margin-bottom: 10px;
+	border-radius: 4px;
+}
+
+.entry-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.entry-key {
+	font-weight: bold;
+	font-family: var(--vscode-editor-font-family);
+}
+
+.entry-actions {
+	display: flex;
+	gap: 5px;
+}
+
+.entry-actions button {
+	padding: 4px 8px;
+	font-size: 12px;
+}
+
+.entry-value {
+	font-family: var(--vscode-editor-font-family);
+	background-color: var(--vscode-editor-background);
+	padding: 8px;
+	border-radius: 4px;
+	font-size: 12px;
+}
+
+.entry-meta {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin-top: 5px;
+}
+
+.protected {
+	border-left: 3px solid var(--vscode-charts-yellow);
+}
+
+.secret {
+	border-left: 3px solid var(--vscode-charts-red);
+}
+
+/* JSON Tree View Styles */
+.tree-node {
+	font-family: var(--vscode-editor-font-family);
+	font-size: 12px;
+}
+
+.tree-header {
+	display: flex;
+	align-items: center;
+	cursor: pointer;
+	padding: 2px 0;
+	user-select: none;
+}
+
+.tree-header:hover {
+	background-color: var(--vscode-list-hoverBackground);
+}
+
+.tree-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	color: var(--vscode-foreground);
+	font-weight: normal;
+	font-size: 9px;
+	order: 2;
+	margin-left: 4px;
+}
+
+/* Make down arrow bigger - target when children are expanded (not collapsed) */
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-header .tree-toggle {
+	font-size: 12px;
+}
+
+.tree-label {
+	order: 1;
+	color: var(--vscode-symbolIcon-objectForeground);
+	font-weight: bold;
+}
+
+/* Apply padding to ALL tree-children divs */
+div.tree-children {
+	padding-left: 20px;
+}
+
+.tree-children.collapsed {
+	display: none;
+}
+
+.tree-closing-bracket {
+	color: var(--vscode-symbolIcon-objectForeground);
+	font-weight: bold;
+}
+
+.tree-closing-bracket.collapsed {
+	display: none;
+}
+
+.tree-property {
+	position: relative;
+}
+
+.tree-property-key-line {
+	display: flex;
+	align-items: center;
+	padding: 2px 0;
+	gap: 4px;
+}
+
+.tree-property-key-line:hover {
+	background-color: var(--vscode-list-hoverBackground);
+}
+
+.tree-property-key-line:hover .tree-delete-btn {
+	opacity: 0.7;
+}
+
+.tree-property-line {
+	display: flex;
+	align-items: center;
+	padding: 2px 0;
+	gap: 4px;
+}
+
+.tree-property-line:hover {
+	background-color: var(--vscode-list-hoverBackground);
+}
+
+.tree-property-key {
+	color: var(--vscode-symbolIcon-propertyForeground);
+	font-weight: 500;
+	flex-shrink: 0;
+}
+
+.tree-array-index {
+	color: var(--vscode-symbolIcon-numberForeground);
+}
+
+.tree-value {
+	display: inline;
+}
+
+.tree-value.tree-string {
+	color: var(--vscode-debugTokenExpression-string);
+}
+
+.tree-value.tree-number {
+	color: var(--vscode-debugTokenExpression-number);
+}
+
+.tree-value.tree-boolean {
+	color: var(--vscode-debugTokenExpression-boolean);
+}
+
+.tree-value.tree-null {
+	color: var(--vscode-debugTokenExpression-error);
+}
+
+.tree-value.tree-object,
+.tree-value.tree-array {
+	color: var(--vscode-foreground);
+}
+
+.tree-delete-btn {
+	background: transparent;
+	border: 1px solid transparent;
+	color: var(--vscode-errorForeground);
+	cursor: pointer;
+	font-size: 18px;
+	font-weight: bold;
+	line-height: 1;
+	padding: 2px 6px;
+	margin-left: 8px;
+	opacity: 0;
+	transition: opacity 0.15s, background-color 0.15s;
+	flex-shrink: 0;
+}
+
+.tree-property-line:hover .tree-delete-btn {
+	opacity: 0.7;
+}
+
+.tree-delete-btn:hover {
+	opacity: 1 !important;
+	background-color: var(--vscode-inputValidation-errorBackground);
+	border-radius: 3px;
+}

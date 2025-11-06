@@ -202,7 +202,7 @@ module.exports = {
 				MethodDefinition(node) {
 					// Allow factory/creation methods (common value object patterns)
 					const allowedStaticMethods = [
-						'create', 'createFrom', 'createEmpty', 'createGlobal', 'createSecret',
+						'create', 'createFrom', 'createEmpty', 'createGlobal', 'createSecret', 'createWorkspace',
 						'from', 'fromJson', 'fromData', 'fromValue', 'fromSegments',
 						'fromNumber', 'fromMilliseconds', 'default',
 						'generate', 'success', 'failure', 'successWithWarnings',
