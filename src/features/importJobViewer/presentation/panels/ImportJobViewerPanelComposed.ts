@@ -1,33 +1,39 @@
 import * as vscode from 'vscode';
 
-import { ILogger } from '../../../../infrastructure/logging/ILogger';
-import { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
-import type { EnvironmentOption, DataTableConfig } from '../../../../shared/infrastructure/ui/DataTablePanel';
-import { PanelTrackingBehavior } from '../../../../shared/infrastructure/ui/behaviors/PanelTrackingBehavior';
-import { HtmlRenderingBehavior, type HtmlCustomization } from '../../../../shared/infrastructure/ui/behaviors/HtmlRenderingBehavior';
-import { DataBehavior } from '../../../../shared/infrastructure/ui/behaviors/DataBehavior';
-import { EnvironmentBehavior } from '../../../../shared/infrastructure/ui/behaviors/EnvironmentBehavior';
-import { SolutionFilterBehavior } from '../../../../shared/infrastructure/ui/behaviors/SolutionFilterBehavior';
-import { MessageRoutingBehavior } from '../../../../shared/infrastructure/ui/behaviors/MessageRoutingBehavior';
-import { DataTableBehaviorRegistry } from '../../../../shared/infrastructure/ui/behaviors/DataTableBehaviorRegistry';
-import { DataTablePanelCoordinator, type CoordinatorDependencies } from '../../../../shared/infrastructure/ui/coordinators/DataTablePanelCoordinator';
-import { ListImportJobsUseCase } from '../../application/useCases/ListImportJobsUseCase';
-import { OpenImportLogUseCase } from '../../application/useCases/OpenImportLogUseCase';
-import { ImportJobDataLoader } from '../dataLoaders/ImportJobDataLoader';
-import { isViewImportJobMessage } from '../../../../infrastructure/ui/utils/TypeGuards';
-import { renderLinkClickHandler } from '../../../../shared/infrastructure/ui/views/clickableLinks';
+import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
+import type { DataTableConfig, EnvironmentOption } from '../../../../shared/infrastructure/ui/DataTablePanel';
+import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
+import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
+import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
+import { DataTableSection } from '../../../../shared/infrastructure/ui/sections/DataTableSection';
+import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
+import { EnvironmentSelectorSection } from '../../../../shared/infrastructure/ui/sections/EnvironmentSelectorSection';
+import { PanelLayout } from '../../../../shared/infrastructure/ui/types/PanelLayout';
+import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
+import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
+import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
+import type { ListImportJobsUseCase } from '../../application/useCases/ListImportJobsUseCase';
+import type { OpenImportLogUseCase } from '../../application/useCases/OpenImportLogUseCase';
+import type { ImportJobViewModelMapper } from '../../application/mappers/ImportJobViewModelMapper';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
 
 /**
- * Presentation layer panel for Import Job Viewer.
- * Uses composition pattern with specialized behaviors instead of inheritance.
+ * Commands supported by Import Job Viewer panel.
+ */
+type ImportJobViewerCommands = 'refresh' | 'openMaker' | 'viewImportJob' | 'environmentChange';
+
+/**
+ * Import Job Viewer panel using new PanelCoordinator architecture.
+ * Displays list of import jobs for a specific environment.
  */
 export class ImportJobViewerPanelComposed {
 	public static readonly viewType = 'powerPlatformDevSuite.importJobViewer';
 	private static panels = new Map<string, ImportJobViewerPanelComposed>();
 
-	private readonly coordinator: DataTablePanelCoordinator;
-	private readonly registry: DataTableBehaviorRegistry;
+	private readonly coordinator: PanelCoordinator<ImportJobViewerCommands>;
+	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private currentEnvironmentId: string;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -41,10 +47,12 @@ export class ImportJobViewerPanelComposed {
 		private readonly listImportJobsUseCase: ListImportJobsUseCase,
 		private readonly openImportLogUseCase: OpenImportLogUseCase,
 		private readonly urlBuilder: IMakerUrlBuilder,
+		private readonly viewModelMapper: ImportJobViewModelMapper,
 		private readonly logger: ILogger,
 		environmentId: string
 	) {
-		logger.debug('ImportJobViewerPanel: Initialized');
+		this.currentEnvironmentId = environmentId;
+		logger.debug('ImportJobViewerPanel: Initialized with new architecture');
 
 		// Configure webview
 		panel.webview.options = {
@@ -52,20 +60,18 @@ export class ImportJobViewerPanelComposed {
 			localResourceRoots: [extensionUri]
 		};
 
-		// Create behaviors
-		this.registry = this.createBehaviorRegistry(environmentId);
-		this.coordinator = this.createCoordinator();
+		// Create coordinator with new architecture
+		const result = this.createCoordinator();
+		this.coordinator = result.coordinator;
+		this.scaffoldingBehavior = result.scaffoldingBehavior;
 
-		// Register panel-specific command handlers
-		this.registerPanelCommands();
+		// Register command handlers
+		this.registerCommandHandlers();
 
-		// Initialize panel asynchronously
-		void this.coordinator.initialize();
+		// Initialize panel and load data asynchronously
+		void this.initializeAndLoadData();
 	}
 
-	/**
-	 * Creates or shows the Import Job Viewer panel for the specified environment.
-	 */
 	public static async createOrShow(
 		extensionUri: vscode.Uri,
 		getEnvironments: () => Promise<EnvironmentOption[]>,
@@ -77,12 +83,11 @@ export class ImportJobViewerPanelComposed {
 		listImportJobsUseCase: ListImportJobsUseCase,
 		openImportLogUseCase: OpenImportLogUseCase,
 		urlBuilder: IMakerUrlBuilder,
+		viewModelMapper: ImportJobViewModelMapper,
 		logger: ILogger,
 		initialEnvironmentId?: string
 	): Promise<ImportJobViewerPanelComposed> {
-		const column = vscode.window.activeTextEditor
-			? vscode.window.activeTextEditor.viewColumn
-			: undefined;
+		const column = vscode.ViewColumn.One;
 
 		// Determine which environment to use
 		let targetEnvironmentId = initialEnvironmentId;
@@ -109,7 +114,7 @@ export class ImportJobViewerPanelComposed {
 		const panel = vscode.window.createWebviewPanel(
 			ImportJobViewerPanelComposed.viewType,
 			`Import Jobs - ${environmentName}`,
-			column || vscode.ViewColumn.One,
+			column,
 			{
 				enableScripts: true,
 				localResourceRoots: [extensionUri],
@@ -125,122 +130,130 @@ export class ImportJobViewerPanelComposed {
 			listImportJobsUseCase,
 			openImportLogUseCase,
 			urlBuilder,
+			viewModelMapper,
 			logger,
 			targetEnvironmentId
 		);
 
 		ImportJobViewerPanelComposed.panels.set(targetEnvironmentId, newPanel);
 
+		// Handle panel disposal
+		const envId = targetEnvironmentId; // Capture for closure
+		panel.onDidDispose(() => {
+			ImportJobViewerPanelComposed.panels.delete(envId);
+		});
+
 		return newPanel;
 	}
 
-	/**
-	 * Creates all behaviors and composes them into a registry.
-	 */
-	private createBehaviorRegistry(environmentId: string): DataTableBehaviorRegistry {
-		const config = this.getConfig();
-		const customization = this.getCustomization();
+	private async initializeAndLoadData(): Promise<void> {
+		// Load environments first so they appear on initial render
+		const environments = await this.getEnvironments();
 
-		// Panel tracking behavior
-		const panelTrackingBehavior = new PanelTrackingBehavior(
-			ImportJobViewerPanelComposed.panels
-		);
+		// Initialize coordinator with environments
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			tableData: []
+		});
 
-		// HTML rendering behavior
-		const htmlRenderingBehavior = new HtmlRenderingBehavior(
-			this.panel.webview,
-			this.extensionUri,
-			config,
-			customization
-		);
-
-		// Message routing behavior
-		const messageRoutingBehavior = new MessageRoutingBehavior(
-			this.panel.webview,
-			this.logger
-		);
-
-		// Environment behavior
-		const environmentBehavior = new EnvironmentBehavior(
-			this.panel.webview,
-			this.getEnvironments,
-			this.getEnvironmentById,
-			async () => { /* Coordinator handles reload */ },
-			this.logger,
-			environmentId
-		);
-
-		// Solution filter behavior (disabled for import jobs)
-		const solutionFilterBehavior = new SolutionFilterBehavior(
-			this.panel.webview,
-			'importJobs',
-			environmentBehavior,
-			async () => [],
-			undefined,
-			async () => { /* No solution filtering */ },
-			this.logger,
-			false
-		);
-
-		// Data loader - gets current environment ID dynamically
-		const dataLoader = new ImportJobDataLoader(
-			() => environmentBehavior.getCurrentEnvironmentId(),
-			this.listImportJobsUseCase,
-			this.logger
-		);
-
-		// Data behavior
-		const dataBehavior = new DataBehavior(
-			this.panel.webview,
-			config,
-			dataLoader,
-			this.logger
-		);
-
-		return new DataTableBehaviorRegistry(
-			environmentBehavior,
-			solutionFilterBehavior,
-			dataBehavior,
-			messageRoutingBehavior,
-			htmlRenderingBehavior,
-			panelTrackingBehavior
-		);
+		// Load import jobs data
+		await this.handleRefresh();
 	}
 
-	/**
-	 * Creates the panel lifecycle coordinator.
-	 */
-	private createCoordinator(): DataTablePanelCoordinator {
-		const dependencies: CoordinatorDependencies = {
-			panel: this.panel,
-			getEnvironmentById: this.getEnvironmentById,
-			logger: this.logger
+	private createCoordinator(): { coordinator: PanelCoordinator<ImportJobViewerCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
+		const config = this.getTableConfig();
+
+		// Create sections
+		const environmentSelector = new EnvironmentSelectorSection();
+		const tableSection = new DataTableSection(config);
+		// Note: Button IDs must match command names registered in registerCommandHandlers()
+		const actionButtons = new ActionButtonsSection({
+			buttons: [
+				{ id: 'openMaker', label: 'Open in Maker' },
+				{ id: 'refresh', label: 'Refresh' }
+			]
+		}, SectionPosition.Toolbar);
+
+		// Create section composition behavior
+		const compositionBehavior = new SectionCompositionBehavior(
+			[actionButtons, environmentSelector, tableSection],
+			PanelLayout.SingleColumn
+		);
+
+		// Resolve CSS module paths to webview URIs
+		const cssUris = resolveCssModules(
+			{
+				base: true,
+				components: ['buttons', 'inputs'],
+				sections: ['environment-selector', 'action-buttons', 'datatable']
+			},
+			this.extensionUri,
+			this.panel.webview
+		);
+
+		// Create HTML scaffolding behavior
+		const scaffoldingConfig: HtmlScaffoldingConfig = {
+			cssUris,
+			jsUris: [
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
+				).toString()
+			],
+			cspNonce: getNonce(),
+			title: 'Import Jobs',
+			customCss: this.getCustomCss()
 		};
 
-		return new DataTablePanelCoordinator(this.registry, dependencies);
+		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
+			this.panel.webview,
+			compositionBehavior,
+			scaffoldingConfig
+		);
+
+		// Create coordinator
+		const coordinator = new PanelCoordinator<ImportJobViewerCommands>({
+			panel: this.panel,
+			extensionUri: this.extensionUri,
+			behaviors: [scaffoldingBehavior],
+			logger: this.logger
+		});
+
+		return { coordinator, scaffoldingBehavior };
 	}
 
-	/**
-	 * Registers panel-specific command handlers.
-	 */
-	private registerPanelCommands(): void {
-		// View import job command
-		this.registry.messageRoutingBehavior.registerHandler('viewImportJob', async (message) => {
-			if (isViewImportJobMessage(message)) {
-				await this.handleViewImportLog(message.data.importJobId);
+	private registerCommandHandlers(): void {
+		// Refresh import jobs
+		this.coordinator.registerHandler('refresh', async () => {
+			await this.handleRefresh();
+		});
+
+		// Open import history in Maker
+		this.coordinator.registerHandler('openMaker', async () => {
+			await this.handleOpenMakerImportHistory();
+		});
+
+		// View individual import job log
+		this.coordinator.registerHandler('viewImportJob', async (data) => {
+			const importJobId = (data as { importJobId?: string })?.importJobId;
+			if (importJobId) {
+				await this.handleViewImportLog(importJobId);
 			}
 		});
 
-		// Open in Maker Portal command
-		this.registry.messageRoutingBehavior.registerHandler('openMaker', async () => {
-			await this.handleOpenMakerImportHistory();
+		// Environment change
+		this.coordinator.registerHandler('environmentChange', async (data) => {
+			const environmentId = (data as { environmentId?: string })?.environmentId;
+			if (environmentId) {
+				await this.handleEnvironmentChange(environmentId);
+			}
 		});
 	}
 
-	/**
-	 * Returns the panel configuration.
-	 */
-	private getConfig(): DataTableConfig {
+	private getTableConfig(): DataTableConfig {
 		return {
 			viewType: ImportJobViewerPanelComposed.viewType,
 			title: 'Import Jobs',
@@ -258,52 +271,72 @@ export class ImportJobViewerPanelComposed {
 			],
 			searchPlaceholder: '🔍 Search...',
 			noDataMessage: 'No import jobs found.',
-			toolbarButtons: [
-				{ id: 'openMakerBtn', label: 'Open in Maker', command: 'openMaker', position: 'left' },
-				{ id: 'refreshBtn', label: 'Refresh', command: 'refresh', position: 'left' }
-			]
+			toolbarButtons: []
 		};
 	}
 
 	/**
-	 * Returns panel-specific HTML/CSS/JS customization.
+	 * Returns custom CSS for import job status styling.
 	 */
-	private getCustomization(): HtmlCustomization {
-		return {
-			customCss: `
-				.status-completed {
-					color: var(--vscode-terminal-ansiGreen);
-				}
-				.status-failed {
-					color: var(--vscode-terminal-ansiRed);
-				}
-				.status-in-progress {
-					color: var(--vscode-terminal-ansiYellow);
-				}
-			`,
-			filterLogic: `
-				filtered = allData.filter(job =>
-					job.solutionName.toLowerCase().includes(query) ||
-					job.createdBy.toLowerCase().includes(query) ||
-					job.status.toLowerCase().includes(query) ||
-					job.operationContext.toLowerCase().includes(query)
-				);
-			`,
-			customJavaScript: renderLinkClickHandler('.job-link', 'viewImportJob', 'importJobId')
-		};
+	private getCustomCss(): string {
+		return `
+			.status-completed {
+				color: var(--vscode-terminal-ansiGreen);
+			}
+			.status-failed {
+				color: var(--vscode-terminal-ansiRed);
+			}
+			.status-in-progress {
+				color: var(--vscode-terminal-ansiYellow);
+			}
+		`;
 	}
 
-	/**
-	 * Opens the import history page in the Maker Portal.
-	 */
-	private async handleOpenMakerImportHistory(): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
-			this.logger.warn('Cannot open Maker Portal: No environment selected');
-			return;
+	private async handleRefresh(): Promise<void> {
+		this.logger.debug('Refreshing import jobs');
+
+		try {
+			const importJobs = await this.listImportJobsUseCase.execute(this.currentEnvironmentId);
+
+			// Map to view models with clickable links
+			const viewModels = importJobs
+				.map(job => this.viewModelMapper.toViewModel(job));
+
+			const environments = await this.getEnvironments();
+
+			this.logger.info('Import jobs loaded successfully', { count: viewModels.length });
+
+			// Refresh HTML with data
+			await this.scaffoldingBehavior.refresh({
+				tableData: viewModels,
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId
+			});
+		} catch (error: unknown) {
+			this.logger.error('Error refreshing import jobs', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			vscode.window.showErrorMessage(`Failed to refresh import jobs: ${errorMessage}`);
 		}
+	}
 
-		const environment = await this.getEnvironmentById(envId);
+	private async handleViewImportLog(importJobId: string): Promise<void> {
+		try {
+			this.logger.info('Opening import log', { importJobId });
+
+			const cancellationTokenSource = new vscode.CancellationTokenSource();
+			const cancellationToken = new VsCodeCancellationTokenAdapter(cancellationTokenSource.token);
+
+			await this.openImportLogUseCase.execute(this.currentEnvironmentId, importJobId, cancellationToken);
+
+			this.logger.info('Import log opened successfully', { importJobId });
+		} catch (error) {
+			this.logger.error('Failed to open import log', error);
+			vscode.window.showErrorMessage(`Failed to open import log: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	private async handleOpenMakerImportHistory(): Promise<void> {
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 		if (!environment?.powerPlatformEnvironmentId) {
 			this.logger.warn('Cannot open Maker Portal: Environment ID not configured');
 			vscode.window.showErrorMessage('Cannot open in Maker Portal: Environment ID not configured. Edit environment to add one.');
@@ -312,31 +345,39 @@ export class ImportJobViewerPanelComposed {
 
 		const url = this.urlBuilder.buildImportHistoryUrl(environment.powerPlatformEnvironmentId);
 		await vscode.env.openExternal(vscode.Uri.parse(url));
-		this.logger.info('Opened import history in Maker Portal', { environmentId: envId });
+		this.logger.info('Opened import history in Maker Portal');
 	}
 
-	/**
-	 * Handles opening the import log XML in VS Code editor.
-	 */
-	private async handleViewImportLog(importJobId: string): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
-			this.logger.warn('Cannot view import log: No environment selected');
-			return;
-		}
+	private async handleEnvironmentChange(environmentId: string): Promise<void> {
+		this.logger.debug('Environment changed', { environmentId });
+
+		// Disable refresh button during operation
+		this.setButtonLoading('refresh', true);
 
 		try {
-			this.logger.info('Opening import log', { importJobId });
+			// Update current environment
+			this.currentEnvironmentId = environmentId;
 
-			const cancellationTokenSource = new vscode.CancellationTokenSource();
-			const cancellationToken = new VsCodeCancellationTokenAdapter(cancellationTokenSource.token);
+			// Update panel title
+			const environment = await this.getEnvironmentById(environmentId);
+			if (environment) {
+				this.panel.title = `Import Jobs - ${environment.name}`;
+			}
 
-			await this.openImportLogUseCase.execute(envId, importJobId, cancellationToken);
-
-			this.logger.info('Import log opened successfully', { importJobId });
-		} catch (error) {
-			this.logger.error('Failed to open import log', error);
-			vscode.window.showErrorMessage(`Failed to open import log: ${error instanceof Error ? error.message : String(error)}`);
+			// Refresh data
+			await this.handleRefresh();
+		} finally {
+			// Re-enable refresh button
+			this.setButtonLoading('refresh', false);
 		}
+	}
+
+	private setButtonLoading(buttonId: string, isLoading: boolean): void {
+		this.panel.webview.postMessage({
+			command: 'setButtonState',
+			buttonId,
+			disabled: isLoading,
+			showSpinner: isLoading,
+		});
 	}
 }

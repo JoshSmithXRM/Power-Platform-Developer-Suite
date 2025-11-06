@@ -631,6 +631,8 @@ async function initializeImportJobViewer(
 	const { ListImportJobsUseCase } = await import('./features/importJobViewer/application/useCases/ListImportJobsUseCase.js');
 	const { OpenImportLogUseCase } = await import('./features/importJobViewer/application/useCases/OpenImportLogUseCase.js');
 	const { ImportJobViewerPanelComposed } = await import('./features/importJobViewer/presentation/panels/ImportJobViewerPanelComposed.js');
+	const { ImportJobViewModelMapper } = await import('./features/importJobViewer/application/mappers/ImportJobViewModelMapper.js');
+	const { ImportJobCollectionService } = await import('./features/importJobViewer/domain/services/ImportJobCollectionService.js');
 
 	const getEnvironments = createGetEnvironments(environmentRepository);
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
@@ -646,6 +648,9 @@ async function initializeImportJobViewer(
 	const listImportJobsUseCase = new ListImportJobsUseCase(importJobRepository, logger);
 	const openImportLogUseCase = new OpenImportLogUseCase(importJobRepository, editorService, logger);
 
+	const collectionService = new ImportJobCollectionService();
+	const viewModelMapper = new ImportJobViewModelMapper(collectionService);
+
 	await ImportJobViewerPanelComposed.createOrShow(
 		context.extensionUri,
 		getEnvironments,
@@ -653,6 +658,7 @@ async function initializeImportJobViewer(
 		listImportJobsUseCase,
 		openImportLogUseCase,
 		urlBuilder,
+		viewModelMapper,
 		logger,
 		initialEnvironmentId
 	);
