@@ -9,6 +9,13 @@ window.createBehavior({
 		setupDetailPanelTabs();
 		setupDetailPanelVisibility();
 		setupRowSelection();
+		initializeDropdowns();
+	},
+	handleMessage(message) {
+		// Re-initialize dropdowns after HTML updates
+		if (message.command === 'htmlUpdated') {
+			initializeDropdowns();
+		}
 	}
 });
 

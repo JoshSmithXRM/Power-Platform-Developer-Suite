@@ -14,7 +14,7 @@ export class FileSystemPluginTraceExporter implements IPluginTraceExporter {
 	constructor(private readonly logger: ILogger) {}
 
 	exportToCsv(traces: readonly PluginTrace[]): string {
-		this.logger.debug(`Exporting ${traces.length} traces to CSV`);
+		this.logger.debug('Exporting traces to CSV', { count: traces.length });
 
 		const headers = [
 			'ID',
@@ -74,7 +74,7 @@ export class FileSystemPluginTraceExporter implements IPluginTraceExporter {
 	}
 
 	exportToJson(traces: readonly PluginTrace[]): string {
-		this.logger.debug(`Exporting ${traces.length} traces to JSON`);
+		this.logger.debug('Exporting traces to JSON', { count: traces.length });
 
 		const jsonData = traces.map((trace) => ({
 			id: trace.id,
@@ -126,6 +126,14 @@ export class FileSystemPluginTraceExporter implements IPluginTraceExporter {
 			return uri.fsPath;
 		} catch (error) {
 			const normalizedError = normalizeError(error);
+			const errorMessage = normalizedError.message || String(normalizedError);
+
+			// User cancellation is expected - don't log as error
+			if (errorMessage.includes('cancelled by user')) {
+				this.logger.debug('Save dialog cancelled by user');
+				throw normalizedError;
+			}
+
 			this.logger.error('Failed to save file', normalizedError);
 			throw normalizedError;
 		}

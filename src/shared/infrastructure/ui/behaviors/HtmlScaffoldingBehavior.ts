@@ -49,6 +49,9 @@ export class HtmlScaffoldingBehavior implements IPanelBehavior {
 		const bodyHtml = this.composer.compose(data);
 		const fullHtml = this.wrapInHtmlScaffolding(bodyHtml);
 		this.webview.html = fullHtml;
+
+		// Notify webview that HTML has been updated (for re-initialization)
+		await this.webview.postMessage({ command: 'htmlUpdated' });
 	}
 
 	/**

@@ -80,4 +80,10 @@ export interface SectionRenderData {
 	 * The currently selected solution filter.
 	 */
 	readonly currentSolutionId?: string | undefined;
+
+	/**
+	 * Panel state (for stateful dropdowns and other controls).
+	 * Custom state object that sections can use to track UI state.
+	 */
+	readonly state?: Record<string, unknown>;
 }

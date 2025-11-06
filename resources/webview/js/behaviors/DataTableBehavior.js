@@ -210,6 +210,14 @@
 		wireSorting();
 	}
 
+	// Re-initialize after HTML updates
+	window.addEventListener('message', event => {
+		const message = event.data;
+		if (message.command === 'htmlUpdated') {
+			initialize();
+		}
+	});
+
 	// Initialize on DOM ready
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', initialize);

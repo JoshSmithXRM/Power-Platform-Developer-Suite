@@ -60,10 +60,16 @@
 	/**
 	 * Wires up all buttons to send messages when clicked.
 	 * Buttons with id="commandName" will send {command: 'commandName'} messages.
+	 * Skips dropdown buttons (handled by DropdownComponent.js).
 	 */
 	function wireButtons() {
 		const buttons = document.querySelectorAll('button[id]');
 		buttons.forEach(button => {
+			// Skip dropdown triggers - they're handled by DropdownComponent
+			if (button.hasAttribute('data-dropdown-trigger')) {
+				return;
+			}
+
 			const commandName = button.id;
 			button.addEventListener('click', () => {
 				vscode.postMessage({ command: commandName });

@@ -62,8 +62,8 @@ describe('ExportTracesUseCase', () => {
 				filename
 			);
 			expect(mockLogger.info).toHaveBeenCalledWith(
-				`ExportTracesUseCase: Exporting ${traces.length} traces to CSV`,
-				{ suggestedFilename: filename }
+				'ExportTracesUseCase: Exporting traces to CSV',
+				{ count: traces.length, suggestedFilename: filename }
 			);
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				'ExportTracesUseCase: Successfully exported to CSV',
@@ -143,8 +143,8 @@ describe('ExportTracesUseCase', () => {
 				filename
 			);
 			expect(mockLogger.info).toHaveBeenCalledWith(
-				`ExportTracesUseCase: Exporting ${traces.length} traces to JSON`,
-				{ suggestedFilename: filename }
+				'ExportTracesUseCase: Exporting traces to JSON',
+				{ count: traces.length, suggestedFilename: filename }
 			);
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				'ExportTracesUseCase: Successfully exported to JSON',

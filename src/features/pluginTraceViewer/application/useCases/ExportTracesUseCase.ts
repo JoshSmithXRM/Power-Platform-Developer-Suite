@@ -26,8 +26,8 @@ export class ExportTracesUseCase {
 		suggestedFilename: string
 	): Promise<string> {
 		this.logger.info(
-			`ExportTracesUseCase: Exporting ${traces.length} traces to CSV`,
-			{ suggestedFilename }
+			'ExportTracesUseCase: Exporting traces to CSV',
+			{ count: traces.length, suggestedFilename }
 		);
 
 		try {
@@ -44,6 +44,14 @@ export class ExportTracesUseCase {
 
 			return filePath;
 		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+
+			// User cancellation is expected - don't log as error
+			if (errorMessage.includes('cancelled by user')) {
+				this.logger.info('ExportTracesUseCase: Export cancelled by user');
+				throw error;
+			}
+
 			this.logger.error(
 				'ExportTracesUseCase: Failed to export to CSV',
 				error
@@ -64,8 +72,8 @@ export class ExportTracesUseCase {
 		suggestedFilename: string
 	): Promise<string> {
 		this.logger.info(
-			`ExportTracesUseCase: Exporting ${traces.length} traces to JSON`,
-			{ suggestedFilename }
+			'ExportTracesUseCase: Exporting traces to JSON',
+			{ count: traces.length, suggestedFilename }
 		);
 
 		try {
@@ -82,6 +90,14 @@ export class ExportTracesUseCase {
 
 			return filePath;
 		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+
+			// User cancellation is expected - don't log as error
+			if (errorMessage.includes('cancelled by user')) {
+				this.logger.info('ExportTracesUseCase: Export cancelled by user');
+				throw error;
+			}
+
 			this.logger.error(
 				'ExportTracesUseCase: Failed to export to JSON',
 				error

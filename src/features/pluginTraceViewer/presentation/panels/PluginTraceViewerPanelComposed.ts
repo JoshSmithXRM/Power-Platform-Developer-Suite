@@ -31,8 +31,11 @@ import { TraceLevelFormatter } from '../utils/TraceLevelFormatter';
 import type { PluginTrace } from '../../domain/entities/PluginTrace';
 import type { ExportFormat } from '../../domain/types/ExportFormat';
 import { TraceLevel, TraceFilter } from '../../application/types';
-import { PluginTraceToolbarSection } from '../sections/PluginTraceToolbarSection';
 import { PluginTraceDetailSection } from '../sections/PluginTraceDetailSection';
+import { ExportDropdownSection } from '../sections/ExportDropdownSection';
+import { DeleteDropdownSection } from '../sections/DeleteDropdownSection';
+import { TraceLevelDropdownSection } from '../sections/TraceLevelDropdownSection';
+import { AutoRefreshDropdownSection } from '../sections/AutoRefreshDropdownSection';
 
 /**
  * Commands supported by Plugin Trace Viewer panel.
@@ -49,6 +52,7 @@ type PluginTraceViewerCommands =
 	| 'exportCsv'
 	| 'exportJson'
 	| 'setTraceLevel'
+	| 'setAutoRefresh'
 	| 'loadRelatedTraces';
 
 /**
@@ -61,11 +65,12 @@ export class PluginTraceViewerPanelComposed {
 
 	private readonly coordinator: PanelCoordinator<PluginTraceViewerCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
-	private readonly toolbarSection: PluginTraceToolbarSection;
 	private readonly detailSection: PluginTraceDetailSection;
 	private currentEnvironmentId: string;
 	private traces: readonly PluginTrace[] = [];
 	private currentTraceLevel: TraceLevel | null = null;
+	private autoRefreshInterval: number = 0;
+	private autoRefreshTimer: NodeJS.Timeout | null = null;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -96,7 +101,6 @@ export class PluginTraceViewerPanelComposed {
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
-		this.toolbarSection = result.toolbarSection;
 		this.detailSection = result.detailSection;
 
 		this.registerCommandHandlers();
@@ -174,6 +178,10 @@ export class PluginTraceViewerPanelComposed {
 		const envId = targetEnvironmentId;
 		panel.onDidDispose(() => {
 			PluginTraceViewerPanelComposed.panels.delete(envId);
+			if (newPanel.autoRefreshTimer) {
+				clearInterval(newPanel.autoRefreshTimer);
+				newPanel.autoRefreshTimer = null;
+			}
 		});
 
 		return newPanel;
@@ -185,7 +193,11 @@ export class PluginTraceViewerPanelComposed {
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
-			tableData: []
+			tableData: [],
+			state: {
+				traceLevel: this.currentTraceLevel?.value,
+				autoRefreshInterval: this.autoRefreshInterval
+			}
 		});
 
 		await this.handleRefresh();
@@ -193,32 +205,41 @@ export class PluginTraceViewerPanelComposed {
 		await this.loadTraceLevel();
 
 		const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
+
+		// eslint-disable-next-line no-console
+		console.log('[Panel] initializeAndLoadData: Final refresh with state:', {
+			traceLevel: this.currentTraceLevel?.value,
+			autoRefreshInterval: this.autoRefreshInterval
+		});
+
 		await this.scaffoldingBehavior.refresh({
 			tableData: viewModels,
 			environments,
-			currentEnvironmentId: this.currentEnvironmentId
+			currentEnvironmentId: this.currentEnvironmentId,
+			state: {
+				traceLevel: this.currentTraceLevel?.value,
+				autoRefreshInterval: this.autoRefreshInterval
+			}
 		});
 	}
 
 	private createCoordinator(): {
 		coordinator: PanelCoordinator<PluginTraceViewerCommands>;
 		scaffoldingBehavior: HtmlScaffoldingBehavior;
-		toolbarSection: PluginTraceToolbarSection;
 		detailSection: PluginTraceDetailSection;
 	} {
 		const config = this.getTableConfig();
 
 		const environmentSelector = new EnvironmentSelectorSection();
-		const toolbarSection = new PluginTraceToolbarSection();
+		const exportDropdown = new ExportDropdownSection();
+		const deleteDropdown = new DeleteDropdownSection();
+		const traceLevelDropdown = new TraceLevelDropdownSection();
+		const autoRefreshDropdown = new AutoRefreshDropdownSection();
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
-				{ id: 'refresh', label: '🔄 Refresh' },
+				{ id: 'refresh', label: 'Refresh' },
 				{ id: 'openMaker', label: 'Open in Maker' },
-				{ id: 'deleteSelected', label: 'Delete Selected' },
-				{ id: 'deleteAll', label: 'Delete All' },
-				{ id: 'deleteOld', label: 'Delete Old (30 days)' },
-				{ id: 'exportCsv', label: 'Export CSV' },
-				{ id: 'exportJson', label: 'Export JSON' }
+				{ id: 'deleteSelected', label: 'Delete Selected' }
 			]
 		}, SectionPosition.Toolbar);
 
@@ -226,14 +247,23 @@ export class PluginTraceViewerPanelComposed {
 		const detailSection = new PluginTraceDetailSection();
 
 		const compositionBehavior = new SectionCompositionBehavior(
-			[actionButtons, environmentSelector, toolbarSection, tableSection, detailSection],
+			[
+				exportDropdown,
+				deleteDropdown,
+				traceLevelDropdown,
+				autoRefreshDropdown,
+				actionButtons,
+				environmentSelector,
+				tableSection,
+				detailSection
+			],
 			PanelLayout.SplitHorizontal
 		);
 
 		const cssUris = resolveCssModules(
 			{
 				base: true,
-				components: ['buttons', 'inputs', 'split-panel'],
+				components: ['buttons', 'inputs', 'split-panel', 'dropdown'],
 				sections: ['environment-selector', 'action-buttons', 'datatable']
 			},
 			this.extensionUri,
@@ -249,6 +279,9 @@ export class PluginTraceViewerPanelComposed {
 			jsUris: [
 				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'components', 'DropdownComponent.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
@@ -274,7 +307,7 @@ export class PluginTraceViewerPanelComposed {
 			logger: this.logger
 		});
 
-		return { coordinator, scaffoldingBehavior, toolbarSection, detailSection };
+		return { coordinator, scaffoldingBehavior, detailSection };
 	}
 
 	private registerCommandHandlers(): void {
@@ -323,23 +356,26 @@ export class PluginTraceViewerPanelComposed {
 		});
 
 		this.coordinator.registerHandler('exportCsv', async (data) => {
-			const traceIds = (data as { traceIds?: string[] })?.traceIds;
-			if (traceIds) {
-				await this.handleExport(traceIds, 'csv');
-			}
+			const traceIds = (data as { traceIds?: string[] })?.traceIds || this.traces.map(t => t.id);
+			await this.handleExport(traceIds, 'csv');
 		});
 
 		this.coordinator.registerHandler('exportJson', async (data) => {
-			const traceIds = (data as { traceIds?: string[] })?.traceIds;
-			if (traceIds) {
-				await this.handleExport(traceIds, 'json');
-			}
+			const traceIds = (data as { traceIds?: string[] })?.traceIds || this.traces.map(t => t.id);
+			await this.handleExport(traceIds, 'json');
 		});
 
 		this.coordinator.registerHandler('setTraceLevel', async (data) => {
 			const level = (data as { level?: string })?.level;
 			if (level) {
 				await this.handleSetTraceLevel(level);
+			}
+		});
+
+		this.coordinator.registerHandler('setAutoRefresh', async (data) => {
+			const interval = (data as { interval?: number })?.interval;
+			if (interval !== undefined) {
+				await this.handleSetAutoRefresh(interval);
 			}
 		});
 
@@ -397,7 +433,11 @@ export class PluginTraceViewerPanelComposed {
 			await this.scaffoldingBehavior.refresh({
 				tableData: viewModels,
 				environments,
-				currentEnvironmentId: this.currentEnvironmentId
+				currentEnvironmentId: this.currentEnvironmentId,
+				state: {
+					traceLevel: this.currentTraceLevel?.value,
+					autoRefreshInterval: this.autoRefreshInterval
+				}
 			});
 		} catch (error) {
 			this.logger.error('Failed to load plugin traces', error);
@@ -458,7 +498,11 @@ export class PluginTraceViewerPanelComposed {
 			await this.scaffoldingBehavior.refresh({
 				tableData: viewModels,
 				environments,
-				currentEnvironmentId: this.currentEnvironmentId
+				currentEnvironmentId: this.currentEnvironmentId,
+				state: {
+					traceLevel: this.currentTraceLevel?.value,
+					autoRefreshInterval: this.autoRefreshInterval
+				}
 			});
 
 			this.logger.info('Panel refreshed, showing detail panel');
@@ -569,7 +613,7 @@ export class PluginTraceViewerPanelComposed {
 			}
 
 			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-			const filename = `plugin-traces-${timestamp}`;
+			const filename = `plugin-traces-${timestamp}.${format}`;
 
 			if (format === 'csv') {
 				await this.exportTracesUseCase.exportToCsv(tracesToExport, filename);
@@ -579,6 +623,15 @@ export class PluginTraceViewerPanelComposed {
 
 			await vscode.window.showInformationMessage(`Exported ${tracesToExport.length} trace(s) as ${format.toUpperCase()}`);
 		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+
+			// User cancellation is not an error - just log and return
+			if (errorMessage.includes('cancelled by user')) {
+				this.logger.debug('Export cancelled by user');
+				return;
+			}
+
+			// Actual errors should be logged and shown
 			this.logger.error('Failed to export traces', error);
 			await vscode.window.showErrorMessage('Failed to export traces');
 		}
@@ -605,8 +658,6 @@ export class PluginTraceViewerPanelComposed {
 			await this.setTraceLevelUseCase.execute(this.currentEnvironmentId, level);
 			this.currentTraceLevel = level;
 
-			this.toolbarSection.setTraceLevel(TraceLevelFormatter.getDisplayName(level));
-
 			await vscode.window.showInformationMessage(`Trace level set to: ${TraceLevelFormatter.getDisplayName(level)}`);
 
 			const environments = await this.getEnvironments();
@@ -615,7 +666,11 @@ export class PluginTraceViewerPanelComposed {
 			await this.scaffoldingBehavior.refresh({
 				tableData: viewModels,
 				environments,
-				currentEnvironmentId: this.currentEnvironmentId
+				currentEnvironmentId: this.currentEnvironmentId,
+				state: {
+					traceLevel: this.currentTraceLevel?.value,
+					autoRefreshInterval: this.autoRefreshInterval
+				}
 			});
 		} catch (error) {
 			this.logger.error('Failed to set trace level', error);
@@ -648,11 +703,55 @@ export class PluginTraceViewerPanelComposed {
 			const level = await this.getTraceLevelUseCase.execute(this.currentEnvironmentId);
 			this.currentTraceLevel = level;
 
-			this.toolbarSection.setTraceLevel(TraceLevelFormatter.getDisplayName(level));
-
 			this.logger.debug('Trace level loaded', { level: level.value });
 		} catch (error) {
 			this.logger.error('Failed to load trace level', error);
+		}
+	}
+
+	private async handleSetAutoRefresh(interval: number): Promise<void> {
+		try {
+			this.logger.info('Setting auto-refresh interval', { interval });
+
+			this.autoRefreshInterval = interval;
+
+			// Clear existing timer
+			if (this.autoRefreshTimer) {
+				clearInterval(this.autoRefreshTimer);
+				this.autoRefreshTimer = null;
+			}
+
+			// Start new timer if interval > 0
+			if (interval > 0) {
+				this.autoRefreshTimer = setInterval(() => {
+					void this.handleRefresh();
+				}, interval * 1000);
+
+				this.logger.info('Auto-refresh enabled', { interval });
+				await vscode.window.showInformationMessage(
+					`Auto-refresh enabled: every ${interval} seconds`
+				);
+			} else {
+				this.logger.info('Auto-refresh disabled');
+				await vscode.window.showInformationMessage('Auto-refresh disabled');
+			}
+
+			// Refresh UI to update dropdown selection
+			const environments = await this.getEnvironments();
+			const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
+
+			await this.scaffoldingBehavior.refresh({
+				tableData: viewModels,
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				state: {
+					traceLevel: this.currentTraceLevel?.value,
+					autoRefreshInterval: this.autoRefreshInterval
+				}
+			});
+		} catch (error) {
+			this.logger.error('Failed to set auto-refresh', error);
+			await vscode.window.showErrorMessage('Failed to set auto-refresh');
 		}
 	}
 }
