@@ -1,124 +1,69 @@
 /**
  * Presentation layer panel for Plugin Trace Viewer.
- * Uses composition pattern with DataTablePanelCoordinator.
+ * Uses new PanelCoordinator architecture with split panel layout.
  *
  * NO business logic - delegates all operations to use cases.
- * Maps domain entities → ViewModels using injected mapper.
- *
- * Implements comprehensive security measures (OData injection prevention, XSS protection, payload validation).
  */
+
+/* eslint-disable max-lines -- Panel coordinator with 11 simple command handlers */
 
 import * as vscode from 'vscode';
 
-import { ILogger } from '../../../../infrastructure/logging/ILogger';
-import type { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
-import type { IDataLoader } from '../../../../shared/infrastructure/ui/behaviors/IDataLoader';
-import type { EnvironmentOption, DataTableConfig } from '../../../../shared/infrastructure/ui/DataTablePanel';
-import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
-import { PanelTrackingBehavior } from '../../../../shared/infrastructure/ui/behaviors/PanelTrackingBehavior';
-import { HtmlRenderingBehavior, type HtmlCustomization } from '../../../../shared/infrastructure/ui/behaviors/HtmlRenderingBehavior';
-import { DataBehavior } from '../../../../shared/infrastructure/ui/behaviors/DataBehavior';
-import { EnvironmentBehavior } from '../../../../shared/infrastructure/ui/behaviors/EnvironmentBehavior';
-import { SolutionFilterBehavior } from '../../../../shared/infrastructure/ui/behaviors/SolutionFilterBehavior';
-import { MessageRoutingBehavior } from '../../../../shared/infrastructure/ui/behaviors/MessageRoutingBehavior';
-import { DataTableBehaviorRegistry } from '../../../../shared/infrastructure/ui/behaviors/DataTableBehaviorRegistry';
-import { DataTablePanelCoordinator, type CoordinatorDependencies } from '../../../../shared/infrastructure/ui/coordinators/DataTablePanelCoordinator';
-import { GetPluginTracesUseCase } from '../../application/useCases/GetPluginTracesUseCase';
-import { DeleteTracesUseCase } from '../../application/useCases/DeleteTracesUseCase';
-import { ExportTracesUseCase } from '../../application/useCases/ExportTracesUseCase';
-import { GetTraceLevelUseCase } from '../../application/useCases/GetTraceLevelUseCase';
-import { SetTraceLevelUseCase } from '../../application/useCases/SetTraceLevelUseCase';
-import { PluginTraceViewModelMapper } from '../mappers/PluginTraceViewModelMapper';
-import { PluginTracesDataLoader } from '../dataLoaders/PluginTracesDataLoader';
+import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { DataTableConfig, EnvironmentOption } from '../../../../shared/infrastructure/ui/DataTablePanel';
+import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
+import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
+import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
+import { DataTableSection } from '../../../../shared/infrastructure/ui/sections/DataTableSection';
+import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
+import { EnvironmentSelectorSection } from '../../../../shared/infrastructure/ui/sections/EnvironmentSelectorSection';
+import { PanelLayout } from '../../../../shared/infrastructure/ui/types/PanelLayout';
+import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
+import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
+import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
+import type { GetPluginTracesUseCase } from '../../application/useCases/GetPluginTracesUseCase';
+import type { DeleteTracesUseCase } from '../../application/useCases/DeleteTracesUseCase';
+import type { ExportTracesUseCase } from '../../application/useCases/ExportTracesUseCase';
+import type { GetTraceLevelUseCase } from '../../application/useCases/GetTraceLevelUseCase';
+import type { SetTraceLevelUseCase } from '../../application/useCases/SetTraceLevelUseCase';
+import type { PluginTraceViewModelMapper } from '../mappers/PluginTraceViewModelMapper';
 import { TraceLevelFormatter } from '../utils/TraceLevelFormatter';
 import type { PluginTrace } from '../../domain/entities/PluginTrace';
 import type { ExportFormat } from '../../domain/types/ExportFormat';
 import { TraceLevel, TraceFilter } from '../../application/types';
+import { PluginTraceToolbarSection } from '../sections/PluginTraceToolbarSection';
+import { PluginTraceDetailSection } from '../sections/PluginTraceDetailSection';
 
 /**
- * Type guards for webview messages
+ * Commands supported by Plugin Trace Viewer panel.
  */
-interface WebviewMessage {
-	command: string;
-	data?: unknown;
-}
-
-interface ViewDetailMessage extends WebviewMessage {
-	command: 'viewDetail';
-	data: { traceId: string };
-}
-
-interface DeleteSelectedMessage extends WebviewMessage {
-	command: 'deleteSelected';
-	data: { traceIds: readonly string[] };
-}
-
-interface DeleteOldMessage extends WebviewMessage {
-	command: 'deleteOld';
-	data: { olderThanDays: number };
-}
-
-interface ExportMessage extends WebviewMessage {
-	command: 'export';
-	data: { traceIds: readonly string[]; format: ExportFormat };
-}
-
-interface SetTraceLevelMessage extends WebviewMessage {
-	command: 'setTraceLevel';
-	data: { level: string };
-}
-
-function isViewDetailMessage(message: WebviewMessage): message is ViewDetailMessage {
-	return message.command === 'viewDetail' &&
-		typeof message.data === 'object' &&
-		message.data !== null &&
-		'traceId' in message.data &&
-		typeof (message.data as {traceId: unknown}).traceId === 'string';
-}
-
-function isDeleteSelectedMessage(message: WebviewMessage): message is DeleteSelectedMessage {
-	return message.command === 'deleteSelected' &&
-		typeof message.data === 'object' &&
-		message.data !== null &&
-		'traceIds' in message.data &&
-		Array.isArray((message.data as {traceIds: unknown}).traceIds);
-}
-
-function isDeleteOldMessage(message: WebviewMessage): message is DeleteOldMessage {
-	return message.command === 'deleteOld' &&
-		typeof message.data === 'object' &&
-		message.data !== null &&
-		'olderThanDays' in message.data &&
-		typeof (message.data as {olderThanDays: unknown}).olderThanDays === 'number';
-}
-
-function isExportMessage(message: WebviewMessage): message is ExportMessage {
-	return message.command === 'export' &&
-		typeof message.data === 'object' &&
-		message.data !== null &&
-		'traceIds' in message.data &&
-		'format' in message.data &&
-		Array.isArray((message.data as {traceIds: unknown}).traceIds);
-}
-
-function isSetTraceLevelMessage(message: WebviewMessage): message is SetTraceLevelMessage {
-	return message.command === 'setTraceLevel' &&
-		typeof message.data === 'object' &&
-		message.data !== null &&
-		'level' in message.data &&
-		typeof (message.data as {level: unknown}).level === 'string';
-}
+type PluginTraceViewerCommands =
+	| 'refresh'
+	| 'openMaker'
+	| 'environmentChange'
+	| 'viewDetail'
+	| 'closeDetail'
+	| 'deleteSelected'
+	| 'deleteAll'
+	| 'deleteOld'
+	| 'exportCsv'
+	| 'exportJson'
+	| 'setTraceLevel'
+	| 'loadRelatedTraces';
 
 /**
- * Presentation layer panel for Plugin Trace Viewer.
- * Uses composition pattern with specialized behaviors instead of inheritance.
+ * Plugin Trace Viewer panel using new PanelCoordinator architecture.
+ * Features split panel layout with trace list and detail view.
  */
 export class PluginTraceViewerPanelComposed {
 	public static readonly viewType = 'powerPlatformDevSuite.pluginTraceViewer';
 	private static panels = new Map<string, PluginTraceViewerPanelComposed>();
 
-	private readonly coordinator: DataTablePanelCoordinator;
-	private readonly registry: DataTableBehaviorRegistry;
+	private readonly coordinator: PanelCoordinator<PluginTraceViewerCommands>;
+	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private readonly toolbarSection: PluginTraceToolbarSection;
+	private readonly detailSection: PluginTraceDetailSection;
+	private currentEnvironmentId: string;
 	private traces: readonly PluginTrace[] = [];
 	private currentTraceLevel: TraceLevel | null = null;
 
@@ -138,22 +83,25 @@ export class PluginTraceViewerPanelComposed {
 		private readonly setTraceLevelUseCase: SetTraceLevelUseCase,
 		private readonly viewModelMapper: PluginTraceViewModelMapper,
 		private readonly logger: ILogger,
-		environmentId: string,
-		private readonly panelStateRepository: IPanelStateRepository | undefined
+		environmentId: string
 	) {
-		logger.debug('PluginTraceViewerPanel: Initialized');
+		this.currentEnvironmentId = environmentId;
+		logger.debug('PluginTraceViewerPanel: Initialized with new architecture');
 
 		panel.webview.options = {
 			enableScripts: true,
 			localResourceRoots: [extensionUri]
 		};
 
-		this.registry = this.createBehaviorRegistry(environmentId);
-		this.coordinator = this.createCoordinator();
-		this.registerPanelCommands();
+		const result = this.createCoordinator();
+		this.coordinator = result.coordinator;
+		this.scaffoldingBehavior = result.scaffoldingBehavior;
+		this.toolbarSection = result.toolbarSection;
+		this.detailSection = result.detailSection;
 
-		void this.coordinator.initialize();
-		void this.loadTraceLevel();
+		this.registerCommandHandlers();
+
+		void this.initializeAndLoadData();
 	}
 
 	public static async createOrShow(
@@ -172,11 +120,10 @@ export class PluginTraceViewerPanelComposed {
 		viewModelMapper: PluginTraceViewModelMapper,
 		logger: ILogger,
 		initialEnvironmentId?: string,
-		panelStateRepository?: IPanelStateRepository
+		_panelStateRepository?: unknown
 	): Promise<PluginTraceViewerPanelComposed> {
 		const column = vscode.ViewColumn.One;
 
-		// Get target environment
 		let targetEnvironmentId = initialEnvironmentId;
 		if (!targetEnvironmentId) {
 			const environments = await getEnvironments();
@@ -187,18 +134,15 @@ export class PluginTraceViewerPanelComposed {
 			throw new Error('No environments available');
 		}
 
-		// Reuse existing panel if open for this environment
 		const existingPanel = PluginTraceViewerPanelComposed.panels.get(targetEnvironmentId);
 		if (existingPanel) {
 			existingPanel.panel.reveal(column);
 			return existingPanel;
 		}
 
-		// Get environment name for title
 		const environment = await getEnvironmentById(targetEnvironmentId);
 		const environmentName = environment?.name || 'Unknown';
 
-		// Create new panel
 		const panel = vscode.window.createWebviewPanel(
 			PluginTraceViewerPanelComposed.viewType,
 			`Plugin Trace Viewer - ${environmentName}`,
@@ -222,180 +166,248 @@ export class PluginTraceViewerPanelComposed {
 			setTraceLevelUseCase,
 			viewModelMapper,
 			logger,
-			targetEnvironmentId,
-			panelStateRepository
+			targetEnvironmentId
 		);
 
 		PluginTraceViewerPanelComposed.panels.set(targetEnvironmentId, newPanel);
 
+		const envId = targetEnvironmentId;
+		panel.onDidDispose(() => {
+			PluginTraceViewerPanelComposed.panels.delete(envId);
+		});
+
 		return newPanel;
 	}
 
-	private createBehaviorRegistry(environmentId: string): DataTableBehaviorRegistry {
-		const config = this.getConfig();
-		const customization = this.getCustomization();
+	private async initializeAndLoadData(): Promise<void> {
+		const environments = await this.getEnvironments();
 
-		const panelTrackingBehavior = new PanelTrackingBehavior(
-			PluginTraceViewerPanelComposed.panels
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			tableData: []
+		});
+
+		await this.handleRefresh();
+
+		await this.loadTraceLevel();
+
+		const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
+		await this.scaffoldingBehavior.refresh({
+			tableData: viewModels,
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId
+		});
+	}
+
+	private createCoordinator(): {
+		coordinator: PanelCoordinator<PluginTraceViewerCommands>;
+		scaffoldingBehavior: HtmlScaffoldingBehavior;
+		toolbarSection: PluginTraceToolbarSection;
+		detailSection: PluginTraceDetailSection;
+	} {
+		const config = this.getTableConfig();
+
+		const environmentSelector = new EnvironmentSelectorSection();
+		const toolbarSection = new PluginTraceToolbarSection();
+		const actionButtons = new ActionButtonsSection({
+			buttons: [
+				{ id: 'refresh', label: '🔄 Refresh' },
+				{ id: 'openMaker', label: 'Open in Maker' },
+				{ id: 'deleteSelected', label: 'Delete Selected' },
+				{ id: 'deleteAll', label: 'Delete All' },
+				{ id: 'deleteOld', label: 'Delete Old (30 days)' },
+				{ id: 'exportCsv', label: 'Export CSV' },
+				{ id: 'exportJson', label: 'Export JSON' }
+			]
+		}, SectionPosition.Toolbar);
+
+		const tableSection = new DataTableSection(config);
+		const detailSection = new PluginTraceDetailSection();
+
+		const compositionBehavior = new SectionCompositionBehavior(
+			[actionButtons, environmentSelector, toolbarSection, tableSection, detailSection],
+			PanelLayout.SplitHorizontal
 		);
 
-		const htmlRenderingBehavior = new HtmlRenderingBehavior(
-			this.panel.webview,
-			this.extensionUri,
-			config,
-			customization
-		);
-
-		const messageRoutingBehavior = new MessageRoutingBehavior(
-			this.panel.webview,
-			this.logger
-		);
-
-		const environmentBehavior = new EnvironmentBehavior(
-			this.panel.webview,
-			this.getEnvironments,
-			this.getEnvironmentById,
-			async () => {
-				// Coordinator handles reload, but also reload trace level
-				await this.loadTraceLevel();
+		const cssUris = resolveCssModules(
+			{
+				base: true,
+				components: ['buttons', 'inputs', 'split-panel'],
+				sections: ['environment-selector', 'action-buttons', 'datatable']
 			},
-			this.logger,
-			environmentId
+			this.extensionUri,
+			this.panel.webview
 		);
 
-		// Solution filter disabled (not needed for traces)
-		const solutionFilterBehavior = new SolutionFilterBehavior(
-			this.panel.webview,
-			'pluginTraceViewer',
-			environmentBehavior,
-			async () => [],
-			this.panelStateRepository,
-			async () => { /* Coordinator handles reload */ },
-			this.logger,
-			false  // Disabled
-		);
+		const featureCssUri = this.panel.webview.asWebviewUri(
+			vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'plugin-trace-viewer.css')
+		).toString();
 
-		// Custom data loader - wraps to capture traces
-		const baseDataLoader = new PluginTracesDataLoader(
-			() => environmentBehavior.getCurrentEnvironmentId(),
-			this.getPluginTracesUseCase,
-			this.viewModelMapper,
-			this.logger
-		);
-
-		// Wrap data loader to capture traces
-		const wrappedDataLoader: IDataLoader = {
-			load: async (cancellationToken: ICancellationToken): Promise<Record<string, unknown>[]> => {
-				// Load traces via use case (capture domain entities)
-				const envId = environmentBehavior.getCurrentEnvironmentId();
-				if (!envId) {
-					this.traces = [];
-					return [];
-				}
-
-				const filter = TraceFilter.create({
-					top: 100,
-					orderBy: 'createdon desc',
-					odataFilter: ''
-				});
-				const traces = await this.getPluginTracesUseCase.execute(envId, filter);
-				this.traces = traces;
-
-				// Use base data loader for transformation
-				return baseDataLoader.load(cancellationToken);
-			}
+		const scaffoldingConfig: HtmlScaffoldingConfig = {
+			cssUris: [...cssUris, featureCssUri],
+			jsUris: [
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'PluginTraceViewerBehavior.js')
+				).toString()
+			],
+			cspNonce: getNonce(),
+			title: 'Plugin Trace Viewer'
 		};
 
-		const dataBehavior = new DataBehavior(
+		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
 			this.panel.webview,
-			config,
-			wrappedDataLoader,
-			this.logger
+			compositionBehavior,
+			scaffoldingConfig
 		);
 
-		return new DataTableBehaviorRegistry(
-			environmentBehavior,
-			solutionFilterBehavior,
-			dataBehavior,
-			messageRoutingBehavior,
-			htmlRenderingBehavior,
-			panelTrackingBehavior
-		);
-	}
-
-	private createCoordinator(): DataTablePanelCoordinator {
-		const dependencies: CoordinatorDependencies = {
+		const coordinator = new PanelCoordinator<PluginTraceViewerCommands>({
 			panel: this.panel,
-			getEnvironmentById: this.getEnvironmentById,
+			extensionUri: this.extensionUri,
+			behaviors: [scaffoldingBehavior],
 			logger: this.logger
-		};
+		});
 
-		return new DataTablePanelCoordinator(this.registry, dependencies);
+		return { coordinator, scaffoldingBehavior, toolbarSection, detailSection };
 	}
 
-	private registerPanelCommands(): void {
-		// Open in Maker
-		this.registry.messageRoutingBehavior.registerHandler('openMaker', async () => {
+	private registerCommandHandlers(): void {
+		this.coordinator.registerHandler('refresh', async () => {
+			await this.handleRefresh();
+		});
+
+		this.coordinator.registerHandler('openMaker', async () => {
 			await this.handleOpenMaker();
 		});
 
-		// View trace detail
-		this.registry.messageRoutingBehavior.registerHandler('viewDetail', async (message) => {
-			if (isViewDetailMessage(message)) {
-				await this.handleViewDetail(message.data.traceId);
+		this.coordinator.registerHandler('environmentChange', async (data) => {
+			const environmentId = (data as { environmentId?: string })?.environmentId;
+			if (environmentId) {
+				await this.handleEnvironmentChange(environmentId);
 			}
 		});
 
-		// Delete selected traces
-		this.registry.messageRoutingBehavior.registerHandler('deleteSelected', async (message) => {
-			if (isDeleteSelectedMessage(message)) {
-				await this.handleDeleteSelected(message.data.traceIds);
+		this.coordinator.registerHandler('viewDetail', async (data) => {
+			this.logger.info('viewDetail command received', { data });
+			const traceId = (data as { traceId?: string })?.traceId;
+			if (traceId) {
+				await this.handleViewDetail(traceId);
+			} else {
+				this.logger.warn('viewDetail called but no traceId in data', { data });
 			}
 		});
 
-		// Delete all traces
-		this.registry.messageRoutingBehavior.registerHandler('deleteAll', async () => {
+		this.coordinator.registerHandler('closeDetail', async () => {
+			await this.handleCloseDetail();
+		});
+
+		this.coordinator.registerHandler('deleteSelected', async (data) => {
+			const traceIds = (data as { traceIds?: string[] })?.traceIds;
+			if (traceIds) {
+				await this.handleDeleteSelected(traceIds);
+			}
+		});
+
+		this.coordinator.registerHandler('deleteAll', async () => {
 			await this.handleDeleteAll();
 		});
 
-		// Delete old traces
-		this.registry.messageRoutingBehavior.registerHandler('deleteOld', async (message) => {
-			if (isDeleteOldMessage(message)) {
-				await this.handleDeleteOld(message.data.olderThanDays);
+		this.coordinator.registerHandler('deleteOld', async () => {
+			await this.handleDeleteOld(30);
+		});
+
+		this.coordinator.registerHandler('exportCsv', async (data) => {
+			const traceIds = (data as { traceIds?: string[] })?.traceIds;
+			if (traceIds) {
+				await this.handleExport(traceIds, 'csv');
 			}
 		});
 
-		// Export traces
-		this.registry.messageRoutingBehavior.registerHandler('export', async (message) => {
-			if (isExportMessage(message)) {
-				await this.handleExport(message.data.traceIds, message.data.format);
+		this.coordinator.registerHandler('exportJson', async (data) => {
+			const traceIds = (data as { traceIds?: string[] })?.traceIds;
+			if (traceIds) {
+				await this.handleExport(traceIds, 'json');
 			}
 		});
 
-		// Get trace level
-		this.registry.messageRoutingBehavior.registerHandler('getTraceLevel', async () => {
-			await this.loadTraceLevel();
+		this.coordinator.registerHandler('setTraceLevel', async (data) => {
+			const level = (data as { level?: string })?.level;
+			if (level) {
+				await this.handleSetTraceLevel(level);
+			}
 		});
 
-		// Set trace level
-		this.registry.messageRoutingBehavior.registerHandler('setTraceLevel', async (message) => {
-			if (isSetTraceLevelMessage(message)) {
-				await this.handleSetTraceLevel(message.data.level);
+		this.coordinator.registerHandler('loadRelatedTraces', async (data) => {
+			const correlationId = (data as { correlationId?: string })?.correlationId;
+			if (correlationId) {
+				await this.handleLoadRelatedTraces(correlationId);
 			}
 		});
 	}
 
-	/**
-	 * Opens the current environment in Power Platform Maker portal.
-	 */
-	private async handleOpenMaker(): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
-			return;
-		}
+	private getTableConfig(): DataTableConfig {
+		return {
+			viewType: PluginTraceViewerPanelComposed.viewType,
+			title: 'Plugin Traces',
+			dataCommand: 'tracesData',
+			defaultSortColumn: 'createdOn',
+			defaultSortDirection: 'desc',
+			columns: [
+				{ key: 'status', label: 'Status' },
+				{ key: 'createdOn', label: 'Started' },
+				{ key: 'duration', label: 'Duration' },
+				{ key: 'operationType', label: 'Operation' },
+				{ key: 'entityName', label: 'Entity' },
+				{ key: 'messageName', label: 'Message' },
+				{ key: 'pluginName', label: 'Plugin' },
+				{ key: 'depth', label: 'Depth' },
+				{ key: 'mode', label: 'Mode' }
+			],
+			searchPlaceholder: '🔍 Search plugin traces...',
+			noDataMessage: 'No plugin traces found. Adjust your trace level to start logging.',
+			toolbarButtons: []
+		};
+	}
+
+	private async handleRefresh(): Promise<void> {
+		this.logger.debug('Refreshing plugin traces');
 
 		try {
-			const environment = await this.getEnvironmentById(envId);
+			const filter = TraceFilter.create({
+				top: 100,
+				orderBy: 'createdon desc',
+				odataFilter: ''
+			});
+
+			const traces = await this.getPluginTracesUseCase.execute(this.currentEnvironmentId, filter);
+			this.traces = traces;
+
+			const viewModels = traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
+
+			const environments = await this.getEnvironments();
+
+			this.logger.info('Plugin traces loaded successfully', { count: viewModels.length });
+
+			await this.scaffoldingBehavior.refresh({
+				tableData: viewModels,
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId
+			});
+		} catch (error) {
+			this.logger.error('Failed to load plugin traces', error);
+			await vscode.window.showErrorMessage('Failed to load plugin traces');
+		}
+	}
+
+	private async handleOpenMaker(): Promise<void> {
+		try {
+			const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 			if (environment?.powerPlatformEnvironmentId) {
 				const makerUrl = `https://make.powerapps.com/environments/${environment.powerPlatformEnvironmentId}/home`;
 				await vscode.env.openExternal(vscode.Uri.parse(makerUrl));
@@ -408,276 +420,100 @@ export class PluginTraceViewerPanelComposed {
 		}
 	}
 
-	private getConfig(): DataTableConfig {
-		return {
-			viewType: PluginTraceViewerPanelComposed.viewType,
-			title: 'Plugin Trace Viewer',
-			dataCommand: 'tracesData',
-			defaultSortColumn: 'createdOn',
-			defaultSortDirection: 'desc',
-			columns: [
-				{ key: 'status', label: 'Status' },
-				{ key: 'createdOn', label: 'Created On' },
-				{ key: 'pluginName', label: 'Plugin Name' },
-				{ key: 'entity', label: 'Entity' },
-				{ key: 'message', label: 'Message' },
-				{ key: 'mode', label: 'Mode' },
-				{ key: 'duration', label: 'Duration (ms)' },
-				{ key: 'depth', label: 'Depth' }
-			],
-			searchPlaceholder: '🔍 Search plugin traces...',
-			noDataMessage: 'No plugin traces found. Adjust your trace level to start logging.',
-			enableSolutionFilter: false,
-			toolbarButtons: [
-				{ id: 'refreshBtn', label: '🔄 Refresh', command: 'refresh', position: 'left' },
-				{ id: 'openMakerBtn', label: 'Open in Maker', command: 'openMaker', position: 'left' },
-				{ id: 'deleteSelectedBtn', label: 'Delete Selected', command: 'deleteSelected', position: 'right' },
-				{ id: 'deleteAllBtn', label: 'Delete All', command: 'deleteAll', position: 'right' },
-				{ id: 'deleteOldBtn', label: 'Delete Old (30 days)', command: 'deleteOld', position: 'right' },
-				{ id: 'exportCsvBtn', label: 'Export CSV', command: 'export', position: 'right' },
-				{ id: 'exportJsonBtn', label: 'Export JSON', command: 'export', position: 'right' }
-			]
-		};
-	}
+	private async handleEnvironmentChange(environmentId: string): Promise<void> {
+		this.logger.debug('Environment changed', { environmentId });
+		this.currentEnvironmentId = environmentId;
 
-	private getCustomization(): HtmlCustomization {
-		return {
-			customCss: this.getCustomCss(),
-			filterLogic: this.getFilterLogic(),
-			customJavaScript: this.getCustomJavaScript()
-		};
-	}
-
-	private getCustomCss(): string {
-		return `
-			/* Trace level section */
-			.trace-level-section {
-				padding: 12px 16px;
-				background: var(--vscode-editor-background);
-				border-bottom: 1px solid var(--vscode-panel-border);
-				display: flex;
-				justify-content: space-between;
-				align-items: center;
-				margin-bottom: 16px;
-			}
-			.trace-level-label {
-				font-size: 13px;
-				color: var(--vscode-foreground);
-			}
-			.trace-level-value {
-				font-weight: 600;
-				color: var(--vscode-textLink-foreground);
-			}
-			.trace-level-btn {
-				padding: 6px 12px;
-				font-size: 12px;
-			}
-
-			/* Status colors in table */
-			.status-success {
-				color: var(--vscode-testing-iconPassed);
-				font-weight: 600;
-			}
-			.status-exception {
-				color: var(--vscode-testing-iconFailed);
-				font-weight: 600;
-			}
-		`;
-	}
-
-	private getFilterLogic(): string {
-		return `
-			// Trace-specific filtering
-			filtered = allData.filter(row => {
-				const searchLower = query.toLowerCase();
-				const matchesSearch = (
-					(row.pluginName || '').toLowerCase().includes(searchLower) ||
-					(row.entity || '').toLowerCase().includes(searchLower) ||
-					(row.message || '').toLowerCase().includes(searchLower) ||
-					(row.status || '').toLowerCase().includes(searchLower)
-				);
-				return matchesSearch;
-			});
-		`;
-	}
-
-	private getCustomJavaScript(): string {
-		return `
-			// Wait for DOM to be ready
-			function initializeTraceViewer() {
-				// Trace level section initialization
-				const tableContainer = document.querySelector('.data-table-container');
-				if (tableContainer && !document.getElementById('traceLevelSection')) {
-					const traceLevelSection = document.createElement('div');
-					traceLevelSection.id = 'traceLevelSection';
-					traceLevelSection.className = 'trace-level-section';
-
-					const labelDiv = document.createElement('div');
-					const labelSpan = document.createElement('span');
-					labelSpan.className = 'trace-level-label';
-					labelSpan.textContent = 'Current Trace Level: ';
-					const valueSpan = document.createElement('span');
-					valueSpan.className = 'trace-level-value';
-					valueSpan.id = 'currentTraceLevel';
-					valueSpan.textContent = 'Loading...';
-					labelDiv.appendChild(labelSpan);
-					labelDiv.appendChild(valueSpan);
-
-					const changeBtn = document.createElement('button');
-					changeBtn.className = 'trace-level-btn';
-					changeBtn.id = 'changeLevelBtn';
-					changeBtn.textContent = 'Change Level';
-
-					traceLevelSection.appendChild(labelDiv);
-					traceLevelSection.appendChild(changeBtn);
-					tableContainer.parentNode.insertBefore(traceLevelSection, tableContainer);
-
-					// Change level button handler
-					document.getElementById('changeLevelBtn').addEventListener('click', () => {
-						const levels = ['Off', 'Exception', 'All'];
-						const currentLevel = document.getElementById('currentTraceLevel').textContent;
-						const currentIndex = levels.indexOf(currentLevel);
-						const nextIndex = (currentIndex + 1) % levels.length;
-						const nextLevel = levels[nextIndex];
-
-						vscode.postMessage({
-							command: 'setTraceLevel',
-							data: { level: nextLevel }
-						});
-					});
-				}
-
-				// Apply status styling to table cells
-				const statusCells = document.querySelectorAll('td[data-column="status"]');
-				statusCells.forEach(cell => {
-					const status = cell.textContent.trim().toLowerCase();
-					if (status.includes('success') || status === 'success') {
-						cell.classList.add('status-success');
-					} else if (status.includes('exception') || status === 'exception') {
-						cell.classList.add('status-exception');
-					}
-				});
-			}
-
-			// Initialize on DOM ready
-			if (document.readyState === 'loading') {
-				document.addEventListener('DOMContentLoaded', initializeTraceViewer);
-			} else {
-				initializeTraceViewer();
-			}
-
-			// Re-apply styling when table data changes
-			const observer = new MutationObserver(() => {
-				initializeTraceViewer();
-			});
-
-			// Start observing once body exists
-			if (document.body) {
-				observer.observe(document.body, { childList: true, subtree: true });
-			}
-
-			// Listen for trace level updates
-			window.addEventListener('message', (event) => {
-				const message = event.data;
-				if (message.command === 'traceLevelLoaded' && message.data) {
-					const levelElement = document.getElementById('currentTraceLevel');
-					if (levelElement) {
-						levelElement.textContent = message.data.level;
-					}
-				}
-			});
-		`;
-	}
-
-	/**
-	 * Loads and displays current trace level.
-	 */
-	private async loadTraceLevel(): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
-			return;
+		const environment = await this.getEnvironmentById(environmentId);
+		if (environment) {
+			this.panel.title = `Plugin Trace Viewer - ${environment.name}`;
 		}
 
-		try {
-			this.logger.debug('Loading trace level', { envId });
-
-			const level = await this.getTraceLevelUseCase.execute(envId);
-			this.currentTraceLevel = level;
-
-			await this.panel.webview.postMessage({
-				command: 'traceLevelLoaded',
-				data: { level: TraceLevelFormatter.getDisplayName(level) }
-			});
-
-			this.logger.debug('Trace level loaded', { envId, level: level.value });
-		} catch (error) {
-			this.logger.error('Failed to load trace level', error);
-		}
+		await this.loadTraceLevel();
+		await this.handleRefresh();
 	}
 
-	/**
-	 * Views trace detail (currently shows in VS Code info message).
-	 * TODO: Implement detail panel in future enhancement.
-	 */
 	private async handleViewDetail(traceId: string): Promise<void> {
 		try {
-			this.logger.debug('Viewing trace detail', { traceId });
+			this.logger.info('handleViewDetail called', { traceId, tracesCount: this.traces.length });
 
-			// Find trace in cached array
 			const trace = this.traces.find(t => t.id === traceId);
 			if (!trace) {
+				this.logger.warn('Trace not found', { traceId, availableIds: this.traces.map(t => t.id) });
 				await vscode.window.showWarningMessage('Trace not found');
 				return;
 			}
 
-			// Map to detail ViewModel
+			this.logger.info('Found trace, mapping to detail view', { traceId });
+
 			const detailViewModel = this.viewModelMapper.toDetailViewModel(trace);
 
-			// TODO: Send to detail panel (future enhancement)
-			// For now, show basic info
-			await vscode.window.showInformationMessage(
-				`Trace: ${detailViewModel.pluginName} - ${detailViewModel.status}`
-			);
+			this.detailSection.setTrace(detailViewModel);
+
+			this.logger.info('Detail section updated, refreshing panel');
+
+			const environments = await this.getEnvironments();
+			const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
+
+			await this.scaffoldingBehavior.refresh({
+				tableData: viewModels,
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId
+			});
+
+			this.logger.info('Panel refreshed, showing detail panel');
+
+			await this.panel.webview.postMessage({
+				command: 'showDetailPanel'
+			});
+
+			// Re-apply row selection after refresh (which wipes DOM state)
+			await this.panel.webview.postMessage({
+				command: 'selectRow',
+				traceId: traceId
+			});
+
+			this.logger.info('showDetailPanel and selectRow messages sent to webview');
 		} catch (error) {
 			this.logger.error('Failed to view trace detail', error);
 			await vscode.window.showErrorMessage('Failed to load trace detail');
 		}
 	}
 
-	/**
-	 * Deletes selected traces.
-	 */
-	private async handleDeleteSelected(traceIds: readonly string[]): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
-			return;
-		}
+	private async handleCloseDetail(): Promise<void> {
+		this.logger.debug('Closing trace detail');
 
+		this.detailSection.setTrace(null);
+
+		const environments = await this.getEnvironments();
+		const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
+
+		await this.scaffoldingBehavior.refresh({
+			tableData: viewModels,
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId
+		});
+
+		await this.panel.webview.postMessage({
+			command: 'hideDetailPanel'
+		});
+	}
+
+	private async handleDeleteSelected(traceIds: string[]): Promise<void> {
 		try {
-			this.logger.info('Deleting selected traces', { envId, count: traceIds.length });
+			this.logger.info('Deleting selected traces', { count: traceIds.length });
 
-			const deletedCount = await this.deleteTracesUseCase.deleteMultiple(envId, traceIds);
+			const deletedCount = await this.deleteTracesUseCase.deleteMultiple(this.currentEnvironmentId, traceIds);
 
 			await vscode.window.showInformationMessage(`Deleted ${deletedCount} trace(s)`);
-
-			// Refresh table
-			await this.registry.dataBehavior.loadData();
+			await this.handleRefresh();
 		} catch (error) {
 			this.logger.error('Failed to delete traces', error);
 			await vscode.window.showErrorMessage('Failed to delete traces');
 		}
 	}
 
-	/**
-	 * Deletes all traces with confirmation.
-	 */
 	private async handleDeleteAll(): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
-			return;
-		}
-
-		// User confirmation
 		const confirmed = await vscode.window.showWarningMessage(
 			'Delete ALL plugin traces? This cannot be undone.',
 			{ modal: true },
@@ -686,38 +522,27 @@ export class PluginTraceViewerPanelComposed {
 		);
 
 		if (confirmed !== 'Delete All') {
-			this.logger.debug('User cancelled delete all');
 			return;
 		}
 
 		try {
-			this.logger.info('Deleting all traces', { envId });
+			this.logger.info('Deleting all traces');
 
-			const deletedCount = await this.deleteTracesUseCase.deleteAll(envId);
+			const deletedCount = await this.deleteTracesUseCase.deleteAll(this.currentEnvironmentId);
 
 			await vscode.window.showInformationMessage(`Deleted ${deletedCount} trace(s)`);
-
-			// Refresh table
-			await this.registry.dataBehavior.loadData();
+			await this.handleRefresh();
 		} catch (error) {
 			this.logger.error('Failed to delete all traces', error);
 			await vscode.window.showErrorMessage('Failed to delete all traces');
 		}
 	}
 
-	/**
-	 * Deletes traces older than specified days.
-	 */
 	private async handleDeleteOld(olderThanDays: number): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
-			return;
-		}
-
 		try {
-			this.logger.info('Deleting old traces', { envId, olderThanDays });
+			this.logger.info('Deleting old traces', { olderThanDays });
 
-			const deletedCount = await this.deleteTracesUseCase.deleteOldTraces(envId, olderThanDays);
+			const deletedCount = await this.deleteTracesUseCase.deleteOldTraces(this.currentEnvironmentId, olderThanDays);
 
 			if (deletedCount === 0) {
 				await vscode.window.showInformationMessage(`No traces found older than ${olderThanDays} days`);
@@ -725,22 +550,17 @@ export class PluginTraceViewerPanelComposed {
 				await vscode.window.showInformationMessage(`Deleted ${deletedCount} trace(s) older than ${olderThanDays} days`);
 			}
 
-			// Refresh table
-			await this.registry.dataBehavior.loadData();
+			await this.handleRefresh();
 		} catch (error) {
 			this.logger.error('Failed to delete old traces', error);
 			await vscode.window.showErrorMessage('Failed to delete old traces');
 		}
 	}
 
-	/**
-	 * Exports traces to file.
-	 */
-	private async handleExport(traceIds: readonly string[], format: ExportFormat): Promise<void> {
+	private async handleExport(traceIds: string[], format: ExportFormat): Promise<void> {
 		try {
 			this.logger.info('Exporting traces', { count: traceIds.length, format });
 
-			// Filter traces by IDs
 			const tracesToExport = this.traces.filter(t => traceIds.includes(t.id));
 
 			if (tracesToExport.length === 0) {
@@ -755,8 +575,6 @@ export class PluginTraceViewerPanelComposed {
 				await this.exportTracesUseCase.exportToCsv(tracesToExport, filename);
 			} else if (format === 'json') {
 				await this.exportTracesUseCase.exportToJson(tracesToExport, filename);
-			} else {
-				throw new Error(`Unsupported export format: ${format}`);
 			}
 
 			await vscode.window.showInformationMessage(`Exported ${tracesToExport.length} trace(s) as ${format.toUpperCase()}`);
@@ -766,20 +584,10 @@ export class PluginTraceViewerPanelComposed {
 		}
 	}
 
-	/**
-	 * Sets trace level with performance warning for "All" level.
-	 */
 	private async handleSetTraceLevel(levelString: string): Promise<void> {
-		const envId = this.registry.environmentBehavior.getCurrentEnvironmentId();
-		if (!envId) {
-			return;
-		}
-
 		try {
-			// Convert string to domain value object
 			const level = TraceLevel.fromString(levelString);
 
-			// Ask domain if this level may impact performance (business logic in domain)
 			if (level.isPerformanceIntensive()) {
 				const confirmed = await vscode.window.showWarningMessage(
 					'Setting trace level to "All" will log all plugin executions and may impact performance. Continue?',
@@ -788,29 +596,63 @@ export class PluginTraceViewerPanelComposed {
 				);
 
 				if (confirmed !== 'Yes') {
-					this.logger.debug('User cancelled trace level change', { level: level.value });
 					return;
 				}
 			}
 
-			this.logger.info('Setting trace level', { envId, level: level.value });
+			this.logger.info('Setting trace level', { level: level.value });
 
-			await this.setTraceLevelUseCase.execute(envId, level);
-
+			await this.setTraceLevelUseCase.execute(this.currentEnvironmentId, level);
 			this.currentTraceLevel = level;
 
-			await vscode.window.showInformationMessage(
-				`Trace level set to: ${TraceLevelFormatter.getDisplayName(level)}`
-			);
+			this.toolbarSection.setTraceLevel(TraceLevelFormatter.getDisplayName(level));
 
-			// Notify webview
-			await this.panel.webview.postMessage({
-				command: 'traceLevelLoaded',
-				data: { level: TraceLevelFormatter.getDisplayName(level) }
+			await vscode.window.showInformationMessage(`Trace level set to: ${TraceLevelFormatter.getDisplayName(level)}`);
+
+			const environments = await this.getEnvironments();
+			const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
+
+			await this.scaffoldingBehavior.refresh({
+				tableData: viewModels,
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId
 			});
 		} catch (error) {
 			this.logger.error('Failed to set trace level', error);
 			await vscode.window.showErrorMessage('Failed to set trace level');
+		}
+	}
+
+	private async handleLoadRelatedTraces(correlationId: string): Promise<void> {
+		try {
+			this.logger.debug('Loading related traces', { correlationId });
+
+			// Filter traces by correlation ID
+			const relatedTraces = this.traces.filter(t =>
+				t.hasCorrelationId() && t.correlationId?.value === correlationId
+			);
+
+			const relatedViewModels = relatedTraces.map(t => this.viewModelMapper.toDetailViewModel(t));
+
+			await vscode.window.showInformationMessage(`Found ${relatedViewModels.length} related trace(s)`);
+		} catch (error) {
+			this.logger.error('Failed to load related traces', error);
+			await vscode.window.showErrorMessage('Failed to load related traces');
+		}
+	}
+
+	private async loadTraceLevel(): Promise<void> {
+		try {
+			this.logger.debug('Loading trace level');
+
+			const level = await this.getTraceLevelUseCase.execute(this.currentEnvironmentId);
+			this.currentTraceLevel = level;
+
+			this.toolbarSection.setTraceLevel(TraceLevelFormatter.getDisplayName(level));
+
+			this.logger.debug('Trace level loaded', { level: level.value });
+		} catch (error) {
+			this.logger.error('Failed to load trace level', error);
 		}
 	}
 }

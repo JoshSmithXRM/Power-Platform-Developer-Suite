@@ -5,10 +5,15 @@ import { ILogger } from './ILogger';
  * Captures all log messages for assertion
  */
 export class SpyLogger implements ILogger {
+	public readonly traceMessages: string[] = [];
 	public readonly debugMessages: string[] = [];
 	public readonly infoMessages: string[] = [];
 	public readonly warnMessages: string[] = [];
 	public readonly errorMessages: string[] = [];
+
+	public trace(message: string, ..._args: unknown[]): void {
+		this.traceMessages.push(message);
+	}
 
 	public debug(message: string, ..._args: unknown[]): void {
 		this.debugMessages.push(message);
@@ -27,6 +32,7 @@ export class SpyLogger implements ILogger {
 	}
 
 	public reset(): void {
+		this.traceMessages.length = 0;
 		this.debugMessages.length = 0;
 		this.infoMessages.length = 0;
 		this.warnMessages.length = 0;

@@ -5,6 +5,8 @@ import { ILogger } from './ILogger';
  * Discards all log messages
  */
 export class NullLogger implements ILogger {
+	public trace(_message: string, ..._args: unknown[]): void {}
+
 	public debug(_message: string, ..._args: unknown[]): void {}
 
 	public info(_message: string, ..._args: unknown[]): void {}

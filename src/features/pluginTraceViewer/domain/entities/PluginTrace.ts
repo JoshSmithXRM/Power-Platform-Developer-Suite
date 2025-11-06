@@ -49,6 +49,8 @@ export class PluginTrace {
 		public readonly depth: number,
 		public readonly duration: Duration,
 		public readonly constructorDuration: Duration,
+		public readonly executionStartTime: Date | null,
+		public readonly constructorStartTime: Date | null,
 		public readonly exceptionDetails: string | null,
 		public readonly messageBlock: string | null,
 		public readonly configuration: string | null,
@@ -56,7 +58,12 @@ export class PluginTrace {
 		public readonly correlationId: CorrelationId | null,
 		public readonly requestId: string | null,
 		public readonly pluginStepId: string | null,
-		public readonly persistenceKey: string | null
+		public readonly persistenceKey: string | null,
+		public readonly organizationId: string | null,
+		public readonly profile: string | null,
+		public readonly isSystemCreated: boolean | null,
+		public readonly createdBy: string | null,
+		public readonly createdOnBehalfBy: string | null
 	) {}
 
 	/**
@@ -111,6 +118,7 @@ export class PluginTrace {
 	/**
 	 * Validates required fields (id, pluginName, messageName) before construction.
 	 */
+	// eslint-disable-next-line complexity -- Parameter assignment complexity (26 params), not business logic
 	static create(params: {
 		// Required fields
 		id: string;
@@ -128,6 +136,8 @@ export class PluginTrace {
 		depth?: number; // Default: 1
 
 		// Nullable fields (can be undefined or null, normalized to null)
+		executionStartTime?: Date | null;
+		constructorStartTime?: Date | null;
 		exceptionDetails?: string | null;
 		messageBlock?: string | null;
 		configuration?: string | null;
@@ -136,6 +146,11 @@ export class PluginTrace {
 		requestId?: string | null;
 		pluginStepId?: string | null;
 		persistenceKey?: string | null;
+		organizationId?: string | null;
+		profile?: string | null;
+		isSystemCreated?: boolean | null;
+		createdBy?: string | null;
+		createdOnBehalfBy?: string | null;
 	}): PluginTrace {
 		// Validation
 		validateRequiredField('PluginTrace', 'id', params.id);
@@ -154,6 +169,8 @@ export class PluginTrace {
 			params.depth ?? 1,
 			params.duration,
 			params.constructorDuration,
+			params.executionStartTime ?? null,
+			params.constructorStartTime ?? null,
 			params.exceptionDetails ?? null,
 			params.messageBlock ?? null,
 			params.configuration ?? null,
@@ -161,7 +178,12 @@ export class PluginTrace {
 			params.correlationId ?? null,
 			params.requestId ?? null,
 			params.pluginStepId ?? null,
-			params.persistenceKey ?? null
+			params.persistenceKey ?? null,
+			params.organizationId ?? null,
+			params.profile ?? null,
+			params.isSystemCreated ?? null,
+			params.createdBy ?? null,
+			params.createdOnBehalfBy ?? null
 		);
 	}
 }

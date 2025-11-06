@@ -34,6 +34,8 @@ interface DataversePluginTraceLogDto {
 	depth: number;
 	performanceexecutionduration: number;
 	performanceconstructorduration: number;
+	performanceexecutionstarttime: string | null;
+	performanceconstructorstarttime: string | null;
 	exceptiondetails: string | null;
 	messageblock: string | null;
 	configuration: string | null;
@@ -42,13 +44,18 @@ interface DataversePluginTraceLogDto {
 	requestid: string | null;
 	pluginstepid: string | null;
 	persistencekey: string | null;
+	organizationid: string | null;
+	profile: string | null;
+	issystemcreated: boolean | null;
+	_createdby_value: string | null;
+	_createdonbehalfby_value: string | null;
 }
 
 /**
  * Dataverse API response for organization entity
  */
 interface DataverseOrganizationResponse {
-	plugintraceloglevelsetting: number;
+	plugintracelogsetting: number;
 }
 
 /**
@@ -190,8 +197,8 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		traceIds: readonly string[]
 	): Promise<number> {
 		this.logger.debug(
-			`Deleting ${traceIds.length} plugin traces from Dataverse using batch API`,
-			{ environmentId }
+			'Deleting plugin traces from Dataverse using batch API',
+			{ environmentId, count: traceIds.length }
 		);
 
 		const batchSize = 100;
@@ -210,20 +217,20 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 				totalDeleted += deletedCount;
 
 				this.logger.debug(
-					`Batch delete progress: ${totalDeleted}/${traceIds.length}`,
-					{ environmentId }
+					'Batch delete progress',
+					{ environmentId, deleted: totalDeleted, total: traceIds.length }
 				);
 			} catch (error) {
 				this.logger.error(
-					`Batch delete failed for ${batch.length} traces, continuing with remaining batches`,
+					'Batch delete failed, continuing with remaining batches',
 					error
 				);
 			}
 		}
 
 		this.logger.debug(
-			`Deleted ${totalDeleted} of ${traceIds.length} plugin traces`,
-			{ environmentId }
+			'Deleted plugin traces',
+			{ environmentId, deleted: totalDeleted, total: traceIds.length }
 		);
 
 		return totalDeleted;
@@ -252,8 +259,8 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			);
 
 			this.logger.debug(
-				`Deleted all plugin traces (${deletedCount}) from Dataverse`,
-				{ environmentId }
+				'Deleted all plugin traces from Dataverse',
+				{ environmentId, count: deletedCount }
 			);
 
 			return deletedCount;
@@ -272,8 +279,8 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		olderThanDays: number
 	): Promise<number> {
 		this.logger.debug(
-			`Deleting plugin traces older than ${olderThanDays} days`,
-			{ environmentId }
+			'Deleting plugin traces older than threshold',
+			{ environmentId, olderThanDays }
 		);
 
 		try {
@@ -300,8 +307,8 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			);
 
 			this.logger.debug(
-				`Deleted ${deletedCount} old plugin traces from Dataverse`,
-				{ environmentId, olderThanDays }
+				'Deleted old plugin traces from Dataverse',
+				{ environmentId, olderThanDays, count: deletedCount }
 			);
 
 			return deletedCount;
@@ -321,7 +328,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		});
 
 		try {
-			const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ORGANIZATION_ENTITY}?$select=plugintraceloglevelsetting&$top=1`;
+			const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ORGANIZATION_ENTITY}?$select=plugintracelogsetting&$top=1`;
 
 			const response =
 				await this.apiService.get<{
@@ -334,7 +341,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			}
 
 			const level = TraceLevelVO.fromNumber(
-				orgSettings.plugintraceloglevelsetting
+				orgSettings.plugintracelogsetting
 			);
 
 			this.logger.debug('Fetched trace level setting from Dataverse', {
@@ -382,7 +389,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 				environmentId,
 				patchEndpoint,
 				{
-					plugintraceloglevelsetting: level.value,
+					plugintracelogsetting: level.value,
 				}
 			);
 
@@ -416,6 +423,12 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			constructorDuration: Duration.fromMilliseconds(
 				dto.performanceconstructorduration
 			),
+			executionStartTime: dto.performanceexecutionstarttime
+				? new Date(dto.performanceexecutionstarttime)
+				: null,
+			constructorStartTime: dto.performanceconstructorstarttime
+				? new Date(dto.performanceconstructorstarttime)
+				: null,
 			exceptionDetails: dto.exceptiondetails,
 			messageBlock: dto.messageblock,
 			configuration: dto.configuration,
@@ -426,6 +439,11 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			requestId: dto.requestid,
 			pluginStepId: dto.pluginstepid,
 			persistenceKey: dto.persistencekey,
+			organizationId: dto.organizationid,
+			profile: dto.profile,
+			isSystemCreated: dto.issystemcreated,
+			createdBy: dto._createdby_value,
+			createdOnBehalfBy: dto._createdonbehalfby_value,
 		});
 	}
 

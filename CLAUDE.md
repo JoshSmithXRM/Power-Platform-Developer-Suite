@@ -41,7 +41,13 @@
 
 ---
 
-## 💬 Commenting Rules
+## 💬 Comment & Logging Standards
+
+**See detailed guides:**
+- **Comments**: [CODE_QUALITY_GUIDE.md](docs/architecture/CODE_QUALITY_GUIDE.md) - When/how to comment
+- **Logging**: [LOGGING_GUIDE.md](docs/architecture/LOGGING_GUIDE.md) - Logging levels, formatting, architecture
+
+**Comment Rules:**
 
 **Comment when:**
 - ✅ Public/protected methods (JSDoc)
@@ -53,22 +59,30 @@
 - ❌ Placeholders ("Handle event" / "Process data")
 - ❌ Band-aids for bad code
 
----
-
-## 📝 Logging Rules
+**Logging Architecture:**
 
 **Never log:**
-- ❌ In domain entities/services - Domain is pure business logic, zero infrastructure
-- ❌ `console.log` in production code - Remove before commit (dev debugging only)
-- ❌ Secrets/tokens unredacted - Truncate tokens, sanitize sensitive data
-- ❌ Global `Logger.getInstance()` - Inject `ILogger` via constructor for testability
+- ❌ In domain entities/services (zero infrastructure in domain)
+- ❌ `console.log` in production code (dev debugging only, remove before commit)
+- ❌ Global `Logger.getInstance()` (inject `ILogger` via constructor)
 
 **Always log:**
-- ✅ At use case boundaries - Start/completion/failures in application layer
-- ✅ Via injected `ILogger` - Constructor injection, not global singleton
-- ✅ Infrastructure operations - API calls, auth, storage (debug level)
-- ✅ User actions in panels - Command invocations, lifecycle events
-- ✅ Use `NullLogger` in tests - Silent by default, `SpyLogger` for assertions
+- ✅ At use case boundaries (application layer: start/completion/failures)
+- ✅ Via injected `ILogger` (constructor injection, testable)
+- ✅ Use `NullLogger` in tests (silent by default, `SpyLogger` for assertions)
+
+**Logging Levels:**
+- `trace` - Extremely verbose (loop iterations, raw payloads, method entry/exit)
+- `debug` - Technical details, method flow, API calls
+- `info` - Business events, use case completion, state changes
+- `warn` - Recoverable issues, fallbacks, missing optional config
+- `error` - Failures, exceptions (always pass error object)
+
+**Message Format:**
+- ✅ Capitalize first letter (sentence case)
+- ✅ No period at end
+- ✅ Structured data in args: `logger.info('Deleted traces', { count: 15 })`
+- ❌ No string interpolation: `` logger.info(`Deleted ${count} traces`) ``
 
 ---
 
@@ -137,6 +151,7 @@ See `.claude/AGENTS.md` for detailed agent guide.
 
 **Architecture guides:**
 - `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Detailed patterns
+- `docs/architecture/CODE_QUALITY_GUIDE.md` - Comment & code quality standards
 - `docs/architecture/LOGGING_GUIDE.md` - Logging by layer
 - `docs/testing/TESTING_GUIDE.md` - Testing patterns
 

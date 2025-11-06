@@ -7,6 +7,7 @@ import { TraceStatusFormatter } from '../utils/TraceStatusFormatter';
 import { ExecutionModeFormatter } from '../utils/ExecutionModeFormatter';
 import { OperationTypeFormatter } from '../utils/OperationTypeFormatter';
 import { DurationFormatter } from '../utils/DurationFormatter';
+import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
 
 /**
  * Mapper: Plugin Trace to View Models
@@ -23,20 +24,23 @@ export class PluginTraceViewModelMapper {
 	 */
 	toTableRowViewModel(trace: PluginTrace): PluginTraceTableRowViewModel {
 		const status = trace.getStatus();
+		const escapedId = escapeHtml(trace.id);
+		const escapedName = escapeHtml(trace.pluginName);
 
 		return {
-			id: trace.id,
 			createdOn: trace.createdOn.toLocaleString(),
 			pluginName: trace.pluginName,
+			pluginNameHtml: `<a href="#" class="plugin-link" data-command="viewDetail" data-trace-id="${escapedId}">${escapedName}</a>`,
 			entityName: trace.entityName ?? 'N/A',
 			messageName: trace.messageName,
 			operationType: OperationTypeFormatter.getDisplayName(
 				trace.operationType
 			),
 			mode: ExecutionModeFormatter.getDisplayName(trace.mode),
+			depth: trace.depth.toString(),
 			duration: DurationFormatter.format(trace.duration),
 			status: TraceStatusFormatter.getDisplayName(status),
-			statusBadgeClass: TraceStatusFormatter.getBadgeClass(status),
+			statusClass: TraceStatusFormatter.getBadgeClass(status),
 		};
 	}
 
@@ -46,6 +50,7 @@ export class PluginTraceViewModelMapper {
 	 * @param trace - The domain entity to map
 	 * @returns Detail view model ready for display
 	 */
+	// eslint-disable-next-line complexity -- Linear field mapping (18 fields), not branching logic
 	toDetailViewModel(trace: PluginTrace): PluginTraceDetailViewModel {
 		const status = trace.getStatus();
 
@@ -65,6 +70,8 @@ export class PluginTraceViewModelMapper {
 			constructorDuration: DurationFormatter.format(
 				trace.constructorDuration
 			),
+			executionStartTime: trace.executionStartTime?.toLocaleString() ?? 'N/A',
+			constructorStartTime: trace.constructorStartTime?.toLocaleString() ?? 'N/A',
 			status: TraceStatusFormatter.getDisplayName(status),
 			statusBadgeClass: TraceStatusFormatter.getBadgeClass(status),
 			exceptionDetails: trace.exceptionDetails ?? 'None',
@@ -75,6 +82,11 @@ export class PluginTraceViewModelMapper {
 			requestId: trace.requestId ?? 'N/A',
 			pluginStepId: trace.pluginStepId ?? 'N/A',
 			persistenceKey: trace.persistenceKey ?? 'N/A',
+			organizationId: trace.organizationId ?? 'N/A',
+			profile: trace.profile ?? 'N/A',
+			isSystemCreated: trace.isSystemCreated?.toString() ?? 'N/A',
+			createdBy: trace.createdBy ?? 'N/A',
+			createdOnBehalfBy: trace.createdOnBehalfBy ?? 'N/A',
 		};
 	}
 

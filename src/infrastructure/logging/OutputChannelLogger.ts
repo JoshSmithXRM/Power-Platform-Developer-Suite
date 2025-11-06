@@ -9,6 +9,15 @@ import { ILogger } from './ILogger';
 export class OutputChannelLogger implements ILogger {
 	constructor(private readonly outputChannel: vscode.LogOutputChannel) {}
 
+	public trace(message: string, ...args: unknown[]): void {
+		if (args.length > 0) {
+			const argsStr = args.map(arg => this.stringify(arg)).join('\n');
+			this.outputChannel.trace(`${message}\n${argsStr}`);
+		} else {
+			this.outputChannel.trace(message);
+		}
+	}
+
 	public debug(message: string, ...args: unknown[]): void {
 		if (args.length > 0) {
 			const argsStr = args.map(arg => this.stringify(arg)).join('\n');

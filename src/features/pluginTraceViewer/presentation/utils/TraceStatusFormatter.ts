@@ -18,11 +18,11 @@ export class TraceStatusFormatter {
 	static getBadgeClass(status: TraceStatus): string {
 		switch (status.value) {
 			case 'Success':
-				return 'badge-success';
+				return 'status-success';
 			case 'Exception':
-				return 'badge-error';
+				return 'status-exception';
 			default:
-				return 'badge-default';
+				return '';
 		}
 	}
 }

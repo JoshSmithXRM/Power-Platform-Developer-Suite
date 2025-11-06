@@ -40,7 +40,8 @@ describe('DataversePluginTraceRepository', () => {
 		};
 
 		mockLogger = {
-			debug: jest.fn(),
+			trace: jest.fn(),
+		debug: jest.fn(),
 			info: jest.fn(),
 			warn: jest.fn(),
 			error: jest.fn(),
@@ -339,7 +340,7 @@ describe('DataversePluginTraceRepository', () => {
 			const environmentId = 'env-123';
 
 			mockApiService.get.mockResolvedValue({
-				value: [{ plugintraceloglevelsetting: 2 }],
+				value: [{ plugintracelogsetting: 2 }],
 			});
 
 			const level = await repository.getTraceLevel(environmentId);
@@ -393,7 +394,7 @@ describe('DataversePluginTraceRepository', () => {
 			expect(mockApiService.patch).toHaveBeenCalledWith(
 				environmentId,
 				expect.stringContaining('org-123'),
-				{ plugintraceloglevelsetting: 2 }
+				{ plugintracelogsetting: 2 }
 			);
 		});
 

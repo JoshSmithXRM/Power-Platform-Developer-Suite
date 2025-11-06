@@ -5,16 +5,18 @@
  * All properties are formatted strings ready for display.
  */
 export interface PluginTraceTableRowViewModel {
-	readonly id: string;
+	readonly [key: string]: unknown;
 	readonly createdOn: string;
 	readonly pluginName: string;
+	readonly pluginNameHtml: string; // Clickable link
 	readonly entityName: string;
 	readonly messageName: string;
 	readonly operationType: string;
 	readonly mode: string;
+	readonly depth: string;
 	readonly duration: string;
 	readonly status: string;
-	readonly statusBadgeClass: string;
+	readonly statusClass: string; // CSS class for status coloring
 }
 
 /**
@@ -35,6 +37,8 @@ export interface PluginTraceDetailViewModel {
 	readonly depth: string;
 	readonly duration: string;
 	readonly constructorDuration: string;
+	readonly executionStartTime: string;
+	readonly constructorStartTime: string;
 	readonly status: string;
 	readonly statusBadgeClass: string;
 	readonly exceptionDetails: string;
@@ -45,4 +49,9 @@ export interface PluginTraceDetailViewModel {
 	readonly requestId: string;
 	readonly pluginStepId: string;
 	readonly persistenceKey: string;
+	readonly organizationId: string;
+	readonly profile: string;
+	readonly isSystemCreated: string;
+	readonly createdBy: string;
+	readonly createdOnBehalfBy: string;
 }

@@ -1,0 +1,65 @@
+/**
+ * Split Panel Component
+ * Provides layout for horizontally or vertically split panels
+ */
+
+.split-panel-container {
+	display: flex;
+	flex-direction: row;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+.split-panel-container.vertical {
+	flex-direction: column;
+}
+
+.split-panel-left,
+.split-panel-top {
+	flex: 1;
+	overflow: auto;
+	min-width: 0; /* Prevent flex overflow issues */
+	min-height: 0;
+}
+
+.split-panel-right,
+.split-panel-bottom {
+	flex: 0 0 40%; /* Default width/height: 40% */
+	overflow: auto;
+	min-width: 0;
+	min-height: 0;
+	border-left: 1px solid var(--vscode-panel-border);
+}
+
+.split-panel-container.vertical .split-panel-bottom {
+	border-left: none;
+	border-top: 1px solid var(--vscode-panel-border);
+}
+
+/* Resizer handle (for future enhancement) */
+.split-panel-resizer {
+	flex: 0 0 4px;
+	background: var(--vscode-panel-border);
+	cursor: col-resize;
+	transition: background 0.2s ease;
+}
+
+.split-panel-container.vertical .split-panel-resizer {
+	cursor: row-resize;
+}
+
+.split-panel-resizer:hover {
+	background: var(--vscode-focusBorder);
+}
+
+/* When detail panel is closed */
+.split-panel-container .split-panel-right.hidden,
+.split-panel-container .split-panel-bottom.hidden {
+	display: none;
+}
+
+.split-panel-container .split-panel-left.full-width,
+.split-panel-container .split-panel-top.full-height {
+	flex: 1;
+}
