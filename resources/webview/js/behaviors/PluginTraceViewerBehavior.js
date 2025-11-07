@@ -15,6 +15,10 @@ window.createBehavior({
 		// Handle data-driven updates
 		if (message.command === 'updateTableData') {
 			updateTableData(message.data);
+		} else if (message.command === 'updateDropdownState') {
+			window.updateDropdownState(message.data.dropdownId, message.data.selectedId);
+		} else if (message.command === 'updateDetailPanel') {
+			updateDetailPanel(message.data);
 		}
 	}
 });
@@ -57,6 +61,29 @@ function updateTableData(data) {
 		const event = new Event('tableUpdated', { bubbles: true });
 		table.dispatchEvent(event);
 	}
+}
+
+/**
+ * Updates detail panel without full page refresh.
+ * Uses DetailPanelRenderer to update detail section only.
+ *
+ * @param {Object} data - Detail trace ViewModel
+ */
+function updateDetailPanel(data) {
+	const detailSection = document.querySelector('.detail-section');
+	if (!detailSection) {
+		console.warn('[PluginTraceViewer] No detail section found for panel update');
+		return;
+	}
+
+	// Render new detail panel HTML using DetailPanelRenderer
+	const detailHtml = window.DetailPanelRenderer.renderDetailPanel(data.trace);
+
+	// Update detail section (preserves event listeners on other elements)
+	detailSection.innerHTML = detailHtml;
+
+	// Re-apply tab event listeners (tabs are inside detail section)
+	setupDetailPanelTabs();
 }
 
 /**

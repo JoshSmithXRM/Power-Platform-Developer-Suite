@@ -287,6 +287,9 @@ export class PluginTraceViewerPanelComposed {
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DetailPanelRenderer.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
@@ -490,28 +493,23 @@ export class PluginTraceViewerPanelComposed {
 
 			this.detailSection.setTrace(detailViewModel);
 
-			this.logger.info('Detail section updated, refreshing panel');
+			this.logger.info('Detail section updated, sending data to frontend');
 
-			const environments = await this.getEnvironments();
-			const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
-
-			await this.scaffoldingBehavior.refresh({
-				tableData: viewModels,
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				state: {
-					traceLevel: this.currentTraceLevel?.value,
-					autoRefreshInterval: this.autoRefreshInterval
+			// Data-driven update: Send detail panel data to frontend
+			await this.panel.webview.postMessage({
+				command: 'updateDetailPanel',
+				data: {
+					trace: detailViewModel
 				}
 			});
 
-			this.logger.info('Panel refreshed, showing detail panel');
+			this.logger.info('Detail data sent, showing detail panel');
 
 			await this.panel.webview.postMessage({
 				command: 'showDetailPanel'
 			});
 
-			// Re-apply row selection after refresh (which wipes DOM state)
+			// Highlight the selected row (no refresh needed, so selection persists)
 			await this.panel.webview.postMessage({
 				command: 'selectRow',
 				traceId: traceId
@@ -660,16 +658,12 @@ export class PluginTraceViewerPanelComposed {
 
 			await vscode.window.showInformationMessage(`Trace level set to: ${TraceLevelFormatter.getDisplayName(level)}`);
 
-			const environments = await this.getEnvironments();
-			const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
-
-			await this.scaffoldingBehavior.refresh({
-				tableData: viewModels,
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				state: {
-					traceLevel: this.currentTraceLevel?.value,
-					autoRefreshInterval: this.autoRefreshInterval
+			// Data-driven update: Send dropdown state change to frontend
+			await this.panel.webview.postMessage({
+				command: 'updateDropdownState',
+				data: {
+					dropdownId: 'traceLevelDropdown',
+					selectedId: level.value.toString()
 				}
 			});
 		} catch (error) {
@@ -736,17 +730,12 @@ export class PluginTraceViewerPanelComposed {
 				await vscode.window.showInformationMessage('Auto-refresh disabled');
 			}
 
-			// Refresh UI to update dropdown selection
-			const environments = await this.getEnvironments();
-			const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
-
-			await this.scaffoldingBehavior.refresh({
-				tableData: viewModels,
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				state: {
-					traceLevel: this.currentTraceLevel?.value,
-					autoRefreshInterval: this.autoRefreshInterval
+			// Data-driven update: Send dropdown state change to frontend
+			await this.panel.webview.postMessage({
+				command: 'updateDropdownState',
+				data: {
+					dropdownId: 'autoRefreshDropdown',
+					selectedId: interval.toString()
 				}
 			});
 		} catch (error) {

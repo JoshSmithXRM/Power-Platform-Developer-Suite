@@ -46,6 +46,9 @@ function setupDropdownItems() {
 			const itemId = item.getAttribute('data-dropdown-item-id');
 
 			if (dropdownId && itemId) {
+				// Optimistic update: Update UI immediately before backend confirms
+				updateDropdownState(dropdownId, itemId);
+
 				handleDropdownItemClick(dropdownId, itemId);
 				closeDropdown(dropdownId);
 			}
@@ -172,6 +175,46 @@ function focusDropdownItem(items, index) {
 }
 
 /**
+ * Updates dropdown selected state without re-rendering.
+ * Moves checkmark to newly selected item.
+ *
+ * @param {string} dropdownId - ID of the dropdown to update
+ * @param {string} selectedId - ID of the item to mark as selected
+ */
+function updateDropdownState(dropdownId, selectedId) {
+	const menu = document.querySelector(`[data-dropdown-menu="${dropdownId}"]`);
+	if (!menu) {
+		return;
+	}
+
+	const items = menu.querySelectorAll('.dropdown-item');
+
+	items.forEach(item => {
+		const itemId = item.getAttribute('data-dropdown-item-id');
+		const isSelected = itemId === selectedId;
+
+		// Update selected class
+		if (isSelected) {
+			item.classList.add('dropdown-item--selected');
+		} else {
+			item.classList.remove('dropdown-item--selected');
+		}
+
+		// Update checkmark visibility (first child element)
+		const firstChild = item.firstElementChild;
+		if (firstChild) {
+			if (isSelected) {
+				// Replace with checkmark
+				firstChild.outerHTML = '<span style="color: var(--vscode-testing-iconPassed); font-size: 16px; width: 16px; display: inline-block; text-align: center;">✓</span>';
+			} else {
+				// Replace with spacer
+				firstChild.outerHTML = '<span class="dropdown-item-spacer"></span>';
+			}
+		}
+	});
+}
+
+/**
  * Gets trace IDs from visible table rows (respects search/filter).
  * Extracts IDs from data-trace-id attributes on plugin name links.
  *
@@ -260,3 +303,4 @@ function handleDropdownItemClick(dropdownId, itemId) {
 
 // Make available globally for behaviors
 window.initializeDropdowns = initializeDropdowns;
+window.updateDropdownState = updateDropdownState;

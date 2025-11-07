@@ -15,7 +15,8 @@ module.exports = (env, argv) => {
 			EnvironmentSetupBehavior: './resources/webview/js/behaviors/EnvironmentSetupBehavior.js',
 			DataTableBehavior: './resources/webview/js/behaviors/DataTableBehavior.js',
 			PluginTraceViewerBehavior: './resources/webview/js/behaviors/PluginTraceViewerBehavior.js',
-			TableRenderer: './resources/webview/js/renderers/TableRenderer.js'
+			TableRenderer: './resources/webview/js/renderers/TableRenderer.js',
+			DetailPanelRenderer: './resources/webview/js/renderers/DetailPanelRenderer.js'
 		},
 
 		output: {
