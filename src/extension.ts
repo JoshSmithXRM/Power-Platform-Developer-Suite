@@ -23,7 +23,6 @@ import { EnvironmentListViewModelMapper } from './features/environmentSetup/appl
 import { EnvironmentListViewModel } from './features/environmentSetup/application/viewModels/EnvironmentListViewModel';
 import { EnvironmentFormViewModelMapper } from './features/environmentSetup/application/mappers/EnvironmentFormViewModelMapper';
 import { EnvironmentSetupPanelComposed } from './features/environmentSetup/presentation/panels/EnvironmentSetupPanelComposed';
-import { TestEnvironmentConnectionCommandHandler } from './features/environmentSetup/presentation/commands/TestEnvironmentConnectionCommandHandler';
 import { EnvironmentId } from './features/environmentSetup/domain/valueObjects/EnvironmentId';
 import { Environment } from './features/environmentSetup/domain/entities/Environment';
 import { EnvironmentCreated } from './features/environmentSetup/domain/events/EnvironmentCreated';
@@ -72,6 +71,42 @@ function createGetEnvironmentById(
 }
 
 /**
+ * Shows environment picker and executes callback with selected environment ID.
+ * Handles "no environments" case and displays warning for missing Power Platform IDs.
+ */
+async function showEnvironmentPickerAndExecute(
+	environmentRepository: IEnvironmentRepository,
+	placeholder: string,
+	onSelected: (envId: string) => Promise<void>
+): Promise<void> {
+	const environments = await environmentRepository.getAll();
+
+	if (environments.length === 0) {
+		vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
+		return;
+	}
+
+	const quickPickItems: QuickPickItemWithEnvId[] = environments.map(env => {
+		const ppEnvId = env.getPowerPlatformEnvironmentId();
+		const item: QuickPickItemWithEnvId = {
+			label: env.getName().getValue(),
+			description: env.getDataverseUrl().getValue(),
+			envId: env.getId().getValue()
+		};
+		if (!ppEnvId) {
+			item.detail = '💡 Missing Environment ID - "Open in Maker" button will be disabled';
+		}
+		return item;
+	});
+
+	const selected = await vscode.window.showQuickPick(quickPickItems, { placeHolder: placeholder });
+
+	if (selected) {
+		await onSelected(selected.envId);
+	}
+}
+
+/**
  * Extension activation entry point
  */
 export function activate(context: vscode.ExtensionContext): void {
@@ -107,11 +142,12 @@ export function activate(context: vscode.ExtensionContext): void {
 	const validateUniqueNameUseCase = new ValidateUniqueNameUseCase(environmentRepository, logger);
 	const checkConcurrentEditUseCase = new CheckConcurrentEditUseCase(logger);
 
-	// Command Handlers (Presentation Layer)
-	const testEnvironmentConnectionCommandHandler = new TestEnvironmentConnectionCommandHandler(
-		testExistingEnvironmentConnectionUseCase,
-		logger
-	);
+	// Shared factory functions for feature initializers
+	const getEnvironments = createGetEnvironments(environmentRepository);
+	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
+	const dataverseApiServiceFactory = createDataverseApiServiceFactory(authService, environmentRepository);
+
+	// Command Handlers (Presentation Layer) - removed, using inline handlers instead
 
 	const isDevelopment = context.extensionMode === vscode.ExtensionMode.Development;
 	void vscode.commands.executeCommand('setContext', 'powerPlatformDevSuite.isDevelopment', isDevelopment);
@@ -126,22 +162,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	vscode.window.registerTreeDataProvider('power-platform-dev-suite-environments', environmentsProvider);
 
 	const addEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.addEnvironment', () => {
-		EnvironmentSetupPanelComposed.createOrShow(
-			context.extensionUri,
-			loadEnvironmentByIdUseCase,
-			saveEnvironmentUseCase,
-			deleteEnvironmentUseCase,
-			testConnectionUseCase,
-			discoverEnvironmentIdUseCase,
-			validateUniqueNameUseCase,
-			checkConcurrentEditUseCase,
-			logger,
-			undefined
-		);
-	});
-
-	const editEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.editEnvironment', async (environmentItem?: { envId: string }) => {
-		if (environmentItem) {
+		try {
 			EnvironmentSetupPanelComposed.createOrShow(
 				context.extensionUri,
 				loadEnvironmentByIdUseCase,
@@ -152,17 +173,77 @@ export function activate(context: vscode.ExtensionContext): void {
 				validateUniqueNameUseCase,
 				checkConcurrentEditUseCase,
 				logger,
-				environmentItem.envId
+				undefined
 			);
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Environment Setup: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	const editEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.editEnvironment', async (environmentItem?: { envId: string }) => {
+		if (environmentItem) {
+			try {
+				EnvironmentSetupPanelComposed.createOrShow(
+					context.extensionUri,
+					loadEnvironmentByIdUseCase,
+					saveEnvironmentUseCase,
+					deleteEnvironmentUseCase,
+					testConnectionUseCase,
+					discoverEnvironmentIdUseCase,
+					validateUniqueNameUseCase,
+					checkConcurrentEditUseCase,
+					logger,
+					environmentItem.envId
+				);
+			} catch (error) {
+				vscode.window.showErrorMessage(
+					`Failed to open Environment Setup: ${error instanceof Error ? error.message : String(error)}`
+				);
+			}
 		}
 	});
 
 	const testEnvironmentConnectionCommand = vscode.commands.registerCommand(
 		'power-platform-dev-suite.testEnvironmentConnection',
 		async (environmentItem?: { envId: string }) => {
-			await testEnvironmentConnectionCommandHandler.execute({
-				environmentId: environmentItem?.envId || ''
-			});
+			if (!environmentItem?.envId) {
+				vscode.window.showErrorMessage('No environment selected');
+				return;
+			}
+
+			try {
+				const environmentId = new EnvironmentId(environmentItem.envId);
+
+				await vscode.window.withProgress(
+					{
+						location: vscode.ProgressLocation.Notification,
+						title: 'Testing connection...',
+						cancellable: false
+					},
+					async () => {
+						const result = await testExistingEnvironmentConnectionUseCase.execute({
+							environmentId
+						});
+
+						if (result.success) {
+							vscode.window.showInformationMessage(
+								`Connection successful! User ID: ${result.userId}`
+							);
+						} else {
+							vscode.window.showErrorMessage(
+								`Connection test failed: ${result.errorMessage || 'Unknown error'}`
+							);
+						}
+					}
+				);
+			} catch (error) {
+				logger.error('Connection test command failed', error);
+				vscode.window.showErrorMessage(
+					`Connection test failed: ${error instanceof Error ? error.message : String(error)}`
+				);
+			}
 		}
 	);
 
@@ -255,13 +336,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const solutionExplorerCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorer', async (environmentItem?: { envId: string }) => {
 		try {
-			let initialEnvironmentId: string | undefined;
-
-			if (environmentItem?.envId) {
-				initialEnvironmentId = environmentItem.envId;
-			}
-
-			void initializeSolutionExplorer(context, authService, environmentRepository, logger, initialEnvironmentId);
+			void initializeSolutionExplorer(context, getEnvironments, getEnvironmentById, dataverseApiServiceFactory, logger, environmentItem?.envId);
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Solution Explorer: ${error instanceof Error ? error.message : String(error)}`
@@ -271,33 +346,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const solutionExplorerPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionExplorerPickEnvironment', async () => {
 		try {
-			const environments = await environmentRepository.getAll();
-
-			if (environments.length === 0) {
-				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
-				return;
-			}
-
-			const quickPickItems: QuickPickItemWithEnvId[] = environments.map(env => {
-				const ppEnvId = env.getPowerPlatformEnvironmentId();
-				const item: QuickPickItemWithEnvId = {
-					label: env.getName().getValue(),
-					description: env.getDataverseUrl().getValue(),
-					envId: env.getId().getValue()
-				};
-				if (!ppEnvId) {
-					item.detail = '💡 Missing Environment ID - "Open in Maker" button will be disabled';
-				}
-				return item;
-			});
-
-			const selected = await vscode.window.showQuickPick(quickPickItems, {
-				placeHolder: 'Select an environment to open Solutions'
-			});
-
-			if (selected) {
-				void initializeSolutionExplorer(context, authService, environmentRepository, logger, selected.envId);
-			}
+			await showEnvironmentPickerAndExecute(
+				environmentRepository,
+				'Select an environment to open Solutions',
+				async (envId) => initializeSolutionExplorer(context, getEnvironments, getEnvironmentById, dataverseApiServiceFactory, logger, envId)
+			);
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Solutions: ${error instanceof Error ? error.message : String(error)}`
@@ -307,13 +360,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const importJobViewerCommand = vscode.commands.registerCommand('power-platform-dev-suite.importJobViewer', async (environmentItem?: { envId: string }) => {
 		try {
-			let initialEnvironmentId: string | undefined;
-
-			if (environmentItem?.envId) {
-				initialEnvironmentId = environmentItem.envId;
-			}
-
-			void initializeImportJobViewer(context, authService, environmentRepository, logger, initialEnvironmentId);
+			void initializeImportJobViewer(context, getEnvironments, getEnvironmentById, dataverseApiServiceFactory, logger, environmentItem?.envId);
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Import Job Viewer: ${error instanceof Error ? error.message : String(error)}`
@@ -323,33 +370,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const importJobViewerPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.importJobViewerPickEnvironment', async () => {
 		try {
-			const environments = await environmentRepository.getAll();
-
-			if (environments.length === 0) {
-				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
-				return;
-			}
-
-			const quickPickItems: QuickPickItemWithEnvId[] = environments.map(env => {
-				const ppEnvId = env.getPowerPlatformEnvironmentId();
-				const item: QuickPickItemWithEnvId = {
-					label: env.getName().getValue(),
-					description: env.getDataverseUrl().getValue(),
-					envId: env.getId().getValue()
-				};
-				if (!ppEnvId) {
-					item.detail = '💡 Missing Environment ID - "Open in Maker" button will be disabled';
-				}
-				return item;
-			});
-
-			const selected = await vscode.window.showQuickPick(quickPickItems, {
-				placeHolder: 'Select an environment to open Import Jobs'
-			});
-
-			if (selected) {
-				void initializeImportJobViewer(context, authService, environmentRepository, logger, selected.envId);
-			}
+			await showEnvironmentPickerAndExecute(
+				environmentRepository,
+				'Select an environment to open Import Jobs',
+				async (envId) => initializeImportJobViewer(context, getEnvironments, getEnvironmentById, dataverseApiServiceFactory, logger, envId)
+			);
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Import Jobs: ${error instanceof Error ? error.message : String(error)}`
@@ -359,13 +384,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const connectionReferencesCommand = vscode.commands.registerCommand('power-platform-dev-suite.connectionReferences', async (environmentItem?: { envId: string }) => {
 		try {
-			let initialEnvironmentId: string | undefined;
-
-			if (environmentItem?.envId) {
-				initialEnvironmentId = environmentItem.envId;
-			}
-
-			void initializeConnectionReferences(context, authService, environmentRepository, logger, initialEnvironmentId);
+			void initializeConnectionReferences(context, getEnvironments, getEnvironmentById, dataverseApiServiceFactory, logger, environmentItem?.envId);
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Connection References: ${error instanceof Error ? error.message : String(error)}`
@@ -375,26 +394,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const connectionReferencesPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.connectionReferencesPickEnvironment', async () => {
 		try {
-			const environments = await environmentRepository.getAll();
-
-			if (environments.length === 0) {
-				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
-				return;
-			}
-
-			const quickPickItems = environments.map(env => ({
-				label: env.getName().getValue(),
-				description: env.getDataverseUrl().getValue(),
-				envId: env.getId().getValue()
-			}));
-
-			const selected = await vscode.window.showQuickPick(quickPickItems, {
-				placeHolder: 'Select an environment to view Connection References'
-			});
-
-			if (selected) {
-				void initializeConnectionReferences(context, authService, environmentRepository, logger, selected.envId);
-			}
+			await showEnvironmentPickerAndExecute(
+				environmentRepository,
+				'Select an environment to view Connection References',
+				async (envId) => initializeConnectionReferences(context, getEnvironments, getEnvironmentById, dataverseApiServiceFactory, logger, envId)
+			);
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Connection References: ${error instanceof Error ? error.message : String(error)}`
@@ -404,13 +408,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const environmentVariablesCommand = vscode.commands.registerCommand('power-platform-dev-suite.environmentVariables', async (environmentItem?: { envId: string }) => {
 		try {
-			let initialEnvironmentId: string | undefined;
-
-			if (environmentItem?.envId) {
-				initialEnvironmentId = environmentItem.envId;
-			}
-
-			void initializeEnvironmentVariables(context, authService, environmentRepository, logger, initialEnvironmentId);
+			void initializeEnvironmentVariables(context, getEnvironments, getEnvironmentById, dataverseApiServiceFactory, logger, environmentItem?.envId);
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Environment Variables: ${error instanceof Error ? error.message : String(error)}`
@@ -420,26 +418,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const environmentVariablesPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.environmentVariablesPickEnvironment', async () => {
 		try {
-			const environments = await environmentRepository.getAll();
-
-			if (environments.length === 0) {
-				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
-				return;
-			}
-
-			const quickPickItems = environments.map(env => ({
-				label: env.getName().getValue(),
-				description: env.getDataverseUrl().getValue(),
-				envId: env.getId().getValue()
-			}));
-
-			const selected = await vscode.window.showQuickPick(quickPickItems, {
-				placeHolder: 'Select an environment to view Environment Variables'
-			});
-
-			if (selected) {
-				void initializeEnvironmentVariables(context, authService, environmentRepository, logger, selected.envId);
-			}
+			await showEnvironmentPickerAndExecute(
+				environmentRepository,
+				'Select an environment to view Environment Variables',
+				async (envId) => initializeEnvironmentVariables(context, getEnvironments, getEnvironmentById, dataverseApiServiceFactory, logger, envId)
+			);
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Environment Variables: ${error instanceof Error ? error.message : String(error)}`
@@ -449,13 +432,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const pluginTraceViewerCommand = vscode.commands.registerCommand('power-platform-dev-suite.pluginTraceViewer', async (environmentItem?: { envId: string }) => {
 		try {
-			let initialEnvironmentId: string | undefined;
-
-			if (environmentItem?.envId) {
-				initialEnvironmentId = environmentItem.envId;
-			}
-
-			void initializePluginTraceViewer(context, authService, environmentRepository, logger, initialEnvironmentId);
+			void initializePluginTraceViewer(context, getEnvironments, getEnvironmentById, dataverseApiServiceFactory, logger, environmentItem?.envId);
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Plugin Trace Viewer: ${error instanceof Error ? error.message : String(error)}`
@@ -465,26 +442,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const pluginTraceViewerPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.pluginTraceViewerPickEnvironment', async () => {
 		try {
-			const environments = await environmentRepository.getAll();
-
-			if (environments.length === 0) {
-				vscode.window.showErrorMessage('No environments configured. Please add an environment first.');
-				return;
-			}
-
-			const quickPickItems = environments.map(env => ({
-				label: env.getName().getValue(),
-				description: env.getDataverseUrl().getValue(),
-				envId: env.getId().getValue()
-			}));
-
-			const selected = await vscode.window.showQuickPick(quickPickItems, {
-				placeHolder: 'Select an environment to view Plugin Traces'
-			});
-
-			if (selected) {
-				void initializePluginTraceViewer(context, authService, environmentRepository, logger, selected.envId);
-			}
+			await showEnvironmentPickerAndExecute(
+				environmentRepository,
+				'Select an environment to view Plugin Traces',
+				async (envId) => initializePluginTraceViewer(context, getEnvironments, getEnvironmentById, dataverseApiServiceFactory, logger, envId)
+			);
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Plugin Trace Viewer: ${error instanceof Error ? error.message : String(error)}`
@@ -573,8 +535,9 @@ function createDataverseApiServiceFactory(
  */
 async function initializeSolutionExplorer(
 	context: vscode.ExtensionContext,
-	authService: MsalAuthenticationService,
-	environmentRepository: IEnvironmentRepository,
+	getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>,
+	getEnvironmentById: (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId: string | undefined } | null>,
+	dataverseApiServiceFactory: { getAccessToken: (envId: string) => Promise<string>; getDataverseUrl: (envId: string) => Promise<string> },
 	logger: ILogger,
 	initialEnvironmentId?: string
 ): Promise<void> {
@@ -586,10 +549,7 @@ async function initializeSolutionExplorer(
 	const { SolutionViewModelMapper } = await import('./features/solutionExplorer/application/mappers/SolutionViewModelMapper.js');
 	const { SolutionCollectionService } = await import('./features/solutionExplorer/domain/services/SolutionCollectionService.js');
 
-	const getEnvironments = createGetEnvironments(environmentRepository);
-	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
-
-	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
+	const { getAccessToken, getDataverseUrl } = dataverseApiServiceFactory;
 	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
 
 	const urlBuilder = new MakerUrlBuilder();
@@ -618,8 +578,9 @@ async function initializeSolutionExplorer(
  */
 async function initializeImportJobViewer(
 	context: vscode.ExtensionContext,
-	authService: MsalAuthenticationService,
-	environmentRepository: IEnvironmentRepository,
+	getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>,
+	getEnvironmentById: (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId: string | undefined } | null>,
+	dataverseApiServiceFactory: { getAccessToken: (envId: string) => Promise<string>; getDataverseUrl: (envId: string) => Promise<string> },
 	logger: ILogger,
 	initialEnvironmentId?: string
 ): Promise<void> {
@@ -634,10 +595,7 @@ async function initializeImportJobViewer(
 	const { ImportJobViewModelMapper } = await import('./features/importJobViewer/application/mappers/ImportJobViewModelMapper.js');
 	const { ImportJobCollectionService } = await import('./features/importJobViewer/domain/services/ImportJobCollectionService.js');
 
-	const getEnvironments = createGetEnvironments(environmentRepository);
-	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
-
-	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
+	const { getAccessToken, getDataverseUrl } = dataverseApiServiceFactory;
 	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
 
 	const urlBuilder = new MakerUrlBuilder();
@@ -670,8 +628,9 @@ async function initializeImportJobViewer(
  */
 async function initializeConnectionReferences(
 	context: vscode.ExtensionContext,
-	authService: MsalAuthenticationService,
-	environmentRepository: IEnvironmentRepository,
+	getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>,
+	getEnvironmentById: (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId: string | undefined } | null>,
+	dataverseApiServiceFactory: { getAccessToken: (envId: string) => Promise<string>; getDataverseUrl: (envId: string) => Promise<string> },
 	logger: ILogger,
 	initialEnvironmentId?: string
 ): Promise<void> {
@@ -690,10 +649,7 @@ async function initializeConnectionReferences(
 	const { MakerUrlBuilder } = await import('./shared/infrastructure/services/MakerUrlBuilder.js');
 	const { ConnectionReferenceToDeploymentSettingsMapper } = await import('./features/connectionReferences/application/mappers/ConnectionReferenceToDeploymentSettingsMapper.js');
 
-	const getEnvironments = createGetEnvironments(environmentRepository);
-	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
-
-	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
+	const { getAccessToken, getDataverseUrl } = dataverseApiServiceFactory;
 	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
 
 	const flowRepository = new DataverseApiCloudFlowRepository(dataverseApiService, logger);
@@ -740,8 +696,9 @@ async function initializeConnectionReferences(
  */
 async function initializeEnvironmentVariables(
 	context: vscode.ExtensionContext,
-	authService: MsalAuthenticationService,
-	environmentRepository: IEnvironmentRepository,
+	getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>,
+	getEnvironmentById: (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId: string | undefined } | null>,
+	dataverseApiServiceFactory: { getAccessToken: (envId: string) => Promise<string>; getDataverseUrl: (envId: string) => Promise<string> },
 	logger: ILogger,
 	initialEnvironmentId?: string
 ): Promise<void> {
@@ -760,10 +717,7 @@ async function initializeEnvironmentVariables(
 	const { EnvironmentVariableViewModelMapper } = await import('./features/environmentVariables/application/mappers/EnvironmentVariableViewModelMapper.js');
 	const { EnvironmentVariableCollectionService } = await import('./features/environmentVariables/domain/services/EnvironmentVariableCollectionService.js');
 
-	const getEnvironments = createGetEnvironments(environmentRepository);
-	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
-
-	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
+	const { getAccessToken, getDataverseUrl } = dataverseApiServiceFactory;
 	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
 
 	const environmentVariableRepository = new DataverseApiEnvironmentVariableRepository(dataverseApiService, logger);
@@ -809,8 +763,9 @@ async function initializeEnvironmentVariables(
  */
 async function initializePluginTraceViewer(
 	context: vscode.ExtensionContext,
-	authService: MsalAuthenticationService,
-	environmentRepository: IEnvironmentRepository,
+	getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>,
+	getEnvironmentById: (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId: string | undefined } | null>,
+	dataverseApiServiceFactory: { getAccessToken: (envId: string) => Promise<string>; getDataverseUrl: (envId: string) => Promise<string> },
 	logger: ILogger,
 	initialEnvironmentId?: string
 ): Promise<void> {
@@ -825,10 +780,7 @@ async function initializePluginTraceViewer(
 	const { PluginTraceViewModelMapper } = await import('./features/pluginTraceViewer/presentation/mappers/PluginTraceViewModelMapper.js');
 	const { PluginTraceViewerPanelComposed } = await import('./features/pluginTraceViewer/presentation/panels/PluginTraceViewerPanelComposed.js');
 
-	const getEnvironments = createGetEnvironments(environmentRepository);
-	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
-
-	const { getAccessToken, getDataverseUrl } = createDataverseApiServiceFactory(authService, environmentRepository);
+	const { getAccessToken, getDataverseUrl } = dataverseApiServiceFactory;
 	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
 
 	const pluginTraceRepository = new DataversePluginTraceRepository(dataverseApiService, logger);
