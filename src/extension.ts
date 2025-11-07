@@ -78,7 +78,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	const outputChannel = vscode.window.createOutputChannel('Power Platform Dev Suite', { log: true });
 	const logger: ILogger = new OutputChannelLogger(outputChannel);
 
-	logger.info('Extension activating...');
+	logger.info('Extension activating');
 
 	// Infrastructure Layer
 	const environmentDomainMapper = new EnvironmentDomainMapper(logger);

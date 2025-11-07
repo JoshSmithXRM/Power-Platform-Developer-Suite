@@ -48,7 +48,7 @@ export class DiscoverEnvironmentIdUseCase {
 				cancellationToken
 			);
 
-			this.logger.info(`Environment ID discovered: ${environmentId}`);
+			this.logger.info('Environment ID discovered', { environmentId });
 
 			return {
 				success: true,

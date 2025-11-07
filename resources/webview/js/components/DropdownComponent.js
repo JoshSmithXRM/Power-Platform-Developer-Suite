@@ -180,6 +180,8 @@ function focusDropdownItem(items, index) {
  *
  * @param {string} dropdownId - ID of the dropdown to update
  * @param {string} selectedId - ID of the item to mark as selected
+ * @example
+ * updateDropdownState('traceLevelDropdown', '2'); // Selects "All" level
  */
 function updateDropdownState(dropdownId, selectedId) {
 	const menu = document.querySelector(`[data-dropdown-menu="${dropdownId}"]`);

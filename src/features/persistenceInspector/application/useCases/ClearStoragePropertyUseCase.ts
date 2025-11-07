@@ -23,7 +23,7 @@ export class ClearStoragePropertyUseCase {
 	 * @param propertyPath Dot-notation path to the property (e.g., "user.settings.theme")
 	 */
 	public async execute(key: string, propertyPath: string): Promise<void> {
-		this.logger.debug(`ClearStoragePropertyUseCase: Clearing property "${propertyPath}" in "${key}"`);
+		this.logger.debug('ClearStoragePropertyUseCase: Clearing property', { key, propertyPath });
 
 		try {
 			// Orchestrate: get current collection for validation
@@ -31,7 +31,7 @@ export class ClearStoragePropertyUseCase {
 			const entry = collection.getEntry(key);
 
 			if (!entry) {
-				this.logger.warn(`Entry not found: ${key}`);
+				this.logger.warn('Entry not found', { key });
 				throw new Error(`Entry not found: ${key}`);
 			}
 
@@ -46,7 +46,7 @@ export class ClearStoragePropertyUseCase {
 				new StoragePropertyCleared(entry.key, path.toString())
 			);
 
-			this.logger.info(`Property cleared: ${propertyPath} in ${key}`);
+			this.logger.info('Property cleared', { key, propertyPath });
 		} catch (error) {
 			this.logger.error('ClearStoragePropertyUseCase: Failed to clear property', error);
 			throw error;

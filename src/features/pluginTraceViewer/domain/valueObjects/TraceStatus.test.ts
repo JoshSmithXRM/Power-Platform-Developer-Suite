@@ -11,13 +11,13 @@ describe('TraceStatus', () => {
 		});
 	});
 
-	describe('isError', () => {
+	describe('isException', () => {
 		it('should return true for Exception status', () => {
-			expect(TraceStatus.Exception.isError()).toBe(true);
+			expect(TraceStatus.Exception.isException()).toBe(true);
 		});
 
 		it('should return false for Success status', () => {
-			expect(TraceStatus.Success.isError()).toBe(false);
+			expect(TraceStatus.Success.isException()).toBe(false);
 		});
 	});
 

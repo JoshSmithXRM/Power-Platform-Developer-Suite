@@ -18,7 +18,7 @@ export class ValidateUniqueNameUseCase {
 	 * @returns Response indicating uniqueness status
 	 */
 	public async execute(request: ValidateUniqueNameRequest): Promise<ValidateUniqueNameResponse> {
-		this.logger.debug(`ValidateUniqueNameUseCase: Checking uniqueness for "${request.name}"`);
+		this.logger.debug('ValidateUniqueNameUseCase: Checking uniqueness', { name: request.name });
 
 		const excludeId = request.excludeEnvironmentId
 			? new EnvironmentId(request.excludeEnvironmentId)
@@ -26,7 +26,7 @@ export class ValidateUniqueNameUseCase {
 
 		const isUnique = await this.repository.isNameUnique(request.name, excludeId);
 
-		this.logger.debug(`Name "${request.name}" is ${isUnique ? 'unique' : 'duplicate'}`);
+		this.logger.debug('Name uniqueness check result', { name: request.name, isUnique });
 
 		const result: ValidateUniqueNameResponse = {
 			isUnique

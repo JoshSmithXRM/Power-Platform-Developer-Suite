@@ -87,7 +87,7 @@ export class DataverseApiConnectionReferenceRepository implements IConnectionRef
 
 			const refs = response.value.map((dto) => this.mapToEntity(dto));
 
-			this.logger.debug(`Fetched ${refs.length} connection reference(s) from Dataverse`, { environmentId });
+			this.logger.debug('Fetched connection references from Dataverse', { environmentId, count: refs.length });
 
 			return refs;
 		} catch (error) {

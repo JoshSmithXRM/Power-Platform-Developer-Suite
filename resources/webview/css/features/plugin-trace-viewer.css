@@ -385,3 +385,335 @@ tbody tr.selected.row-odd:hover {
         font-weight: 600;
     }
 }
+
+/* Filter Panel Styles */
+.filter-panel {
+    background: var(--vscode-editor-background);
+    border-bottom: 1px solid var(--vscode-panel-border);
+    margin-bottom: 0;
+}
+
+.filter-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--vscode-editorWidget-background);
+    cursor: pointer;
+    user-select: none;
+}
+
+.filter-panel-header:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.filter-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--vscode-foreground);
+}
+
+.filter-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.filter-toggle-btn:hover {
+    background: var(--vscode-input-background);
+    border-radius: 4px;
+}
+
+.filter-panel-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: all 0.3s ease;
+}
+
+.filter-panel-body.collapsed {
+    display: none;
+}
+
+.filter-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-row label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--vscode-descriptionForeground);
+}
+
+.filter-row input,
+.filter-row select {
+    padding: 6px 10px;
+    font-size: 13px;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 2px;
+    outline: none;
+    font-family: var(--vscode-font-family);
+}
+
+.filter-row input:focus,
+.filter-row select:focus {
+    border-color: var(--vscode-focusBorder);
+    outline: 1px solid var(--vscode-focusBorder);
+}
+
+.filter-row input::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+.filter-actions {
+    display: flex;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--vscode-panel-border);
+}
+
+.filter-actions .primary-button {
+    padding: 8px 16px;
+    font-size: 13px;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.filter-actions .primary-button:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.filter-actions .secondary-button {
+    padding: 8px 16px;
+    font-size: 13px;
+    background: transparent;
+    color: var(--vscode-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 2px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.filter-actions .secondary-button:hover {
+    background: var(--vscode-list-hoverBackground);
+    border-color: var(--vscode-focusBorder);
+}
+
+/* Query Builder Styles */
+.filter-controls {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.filter-logic-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    user-select: none;
+}
+
+.filter-logic-label input[type="radio"] {
+    cursor: pointer;
+}
+
+.filter-conditions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.filter-condition-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.filter-condition-row:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.filter-condition-row .condition-enabled {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.filter-condition-row .condition-field {
+    flex: 0 0 140px;
+    padding: 6px 8px;
+    font-size: 12px;
+    background: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.filter-condition-row .condition-operator {
+    flex: 0 0 130px;
+    padding: 6px 8px;
+    font-size: 12px;
+    background: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.filter-condition-row .condition-value {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 8px;
+    font-size: 13px;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 2px;
+    outline: none;
+}
+
+.filter-condition-row .condition-value:focus {
+    border-color: var(--vscode-focusBorder);
+    outline: 1px solid var(--vscode-focusBorder);
+}
+
+.filter-condition-row .condition-value::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+/* Enum dropdown styling */
+.filter-condition-row select.condition-value {
+    background: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border);
+    cursor: pointer;
+}
+
+.filter-condition-row select.condition-value:focus {
+    border-color: var(--vscode-focusBorder);
+    outline: 1px solid var(--vscode-focusBorder);
+}
+
+/* Date and number input styling */
+.filter-condition-row input[type="datetime-local"].condition-value,
+.filter-condition-row input[type="number"].condition-value {
+    font-family: var(--vscode-font-family);
+}
+
+.filter-condition-row .remove-condition-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.filter-condition-row .remove-condition-btn:hover {
+    background: var(--vscode-inputValidation-errorBackground);
+    border-color: var(--vscode-inputValidation-errorBorder);
+    color: var(--vscode-errorForeground);
+}
+
+.icon-button {
+    padding: 6px;
+    background: transparent;
+    border: none;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.icon-button:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+/* Responsive filter panel */
+@media (max-width: 768px) {
+    .filter-condition-row {
+        flex-wrap: wrap;
+    }
+
+    .filter-condition-row .condition-field,
+    .filter-condition-row .condition-operator {
+        flex: 1 1 45%;
+    }
+
+    .filter-condition-row .condition-value {
+        flex: 1 1 100%;
+        order: 3;
+    }
+
+    .filter-condition-row .remove-condition-btn {
+        order: 4;
+    }
+}
+
+@media (min-width: 769px) {
+    .filter-row {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .filter-row label {
+        min-width: 120px;
+        margin-bottom: 0;
+    }
+
+    .filter-row input,
+    .filter-row select {
+        flex: 1;
+    }
+}

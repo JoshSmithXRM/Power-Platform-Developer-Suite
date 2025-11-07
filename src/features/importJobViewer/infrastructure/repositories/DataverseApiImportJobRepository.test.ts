@@ -365,7 +365,7 @@ describe('DataverseApiImportJobRepository', () => {
 			await repository.findAll('env-123', undefined, undefined);
 
 			expect(mockLogger.debug).toHaveBeenCalledWith('Fetching import jobs from Dataverse API', { environmentId: 'env-123' });
-			expect(mockLogger.debug).toHaveBeenCalledWith('Fetched 1 import job(s) from Dataverse', { environmentId: 'env-123' });
+			expect(mockLogger.debug).toHaveBeenCalledWith('Fetched import jobs from Dataverse', { environmentId: 'env-123', count: 1 });
 		});
 
 		it('should use correct Dataverse endpoint with query parameters', async () => {

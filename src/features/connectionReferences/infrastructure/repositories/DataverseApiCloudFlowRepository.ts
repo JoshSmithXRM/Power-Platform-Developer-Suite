@@ -95,7 +95,7 @@ export class DataverseApiCloudFlowRepository implements ICloudFlowRepository {
 
 			const flows = response.value.map((dto) => this.mapToEntity(dto));
 
-			this.logger.debug(`Fetched ${flows.length} cloud flow(s) from Dataverse`, { environmentId });
+			this.logger.debug('Fetched cloud flows from Dataverse', { environmentId, count: flows.length });
 
 			return flows;
 		} catch (error) {

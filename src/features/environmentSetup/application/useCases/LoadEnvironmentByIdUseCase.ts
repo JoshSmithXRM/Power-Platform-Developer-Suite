@@ -22,7 +22,7 @@ export class LoadEnvironmentByIdUseCase {
 	 * @returns Form view model with environment data and credential availability flags
 	 */
 	public async execute(request: LoadEnvironmentByIdRequest): Promise<EnvironmentFormViewModel> {
-		this.logger.debug(`LoadEnvironmentByIdUseCase: Loading environment ${request.environmentId}`);
+		this.logger.debug('LoadEnvironmentByIdUseCase: Loading environment', { environmentId: request.environmentId });
 
 		try {
 			const environmentId = new EnvironmentId(request.environmentId);
@@ -30,7 +30,7 @@ export class LoadEnvironmentByIdUseCase {
 			// Get domain entity
 			const environment = await this.repository.getById(environmentId);
 			if (!environment) {
-				this.logger.warn(`Environment not found: ${request.environmentId}`);
+				this.logger.warn('Environment not found', { environmentId: request.environmentId });
 				throw new ApplicationError(`Environment not found: ${request.environmentId}`);
 			}
 
@@ -45,7 +45,7 @@ export class LoadEnvironmentByIdUseCase {
 				? !!(await this.repository.getPassword(username))
 				: false;
 
-			this.logger.info(`Environment loaded: ${environment.getName().getValue()}`);
+			this.logger.info('Environment loaded', { environmentName: environment.getName().getValue() });
 
 			// Transform to ViewModel for editing
 			return this.mapper.toFormViewModel(environment, hasStoredClientSecret, hasStoredPassword);

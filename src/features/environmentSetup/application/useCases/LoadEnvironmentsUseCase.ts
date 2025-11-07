@@ -28,7 +28,7 @@ export class LoadEnvironmentsUseCase {
 			// Transform to sorted ViewModels (sorting is presentation concern handled by mapper)
 			const viewModels = this.mapper.toSortedViewModels(environments);
 
-			this.logger.info(`Loaded ${viewModels.length} environment(s)`);
+			this.logger.info('Loaded environments', { count: viewModels.length });
 
 			const result: LoadEnvironmentsResponse = {
 				environments: viewModels,

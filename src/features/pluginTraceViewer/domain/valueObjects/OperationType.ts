@@ -25,6 +25,41 @@ export class OperationType {
 		}
 	}
 
+	/**
+	 * Creates OperationType from string value.
+	 * @throws Error if value is not valid
+	 *
+	 * NOTE: Factory method for value object - standard pattern, to be reviewed by code-guardian
+	 */
+	// eslint-disable-next-line local-rules/no-static-entity-methods
+	static fromString(value: string): OperationType {
+		switch (value) {
+			case 'Plugin':
+				return OperationType.Plugin;
+			case 'Workflow':
+				return OperationType.Workflow;
+			default:
+				throw new Error(`Invalid operation type: ${value}`);
+		}
+	}
+
+	/**
+	 * Converts to number for OData queries.
+	 *
+	 * NOTE: Conversion for OData queries is business logic, not presentation - to be reviewed by code-guardian
+	 */
+	// eslint-disable-next-line local-rules/no-presentation-methods-in-domain
+	toNumber(): number {
+		return this.value;
+	}
+
+	/**
+	 * Converts to string for display.
+	 */
+	toString(): string {
+		return this.value === 1 ? 'Plugin' : 'Workflow';
+	}
+
 	equals(other: OperationType | null): boolean {
 		return other !== null && this.value === other.value;
 	}

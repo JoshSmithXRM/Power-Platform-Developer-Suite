@@ -21,7 +21,7 @@ export class ClearStorageEntryUseCase {
 	 * @param key Storage key to clear
 	 */
 	public async execute(key: string): Promise<void> {
-		this.logger.debug(`ClearStorageEntryUseCase: Clearing entry "${key}"`);
+		this.logger.debug('ClearStorageEntryUseCase: Clearing entry', { key });
 
 		try {
 			// Orchestrate: get current collection for validation
@@ -29,7 +29,7 @@ export class ClearStorageEntryUseCase {
 			const entry = collection.getEntry(key);
 
 			if (!entry) {
-				this.logger.warn(`Entry not found: ${key}`);
+				this.logger.warn('Entry not found', { key });
 				throw new Error(`Entry not found: ${key}`);
 			}
 
@@ -41,7 +41,7 @@ export class ClearStorageEntryUseCase {
 				new StorageEntryCleared(entry.key, entry.storageType)
 			);
 
-			this.logger.info(`Storage entry cleared: ${key}`);
+			this.logger.info('Storage entry cleared', { key });
 		} catch (error) {
 			this.logger.error('ClearStorageEntryUseCase: Failed to clear entry', error);
 			throw error;

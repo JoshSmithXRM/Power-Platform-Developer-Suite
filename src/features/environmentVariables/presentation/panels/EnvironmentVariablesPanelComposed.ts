@@ -227,7 +227,13 @@ export class EnvironmentVariablesPanelComposed {
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'EnvironmentVariablesBehavior.js')
 				).toString()
 			],
 			cspNonce: getNonce(),
@@ -327,18 +333,15 @@ export class EnvironmentVariablesPanelComposed {
 				.map(envVar => this.viewModelMapper.toViewModel(envVar))
 				.sort((a, b) => a.schemaName.localeCompare(b.schemaName));
 
-			const environments = await this.getEnvironments();
-			const solutions = this.solutionOptions;
-
 			this.logger.info('Environment variables loaded successfully', { count: viewModels.length });
 
-			// Refresh HTML with data
-			await this.scaffoldingBehavior.refresh({
-				tableData: viewModels,
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				solutions,
-				currentSolutionId: this.currentSolutionId || undefined
+			// Data-driven update: Send ViewModels to frontend
+			await this.panel.webview.postMessage({
+				command: 'updateTableData',
+				data: {
+					viewModels,
+					columns: this.getTableConfig().columns
+				}
 			});
 		} catch (error: unknown) {
 			this.logger.error('Error refreshing environment variables', error);

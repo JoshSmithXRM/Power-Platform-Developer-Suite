@@ -93,20 +93,21 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 			}
 
 			if (response.value.length === 0) {
-				this.logger.warn(`No entity definition found for logical name: ${entityLogicalName}`);
+				this.logger.warn('No entity definition found for logical name', { entityLogicalName });
 				return null;
 			}
 
 			const firstEntity = response.value[0];
 			if (firstEntity === undefined) {
-				this.logger.warn(`Entity definition array is empty for: ${entityLogicalName}`);
+				this.logger.warn('Entity definition array is empty', { entityLogicalName });
 				return null;
 			}
 
 			const objectTypeCode = firstEntity.ObjectTypeCode;
 
-			this.logger.debug(`Fetched ObjectTypeCode for ${entityLogicalName}`, {
+			this.logger.debug('Fetched ObjectTypeCode', {
 				environmentId,
+				entityLogicalName,
 				objectTypeCode
 			});
 
@@ -143,7 +144,7 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 		);
 
 		if (objectTypeCode === null) {
-			this.logger.warn(`Cannot fetch solution components - no ObjectTypeCode for ${entityLogicalName}`);
+			this.logger.warn('Cannot fetch solution components - no ObjectTypeCode', { entityLogicalName });
 			return [];
 		}
 
@@ -180,11 +181,12 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 
 			const componentIds = response.value.map((dto) => dto.objectid);
 
-			this.logger.debug(`Fetched ${componentIds.length} solution component(s) from Dataverse`, {
+			this.logger.debug('Fetched solution components from Dataverse', {
 				environmentId,
 				solutionId,
 				entityLogicalName,
-				objectTypeCode
+				objectTypeCode,
+				count: componentIds.length
 			});
 
 			return componentIds;

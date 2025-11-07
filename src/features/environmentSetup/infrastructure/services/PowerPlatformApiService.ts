@@ -69,7 +69,7 @@ export class PowerPlatformApiService implements IPowerPlatformApiService {
 
 		if (!response.ok) {
 			const errorText = await response.text();
-			this.logger.error(`BAP API request failed: ${response.status} ${response.statusText}`);
+			this.logger.error('BAP API request failed', { status: response.status, statusText: response.statusText });
 			throw new Error(`BAP API request failed: ${response.status} ${response.statusText} - ${errorText}`);
 		}
 
@@ -79,7 +79,7 @@ export class PowerPlatformApiService implements IPowerPlatformApiService {
 			throw new Error('Invalid BAP API response structure');
 		}
 
-		this.logger.debug(`BAP API returned ${data.value.length} environments`);
+		this.logger.debug('BAP API returned environments', { count: data.value.length });
 
 		const matchingEnvironment = data.value.find(env => {
 			const envOrgName = env.properties?.linkedEnvironmentMetadata?.uniqueName?.toLowerCase();
@@ -102,7 +102,7 @@ export class PowerPlatformApiService implements IPowerPlatformApiService {
 		});
 
 		if (!matchingEnvironment) {
-			this.logger.warn(`No Power Platform environment found matching organization: ${orgName}`);
+			this.logger.warn('No Power Platform environment found matching organization', { orgName });
 			throw new Error(`No Power Platform environment found matching organization: ${orgName}`);
 		}
 
@@ -112,7 +112,7 @@ export class PowerPlatformApiService implements IPowerPlatformApiService {
 			throw new Error('Failed to extract environment ID from BAP API response');
 		}
 
-		this.logger.info(`Environment ID discovered: ${environmentId} for organization: ${orgName}`);
+		this.logger.info('Environment ID discovered', { environmentId, orgName });
 
 		return environmentId;
 		} catch (error) {

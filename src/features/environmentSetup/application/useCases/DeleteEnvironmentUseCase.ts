@@ -22,7 +22,7 @@ export class DeleteEnvironmentUseCase {
 	 * @param request Request containing environment ID to delete
 	 */
 	public async execute(request: DeleteEnvironmentRequest): Promise<void> {
-		this.logger.debug(`DeleteEnvironmentUseCase: Deleting environment ${request.environmentId}`);
+		this.logger.debug('DeleteEnvironmentUseCase: Deleting environment', { environmentId: request.environmentId });
 
 		try {
 			const environmentId = new EnvironmentId(request.environmentId);
@@ -30,7 +30,7 @@ export class DeleteEnvironmentUseCase {
 			// Get environment to emit proper event
 			const environment = await this.repository.getById(environmentId);
 			if (!environment) {
-				this.logger.warn(`Environment not found: ${request.environmentId}`);
+				this.logger.warn('Environment not found', { environmentId: request.environmentId });
 				throw new ApplicationError('Environment not found');
 			}
 
@@ -54,7 +54,7 @@ export class DeleteEnvironmentUseCase {
 				environment.getIsActive()
 			));
 
-			this.logger.info(`Environment deleted: ${environmentName}`);
+			this.logger.info('Environment deleted', { environmentName });
 		} catch (error) {
 			this.logger.error('DeleteEnvironmentUseCase: Failed to delete environment', error);
 			throw error;

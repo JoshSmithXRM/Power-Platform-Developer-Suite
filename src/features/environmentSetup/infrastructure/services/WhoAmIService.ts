@@ -54,7 +54,8 @@ export class WhoAmIService implements IWhoAmIService {
 		password?: string
 	): Promise<WhoAmIResponse> {
 		const url = `${environment.getDataverseUrl().getApiBaseUrl()}/WhoAmI`;
-		this.logger.debug(`WhoAmIService: Testing connection to ${url}`, {
+		this.logger.debug('WhoAmIService: Testing connection', {
+			url,
 			authMethod: environment.getAuthenticationMethod().getType(),
 			hasClientSecret: !!clientSecret,
 			hasPassword: !!password
@@ -87,7 +88,7 @@ export class WhoAmIService implements IWhoAmIService {
 				});
 
 				if (!response.ok) {
-					this.logger.error(`WhoAmI API failed: ${response.status} ${response.statusText}`);
+					this.logger.error('WhoAmI API failed', { status: response.status, statusText: response.statusText });
 					throw new Error(`WhoAmI API returned ${response.status}: ${response.statusText}`);
 				}
 

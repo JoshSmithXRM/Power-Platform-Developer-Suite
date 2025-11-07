@@ -51,7 +51,7 @@ export class TestConnectionUseCase {
 				credentials.password
 			);
 
-			this.logger.info(`Connection test successful for "${request.name}"`);
+			this.logger.info('Connection test successful', { name: request.name });
 			return this.createSuccessResponse(whoAmIResponse);
 		} catch (error) {
 			this.logger.error('TestConnectionUseCase: Connection test failed', error);

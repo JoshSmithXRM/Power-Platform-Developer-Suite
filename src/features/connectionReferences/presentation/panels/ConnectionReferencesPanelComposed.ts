@@ -152,10 +152,7 @@ export class ConnectionReferencesPanelComposed {
 		return newPanel;
 	}
 
-	private createCoordinator(): { coordinator: PanelCoordinator<ConnectionReferencesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
-		const environmentSelector = new EnvironmentSelectorSection();
-		const solutionFilter = new SolutionFilterSection();
-
+	private getTableConfig(): DataTableConfig {
 		const columns: DataTableColumn[] = [
 			{ key: 'flowName', label: 'Flow Name' },
 			{ key: 'connectionReferenceLogicalName', label: 'Connection Reference' },
@@ -167,7 +164,7 @@ export class ConnectionReferencesPanelComposed {
 			{ key: 'connectionReferenceModifiedOn', label: 'CR Modified' }
 		];
 
-		const tableConfig: DataTableConfig = {
+		return {
 			viewType: ConnectionReferencesPanelComposed.viewType,
 			title: 'Connection References',
 			dataCommand: 'connectionReferencesData',
@@ -178,6 +175,13 @@ export class ConnectionReferencesPanelComposed {
 			noDataMessage: 'No connection references found.',
 			toolbarButtons: []
 		};
+	}
+
+	private createCoordinator(): { coordinator: PanelCoordinator<ConnectionReferencesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
+		const environmentSelector = new EnvironmentSelectorSection();
+		const solutionFilter = new SolutionFilterSection();
+
+		const tableConfig = this.getTableConfig();
 
 		const tableSection = new DataTableSection(tableConfig);
 
@@ -218,7 +222,13 @@ export class ConnectionReferencesPanelComposed {
 					vscodeImpl.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscodeImpl.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscodeImpl.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscodeImpl.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'ConnectionReferencesBehavior.js')
 				).toString()
 			],
 			cspNonce: getNonce(),
@@ -295,20 +305,32 @@ export class ConnectionReferencesPanelComposed {
 			}
 		}
 
-		await this.render();
-	}
-
-	private async render(): Promise<void> {
+		// Initial HTML scaffolding (environments, solutions, empty table)
 		const environments = await this.getEnvironments();
 		const solutions = await this.loadSolutions();
-		const data = await this.loadData();
 
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			solutions,
 			currentSolutionId: this.currentSolutionId,
-			tableData: data
+			tableData: []
+		});
+
+		// Load data and update table with data-driven pattern
+		await this.render();
+	}
+
+	private async render(): Promise<void> {
+		const data = await this.loadData();
+
+		// Data-driven update: Send ViewModels to frontend
+		await this.panel.webview.postMessage({
+			command: 'updateTableData',
+			data: {
+				viewModels: data,
+				columns: this.getTableConfig().columns
+			}
 		});
 	}
 

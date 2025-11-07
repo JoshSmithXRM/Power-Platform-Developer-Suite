@@ -76,7 +76,7 @@ describe('DataversePluginTraceRepository', () => {
 			const environmentId = 'env-123';
 			const filter = TraceFilter.create({
 				top: 100,
-				odataFilter: 'typename eq \'TestPlugin\'',
+				pluginNameFilter: 'TestPlugin',
 			});
 
 			mockApiService.get.mockResolvedValue({ value: [] });
@@ -86,6 +86,10 @@ describe('DataversePluginTraceRepository', () => {
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				environmentId,
 				expect.stringContaining('$filter=')
+			);
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				environmentId,
+				expect.stringContaining('typename')
 			);
 		});
 

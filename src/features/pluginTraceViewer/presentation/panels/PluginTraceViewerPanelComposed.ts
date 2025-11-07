@@ -30,12 +30,15 @@ import type { PluginTraceViewModelMapper } from '../mappers/PluginTraceViewModel
 import { TraceLevelFormatter } from '../utils/TraceLevelFormatter';
 import type { PluginTrace } from '../../domain/entities/PluginTrace';
 import type { ExportFormat } from '../../domain/types/ExportFormat';
-import { TraceLevel, TraceFilter } from '../../application/types';
+import { TraceLevel } from '../../application/types';
 import { PluginTraceDetailSection } from '../sections/PluginTraceDetailSection';
 import { ExportDropdownSection } from '../sections/ExportDropdownSection';
 import { DeleteDropdownSection } from '../sections/DeleteDropdownSection';
 import { TraceLevelDropdownSection } from '../sections/TraceLevelDropdownSection';
 import { AutoRefreshDropdownSection } from '../sections/AutoRefreshDropdownSection';
+import { FilterPanelSection } from '../sections/FilterPanelSection';
+import { FilterCriteriaMapper } from '../mappers/FilterCriteriaMapper';
+import type { FilterCriteriaViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
 
 /**
  * Commands supported by Plugin Trace Viewer panel.
@@ -53,7 +56,9 @@ type PluginTraceViewerCommands =
 	| 'exportJson'
 	| 'setTraceLevel'
 	| 'setAutoRefresh'
-	| 'loadRelatedTraces';
+	| 'loadRelatedTraces'
+	| 'applyFilters'
+	| 'clearFilters';
 
 /**
  * Plugin Trace Viewer panel using new PanelCoordinator architecture.
@@ -66,11 +71,13 @@ export class PluginTraceViewerPanelComposed {
 	private readonly coordinator: PanelCoordinator<PluginTraceViewerCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
 	private readonly detailSection: PluginTraceDetailSection;
+	private readonly filterCriteriaMapper: FilterCriteriaMapper;
 	private currentEnvironmentId: string;
 	private traces: readonly PluginTrace[] = [];
 	private currentTraceLevel: TraceLevel | null = null;
 	private autoRefreshInterval: number = 0;
 	private autoRefreshTimer: NodeJS.Timeout | null = null;
+	private filterCriteria: FilterCriteriaViewModel;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -91,6 +98,8 @@ export class PluginTraceViewerPanelComposed {
 		environmentId: string
 	) {
 		this.currentEnvironmentId = environmentId;
+		this.filterCriteriaMapper = new FilterCriteriaMapper();
+		this.filterCriteria = FilterCriteriaMapper.empty();
 		logger.debug('PluginTraceViewerPanel: Initialized with new architecture');
 
 		panel.webview.options = {
@@ -196,7 +205,8 @@ export class PluginTraceViewerPanelComposed {
 			tableData: [],
 			state: {
 				traceLevel: this.currentTraceLevel?.value,
-				autoRefreshInterval: this.autoRefreshInterval
+				autoRefreshInterval: this.autoRefreshInterval,
+				filterCriteria: this.filterCriteria
 			}
 		});
 
@@ -206,19 +216,14 @@ export class PluginTraceViewerPanelComposed {
 
 		const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
 
-		// eslint-disable-next-line no-console
-		console.log('[Panel] initializeAndLoadData: Final refresh with state:', {
-			traceLevel: this.currentTraceLevel?.value,
-			autoRefreshInterval: this.autoRefreshInterval
-		});
-
 		await this.scaffoldingBehavior.refresh({
 			tableData: viewModels,
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			state: {
 				traceLevel: this.currentTraceLevel?.value,
-				autoRefreshInterval: this.autoRefreshInterval
+				autoRefreshInterval: this.autoRefreshInterval,
+				filterCriteria: this.filterCriteria
 			}
 		});
 	}
@@ -235,6 +240,7 @@ export class PluginTraceViewerPanelComposed {
 		const deleteDropdown = new DeleteDropdownSection();
 		const traceLevelDropdown = new TraceLevelDropdownSection();
 		const autoRefreshDropdown = new AutoRefreshDropdownSection();
+		const filterPanel = new FilterPanelSection();
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
 				{ id: 'refresh', label: 'Refresh' },
@@ -254,6 +260,7 @@ export class PluginTraceViewerPanelComposed {
 				autoRefreshDropdown,
 				actionButtons,
 				environmentSelector,
+				filterPanel,
 				tableSection,
 				detailSection
 			],
@@ -333,12 +340,12 @@ export class PluginTraceViewerPanelComposed {
 		});
 
 		this.coordinator.registerHandler('viewDetail', async (data) => {
-			this.logger.info('viewDetail command received', { data });
+			this.logger.info('ViewDetail command received', { data });
 			const traceId = (data as { traceId?: string })?.traceId;
 			if (traceId) {
 				await this.handleViewDetail(traceId);
 			} else {
-				this.logger.warn('viewDetail called but no traceId in data', { data });
+				this.logger.warn('ViewDetail called but no traceId in data', { data });
 			}
 		});
 
@@ -391,6 +398,15 @@ export class PluginTraceViewerPanelComposed {
 				await this.handleLoadRelatedTraces(correlationId);
 			}
 		});
+
+		this.coordinator.registerHandler('applyFilters', async (data) => {
+			const filterData = data as Partial<FilterCriteriaViewModel>;
+			await this.handleApplyFilters(filterData);
+		});
+
+		this.coordinator.registerHandler('clearFilters', async () => {
+			await this.handleClearFilters();
+		});
 	}
 
 	private getTableConfig(): DataTableConfig {
@@ -421,11 +437,8 @@ export class PluginTraceViewerPanelComposed {
 		this.logger.debug('Refreshing plugin traces');
 
 		try {
-			const filter = TraceFilter.create({
-				top: 100,
-				orderBy: 'createdon desc',
-				odataFilter: ''
-			});
+			// Build filter from current filter criteria
+			const filter = this.filterCriteriaMapper.toDomain(this.filterCriteria);
 
 			const traces = await this.getPluginTracesUseCase.execute(this.currentEnvironmentId, filter);
 			this.traces = traces;
@@ -478,7 +491,7 @@ export class PluginTraceViewerPanelComposed {
 
 	private async handleViewDetail(traceId: string): Promise<void> {
 		try {
-			this.logger.info('handleViewDetail called', { traceId, tracesCount: this.traces.length });
+			this.logger.info('HandleViewDetail called', { traceId, tracesCount: this.traces.length });
 
 			const trace = this.traces.find(t => t.id === traceId);
 			if (!trace) {
@@ -515,7 +528,7 @@ export class PluginTraceViewerPanelComposed {
 				traceId: traceId
 			});
 
-			this.logger.info('showDetailPanel and selectRow messages sent to webview');
+			this.logger.info('ShowDetailPanel and selectRow messages sent to webview');
 		} catch (error) {
 			this.logger.error('Failed to view trace detail', error);
 			await vscode.window.showErrorMessage('Failed to load trace detail');
@@ -526,15 +539,6 @@ export class PluginTraceViewerPanelComposed {
 		this.logger.debug('Closing trace detail');
 
 		this.detailSection.setTrace(null);
-
-		const environments = await this.getEnvironments();
-		const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
-
-		await this.scaffoldingBehavior.refresh({
-			tableData: viewModels,
-			environments,
-			currentEnvironmentId: this.currentEnvironmentId
-		});
 
 		await this.panel.webview.postMessage({
 			command: 'hideDetailPanel'
@@ -687,6 +691,45 @@ export class PluginTraceViewerPanelComposed {
 		} catch (error) {
 			this.logger.error('Failed to load related traces', error);
 			await vscode.window.showErrorMessage('Failed to load related traces');
+		}
+	}
+
+	private async handleApplyFilters(filterData: Partial<FilterCriteriaViewModel>): Promise<void> {
+		try {
+			this.logger.debug('Applying filters', { filterData });
+
+			// Merge partial filter data with current filter criteria
+			this.filterCriteria = {
+				...this.filterCriteria,
+				...filterData
+			};
+
+			// Refresh traces with new filter (uses data-driven update)
+			await this.handleRefresh();
+
+			this.logger.info('Filters applied successfully', {
+				filterCount: this.filterCriteriaMapper.toDomain(this.filterCriteria).getActiveFilterCount()
+			});
+		} catch (error) {
+			this.logger.error('Failed to apply filters', error);
+			await vscode.window.showErrorMessage('Failed to apply filters');
+		}
+	}
+
+	private async handleClearFilters(): Promise<void> {
+		try {
+			this.logger.debug('Clearing filters');
+
+			// Reset to empty filter criteria
+			this.filterCriteria = FilterCriteriaMapper.empty();
+
+			// Refresh traces with cleared filter (uses data-driven update)
+			await this.handleRefresh();
+
+			this.logger.info('Filters cleared successfully');
+		} catch (error) {
+			this.logger.error('Failed to clear filters', error);
+			await vscode.window.showErrorMessage('Failed to clear filters');
 		}
 	}
 

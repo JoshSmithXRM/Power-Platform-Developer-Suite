@@ -126,7 +126,7 @@ describe('MessageRoutingBehavior', () => {
 			await messageListener?.({ command: 'testCommand', data: { value: 'test' } });
 
 			expect(handler).toHaveBeenCalledWith({ command: 'testCommand', data: { value: 'test' } });
-			expect(loggerMock.debug).toHaveBeenCalledWith('Handling webview command: testCommand');
+			expect(loggerMock.debug).toHaveBeenCalledWith('Handling webview command', { command: 'testCommand' });
 		});
 
 		it('should handle message with no data', async () => {
@@ -179,7 +179,8 @@ describe('MessageRoutingBehavior', () => {
 			await messageListener?.({ command: 'unregisteredCommand' });
 
 			expect(loggerMock.warn).toHaveBeenCalledWith(
-				'No handler registered for command: unregisteredCommand'
+				'No handler registered for command',
+				{ command: 'unregisteredCommand' }
 			);
 		});
 

@@ -68,14 +68,14 @@ export class MessageRoutingBehavior implements IMessageRoutingBehavior {
 				return;
 			}
 
-			this.logger.debug(`Handling webview command: ${message.command}`);
+			this.logger.debug('Handling webview command', { command: message.command });
 
 			// Route to registered handler
 			const handler = this.commandHandlers.get(message.command);
 			if (handler) {
 				await handler(message);
 			} else {
-				this.logger.warn(`No handler registered for command: ${message.command}`);
+				this.logger.warn('No handler registered for command', { command: message.command });
 			}
 		} catch (error) {
 			this.logger.error('Error handling webview command', error);

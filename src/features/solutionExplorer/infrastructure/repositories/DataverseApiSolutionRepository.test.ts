@@ -305,7 +305,7 @@ describe('DataverseApiSolutionRepository', () => {
 			await repository.findAll('env-123', undefined, undefined);
 
 			expect(mockLogger.debug).toHaveBeenCalledWith('Fetching solutions from Dataverse API', { environmentId: 'env-123' });
-			expect(mockLogger.debug).toHaveBeenCalledWith('Fetched 1 solution(s) from Dataverse', { environmentId: 'env-123' });
+			expect(mockLogger.debug).toHaveBeenCalledWith('Fetched solutions from Dataverse', { environmentId: 'env-123', count: 1 });
 		});
 
 		it('should use correct Dataverse endpoint with query parameters', async () => {
@@ -540,8 +540,8 @@ describe('DataverseApiSolutionRepository', () => {
 				{ environmentId: 'env-123' }
 			);
 			expect(mockLogger.debug).toHaveBeenCalledWith(
-				'Fetched 1 visible solution(s) for dropdown',
-				{ environmentId: 'env-123' }
+				'Fetched visible solutions for dropdown',
+				{ environmentId: 'env-123', count: 1 }
 			);
 		});
 

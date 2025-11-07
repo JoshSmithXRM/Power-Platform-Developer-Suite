@@ -20,21 +20,21 @@ export class RevealSecretUseCase {
 	 * @returns The revealed secret value
 	 */
 	public async execute(key: string): Promise<string> {
-		this.logger.debug(`RevealSecretUseCase: Revealing secret "${key}"`);
+		this.logger.debug('RevealSecretUseCase: Revealing secret', { key });
 
 		try {
 			// Orchestrate: call domain service
 			const value = await this.storageInspectionService.revealSecret(key);
 
 			if (value === undefined) {
-				this.logger.warn(`Secret not found: ${key}`);
+				this.logger.warn('Secret not found', { key });
 				throw new Error(`Secret not found: ${key}`);
 			}
 
 			// Orchestrate: raise domain event
 			this.eventPublisher.publish(new SecretRevealed(key));
 
-			this.logger.info(`Secret revealed: ${key}`);
+			this.logger.info('Secret revealed', { key });
 
 			return value;
 		} catch (error) {

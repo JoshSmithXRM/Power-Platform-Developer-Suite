@@ -73,7 +73,7 @@ export class ListEnvironmentVariablesUseCase {
 
 	private checkCancellation(cancellationToken: ICancellationToken | undefined, stage: string): void {
 		if (cancellationToken?.isCancellationRequested) {
-			this.logger.info(`ListEnvironmentVariablesUseCase cancelled ${stage}`);
+			this.logger.info('ListEnvironmentVariablesUseCase cancelled', { stage });
 			throw new OperationCancelledException();
 		}
 	}

@@ -214,7 +214,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				this.logger.debug('Silent token acquisition cancelled by user');
 				throw error;
 			}
-			this.logger.debug(`Silent token acquisition failed, proceeding with ${flowName}`);
+			this.logger.debug('Silent token acquisition failed, proceeding with interactive flow', { flowName });
 			return undefined;
 		}
 	}

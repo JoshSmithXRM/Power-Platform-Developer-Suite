@@ -10,6 +10,7 @@ window.createBehavior({
 		setupDetailPanelVisibility();
 		setupRowSelection();
 		initializeDropdowns();
+		setupFilterPanel();
 	},
 	handleMessage(message) {
 		// Handle data-driven updates
@@ -212,4 +213,415 @@ function selectRowByTraceId(traceId) {
 			row.classList.add('selected');
 		}
 	}
+}
+
+/**
+ * Sets up filter panel event listeners for query builder.
+ */
+function setupFilterPanel() {
+	// Filter toggle (expand/collapse)
+	const toggleBtn = document.getElementById('filterToggleBtn');
+	const filterBody = document.getElementById('filterPanelBody');
+	if (toggleBtn && filterBody) {
+		toggleBtn.addEventListener('click', () => {
+			filterBody.classList.toggle('collapsed');
+			const icon = toggleBtn.querySelector('.codicon');
+			if (icon) {
+				icon.classList.toggle('codicon-chevron-down');
+				icon.classList.toggle('codicon-chevron-up');
+			}
+		});
+	}
+
+	// Add condition button
+	const addConditionBtn = document.getElementById('addConditionBtn');
+	if (addConditionBtn) {
+		addConditionBtn.addEventListener('click', () => {
+			addConditionRow();
+		});
+	}
+
+	// Apply filters button
+	const applyBtn = document.getElementById('applyFiltersBtn');
+	if (applyBtn) {
+		applyBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			e.preventDefault();
+
+			// Collect and send filter criteria
+			const filterCriteria = collectFilterCriteria();
+			vscode.postMessage({
+				command: 'applyFilters',
+				data: filterCriteria
+			});
+		}, true);
+	}
+
+	// Clear filters button
+	const clearBtn = document.getElementById('clearFiltersBtn');
+	if (clearBtn) {
+		clearBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			e.preventDefault();
+
+			// Send clear command
+			vscode.postMessage({
+				command: 'clearFilters'
+			});
+		}, true);
+	}
+
+	// Set up event delegation for dynamic rows
+	const filterConditions = document.getElementById('filterConditions');
+	if (filterConditions) {
+		// Handle remove button clicks
+		filterConditions.addEventListener('click', (e) => {
+			const removeBtn = e.target.closest('.remove-condition-btn');
+			if (removeBtn) {
+				const row = removeBtn.closest('.filter-condition-row');
+				if (row) {
+					removeConditionRow(row);
+				}
+			}
+		});
+
+		// Handle field dropdown changes - update operators
+		filterConditions.addEventListener('change', (e) => {
+			if (e.target.classList.contains('condition-field')) {
+				updateOperatorsForField(e.target);
+			}
+		});
+
+		// Enter key in value inputs triggers apply
+		filterConditions.addEventListener('keypress', (e) => {
+			if (e.target.classList.contains('condition-value') && e.key === 'Enter') {
+				e.preventDefault();
+				if (applyBtn) {
+					applyBtn.click();
+				}
+			}
+		});
+	}
+}
+
+/**
+ * Collects filter criteria from query builder.
+ * Returns FilterCriteriaViewModel structure.
+ */
+function collectFilterCriteria() {
+	// Get logical operator
+	const logicalOperator = document.querySelector('input[name="logicalOperator"]:checked')?.value || 'and';
+
+	// Collect all condition rows
+	const conditionRows = document.querySelectorAll('.filter-condition-row');
+	const conditions = Array.from(conditionRows).map(row => {
+		const id = row.dataset.conditionId;
+		const enabled = row.querySelector('.condition-enabled')?.checked || false;
+		const field = row.querySelector('.condition-field')?.value || '';
+		const operator = row.querySelector('.condition-operator')?.value || '';
+		const value = row.querySelector('.condition-value')?.value || '';
+
+		return { id, enabled, field, operator, value };
+	});
+
+	return {
+		conditions,
+		logicalOperator,
+		top: 100
+	};
+}
+
+/**
+ * Adds a new condition row to the query builder.
+ */
+function addConditionRow() {
+	const filterConditions = document.getElementById('filterConditions');
+	if (!filterConditions) {
+		return;
+	}
+
+	// Generate unique ID
+	const existingRows = filterConditions.querySelectorAll('.filter-condition-row');
+	const nextId = `condition-${existingRows.length}`;
+
+	// Create new row HTML
+	const newRowHtml = createConditionRowHtml({
+		id: nextId,
+		enabled: true,
+		field: 'Plugin Name',
+		operator: 'Contains',
+		value: ''
+	});
+
+	// Append to container
+	filterConditions.insertAdjacentHTML('beforeend', newRowHtml);
+}
+
+/**
+ * Removes a condition row from the query builder.
+ * Keeps at least one row.
+ */
+function removeConditionRow(row) {
+	const filterConditions = document.getElementById('filterConditions');
+	if (!filterConditions) {
+		return;
+	}
+
+	const allRows = filterConditions.querySelectorAll('.filter-condition-row');
+
+	// Keep at least one row
+	if (allRows.length <= 1) {
+		return;
+	}
+
+	row.remove();
+}
+
+/**
+ * Updates operators dropdown and value input when field changes.
+ * Filters operators based on field type and renders appropriate input.
+ */
+function updateOperatorsForField(fieldSelect) {
+	const row = fieldSelect.closest('.filter-condition-row');
+	if (!row) {
+		return;
+	}
+
+	const operatorSelect = row.querySelector('.condition-operator');
+	const valueInput = row.querySelector('.condition-value');
+	if (!operatorSelect || !valueInput) {
+		return;
+	}
+
+	const selectedField = fieldSelect.value;
+	const fieldType = getFieldType(selectedField);
+	const applicableOperators = getApplicableOperators(selectedField);
+
+	// Rebuild operator options
+	operatorSelect.innerHTML = applicableOperators
+		.map(op => `<option value="${escapeHtml(op)}">${escapeHtml(op)}</option>`)
+		.join('');
+
+	// Update field type on row
+	row.setAttribute('data-field-type', fieldType);
+
+	// Replace value input with appropriate type
+	const newValueInput = createValueInput(fieldType, selectedField, '');
+	valueInput.replaceWith(newValueInput);
+}
+
+/**
+ * Gets field type for a field name.
+ */
+function getFieldType(fieldDisplayName) {
+	const fieldTypes = {
+		'Plugin Name': 'text',
+		'Entity Name': 'text',
+		'Message Name': 'text',
+		'Operation Type': 'enum',
+		'Execution Mode': 'enum',
+		'Status': 'enum',
+		'Created On': 'date',
+		'Duration (ms)': 'number'
+	};
+
+	return fieldTypes[fieldDisplayName] || 'text';
+}
+
+/**
+ * Gets applicable operators for a field type.
+ */
+function getApplicableOperators(fieldDisplayName) {
+	// Operator applicability
+	const operatorsByType = {
+		text: ['Contains', 'Equals', 'Not Equals', 'Starts With', 'Ends With'],
+		enum: ['Equals', 'Not Equals'],
+		date: ['Equals', 'Greater Than', 'Less Than', 'Greater Than or Equal', 'Less Than or Equal'],
+		number: ['Equals', 'Greater Than', 'Less Than', 'Greater Than or Equal', 'Less Than or Equal']
+	};
+
+	const fieldType = getFieldType(fieldDisplayName);
+	return operatorsByType[fieldType] || operatorsByType.text;
+}
+
+/**
+ * Creates value input element based on field type.
+ */
+function createValueInput(fieldType, fieldName, value) {
+	switch (fieldType) {
+		case 'enum':
+			return createEnumInput(fieldName, value);
+		case 'date':
+			return createDateInput(value);
+		case 'number':
+			return createNumberInput(fieldName, value);
+		case 'text':
+		default:
+			return createTextInput(value);
+	}
+}
+
+/**
+ * Creates text input element.
+ */
+function createTextInput(value) {
+	const input = document.createElement('input');
+	input.type = 'text';
+	input.className = 'condition-value';
+	input.placeholder = 'Enter value...';
+	input.value = value;
+	return input;
+}
+
+/**
+ * Creates enum dropdown element.
+ */
+function createEnumInput(fieldName, value) {
+	const enumOptions = {
+		'Operation Type': ['Plugin', 'Workflow'],
+		'Execution Mode': ['Synchronous', 'Asynchronous'],
+		'Status': ['Success', 'Exception']
+	};
+
+	const options = enumOptions[fieldName] || [];
+
+	const select = document.createElement('select');
+	select.className = 'condition-value';
+
+	// Add empty option
+	const emptyOption = document.createElement('option');
+	emptyOption.value = '';
+	emptyOption.textContent = 'Select...';
+	select.appendChild(emptyOption);
+
+	// Add enum options
+	options.forEach(opt => {
+		const option = document.createElement('option');
+		option.value = opt;
+		option.textContent = opt;
+		if (opt === value) {
+			option.selected = true;
+		}
+		select.appendChild(option);
+	});
+
+	return select;
+}
+
+/**
+ * Creates date input element.
+ */
+function createDateInput(value) {
+	const input = document.createElement('input');
+	input.type = 'datetime-local';
+	input.className = 'condition-value';
+	input.value = value;
+	return input;
+}
+
+/**
+ * Creates number input element.
+ */
+function createNumberInput(fieldName, value) {
+	const input = document.createElement('input');
+	input.type = 'number';
+	input.className = 'condition-value';
+	input.placeholder = fieldName === 'Duration (ms)' ? 'Duration in ms' : 'Enter number...';
+	input.value = value;
+	input.min = '0';
+	return input;
+}
+
+/**
+ * Creates HTML for a single condition row.
+ */
+function createConditionRowHtml(condition) {
+	const applicableOperators = getApplicableOperators(condition.field);
+	const allFields = ['Plugin Name', 'Entity Name', 'Message Name', 'Operation Type', 'Execution Mode', 'Status', 'Created On', 'Duration (ms)'];
+	const fieldType = getFieldType(condition.field);
+	const valueInputHtml = createValueInputHtml(fieldType, condition.field, condition.value);
+
+	return `
+		<div class="filter-condition-row" data-condition-id="${escapeHtml(condition.id)}" data-field-type="${fieldType}">
+			<input
+				type="checkbox"
+				class="condition-enabled"
+				${condition.enabled ? 'checked' : ''}
+				title="Enable/Disable this condition"
+			/>
+
+			<select class="condition-field">
+				${allFields.map(field => `
+					<option value="${escapeHtml(field)}" ${field === condition.field ? 'selected' : ''}>
+						${escapeHtml(field)}
+					</option>
+				`).join('')}
+			</select>
+
+			<select class="condition-operator">
+				${applicableOperators.map(op => `
+					<option value="${escapeHtml(op)}" ${op === condition.operator ? 'selected' : ''}>
+						${escapeHtml(op)}
+					</option>
+				`).join('')}
+			</select>
+
+			${valueInputHtml}
+
+			<button class="icon-button remove-condition-btn" title="Remove condition">
+				<span class="codicon codicon-trash"></span>
+			</button>
+		</div>
+	`;
+}
+
+/**
+ * Creates HTML string for value input based on field type.
+ */
+function createValueInputHtml(fieldType, fieldName, value) {
+	switch (fieldType) {
+		case 'enum':
+			return createEnumInputHtml(fieldName, value);
+		case 'date':
+			return `<input type="datetime-local" class="condition-value" value="${escapeHtml(value)}" />`;
+		case 'number':
+			const placeholder = fieldName === 'Duration (ms)' ? 'Duration in ms' : 'Enter number...';
+			return `<input type="number" class="condition-value" placeholder="${placeholder}" value="${escapeHtml(value)}" min="0" />`;
+		case 'text':
+		default:
+			return `<input type="text" class="condition-value" placeholder="Enter value..." value="${escapeHtml(value)}" />`;
+	}
+}
+
+/**
+ * Creates HTML string for enum dropdown.
+ */
+function createEnumInputHtml(fieldName, value) {
+	const enumOptions = {
+		'Operation Type': ['Plugin', 'Workflow'],
+		'Execution Mode': ['Synchronous', 'Asynchronous'],
+		'Status': ['Success', 'Exception']
+	};
+
+	const options = enumOptions[fieldName] || [];
+
+	return `
+		<select class="condition-value">
+			<option value="">Select...</option>
+			${options.map(opt => `
+				<option value="${escapeHtml(opt)}" ${opt === value ? 'selected' : ''}>
+					${escapeHtml(opt)}
+				</option>
+			`).join('')}
+		</select>
+	`;
+}
+
+/**
+ * Escapes HTML to prevent XSS.
+ */
+function escapeHtml(str) {
+	const div = document.createElement('div');
+	div.textContent = str;
+	return div.innerHTML;
 }

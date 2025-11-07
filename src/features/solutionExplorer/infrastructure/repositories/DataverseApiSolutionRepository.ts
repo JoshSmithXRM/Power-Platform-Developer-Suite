@@ -98,7 +98,7 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
 
       const solutions = response.value.map((dto) => this.mapToEntity(dto));
 
-      this.logger.debug(`Fetched ${solutions.length} solution(s) from Dataverse`, { environmentId });
+      this.logger.debug('Fetched solutions from Dataverse', { environmentId, count: solutions.length });
 
       return solutions;
     } catch (error) {
@@ -150,7 +150,7 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
         uniqueName: dto.uniquename
       }));
 
-      this.logger.debug(`Fetched ${solutions.length} visible solution(s) for dropdown`, { environmentId });
+      this.logger.debug('Fetched visible solutions for dropdown', { environmentId, count: solutions.length });
 
       return solutions;
     } catch (error) {

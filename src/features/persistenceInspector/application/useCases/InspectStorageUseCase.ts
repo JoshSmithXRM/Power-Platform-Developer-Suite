@@ -37,7 +37,12 @@ export class InspectStorageUseCase {
 			const workspaceCount = collection.getEntriesByType('workspace').length;
 			const secretCount = collection.getEntriesByType('secret').length;
 
-			this.logger.info(`Storage inspected: ${entries.length} total entries (${globalCount} global, ${workspaceCount} workspace, ${secretCount} secrets)`);
+			this.logger.info('Storage inspected', {
+				totalEntries: entries.length,
+				globalCount,
+				workspaceCount,
+				secretCount
+			});
 
 			this.eventPublisher.publish(
 				new StorageInspected(entries.length, globalCount, workspaceCount, secretCount)

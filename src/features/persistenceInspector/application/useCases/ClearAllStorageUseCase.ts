@@ -36,7 +36,10 @@ export class ClearAllStorageUseCase {
 			// Orchestrate: call domain service
 			const result = await this.storageClearingService.clearAll(collection);
 
-			this.logger.info(`Clear all completed: ${result.totalCleared} entries cleared, ${collection.getProtectedEntries().length} protected entries skipped`);
+			this.logger.info('Clear all completed', {
+				totalCleared: result.totalCleared,
+				protectedSkipped: collection.getProtectedEntries().length
+			});
 
 			// Orchestrate: raise domain event
 			this.eventPublisher.publish(

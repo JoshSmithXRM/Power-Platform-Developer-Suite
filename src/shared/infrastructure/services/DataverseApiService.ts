@@ -133,7 +133,7 @@ export class DataverseApiService implements IDataverseApiService {
 
       const batchUrl = `${environmentUrl}/api/data/v9.2/$batch`;
 
-      this.logger.debug(`DataverseApiService: Batch DELETE ${entityIds.length} ${entitySetName}`, { environmentId });
+      this.logger.debug('DataverseApiService: Batch DELETE', { environmentId, count: entityIds.length, entitySetName });
 
       const response = await fetch(batchUrl, {
         method: 'POST',
@@ -148,8 +148,9 @@ export class DataverseApiService implements IDataverseApiService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        this.logger.error(`Batch delete failed: ${response.status} ${response.statusText}`, {
+        this.logger.error('Batch delete failed', {
           status: response.status,
+          statusText: response.statusText,
           errorText
         });
         throw new Error(
@@ -160,7 +161,7 @@ export class DataverseApiService implements IDataverseApiService {
       const responseText = await response.text();
       const successCount = (responseText.match(/HTTP\/1\.1 204/g) || []).length;
 
-      this.logger.debug(`DataverseApiService: Batch DELETE succeeded (${successCount}/${entityIds.length})`, { environmentId });
+      this.logger.debug('DataverseApiService: Batch DELETE succeeded', { environmentId, successCount, totalCount: entityIds.length });
 
       return successCount;
     } catch (error) {
@@ -248,7 +249,7 @@ export class DataverseApiService implements IDataverseApiService {
     }
 
     const url = `${environmentUrl}${endpoint}`;
-    this.logger.debug(`DataverseApiService: ${method} ${endpoint} (attempt ${attempt}/${retries})`, { environmentId });
+    this.logger.debug('DataverseApiService: Making API request', { environmentId, method, endpoint, attempt, retries });
 
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${accessToken}`,
@@ -271,10 +272,11 @@ export class DataverseApiService implements IDataverseApiService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      this.logger.error(`Dataverse API request failed: ${response.status} ${response.statusText}`, {
+      this.logger.error('Dataverse API request failed', {
         method,
         endpoint,
         status: response.status,
+        statusText: response.statusText,
         errorText,
         attempt,
         retries
@@ -298,7 +300,7 @@ export class DataverseApiService implements IDataverseApiService {
       throw new Error('Invalid API response structure: expected object');
     }
 
-    this.logger.debug(`DataverseApiService: ${method} ${endpoint} succeeded`);
+    this.logger.debug('DataverseApiService: Request succeeded', { method, endpoint });
 
     return data as T;
   }

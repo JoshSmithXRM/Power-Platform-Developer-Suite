@@ -19,7 +19,11 @@ export class CheckConcurrentEditUseCase {
 	public execute(request: CheckConcurrentEditRequest): CheckConcurrentEditResponse {
 		const isBeingEdited = this.editingSessions.has(request.environmentId);
 
-		this.logger.debug(`Concurrent edit check for ${request.environmentId}: ${isBeingEdited ? 'blocked' : 'allowed'}`);
+		this.logger.debug('Concurrent edit check', {
+			environmentId: request.environmentId,
+			isBeingEdited,
+			canEdit: !isBeingEdited
+		});
 
 		return {
 			isBeingEdited,
@@ -33,7 +37,7 @@ export class CheckConcurrentEditUseCase {
 	 */
 	public registerEditSession(environmentId: string): void {
 		this.editingSessions.add(environmentId);
-		this.logger.debug(`Edit session registered for ${environmentId}`);
+		this.logger.debug('Edit session registered', { environmentId });
 	}
 
 	/**
@@ -42,7 +46,7 @@ export class CheckConcurrentEditUseCase {
 	 */
 	public unregisterEditSession(environmentId: string): void {
 		this.editingSessions.delete(environmentId);
-		this.logger.debug(`Edit session unregistered for ${environmentId}`);
+		this.logger.debug('Edit session unregistered', { environmentId });
 	}
 }
 

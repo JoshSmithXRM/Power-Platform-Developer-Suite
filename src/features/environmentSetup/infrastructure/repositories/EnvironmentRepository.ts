@@ -30,7 +30,7 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 			const dtos = await this.loadDtos();
 			const environments = dtos.map(dto => this.mapper.toDomain(dto));
 
-			this.logger.debug(`Loaded ${environments.length} environment(s) from storage`);
+			this.logger.debug('Loaded environments from storage', { count: environments.length });
 
 			return environments;
 		} catch (error) {
@@ -40,14 +40,14 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 	}
 
 	public async getById(id: EnvironmentId): Promise<Environment | null> {
-		this.logger.debug(`EnvironmentRepository: Loading environment ${id.getValue()}`);
+		this.logger.debug('EnvironmentRepository: Loading environment', { id: id.getValue() });
 
 		try {
 			const dtos = await this.loadDtos();
 			const dto = dtos.find(d => d.id === id.getValue());
 
 			if (!dto) {
-				this.logger.debug(`Environment not found: ${id.getValue()}`);
+				this.logger.debug('Environment not found', { id: id.getValue() });
 				return null;
 			}
 
@@ -86,8 +86,9 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 		const envId = environment.getId().getValue();
 		const envName = environment.getName().getValue();
 
-		this.logger.debug(`EnvironmentRepository: Saving environment "${envName}"`, {
+		this.logger.debug('EnvironmentRepository: Saving environment', {
 			id: envId,
+			name: envName,
 			authMethod: environment.getAuthenticationMethod().getType(),
 			hasClientSecret: !!clientSecret,
 			hasPassword: !!password,
@@ -134,7 +135,7 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 
 			if (existingIndex >= 0) {
 				dtos[existingIndex] = dto;
-				this.logger.debug(`Updated existing environment at index ${existingIndex}`);
+				this.logger.debug('Updated existing environment', { index: existingIndex });
 			} else {
 				dtos.push(dto);
 				this.logger.debug('Added new environment to storage');
@@ -142,7 +143,7 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 
 			await this.saveDtos(dtos);
 
-			this.logger.info(`Environment saved: ${envName}`);
+			this.logger.info('Environment saved', { name: envName });
 		} catch (error) {
 			this.logger.error('EnvironmentRepository: Failed to save environment', error);
 			throw error;
@@ -154,7 +155,7 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 	 * @param id Environment ID to delete
 	 */
 	public async delete(id: EnvironmentId): Promise<void> {
-		this.logger.debug(`EnvironmentRepository: Deleting environment ${id.getValue()}`);
+		this.logger.debug('EnvironmentRepository: Deleting environment', { id: id.getValue() });
 
 		try {
 			const dtos = await this.loadDtos();
@@ -163,13 +164,13 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 			if (environment) {
 				const secretKeys = environment.getRequiredSecretKeys();
 				await this.deleteSecrets(secretKeys);
-				this.logger.debug(`Deleted ${secretKeys.length} secret(s)`);
+				this.logger.debug('Deleted secrets', { count: secretKeys.length });
 			}
 
 			const filtered = dtos.filter(d => d.id !== id.getValue());
 			await this.saveDtos(filtered);
 
-			this.logger.info(`Environment deleted: ${id.getValue()}`);
+			this.logger.info('Environment deleted', { id: id.getValue() });
 		} catch (error) {
 			this.logger.error('EnvironmentRepository: Failed to delete environment', error);
 			throw error;

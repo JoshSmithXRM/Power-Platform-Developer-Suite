@@ -106,7 +106,7 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 
 			const jobs = response.value.map((dto) => this.mapToEntity(dto));
 
-			this.logger.debug(`Fetched ${jobs.length} import job(s) from Dataverse`, { environmentId });
+			this.logger.debug('Fetched import jobs from Dataverse', { environmentId, count: jobs.length });
 
 			return jobs;
 		} catch (error) {

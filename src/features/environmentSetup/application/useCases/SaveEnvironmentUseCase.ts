@@ -36,7 +36,10 @@ export class SaveEnvironmentUseCase {
 	 */
 	public async execute(request: SaveEnvironmentRequest): Promise<SaveEnvironmentResponse> {
 		const isUpdate = !!request.existingEnvironmentId;
-		this.logger.debug(`SaveEnvironmentUseCase: ${isUpdate ? 'Updating' : 'Creating'} environment "${request.name}"`);
+		this.logger.debug('SaveEnvironmentUseCase: Starting operation', {
+			operation: isUpdate ? 'update' : 'create',
+			name: request.name
+		});
 
 		try {
 			const previousEnvironment = await this.loadPreviousEnvironment(request.existingEnvironmentId);
@@ -59,7 +62,10 @@ export class SaveEnvironmentUseCase {
 			await this.handleCacheInvalidation(previousEnvironment, environment, environmentId);
 			this.publishDomainEvent(isUpdate, environmentId, environment, previousEnvironment);
 
-			this.logger.info(`Environment ${isUpdate ? 'updated' : 'created'}: ${environment.getName().getValue()}`);
+			this.logger.info('Environment operation completed', {
+				operation: isUpdate ? 'updated' : 'created',
+				environmentName: environment.getName().getValue()
+			});
 
 			return {
 				success: true,
@@ -152,7 +158,7 @@ export class SaveEnvironmentUseCase {
 		errors: string[],
 		environmentName: string
 	): SaveEnvironmentResponse {
-		this.logger.warn(`SaveEnvironmentUseCase: Validation failed for "${environmentName}"`, { errors });
+		this.logger.warn('SaveEnvironmentUseCase: Validation failed', { environmentName, errors });
 		return {
 			success: false,
 			errors,

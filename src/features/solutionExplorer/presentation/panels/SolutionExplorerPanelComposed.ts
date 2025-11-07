@@ -191,7 +191,13 @@ export class SolutionExplorerPanelComposed {
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'SolutionExplorerBehavior.js')
 				).toString()
 			],
 			cspNonce: getNonce(),
@@ -278,15 +284,15 @@ export class SolutionExplorerPanelComposed {
 				.map(s => this.viewModelMapper.toViewModel(s))
 				.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName));
 
-			const environments = await this.getEnvironments();
-
 			this.logger.info('Solutions loaded successfully', { count: viewModels.length });
 
-			// Refresh HTML with sorted data
-			await this.scaffoldingBehavior.refresh({
-				tableData: viewModels,
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId
+			// Data-driven update: Send ViewModels to frontend
+			await this.panel.webview.postMessage({
+				command: 'updateTableData',
+				data: {
+					viewModels,
+					columns: this.getTableConfig().columns
+				}
 			});
 		} catch (error: unknown) {
 			this.logger.error('Error refreshing solutions', error);

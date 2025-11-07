@@ -27,6 +27,10 @@ export class CorrelationId {
 		return other !== null && this.value === other.value;
 	}
 
+	getValue(): string {
+		return this.value;
+	}
+
 	toString(): string {
 		return this.value;
 	}

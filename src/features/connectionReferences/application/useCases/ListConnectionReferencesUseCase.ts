@@ -85,7 +85,7 @@ export class ListConnectionReferencesUseCase {
 
 	private checkCancellation(cancellationToken: ICancellationToken | undefined, stage: string): void {
 		if (cancellationToken?.isCancellationRequested) {
-			this.logger.info(`ListConnectionReferencesUseCase cancelled ${stage}`);
+			this.logger.info('ListConnectionReferencesUseCase cancelled', { stage });
 			throw new OperationCancelledException();
 		}
 	}

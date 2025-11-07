@@ -64,7 +64,7 @@ export class TestExistingEnvironmentConnectionUseCase {
 				credentials.password
 			);
 
-			this.logger.info(`Connection test successful for "${environment.getName().getValue()}"`);
+			this.logger.info('Connection test successful', { environmentName: environment.getName().getValue() });
 
 			return {
 				success: true,

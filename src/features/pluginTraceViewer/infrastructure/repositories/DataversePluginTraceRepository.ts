@@ -80,8 +80,9 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			queryParams.push(`$orderby=${filter.orderBy}`);
 		}
 
-		if (filter.odataFilter) {
-			queryParams.push(`$filter=${filter.odataFilter}`);
+		const odataFilter = filter.toODataFilter();
+		if (odataFilter) {
+			queryParams.push(`$filter=${odataFilter}`);
 		}
 
 		const queryString = queryParams.join('&');
@@ -104,8 +105,8 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			);
 
 			this.logger.debug(
-				`Fetched ${traces.length} plugin traces from Dataverse`,
-				{ environmentId }
+				'Fetched plugin traces from Dataverse',
+				{ environmentId, count: traces.length }
 			);
 
 			return traces;
