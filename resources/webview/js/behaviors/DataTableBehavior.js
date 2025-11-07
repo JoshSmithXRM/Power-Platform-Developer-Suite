@@ -210,11 +210,11 @@
 		wireSorting();
 	}
 
-	// Re-initialize after HTML updates
-	window.addEventListener('message', event => {
-		const message = event.data;
-		if (message.command === 'htmlUpdated') {
-			initialize();
+	// Re-apply striping after table updates
+	document.addEventListener('tableUpdated', () => {
+		const table = document.querySelector('table');
+		if (table) {
+			applyRowStriping(table);
 		}
 	});
 

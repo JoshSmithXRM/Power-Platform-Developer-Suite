@@ -284,6 +284,9 @@ export class PluginTraceViewerPanelComposed {
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'components', 'DropdownComponent.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
@@ -426,17 +429,14 @@ export class PluginTraceViewerPanelComposed {
 
 			const viewModels = traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
 
-			const environments = await this.getEnvironments();
-
 			this.logger.info('Plugin traces loaded successfully', { count: viewModels.length });
 
-			await this.scaffoldingBehavior.refresh({
-				tableData: viewModels,
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				state: {
-					traceLevel: this.currentTraceLevel?.value,
-					autoRefreshInterval: this.autoRefreshInterval
+			// Data-driven update: Send ViewModels to frontend
+			await this.panel.webview.postMessage({
+				command: 'updateTableData',
+				data: {
+					viewModels,
+					columns: this.getTableConfig().columns
 				}
 			});
 		} catch (error) {
