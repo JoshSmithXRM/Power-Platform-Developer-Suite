@@ -23,6 +23,7 @@ import { EnvironmentListViewModelMapper } from './features/environmentSetup/appl
 import { EnvironmentListViewModel } from './features/environmentSetup/application/viewModels/EnvironmentListViewModel';
 import { EnvironmentFormViewModelMapper } from './features/environmentSetup/application/mappers/EnvironmentFormViewModelMapper';
 import { EnvironmentSetupPanelComposed } from './features/environmentSetup/presentation/panels/EnvironmentSetupPanelComposed';
+import { TestEnvironmentConnectionCommandHandler } from './features/environmentSetup/presentation/commands/TestEnvironmentConnectionCommandHandler';
 import { EnvironmentId } from './features/environmentSetup/domain/valueObjects/EnvironmentId';
 import { Environment } from './features/environmentSetup/domain/entities/Environment';
 import { EnvironmentCreated } from './features/environmentSetup/domain/events/EnvironmentCreated';
@@ -147,7 +148,11 @@ export function activate(context: vscode.ExtensionContext): void {
 	const getEnvironmentById = createGetEnvironmentById(environmentRepository);
 	const dataverseApiServiceFactory = createDataverseApiServiceFactory(authService, environmentRepository);
 
-	// Command Handlers (Presentation Layer) - removed, using inline handlers instead
+	// Command Handlers (Presentation Layer)
+	const testEnvironmentConnectionCommandHandler = new TestEnvironmentConnectionCommandHandler(
+		testExistingEnvironmentConnectionUseCase,
+		logger
+	);
 
 	const isDevelopment = context.extensionMode === vscode.ExtensionMode.Development;
 	void vscode.commands.executeCommand('setContext', 'powerPlatformDevSuite.isDevelopment', isDevelopment);
@@ -208,42 +213,9 @@ export function activate(context: vscode.ExtensionContext): void {
 	const testEnvironmentConnectionCommand = vscode.commands.registerCommand(
 		'power-platform-dev-suite.testEnvironmentConnection',
 		async (environmentItem?: { envId: string }) => {
-			if (!environmentItem?.envId) {
-				vscode.window.showErrorMessage('No environment selected');
-				return;
-			}
-
-			try {
-				const environmentId = new EnvironmentId(environmentItem.envId);
-
-				await vscode.window.withProgress(
-					{
-						location: vscode.ProgressLocation.Notification,
-						title: 'Testing connection...',
-						cancellable: false
-					},
-					async () => {
-						const result = await testExistingEnvironmentConnectionUseCase.execute({
-							environmentId
-						});
-
-						if (result.success) {
-							vscode.window.showInformationMessage(
-								`Connection successful! User ID: ${result.userId}`
-							);
-						} else {
-							vscode.window.showErrorMessage(
-								`Connection test failed: ${result.errorMessage || 'Unknown error'}`
-							);
-						}
-					}
-				);
-			} catch (error) {
-				logger.error('Connection test command failed', error);
-				vscode.window.showErrorMessage(
-					`Connection test failed: ${error instanceof Error ? error.message : String(error)}`
-				);
-			}
+			await testEnvironmentConnectionCommandHandler.execute({
+				environmentId: environmentItem?.envId || ''
+			});
 		}
 	);
 
