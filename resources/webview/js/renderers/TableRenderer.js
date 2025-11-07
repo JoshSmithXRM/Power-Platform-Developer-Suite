@@ -34,7 +34,7 @@ function renderTableRows(viewModels, columns) {
 		return renderNoDataRow(columns.length, 'No plugin traces found. Adjust your trace level to start logging.');
 	}
 
-	return viewModels.map(row => renderTableRow(row, columns)).join('');
+	return viewModels.map((row, index) => renderTableRow(row, columns, index)).join('');
 }
 
 /**
@@ -42,9 +42,10 @@ function renderTableRows(viewModels, columns) {
  *
  * @param {Object} row - PluginTraceTableRowViewModel
  * @param {Array} columns - Column configuration
+ * @param {number} [index] - Row index for striping (optional)
  * @returns {string} HTML for <tr>
  */
-function renderTableRow(row, columns) {
+function renderTableRow(row, columns, index) {
 	const cells = columns.map(col => {
 		const value = row[col.key];
 		const cellClass = row[col.key + 'Class'] || '';
@@ -52,7 +53,11 @@ function renderTableRow(row, columns) {
 		return `<td class="${cellClass}">${cellHtml}</td>`;
 	}).join('');
 
-	return `<tr>${cells}</tr>`;
+	// Apply striping class if index provided
+	const stripingClass = index !== undefined ? (index % 2 === 0 ? 'row-even' : 'row-odd') : '';
+	const classAttr = stripingClass ? ` class="${stripingClass}"` : '';
+
+	return `<tr${classAttr}>${cells}</tr>`;
 }
 
 /**

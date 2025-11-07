@@ -15,7 +15,7 @@ import type { FilterCriteriaViewModel, FilterConditionViewModel } from '../../ap
  * - AND/OR toggle
  */
 export class FilterPanelSection implements ISection {
-	public readonly position = SectionPosition.Toolbar;
+	public readonly position = SectionPosition.Filters;
 
 	public render(data: SectionRenderData): string {
 		const filterState = this.extractFilterState(data);
@@ -25,7 +25,7 @@ export class FilterPanelSection implements ISection {
 				<div class="filter-panel-header" id="filterPanelHeader">
 					<span class="filter-panel-title">
 						<span class="codicon codicon-filter"></span>
-						Filters ${filterState.activeCount > 0 ? `(${filterState.activeCount})` : ''}
+						Filters (${filterState.activeCount} / ${filterState.totalCount})
 					</span>
 					<button class="filter-toggle-btn" id="filterToggleBtn" title="Expand/Collapse">
 						<span class="codicon codicon-chevron-down"></span>
@@ -33,29 +33,27 @@ export class FilterPanelSection implements ISection {
 				</div>
 
 				<div class="filter-panel-body" id="filterPanelBody">
-					<div class="filter-controls">
-						<label class="filter-logic-label">
-							<input
-								type="radio"
-								name="logicalOperator"
-								value="and"
-								${filterState.logicalOperator === 'and' ? 'checked' : ''}
-							/>
-							Match ALL conditions (AND)
-						</label>
-						<label class="filter-logic-label">
-							<input
-								type="radio"
-								name="logicalOperator"
-								value="or"
-								${filterState.logicalOperator === 'or' ? 'checked' : ''}
-							/>
-							Match ANY condition (OR)
-						</label>
+					<div class="quick-filters">
+						<button class="quick-filter-btn" data-quick-filter="exceptions" title="Show only exceptions">
+							<span class="codicon codicon-error"></span>
+							Exceptions Only
+						</button>
+						<button class="quick-filter-btn" data-quick-filter="lastHour" title="Show traces from last hour">
+							<span class="codicon codicon-clock"></span>
+							Last Hour
+						</button>
+						<button class="quick-filter-btn" data-quick-filter="last24Hours" title="Show traces from last 24 hours">
+							<span class="codicon codicon-history"></span>
+							Last 24 Hours
+						</button>
+						<button class="quick-filter-btn" data-quick-filter="today" title="Show traces from today">
+							<span class="codicon codicon-calendar"></span>
+							Today
+						</button>
 					</div>
 
 					<div class="filter-conditions" id="filterConditions">
-						${filterState.conditions.map(condition => this.renderConditionRow(condition)).join('')}
+						${filterState.conditions.map((condition, index) => this.renderConditionRow(condition, index, filterState.conditions.length)).join('')}
 					</div>
 
 					<div class="filter-actions">
@@ -85,10 +83,11 @@ export class FilterPanelSection implements ISection {
 		`;
 	}
 
-	private renderConditionRow(condition: FilterConditionViewModel): string {
+	private renderConditionRow(condition: FilterConditionViewModel, index: number, totalCount: number): string {
 		const applicableOperators = this.getApplicableOperators(condition.field);
 		const field = FilterField.fromDisplayName(condition.field);
 		const valueInput = this.renderValueInput(condition, field);
+		const isLastRow = index === totalCount - 1;
 
 		return `
 			<div class="filter-condition-row" data-condition-id="${condition.id}" data-field-type="${field?.fieldType || 'text'}">
@@ -117,9 +116,16 @@ export class FilterPanelSection implements ISection {
 
 				${valueInput}
 
-				<button class="icon-button remove-condition-btn" title="Remove condition">
-					<span class="codicon codicon-trash"></span>
-				</button>
+				${!isLastRow ? `
+					<select class="condition-logical-operator">
+						<option value="and" ${condition.logicalOperator === 'and' ? 'selected' : ''}>AND</option>
+						<option value="or" ${condition.logicalOperator === 'or' ? 'selected' : ''}>OR</option>
+					</select>
+				` : `
+					<span class="logical-operator-placeholder"></span>
+				`}
+
+				<button class="icon-button remove-condition-btn" title="Remove condition">×</button>
 			</div>
 		`;
 	}
@@ -212,19 +218,13 @@ export class FilterPanelSection implements ISection {
 
 	private extractFilterState(data: SectionRenderData): {
 		conditions: FilterConditionViewModel[];
-		logicalOperator: 'and' | 'or';
 		activeCount: number;
+		totalCount: number;
 	} {
 		const defaultState = {
-			conditions: [{
-				id: 'condition-0',
-				enabled: true,
-				field: 'Plugin Name',
-				operator: 'Contains',
-				value: ''
-			}],
-			logicalOperator: 'and' as const,
-			activeCount: 0
+			conditions: [],
+			activeCount: 0,
+			totalCount: 0
 		};
 
 		if (!data.state || typeof data.state !== 'object') {
@@ -239,12 +239,14 @@ export class FilterPanelSection implements ISection {
 
 		const filterObj = filterState as FilterCriteriaViewModel;
 
-		const activeCount = filterObj.conditions?.filter(c => c.enabled && c.value.trim()).length || 0;
+		const conditions = filterObj.conditions ? [...filterObj.conditions] : [];
+		const activeCount = conditions.filter(c => c.enabled && c.value.trim()).length || 0;
+		const totalCount = conditions.length;
 
 		return {
-			conditions: filterObj.conditions ? [...filterObj.conditions] : defaultState.conditions,
-			logicalOperator: filterObj.logicalOperator || 'and',
-			activeCount
+			conditions,
+			activeCount,
+			totalCount
 		};
 	}
 

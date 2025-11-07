@@ -233,6 +233,39 @@ describe('FilterCondition', () => {
 
 			expect(condition.toODataExpression()).toBe("typename eq 'It''s a test''s value'");
 		});
+
+		it('should build Status Exception filter as exceptiondetails ne null', () => {
+			const condition = new FilterCondition(
+				FilterField.Status,
+				FilterOperator.Equals,
+				'Exception',
+				true
+			);
+
+			expect(condition.toODataExpression()).toBe('exceptiondetails ne null');
+		});
+
+		it('should build Status Success filter as exceptiondetails eq null', () => {
+			const condition = new FilterCondition(
+				FilterField.Status,
+				FilterOperator.Equals,
+				'Success',
+				true
+			);
+
+			expect(condition.toODataExpression()).toBe('exceptiondetails eq null');
+		});
+
+		it('should return undefined for Status field with non-Equals operator', () => {
+			const condition = new FilterCondition(
+				FilterField.Status,
+				FilterOperator.NotEquals,
+				'Exception',
+				true
+			);
+
+			expect(condition.toODataExpression()).toBeUndefined();
+		});
 	});
 
 	describe('getDescription', () => {

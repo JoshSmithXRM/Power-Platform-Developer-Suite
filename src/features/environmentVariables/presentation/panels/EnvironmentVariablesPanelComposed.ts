@@ -411,6 +411,7 @@ export class EnvironmentVariablesPanelComposed {
 		this.logger.debug('Environment changed', { environmentId });
 
 		this.setButtonLoading('refresh', true);
+		this.clearTable();
 
 		try {
 			this.currentEnvironmentId = environmentId;
@@ -433,6 +434,7 @@ export class EnvironmentVariablesPanelComposed {
 		this.logger.debug('Solution filter changed', { solutionId });
 
 		this.setButtonLoading('refresh', true);
+		this.clearTable();
 
 		try {
 			this.currentSolutionId = solutionId;
@@ -462,6 +464,20 @@ export class EnvironmentVariablesPanelComposed {
 		} finally {
 			this.setButtonLoading('refresh', false);
 		}
+	}
+
+	/**
+	 * Clears the table by sending empty data to the webview.
+	 * Provides immediate visual feedback during environment switches.
+	 */
+	private clearTable(): void {
+		this.panel.webview.postMessage({
+			command: 'updateTableData',
+			data: {
+				viewModels: [],
+				columns: this.getTableConfig().columns
+			}
+		});
 	}
 
 	private setButtonLoading(buttonId: string, isLoading: boolean): void {

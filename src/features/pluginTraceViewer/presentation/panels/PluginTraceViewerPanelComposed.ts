@@ -21,6 +21,7 @@ import { PanelLayout } from '../../../../shared/infrastructure/ui/types/PanelLay
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
 import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
 import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
+import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import type { GetPluginTracesUseCase } from '../../application/useCases/GetPluginTracesUseCase';
 import type { DeleteTracesUseCase } from '../../application/useCases/DeleteTracesUseCase';
 import type { ExportTracesUseCase } from '../../application/useCases/ExportTracesUseCase';
@@ -95,6 +96,7 @@ export class PluginTraceViewerPanelComposed {
 		private readonly setTraceLevelUseCase: SetTraceLevelUseCase,
 		private readonly viewModelMapper: PluginTraceViewModelMapper,
 		private readonly logger: ILogger,
+		private readonly panelStateRepository: IPanelStateRepository | null,
 		environmentId: string
 	) {
 		this.currentEnvironmentId = environmentId;
@@ -133,7 +135,7 @@ export class PluginTraceViewerPanelComposed {
 		viewModelMapper: PluginTraceViewModelMapper,
 		logger: ILogger,
 		initialEnvironmentId?: string,
-		_panelStateRepository?: unknown
+		panelStateRepository?: IPanelStateRepository
 	): Promise<PluginTraceViewerPanelComposed> {
 		const column = vscode.ViewColumn.One;
 
@@ -179,6 +181,7 @@ export class PluginTraceViewerPanelComposed {
 			setTraceLevelUseCase,
 			viewModelMapper,
 			logger,
+			panelStateRepository || null,
 			targetEnvironmentId
 		);
 
@@ -198,6 +201,9 @@ export class PluginTraceViewerPanelComposed {
 
 	private async initializeAndLoadData(): Promise<void> {
 		const environments = await this.getEnvironments();
+
+		// Load persisted filter criteria before initial render
+		await this.loadFilterCriteria();
 
 		await this.scaffoldingBehavior.refresh({
 			environments,
@@ -478,15 +484,23 @@ export class PluginTraceViewerPanelComposed {
 
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
-		this.currentEnvironmentId = environmentId;
 
-		const environment = await this.getEnvironmentById(environmentId);
-		if (environment) {
-			this.panel.title = `Plugin Trace Viewer - ${environment.name}`;
+		this.setButtonLoading('refresh', true);
+		this.clearTable();
+
+		try {
+			this.currentEnvironmentId = environmentId;
+
+			const environment = await this.getEnvironmentById(environmentId);
+			if (environment) {
+				this.panel.title = `Plugin Trace Viewer - ${environment.name}`;
+			}
+
+			await this.loadTraceLevel();
+			await this.handleRefresh();
+		} finally {
+			this.setButtonLoading('refresh', false);
 		}
-
-		await this.loadTraceLevel();
-		await this.handleRefresh();
 	}
 
 	private async handleViewDetail(traceId: string): Promise<void> {
@@ -704,6 +718,9 @@ export class PluginTraceViewerPanelComposed {
 				...filterData
 			};
 
+			// Persist filter criteria
+			await this.saveFilterCriteria();
+
 			// Refresh traces with new filter (uses data-driven update)
 			await this.handleRefresh();
 
@@ -722,6 +739,14 @@ export class PluginTraceViewerPanelComposed {
 
 			// Reset to empty filter criteria
 			this.filterCriteria = FilterCriteriaMapper.empty();
+
+			// Persist empty filter criteria
+			await this.saveFilterCriteria();
+
+			// Update filter panel UI to remove all conditions
+			this.panel.webview.postMessage({
+				command: 'clearFilterPanel'
+			});
 
 			// Refresh traces with cleared filter (uses data-driven update)
 			await this.handleRefresh();
@@ -743,6 +768,87 @@ export class PluginTraceViewerPanelComposed {
 			this.logger.debug('Trace level loaded', { level: level.value });
 		} catch (error) {
 			this.logger.error('Failed to load trace level', error);
+		}
+	}
+
+	/**
+	 * Load persisted filter criteria from storage for the current environment.
+	 */
+	private async loadFilterCriteria(): Promise<void> {
+		if (!this.panelStateRepository) {
+			return;
+		}
+
+		try {
+			this.logger.debug('Loading filter criteria from storage', {
+				environmentId: this.currentEnvironmentId
+			});
+
+			const state = await this.panelStateRepository.load({
+				panelType: PluginTraceViewerPanelComposed.viewType,
+				environmentId: this.currentEnvironmentId
+			});
+
+			if (state?.filterCriteria) {
+				// Validate that the stored data matches our ViewModel structure
+				const stored = state.filterCriteria as FilterCriteriaViewModel;
+				if (stored.conditions && Array.isArray(stored.conditions)) {
+					this.filterCriteria = stored;
+					this.logger.info('Filter criteria loaded from storage', {
+						environmentId: this.currentEnvironmentId,
+						conditionCount: stored.conditions.length,
+						conditions: stored.conditions
+					});
+				} else {
+					this.logger.warn('Invalid filter criteria in storage', { stored });
+				}
+			} else {
+				this.logger.info('No filter criteria found in storage', {
+					environmentId: this.currentEnvironmentId,
+					hasState: !!state
+				});
+			}
+		} catch (error) {
+			this.logger.error('Failed to load filter criteria from storage', error);
+			// Don't throw - use default empty filter if loading fails
+		}
+	}
+
+	/**
+	 * Save current filter criteria to storage for the current environment.
+	 */
+	private async saveFilterCriteria(): Promise<void> {
+		if (!this.panelStateRepository) {
+			return;
+		}
+
+		try {
+			this.logger.debug('Saving filter criteria to storage', {
+				environmentId: this.currentEnvironmentId,
+				conditionCount: this.filterCriteria.conditions.length
+			});
+
+			// Load existing state to preserve other properties (like selectedSolutionId)
+			const existingState = await this.panelStateRepository.load({
+				panelType: PluginTraceViewerPanelComposed.viewType,
+				environmentId: this.currentEnvironmentId
+			});
+
+			const newState = {
+				selectedSolutionId: existingState?.selectedSolutionId || 'default',
+				lastUpdated: new Date().toISOString(),
+				filterCriteria: this.filterCriteria
+			};
+
+			await this.panelStateRepository.save({
+				panelType: PluginTraceViewerPanelComposed.viewType,
+				environmentId: this.currentEnvironmentId
+			}, newState);
+
+			this.logger.debug('Filter criteria saved to storage');
+		} catch (error) {
+			this.logger.error('Failed to save filter criteria to storage', error);
+			// Don't throw - persistence failure shouldn't block filter application
 		}
 	}
 
@@ -785,5 +891,32 @@ export class PluginTraceViewerPanelComposed {
 			this.logger.error('Failed to set auto-refresh', error);
 			await vscode.window.showErrorMessage('Failed to set auto-refresh');
 		}
+	}
+
+	/**
+	 * Clears the table by sending empty data to the webview.
+	 * Provides immediate visual feedback during environment switches.
+	 */
+	private clearTable(): void {
+		this.panel.webview.postMessage({
+			command: 'updateTableData',
+			data: {
+				viewModels: [],
+				columns: this.getTableConfig().columns
+			}
+		});
+	}
+
+	/**
+	 * Sets button loading state via webview message.
+	 * Disables button and shows spinner during async operations.
+	 */
+	private setButtonLoading(buttonId: string, isLoading: boolean): void {
+		this.panel.webview.postMessage({
+			command: 'setButtonState',
+			buttonId,
+			disabled: isLoading,
+			showSpinner: isLoading,
+		});
 	}
 }

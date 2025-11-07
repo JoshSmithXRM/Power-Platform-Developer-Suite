@@ -1,0 +1,306 @@
+import { ODataExpressionBuilder } from '../ODataExpressionBuilder';
+import { FilterCondition } from '../../entities/FilterCondition';
+import { FilterField } from '../../valueObjects/FilterField';
+import { FilterOperator } from '../../valueObjects/FilterOperator';
+
+describe('ODataExpressionBuilder', () => {
+	let builder: ODataExpressionBuilder;
+
+	beforeEach(() => {
+		builder = new ODataExpressionBuilder();
+	});
+
+	describe('buildExpression', () => {
+		describe('disabled conditions', () => {
+			it('should return undefined for disabled condition', () => {
+				const condition = new FilterCondition(
+					FilterField.PluginName,
+					FilterOperator.Contains,
+					'test',
+					false
+				);
+
+				expect(builder.buildExpression(condition)).toBeUndefined();
+			});
+		});
+
+		describe('function-style operators', () => {
+			it('should build contains function', () => {
+				const condition = new FilterCondition(
+					FilterField.PluginName,
+					FilterOperator.Contains,
+					'MyPlugin',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe("contains(typename, 'MyPlugin')");
+			});
+
+			it('should build startswith function', () => {
+				const condition = new FilterCondition(
+					FilterField.EntityName,
+					FilterOperator.StartsWith,
+					'account',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe("startswith(primaryentity, 'account')");
+			});
+
+			it('should build endswith function', () => {
+				const condition = new FilterCondition(
+					FilterField.MessageName,
+					FilterOperator.EndsWith,
+					'Update',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe("endswith(messagename, 'Update')");
+			});
+		});
+
+		describe('comparison operators', () => {
+			it('should build equals comparison for text fields', () => {
+				const condition = new FilterCondition(
+					FilterField.PluginName,
+					FilterOperator.Equals,
+					'MyPlugin',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe("typename eq 'MyPlugin'");
+			});
+
+			it('should build not equals comparison for text fields', () => {
+				const condition = new FilterCondition(
+					FilterField.PluginName,
+					FilterOperator.NotEquals,
+					'MyPlugin',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe("typename ne 'MyPlugin'");
+			});
+
+			it('should build greater than comparison for number fields', () => {
+				const condition = new FilterCondition(
+					FilterField.Duration,
+					FilterOperator.GreaterThan,
+					'1000',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('performanceexecutionduration gt 1000');
+			});
+
+			it('should build less than comparison for number fields', () => {
+				const condition = new FilterCondition(
+					FilterField.Duration,
+					FilterOperator.LessThan,
+					'5000',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('performanceexecutionduration lt 5000');
+			});
+
+			it('should build greater than or equal comparison for date fields', () => {
+				const condition = new FilterCondition(
+					FilterField.CreatedOn,
+					FilterOperator.GreaterThanOrEqual,
+					'2024-01-01T00:00:00Z',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('createdon ge 2024-01-01T00:00:00Z');
+			});
+
+			it('should build less than or equal comparison for date fields', () => {
+				const condition = new FilterCondition(
+					FilterField.CreatedOn,
+					FilterOperator.LessThanOrEqual,
+					'2024-12-31T23:59:59Z',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('createdon le 2024-12-31T23:59:59Z');
+			});
+		});
+
+		describe('value formatting', () => {
+			it('should quote text field values', () => {
+				const condition = new FilterCondition(
+					FilterField.PluginName,
+					FilterOperator.Equals,
+					'test',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe("typename eq 'test'");
+			});
+
+			it('should quote enum field values', () => {
+				const condition = new FilterCondition(
+					FilterField.OperationType,
+					FilterOperator.Equals,
+					'Plugin',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe("operationtype eq 'Plugin'");
+			});
+
+			it('should not quote number field values', () => {
+				const condition = new FilterCondition(
+					FilterField.Duration,
+					FilterOperator.Equals,
+					'1500',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('performanceexecutionduration eq 1500');
+			});
+
+			it('should not quote date field values', () => {
+				const condition = new FilterCondition(
+					FilterField.CreatedOn,
+					FilterOperator.GreaterThanOrEqual,
+					'2024-01-01T00:00:00Z',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('createdon ge 2024-01-01T00:00:00Z');
+			});
+		});
+
+		describe('OData string escaping', () => {
+			it('should escape single quote as double single quote', () => {
+				const condition = new FilterCondition(
+					FilterField.PluginName,
+					FilterOperator.Contains,
+					"O'Brien",
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe("contains(typename, 'O''Brien')");
+			});
+
+			it('should escape multiple single quotes', () => {
+				const condition = new FilterCondition(
+					FilterField.PluginName,
+					FilterOperator.Equals,
+					"It's a test's value",
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe("typename eq 'It''s a test''s value'");
+			});
+
+			it('should handle strings with no quotes', () => {
+				const condition = new FilterCondition(
+					FilterField.PluginName,
+					FilterOperator.Contains,
+					'NoQuotesHere',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe("contains(typename, 'NoQuotesHere')");
+			});
+		});
+
+		describe('Status field special handling', () => {
+			it('should convert Exception to exceptiondetails ne null', () => {
+				const condition = new FilterCondition(
+					FilterField.Status,
+					FilterOperator.Equals,
+					'Exception',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('exceptiondetails ne null');
+			});
+
+			it('should convert Success to exceptiondetails eq null', () => {
+				const condition = new FilterCondition(
+					FilterField.Status,
+					FilterOperator.Equals,
+					'Success',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('exceptiondetails eq null');
+			});
+
+			it('should handle Exception with whitespace', () => {
+				const condition = new FilterCondition(
+					FilterField.Status,
+					FilterOperator.Equals,
+					'  Exception  ',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('exceptiondetails ne null');
+			});
+
+			it('should return undefined for Status with non-Equals operator', () => {
+				const condition = new FilterCondition(
+					FilterField.Status,
+					FilterOperator.NotEquals,
+					'Exception',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBeUndefined();
+			});
+
+			it('should return undefined for Status with invalid value', () => {
+				const condition = new FilterCondition(
+					FilterField.Status,
+					FilterOperator.Equals,
+					'InvalidValue',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBeUndefined();
+			});
+
+			it('should trim whitespace from Status value', () => {
+				// Note: FilterCondition validates non-empty values, so we test trimming behavior
+				const condition = new FilterCondition(
+					FilterField.Status,
+					FilterOperator.Equals,
+					'  Success  ',
+					true
+				);
+
+				// The builder should trim the value before checking
+				expect(builder.buildExpression(condition)).toBe('exceptiondetails eq null');
+			});
+		});
+
+		describe('edge cases', () => {
+
+			it('should handle zero for number fields', () => {
+				const condition = new FilterCondition(
+					FilterField.Duration,
+					FilterOperator.Equals,
+					'0',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('performanceexecutionduration eq 0');
+			});
+
+			it('should handle special characters in text values', () => {
+				const condition = new FilterCondition(
+					FilterField.PluginName,
+					FilterOperator.Contains,
+					'test-plugin_v2.0',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe("contains(typename, 'test-plugin_v2.0')");
+			});
+		});
+	});
+});

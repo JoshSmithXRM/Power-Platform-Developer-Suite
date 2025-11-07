@@ -15,6 +15,9 @@ export class FilterField {
 	static readonly MessageName = new FilterField('Message Name', 'messagename', 'text');
 	static readonly OperationType = new FilterField('Operation Type', 'operationtype', 'enum');
 	static readonly Mode = new FilterField('Mode', 'mode', 'enum');
+	// Status is a virtual field - UI shows "Exception"/"Success", but queries map to exceptiondetails null checks
+	// See ODataExpressionBuilder.buildStatusExpression() for the transformation logic
+	static readonly Status = new FilterField('Status', 'exceptiondetails', 'enum');
 	static readonly CorrelationId = new FilterField('Correlation ID', 'correlationid', 'text');
 	static readonly CreatedOn = new FilterField('Created On', 'createdon', 'date');
 	static readonly Duration = new FilterField('Duration (ms)', 'performanceexecutionduration', 'number');
@@ -28,6 +31,7 @@ export class FilterField {
 		FilterField.MessageName,
 		FilterField.OperationType,
 		FilterField.Mode,
+		FilterField.Status,
 		FilterField.CorrelationId,
 		FilterField.CreatedOn,
 		FilterField.Duration

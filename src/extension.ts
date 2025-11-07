@@ -842,8 +842,9 @@ async function initializePluginTraceViewer(
 
 	const viewModelMapper = new PluginTraceViewModelMapper();
 
-	// Panel state repository for persisting UI state (optional)
-	const panelStateRepository = undefined; // Can be added later for state persistence
+	// Panel state repository for persisting UI state (filter criteria per environment)
+	const { VSCodePanelStateRepository } = await import('./shared/infrastructure/ui/VSCodePanelStateRepository.js');
+	const panelStateRepository = new VSCodePanelStateRepository(context.workspaceState, logger);
 
 	await PluginTraceViewerPanelComposed.createOrShow(
 		context.extensionUri,
@@ -929,11 +930,11 @@ class ToolsTreeProvider implements vscode.TreeDataProvider<ToolItem> {
 
 	getChildren(): ToolItem[] {
 		return [
-			new ToolItem('Solutions', 'Browse and manage solutions', 'solutionExplorer', 'power-platform-dev-suite.solutionExplorerPickEnvironment'),
-			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewerPickEnvironment'),
-			new ToolItem('Connection References', 'View connection references and flows', 'connectionReferences', 'power-platform-dev-suite.connectionReferencesPickEnvironment'),
-			new ToolItem('Environment Variables', 'View environment variables', 'environmentVariables', 'power-platform-dev-suite.environmentVariablesPickEnvironment'),
-			new ToolItem('Plugin Traces', 'View and manage plugin trace logs', 'pluginTraceViewer', 'power-platform-dev-suite.pluginTraceViewerPickEnvironment')
+			new ToolItem('Solutions', 'Browse and manage solutions', 'solutionExplorer', 'power-platform-dev-suite.solutionExplorer'),
+			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewer'),
+			new ToolItem('Connection References', 'View connection references and flows', 'connectionReferences', 'power-platform-dev-suite.connectionReferences'),
+			new ToolItem('Environment Variables', 'View environment variables', 'environmentVariables', 'power-platform-dev-suite.environmentVariables'),
+			new ToolItem('Plugin Traces', 'View and manage plugin trace logs', 'pluginTraceViewer', 'power-platform-dev-suite.pluginTraceViewer')
 		];
 	}
 }

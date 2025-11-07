@@ -275,7 +275,6 @@ describe('TraceFilter', () => {
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [condition],
-				logicalOperator: 'and'
 			});
 
 			expect(filter.toODataFilter()).toBe("(contains(typename, 'MyPlugin'))");
@@ -299,7 +298,6 @@ describe('TraceFilter', () => {
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [condition1, condition2],
-				logicalOperator: 'and'
 			});
 
 			expect(filter.toODataFilter()).toBe(
@@ -319,13 +317,13 @@ describe('TraceFilter', () => {
 				field: FilterField.PluginName,
 				operator: FilterOperator.Contains,
 				value: 'Plugin2',
-				enabled: true
+				enabled: true,
+				logicalOperator: 'or'
 			});
 
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [condition1, condition2],
-				logicalOperator: 'or'
 			});
 
 			expect(filter.toODataFilter()).toBe(
@@ -351,7 +349,6 @@ describe('TraceFilter', () => {
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [condition1, condition2],
-				logicalOperator: 'and'
 			});
 
 			expect(filter.toODataFilter()).toBe("(contains(typename, 'MyPlugin'))");
@@ -382,7 +379,6 @@ describe('TraceFilter', () => {
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [condition1, condition2, condition3],
-				logicalOperator: 'and'
 			});
 
 			expect(filter.toODataFilter()).toBe(
@@ -408,7 +404,6 @@ describe('TraceFilter', () => {
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [condition1, condition2],
-				logicalOperator: 'and'
 			});
 
 			expect(filter.toODataFilter()).toBeUndefined();
@@ -418,7 +413,6 @@ describe('TraceFilter', () => {
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [],
-				logicalOperator: 'and'
 			});
 
 			expect(filter.toODataFilter()).toBeUndefined();
@@ -442,7 +436,6 @@ describe('TraceFilter', () => {
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [condition1, condition2],
-				logicalOperator: 'and'
 			});
 
 			expect(filter.toODataFilter()).toBe(
@@ -462,13 +455,13 @@ describe('TraceFilter', () => {
 				field: FilterField.OperationType,
 				operator: FilterOperator.Equals,
 				value: 'Workflow',
-				enabled: true
+				enabled: true,
+				logicalOperator: 'or'
 			});
 
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [condition1, condition2],
-				logicalOperator: 'or'
 			});
 
 			expect(filter.toODataFilter()).toBe(
@@ -501,7 +494,6 @@ describe('TraceFilter', () => {
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [textCondition, enumCondition, numberCondition],
-				logicalOperator: 'and'
 			});
 
 			expect(filter.toODataFilter()).toBe(
@@ -534,7 +526,6 @@ describe('TraceFilter', () => {
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [condition1, condition2, condition3],
-				logicalOperator: 'and'
 			});
 
 			expect(filter.getActiveFilterCount()).toBe(2);
@@ -551,7 +542,6 @@ describe('TraceFilter', () => {
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [condition],
-				logicalOperator: 'and',
 				pluginNameFilter: 'OldPlugin' // Legacy filter
 			});
 

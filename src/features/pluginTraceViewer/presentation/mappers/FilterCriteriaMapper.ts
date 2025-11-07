@@ -27,8 +27,7 @@ export class FilterCriteriaMapper {
 
 		return TraceFilter.create({
 			top: viewModel.top,
-			conditions,
-			logicalOperator: viewModel.logicalOperator
+			conditions
 		});
 	}
 
@@ -53,7 +52,8 @@ export class FilterCriteriaMapper {
 				field,
 				operator,
 				value: conditionVM.value,
-				enabled: conditionVM.enabled
+				enabled: conditionVM.enabled,
+				logicalOperator: conditionVM.logicalOperator
 			});
 		} catch {
 			return null; // Invalid condition (e.g., incompatible operator for field type)
@@ -70,7 +70,6 @@ export class FilterCriteriaMapper {
 
 		return {
 			conditions,
-			logicalOperator: filter.logicalOperator,
 			top: filter.top
 		};
 	}
@@ -84,23 +83,17 @@ export class FilterCriteriaMapper {
 			enabled: condition.enabled,
 			field: condition.field.displayName,
 			operator: condition.operator.displayName,
-			value: condition.value
+			value: condition.value,
+			logicalOperator: condition.logicalOperator
 		};
 	}
 
 	/**
-	 * Creates empty filter criteria with one default condition.
+	 * Creates empty filter criteria with no conditions.
 	 */
 	public static empty(): FilterCriteriaViewModel {
 		return {
-			conditions: [{
-				id: 'condition-0',
-				enabled: true,
-				field: FilterField.PluginName.displayName,
-				operator: FilterOperator.Contains.displayName,
-				value: ''
-			}],
-			logicalOperator: 'and',
+			conditions: [],
 			top: 100
 		};
 	}
@@ -115,7 +108,8 @@ export class FilterCriteriaMapper {
 			enabled: true,
 			field: FilterField.PluginName.displayName,
 			operator: FilterOperator.Contains.displayName,
-			value: ''
+			value: '',
+			logicalOperator: 'and'
 		};
 	}
 }

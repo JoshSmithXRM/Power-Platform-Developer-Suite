@@ -52,8 +52,8 @@ describe('FilterField', () => {
 	});
 
 	describe('All array', () => {
-		it('should contain all 8 field definitions', () => {
-			expect(FilterField.All).toHaveLength(8);
+		it('should contain all 9 field definitions', () => {
+			expect(FilterField.All).toHaveLength(9);
 		});
 
 		it('should contain PluginName field', () => {
@@ -245,12 +245,13 @@ describe('FilterField', () => {
 			expect(textFields).toContain(FilterField.CorrelationId);
 		});
 
-		it('should have 2 enum fields', () => {
+		it('should have 3 enum fields', () => {
 			const enumFields = FilterField.All.filter(f => f.fieldType === 'enum');
 
-			expect(enumFields).toHaveLength(2);
+			expect(enumFields).toHaveLength(3);
 			expect(enumFields).toContain(FilterField.OperationType);
 			expect(enumFields).toContain(FilterField.Mode);
+			expect(enumFields).toContain(FilterField.Status);
 		});
 
 		it('should have 1 date field', () => {

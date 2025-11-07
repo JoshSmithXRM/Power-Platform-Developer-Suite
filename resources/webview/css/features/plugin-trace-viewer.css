@@ -421,15 +421,21 @@ tbody tr.selected.row-odd:hover {
     border: none;
     color: var(--vscode-foreground);
     cursor: pointer;
-    padding: 4px;
+    padding: 4px 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
+    min-width: 24px;
+    min-height: 24px;
+}
+
+.filter-toggle-btn .codicon {
+    font-size: 16px;
 }
 
 .filter-toggle-btn:hover {
-    background: var(--vscode-input-background);
+    background: var(--vscode-toolbar-hoverBackground);
     border-radius: 4px;
 }
 
@@ -443,6 +449,43 @@ tbody tr.selected.row-odd:hover {
 
 .filter-panel-body.collapsed {
     display: none;
+}
+
+/* Quick Filters */
+.quick-filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    margin-bottom: 4px;
+}
+
+.quick-filter-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border: 1px solid var(--vscode-button-border);
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.quick-filter-btn .codicon {
+    font-size: 14px;
+}
+
+.quick-filter-btn:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.quick-filter-btn:active {
+    transform: scale(0.97);
 }
 
 .filter-row {
@@ -553,6 +596,7 @@ tbody tr.selected.row-odd:hover {
     flex-direction: column;
     gap: 8px;
     margin-bottom: 12px;
+    min-height: 40px;
 }
 
 .filter-condition-row {
@@ -564,10 +608,23 @@ tbody tr.selected.row-odd:hover {
     border: 1px solid var(--vscode-input-border);
     border-radius: 4px;
     transition: all 0.2s ease;
+    animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .filter-condition-row:hover {
     background: var(--vscode-list-hoverBackground);
+    border-color: var(--vscode-focusBorder);
 }
 
 .filter-condition-row .condition-enabled {
@@ -655,12 +712,17 @@ tbody tr.selected.row-odd:hover {
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
+    opacity: 0.7;
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 1;
 }
 
 .filter-condition-row .remove-condition-btn:hover {
     background: var(--vscode-inputValidation-errorBackground);
     border-color: var(--vscode-inputValidation-errorBorder);
     color: var(--vscode-errorForeground);
+    opacity: 1;
 }
 
 .icon-button {
@@ -716,4 +778,29 @@ tbody tr.selected.row-odd:hover {
     .filter-row select {
         flex: 1;
     }
+}
+
+/* Logical operator dropdown (AND/OR) */
+.filter-condition-row .condition-logical-operator {
+	flex: 0 0 80px;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-weight: 600;
+	background: var(--vscode-dropdown-background);
+	color: var(--vscode-dropdown-foreground);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 2px;
+	outline: none;
+	cursor: pointer;
+}
+
+.filter-condition-row .condition-logical-operator:focus {
+	border-color: var(--vscode-focusBorder);
+	outline: 1px solid var(--vscode-focusBorder);
+}
+
+/* WHERE label for first row */
+.filter-condition-row .logical-operator-placeholder {
+	flex: 0 0 80px;
+	/* Empty space for last row where there's no operator */
 }

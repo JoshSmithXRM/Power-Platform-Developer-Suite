@@ -22,6 +22,11 @@ export class ODataExpressionBuilder {
 			return undefined;
 		}
 
+		// Special handling for Status field (Exception vs Success)
+		if (condition.field.displayName === 'Status') {
+			return this.buildStatusExpression(condition);
+		}
+
 		const fieldName = condition.field.odataName;
 		const operator = condition.operator.odataOperator;
 		const value = this.formatValue(condition.value, condition.field.fieldType);
@@ -33,6 +38,30 @@ export class ODataExpressionBuilder {
 
 		// Comparison operators (eq, ne, gt, lt, ge, le)
 		return `${fieldName} ${operator} ${value}`;
+	}
+
+	/**
+	 * Builds OData expression for Status field.
+	 * Status is virtual - maps to exceptiondetails null check:
+	 * - "Exception" → exceptiondetails ne null
+	 * - "Success" → exceptiondetails eq null
+	 */
+	private buildStatusExpression(condition: FilterCondition): string | undefined {
+		const value = condition.value.trim();
+		const operator = condition.operator.odataOperator;
+
+		// Only "Equals" operator makes sense for Status enum
+		if (operator !== 'eq') {
+			return undefined;
+		}
+
+		if (value === 'Exception') {
+			return 'exceptiondetails ne null';
+		} else if (value === 'Success') {
+			return 'exceptiondetails eq null';
+		}
+
+		return undefined;
 	}
 
 	/**

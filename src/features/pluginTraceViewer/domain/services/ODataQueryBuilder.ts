@@ -23,27 +23,52 @@ import type { FilterCondition } from '../entities/FilterCondition';
 export class ODataQueryBuilder {
 	/**
 	 * Builds OData filter from query builder conditions.
-	 * Combines enabled conditions with AND or OR operator.
+	 * Each condition has its own logical operator (AND/OR) for chaining.
+	 * First condition is the base, subsequent conditions use their logicalOperator.
 	 */
 	public buildFromConditions(
-		conditions: readonly FilterCondition[],
-		logicalOperator: 'and' | 'or'
+		conditions: readonly FilterCondition[]
 	): string | undefined {
-		const expressions = conditions
-			.map(condition => condition.toODataExpression())
-			.filter((expr): expr is string => expr !== undefined);
+		// Filter for enabled conditions and get their expressions
+		const enabledConditions = conditions.filter(c => c.enabled);
 
-		if (expressions.length === 0) {
+		if (enabledConditions.length === 0) {
 			return undefined;
 		}
 
-		if (expressions.length === 1) {
-			return `(${expressions[0]})`;
+		// Build expression for first condition (no operator prefix)
+		const firstCondition = enabledConditions[0];
+		if (!firstCondition) {
+			return undefined;
 		}
 
-		// Combine with AND or OR based on logicalOperator
-		const operator = logicalOperator === 'or' ? ' or ' : ' and ';
-		return expressions.map(expr => `(${expr})`).join(operator);
+		const firstExpression = firstCondition.toODataExpression();
+		if (!firstExpression) {
+			return undefined;
+		}
+
+		if (enabledConditions.length === 1) {
+			return `(${firstExpression})`;
+		}
+
+		// Build query by chaining conditions with their logical operators
+		let query = `(${firstExpression})`;
+
+		for (let i = 1; i < enabledConditions.length; i++) {
+			const condition = enabledConditions[i];
+			if (!condition) {
+				continue;
+			}
+
+			const expression = condition.toODataExpression();
+
+			if (expression) {
+				const operator = condition.logicalOperator === 'or' ? ' or ' : ' and ';
+				query += `${operator}(${expression})`;
+			}
+		}
+
+		return query;
 	}
 
 	/**

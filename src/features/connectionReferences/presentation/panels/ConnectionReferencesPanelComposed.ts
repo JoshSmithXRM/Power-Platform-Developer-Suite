@@ -395,38 +395,46 @@ export class ConnectionReferencesPanelComposed {
 	}
 
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
-		// Remove old panel from registry
-		ConnectionReferencesPanelComposed.panels.delete(this.currentEnvironmentId);
+		this.setButtonLoading('refresh', true);
+		this.clearTable();
 
-		this.currentEnvironmentId = environmentId;
-		this.currentSolutionId = undefined;
+		try {
+			// Remove old panel from registry
+			ConnectionReferencesPanelComposed.panels.delete(this.currentEnvironmentId);
 
-		// Add new panel to registry
-		ConnectionReferencesPanelComposed.panels.set(this.currentEnvironmentId, this);
+			this.currentEnvironmentId = environmentId;
+			this.currentSolutionId = undefined;
 
-		const environment = await this.getEnvironmentById(environmentId);
-		this.panel.title = `Connection References - ${environment?.name || 'Unknown'}`;
+			// Add new panel to registry
+			ConnectionReferencesPanelComposed.panels.set(this.currentEnvironmentId, this);
 
-		// Load saved solution selection for new environment
-		if (this.panelStateRepository) {
-			try {
-				const state = await this.panelStateRepository.load({
-					panelType: 'connectionReferences',
-					environmentId: this.currentEnvironmentId
-				});
-				if (state && typeof state === 'object' && 'selectedSolutionId' in state) {
-					this.currentSolutionId = state.selectedSolutionId as string | undefined;
+			const environment = await this.getEnvironmentById(environmentId);
+			this.panel.title = `Connection References - ${environment?.name || 'Unknown'}`;
+
+			// Load saved solution selection for new environment
+			if (this.panelStateRepository) {
+				try {
+					const state = await this.panelStateRepository.load({
+						panelType: 'connectionReferences',
+						environmentId: this.currentEnvironmentId
+					});
+					if (state && typeof state === 'object' && 'selectedSolutionId' in state) {
+						this.currentSolutionId = state.selectedSolutionId as string | undefined;
+					}
+				} catch (error) {
+					this.logger.warn('Failed to load panel state for new environment', error);
 				}
-			} catch (error) {
-				this.logger.warn('Failed to load panel state for new environment', error);
 			}
-		}
 
-		await this.handleRefresh();
+			await this.handleRefresh();
+		} finally {
+			this.setButtonLoading('refresh', false);
+		}
 	}
 
 	private async handleSolutionChange(solutionId: string | undefined): Promise<void> {
 		this.currentSolutionId = solutionId;
+		this.clearTable();
 
 		// Save solution selection to panel state
 		if (this.panelStateRepository) {
@@ -527,5 +535,32 @@ export class ConnectionReferencesPanelComposed {
 			this.logger.error('Failed to sync deployment settings', error);
 			vscodeImpl.window.showErrorMessage(`Failed to sync deployment settings: ${error instanceof Error ? error.message : String(error)}`);
 		}
+	}
+
+	/**
+	 * Clears the table by sending empty data to the webview.
+	 * Provides immediate visual feedback during environment switches.
+	 */
+	private clearTable(): void {
+		this.panel.webview.postMessage({
+			command: 'updateTableData',
+			data: {
+				viewModels: [],
+				columns: this.getTableConfig().columns
+			}
+		});
+	}
+
+	/**
+	 * Sets button loading state via webview message.
+	 * Disables button and shows spinner during async operations.
+	 */
+	private setButtonLoading(buttonId: string, isLoading: boolean): void {
+		this.panel.webview.postMessage({
+			command: 'setButtonState',
+			buttonId,
+			disabled: isLoading,
+			showSpinner: isLoading,
+		});
 	}
 }

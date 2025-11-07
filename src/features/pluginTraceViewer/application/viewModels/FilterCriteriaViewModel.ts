@@ -7,16 +7,16 @@ export interface FilterConditionViewModel {
 	readonly field: string; // FilterField display name
 	readonly operator: string; // FilterOperator display name
 	readonly value: string;
+	readonly logicalOperator: 'and' | 'or'; // Logical operator for chaining (ignored for first row)
 }
 
 /**
  * View Model: Filter Criteria (Query Builder)
  *
  * DTO for filter panel state.
- * Supports dynamic query builder with multiple conditions.
+ * Supports dynamic query builder with per-row logical operators.
  */
 export interface FilterCriteriaViewModel {
 	readonly conditions: readonly FilterConditionViewModel[];
-	readonly logicalOperator: 'and' | 'or';
 	readonly top: number;
 }

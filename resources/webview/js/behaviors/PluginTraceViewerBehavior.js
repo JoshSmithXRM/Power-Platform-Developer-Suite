@@ -20,6 +20,8 @@ window.createBehavior({
 			window.updateDropdownState(message.data.dropdownId, message.data.selectedId);
 		} else if (message.command === 'updateDetailPanel') {
 			updateDetailPanel(message.data);
+		} else if (message.command === 'clearFilterPanel') {
+			clearFilterPanel();
 		}
 	}
 });
@@ -219,18 +221,23 @@ function selectRowByTraceId(traceId) {
  * Sets up filter panel event listeners for query builder.
  */
 function setupFilterPanel() {
-	// Filter toggle (expand/collapse)
+	// Filter toggle (expand/collapse) - make entire header clickable
+	const filterHeader = document.getElementById('filterPanelHeader');
 	const toggleBtn = document.getElementById('filterToggleBtn');
 	const filterBody = document.getElementById('filterPanelBody');
-	if (toggleBtn && filterBody) {
-		toggleBtn.addEventListener('click', () => {
+
+	if (filterHeader && toggleBtn && filterBody) {
+		const toggleCollapse = () => {
 			filterBody.classList.toggle('collapsed');
 			const icon = toggleBtn.querySelector('.codicon');
 			if (icon) {
 				icon.classList.toggle('codicon-chevron-down');
 				icon.classList.toggle('codicon-chevron-up');
 			}
-		});
+		};
+
+		// Make entire header clickable
+		filterHeader.addEventListener('click', toggleCollapse);
 	}
 
 	// Add condition button
@@ -238,6 +245,7 @@ function setupFilterPanel() {
 	if (addConditionBtn) {
 		addConditionBtn.addEventListener('click', () => {
 			addConditionRow();
+			updateFilterCount();
 		});
 	}
 
@@ -257,19 +265,16 @@ function setupFilterPanel() {
 		}, true);
 	}
 
-	// Clear filters button
-	const clearBtn = document.getElementById('clearFiltersBtn');
-	if (clearBtn) {
-		clearBtn.addEventListener('click', (e) => {
-			e.stopPropagation();
-			e.preventDefault();
+	// Clear filters button - handled by data-command attribute
 
-			// Send clear command
-			vscode.postMessage({
-				command: 'clearFilters'
-			});
-		}, true);
-	}
+	// Set up quick filter buttons
+	const quickFilterButtons = document.querySelectorAll('.quick-filter-btn');
+	quickFilterButtons.forEach(btn => {
+		btn.addEventListener('click', () => {
+			const filterType = btn.dataset.quickFilter;
+			applyQuickFilter(filterType);
+		});
+	});
 
 	// Set up event delegation for dynamic rows
 	const filterConditions = document.getElementById('filterConditions');
@@ -290,6 +295,17 @@ function setupFilterPanel() {
 			if (e.target.classList.contains('condition-field')) {
 				updateOperatorsForField(e.target);
 			}
+			// Update count when checkbox or any field changes
+			if (e.target.classList.contains('condition-enabled')) {
+				updateFilterCount();
+			}
+		});
+
+		// Update count when value inputs change
+		filterConditions.addEventListener('input', (e) => {
+			if (e.target.classList.contains('condition-value')) {
+				updateFilterCount();
+			}
 		});
 
 		// Enter key in value inputs triggers apply
@@ -302,31 +318,40 @@ function setupFilterPanel() {
 			}
 		});
 	}
+
+	// Initialize filter count on load
+	updateFilterCount();
 }
 
 /**
  * Collects filter criteria from query builder.
  * Returns FilterCriteriaViewModel structure.
+ *
+ * Note: Logical operator is at the END of each row (except last),
+ * but it logically belongs to the NEXT row for the domain model.
  */
 function collectFilterCriteria() {
-	// Get logical operator
-	const logicalOperator = document.querySelector('input[name="logicalOperator"]:checked')?.value || 'and';
-
 	// Collect all condition rows
 	const conditionRows = document.querySelectorAll('.filter-condition-row');
-	const conditions = Array.from(conditionRows).map(row => {
+	const conditions = Array.from(conditionRows).map((row, index) => {
 		const id = row.dataset.conditionId;
 		const enabled = row.querySelector('.condition-enabled')?.checked || false;
 		const field = row.querySelector('.condition-field')?.value || '';
 		const operator = row.querySelector('.condition-operator')?.value || '';
 		const value = row.querySelector('.condition-value')?.value || '';
 
-		return { id, enabled, field, operator, value };
+		// Get logical operator from PREVIOUS row (since it's at the end of that row)
+		let logicalOperator = 'and';
+		if (index > 0) {
+			const prevRow = conditionRows[index - 1];
+			logicalOperator = prevRow?.querySelector('.condition-logical-operator')?.value || 'and';
+		}
+
+		return { id, enabled, field, operator, value, logicalOperator };
 	});
 
 	return {
 		conditions,
-		logicalOperator,
 		top: 100
 	};
 }
@@ -343,6 +368,7 @@ function addConditionRow() {
 	// Generate unique ID
 	const existingRows = filterConditions.querySelectorAll('.filter-condition-row');
 	const nextId = `condition-${existingRows.length}`;
+	const isFirstRow = existingRows.length === 0;
 
 	// Create new row HTML
 	const newRowHtml = createConditionRowHtml({
@@ -350,8 +376,23 @@ function addConditionRow() {
 		enabled: true,
 		field: 'Plugin Name',
 		operator: 'Contains',
-		value: ''
-	});
+		value: '',
+		logicalOperator: 'and'
+	}, isFirstRow);
+
+	// If there's a previous last row, add operator dropdown to it
+	if (existingRows.length > 0) {
+		const prevLastRow = existingRows[existingRows.length - 1];
+		const placeholder = prevLastRow?.querySelector('.logical-operator-placeholder');
+		if (placeholder) {
+			placeholder.outerHTML = `
+				<select class="condition-logical-operator">
+					<option value="and" selected>AND</option>
+					<option value="or">OR</option>
+				</select>
+			`;
+		}
+	}
 
 	// Append to container
 	filterConditions.insertAdjacentHTML('beforeend', newRowHtml);
@@ -359,7 +400,6 @@ function addConditionRow() {
 
 /**
  * Removes a condition row from the query builder.
- * Keeps at least one row.
  */
 function removeConditionRow(row) {
 	const filterConditions = document.getElementById('filterConditions');
@@ -367,14 +407,183 @@ function removeConditionRow(row) {
 		return;
 	}
 
-	const allRows = filterConditions.querySelectorAll('.filter-condition-row');
+	row.remove();
 
-	// Keep at least one row
-	if (allRows.length <= 1) {
+	// If the new last row has an operator dropdown, replace it with placeholder
+	const allRows = filterConditions.querySelectorAll('.filter-condition-row');
+	if (allRows.length > 0) {
+		const newLastRow = allRows[allRows.length - 1];
+		const operatorDropdown = newLastRow?.querySelector('.condition-logical-operator');
+		if (operatorDropdown) {
+			operatorDropdown.outerHTML = '<span class="logical-operator-placeholder"></span>';
+		}
+	}
+
+	updateFilterCount();
+}
+
+/**
+ * Clears all filter conditions from the filter panel.
+ */
+function clearFilterPanel() {
+	const filterConditions = document.getElementById('filterConditions');
+	if (!filterConditions) {
 		return;
 	}
 
-	row.remove();
+	// Remove all condition rows
+	filterConditions.innerHTML = '';
+
+	// Update count
+	updateFilterCount();
+}
+
+/**
+ * Applies a quick filter preset (additive - appends to existing filters).
+ */
+function applyQuickFilter(filterType) {
+	const now = new Date();
+	let newCondition = null;
+
+	switch (filterType) {
+		case 'exceptions':
+			// Status equals Exception
+			newCondition = {
+				enabled: true,
+				field: 'Status',
+				operator: 'Equals',
+				value: 'Exception',
+				logicalOperator: 'and'
+			};
+			break;
+
+		case 'lastHour':
+			// Created On >= (now - 1 hour)
+			{
+				const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+				newCondition = {
+					enabled: true,
+					field: 'Created On',
+					operator: 'Greater Than or Equal',
+					value: formatDateTimeLocal(oneHourAgo),
+					logicalOperator: 'and'
+				};
+			}
+			break;
+
+		case 'last24Hours':
+			// Created On >= (now - 24 hours)
+			{
+				const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+				newCondition = {
+					enabled: true,
+					field: 'Created On',
+					operator: 'Greater Than or Equal',
+					value: formatDateTimeLocal(twentyFourHoursAgo),
+					logicalOperator: 'and'
+				};
+			}
+			break;
+
+		case 'today':
+			// Created On >= start of today
+			{
+				const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+				newCondition = {
+					enabled: true,
+					field: 'Created On',
+					operator: 'Greater Than or Equal',
+					value: formatDateTimeLocal(startOfToday),
+					logicalOperator: 'and'
+				};
+			}
+			break;
+	}
+
+	if (!newCondition) {
+		return;
+	}
+
+	// Get existing condition rows
+	const filterConditions = document.getElementById('filterConditions');
+	if (!filterConditions) {
+		return;
+	}
+
+	const existingRows = filterConditions.querySelectorAll('.filter-condition-row');
+	const existingCount = existingRows.length;
+
+	// Generate new condition ID
+	newCondition.id = `condition-${existingCount}`;
+
+	// If there are existing rows, update the last one to show logical operator
+	if (existingCount > 0) {
+		const lastRow = existingRows[existingCount - 1];
+		const placeholder = lastRow.querySelector('.logical-operator-placeholder');
+		if (placeholder) {
+			// Replace placeholder with actual operator dropdown
+			placeholder.outerHTML = `
+				<select class="condition-logical-operator">
+					<option value="and" selected>AND</option>
+					<option value="or">OR</option>
+				</select>
+			`;
+		}
+	}
+
+	// Add the new condition (it will be the last row, so no operator at the end)
+	const isLastRow = true;
+	const html = createConditionRowHtml(newCondition, isLastRow);
+	filterConditions.insertAdjacentHTML('beforeend', html);
+
+	updateFilterCount();
+
+	// Auto-apply the filter
+	const applyBtn = document.getElementById('applyFiltersBtn');
+	if (applyBtn) {
+		applyBtn.click();
+	}
+}
+
+/**
+ * Formats a Date object for datetime-local input.
+ */
+function formatDateTimeLocal(date) {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	const hours = String(date.getHours()).padStart(2, '0');
+	const minutes = String(date.getMinutes()).padStart(2, '0');
+	return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+/**
+ * Updates the filter count display in the header (active / total).
+ */
+function updateFilterCount() {
+	const filterTitle = document.querySelector('.filter-panel-title');
+	if (!filterTitle) {
+		return;
+	}
+
+	const conditionRows = document.querySelectorAll('.filter-condition-row');
+	const totalCount = conditionRows.length;
+
+	// Count active filters (enabled + has value)
+	let activeCount = 0;
+	conditionRows.forEach(row => {
+		const enabled = row.querySelector('.condition-enabled')?.checked || false;
+		const value = row.querySelector('.condition-value')?.value || '';
+		if (enabled && value.trim()) {
+			activeCount++;
+		}
+	});
+
+	// Update header text
+	filterTitle.innerHTML = `
+		<span class="codicon codicon-filter"></span>
+		Filters (${activeCount} / ${totalCount})
+	`;
 }
 
 /**
@@ -534,8 +743,10 @@ function createNumberInput(fieldName, value) {
 
 /**
  * Creates HTML for a single condition row.
+ * @param {Object} condition - The condition data
+ * @param {boolean} isLastRow - Whether this is the last row (no operator needed)
  */
-function createConditionRowHtml(condition) {
+function createConditionRowHtml(condition, isLastRow = true) {
 	const applicableOperators = getApplicableOperators(condition.field);
 	const allFields = ['Plugin Name', 'Entity Name', 'Message Name', 'Operation Type', 'Execution Mode', 'Status', 'Created On', 'Duration (ms)'];
 	const fieldType = getFieldType(condition.field);
@@ -568,9 +779,16 @@ function createConditionRowHtml(condition) {
 
 			${valueInputHtml}
 
-			<button class="icon-button remove-condition-btn" title="Remove condition">
-				<span class="codicon codicon-trash"></span>
-			</button>
+			${!isLastRow ? `
+				<select class="condition-logical-operator">
+					<option value="and" ${condition.logicalOperator === 'and' ? 'selected' : ''}>AND</option>
+					<option value="or" ${condition.logicalOperator === 'or' ? 'selected' : ''}>OR</option>
+				</select>
+			` : `
+				<span class="logical-operator-placeholder"></span>
+			`}
+
+			<button class="icon-button remove-condition-btn" title="Remove condition">×</button>
 		</div>
 	`;
 }

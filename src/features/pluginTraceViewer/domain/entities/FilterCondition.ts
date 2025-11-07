@@ -11,13 +11,15 @@ import { FilterOperator } from '../valueObjects/FilterOperator';
  * - Value cannot be empty for most operators
  * - Operator must be applicable to the field type
  * - Conditions can be enabled/disabled without deletion
+ * - Each condition has its own logical operator (AND/OR) for chaining
  */
 export class FilterCondition {
 	constructor(
 		public readonly field: FilterField,
 		public readonly operator: FilterOperator,
 		public readonly value: string,
-		public readonly enabled: boolean = true
+		public readonly enabled: boolean = true,
+		public readonly logicalOperator: 'and' | 'or' = 'and'
 	) {
 		this.validateInvariants();
 	}
@@ -66,28 +68,35 @@ export class FilterCondition {
 	 */
 	// eslint-disable-next-line local-rules/no-presentation-methods-in-domain -- Immutable builder pattern for domain entity
 	public toggleEnabled(): FilterCondition {
-		return new FilterCondition(this.field, this.operator, this.value, !this.enabled);
+		return new FilterCondition(this.field, this.operator, this.value, !this.enabled, this.logicalOperator);
 	}
 
 	/**
 	 * Creates a new condition with updated field.
 	 */
 	public withField(field: FilterField): FilterCondition {
-		return new FilterCondition(field, this.operator, this.value, this.enabled);
+		return new FilterCondition(field, this.operator, this.value, this.enabled, this.logicalOperator);
 	}
 
 	/**
 	 * Creates a new condition with updated operator.
 	 */
 	public withOperator(operator: FilterOperator): FilterCondition {
-		return new FilterCondition(this.field, operator, this.value, this.enabled);
+		return new FilterCondition(this.field, operator, this.value, this.enabled, this.logicalOperator);
 	}
 
 	/**
 	 * Creates a new condition with updated value.
 	 */
 	public withValue(value: string): FilterCondition {
-		return new FilterCondition(this.field, this.operator, value, this.enabled);
+		return new FilterCondition(this.field, this.operator, value, this.enabled, this.logicalOperator);
+	}
+
+	/**
+	 * Creates a new condition with updated logical operator.
+	 */
+	public withLogicalOperator(logicalOperator: 'and' | 'or'): FilterCondition {
+		return new FilterCondition(this.field, this.operator, this.value, this.enabled, logicalOperator);
 	}
 
 	/**
@@ -112,12 +121,14 @@ export class FilterCondition {
 		operator: FilterOperator;
 		value: string;
 		enabled?: boolean;
+		logicalOperator?: 'and' | 'or';
 	}): FilterCondition {
 		return new FilterCondition(
 			params.field,
 			params.operator,
 			params.value,
-			params.enabled ?? true
+			params.enabled ?? true,
+			params.logicalOperator ?? 'and'
 		);
 	}
 }

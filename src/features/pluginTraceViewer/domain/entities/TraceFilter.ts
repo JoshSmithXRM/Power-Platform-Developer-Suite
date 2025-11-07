@@ -25,7 +25,6 @@ export class TraceFilter {
 		public readonly top: number,
 		public readonly orderBy: string,
 		public readonly conditions: readonly FilterCondition[] = [],
-		public readonly logicalOperator: 'and' | 'or' = 'and',
 		public readonly pluginNameFilter?: string,
 		public readonly entityNameFilter?: string,
 		public readonly messageNameFilter?: string,
@@ -101,7 +100,7 @@ export class TraceFilter {
 
 		// NEW: If using query builder conditions, build from those instead
 		if (this.conditions.length > 0) {
-			return builder.buildFromConditions(this.conditions, this.logicalOperator);
+			return builder.buildFromConditions(this.conditions);
 		}
 
 		// LEGACY: Fall back to simple filters for backward compatibility
@@ -187,7 +186,6 @@ export class TraceFilter {
 		top?: number;
 		orderBy?: string;
 		conditions?: readonly FilterCondition[];
-		logicalOperator?: 'and' | 'or';
 		pluginNameFilter?: string;
 		entityNameFilter?: string;
 		messageNameFilter?: string;
@@ -205,7 +203,6 @@ export class TraceFilter {
 			params.top ?? 100,
 			params.orderBy ?? 'createdon desc',
 			params.conditions ?? [],
-			params.logicalOperator ?? 'and',
 			params.pluginNameFilter,
 			params.entityNameFilter,
 			params.messageNameFilter,
@@ -232,7 +229,6 @@ export class TraceFilter {
 			this.top,
 			this.orderBy,
 			this.conditions,
-			this.logicalOperator,
 			pluginName,
 			this.entityNameFilter,
 			this.messageNameFilter,
@@ -258,7 +254,7 @@ export class TraceFilter {
 			this.top,
 			this.orderBy,
 			this.conditions,
-			this.logicalOperator,
+
 			this.pluginNameFilter,
 			entityName,
 			this.messageNameFilter,
@@ -284,7 +280,7 @@ export class TraceFilter {
 			this.top,
 			this.orderBy,
 			this.conditions,
-			this.logicalOperator,
+
 			this.pluginNameFilter,
 			this.entityNameFilter,
 			messageName,
@@ -310,7 +306,7 @@ export class TraceFilter {
 			this.top,
 			this.orderBy,
 			this.conditions,
-			this.logicalOperator,
+
 			this.pluginNameFilter,
 			this.entityNameFilter,
 			this.messageNameFilter,
@@ -336,7 +332,7 @@ export class TraceFilter {
 			this.top,
 			this.orderBy,
 			this.conditions,
-			this.logicalOperator,
+
 			this.pluginNameFilter,
 			this.entityNameFilter,
 			this.messageNameFilter,
@@ -362,7 +358,7 @@ export class TraceFilter {
 			this.top,
 			this.orderBy,
 			this.conditions,
-			this.logicalOperator,
+
 			this.pluginNameFilter,
 			this.entityNameFilter,
 			this.messageNameFilter,
@@ -388,7 +384,7 @@ export class TraceFilter {
 			this.top,
 			this.orderBy,
 			this.conditions,
-			this.logicalOperator,
+
 			this.pluginNameFilter,
 			this.entityNameFilter,
 			this.messageNameFilter,
@@ -414,7 +410,7 @@ export class TraceFilter {
 			this.top,
 			this.orderBy,
 			this.conditions,
-			this.logicalOperator,
+
 			this.pluginNameFilter,
 			this.entityNameFilter,
 			this.messageNameFilter,
@@ -440,7 +436,7 @@ export class TraceFilter {
 			this.top,
 			this.orderBy,
 			this.conditions,
-			this.logicalOperator,
+
 			this.pluginNameFilter,
 			this.entityNameFilter,
 			this.messageNameFilter,
@@ -466,7 +462,7 @@ export class TraceFilter {
 			this.top,
 			this.orderBy,
 			this.conditions,
-			this.logicalOperator,
+
 			this.pluginNameFilter,
 			this.entityNameFilter,
 			this.messageNameFilter,
@@ -492,7 +488,7 @@ export class TraceFilter {
 			top,
 			this.orderBy,
 			this.conditions,
-			this.logicalOperator,
+
 			this.pluginNameFilter,
 			this.entityNameFilter,
 			this.messageNameFilter,

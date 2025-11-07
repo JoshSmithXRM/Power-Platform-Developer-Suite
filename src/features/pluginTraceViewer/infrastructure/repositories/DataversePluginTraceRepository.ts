@@ -83,6 +83,12 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		const odataFilter = filter.toODataFilter();
 		if (odataFilter) {
 			queryParams.push(`$filter=${odataFilter}`);
+			this.logger.info('Applied OData filter', {
+				filterExpression: odataFilter,
+				activeConditions: filter.getActiveFilterCount()
+			});
+		} else {
+			this.logger.info('No filter applied - retrieving all traces (up to $top limit)');
 		}
 
 		const queryString = queryParams.join('&');
