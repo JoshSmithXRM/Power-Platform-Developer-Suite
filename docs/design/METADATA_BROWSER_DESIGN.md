@@ -1,197 +1,186 @@
 # Metadata Browser - Technical Design
 
 **Status:** Draft
-**Date:** 2025-11-06
+**Date:** 2025-11-08
 **Complexity:** Complex
 
 ---
 
 ## Overview
 
-**User Problem:** Power Platform developers need to explore Dataverse table and choice (option set) metadata to understand schema structure, relationships, and properties for development and troubleshooting. Currently, they must use Power Apps Maker Portal or manually query APIs, which is slow and context-switching.
+**User Problem:** Developers need to quickly browse and inspect Dataverse entity metadata (entities, attributes, relationships, keys, privileges, global option sets) without leaving VS Code or navigating to the Power Apps Maker portal.
 
-**Solution:** A 3-panel VS Code tool that provides fast, searchable access to entity metadata (attributes, keys, relationships, privileges) and global choices, with drill-down capabilities and quick navigation.
+**Solution:** A three-panel layout providing (1) tree navigation for entities/choices, (2) tabbed tables showing attributes/relationships/keys/privileges, and (3) a detail panel for viewing full metadata properties when clicking on specific items.
 
-**Value:** Reduces context switching, accelerates schema discovery, and provides detailed metadata inspection within the developer's IDE, improving productivity for plugin development, data modeling, and troubleshooting.
+**Value:** Eliminates context switching, accelerates development workflows, and provides instant access to metadata critical for plugin development, custom APIs, and data modeling.
 
 ---
 
 ## Requirements
 
 ### Functional Requirements
-- [ ] Browse hierarchical tree of all tables and global choices in an environment
-- [ ] Search/filter tree by display name or logical name
-- [ ] Select table to view attributes, keys, relationships, and privileges
-- [ ] Select choice to view option values
-- [ ] Drill down into specific attribute or relationship details (Properties and Raw JSON tabs)
-- [ ] Navigate to related entities from relationship rows
-- [ ] Copy logical names to clipboard
-- [ ] Open selected entity in Power Apps Maker Portal
-- [ ] Refresh metadata to see latest schema changes
-- [ ] Persist panel preferences per environment (collapsed sections, split ratios, left panel state)
+- [ ] Display hierarchical tree of all entities and global option sets in left panel
+- [ ] Show entity metadata in tabbed tables (Attributes, Relationships, Keys, Privileges)
+- [ ] Display detail information for selected metadata item in right panel
+- [ ] Support environment switching (metadata is environment-specific)
+- [ ] Support search/filter in entity tree
+- [ ] Preserve selected entity when refreshing
+- [ ] Support both system entities and custom entities with visual distinction
+- [ ] Handle loading states gracefully (tree, tables, detail panel)
 
 ### Non-Functional Requirements
-- [ ] Tree loads in <2 seconds (all entities + choices)
-- [ ] Entity metadata loads in <3 seconds (parallel API calls)
-- [ ] UI remains responsive during data fetch (loading states)
-- [ ] Client-side caching with 5-minute timeout
-- [ ] Keyboard shortcuts for detail panel (Ctrl+A to select all)
-- [ ] Accessible UI (ARIA labels, keyboard navigation)
+- [ ] Performance: Load entity tree in < 3 seconds for environments with 1000+ entities
+- [ ] Performance: Switch tabs client-side (no backend call)
+- [ ] Performance: Load entity metadata (attributes/relationships) in < 2 seconds
+- [ ] UX: Preserve scroll position when switching between entity details
+- [ ] UX: Show visual feedback during async operations (loading spinners)
+- [ ] Compatibility: Works across all supported Dataverse regions
 
 ### Success Criteria
-- [ ] User can browse and search 300+ tables in <2 seconds
-- [ ] User can view entity attributes without leaving VS Code
-- [ ] User can drill down into attribute details via context menu
-- [ ] User can navigate from relationship to related entity
-- [ ] Preferences persist across sessions per environment
-- [ ] All use case tests pass (90%+ coverage target)
-- [ ] Domain entity tests pass (100% coverage target)
+- [ ] User can browse all entities in selected environment
+- [ ] User can view attributes, relationships, keys, and privileges for any entity
+- [ ] User can see detailed information for specific metadata items
+- [ ] User can search/filter entities by name
+- [ ] Panel maintains state (selected entity, active tab) during session
+- [ ] System handles large metadata sets (1000+ entities, 500+ attributes per entity)
 
 ---
 
 ## Implementation Slices (Vertical Slicing)
 
-### MVP Slice (Slice 1): "User can browse entity tree and view attributes"
-**Goal:** Simplest end-to-end functionality (walking skeleton)
+### MVP Slice (Slice 1): "User can view entity tree and basic attributes"
+**Goal:** Prove entire stack with simplest end-to-end functionality
 
 **Domain:**
-- `EntityMetadata` entity with minimal fields (logicalName, displayName, isCustom)
-- `AttributeMetadata` entity with basic fields (logicalName, displayName, attributeType)
-- `IMetadataRepository` interface with `getEntityDefinitions()` and `getEntityAttributes()`
+- `EntityMetadata` entity (minimal: logicalName, displayName, isCustomEntity)
+- `AttributeMetadata` entity (minimal: logicalName, displayName, attributeType)
+- `IEntityMetadataRepository` interface (single method: `getAllEntities()`)
 
 **Application:**
-- `LoadEntityTreeUseCase` - Load all entities and choices
-- `LoadEntityMetadataUseCase` - Load attributes for selected entity
-- `EntityTreeItemViewModel` - DTO for tree items
-- `AttributeViewModel` - DTO for attribute table rows
+- `LoadEntityTreeUseCase` - Fetch all entities
+- `LoadEntityAttributesUseCase` - Fetch attributes for one entity
+- `EntityTreeItemViewModel` (minimal: id, label, isCustom)
+- `EntityAttributeViewModel` (minimal: logicalName, displayName, type)
 
 **Infrastructure:**
-- `DataverseMetadataRepository` - Implement `getEntityDefinitions()` and `getEntityAttributes()` methods
-- API calls to Dataverse metadata endpoints
+- `DataverseEntityMetadataRepository` - Implements repository interface
+- Fetch entities via Dataverse Web API: `GET /api/data/v9.2/EntityDefinitions`
+- Fetch attributes via: `GET /api/data/v9.2/EntityDefinitions(LogicalName='account')/Attributes`
 
 **Presentation:**
-- `MetadataBrowserPanel` - 3-panel layout (tree, content, detail - detail hidden initially)
-- Entity tree on left (tables + choices sections)
-- Attributes table in center (collapsible section)
-- Search filter for tree
+- `MetadataBrowserPanel` with PanelCoordinator
+- `MetadataTreeSection` (left panel)
+- `MetadataAttributeTableSection` (middle panel, single tab)
+- Three-panel layout template in `SectionCompositionBehavior`
+- Client-side tree renderer (JS)
+- Client-side table renderer (reuse existing DataTableSection patterns)
 
-**Result:** WORKING FEATURE ✅ (user can select entity and see attributes table)
+**Result:** WORKING FEATURE ✅ User can browse entity tree and view attributes table
 
 ---
 
-### Slice 2: "User can view keys, relationships, and privileges"
+### Slice 2: "User can view relationships, keys, and privileges"
 **Builds on:** Slice 1
 
 **Domain:**
-- `KeyMetadata` entity (name, type, keyAttributes)
-- `RelationshipMetadata` entity (name, type, relatedEntity, referencingAttribute)
-- `PrivilegeMetadata` entity (name, privilegeType, depth)
+- `RelationshipMetadata` entity (fields: schemaName, relatedEntity, relationshipType)
+- `KeyMetadata` entity (fields: logicalName, keyAttributes)
+- `PrivilegeMetadata` entity (fields: name, privilegeType)
+- Expand `IEntityMetadataRepository` (add methods for relationships/keys/privileges)
 
 **Application:**
-- Update `LoadEntityMetadataUseCase` to load all metadata sections in parallel
-- `KeyViewModel`, `RelationshipViewModel`, `PrivilegeViewModel` DTOs
+- `LoadEntityRelationshipsUseCase`
+- `LoadEntityKeysUseCase`
+- `LoadEntityPrivilegesUseCase`
+- ViewModels: `EntityRelationshipViewModel`, `EntityKeyViewModel`, `EntityPrivilegeViewModel`
 
 **Infrastructure:**
-- Add repository methods: `getEntityKeys()`, `getRelationships()`, `getEntityPrivileges()`
-- Parallel Promise.all() for efficient loading
+- Add repository methods:
+  - `getRelationships(logicalName)`
+  - `getKeys(logicalName)`
+  - `getPrivileges(logicalName)`
+- API calls to fetch relationships/keys/privileges
 
 **Presentation:**
-- Add Keys, Relationships, Privileges sections (collapsible)
-- Section headers show counts
-- Default collapsed state (only attributes expanded)
+- Add tabs to middle panel (Attributes | Relationships | Keys | Privileges)
+- Client-side tab switching (no backend calls)
+- Sections: `MetadataRelationshipTableSection`, `MetadataKeyTableSection`, `MetadataPrivilegeTableSection`
 
-**Result:** ENHANCED FEATURE ✅ (full entity metadata visible)
+**Result:** ENHANCED FEATURE ✅ User can view all entity metadata types
 
 ---
 
-### Slice 3: "User can view choice metadata"
+### Slice 3: "User can view detailed metadata in right panel"
 **Builds on:** Slice 2
 
 **Domain:**
-- `ChoiceMetadata` entity (name, displayName, isCustom)
-- `ChoiceValueMetadata` entity (label, value, description)
+- Expand entities with full properties:
+  - `AttributeMetadata`: Add all properties (isRequired, maxLength, format, etc.)
+  - `RelationshipMetadata`: Add all properties (cascadeConfiguration, etc.)
+  - `KeyMetadata`: Add all properties
+  - `PrivilegeMetadata`: Add all properties
 
 **Application:**
-- `LoadChoiceMetadataUseCase` - Load choice values
-- `ChoiceValueViewModel` - DTO for choice values table
-
-**Infrastructure:**
-- `getGlobalOptionSets()` method
-- `getOptionSetMetadata(name)` method
+- ViewModels for detail panels:
+  - `AttributeDetailViewModel`
+  - `RelationshipDetailViewModel`
+  - `KeyDetailViewModel`
+  - `PrivilegeDetailViewModel`
 
 **Presentation:**
-- Choice tree items with icon (🔽)
-- Choice values section (only visible when choice selected)
-- Mode switching (entity-mode vs choice-mode CSS classes)
+- `MetadataDetailSection` (right panel)
+- Commands: `viewAttributeDetail`, `viewRelationshipDetail`, etc.
+- Client-side detail renderer
+- Show/hide detail panel dynamically
 
-**Result:** ENHANCED FEATURE ✅ (choices browsable)
+**Result:** ENHANCED FEATURE ✅ User can drill into metadata details
 
 ---
 
-### Slice 4: "User can drill down into details"
+### Slice 4: "User can view global option sets"
 **Builds on:** Slice 3
 
 **Domain:**
-- No changes (metadata already loaded)
+- `GlobalOptionSetMetadata` entity
+- `OptionMetadata` entity (for option values)
+- Expand `IEntityMetadataRepository.getAllEntities()` to include global option sets
 
 **Application:**
-- No new use cases (detail view uses cached metadata)
+- `LoadGlobalOptionSetsUseCase`
+- `GlobalOptionSetViewModel`
+- `OptionValueViewModel`
+
+**Infrastructure:**
+- API call: `GET /api/data/v9.2/GlobalOptionSetDefinitions`
 
 **Presentation:**
-- Split panel behavior (middle + right panels)
-- Detail panel with two tabs (Properties, Raw Data)
-- Context menu on attribute and relationship rows ("View Details")
-- Properties tab: Flat table rendering all fields
-- Raw Data tab: JSON viewer component
-- Close button and keyboard shortcuts
+- Update tree to show "Global Option Sets" node
+- Add table for option values
+- Detail panel for option set metadata
 
-**Result:** ENHANCED FEATURE ✅ (detailed inspection available)
+**Result:** ENHANCED FEATURE ✅ User can browse global option sets
 
 ---
 
-### Slice 5: "User can navigate and refresh"
+### Slice 5: "User can search/filter entities and persist state"
 **Builds on:** Slice 4
 
 **Domain:**
-- No changes
+- `EntityTreeFilter` value object (search text, filter flags)
 
 **Application:**
-- `NavigateToRelatedEntityUseCase` - Load entity by logical name from relationship row
-- `RefreshMetadataUseCase` - Clear cache and reload current selection
+- Expand `LoadEntityTreeUseCase` to accept filter
+- State persistence in `IPanelStateRepository`
 
 **Infrastructure:**
-- Cache invalidation method
+- No changes (filtering is in-memory on frontend)
 
 **Presentation:**
-- "Open Related Entity" context menu on relationships
-- "Open in Maker" action bar button
-- "Refresh" action bar button
-- Copy logical name context menu
-- Environment selector integration
+- Add search input to tree header
+- Client-side filtering (instant feedback)
+- Persist: selected entity, active tab, detail panel state
 
-**Result:** COMPLETE FEATURE ✅ (full functionality)
-
----
-
-### Slice 6: "Preferences persist per environment"
-**Builds on:** Slice 5
-
-**Domain:**
-- No changes (preferences are infrastructure concern)
-
-**Application:**
-- No changes
-
-**Infrastructure:**
-- Extend StateManager for per-environment preferences
-
-**Presentation:**
-- Persist collapsed sections state
-- Persist split panel ratio
-- Persist left panel collapsed state
-- Load preferences on environment switch
-
-**Result:** POLISHED FEATURE ✅ (user experience optimized)
+**Result:** ENHANCED FEATURE ✅ User can find entities quickly and maintain context
 
 ---
 
@@ -202,33 +191,32 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ Presentation Layer                                          │
-│ - MetadataBrowserPanel orchestrates use cases               │
-│ - Maps domain entities → ViewModels (via mappers)          │
-│ - HTML extracted to separate view file                     │
-│ - Tree interaction behavior in JavaScript                  │
+│ - MetadataBrowserPanel (PanelCoordinator)                  │
+│ - Sections: Tree, Tables (tabs), Detail                    │
+│ - Client-side renderers (JS)                               │
+│ - NO business logic                                         │
 └─────────────────────────────────────────────────────────────┘
                           ↓ depends on ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ Application Layer                                           │
-│ - Use cases orchestrate domain entities (NO business logic)│
+│ - Use cases orchestrate (LoadEntityTree, LoadAttributes)   │
 │ - ViewModels are DTOs (no behavior)                        │
 │ - Mappers transform domain → ViewModel                     │
 └─────────────────────────────────────────────────────────────┘
                           ↓ depends on ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ Domain Layer                                                │
-│ - Rich entities with behavior (NOT anemic)                 │
-│ - Value objects (immutable, validated)                     │
-│ - Repository interfaces (domain defines contracts)         │
+│ - Rich entities: EntityMetadata, AttributeMetadata, etc.   │
+│ - Business rules (isSystemEntity, isCustom, isRequired)    │
+│ - Repository interfaces (IEntityMetadataRepository)        │
 │ - ZERO external dependencies                               │
 └─────────────────────────────────────────────────────────────┘
                           ↑ implements ↑
 ┌─────────────────────────────────────────────────────────────┐
 │ Infrastructure Layer                                        │
-│ - DataverseMetadataRepository implements domain interface  │
-│ - Dataverse API integration                                 │
-│ - DTO mapping (API → Domain entities)                      │
-│ - Caching with 5-minute timeout                            │
+│ - DataverseEntityMetadataRepository                        │
+│ - Dataverse Web API integration                            │
+│ - DTO → Domain mapping                                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -253,658 +241,471 @@
 
 ```typescript
 /**
- * Represents Dataverse entity (table) metadata with rich behavior.
+ * Represents Dataverse entity metadata.
  *
  * Business Rules:
- * - Custom entities have logical names with prefixes (e.g., "new_", "cr123_")
- * - System entities are predefined by Microsoft (e.g., "account", "contact")
- * - Entity type determines available metadata sections
+ * - System entities (out-of-box) cannot be deleted
+ * - Custom entities have 'new_' prefix or publisher prefix
+ * - Entity logical name is immutable
+ * - Entity can have 0 to N attributes, relationships, keys, privileges
  *
  * Rich behavior (NOT anemic):
- * - isCustomEntity(): boolean
  * - isSystemEntity(): boolean
+ * - isCustomEntity(): boolean
  * - hasAttributes(): boolean
- * - requiresFullLoad(): boolean
+ * - getAttributeCount(): number
  */
 export class EntityMetadata {
   constructor(
-    private readonly metadataId: string,
-    private readonly logicalName: string,
-    private readonly schemaName: string,
-    private readonly displayName: string,
-    private readonly description: string,
+    private readonly logicalName: LogicalName,
+    private readonly schemaName: SchemaName,
+    private readonly displayName: DisplayName,
+    private readonly pluralName: DisplayName,
+    private readonly description: string | null,
     private readonly entitySetName: string,
-    private readonly primaryIdAttribute: string,
+    private readonly isCustomEntity: boolean,
+    private readonly objectTypeCode: number | null,
+    private readonly primaryIdAttribute: string | null,
     private readonly primaryNameAttribute: string | null,
-    private readonly isManaged: boolean,
-    private readonly isCustomizable: boolean,
-    private readonly objectTypeCode: number
+    private readonly ownershipType: OwnershipType,
+    private readonly attributes: readonly AttributeMetadata[]
   ) {
     this.validateInvariants();
   }
 
   /**
-   * Validates business invariants on construction.
-   * @throws {ValidationError} if invariants violated
+   * Validates business rules on construction.
    */
   private validateInvariants(): void {
-    if (!this.logicalName || this.logicalName.trim().length === 0) {
-      throw new ValidationError('EntityMetadata', 'logicalName', this.logicalName, 'Cannot be empty');
-    }
-
-    if (!this.metadataId || this.metadataId.trim().length === 0) {
-      throw new ValidationError('EntityMetadata', 'metadataId', this.metadataId, 'Cannot be empty');
+    if (this.attributes.some(attr => attr.getEntityLogicalName().getValue() !== this.logicalName.getValue())) {
+      throw new Error('All attributes must belong to this entity');
     }
   }
 
   /**
-   * Determines if entity is custom (created by user/partner).
-   *
-   * Business Rule: Custom entities have prefixes in logical name
-   *
-   * @returns True if custom entity, false if system entity
-   */
-  public isCustomEntity(): boolean {
-    // Custom entities have prefixes like "new_", "cr123_"
-    return /^[a-z]+\d*_/.test(this.logicalName);
-  }
-
-  /**
-   * Determines if entity is system entity (predefined by Microsoft).
+   * Business rule: System entities are created by Microsoft (not custom)
    */
   public isSystemEntity(): boolean {
-    return !this.isCustomEntity();
+    return !this.isCustomEntity;
   }
 
   /**
-   * Gets display label for tree rendering.
-   *
-   * @returns Display name or logical name if display name unavailable
+   * Business rule: Check if entity has attributes
    */
-  public getDisplayLabel(): string {
-    return this.displayName && this.displayName.trim().length > 0
-      ? this.displayName
-      : this.logicalName;
+  public hasAttributes(): boolean {
+    return this.attributes.length > 0;
   }
 
   /**
-   * Gets icon for tree rendering based on entity type.
-   *
-   * @returns Emoji icon (🏷️ for custom, 📋 for system)
+   * Get number of attributes
    */
-  public getIcon(): string {
-    return this.isCustomEntity() ? '🏷️' : '📋';
+  public getAttributeCount(): number {
+    return this.attributes.length;
   }
 
-  // Type-safe getters
-  public getMetadataId(): string { return this.metadataId; }
-  public getLogicalName(): string { return this.logicalName; }
-  public getSchemaName(): string { return this.schemaName; }
-  public getDisplayName(): string { return this.displayName; }
-  public getDescription(): string { return this.description; }
+  /**
+   * Get attributes filtered by type
+   */
+  public getAttributesByType(type: AttributeType): readonly AttributeMetadata[] {
+    return this.attributes.filter(attr => attr.getType().equals(type));
+  }
+
+  // Getters (NO business logic in getters)
+  public getLogicalName(): LogicalName { return this.logicalName; }
+  public getSchemaName(): SchemaName { return this.schemaName; }
+  public getDisplayName(): DisplayName { return this.displayName; }
+  public getPluralName(): DisplayName { return this.pluralName; }
+  public getDescription(): string | null { return this.description; }
   public getEntitySetName(): string { return this.entitySetName; }
-  public getPrimaryIdAttribute(): string { return this.primaryIdAttribute; }
+  public getIsCustomEntity(): boolean { return this.isCustomEntity; }
+  public getObjectTypeCode(): number | null { return this.objectTypeCode; }
+  public getPrimaryIdAttribute(): string | null { return this.primaryIdAttribute; }
   public getPrimaryNameAttribute(): string | null { return this.primaryNameAttribute; }
-  public getIsManaged(): boolean { return this.isManaged; }
-  public getIsCustomizable(): boolean { return this.isCustomizable; }
-  public getObjectTypeCode(): number { return this.objectTypeCode; }
+  public getOwnershipType(): OwnershipType { return this.ownershipType; }
+  public getAttributes(): readonly AttributeMetadata[] { return this.attributes; }
 }
-```
 
-```typescript
 /**
- * Represents entity attribute (field) metadata with behavior.
+ * Represents entity attribute metadata.
  *
  * Business Rules:
- * - Required level determines if field is mandatory
- * - Attribute type determines available properties (maxLength, targets, etc.)
- * - String attributes have maxLength constraint
- * - Lookup attributes have Targets array
+ * - System attributes (created by platform) cannot be deleted
+ * - Custom attributes have 'new_' prefix or publisher prefix
+ * - Required attributes cannot have null values in records
+ * - String attributes have max length constraint
+ * - Lookup attributes reference another entity
  *
  * Rich behavior:
+ * - isSystemAttribute(): boolean
+ * - isCustomAttribute(): boolean
  * - isRequired(): boolean
- * - isString(): boolean
  * - isLookup(): boolean
- * - isPicklist(): boolean
- * - getRequiredLevelLabel(): string
+ * - hasMaxLength(): boolean
  */
 export class AttributeMetadata {
   constructor(
-    private readonly metadataId: string,
-    private readonly logicalName: string,
-    private readonly schemaName: string,
-    private readonly displayName: string,
-    private readonly description: string,
-    private readonly attributeType: string,
-    private readonly attributeTypeName: string,
-    private readonly requiredLevel: RequiredLevel,
+    private readonly logicalName: LogicalName,
+    private readonly schemaName: SchemaName,
+    private readonly displayName: DisplayName,
+    private readonly description: string | null,
+    private readonly attributeType: AttributeType,
     private readonly isCustomAttribute: boolean,
-    private readonly isManaged: boolean,
-    private readonly isPrimaryId: boolean,
-    private readonly isPrimaryName: boolean,
-    private readonly maxLength: number | null = null,
-    private readonly targets: string[] | null = null,
-    private readonly optionSet: OptionSetMetadata | null = null
+    private readonly isRequiredLevel: RequiredLevel,
+    private readonly entityLogicalName: LogicalName,
+    private readonly maxLength: number | null,
+    private readonly format: string | null,
+    private readonly lookupTargetEntity: LogicalName | null,
+    private readonly optionSetName: string | null
   ) {
     this.validateInvariants();
   }
 
   private validateInvariants(): void {
-    if (!this.logicalName || this.logicalName.trim().length === 0) {
-      throw new ValidationError('AttributeMetadata', 'logicalName', this.logicalName, 'Cannot be empty');
+    // Business rule: String attributes with maxLength must have positive value
+    if (this.maxLength !== null && this.maxLength <= 0) {
+      throw new Error('Max length must be positive');
+    }
+
+    // Business rule: Lookup attributes must have target entity
+    if (this.attributeType.isLookup() && !this.lookupTargetEntity) {
+      throw new Error('Lookup attributes must have target entity');
+    }
+
+    // Business rule: Picklist/MultiSelectPicklist must have option set
+    if (this.attributeType.isOptionSet() && !this.optionSetName) {
+      throw new Error('Option set attributes must have option set name');
     }
   }
 
   /**
-   * Determines if attribute is required.
-   *
-   * Business Rule: SystemRequired and ApplicationRequired are both mandatory
+   * Business rule: System attributes created by platform
+   */
+  public isSystemAttribute(): boolean {
+    return !this.isCustomAttribute;
+  }
+
+  /**
+   * Business rule: Required attributes cannot be null in records
    */
   public isRequired(): boolean {
-    return this.requiredLevel === RequiredLevel.SystemRequired ||
-           this.requiredLevel === RequiredLevel.ApplicationRequired;
+    return this.isRequiredLevel.isRequired();
   }
 
   /**
-   * Checks if attribute is string type with maxLength constraint.
-   */
-  public isString(): boolean {
-    return this.attributeType === 'String' || this.attributeTypeName === 'StringType';
-  }
-
-  /**
-   * Checks if attribute is lookup (foreign key).
+   * Business rule: Check if attribute is a lookup
    */
   public isLookup(): boolean {
-    return this.attributeType === 'Lookup' || this.attributeTypeName === 'LookupType';
+    return this.attributeType.isLookup();
   }
 
   /**
-   * Checks if attribute is picklist (dropdown).
+   * Business rule: Check if attribute has max length constraint
    */
-  public isPicklist(): boolean {
-    return this.attributeType === 'Picklist' || this.attributeTypeName === 'PicklistType';
+  public hasMaxLength(): boolean {
+    return this.maxLength !== null;
   }
 
   /**
-   * Gets user-friendly required level label.
-   *
-   * @returns Label for UI display
+   * Get formatted type display
    */
-  public getRequiredLevelLabel(): string {
-    switch (this.requiredLevel) {
-      case RequiredLevel.None:
-        return 'Optional';
-      case RequiredLevel.SystemRequired:
-        return 'System Required';
-      case RequiredLevel.ApplicationRequired:
-        return 'Business Required';
-      case RequiredLevel.Recommended:
-        return 'Business Recommended';
-      default:
-        return 'Unknown';
+  public getTypeDisplay(): string {
+    if (this.isLookup() && this.lookupTargetEntity) {
+      return `Lookup (${this.lookupTargetEntity.getValue()})`;
     }
+    return this.attributeType.getDisplayName();
   }
 
-  /**
-   * Gets max length value or placeholder.
-   *
-   * @returns Max length number or '-' if not applicable
-   */
-  public getMaxLengthDisplay(): string {
-    return this.maxLength !== null ? this.maxLength.toString() : '-';
-  }
-
-  /**
-   * Gets display label for tree/table rendering.
-   */
-  public getDisplayLabel(): string {
-    return this.displayName && this.displayName.trim().length > 0
-      ? this.displayName
-      : this.logicalName;
-  }
-
-  // Type-safe getters
-  public getMetadataId(): string { return this.metadataId; }
-  public getLogicalName(): string { return this.logicalName; }
-  public getSchemaName(): string { return this.schemaName; }
-  public getDisplayName(): string { return this.displayName; }
-  public getDescription(): string { return this.description; }
-  public getAttributeType(): string { return this.attributeType; }
-  public getAttributeTypeName(): string { return this.attributeTypeName; }
-  public getRequiredLevel(): RequiredLevel { return this.requiredLevel; }
+  // Getters
+  public getLogicalName(): LogicalName { return this.logicalName; }
+  public getSchemaName(): SchemaName { return this.schemaName; }
+  public getDisplayName(): DisplayName { return this.displayName; }
+  public getDescription(): string | null { return this.description; }
+  public getType(): AttributeType { return this.attributeType; }
   public getIsCustomAttribute(): boolean { return this.isCustomAttribute; }
-  public getIsManaged(): boolean { return this.isManaged; }
-  public getIsPrimaryId(): boolean { return this.isPrimaryId; }
-  public getIsPrimaryName(): boolean { return this.isPrimaryName; }
+  public getRequiredLevel(): RequiredLevel { return this.isRequiredLevel; }
+  public getEntityLogicalName(): LogicalName { return this.entityLogicalName; }
   public getMaxLength(): number | null { return this.maxLength; }
-  public getTargets(): string[] | null { return this.targets; }
-  public getOptionSet(): OptionSetMetadata | null { return this.optionSet; }
+  public getFormat(): string | null { return this.format; }
+  public getLookupTargetEntity(): LogicalName | null { return this.lookupTargetEntity; }
+  public getOptionSetName(): string | null { return this.optionSetName; }
 }
-```
 
-```typescript
 /**
- * Represents entity key metadata (primary or alternate keys).
+ * Represents entity relationship metadata.
  *
  * Business Rules:
- * - Single attribute key = Primary key
- * - Multiple attribute key = Alternate key
- *
- * Rich behavior:
- * - isPrimaryKey(): boolean
- * - isAlternateKey(): boolean
- * - getKeyAttributesDisplay(): string
- */
-export class KeyMetadata {
-  constructor(
-    private readonly metadataId: string,
-    private readonly logicalName: string,
-    private readonly schemaName: string,
-    private readonly displayName: string,
-    private readonly keyAttributes: string[],
-    private readonly isManaged: boolean,
-    private readonly entityKeyIndexStatus: string
-  ) {
-    this.validateInvariants();
-  }
-
-  private validateInvariants(): void {
-    if (!this.keyAttributes || this.keyAttributes.length === 0) {
-      throw new ValidationError('KeyMetadata', 'keyAttributes', this.keyAttributes, 'Must have at least one attribute');
-    }
-  }
-
-  /**
-   * Determines if key is primary key.
-   *
-   * Business Rule: Single attribute keys are typically primary keys
-   */
-  public isPrimaryKey(): boolean {
-    return this.keyAttributes.length === 1;
-  }
-
-  /**
-   * Determines if key is alternate key.
-   */
-  public isAlternateKey(): boolean {
-    return this.keyAttributes.length > 1;
-  }
-
-  /**
-   * Gets type label for UI display.
-   *
-   * @returns 'Primary' or 'Alternate'
-   */
-  public getTypeLabel(): string {
-    return this.isPrimaryKey() ? 'Primary' : 'Alternate';
-  }
-
-  /**
-   * Gets comma-separated list of key attributes.
-   *
-   * @returns Attribute names joined by ', '
-   */
-  public getKeyAttributesDisplay(): string {
-    return this.keyAttributes.join(', ');
-  }
-
-  public getDisplayLabel(): string {
-    return this.displayName && this.displayName.trim().length > 0
-      ? this.displayName
-      : this.logicalName;
-  }
-
-  // Type-safe getters
-  public getMetadataId(): string { return this.metadataId; }
-  public getLogicalName(): string { return this.logicalName; }
-  public getSchemaName(): string { return this.schemaName; }
-  public getDisplayName(): string { return this.displayName; }
-  public getKeyAttributes(): string[] { return this.keyAttributes; }
-  public getIsManaged(): boolean { return this.isManaged; }
-  public getEntityKeyIndexStatus(): string { return this.entityKeyIndexStatus; }
-}
-```
-
-```typescript
-/**
- * Represents entity relationship metadata (1:N, N:1, N:N).
- *
- * Business Rules:
- * - 1:N = One-to-Many (parent to children)
- * - N:1 = Many-to-One (child to parent)
- * - N:N = Many-to-Many (via intersect entity)
+ * - Relationship must have valid referenced and referencing entities
+ * - Relationship type determines cardinality (OneToMany, ManyToOne, ManyToMany)
+ * - Cascade configuration determines behavior on parent delete/update
  *
  * Rich behavior:
  * - isOneToMany(): boolean
  * - isManyToOne(): boolean
  * - isManyToMany(): boolean
- * - getRelatedEntityName(): string
+ * - getCascadeDeleteBehavior(): CascadeBehavior
  */
 export class RelationshipMetadata {
   constructor(
-    private readonly metadataId: string,
-    private readonly schemaName: string,
+    private readonly schemaName: SchemaName,
     private readonly relationshipType: RelationshipType,
-    private readonly referencedEntity: string,
-    private readonly referencingEntity: string,
-    private readonly referencingAttribute: string,
-    private readonly isManaged: boolean,
-    private readonly isCustomRelationship: boolean,
-    private readonly entity1LogicalName: string | null = null,
-    private readonly entity2LogicalName: string | null = null,
-    private readonly intersectEntityName: string | null = null
+    private readonly referencedEntity: LogicalName,
+    private readonly referencedAttribute: LogicalName,
+    private readonly referencingEntity: LogicalName,
+    private readonly referencingAttribute: LogicalName,
+    private readonly cascadeConfiguration: CascadeConfiguration
   ) {
     this.validateInvariants();
   }
 
   private validateInvariants(): void {
-    if (!this.schemaName || this.schemaName.trim().length === 0) {
-      throw new ValidationError('RelationshipMetadata', 'schemaName', this.schemaName, 'Cannot be empty');
-    }
-
-    if (this.relationshipType === RelationshipType.ManyToMany) {
-      if (!this.entity1LogicalName || !this.entity2LogicalName) {
-        throw new ValidationError('RelationshipMetadata', 'entity1/entity2', null, 'Required for N:N relationships');
+    // Business rule: Referenced and referencing entities must be different for hierarchical
+    if (this.relationshipType.isHierarchical()) {
+      if (this.referencedEntity.equals(this.referencingEntity)) {
+        throw new Error('Hierarchical relationships must reference different entities');
       }
     }
   }
 
   /**
-   * Checks if relationship is One-to-Many (1:N).
+   * Business rule: Check if relationship is one-to-many
    */
   public isOneToMany(): boolean {
-    return this.relationshipType === RelationshipType.OneToMany;
+    return this.relationshipType.isOneToMany();
   }
 
   /**
-   * Checks if relationship is Many-to-One (N:1).
+   * Business rule: Check if relationship is many-to-one
    */
   public isManyToOne(): boolean {
-    return this.relationshipType === RelationshipType.ManyToOne;
+    return this.relationshipType.isManyToOne();
   }
 
   /**
-   * Checks if relationship is Many-to-Many (N:N).
+   * Business rule: Check if relationship is many-to-many
    */
   public isManyToMany(): boolean {
-    return this.relationshipType === RelationshipType.ManyToMany;
+    return this.relationshipType.isManyToMany();
   }
 
   /**
-   * Gets relationship type label for UI.
-   *
-   * @returns '1:N', 'N:1', or 'N:N'
+   * Get cascade delete behavior
    */
-  public getTypeLabel(): string {
-    switch (this.relationshipType) {
-      case RelationshipType.OneToMany:
-        return '1:N';
-      case RelationshipType.ManyToOne:
-        return 'N:1';
-      case RelationshipType.ManyToMany:
-        return 'N:N';
-      default:
-        return 'Unknown';
-    }
+  public getCascadeDeleteBehavior(): CascadeBehavior {
+    return this.cascadeConfiguration.getDeleteBehavior();
   }
 
   /**
-   * Gets related entity name for display.
-   *
-   * For N:N, returns both entities with separator.
+   * Get display representation of relationship
    */
-  public getRelatedEntityDisplay(): string {
-    if (this.isManyToMany()) {
-      return `${this.entity1LogicalName} ↔ ${this.entity2LogicalName}`;
-    }
-
-    return this.referencedEntity;
+  public getRelationshipDisplay(): string {
+    const type = this.relationshipType.getDisplayName();
+    return `${this.referencedEntity.getValue()} → ${this.referencingEntity.getValue()} (${type})`;
   }
 
-  /**
-   * Gets referencing attribute display.
-   *
-   * For N:N, returns intersect entity name.
-   */
-  public getReferencingAttributeDisplay(): string {
-    if (this.isManyToMany() && this.intersectEntityName) {
-      return this.intersectEntityName;
-    }
-
-    return this.referencingAttribute;
-  }
-
-  /**
-   * Gets list of related entity names for navigation.
-   *
-   * For N:N, returns both entities. For 1:N/N:1, returns single entity.
-   *
-   * @returns Array of entity logical names
-   */
-  public getNavigableEntityNames(): string[] {
-    if (this.isManyToMany()) {
-      return [this.entity1LogicalName!, this.entity2LogicalName!];
-    }
-
-    return [this.referencedEntity];
-  }
-
-  // Type-safe getters
-  public getMetadataId(): string { return this.metadataId; }
-  public getSchemaName(): string { return this.schemaName; }
+  // Getters
+  public getSchemaName(): SchemaName { return this.schemaName; }
   public getRelationshipType(): RelationshipType { return this.relationshipType; }
-  public getReferencedEntity(): string { return this.referencedEntity; }
-  public getReferencingEntity(): string { return this.referencingEntity; }
-  public getReferencingAttribute(): string { return this.referencingAttribute; }
-  public getIsManaged(): boolean { return this.isManaged; }
-  public getIsCustomRelationship(): boolean { return this.isCustomRelationship; }
-  public getEntity1LogicalName(): string | null { return this.entity1LogicalName; }
-  public getEntity2LogicalName(): string | null { return this.entity2LogicalName; }
-  public getIntersectEntityName(): string | null { return this.intersectEntityName; }
+  public getReferencedEntity(): LogicalName { return this.referencedEntity; }
+  public getReferencedAttribute(): LogicalName { return this.referencedAttribute; }
+  public getReferencingEntity(): LogicalName { return this.referencingEntity; }
+  public getReferencingAttribute(): LogicalName { return this.referencingAttribute; }
+  public getCascadeConfiguration(): CascadeConfiguration { return this.cascadeConfiguration; }
 }
-```
 
-```typescript
 /**
- * Represents entity privilege metadata (CRUD permissions).
+ * Represents entity key metadata.
  *
  * Business Rules:
- * - Privileges define security depth (Basic, Local, Deep, Global)
- * - Each privilege type (Create, Read, Update, Delete) has separate permissions
+ * - Alternate keys must have at least one attribute
+ * - Key attributes must belong to the entity
+ * - Keys enforce uniqueness constraints
  *
  * Rich behavior:
- * - getDepthLabel(): string
- * - hasBasicDepth(): boolean
- * - hasLocalDepth(): boolean
- * - hasDeepDepth(): boolean
- * - hasGlobalDepth(): boolean
+ * - hasMultipleAttributes(): boolean
+ * - getAttributeCount(): number
+ */
+export class KeyMetadata {
+  constructor(
+    private readonly logicalName: LogicalName,
+    private readonly displayName: DisplayName,
+    private readonly entityLogicalName: LogicalName,
+    private readonly keyAttributes: readonly LogicalName[]
+  ) {
+    this.validateInvariants();
+  }
+
+  private validateInvariants(): void {
+    if (this.keyAttributes.length === 0) {
+      throw new Error('Key must have at least one attribute');
+    }
+  }
+
+  /**
+   * Business rule: Check if key uses multiple attributes
+   */
+  public hasMultipleAttributes(): boolean {
+    return this.keyAttributes.length > 1;
+  }
+
+  /**
+   * Get number of attributes in key
+   */
+  public getAttributeCount(): number {
+    return this.keyAttributes.length;
+  }
+
+  /**
+   * Get formatted attribute list
+   */
+  public getAttributeListDisplay(): string {
+    return this.keyAttributes.map(attr => attr.getValue()).join(', ');
+  }
+
+  // Getters
+  public getLogicalName(): LogicalName { return this.logicalName; }
+  public getDisplayName(): DisplayName { return this.displayName; }
+  public getEntityLogicalName(): LogicalName { return this.entityLogicalName; }
+  public getKeyAttributes(): readonly LogicalName[] { return this.keyAttributes; }
+}
+
+/**
+ * Represents entity privilege metadata.
+ *
+ * Business Rules:
+ * - Privileges define security permissions for entity operations
+ * - Privilege types: Create, Read, Write, Delete, Append, AppendTo, Assign, Share
+ *
+ * Rich behavior:
+ * - isCreatePrivilege(): boolean
+ * - isReadPrivilege(): boolean
+ * - etc.
  */
 export class PrivilegeMetadata {
   constructor(
     private readonly privilegeId: string,
     private readonly name: string,
-    private readonly privilegeType: string,
+    private readonly privilegeType: PrivilegeType,
     private readonly canBeBasic: boolean,
     private readonly canBeLocal: boolean,
     private readonly canBeDeep: boolean,
     private readonly canBeGlobal: boolean
-  ) {
-    this.validateInvariants();
-  }
+  ) {}
 
-  private validateInvariants(): void {
-    if (!this.privilegeId || this.privilegeId.trim().length === 0) {
-      throw new ValidationError('PrivilegeMetadata', 'privilegeId', this.privilegeId, 'Cannot be empty');
-    }
+  /**
+   * Business rule: Check if privilege is Create
+   */
+  public isCreatePrivilege(): boolean {
+    return this.privilegeType.isCreate();
   }
 
   /**
-   * Gets comma-separated list of available depth levels.
-   *
-   * @returns 'Basic, Local, Deep, Global' (as applicable)
+   * Business rule: Check if privilege is Read
    */
-  public getDepthLabel(): string {
-    const depths: string[] = [];
+  public isReadPrivilege(): boolean {
+    return this.privilegeType.isRead();
+  }
 
+  /**
+   * Get available depth levels
+   */
+  public getAvailableDepths(): string[] {
+    const depths: string[] = [];
     if (this.canBeBasic) depths.push('Basic');
     if (this.canBeLocal) depths.push('Local');
     if (this.canBeDeep) depths.push('Deep');
     if (this.canBeGlobal) depths.push('Global');
-
-    return depths.length > 0 ? depths.join(', ') : 'None';
+    return depths;
   }
 
-  // Depth check methods
-  public hasBasicDepth(): boolean { return this.canBeBasic; }
-  public hasLocalDepth(): boolean { return this.canBeLocal; }
-  public hasDeepDepth(): boolean { return this.canBeDeep; }
-  public hasGlobalDepth(): boolean { return this.canBeGlobal; }
-
-  // Type-safe getters
+  // Getters
   public getPrivilegeId(): string { return this.privilegeId; }
   public getName(): string { return this.name; }
-  public getPrivilegeType(): string { return this.privilegeType; }
+  public getPrivilegeType(): PrivilegeType { return this.privilegeType; }
   public getCanBeBasic(): boolean { return this.canBeBasic; }
   public getCanBeLocal(): boolean { return this.canBeLocal; }
   public getCanBeDeep(): boolean { return this.canBeDeep; }
   public getCanBeGlobal(): boolean { return this.canBeGlobal; }
 }
-```
 
-```typescript
 /**
- * Represents global option set (choice) metadata.
+ * Represents global option set metadata.
  *
  * Business Rules:
- * - Global choices are reusable across entities
- * - Each option has numeric value and label
+ * - Global option sets are reusable across multiple entities
+ * - Option values must have unique integer values
+ * - Option labels are localizable
  *
  * Rich behavior:
- * - isCustomChoice(): boolean
  * - hasOptions(): boolean
  * - getOptionCount(): number
+ * - findOptionByValue(value): OptionMetadata | null
  */
-export class ChoiceMetadata {
+export class GlobalOptionSetMetadata {
   constructor(
-    private readonly metadataId: string,
     private readonly name: string,
-    private readonly displayName: string,
-    private readonly description: string,
-    private readonly isCustomOptionSet: boolean,
-    private readonly isManaged: boolean,
-    private readonly isGlobal: boolean,
-    private readonly options: OptionMetadata[]
+    private readonly displayName: DisplayName,
+    private readonly description: string | null,
+    private readonly isCustom: boolean,
+    private readonly options: readonly OptionMetadata[]
   ) {
     this.validateInvariants();
   }
 
   private validateInvariants(): void {
-    if (!this.name || this.name.trim().length === 0) {
-      throw new ValidationError('ChoiceMetadata', 'name', this.name, 'Cannot be empty');
+    // Business rule: Option values must be unique
+    const values = this.options.map(opt => opt.getValue());
+    const uniqueValues = new Set(values);
+    if (values.length !== uniqueValues.size) {
+      throw new Error('Option values must be unique');
     }
   }
 
   /**
-   * Checks if choice is custom (user/partner created).
-   */
-  public isCustomChoice(): boolean {
-    return this.isCustomOptionSet;
-  }
-
-  /**
-   * Checks if choice has options.
+   * Business rule: Check if option set has options
    */
   public hasOptions(): boolean {
-    return this.options && this.options.length > 0;
+    return this.options.length > 0;
   }
 
   /**
-   * Gets number of options in choice.
+   * Get number of options
    */
   public getOptionCount(): number {
-    return this.options ? this.options.length : 0;
+    return this.options.length;
   }
 
   /**
-   * Gets display label for tree rendering.
+   * Find option by value
    */
-  public getDisplayLabel(): string {
-    return this.displayName && this.displayName.trim().length > 0
-      ? this.displayName
-      : this.name;
+  public findOptionByValue(value: number): OptionMetadata | null {
+    return this.options.find(opt => opt.getValue() === value) || null;
   }
 
-  /**
-   * Gets icon for tree rendering based on choice type.
-   *
-   * @returns Emoji icon (🔽 for all choices)
-   */
-  public getIcon(): string {
-    return '🔽';
-  }
-
-  // Type-safe getters
-  public getMetadataId(): string { return this.metadataId; }
+  // Getters
   public getName(): string { return this.name; }
-  public getDisplayName(): string { return this.displayName; }
-  public getDescription(): string { return this.description; }
-  public getIsCustomOptionSet(): boolean { return this.isCustomOptionSet; }
-  public getIsManaged(): boolean { return this.isManaged; }
-  public getIsGlobal(): boolean { return this.isGlobal; }
-  public getOptions(): OptionMetadata[] { return this.options; }
+  public getDisplayName(): DisplayName { return this.displayName; }
+  public getDescription(): string | null { return this.description; }
+  public getIsCustom(): boolean { return this.isCustom; }
+  public getOptions(): readonly OptionMetadata[] { return this.options; }
 }
-```
 
-```typescript
 /**
- * Represents a single option within a choice.
+ * Represents option metadata (option set value).
  *
- * Business Rules:
- * - Each option has unique numeric value
- * - Label is displayed to users
+ * Rich behavior:
+ * - None (simple value object)
  */
 export class OptionMetadata {
   constructor(
     private readonly value: number,
     private readonly label: string,
-    private readonly description: string,
-    private readonly color: string | null,
-    private readonly isManaged: boolean
-  ) {
-    this.validateInvariants();
-  }
+    private readonly description: string | null
+  ) {}
 
-  private validateInvariants(): void {
-    if (this.value === null || this.value === undefined) {
-      throw new ValidationError('OptionMetadata', 'value', this.value, 'Cannot be null');
-    }
-  }
-
-  /**
-   * Gets display label for option.
-   */
-  public getDisplayLabel(): string {
-    return this.label && this.label.trim().length > 0
-      ? this.label
-      : this.value.toString();
-  }
-
-  /**
-   * Gets description display value.
-   */
-  public getDescriptionDisplay(): string {
-    return this.description && this.description.trim().length > 0
-      ? this.description
-      : '';
-  }
-
-  // Type-safe getters
+  // Getters
   public getValue(): number { return this.value; }
   public getLabel(): string { return this.label; }
-  public getDescription(): string { return this.description; }
-  public getColor(): string | null { return this.color; }
-  public getIsManaged(): boolean { return this.isManaged; }
+  public getDescription(): string | null { return this.description; }
 }
 ```
 
@@ -912,22 +713,302 @@ export class OptionMetadata {
 
 ```typescript
 /**
- * Required level enum for attributes.
+ * Value object for entity/attribute logical name.
+ * Immutable, validated on construction.
  */
-export enum RequiredLevel {
-  None = 'None',
-  SystemRequired = 'SystemRequired',
-  ApplicationRequired = 'ApplicationRequired',
-  Recommended = 'Recommended'
+export class LogicalName {
+  private constructor(private readonly value: string) {}
+
+  public static create(value: string): LogicalName {
+    if (!value || value.trim().length === 0) {
+      throw new Error('Logical name cannot be empty');
+    }
+
+    // Business rule: Logical names are lowercase, no spaces
+    if (value !== value.toLowerCase() || value.includes(' ')) {
+      throw new Error('Logical name must be lowercase with no spaces');
+    }
+
+    return new LogicalName(value);
+  }
+
+  public getValue(): string {
+    return this.value;
+  }
+
+  public equals(other: LogicalName): boolean {
+    return this.value === other.value;
+  }
 }
 
 /**
- * Relationship type enum.
+ * Value object for schema name.
+ * Immutable, validated on construction.
  */
-export enum RelationshipType {
-  OneToMany = 'OneToMany',
-  ManyToOne = 'ManyToOne',
-  ManyToMany = 'ManyToMany'
+export class SchemaName {
+  private constructor(private readonly value: string) {}
+
+  public static create(value: string): SchemaName {
+    if (!value || value.trim().length === 0) {
+      throw new Error('Schema name cannot be empty');
+    }
+
+    return new SchemaName(value);
+  }
+
+  public getValue(): string {
+    return this.value;
+  }
+
+  public equals(other: SchemaName): boolean {
+    return this.value === other.value;
+  }
+}
+
+/**
+ * Value object for display name.
+ * Immutable, validated on construction.
+ */
+export class DisplayName {
+  private constructor(private readonly value: string) {}
+
+  public static create(value: string): DisplayName {
+    if (!value || value.trim().length === 0) {
+      throw new Error('Display name cannot be empty');
+    }
+
+    return new DisplayName(value);
+  }
+
+  public getValue(): string {
+    return this.value;
+  }
+}
+
+/**
+ * Value object for attribute type.
+ * Represents the data type of an attribute.
+ */
+export class AttributeType {
+  private static readonly LOOKUP_TYPES = ['Lookup', 'Customer', 'Owner'];
+  private static readonly OPTION_SET_TYPES = ['Picklist', 'MultiSelectPicklist', 'Status', 'State'];
+
+  private constructor(private readonly value: string) {}
+
+  public static create(value: string): AttributeType {
+    if (!value || value.trim().length === 0) {
+      throw new Error('Attribute type cannot be empty');
+    }
+
+    return new AttributeType(value);
+  }
+
+  /**
+   * Business rule: Check if attribute is a lookup type
+   */
+  public isLookup(): boolean {
+    return AttributeType.LOOKUP_TYPES.includes(this.value);
+  }
+
+  /**
+   * Business rule: Check if attribute is an option set type
+   */
+  public isOptionSet(): boolean {
+    return AttributeType.OPTION_SET_TYPES.includes(this.value);
+  }
+
+  public getValue(): string {
+    return this.value;
+  }
+
+  public getDisplayName(): string {
+    return this.value;
+  }
+
+  public equals(other: AttributeType): boolean {
+    return this.value === other.value;
+  }
+}
+
+/**
+ * Value object for required level.
+ * Determines if an attribute is required in records.
+ */
+export class RequiredLevel {
+  private static readonly REQUIRED_VALUES = ['ApplicationRequired', 'SystemRequired'];
+
+  private constructor(private readonly value: string) {}
+
+  public static create(value: string): RequiredLevel {
+    return new RequiredLevel(value);
+  }
+
+  /**
+   * Business rule: Check if attribute is required
+   */
+  public isRequired(): boolean {
+    return RequiredLevel.REQUIRED_VALUES.includes(this.value);
+  }
+
+  public getValue(): string {
+    return this.value;
+  }
+
+  public getDisplayName(): string {
+    if (this.value === 'ApplicationRequired') return 'Business Required';
+    if (this.value === 'SystemRequired') return 'System Required';
+    if (this.value === 'Recommended') return 'Business Recommended';
+    return 'Optional';
+  }
+}
+
+/**
+ * Value object for ownership type.
+ */
+export enum OwnershipType {
+  UserOwned = 'UserOwned',
+  TeamOwned = 'TeamOwned',
+  OrganizationOwned = 'OrganizationOwned',
+  None = 'None'
+}
+
+/**
+ * Value object for relationship type.
+ */
+export class RelationshipType {
+  private constructor(private readonly value: string) {}
+
+  public static create(value: string): RelationshipType {
+    return new RelationshipType(value);
+  }
+
+  public isOneToMany(): boolean {
+    return this.value === 'OneToManyRelationship';
+  }
+
+  public isManyToOne(): boolean {
+    return this.value === 'ManyToOneRelationship';
+  }
+
+  public isManyToMany(): boolean {
+    return this.value === 'ManyToManyRelationship';
+  }
+
+  public isHierarchical(): boolean {
+    return this.value === 'OneToManyRelationship' || this.value === 'ManyToOneRelationship';
+  }
+
+  public getValue(): string {
+    return this.value;
+  }
+
+  public getDisplayName(): string {
+    if (this.isOneToMany()) return '1:N';
+    if (this.isManyToOne()) return 'N:1';
+    if (this.isManyToMany()) return 'N:N';
+    return this.value;
+  }
+}
+
+/**
+ * Value object for cascade configuration.
+ */
+export class CascadeConfiguration {
+  constructor(
+    private readonly deleteBehavior: CascadeBehavior,
+    private readonly assignBehavior: CascadeBehavior,
+    private readonly shareBehavior: CascadeBehavior,
+    private readonly unshareBehavior: CascadeBehavior,
+    private readonly reparentBehavior: CascadeBehavior,
+    private readonly mergeBehavior: CascadeBehavior
+  ) {}
+
+  public getDeleteBehavior(): CascadeBehavior {
+    return this.deleteBehavior;
+  }
+
+  public getAssignBehavior(): CascadeBehavior {
+    return this.assignBehavior;
+  }
+
+  public getShareBehavior(): CascadeBehavior {
+    return this.shareBehavior;
+  }
+
+  public getUnshareBehavior(): CascadeBehavior {
+    return this.unshareBehavior;
+  }
+
+  public getReparentBehavior(): CascadeBehavior {
+    return this.reparentBehavior;
+  }
+
+  public getMergeBehavior(): CascadeBehavior {
+    return this.mergeBehavior;
+  }
+}
+
+/**
+ * Value object for cascade behavior.
+ */
+export enum CascadeBehavior {
+  Cascade = 'Cascade',
+  Active = 'Active',
+  UserOwned = 'UserOwned',
+  RemoveLink = 'RemoveLink',
+  Restrict = 'Restrict',
+  NoCascade = 'NoCascade'
+}
+
+/**
+ * Value object for privilege type.
+ */
+export class PrivilegeType {
+  private constructor(private readonly value: string) {}
+
+  public static create(value: string): PrivilegeType {
+    return new PrivilegeType(value);
+  }
+
+  public isCreate(): boolean {
+    return this.value === 'Create';
+  }
+
+  public isRead(): boolean {
+    return this.value === 'Read';
+  }
+
+  public isWrite(): boolean {
+    return this.value === 'Write';
+  }
+
+  public isDelete(): boolean {
+    return this.value === 'Delete';
+  }
+
+  public isAppend(): boolean {
+    return this.value === 'Append';
+  }
+
+  public isAppendTo(): boolean {
+    return this.value === 'AppendTo';
+  }
+
+  public isAssign(): boolean {
+    return this.value === 'Assign';
+  }
+
+  public isShare(): boolean {
+    return this.value === 'Share';
+  }
+
+  public getValue(): string {
+    return this.value;
+  }
+
+  public getDisplayName(): string {
+    return this.value;
+  }
 }
 ```
 
@@ -935,118 +1016,62 @@ export enum RelationshipType {
 
 ```typescript
 /**
- * Repository interface for metadata operations.
- *
- * Defined in domain layer, implemented by infrastructure.
+ * Repository interface for entity metadata.
+ * Defined in domain, implemented in infrastructure.
  */
-export interface IMetadataRepository {
+export interface IEntityMetadataRepository {
   /**
-   * Retrieve all entity definitions for an environment.
+   * Retrieve all entity metadata for an environment.
+   * Includes entity-level information and counts (no full attribute lists).
    *
    * @param environmentId - Environment ID
-   * @returns Array of entity metadata
+   * @returns Array of EntityMetadata (summary level)
    */
-  getEntityDefinitions(environmentId: string): Promise<EntityMetadata[]>;
+  getAllEntities(environmentId: string): Promise<readonly EntityMetadata[]>;
 
   /**
-   * Retrieve all global option sets (choices) for an environment.
+   * Retrieve full entity metadata including all attributes.
    *
    * @param environmentId - Environment ID
-   * @returns Array of choice metadata
+   * @param logicalName - Entity logical name
+   * @returns EntityMetadata with full attribute collection
    */
-  getGlobalOptionSets(environmentId: string): Promise<ChoiceMetadata[]>;
+  getEntityWithAttributes(environmentId: string, logicalName: string): Promise<EntityMetadata>;
 
   /**
-   * Retrieve complete metadata for a specific entity.
-   *
-   * Includes attributes, keys, relationships, privileges.
+   * Retrieve relationships for an entity.
    *
    * @param environmentId - Environment ID
-   * @param entityLogicalName - Entity logical name
-   * @returns Complete entity metadata
+   * @param logicalName - Entity logical name
+   * @returns Array of RelationshipMetadata
    */
-  getCompleteEntityMetadata(
-    environmentId: string,
-    entityLogicalName: string
-  ): Promise<CompleteEntityMetadata>;
+  getEntityRelationships(environmentId: string, logicalName: string): Promise<readonly RelationshipMetadata[]>;
 
   /**
-   * Retrieve entity attributes with expanded option set data.
+   * Retrieve keys for an entity.
    *
    * @param environmentId - Environment ID
-   * @param entityLogicalName - Entity logical name
-   * @returns Array of attribute metadata
+   * @param logicalName - Entity logical name
+   * @returns Array of KeyMetadata
    */
-  getEntityAttributes(
-    environmentId: string,
-    entityLogicalName: string
-  ): Promise<AttributeMetadata[]>;
+  getEntityKeys(environmentId: string, logicalName: string): Promise<readonly KeyMetadata[]>;
 
   /**
-   * Retrieve entity keys.
+   * Retrieve privileges for an entity.
    *
    * @param environmentId - Environment ID
-   * @param entityLogicalName - Entity logical name
-   * @returns Array of key metadata
+   * @param logicalName - Entity logical name
+   * @returns Array of PrivilegeMetadata
    */
-  getEntityKeys(
-    environmentId: string,
-    entityLogicalName: string
-  ): Promise<KeyMetadata[]>;
+  getEntityPrivileges(environmentId: string, logicalName: string): Promise<readonly PrivilegeMetadata[]>;
 
   /**
-   * Retrieve entity relationships (1:N, N:1, N:N).
+   * Retrieve all global option sets.
    *
    * @param environmentId - Environment ID
-   * @param entityLogicalName - Entity logical name
-   * @returns Array of relationship metadata
+   * @returns Array of GlobalOptionSetMetadata
    */
-  getEntityRelationships(
-    environmentId: string,
-    entityLogicalName: string
-  ): Promise<RelationshipMetadata[]>;
-
-  /**
-   * Retrieve entity privileges.
-   *
-   * @param environmentId - Environment ID
-   * @param entityLogicalName - Entity logical name
-   * @returns Array of privilege metadata
-   */
-  getEntityPrivileges(
-    environmentId: string,
-    entityLogicalName: string
-  ): Promise<PrivilegeMetadata[]>;
-
-  /**
-   * Retrieve choice metadata with options.
-   *
-   * @param environmentId - Environment ID
-   * @param choiceName - Choice name
-   * @returns Choice metadata with options
-   */
-  getOptionSetMetadata(
-    environmentId: string,
-    choiceName: string
-  ): Promise<ChoiceMetadata>;
-
-  /**
-   * Clear cache for environment (used by refresh).
-   *
-   * @param environmentId - Environment ID
-   */
-  clearCache(environmentId: string): void;
-}
-
-/**
- * Aggregate containing complete entity metadata.
- */
-export interface CompleteEntityMetadata {
-  readonly entity: EntityMetadata;
-  readonly attributes: AttributeMetadata[];
-  readonly keys: KeyMetadata[];
-  readonly relationships: RelationshipMetadata[];
-  readonly privileges: PrivilegeMetadata[];
+  getAllGlobalOptionSets(environmentId: string): Promise<readonly GlobalOptionSetMetadata[]>;
 }
 ```
 
@@ -1058,378 +1083,293 @@ export interface CompleteEntityMetadata {
 
 ```typescript
 /**
- * Load entity and choice tree for an environment.
+ * Loads entity tree for environment.
+ * Orchestrates repository fetch → domain entity validation → ViewModel mapping.
  *
- * Orchestrates: Repository fetch → Sort by logical name → Map to ViewModels
+ * NO business logic - orchestration only.
  */
 export class LoadEntityTreeUseCase {
   constructor(
-    private readonly repository: IMetadataRepository,
+    private readonly repository: IEntityMetadataRepository,
     private readonly logger: ILogger
   ) {}
 
-  public async execute(environmentId: string): Promise<EntityTreeResponse> {
+  /**
+   * Execute use case.
+   * Returns ViewModels for tree display (summary level, no full attribute lists).
+   */
+  public async execute(environmentId: string): Promise<EntityTreeItemViewModel[]> {
     this.logger.info('Loading entity tree', { environmentId });
 
-    try {
-      // Orchestration: Fetch entities and choices in parallel
-      const [entities, choices] = await Promise.all([
-        this.repository.getEntityDefinitions(environmentId),
-        this.repository.getGlobalOptionSets(environmentId)
-      ]);
+    // Orchestration: Fetch domain entities from repository
+    const entities = await this.repository.getAllEntities(environmentId);
 
-      // Orchestration: Sort by logical name (domain provides method)
-      const sortedEntities = entities.sort((a, b) =>
-        a.getLogicalName().localeCompare(b.getLogicalName())
-      );
+    // Orchestration: Map to ViewModels
+    const viewModels = entities.map(entity =>
+      EntityTreeItemViewModelMapper.toViewModel(entity)
+    );
 
-      const sortedChoices = choices.sort((a, b) =>
-        a.getName().localeCompare(b.getName())
-      );
-
-      // Orchestration: Map to ViewModels
-      const entityViewModels = sortedEntities.map(entity =>
-        EntityTreeItemViewModelMapper.toViewModel(entity)
-      );
-
-      const choiceViewModels = sortedChoices.map(choice =>
-        ChoiceTreeItemViewModelMapper.toViewModel(choice)
-      );
-
-      this.logger.info('Entity tree loaded', {
-        entitiesCount: entityViewModels.length,
-        choicesCount: choiceViewModels.length
-      });
-
-      return {
-        entities: entityViewModels,
-        choices: choiceViewModels
-      };
-    } catch (error) {
-      this.logger.error('Failed to load entity tree', error as Error, { environmentId });
-      throw error;
-    }
+    this.logger.info('Entity tree loaded', { count: viewModels.length });
+    return viewModels;
   }
 }
 
 /**
- * Response DTO for entity tree.
+ * Loads entity attributes for selected entity.
+ * Orchestrates: Repository fetch → Domain entity → ViewModel mapping.
  */
-export interface EntityTreeResponse {
-  readonly entities: EntityTreeItemViewModel[];
-  readonly choices: ChoiceTreeItemViewModel[];
+export class LoadEntityAttributesUseCase {
+  constructor(
+    private readonly repository: IEntityMetadataRepository,
+    private readonly logger: ILogger
+  ) {}
+
+  public async execute(environmentId: string, logicalName: string): Promise<EntityAttributeViewModel[]> {
+    this.logger.info('Loading entity attributes', { environmentId, logicalName });
+
+    // Orchestration: Fetch entity with full attributes
+    const entity = await this.repository.getEntityWithAttributes(environmentId, logicalName);
+
+    // Orchestration: Map to ViewModels
+    const viewModels = entity.getAttributes().map(attr =>
+      EntityAttributeViewModelMapper.toViewModel(attr)
+    );
+
+    this.logger.info('Entity attributes loaded', { count: viewModels.length });
+    return viewModels;
+  }
+}
+
+/**
+ * Loads entity relationships for selected entity.
+ */
+export class LoadEntityRelationshipsUseCase {
+  constructor(
+    private readonly repository: IEntityMetadataRepository,
+    private readonly logger: ILogger
+  ) {}
+
+  public async execute(environmentId: string, logicalName: string): Promise<EntityRelationshipViewModel[]> {
+    this.logger.info('Loading entity relationships', { environmentId, logicalName });
+
+    const relationships = await this.repository.getEntityRelationships(environmentId, logicalName);
+
+    const viewModels = relationships.map(rel =>
+      EntityRelationshipViewModelMapper.toViewModel(rel)
+    );
+
+    this.logger.info('Entity relationships loaded', { count: viewModels.length });
+    return viewModels;
+  }
+}
+
+/**
+ * Loads entity keys for selected entity.
+ */
+export class LoadEntityKeysUseCase {
+  constructor(
+    private readonly repository: IEntityMetadataRepository,
+    private readonly logger: ILogger
+  ) {}
+
+  public async execute(environmentId: string, logicalName: string): Promise<EntityKeyViewModel[]> {
+    this.logger.info('Loading entity keys', { environmentId, logicalName });
+
+    const keys = await this.repository.getEntityKeys(environmentId, logicalName);
+
+    const viewModels = keys.map(key =>
+      EntityKeyViewModelMapper.toViewModel(key)
+    );
+
+    this.logger.info('Entity keys loaded', { count: viewModels.length });
+    return viewModels;
+  }
+}
+
+/**
+ * Loads entity privileges for selected entity.
+ */
+export class LoadEntityPrivilegesUseCase {
+  constructor(
+    private readonly repository: IEntityMetadataRepository,
+    private readonly logger: ILogger
+  ) {}
+
+  public async execute(environmentId: string, logicalName: string): Promise<EntityPrivilegeViewModel[]> {
+    this.logger.info('Loading entity privileges', { environmentId, logicalName });
+
+    const privileges = await this.repository.getEntityPrivileges(environmentId, logicalName);
+
+    const viewModels = privileges.map(priv =>
+      EntityPrivilegeViewModelMapper.toViewModel(priv)
+    );
+
+    this.logger.info('Entity privileges loaded', { count: viewModels.length });
+    return viewModels;
+  }
+}
+
+/**
+ * Loads global option sets.
+ */
+export class LoadGlobalOptionSetsUseCase {
+  constructor(
+    private readonly repository: IEntityMetadataRepository,
+    private readonly logger: ILogger
+  ) {}
+
+  public async execute(environmentId: string): Promise<GlobalOptionSetViewModel[]> {
+    this.logger.info('Loading global option sets', { environmentId });
+
+    const optionSets = await this.repository.getAllGlobalOptionSets(environmentId);
+
+    const viewModels = optionSets.map(optionSet =>
+      GlobalOptionSetViewModelMapper.toViewModel(optionSet)
+    );
+
+    this.logger.info('Global option sets loaded', { count: viewModels.length });
+    return viewModels;
+  }
 }
 ```
 
+#### ViewModels
+
 ```typescript
 /**
- * Load complete metadata for selected entity.
- *
- * Orchestrates: Parallel repository fetches → Map to ViewModels
+ * ViewModel for entity tree item (left panel).
+ * DTO for presentation - NO behavior.
  */
-export class LoadEntityMetadataUseCase {
-  constructor(
-    private readonly repository: IMetadataRepository,
-    private readonly logger: ILogger
-  ) {}
-
-  public async execute(request: LoadEntityMetadataRequest): Promise<EntityMetadataResponse> {
-    this.logger.info('Loading entity metadata', {
-      environmentId: request.environmentId,
-      entityLogicalName: request.entityLogicalName
-    });
-
-    try {
-      // Orchestration: Load complete metadata (repository does parallel fetch internally)
-      const completeMetadata = await this.repository.getCompleteEntityMetadata(
-        request.environmentId,
-        request.entityLogicalName
-      );
-
-      // Orchestration: Map to ViewModels
-      const attributeViewModels = completeMetadata.attributes.map(attr =>
-        AttributeViewModelMapper.toViewModel(attr)
-      );
-
-      const keyViewModels = completeMetadata.keys.map(key =>
-        KeyViewModelMapper.toViewModel(key)
-      );
-
-      const relationshipViewModels = completeMetadata.relationships.map(rel =>
-        RelationshipViewModelMapper.toViewModel(rel)
-      );
-
-      const privilegeViewModels = completeMetadata.privileges.map(priv =>
-        PrivilegeViewModelMapper.toViewModel(priv)
-      );
-
-      this.logger.info('Entity metadata loaded', {
-        attributesCount: attributeViewModels.length,
-        keysCount: keyViewModels.length,
-        relationshipsCount: relationshipViewModels.length,
-        privilegesCount: privilegeViewModels.length
-      });
-
-      return {
-        entity: EntityViewModelMapper.toViewModel(completeMetadata.entity),
-        attributes: attributeViewModels,
-        keys: keyViewModels,
-        relationships: relationshipViewModels,
-        privileges: privilegeViewModels
-      };
-    } catch (error) {
-      this.logger.error('Failed to load entity metadata', error as Error, {
-        environmentId: request.environmentId,
-        entityLogicalName: request.entityLogicalName
-      });
-      throw error;
-    }
-  }
+export interface EntityTreeItemViewModel {
+  readonly id: string; // Logical name
+  readonly label: string; // Display name
+  readonly isCustom: boolean;
+  readonly iconName: string; // 'entity-system' | 'entity-custom'
+  readonly attributeCount: number; // For tooltip display
 }
 
-export interface LoadEntityMetadataRequest {
-  readonly environmentId: string;
+/**
+ * ViewModel for entity attribute (middle panel table row).
+ * DTO for presentation - NO behavior.
+ */
+export interface EntityAttributeViewModel {
+  readonly logicalName: string;
+  readonly schemaName: string;
+  readonly displayName: string;
+  readonly type: string; // Human-readable type (e.g., "String", "Lookup (account)")
+  readonly isRequired: boolean;
+  readonly isCustom: boolean;
+  readonly maxLength: string | null; // Formatted as string ("100" or null)
+}
+
+/**
+ * ViewModel for entity relationship (middle panel table row).
+ * DTO for presentation - NO behavior.
+ */
+export interface EntityRelationshipViewModel {
+  readonly schemaName: string;
+  readonly relationshipType: string; // "1:N", "N:1", "N:N"
+  readonly referencedEntity: string;
+  readonly referencingEntity: string;
+  readonly cascadeDelete: string; // "Cascade", "Restrict", etc.
+}
+
+/**
+ * ViewModel for entity key (middle panel table row).
+ * DTO for presentation - NO behavior.
+ */
+export interface EntityKeyViewModel {
+  readonly logicalName: string;
+  readonly displayName: string;
+  readonly attributes: string; // Comma-separated attribute list
+  readonly attributeCount: number;
+}
+
+/**
+ * ViewModel for entity privilege (middle panel table row).
+ * DTO for presentation - NO behavior.
+ */
+export interface EntityPrivilegeViewModel {
+  readonly privilegeId: string;
+  readonly name: string;
+  readonly privilegeType: string; // "Create", "Read", "Write", etc.
+  readonly availableDepths: string; // "Basic, Local, Deep, Global"
+}
+
+/**
+ * ViewModel for global option set (tree item).
+ * DTO for presentation - NO behavior.
+ */
+export interface GlobalOptionSetViewModel {
+  readonly name: string;
+  readonly displayName: string;
+  readonly isCustom: boolean;
+  readonly optionCount: number;
+}
+
+/**
+ * ViewModel for attribute detail (right panel).
+ * DTO for presentation - NO behavior.
+ */
+export interface AttributeDetailViewModel {
+  readonly logicalName: string;
+  readonly schemaName: string;
+  readonly displayName: string;
+  readonly description: string | null;
+  readonly type: string;
+  readonly isRequired: boolean;
+  readonly isCustom: boolean;
+  readonly maxLength: string | null;
+  readonly format: string | null;
+  readonly lookupTargetEntity: string | null;
+  readonly optionSetName: string | null;
   readonly entityLogicalName: string;
 }
 
-export interface EntityMetadataResponse {
-  readonly entity: EntityViewModel;
-  readonly attributes: AttributeViewModel[];
-  readonly keys: KeyViewModel[];
-  readonly relationships: RelationshipViewModel[];
-  readonly privileges: PrivilegeViewModel[];
-}
-```
-
-```typescript
 /**
- * Load choice metadata with options.
- *
- * Orchestrates: Repository fetch → Sort options by value → Map to ViewModels
+ * ViewModel for relationship detail (right panel).
+ * DTO for presentation - NO behavior.
  */
-export class LoadChoiceMetadataUseCase {
-  constructor(
-    private readonly repository: IMetadataRepository,
-    private readonly logger: ILogger
-  ) {}
-
-  public async execute(request: LoadChoiceMetadataRequest): Promise<ChoiceMetadataResponse> {
-    this.logger.info('Loading choice metadata', {
-      environmentId: request.environmentId,
-      choiceName: request.choiceName
-    });
-
-    try {
-      // Orchestration: Fetch choice metadata
-      const choice = await this.repository.getOptionSetMetadata(
-        request.environmentId,
-        request.choiceName
-      );
-
-      // Orchestration: Sort options by value
-      const sortedOptions = choice.getOptions().sort((a, b) =>
-        a.getValue() - b.getValue()
-      );
-
-      // Orchestration: Map to ViewModels
-      const optionViewModels = sortedOptions.map(option =>
-        OptionViewModelMapper.toViewModel(option)
-      );
-
-      this.logger.info('Choice metadata loaded', {
-        optionsCount: optionViewModels.length
-      });
-
-      return {
-        choice: ChoiceViewModelMapper.toViewModel(choice),
-        options: optionViewModels
-      };
-    } catch (error) {
-      this.logger.error('Failed to load choice metadata', error as Error, {
-        environmentId: request.environmentId,
-        choiceName: request.choiceName
-      });
-      throw error;
-    }
-  }
-}
-
-export interface LoadChoiceMetadataRequest {
-  readonly environmentId: string;
-  readonly choiceName: string;
-}
-
-export interface ChoiceMetadataResponse {
-  readonly choice: ChoiceViewModel;
-  readonly options: OptionViewModel[];
-}
-```
-
-```typescript
-/**
- * Navigate to related entity from relationship row.
- *
- * Orchestrates: Parse entity names → Load target entity metadata
- */
-export class NavigateToRelatedEntityUseCase {
-  constructor(
-    private readonly loadEntityMetadataUseCase: LoadEntityMetadataUseCase,
-    private readonly logger: ILogger
-  ) {}
-
-  public async execute(request: NavigateToRelatedEntityRequest): Promise<EntityMetadataResponse> {
-    this.logger.info('Navigating to related entity', {
-      environmentId: request.environmentId,
-      targetEntityLogicalName: request.targetEntityLogicalName
-    });
-
-    // Orchestration: Delegate to load entity metadata use case
-    return await this.loadEntityMetadataUseCase.execute({
-      environmentId: request.environmentId,
-      entityLogicalName: request.targetEntityLogicalName
-    });
-  }
-}
-
-export interface NavigateToRelatedEntityRequest {
-  readonly environmentId: string;
-  readonly targetEntityLogicalName: string;
-}
-```
-
-```typescript
-/**
- * Refresh metadata (clear cache and reload current selection).
- *
- * Orchestrates: Clear cache → Reload tree and current selection
- */
-export class RefreshMetadataUseCase {
-  constructor(
-    private readonly repository: IMetadataRepository,
-    private readonly loadEntityTreeUseCase: LoadEntityTreeUseCase,
-    private readonly logger: ILogger
-  ) {}
-
-  public async execute(environmentId: string): Promise<EntityTreeResponse> {
-    this.logger.info('Refreshing metadata', { environmentId });
-
-    try {
-      // Orchestration: Clear cache
-      this.repository.clearCache(environmentId);
-
-      // Orchestration: Reload tree
-      const treeResponse = await this.loadEntityTreeUseCase.execute(environmentId);
-
-      this.logger.info('Metadata refreshed successfully');
-
-      return treeResponse;
-    } catch (error) {
-      this.logger.error('Failed to refresh metadata', error as Error, { environmentId });
-      throw error;
-    }
-  }
-}
-```
-
-#### ViewModels (DTOs)
-
-```typescript
-/**
- * ViewModel for entity tree items.
- *
- * Simple DTO with no behavior (mapped from EntityMetadata).
- */
-export interface EntityTreeItemViewModel {
-  readonly logicalName: string;
-  readonly displayName: string;
-  readonly metadataId: string;
-  readonly isCustom: boolean;
-  readonly icon: string; // 🏷️ or 📋
-}
-
-/**
- * ViewModel for choice tree items.
- */
-export interface ChoiceTreeItemViewModel {
-  readonly name: string;
-  readonly displayName: string;
-  readonly isCustom: boolean;
-  readonly icon: string; // 🔽
-}
-
-/**
- * ViewModel for entity details (header).
- */
-export interface EntityViewModel {
-  readonly logicalName: string;
-  readonly displayName: string;
+export interface RelationshipDetailViewModel {
   readonly schemaName: string;
-  readonly description: string;
-  readonly entitySetName: string;
-  readonly primaryIdAttribute: string;
-  readonly primaryNameAttribute: string | null;
+  readonly relationshipType: string;
+  readonly referencedEntity: string;
+  readonly referencedAttribute: string;
+  readonly referencingEntity: string;
+  readonly referencingAttribute: string;
+  readonly cascadeDelete: string;
+  readonly cascadeAssign: string;
+  readonly cascadeShare: string;
+  readonly cascadeUnshare: string;
+  readonly cascadeReparent: string;
+  readonly cascadeMerge: string;
 }
 
 /**
- * ViewModel for attribute table rows.
+ * ViewModel for key detail (right panel).
+ * DTO for presentation - NO behavior.
  */
-export interface AttributeViewModel {
-  readonly id: string; // metadataId (for context menu)
-  readonly displayName: string;
+export interface KeyDetailViewModel {
   readonly logicalName: string;
-  readonly attributeType: string;
-  readonly requiredLevel: string; // User-friendly label
-  readonly maxLength: string; // '-' if not applicable
+  readonly displayName: string;
+  readonly entityLogicalName: string;
+  readonly attributes: string[]; // Array of attribute logical names
+  readonly attributeCount: number;
 }
 
 /**
- * ViewModel for key table rows.
+ * ViewModel for privilege detail (right panel).
+ * DTO for presentation - NO behavior.
  */
-export interface KeyViewModel {
-  readonly id: string; // metadataId
-  readonly name: string;
-  readonly type: string; // 'Primary' or 'Alternate'
-  readonly keyAttributes: string; // Comma-separated
-}
-
-/**
- * ViewModel for relationship table rows.
- */
-export interface RelationshipViewModel {
-  readonly id: string; // schemaName (for context menu)
-  readonly name: string; // schemaName
-  readonly type: string; // '1:N', 'N:1', 'N:N'
-  readonly relatedEntity: string; // Display format (with ↔ for N:N)
-  readonly referencingAttribute: string; // Attribute or intersect entity
-}
-
-/**
- * ViewModel for privilege table rows.
- */
-export interface PrivilegeViewModel {
-  readonly id: string; // privilegeId
+export interface PrivilegeDetailViewModel {
+  readonly privilegeId: string;
   readonly name: string;
   readonly privilegeType: string;
-  readonly depth: string; // 'Basic, Local, Deep, Global'
-}
-
-/**
- * ViewModel for choice details (header).
- */
-export interface ChoiceViewModel {
-  readonly name: string;
-  readonly displayName: string;
-  readonly description: string;
-}
-
-/**
- * ViewModel for choice option table rows.
- */
-export interface OptionViewModel {
-  readonly id: string; // value (as string)
-  readonly label: string;
-  readonly value: string; // Numeric value as string
-  readonly description: string;
+  readonly canBeBasic: boolean;
+  readonly canBeLocal: boolean;
+  readonly canBeDeep: boolean;
+  readonly canBeGlobal: boolean;
+  readonly availableDepths: string[];
 }
 ```
 
@@ -1437,135 +1377,166 @@ export interface OptionViewModel {
 
 ```typescript
 /**
- * Mapper for EntityMetadata → EntityTreeItemViewModel.
- *
- * Transforms only (NO business logic).
+ * Maps EntityMetadata domain entity to EntityTreeItemViewModel.
+ * Transform only - NO business logic.
  */
 export class EntityTreeItemViewModelMapper {
   public static toViewModel(entity: EntityMetadata): EntityTreeItemViewModel {
     return {
-      logicalName: entity.getLogicalName(),
-      displayName: entity.getDisplayLabel(), // Entity method
-      metadataId: entity.getMetadataId(),
-      isCustom: entity.isCustomEntity(), // Entity method
-      icon: entity.getIcon() // Entity method
+      id: entity.getLogicalName().getValue(),
+      label: entity.getDisplayName().getValue(),
+      isCustom: entity.getIsCustomEntity(),
+      iconName: entity.isSystemEntity() ? 'entity-system' : 'entity-custom',
+      attributeCount: entity.getAttributeCount()
     };
   }
 }
 
 /**
- * Mapper for AttributeMetadata → AttributeViewModel.
+ * Maps AttributeMetadata domain entity to EntityAttributeViewModel.
+ * Transform only - NO business logic.
  */
-export class AttributeViewModelMapper {
-  public static toViewModel(attribute: AttributeMetadata): AttributeViewModel {
+export class EntityAttributeViewModelMapper {
+  public static toViewModel(attribute: AttributeMetadata): EntityAttributeViewModel {
     return {
-      id: attribute.getMetadataId(),
-      displayName: attribute.getDisplayLabel(), // Entity method
-      logicalName: attribute.getLogicalName(),
-      attributeType: attribute.getAttributeType(),
-      requiredLevel: attribute.getRequiredLevelLabel(), // Entity method
-      maxLength: attribute.getMaxLengthDisplay() // Entity method
+      logicalName: attribute.getLogicalName().getValue(),
+      schemaName: attribute.getSchemaName().getValue(),
+      displayName: attribute.getDisplayName().getValue(),
+      type: attribute.getTypeDisplay(), // Uses domain method for formatted type
+      isRequired: attribute.isRequired(), // Uses domain method
+      isCustom: attribute.getIsCustomAttribute(),
+      maxLength: attribute.hasMaxLength() ? attribute.getMaxLength()!.toString() : null
+    };
+  }
+
+  /**
+   * Maps AttributeMetadata to detail ViewModel.
+   */
+  public static toDetailViewModel(attribute: AttributeMetadata): AttributeDetailViewModel {
+    return {
+      logicalName: attribute.getLogicalName().getValue(),
+      schemaName: attribute.getSchemaName().getValue(),
+      displayName: attribute.getDisplayName().getValue(),
+      description: attribute.getDescription(),
+      type: attribute.getTypeDisplay(),
+      isRequired: attribute.isRequired(),
+      isCustom: attribute.getIsCustomAttribute(),
+      maxLength: attribute.hasMaxLength() ? attribute.getMaxLength()!.toString() : null,
+      format: attribute.getFormat(),
+      lookupTargetEntity: attribute.getLookupTargetEntity()?.getValue() || null,
+      optionSetName: attribute.getOptionSetName(),
+      entityLogicalName: attribute.getEntityLogicalName().getValue()
     };
   }
 }
 
 /**
- * Mapper for KeyMetadata → KeyViewModel.
+ * Maps RelationshipMetadata domain entity to EntityRelationshipViewModel.
+ * Transform only - NO business logic.
  */
-export class KeyViewModelMapper {
-  public static toViewModel(key: KeyMetadata): KeyViewModel {
+export class EntityRelationshipViewModelMapper {
+  public static toViewModel(relationship: RelationshipMetadata): EntityRelationshipViewModel {
     return {
-      id: key.getMetadataId(),
-      name: key.getDisplayLabel(), // Entity method
-      type: key.getTypeLabel(), // Entity method
-      keyAttributes: key.getKeyAttributesDisplay() // Entity method
+      schemaName: relationship.getSchemaName().getValue(),
+      relationshipType: relationship.getRelationshipType().getDisplayName(),
+      referencedEntity: relationship.getReferencedEntity().getValue(),
+      referencingEntity: relationship.getReferencingEntity().getValue(),
+      cascadeDelete: relationship.getCascadeDeleteBehavior().toString()
+    };
+  }
+
+  /**
+   * Maps RelationshipMetadata to detail ViewModel.
+   */
+  public static toDetailViewModel(relationship: RelationshipMetadata): RelationshipDetailViewModel {
+    const cascade = relationship.getCascadeConfiguration();
+    return {
+      schemaName: relationship.getSchemaName().getValue(),
+      relationshipType: relationship.getRelationshipType().getDisplayName(),
+      referencedEntity: relationship.getReferencedEntity().getValue(),
+      referencedAttribute: relationship.getReferencedAttribute().getValue(),
+      referencingEntity: relationship.getReferencingEntity().getValue(),
+      referencingAttribute: relationship.getReferencingAttribute().getValue(),
+      cascadeDelete: cascade.getDeleteBehavior().toString(),
+      cascadeAssign: cascade.getAssignBehavior().toString(),
+      cascadeShare: cascade.getShareBehavior().toString(),
+      cascadeUnshare: cascade.getUnshareBehavior().toString(),
+      cascadeReparent: cascade.getReparentBehavior().toString(),
+      cascadeMerge: cascade.getMergeBehavior().toString()
     };
   }
 }
 
 /**
- * Mapper for RelationshipMetadata → RelationshipViewModel.
+ * Maps KeyMetadata domain entity to EntityKeyViewModel.
+ * Transform only - NO business logic.
  */
-export class RelationshipViewModelMapper {
-  public static toViewModel(relationship: RelationshipMetadata): RelationshipViewModel {
+export class EntityKeyViewModelMapper {
+  public static toViewModel(key: KeyMetadata): EntityKeyViewModel {
     return {
-      id: relationship.getSchemaName(),
-      name: relationship.getSchemaName(),
-      type: relationship.getTypeLabel(), // Entity method
-      relatedEntity: relationship.getRelatedEntityDisplay(), // Entity method
-      referencingAttribute: relationship.getReferencingAttributeDisplay() // Entity method
+      logicalName: key.getLogicalName().getValue(),
+      displayName: key.getDisplayName().getValue(),
+      attributes: key.getAttributeListDisplay(), // Uses domain method
+      attributeCount: key.getAttributeCount()
+    };
+  }
+
+  /**
+   * Maps KeyMetadata to detail ViewModel.
+   */
+  public static toDetailViewModel(key: KeyMetadata): KeyDetailViewModel {
+    return {
+      logicalName: key.getLogicalName().getValue(),
+      displayName: key.getDisplayName().getValue(),
+      entityLogicalName: key.getEntityLogicalName().getValue(),
+      attributes: key.getKeyAttributes().map(attr => attr.getValue()),
+      attributeCount: key.getAttributeCount()
     };
   }
 }
 
 /**
- * Mapper for PrivilegeMetadata → PrivilegeViewModel.
+ * Maps PrivilegeMetadata domain entity to EntityPrivilegeViewModel.
+ * Transform only - NO business logic.
  */
-export class PrivilegeViewModelMapper {
-  public static toViewModel(privilege: PrivilegeMetadata): PrivilegeViewModel {
+export class EntityPrivilegeViewModelMapper {
+  public static toViewModel(privilege: PrivilegeMetadata): EntityPrivilegeViewModel {
     return {
-      id: privilege.getPrivilegeId(),
+      privilegeId: privilege.getPrivilegeId(),
       name: privilege.getName(),
-      privilegeType: privilege.getPrivilegeType(),
-      depth: privilege.getDepthLabel() // Entity method
+      privilegeType: privilege.getPrivilegeType().getDisplayName(),
+      availableDepths: privilege.getAvailableDepths().join(', ')
+    };
+  }
+
+  /**
+   * Maps PrivilegeMetadata to detail ViewModel.
+   */
+  public static toDetailViewModel(privilege: PrivilegeMetadata): PrivilegeDetailViewModel {
+    return {
+      privilegeId: privilege.getPrivilegeId(),
+      name: privilege.getName(),
+      privilegeType: privilege.getPrivilegeType().getDisplayName(),
+      canBeBasic: privilege.getCanBeBasic(),
+      canBeLocal: privilege.getCanBeLocal(),
+      canBeDeep: privilege.getCanBeDeep(),
+      canBeGlobal: privilege.getCanBeGlobal(),
+      availableDepths: privilege.getAvailableDepths()
     };
   }
 }
 
 /**
- * Mapper for ChoiceMetadata → ChoiceTreeItemViewModel.
+ * Maps GlobalOptionSetMetadata domain entity to GlobalOptionSetViewModel.
+ * Transform only - NO business logic.
  */
-export class ChoiceTreeItemViewModelMapper {
-  public static toViewModel(choice: ChoiceMetadata): ChoiceTreeItemViewModel {
+export class GlobalOptionSetViewModelMapper {
+  public static toViewModel(optionSet: GlobalOptionSetMetadata): GlobalOptionSetViewModel {
     return {
-      name: choice.getName(),
-      displayName: choice.getDisplayLabel(), // Entity method
-      isCustom: choice.isCustomChoice(), // Entity method
-      icon: choice.getIcon() // Entity method
-    };
-  }
-}
-
-/**
- * Mapper for OptionMetadata → OptionViewModel.
- */
-export class OptionViewModelMapper {
-  public static toViewModel(option: OptionMetadata): OptionViewModel {
-    return {
-      id: option.getValue().toString(),
-      label: option.getDisplayLabel(), // Entity method
-      value: option.getValue().toString(),
-      description: option.getDescriptionDisplay() // Entity method
-    };
-  }
-}
-
-/**
- * Mapper for EntityMetadata → EntityViewModel.
- */
-export class EntityViewModelMapper {
-  public static toViewModel(entity: EntityMetadata): EntityViewModel {
-    return {
-      logicalName: entity.getLogicalName(),
-      displayName: entity.getDisplayLabel(),
-      schemaName: entity.getSchemaName(),
-      description: entity.getDescription(),
-      entitySetName: entity.getEntitySetName(),
-      primaryIdAttribute: entity.getPrimaryIdAttribute(),
-      primaryNameAttribute: entity.getPrimaryNameAttribute()
-    };
-  }
-}
-
-/**
- * Mapper for ChoiceMetadata → ChoiceViewModel.
- */
-export class ChoiceViewModelMapper {
-  public static toViewModel(choice: ChoiceMetadata): ChoiceViewModel {
-    return {
-      name: choice.getName(),
-      displayName: choice.getDisplayLabel(),
-      description: choice.getDescription()
+      name: optionSet.getName(),
+      displayName: optionSet.getDisplayName().getValue(),
+      isCustom: optionSet.getIsCustom(),
+      optionCount: optionSet.getOptionCount()
     };
   }
 }
@@ -1579,387 +1550,467 @@ export class ChoiceViewModelMapper {
 
 ```typescript
 /**
- * Dataverse metadata repository implementation.
- *
- * Implements domain interface, uses Dataverse APIs.
+ * Implements IEntityMetadataRepository using Dataverse Web API.
+ * Maps between Dataverse DTOs and domain entities.
  */
-export class DataverseMetadataRepository implements IMetadataRepository {
-  private static readonly CACHE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-  private readonly cache = new Map<string, CachedMetadataEntry>();
-
+export class DataverseEntityMetadataRepository implements IEntityMetadataRepository {
   constructor(
-    private readonly authService: IAuthenticationService,
+    private readonly apiService: IDataverseApiService,
     private readonly logger: ILogger
   ) {}
 
-  /**
-   * Get entity definitions from Dataverse API.
-   */
-  public async getEntityDefinitions(environmentId: string): Promise<EntityMetadata[]> {
-    const cacheKey = `${environmentId}:entityDefinitions`;
-    const cached = this.getCached<EntityMetadata[]>(cacheKey);
-    if (cached) {
-      this.logger.debug('Returning cached entity definitions', { environmentId });
-      return cached;
-    }
+  public async getAllEntities(environmentId: string): Promise<readonly EntityMetadata[]> {
+    this.logger.debug('Fetching all entities from Dataverse', { environmentId });
 
-    this.logger.debug('Fetching entity definitions from API', { environmentId });
-
-    const environment = await this.getEnvironment(environmentId);
-    const token = await this.authService.getAccessToken(environmentId);
-
-    const url = `${environment.settings.dataverseUrl}/api/data/v9.2/EntityDefinitions?$select=MetadataId,LogicalName,SchemaName,DisplayName,Description,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute,IsManaged,IsCustomizable,ObjectTypeCode`;
-
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'OData-MaxVersion': '4.0',
-        'OData-Version': '4.0'
+    // Fetch entities (summary level, no full attribute expansion)
+    const response = await this.apiService.get<EntityDefinitionDto[]>(
+      environmentId,
+      '/EntityDefinitions',
+      {
+        $select: 'LogicalName,SchemaName,DisplayName,LogicalCollectionName,Description,IsCustomEntity,ObjectTypeCode,PrimaryIdAttribute,PrimaryNameAttribute,OwnershipType',
+        $filter: 'IsValidForAdvancedFind eq true' // Exclude system tables
       }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch entity definitions: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const dtos = data.value as EntityDefinitionDto[];
+    );
 
     // Map DTOs to domain entities
-    const entities = dtos.map(dto => this.mapEntityDtoToDomain(dto));
-
-    this.setCached(cacheKey, entities);
-
-    this.logger.info('Entity definitions loaded', { count: entities.length });
-
-    return entities;
+    return response.map(dto => this.mapEntitySummaryToDomain(dto));
   }
 
-  /**
-   * Get complete entity metadata (parallel fetch for performance).
-   */
-  public async getCompleteEntityMetadata(
-    environmentId: string,
-    entityLogicalName: string
-  ): Promise<CompleteEntityMetadata> {
-    this.logger.debug('Fetching complete entity metadata', { environmentId, entityLogicalName });
+  public async getEntityWithAttributes(environmentId: string, logicalName: string): Promise<EntityMetadata> {
+    this.logger.debug('Fetching entity with attributes', { environmentId, logicalName });
 
-    // Fetch all metadata sections in parallel
-    const [entity, attributes, keys, relationships, privileges] = await Promise.all([
-      this.getEntityDefinition(environmentId, entityLogicalName),
-      this.getEntityAttributes(environmentId, entityLogicalName),
-      this.getEntityKeys(environmentId, entityLogicalName),
-      this.getEntityRelationships(environmentId, entityLogicalName),
-      this.getEntityPrivileges(environmentId, entityLogicalName)
-    ]);
-
-    this.logger.info('Complete entity metadata loaded', {
-      attributesCount: attributes.length,
-      keysCount: keys.length,
-      relationshipsCount: relationships.length,
-      privilegesCount: privileges.length
-    });
-
-    return {
-      entity,
-      attributes,
-      keys,
-      relationships,
-      privileges
-    };
-  }
-
-  /**
-   * Get entity attributes with expanded option set data.
-   */
-  public async getEntityAttributes(
-    environmentId: string,
-    entityLogicalName: string
-  ): Promise<AttributeMetadata[]> {
-    const cacheKey = `${environmentId}:attributes:${entityLogicalName}`;
-    const cached = this.getCached<AttributeMetadata[]>(cacheKey);
-    if (cached) {
-      this.logger.debug('Returning cached attributes', { environmentId, entityLogicalName });
-      return cached;
-    }
-
-    this.logger.debug('Fetching entity attributes from API', { environmentId, entityLogicalName });
-
-    const environment = await this.getEnvironment(environmentId);
-    const token = await this.authService.getAccessToken(environmentId);
-    const baseUrl = `${environment.settings.dataverseUrl}/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')`;
-
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'OData-MaxVersion': '4.0',
-      'OData-Version': '4.0'
-    };
-
-    // Parallel fetch: normal attributes + OptionSet-based attributes with expanded data
-    const [
-      normalResponse,
-      picklistResponse,
-      stateResponse,
-      statusResponse,
-      booleanResponse,
-      multiSelectResponse
-    ] = await Promise.all([
-      fetch(`${baseUrl}/Attributes?$orderby=LogicalName`, { headers }),
-      fetch(`${baseUrl}/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$expand=OptionSet,GlobalOptionSet&$orderby=LogicalName`, { headers }),
-      fetch(`${baseUrl}/Attributes/Microsoft.Dynamics.CRM.StateAttributeMetadata?$expand=OptionSet&$orderby=LogicalName`, { headers }),
-      fetch(`${baseUrl}/Attributes/Microsoft.Dynamics.CRM.StatusAttributeMetadata?$expand=OptionSet&$orderby=LogicalName`, { headers }),
-      fetch(`${baseUrl}/Attributes/Microsoft.Dynamics.CRM.BooleanAttributeMetadata?$expand=OptionSet&$orderby=LogicalName`, { headers }),
-      fetch(`${baseUrl}/Attributes/Microsoft.Dynamics.CRM.MultiSelectPicklistAttributeMetadata?$expand=OptionSet,GlobalOptionSet&$orderby=LogicalName`, { headers })
-    ]);
-
-    if (!normalResponse.ok) {
-      throw new Error(`Failed to fetch entity attributes: ${normalResponse.statusText}`);
-    }
-
-    const normalData = await normalResponse.json();
-    const attributeDtos = normalData.value as AttributeMetadataDto[];
-
-    // Merge OptionSet data from typed queries
-    await this.mergeOptionSetData(attributeDtos, picklistResponse, 'PicklistAttributeMetadata');
-    await this.mergeOptionSetData(attributeDtos, stateResponse, 'StateAttributeMetadata');
-    await this.mergeOptionSetData(attributeDtos, statusResponse, 'StatusAttributeMetadata');
-    await this.mergeOptionSetData(attributeDtos, booleanResponse, 'BooleanAttributeMetadata');
-    await this.mergeOptionSetData(attributeDtos, multiSelectResponse, 'MultiSelectPicklistAttributeMetadata');
-
-    // Map DTOs to domain entities
-    const attributes = attributeDtos.map(dto => this.mapAttributeDtoToDomain(dto));
-
-    this.setCached(cacheKey, attributes);
-
-    this.logger.info('Entity attributes loaded', { count: attributes.length });
-
-    return attributes;
-  }
-
-  /**
-   * Clear cache for environment.
-   */
-  public clearCache(environmentId: string): void {
-    const keysToDelete: string[] = [];
-
-    for (const key of this.cache.keys()) {
-      if (key.startsWith(`${environmentId}:`)) {
-        keysToDelete.push(key);
+    // Fetch entity with full attribute expansion
+    const response = await this.apiService.get<EntityDefinitionDto>(
+      environmentId,
+      `/EntityDefinitions(LogicalName='${logicalName}')`,
+      {
+        $expand: 'Attributes($select=LogicalName,SchemaName,DisplayName,Description,AttributeType,IsCustomAttribute,RequiredLevel,MaxLength,Format,Targets,OptionSet)'
       }
-    }
+    );
 
-    keysToDelete.forEach(key => this.cache.delete(key));
-
-    this.logger.info('Cache cleared', { environmentId, keysCleared: keysToDelete.length });
+    // Map DTO to domain entity with full attributes
+    return this.mapEntityWithAttributesToDomain(response);
   }
 
-  // Private helper methods for caching, DTO mapping, etc.
+  public async getEntityRelationships(environmentId: string, logicalName: string): Promise<readonly RelationshipMetadata[]> {
+    this.logger.debug('Fetching entity relationships', { environmentId, logicalName });
 
-  private getCached<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
+    // Fetch one-to-many relationships
+    const oneToManyResponse = await this.apiService.get<OneToManyRelationshipDto[]>(
+      environmentId,
+      `/EntityDefinitions(LogicalName='${logicalName}')/OneToManyRelationships`,
+      {
+        $select: 'SchemaName,ReferencedEntity,ReferencedAttribute,ReferencingEntity,ReferencingAttribute,CascadeConfiguration'
+      }
+    );
 
-    const isExpired = Date.now() - entry.timestamp > DataverseMetadataRepository.CACHE_TIMEOUT_MS;
-    if (isExpired) {
-      this.cache.delete(key);
-      return null;
-    }
+    // Fetch many-to-one relationships
+    const manyToOneResponse = await this.apiService.get<ManyToOneRelationshipDto[]>(
+      environmentId,
+      `/EntityDefinitions(LogicalName='${logicalName}')/ManyToOneRelationships`,
+      {
+        $select: 'SchemaName,ReferencedEntity,ReferencedAttribute,ReferencingEntity,ReferencingAttribute,CascadeConfiguration'
+      }
+    );
 
-    return entry.data as T;
+    // Fetch many-to-many relationships
+    const manyToManyResponse = await this.apiService.get<ManyToManyRelationshipDto[]>(
+      environmentId,
+      `/EntityDefinitions(LogicalName='${logicalName}')/ManyToManyRelationships`,
+      {
+        $select: 'SchemaName,Entity1LogicalName,Entity2LogicalName,IntersectEntityName'
+      }
+    );
+
+    // Map all relationships to domain
+    const oneToMany = oneToManyResponse.map(dto => this.mapOneToManyRelationshipToDomain(dto));
+    const manyToOne = manyToOneResponse.map(dto => this.mapManyToOneRelationshipToDomain(dto));
+    const manyToMany = manyToManyResponse.map(dto => this.mapManyToManyRelationshipToDomain(dto));
+
+    return [...oneToMany, ...manyToOne, ...manyToMany];
   }
 
-  private setCached<T>(key: string, data: T): void {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now()
-    });
+  public async getEntityKeys(environmentId: string, logicalName: string): Promise<readonly KeyMetadata[]> {
+    this.logger.debug('Fetching entity keys', { environmentId, logicalName });
+
+    const response = await this.apiService.get<EntityKeyDto[]>(
+      environmentId,
+      `/EntityDefinitions(LogicalName='${logicalName}')/Keys`,
+      {
+        $select: 'LogicalName,DisplayName,KeyAttributes'
+      }
+    );
+
+    return response.map(dto => this.mapKeyToDomain(dto, logicalName));
   }
 
-  private async getEnvironment(environmentId: string): Promise<Environment> {
-    // Implementation: Get environment from authentication service
-    const environments = await this.authService.getEnvironments();
-    const environment = environments.find(env => env.id === environmentId);
+  public async getEntityPrivileges(environmentId: string, logicalName: string): Promise<readonly PrivilegeMetadata[]> {
+    this.logger.debug('Fetching entity privileges', { environmentId, logicalName });
 
-    if (!environment) {
-      throw new Error(`Environment not found: ${environmentId}`);
-    }
+    const response = await this.apiService.get<PrivilegeDto[]>(
+      environmentId,
+      `/EntityDefinitions(LogicalName='${logicalName}')/Privileges`,
+      {
+        $select: 'PrivilegeId,Name,PrivilegeType,CanBeBasic,CanBeLocal,CanBeDeep,CanBeGlobal'
+      }
+    );
 
-    return environment;
+    return response.map(dto => this.mapPrivilegeToDomain(dto));
   }
 
-  private mapEntityDtoToDomain(dto: EntityDefinitionDto): EntityMetadata {
+  public async getAllGlobalOptionSets(environmentId: string): Promise<readonly GlobalOptionSetMetadata[]> {
+    this.logger.debug('Fetching global option sets', { environmentId });
+
+    const response = await this.apiService.get<GlobalOptionSetDto[]>(
+      environmentId,
+      '/GlobalOptionSetDefinitions',
+      {
+        $select: 'Name,DisplayName,Description,IsCustomOptionSet',
+        $expand: 'Options($select=Value,Label,Description)'
+      }
+    );
+
+    return response.map(dto => this.mapGlobalOptionSetToDomain(dto));
+  }
+
+  /**
+   * Map entity summary DTO to domain entity (no attributes).
+   */
+  private mapEntitySummaryToDomain(dto: EntityDefinitionDto): EntityMetadata {
     return new EntityMetadata(
-      dto.MetadataId,
-      dto.LogicalName,
-      dto.SchemaName,
-      dto.DisplayName?.UserLocalizedLabel?.Label || dto.LogicalName,
-      dto.Description?.UserLocalizedLabel?.Label || '',
-      dto.EntitySetName,
-      dto.PrimaryIdAttribute,
+      LogicalName.create(dto.LogicalName),
+      SchemaName.create(dto.SchemaName),
+      DisplayName.create(dto.DisplayName?.UserLocalizedLabel?.Label || dto.LogicalName),
+      DisplayName.create(dto.LogicalCollectionName?.UserLocalizedLabel?.Label || dto.LogicalName),
+      dto.Description?.UserLocalizedLabel?.Label || null,
+      dto.LogicalCollectionName?.UserLocalizedLabel?.Label || dto.LogicalName,
+      dto.IsCustomEntity || false,
+      dto.ObjectTypeCode || null,
+      dto.PrimaryIdAttribute || null,
       dto.PrimaryNameAttribute || null,
-      dto.IsManaged,
-      dto.IsCustomizable?.Value || false,
-      dto.ObjectTypeCode
+      this.mapOwnershipType(dto.OwnershipType),
+      [] // No attributes in summary
     );
   }
 
-  private mapAttributeDtoToDomain(dto: AttributeMetadataDto): AttributeMetadata {
+  /**
+   * Map entity DTO with attributes to domain entity.
+   */
+  private mapEntityWithAttributesToDomain(dto: EntityDefinitionDto): EntityMetadata {
+    const attributes = (dto.Attributes || []).map(attrDto => this.mapAttributeToDomain(attrDto, dto.LogicalName));
+
+    return new EntityMetadata(
+      LogicalName.create(dto.LogicalName),
+      SchemaName.create(dto.SchemaName),
+      DisplayName.create(dto.DisplayName?.UserLocalizedLabel?.Label || dto.LogicalName),
+      DisplayName.create(dto.LogicalCollectionName?.UserLocalizedLabel?.Label || dto.LogicalName),
+      dto.Description?.UserLocalizedLabel?.Label || null,
+      dto.LogicalCollectionName?.UserLocalizedLabel?.Label || dto.LogicalName,
+      dto.IsCustomEntity || false,
+      dto.ObjectTypeCode || null,
+      dto.PrimaryIdAttribute || null,
+      dto.PrimaryNameAttribute || null,
+      this.mapOwnershipType(dto.OwnershipType),
+      attributes
+    );
+  }
+
+  /**
+   * Map attribute DTO to domain entity.
+   */
+  private mapAttributeToDomain(dto: AttributeDto, entityLogicalName: string): AttributeMetadata {
     return new AttributeMetadata(
-      dto.MetadataId,
-      dto.LogicalName,
-      dto.SchemaName,
-      dto.DisplayName?.UserLocalizedLabel?.Label || dto.LogicalName,
-      dto.Description?.UserLocalizedLabel?.Label || '',
-      dto.AttributeType,
-      dto.AttributeTypeName?.Value || dto.AttributeType,
-      this.mapRequiredLevel(dto.RequiredLevel?.Value),
+      LogicalName.create(dto.LogicalName),
+      SchemaName.create(dto.SchemaName),
+      DisplayName.create(dto.DisplayName?.UserLocalizedLabel?.Label || dto.LogicalName),
+      dto.Description?.UserLocalizedLabel?.Label || null,
+      AttributeType.create(dto.AttributeType),
       dto.IsCustomAttribute || false,
-      dto.IsManaged || false,
-      dto.IsPrimaryId || false,
-      dto.IsPrimaryName || false,
+      RequiredLevel.create(dto.RequiredLevel?.Value || 'None'),
+      LogicalName.create(entityLogicalName),
       dto.MaxLength || null,
-      dto.Targets || null,
-      dto.OptionSet ? this.mapOptionSetDtoToDomain(dto.OptionSet) : null
+      dto.Format || null,
+      dto.Targets && dto.Targets.length > 0 ? LogicalName.create(dto.Targets[0]) : null,
+      dto.OptionSet?.Name || null
     );
   }
 
-  private mapRequiredLevel(value: string | undefined): RequiredLevel {
+  /**
+   * Map relationship DTOs to domain entities.
+   */
+  private mapOneToManyRelationshipToDomain(dto: OneToManyRelationshipDto): RelationshipMetadata {
+    return new RelationshipMetadata(
+      SchemaName.create(dto.SchemaName),
+      RelationshipType.create('OneToManyRelationship'),
+      LogicalName.create(dto.ReferencedEntity),
+      LogicalName.create(dto.ReferencedAttribute),
+      LogicalName.create(dto.ReferencingEntity),
+      LogicalName.create(dto.ReferencingAttribute),
+      this.mapCascadeConfiguration(dto.CascadeConfiguration)
+    );
+  }
+
+  private mapManyToOneRelationshipToDomain(dto: ManyToOneRelationshipDto): RelationshipMetadata {
+    return new RelationshipMetadata(
+      SchemaName.create(dto.SchemaName),
+      RelationshipType.create('ManyToOneRelationship'),
+      LogicalName.create(dto.ReferencedEntity),
+      LogicalName.create(dto.ReferencedAttribute),
+      LogicalName.create(dto.ReferencingEntity),
+      LogicalName.create(dto.ReferencingAttribute),
+      this.mapCascadeConfiguration(dto.CascadeConfiguration)
+    );
+  }
+
+  private mapManyToManyRelationshipToDomain(dto: ManyToManyRelationshipDto): RelationshipMetadata {
+    // Many-to-many relationships don't have cascade configuration
+    const emptyCascade = new CascadeConfiguration(
+      CascadeBehavior.NoCascade,
+      CascadeBehavior.NoCascade,
+      CascadeBehavior.NoCascade,
+      CascadeBehavior.NoCascade,
+      CascadeBehavior.NoCascade,
+      CascadeBehavior.NoCascade
+    );
+
+    return new RelationshipMetadata(
+      SchemaName.create(dto.SchemaName),
+      RelationshipType.create('ManyToManyRelationship'),
+      LogicalName.create(dto.Entity1LogicalName),
+      LogicalName.create(dto.Entity1LogicalName), // Dummy attribute
+      LogicalName.create(dto.Entity2LogicalName),
+      LogicalName.create(dto.Entity2LogicalName), // Dummy attribute
+      emptyCascade
+    );
+  }
+
+  /**
+   * Map key DTO to domain entity.
+   */
+  private mapKeyToDomain(dto: EntityKeyDto, entityLogicalName: string): KeyMetadata {
+    const attributes = dto.KeyAttributes.map(attr => LogicalName.create(attr));
+
+    return new KeyMetadata(
+      LogicalName.create(dto.LogicalName),
+      DisplayName.create(dto.DisplayName?.UserLocalizedLabel?.Label || dto.LogicalName),
+      LogicalName.create(entityLogicalName),
+      attributes
+    );
+  }
+
+  /**
+   * Map privilege DTO to domain entity.
+   */
+  private mapPrivilegeToDomain(dto: PrivilegeDto): PrivilegeMetadata {
+    return new PrivilegeMetadata(
+      dto.PrivilegeId,
+      dto.Name,
+      PrivilegeType.create(dto.PrivilegeType),
+      dto.CanBeBasic || false,
+      dto.CanBeLocal || false,
+      dto.CanBeDeep || false,
+      dto.CanBeGlobal || false
+    );
+  }
+
+  /**
+   * Map global option set DTO to domain entity.
+   */
+  private mapGlobalOptionSetToDomain(dto: GlobalOptionSetDto): GlobalOptionSetMetadata {
+    const options = (dto.Options || []).map(optDto =>
+      new OptionMetadata(
+        optDto.Value,
+        optDto.Label?.UserLocalizedLabel?.Label || optDto.Value.toString(),
+        optDto.Description?.UserLocalizedLabel?.Label || null
+      )
+    );
+
+    return new GlobalOptionSetMetadata(
+      dto.Name,
+      DisplayName.create(dto.DisplayName?.UserLocalizedLabel?.Label || dto.Name),
+      dto.Description?.UserLocalizedLabel?.Label || null,
+      dto.IsCustomOptionSet || false,
+      options
+    );
+  }
+
+  /**
+   * Map cascade configuration DTO to value object.
+   */
+  private mapCascadeConfiguration(dto: CascadeConfigurationDto): CascadeConfiguration {
+    return new CascadeConfiguration(
+      this.mapCascadeBehavior(dto.Delete),
+      this.mapCascadeBehavior(dto.Assign),
+      this.mapCascadeBehavior(dto.Share),
+      this.mapCascadeBehavior(dto.Unshare),
+      this.mapCascadeBehavior(dto.Reparent),
+      this.mapCascadeBehavior(dto.Merge)
+    );
+  }
+
+  /**
+   * Map cascade behavior string to enum.
+   */
+  private mapCascadeBehavior(value: string): CascadeBehavior {
     switch (value) {
-      case 'None':
-        return RequiredLevel.None;
-      case 'SystemRequired':
-        return RequiredLevel.SystemRequired;
-      case 'ApplicationRequired':
-        return RequiredLevel.ApplicationRequired;
-      case 'Recommended':
-        return RequiredLevel.Recommended;
-      default:
-        return RequiredLevel.None;
+      case 'Cascade': return CascadeBehavior.Cascade;
+      case 'Active': return CascadeBehavior.Active;
+      case 'UserOwned': return CascadeBehavior.UserOwned;
+      case 'RemoveLink': return CascadeBehavior.RemoveLink;
+      case 'Restrict': return CascadeBehavior.Restrict;
+      case 'NoCascade': return CascadeBehavior.NoCascade;
+      default: return CascadeBehavior.NoCascade;
     }
   }
 
-  private mapOptionSetDtoToDomain(dto: OptionSetMetadataDto): OptionSetMetadata {
-    // Implementation: Map option set DTO to domain entity
-    // Simplified for brevity
-    return {
-      metadataId: dto.MetadataId,
-      name: dto.Name,
-      displayName: dto.DisplayName?.UserLocalizedLabel?.Label || dto.Name,
-      options: (dto.Options || []).map(optDto => this.mapOptionDtoToDomain(optDto))
-    };
-  }
-
-  private mapOptionDtoToDomain(dto: OptionMetadataDto): OptionMetadata {
-    return new OptionMetadata(
-      dto.Value,
-      dto.Label?.UserLocalizedLabel?.Label || '',
-      dto.Description?.UserLocalizedLabel?.Label || '',
-      dto.Color || null,
-      dto.IsManaged || false
-    );
-  }
-
-  private async mergeOptionSetData(
-    attributes: AttributeMetadataDto[],
-    response: Response,
-    typeName: string
-  ): Promise<void> {
-    if (!response.ok) {
-      this.logger.warn(`Failed to fetch ${typeName}, continuing without OptionSet data`, {
-        status: response.status
-      });
-      return;
+  /**
+   * Map ownership type string to enum.
+   */
+  private mapOwnershipType(value: string): OwnershipType {
+    switch (value) {
+      case 'UserOwned': return OwnershipType.UserOwned;
+      case 'TeamOwned': return OwnershipType.TeamOwned;
+      case 'OrganizationOwned': return OwnershipType.OrganizationOwned;
+      case 'None': return OwnershipType.None;
+      default: return OwnershipType.None;
     }
-
-    const data = await response.json();
-    const typedAttributes = data.value as AttributeMetadataDto[];
-
-    // Create map for fast lookup
-    const typedMap = new Map<string, AttributeMetadataDto>(
-      typedAttributes.map(attr => [attr.MetadataId, attr])
-    );
-
-    // Merge OptionSet data into main attributes array
-    let mergedCount = 0;
-    attributes.forEach(attr => {
-      const typedAttr = typedMap.get(attr.MetadataId);
-      if (typedAttr && typedAttr.OptionSet) {
-        attr.OptionSet = typedAttr.OptionSet;
-        mergedCount++;
-      }
-    });
-
-    this.logger.debug(`Merged ${typeName}`, {
-      merged: mergedCount,
-      total: typedAttributes.length
-    });
   }
+}
+```
 
-  // Additional methods: getEntityKeys, getEntityRelationships, getEntityPrivileges, etc.
-  // Implementation follows same pattern as above
+#### DTOs
+
+```typescript
+/**
+ * DTO for entity definition from Dataverse Web API.
+ */
+export interface EntityDefinitionDto {
+  LogicalName: string;
+  SchemaName: string;
+  DisplayName?: LocalizedLabelDto;
+  LogicalCollectionName?: LocalizedLabelDto;
+  Description?: LocalizedLabelDto;
+  IsCustomEntity?: boolean;
+  ObjectTypeCode?: number;
+  PrimaryIdAttribute?: string;
+  PrimaryNameAttribute?: string;
+  OwnershipType?: string;
+  Attributes?: AttributeDto[];
 }
 
 /**
- * Cache entry for metadata.
+ * DTO for attribute metadata from Dataverse Web API.
  */
-interface CachedMetadataEntry {
-  data: unknown;
-  timestamp: number;
-}
-
-/**
- * DTOs for Dataverse API responses.
- */
-interface EntityDefinitionDto {
-  MetadataId: string;
+export interface AttributeDto {
   LogicalName: string;
   SchemaName: string;
-  DisplayName: { UserLocalizedLabel: { Label: string } };
-  Description: { UserLocalizedLabel: { Label: string } };
-  EntitySetName: string;
-  PrimaryIdAttribute: string;
-  PrimaryNameAttribute: string | null;
-  IsManaged: boolean;
-  IsCustomizable: { Value: boolean };
-  ObjectTypeCode: number;
-}
-
-interface AttributeMetadataDto {
-  MetadataId: string;
-  LogicalName: string;
-  SchemaName: string;
-  DisplayName: { UserLocalizedLabel: { Label: string } };
-  Description: { UserLocalizedLabel: { Label: string } };
+  DisplayName?: LocalizedLabelDto;
+  Description?: LocalizedLabelDto;
   AttributeType: string;
-  AttributeTypeName: { Value: string };
-  RequiredLevel: { Value: string };
-  IsCustomAttribute: boolean;
-  IsManaged: boolean;
-  IsPrimaryId: boolean;
-  IsPrimaryName: boolean;
+  IsCustomAttribute?: boolean;
+  RequiredLevel?: { Value: string };
   MaxLength?: number;
+  Format?: string;
   Targets?: string[];
-  OptionSet?: OptionSetMetadataDto;
+  OptionSet?: { Name: string };
 }
 
-interface OptionSetMetadataDto {
-  MetadataId: string;
+/**
+ * DTO for one-to-many relationship from Dataverse Web API.
+ */
+export interface OneToManyRelationshipDto {
+  SchemaName: string;
+  ReferencedEntity: string;
+  ReferencedAttribute: string;
+  ReferencingEntity: string;
+  ReferencingAttribute: string;
+  CascadeConfiguration: CascadeConfigurationDto;
+}
+
+/**
+ * DTO for many-to-one relationship from Dataverse Web API.
+ */
+export interface ManyToOneRelationshipDto {
+  SchemaName: string;
+  ReferencedEntity: string;
+  ReferencedAttribute: string;
+  ReferencingEntity: string;
+  ReferencingAttribute: string;
+  CascadeConfiguration: CascadeConfigurationDto;
+}
+
+/**
+ * DTO for many-to-many relationship from Dataverse Web API.
+ */
+export interface ManyToManyRelationshipDto {
+  SchemaName: string;
+  Entity1LogicalName: string;
+  Entity2LogicalName: string;
+  IntersectEntityName: string;
+}
+
+/**
+ * DTO for cascade configuration from Dataverse Web API.
+ */
+export interface CascadeConfigurationDto {
+  Delete: string;
+  Assign: string;
+  Share: string;
+  Unshare: string;
+  Reparent: string;
+  Merge: string;
+}
+
+/**
+ * DTO for entity key from Dataverse Web API.
+ */
+export interface EntityKeyDto {
+  LogicalName: string;
+  DisplayName?: LocalizedLabelDto;
+  KeyAttributes: string[];
+}
+
+/**
+ * DTO for privilege from Dataverse Web API.
+ */
+export interface PrivilegeDto {
+  PrivilegeId: string;
   Name: string;
-  DisplayName: { UserLocalizedLabel: { Label: string } };
-  Options: OptionMetadataDto[];
+  PrivilegeType: string;
+  CanBeBasic?: boolean;
+  CanBeLocal?: boolean;
+  CanBeDeep?: boolean;
+  CanBeGlobal?: boolean;
 }
 
-interface OptionMetadataDto {
+/**
+ * DTO for global option set from Dataverse Web API.
+ */
+export interface GlobalOptionSetDto {
+  Name: string;
+  DisplayName?: LocalizedLabelDto;
+  Description?: LocalizedLabelDto;
+  IsCustomOptionSet?: boolean;
+  Options?: OptionDto[];
+}
+
+/**
+ * DTO for option metadata from Dataverse Web API.
+ */
+export interface OptionDto {
   Value: number;
-  Label: { UserLocalizedLabel: { Label: string } };
-  Description: { UserLocalizedLabel: { Label: string } };
-  Color: string | null;
-  IsManaged: boolean;
+  Label?: LocalizedLabelDto;
+  Description?: LocalizedLabelDto;
 }
 
-// Additional DTOs for keys, relationships, privileges, choices, etc.
+/**
+ * DTO for localized label from Dataverse Web API.
+ */
+export interface LocalizedLabelDto {
+  UserLocalizedLabel?: {
+    Label: string;
+  };
+}
 ```
 
 ---
@@ -1970,356 +2021,612 @@ interface OptionMetadataDto {
 
 ```typescript
 /**
- * Metadata Browser panel.
- *
- * Uses use cases for orchestration (NO business logic).
+ * Commands supported by Metadata Browser panel.
  */
-export class MetadataBrowserPanel extends BasePanel {
+type MetadataBrowserCommands =
+  | 'environmentChange'
+  | 'refresh'
+  | 'selectEntity'
+  | 'switchTab'
+  | 'viewAttributeDetail'
+  | 'viewRelationshipDetail'
+  | 'viewKeyDetail'
+  | 'viewPrivilegeDetail'
+  | 'closeDetail'
+  | 'searchEntities';
+
+/**
+ * Metadata Browser panel using PanelCoordinator architecture.
+ * Features three-panel layout: tree + tabs + detail.
+ */
+export class MetadataBrowserPanel {
   public static readonly viewType = 'powerPlatformDevSuite.metadataBrowser';
-  private static currentPanel: MetadataBrowserPanel | undefined;
+  private static panels = new Map<string, MetadataBrowserPanel>();
 
-  private readonly loadEntityTreeUseCase: LoadEntityTreeUseCase;
-  private readonly loadEntityMetadataUseCase: LoadEntityMetadataUseCase;
-  private readonly loadChoiceMetadataUseCase: LoadChoiceMetadataUseCase;
-  private readonly navigateToRelatedEntityUseCase: NavigateToRelatedEntityUseCase;
-  private readonly refreshMetadataUseCase: RefreshMetadataUseCase;
-
-  // State
-  private selectedEntityLogicalName?: string;
-  private selectedChoiceName?: string;
-  private collapsedSections: Set<string> = new Set(['keys', 'relationships', 'privileges', 'choices']);
+  private readonly coordinator: PanelCoordinator<MetadataBrowserCommands>;
+  private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+  private currentEnvironmentId: string;
+  private currentEntityLogicalName: string | null = null;
+  private currentTab: 'attributes' | 'relationships' | 'keys' | 'privileges' = 'attributes';
 
   private constructor(
-    panel: vscode.WebviewPanel,
-    extensionUri: vscode.Uri,
-    loadEntityTreeUseCase: LoadEntityTreeUseCase,
-    loadEntityMetadataUseCase: LoadEntityMetadataUseCase,
-    loadChoiceMetadataUseCase: LoadChoiceMetadataUseCase,
-    navigateToRelatedEntityUseCase: NavigateToRelatedEntityUseCase,
-    refreshMetadataUseCase: RefreshMetadataUseCase,
-    logger: ILogger
+    private readonly panel: vscode.WebviewPanel,
+    private readonly extensionUri: vscode.Uri,
+    private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
+    private readonly getEnvironmentById: (envId: string) => Promise<{ id: string; name: string } | null>,
+    private readonly loadEntityTreeUseCase: LoadEntityTreeUseCase,
+    private readonly loadEntityAttributesUseCase: LoadEntityAttributesUseCase,
+    private readonly loadEntityRelationshipsUseCase: LoadEntityRelationshipsUseCase,
+    private readonly loadEntityKeysUseCase: LoadEntityKeysUseCase,
+    private readonly loadEntityPrivilegesUseCase: LoadEntityPrivilegesUseCase,
+    private readonly logger: ILogger,
+    private readonly panelStateRepository: IPanelStateRepository | null,
+    environmentId: string
   ) {
-    super(panel, extensionUri, ServiceFactory.getAuthService(), {
-      viewType: MetadataBrowserPanel.viewType,
-      title: 'Metadata Browser'
-    });
+    this.currentEnvironmentId = environmentId;
+    this.logger.debug('MetadataBrowserPanel: Initialized');
 
-    this.loadEntityTreeUseCase = loadEntityTreeUseCase;
-    this.loadEntityMetadataUseCase = loadEntityMetadataUseCase;
-    this.loadChoiceMetadataUseCase = loadChoiceMetadataUseCase;
-    this.navigateToRelatedEntityUseCase = navigateToRelatedEntityUseCase;
-    this.refreshMetadataUseCase = refreshMetadataUseCase;
+    panel.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [extensionUri]
+    };
 
-    this.componentLogger = logger;
+    const result = this.createCoordinator();
+    this.coordinator = result.coordinator;
+    this.scaffoldingBehavior = result.scaffoldingBehavior;
 
-    this.panel.onDidDispose(() => {
-      MetadataBrowserPanel.currentPanel = undefined;
-    });
+    this.registerCommandHandlers();
 
-    this.initializeComponents();
-    this.initialize();
+    void this.initializeAndLoadData();
   }
 
-  /**
-   * Factory method (singleton pattern).
-   */
-  public static createOrShow(
+  public static async createOrShow(
     extensionUri: vscode.Uri,
-    useCases: MetadataBrowserUseCases,
-    logger: ILogger
-  ): void {
-    if (MetadataBrowserPanel.currentPanel) {
-      MetadataBrowserPanel.currentPanel.panel.reveal();
-      return;
+    getEnvironments: () => Promise<EnvironmentOption[]>,
+    getEnvironmentById: (envId: string) => Promise<{ id: string; name: string } | null>,
+    loadEntityTreeUseCase: LoadEntityTreeUseCase,
+    loadEntityAttributesUseCase: LoadEntityAttributesUseCase,
+    loadEntityRelationshipsUseCase: LoadEntityRelationshipsUseCase,
+    loadEntityKeysUseCase: LoadEntityKeysUseCase,
+    loadEntityPrivilegesUseCase: LoadEntityPrivilegesUseCase,
+    logger: ILogger,
+    initialEnvironmentId?: string,
+    panelStateRepository?: IPanelStateRepository
+  ): Promise<MetadataBrowserPanel> {
+    const column = vscode.ViewColumn.One;
+
+    let targetEnvironmentId = initialEnvironmentId;
+    if (!targetEnvironmentId) {
+      const environments = await getEnvironments();
+      targetEnvironmentId = environments[0]?.id;
     }
+
+    if (!targetEnvironmentId) {
+      throw new Error('No environments available');
+    }
+
+    const existingPanel = MetadataBrowserPanel.panels.get(targetEnvironmentId);
+    if (existingPanel) {
+      existingPanel.panel.reveal(column);
+      return existingPanel;
+    }
+
+    const environment = await getEnvironmentById(targetEnvironmentId);
+    const environmentName = environment?.name || 'Unknown';
 
     const panel = vscode.window.createWebviewPanel(
       MetadataBrowserPanel.viewType,
-      'Metadata Browser',
-      vscode.ViewColumn.One,
+      `Metadata Browser - ${environmentName}`,
+      column,
       {
         enableScripts: true,
-        localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources', 'webview')]
+        localResourceRoots: [extensionUri],
+        retainContextWhenHidden: true
       }
     );
 
-    const instance = new MetadataBrowserPanel(
+    const newPanel = new MetadataBrowserPanel(
       panel,
       extensionUri,
-      useCases.loadEntityTreeUseCase,
-      useCases.loadEntityMetadataUseCase,
-      useCases.loadChoiceMetadataUseCase,
-      useCases.navigateToRelatedEntityUseCase,
-      useCases.refreshMetadataUseCase,
-      logger
+      getEnvironments,
+      getEnvironmentById,
+      loadEntityTreeUseCase,
+      loadEntityAttributesUseCase,
+      loadEntityRelationshipsUseCase,
+      loadEntityKeysUseCase,
+      loadEntityPrivilegesUseCase,
+      logger,
+      panelStateRepository || null,
+      targetEnvironmentId
     );
 
-    MetadataBrowserPanel.currentPanel = instance;
+    MetadataBrowserPanel.panels.set(targetEnvironmentId, newPanel);
+
+    panel.onDidDispose(() => {
+      MetadataBrowserPanel.panels.delete(targetEnvironmentId);
+    });
+
+    return newPanel;
   }
 
-  /**
-   * Handle user actions from webview.
-   */
-  protected async handleMessage(message: WebviewMessage): Promise<void> {
-    try {
-      switch (message.command) {
-        case 'select-entity':
-          await this.handleEntitySelection(message.data);
-          break;
+  private async initializeAndLoadData(): Promise<void> {
+    const environments = await this.getEnvironments();
 
-        case 'select-choice':
-          await this.handleChoiceSelection(message.data);
-          break;
-
-        case 'view-details':
-          await this.handleViewDetails(message.data);
-          break;
-
-        case 'navigate-to-related-entity':
-          await this.handleNavigateToRelatedEntity(message.data);
-          break;
-
-        case 'copy-logical-name':
-          await this.handleCopyLogicalName(message.data);
-          break;
-
-        case 'open-in-maker':
-          await this.handleOpenInMaker();
-          break;
-
-        case 'refresh':
-          await this.handleRefresh();
-          break;
-
-        case 'toggle-section':
-          this.handleToggleSection(message.data);
-          break;
-
-        default:
-          this.componentLogger.warn('Unknown message command', { command: message.command });
+    // Initial render (empty state)
+    await this.scaffoldingBehavior.refresh({
+      environments,
+      currentEnvironmentId: this.currentEnvironmentId,
+      treeData: [],
+      tableData: [],
+      state: {
+        selectedEntity: this.currentEntityLogicalName,
+        activeTab: this.currentTab
       }
-    } catch (error) {
-      this.componentLogger.error('Error handling message', error as Error, { command: message.command });
-      this.postMessage({
-        command: 'error',
-        message: 'An error occurred while processing your request'
+    });
+
+    // Load entity tree
+    await this.handleLoadEntityTree();
+  }
+
+  private createCoordinator(): {
+    coordinator: PanelCoordinator<MetadataBrowserCommands>;
+    scaffoldingBehavior: HtmlScaffoldingBehavior;
+  } {
+    const environmentSelector = new EnvironmentSelectorSection();
+    const actionButtons = new ActionButtonsSection({
+      buttons: [
+        { id: 'refresh', label: 'Refresh' }
+      ]
+    }, SectionPosition.Toolbar);
+
+    const treeSection = new MetadataTreeSection();
+    const tabsSection = new MetadataTabsSection(); // Middle panel with tabs
+    const detailSection = new MetadataDetailSection(); // Right panel
+
+    const compositionBehavior = new SectionCompositionBehavior(
+      [
+        actionButtons,
+        environmentSelector,
+        treeSection,
+        tabsSection,
+        detailSection
+      ],
+      PanelLayout.ThreePanel // NEW LAYOUT
+    );
+
+    const cssUris = resolveCssModules(
+      {
+        base: true,
+        components: ['buttons', 'inputs', 'three-panel', 'tree'],
+        sections: ['environment-selector', 'action-buttons', 'datatable']
+      },
+      this.extensionUri,
+      this.panel.webview
+    );
+
+    const featureCssUri = this.panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'metadata-browser.css')
+    ).toString();
+
+    const scaffoldingConfig: HtmlScaffoldingConfig = {
+      cssUris: [...cssUris, featureCssUri],
+      jsUris: [
+        this.panel.webview.asWebviewUri(
+          vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
+        ).toString(),
+        this.panel.webview.asWebviewUri(
+          vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'MetadataTreeRenderer.js')
+        ).toString(),
+        this.panel.webview.asWebviewUri(
+          vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'MetadataTabsRenderer.js')
+        ).toString(),
+        this.panel.webview.asWebviewUri(
+          vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'MetadataDetailRenderer.js')
+        ).toString()
+      ],
+      cspNonce: getNonce(),
+      title: 'Metadata Browser'
+    };
+
+    const scaffoldingBehavior = new HtmlScaffoldingBehavior(
+      this.panel.webview,
+      compositionBehavior,
+      scaffoldingConfig
+    );
+
+    const coordinator = new PanelCoordinator<MetadataBrowserCommands>({
+      panel: this.panel,
+      extensionUri: this.extensionUri,
+      behaviors: [scaffoldingBehavior],
+      logger: this.logger
+    });
+
+    return { coordinator, scaffoldingBehavior };
+  }
+
+  private registerCommandHandlers(): void {
+    this.coordinator.registerHandler('refresh', async () => {
+      await this.handleLoadEntityTree();
+    });
+
+    this.coordinator.registerHandler('environmentChange', async (data) => {
+      const environmentId = (data as { environmentId?: string })?.environmentId;
+      if (environmentId) {
+        await this.handleEnvironmentChange(environmentId);
+      }
+    });
+
+    this.coordinator.registerHandler('selectEntity', async (data) => {
+      const logicalName = (data as { logicalName?: string })?.logicalName;
+      if (logicalName) {
+        await this.handleSelectEntity(logicalName);
+      }
+    });
+
+    this.coordinator.registerHandler('switchTab', async (data) => {
+      const tab = (data as { tab?: string })?.tab as 'attributes' | 'relationships' | 'keys' | 'privileges';
+      if (tab) {
+        await this.handleSwitchTab(tab);
+      }
+    });
+
+    this.coordinator.registerHandler('viewAttributeDetail', async (data) => {
+      const logicalName = (data as { logicalName?: string })?.logicalName;
+      if (logicalName) {
+        await this.handleViewAttributeDetail(logicalName);
+      }
+    });
+
+    this.coordinator.registerHandler('viewRelationshipDetail', async (data) => {
+      const schemaName = (data as { schemaName?: string })?.schemaName;
+      if (schemaName) {
+        await this.handleViewRelationshipDetail(schemaName);
+      }
+    });
+
+    this.coordinator.registerHandler('viewKeyDetail', async (data) => {
+      const logicalName = (data as { logicalName?: string })?.logicalName;
+      if (logicalName) {
+        await this.handleViewKeyDetail(logicalName);
+      }
+    });
+
+    this.coordinator.registerHandler('viewPrivilegeDetail', async (data) => {
+      const privilegeId = (data as { privilegeId?: string })?.privilegeId;
+      if (privilegeId) {
+        await this.handleViewPrivilegeDetail(privilegeId);
+      }
+    });
+
+    this.coordinator.registerHandler('closeDetail', async () => {
+      await this.handleCloseDetail();
+    });
+
+    this.coordinator.registerHandler('searchEntities', async (data) => {
+      const searchText = (data as { searchText?: string })?.searchText;
+      await this.handleSearchEntities(searchText || '');
+    });
+  }
+
+  private async handleLoadEntityTree(): Promise<void> {
+    try {
+      this.logger.info('Loading entity tree');
+
+      const viewModels = await this.loadEntityTreeUseCase.execute(this.currentEnvironmentId);
+
+      // Data-driven update: Send tree data to frontend
+      await this.panel.webview.postMessage({
+        command: 'updateTree',
+        data: {
+          entities: viewModels
+        }
       });
+    } catch (error) {
+      this.logger.error('Failed to load entity tree', error);
+      await vscode.window.showErrorMessage('Failed to load entity tree');
     }
   }
 
-  private async handleEntitySelection(data: unknown): Promise<void> {
-    const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
-    if (!selectedEnvironment) return;
-
-    if (!data || typeof data !== 'object') return;
-
-    const entityData = data as Record<string, unknown>;
-    const { logicalName } = entityData;
-    if (!logicalName) return;
-
-    this.componentLogger.info('User selected entity', { logicalName });
-
-    // Show loading state
-    this.setLoadingState(true);
+  private async handleEnvironmentChange(environmentId: string): Promise<void> {
+    this.logger.debug('Environment changed', { environmentId });
 
     try {
-      // Delegate to use case
-      const response = await this.loadEntityMetadataUseCase.execute({
-        environmentId: selectedEnvironment.id,
-        entityLogicalName: logicalName as string
-      });
+      this.currentEnvironmentId = environmentId;
+      this.currentEntityLogicalName = null;
 
-      // Update UI with ViewModels
-      this.updateEntityMetadata(response);
-
-      this.selectedEntityLogicalName = logicalName as string;
-      this.selectedChoiceName = undefined;
-
-    } catch (error) {
-      this.componentLogger.error('Failed to load entity metadata', error as Error, { logicalName });
-      vscode.window.showErrorMessage(`Failed to load entity metadata: ${(error as Error).message}`);
-    } finally {
-      this.setLoadingState(false);
-    }
-  }
-
-  private async handleChoiceSelection(data: unknown): Promise<void> {
-    const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
-    if (!selectedEnvironment) return;
-
-    if (!data || typeof data !== 'object') return;
-
-    const choiceData = data as Record<string, unknown>;
-    const { name } = choiceData;
-    if (!name) return;
-
-    this.componentLogger.info('User selected choice', { name });
-
-    this.setLoadingState(true);
-
-    try {
-      // Delegate to use case
-      const response = await this.loadChoiceMetadataUseCase.execute({
-        environmentId: selectedEnvironment.id,
-        choiceName: name as string
-      });
-
-      // Update UI with ViewModels
-      this.updateChoiceMetadata(response);
-
-      this.selectedChoiceName = name as string;
-      this.selectedEntityLogicalName = undefined;
-
-    } catch (error) {
-      this.componentLogger.error('Failed to load choice metadata', error as Error, { name });
-      vscode.window.showErrorMessage(`Failed to load choice metadata: ${(error as Error).message}`);
-    } finally {
-      this.setLoadingState(false);
-    }
-  }
-
-  private async handleNavigateToRelatedEntity(data: unknown): Promise<void> {
-    const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
-    if (!selectedEnvironment) return;
-
-    if (!data || typeof data !== 'object') return;
-
-    const navData = data as Record<string, unknown>;
-    const { targetEntityLogicalName } = navData;
-    if (!targetEntityLogicalName) return;
-
-    this.componentLogger.info('User navigating to related entity', { targetEntityLogicalName });
-
-    this.setLoadingState(true);
-
-    try {
-      // Delegate to use case
-      const response = await this.navigateToRelatedEntityUseCase.execute({
-        environmentId: selectedEnvironment.id,
-        targetEntityLogicalName: targetEntityLogicalName as string
-      });
-
-      // Update UI with ViewModels
-      this.updateEntityMetadata(response);
-
-      this.selectedEntityLogicalName = targetEntityLogicalName as string;
-
-    } catch (error) {
-      this.componentLogger.error('Failed to navigate to related entity', error as Error, { targetEntityLogicalName });
-      vscode.window.showErrorMessage(`Failed to navigate to entity: ${(error as Error).message}`);
-    } finally {
-      this.setLoadingState(false);
-    }
-  }
-
-  private async handleRefresh(): Promise<void> {
-    const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
-    if (!selectedEnvironment) return;
-
-    this.componentLogger.info('User triggered refresh');
-
-    try {
-      // Delegate to use case (clears cache and reloads tree)
-      await this.refreshMetadataUseCase.execute(selectedEnvironment.id);
-
-      // Reload current selection if any
-      if (this.selectedEntityLogicalName) {
-        await this.handleEntitySelection({ logicalName: this.selectedEntityLogicalName });
-      } else if (this.selectedChoiceName) {
-        await this.handleChoiceSelection({ name: this.selectedChoiceName });
+      const environment = await this.getEnvironmentById(environmentId);
+      if (environment) {
+        this.panel.title = `Metadata Browser - ${environment.name}`;
       }
 
-      vscode.window.showInformationMessage('Metadata refreshed successfully');
-
+      await this.handleLoadEntityTree();
     } catch (error) {
-      this.componentLogger.error('Failed to refresh metadata', error as Error);
-      vscode.window.showErrorMessage(`Failed to refresh metadata: ${(error as Error).message}`);
+      this.logger.error('Failed to change environment', error);
+      await vscode.window.showErrorMessage('Failed to change environment');
     }
   }
 
-  private async handleCopyLogicalName(data: unknown): Promise<void> {
-    if (!data || typeof data !== 'object') return;
+  private async handleSelectEntity(logicalName: string): Promise<void> {
+    try {
+      this.logger.info('Entity selected', { logicalName });
 
-    const copyData = data as Record<string, unknown>;
-    const { logicalName } = copyData;
-    if (!logicalName) return;
+      this.currentEntityLogicalName = logicalName;
+      this.currentTab = 'attributes'; // Reset to attributes tab
 
-    await vscode.env.clipboard.writeText(String(logicalName));
-    vscode.window.showInformationMessage(`Copied logical name: ${logicalName}`);
+      // Load attributes for selected entity
+      await this.loadCurrentTabData();
+    } catch (error) {
+      this.logger.error('Failed to load entity metadata', error);
+      await vscode.window.showErrorMessage('Failed to load entity metadata');
+    }
   }
 
-  private async handleOpenInMaker(): Promise<void> {
-    const selectedEnvironment = this.environmentSelectorComponent?.getSelectedEnvironment();
-    if (!selectedEnvironment || !selectedEnvironment.environmentId) {
-      vscode.window.showErrorMessage('Environment ID not found');
+  private async handleSwitchTab(tab: 'attributes' | 'relationships' | 'keys' | 'privileges'): Promise<void> {
+    try {
+      this.logger.debug('Switching tab', { tab });
+
+      this.currentTab = tab;
+
+      // Load data for new tab
+      await this.loadCurrentTabData();
+    } catch (error) {
+      this.logger.error('Failed to switch tab', error);
+      await vscode.window.showErrorMessage('Failed to switch tab');
+    }
+  }
+
+  private async loadCurrentTabData(): Promise<void> {
+    if (!this.currentEntityLogicalName) {
       return;
     }
 
-    const url = `https://make.powerapps.com/environments/${selectedEnvironment.environmentId}/entities`;
-    await vscode.env.openExternal(vscode.Uri.parse(url));
-  }
+    let viewModels: unknown[];
 
-  private handleToggleSection(data: unknown): void {
-    if (!data || typeof data !== 'object') return;
-
-    const toggleData = data as Record<string, unknown>;
-    const { sectionId } = toggleData;
-    if (!sectionId) return;
-
-    if (this.collapsedSections.has(sectionId as string)) {
-      this.collapsedSections.delete(sectionId as string);
-    } else {
-      this.collapsedSections.add(sectionId as string);
+    switch (this.currentTab) {
+      case 'attributes':
+        viewModels = await this.loadEntityAttributesUseCase.execute(
+          this.currentEnvironmentId,
+          this.currentEntityLogicalName
+        );
+        break;
+      case 'relationships':
+        viewModels = await this.loadEntityRelationshipsUseCase.execute(
+          this.currentEnvironmentId,
+          this.currentEntityLogicalName
+        );
+        break;
+      case 'keys':
+        viewModels = await this.loadEntityKeysUseCase.execute(
+          this.currentEnvironmentId,
+          this.currentEntityLogicalName
+        );
+        break;
+      case 'privileges':
+        viewModels = await this.loadEntityPrivilegesUseCase.execute(
+          this.currentEnvironmentId,
+          this.currentEntityLogicalName
+        );
+        break;
     }
 
-    // Save preferences
-    this.savePreferences();
-  }
-
-  private updateEntityMetadata(response: EntityMetadataResponse): void {
-    // Send ViewModels to webview for rendering
-    this.postMessage({
-      command: 'update-entity-metadata',
+    // Data-driven update: Send tab data to frontend
+    await this.panel.webview.postMessage({
+      command: 'updateTabData',
       data: {
-        entity: response.entity,
-        attributes: response.attributes,
-        keys: response.keys,
-        relationships: response.relationships,
-        privileges: response.privileges
+        tab: this.currentTab,
+        rows: viewModels
       }
     });
   }
 
-  private updateChoiceMetadata(response: ChoiceMetadataResponse): void {
-    // Send ViewModels to webview for rendering
-    this.postMessage({
-      command: 'update-choice-metadata',
+  private async handleViewAttributeDetail(logicalName: string): Promise<void> {
+    // Load full attribute detail and show in right panel
+    // Implementation deferred to Slice 3
+  }
+
+  private async handleViewRelationshipDetail(schemaName: string): Promise<void> {
+    // Load full relationship detail and show in right panel
+    // Implementation deferred to Slice 3
+  }
+
+  private async handleViewKeyDetail(logicalName: string): Promise<void> {
+    // Load full key detail and show in right panel
+    // Implementation deferred to Slice 3
+  }
+
+  private async handleViewPrivilegeDetail(privilegeId: string): Promise<void> {
+    // Load full privilege detail and show in right panel
+    // Implementation deferred to Slice 3
+  }
+
+  private async handleCloseDetail(): Promise<void> {
+    await this.panel.webview.postMessage({
+      command: 'hideDetailPanel'
+    });
+  }
+
+  private async handleSearchEntities(searchText: string): Promise<void> {
+    // Client-side filtering (instant feedback)
+    // No backend call needed
+    await this.panel.webview.postMessage({
+      command: 'filterTree',
       data: {
-        choice: response.choice,
-        options: response.options
+        searchText
       }
     });
   }
+}
+```
 
-  private setLoadingState(loading: boolean): void {
-    this.postMessage({
-      command: 'set-loading',
-      loading
-    });
+#### Sections
+
+```typescript
+/**
+ * Section for entity tree (left panel).
+ */
+export class MetadataTreeSection implements ISection {
+  public readonly position = SectionPosition.Main; // Will be overridden by three-panel layout
+
+  public render(data: SectionRenderData): string {
+    const treeData = data.treeData || [];
+
+    return `
+      <div class="tree-container">
+        <div class="tree-header">
+          <input
+            type="text"
+            id="entitySearch"
+            placeholder="Search entities..."
+            class="tree-search"
+          />
+        </div>
+        <div id="entityTree" class="tree-view">
+          <!-- Tree rendered by MetadataTreeRenderer.js -->
+        </div>
+      </div>
+    `;
   }
-
-  // Additional helper methods for HTML generation, component initialization, etc.
 }
 
 /**
- * Use cases bundle for panel construction.
+ * Section for tabbed tables (middle panel).
  */
-export interface MetadataBrowserUseCases {
-  readonly loadEntityTreeUseCase: LoadEntityTreeUseCase;
-  readonly loadEntityMetadataUseCase: LoadEntityMetadataUseCase;
-  readonly loadChoiceMetadataUseCase: LoadChoiceMetadataUseCase;
-  readonly navigateToRelatedEntityUseCase: NavigateToRelatedEntityUseCase;
-  readonly refreshMetadataUseCase: RefreshMetadataUseCase;
+export class MetadataTabsSection implements ISection {
+  public readonly position = SectionPosition.Main;
+
+  public render(data: SectionRenderData): string {
+    return `
+      <div class="tabs-container">
+        <div class="tabs-header">
+          <button class="tab-button active" data-tab="attributes">Attributes</button>
+          <button class="tab-button" data-tab="relationships">Relationships</button>
+          <button class="tab-button" data-tab="keys">Keys</button>
+          <button class="tab-button" data-tab="privileges">Privileges</button>
+        </div>
+        <div class="tabs-content">
+          <div id="attributesTab" class="tab-pane active">
+            <table id="attributesTable" class="metadata-table">
+              <!-- Table rendered by MetadataTabsRenderer.js -->
+            </table>
+          </div>
+          <div id="relationshipsTab" class="tab-pane hidden">
+            <table id="relationshipsTable" class="metadata-table">
+              <!-- Table rendered by MetadataTabsRenderer.js -->
+            </table>
+          </div>
+          <div id="keysTab" class="tab-pane hidden">
+            <table id="keysTable" class="metadata-table">
+              <!-- Table rendered by MetadataTabsRenderer.js -->
+            </table>
+          </div>
+          <div id="privilegesTab" class="tab-pane hidden">
+            <table id="privilegesTable" class="metadata-table">
+              <!-- Table rendered by MetadataTabsRenderer.js -->
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+/**
+ * Section for detail panel (right panel).
+ */
+export class MetadataDetailSection implements ISection {
+  public readonly position = SectionPosition.Detail;
+
+  public render(data: SectionRenderData): string {
+    return `
+      <div class="detail-container hidden">
+        <div class="detail-header">
+          <button id="closeDetailBtn" class="close-button">×</button>
+        </div>
+        <div id="detailContent" class="detail-content">
+          <!-- Detail rendered by MetadataDetailRenderer.js -->
+        </div>
+      </div>
+    `;
+  }
+}
+```
+
+---
+
+## Three-Panel Layout
+
+### Layout Template (New)
+
+The three-panel layout needs to be added to `SectionCompositionBehavior`:
+
+```typescript
+/**
+ * Three-panel layout template (for Metadata Browser).
+ * Left panel (tree) + Middle panel (tabs) + Right panel (detail).
+ */
+private threePanelTemplate(): string {
+  return `
+    <div class="panel-container three-panel">
+      <div class="toolbar-section"><!-- TOOLBAR --></div>
+      <div class="header-section"><!-- HEADER --></div>
+      <div class="content-three-panel">
+        <div class="left-panel"><!-- LEFT --></div>
+        <div class="middle-panel"><!-- MAIN --></div>
+        <div class="right-panel hidden"><!-- DETAIL --></div>
+      </div>
+    </div>
+  `;
+}
+```
+
+### CSS Structure
+
+```css
+/* Three-panel layout */
+.panel-container.three-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.content-three-panel {
+  display: grid;
+  grid-template-columns: 300px 1fr 400px;
+  flex: 1;
+  overflow: hidden;
+  gap: 1px;
+  background: var(--vscode-panel-border);
+}
+
+.left-panel {
+  background: var(--vscode-editor-background);
+  overflow-y: auto;
+  border-right: 1px solid var(--vscode-panel-border);
+}
+
+.middle-panel {
+  background: var(--vscode-editor-background);
+  overflow-y: auto;
+}
+
+.right-panel {
+  background: var(--vscode-editor-background);
+  overflow-y: auto;
+  border-left: 1px solid var(--vscode-panel-border);
+}
+
+.right-panel.hidden {
+  display: none;
+  grid-column: 3 / 4;
+}
+
+/* When detail panel is shown */
+.content-three-panel.detail-visible {
+  grid-template-columns: 250px 1fr 450px;
+}
+
+.content-three-panel.detail-visible .right-panel {
+  display: block;
 }
 ```
 
@@ -2333,61 +2640,79 @@ src/features/metadataBrowser/
 │   ├── entities/
 │   │   ├── EntityMetadata.ts
 │   │   ├── AttributeMetadata.ts
-│   │   ├── KeyMetadata.ts
 │   │   ├── RelationshipMetadata.ts
+│   │   ├── KeyMetadata.ts
 │   │   ├── PrivilegeMetadata.ts
-│   │   ├── ChoiceMetadata.ts
+│   │   ├── GlobalOptionSetMetadata.ts
 │   │   └── OptionMetadata.ts
 │   ├── valueObjects/
-│   │   └── RequiredLevel.ts
-│   │   └── RelationshipType.ts
-│   ├── interfaces/
-│   │   └── IMetadataRepository.ts
-│   └── types/
-│       └── CompleteEntityMetadata.ts
+│   │   ├── LogicalName.ts
+│   │   ├── SchemaName.ts
+│   │   ├── DisplayName.ts
+│   │   ├── AttributeType.ts
+│   │   ├── RequiredLevel.ts
+│   │   ├── RelationshipType.ts
+│   │   ├── CascadeConfiguration.ts
+│   │   └── PrivilegeType.ts
+│   └── interfaces/
+│       └── IEntityMetadataRepository.ts
 │
 ├── application/
 │   ├── useCases/
 │   │   ├── LoadEntityTreeUseCase.ts
-│   │   ├── LoadEntityMetadataUseCase.ts
-│   │   ├── LoadChoiceMetadataUseCase.ts
-│   │   ├── NavigateToRelatedEntityUseCase.ts
-│   │   └── RefreshMetadataUseCase.ts
+│   │   ├── LoadEntityAttributesUseCase.ts
+│   │   ├── LoadEntityRelationshipsUseCase.ts
+│   │   ├── LoadEntityKeysUseCase.ts
+│   │   ├── LoadEntityPrivilegesUseCase.ts
+│   │   └── LoadGlobalOptionSetsUseCase.ts
 │   ├── viewModels/
 │   │   ├── EntityTreeItemViewModel.ts
-│   │   ├── ChoiceTreeItemViewModel.ts
-│   │   ├── EntityViewModel.ts
-│   │   ├── AttributeViewModel.ts
-│   │   ├── KeyViewModel.ts
-│   │   ├── RelationshipViewModel.ts
-│   │   ├── PrivilegeViewModel.ts
-│   │   ├── ChoiceViewModel.ts
-│   │   └── OptionViewModel.ts
+│   │   ├── EntityAttributeViewModel.ts
+│   │   ├── EntityRelationshipViewModel.ts
+│   │   ├── EntityKeyViewModel.ts
+│   │   ├── EntityPrivilegeViewModel.ts
+│   │   ├── GlobalOptionSetViewModel.ts
+│   │   ├── AttributeDetailViewModel.ts
+│   │   ├── RelationshipDetailViewModel.ts
+│   │   ├── KeyDetailViewModel.ts
+│   │   └── PrivilegeDetailViewModel.ts
 │   └── mappers/
 │       ├── EntityTreeItemViewModelMapper.ts
-│       ├── ChoiceTreeItemViewModelMapper.ts
-│       ├── EntityViewModelMapper.ts
-│       ├── AttributeViewModelMapper.ts
-│       ├── KeyViewModelMapper.ts
-│       ├── RelationshipViewModelMapper.ts
-│       ├── PrivilegeViewModelMapper.ts
-│       ├── ChoiceViewModelMapper.ts
-│       └── OptionViewModelMapper.ts
+│       ├── EntityAttributeViewModelMapper.ts
+│       ├── EntityRelationshipViewModelMapper.ts
+│       ├── EntityKeyViewModelMapper.ts
+│       ├── EntityPrivilegeViewModelMapper.ts
+│       └── GlobalOptionSetViewModelMapper.ts
 │
 ├── infrastructure/
-│   └── repositories/
-│       └── DataverseMetadataRepository.ts
+│   ├── repositories/
+│   │   └── DataverseEntityMetadataRepository.ts
+│   └── dtos/
+│       ├── EntityDefinitionDto.ts
+│       ├── AttributeDto.ts
+│       ├── RelationshipDto.ts
+│       ├── EntityKeyDto.ts
+│       ├── PrivilegeDto.ts
+│       └── GlobalOptionSetDto.ts
 │
 └── presentation/
     ├── panels/
     │   └── MetadataBrowserPanel.ts
-    └── views/
-        └── metadataBrowserView.ts            # HTML generation (extracted from panel)
+    ├── sections/
+    │   ├── MetadataTreeSection.ts
+    │   ├── MetadataTabsSection.ts
+    │   └── MetadataDetailSection.ts
+    └── renderers/ (TypeScript → compiled to JS)
+        ├── MetadataTreeRenderer.ts
+        ├── MetadataTabsRenderer.ts
+        └── MetadataDetailRenderer.ts
 ```
 
-**New Files:** ~40 files
-**Modified Files:** 0 existing files (new feature)
-**Total:** ~40 files for this feature
+**New Files:** 47 files
+**Modified Files:**
+- `src/shared/infrastructure/ui/behaviors/SectionCompositionBehavior.ts` (add three-panel template)
+- `src/shared/infrastructure/ui/types/PanelLayout.ts` (already has ThreePanel enum)
+**Total:** 49 files for this feature
 
 ---
 
@@ -2396,207 +2721,146 @@ src/features/metadataBrowser/
 ### Domain Tests (Target: 100% coverage)
 
 ```typescript
-// Test entity behavior
 describe('EntityMetadata', () => {
-  describe('isCustomEntity', () => {
-    it('should return true for custom entity with prefix', () => {
+  describe('isSystemEntity', () => {
+    it('should return true when isCustomEntity is false', () => {
       const entity = new EntityMetadata(
-        'guid',
-        'new_customentity',
-        'CustomEntity',
-        'Custom Entity',
-        '',
-        'new_customentities',
-        'new_customentityid',
+        LogicalName.create('account'),
+        SchemaName.create('Account'),
+        DisplayName.create('Account'),
+        DisplayName.create('Accounts'),
         null,
-        false,
-        true,
-        10001
-      );
-
-      expect(entity.isCustomEntity()).toBe(true);
-    });
-
-    it('should return false for system entity without prefix', () => {
-      const entity = new EntityMetadata(
-        'guid',
-        'account',
-        'Account',
-        'Account',
-        '',
         'accounts',
+        false, // isCustomEntity = false
+        1,
         'accountid',
         'name',
-        false,
-        true,
-        1
+        OwnershipType.UserOwned,
+        []
       );
 
-      expect(entity.isCustomEntity()).toBe(false);
+      expect(entity.isSystemEntity()).toBe(true);
+    });
+
+    it('should return false when isCustomEntity is true', () => {
+      const entity = new EntityMetadata(
+        LogicalName.create('new_customentity'),
+        SchemaName.create('new_customentity'),
+        DisplayName.create('Custom Entity'),
+        DisplayName.create('Custom Entities'),
+        null,
+        'new_customentities',
+        true, // isCustomEntity = true
+        10001,
+        'new_customentityid',
+        'new_name',
+        OwnershipType.UserOwned,
+        []
+      );
+
+      expect(entity.isSystemEntity()).toBe(false);
     });
   });
 
-  describe('getIcon', () => {
-    it('should return custom icon for custom entity', () => {
-      const entity = new EntityMetadata(/* custom entity params */);
-      expect(entity.getIcon()).toBe('🏷️');
-    });
+  describe('getAttributeCount', () => {
+    it('should return correct attribute count', () => {
+      const attributes = [
+        createTestAttribute('attr1'),
+        createTestAttribute('attr2'),
+        createTestAttribute('attr3')
+      ];
 
-    it('should return system icon for system entity', () => {
-      const entity = new EntityMetadata(/* system entity params */);
-      expect(entity.getIcon()).toBe('📋');
+      const entity = createTestEntity({ attributes });
+
+      expect(entity.getAttributeCount()).toBe(3);
     });
   });
 
-  describe('validateInvariants', () => {
-    it('should throw ValidationError when logicalName is empty', () => {
-      expect(() => {
-        new EntityMetadata('guid', '', 'Schema', 'Display', '', 'set', 'id', null, false, true, 1);
-      }).toThrow(ValidationError);
+  describe('getAttributesByType', () => {
+    it('should filter attributes by type', () => {
+      const stringAttr = createTestAttribute('name', 'String');
+      const lookupAttr = createTestAttribute('parentaccountid', 'Lookup');
+      const integerAttr = createTestAttribute('numberofemployees', 'Integer');
+
+      const entity = createTestEntity({
+        attributes: [stringAttr, lookupAttr, integerAttr]
+      });
+
+      const lookupAttributes = entity.getAttributesByType(AttributeType.create('Lookup'));
+
+      expect(lookupAttributes).toHaveLength(1);
+      expect(lookupAttributes[0].getLogicalName().getValue()).toBe('parentaccountid');
     });
   });
 });
 
 describe('AttributeMetadata', () => {
   describe('isRequired', () => {
+    it('should return true for ApplicationRequired', () => {
+      const attribute = createTestAttribute('name', 'String', 'ApplicationRequired');
+
+      expect(attribute.isRequired()).toBe(true);
+    });
+
     it('should return true for SystemRequired', () => {
-      const attribute = new AttributeMetadata(
-        'guid',
-        'name',
-        'Name',
-        'Name',
-        '',
-        'String',
-        'StringType',
-        RequiredLevel.SystemRequired,
-        false,
-        false,
-        false,
-        false
-      );
+      const attribute = createTestAttribute('accountid', 'Uniqueidentifier', 'SystemRequired');
 
       expect(attribute.isRequired()).toBe(true);
     });
 
     it('should return false for None', () => {
-      const attribute = new AttributeMetadata(/* params with RequiredLevel.None */);
+      const attribute = createTestAttribute('description', 'Memo', 'None');
+
       expect(attribute.isRequired()).toBe(false);
     });
   });
 
-  describe('getMaxLengthDisplay', () => {
-    it('should return number as string when maxLength exists', () => {
-      const attribute = new AttributeMetadata(/* params with maxLength: 100 */);
-      expect(attribute.getMaxLengthDisplay()).toBe('100');
-    });
-
-    it('should return dash when maxLength is null', () => {
-      const attribute = new AttributeMetadata(/* params with maxLength: null */);
-      expect(attribute.getMaxLengthDisplay()).toBe('-');
-    });
-  });
-});
-
-describe('KeyMetadata', () => {
-  describe('isPrimaryKey', () => {
-    it('should return true for single attribute key', () => {
-      const key = new KeyMetadata('guid', 'key', 'Key', 'Key', ['accountid'], false, 'Active');
-      expect(key.isPrimaryKey()).toBe(true);
-    });
-
-    it('should return false for multiple attribute key', () => {
-      const key = new KeyMetadata('guid', 'key', 'Key', 'Key', ['field1', 'field2'], false, 'Active');
-      expect(key.isPrimaryKey()).toBe(false);
-    });
-  });
-
-  describe('validateInvariants', () => {
-    it('should throw ValidationError when keyAttributes is empty', () => {
-      expect(() => {
-        new KeyMetadata('guid', 'key', 'Key', 'Key', [], false, 'Active');
-      }).toThrow(ValidationError);
-    });
-  });
-});
-
-describe('RelationshipMetadata', () => {
-  describe('getRelatedEntityDisplay', () => {
-    it('should return single entity for 1:N relationship', () => {
-      const rel = new RelationshipMetadata(
-        'guid',
-        'account_contact',
-        RelationshipType.OneToMany,
-        'account',
-        'contact',
-        'parentaccountid',
+  describe('getTypeDisplay', () => {
+    it('should return formatted lookup type with target entity', () => {
+      const attribute = new AttributeMetadata(
+        LogicalName.create('parentaccountid'),
+        SchemaName.create('ParentAccountId'),
+        DisplayName.create('Parent Account'),
+        null,
+        AttributeType.create('Lookup'),
         false,
-        false
+        RequiredLevel.create('None'),
+        LogicalName.create('account'),
+        null,
+        null,
+        LogicalName.create('account'), // lookup target
+        null
       );
 
-      expect(rel.getRelatedEntityDisplay()).toBe('account');
+      expect(attribute.getTypeDisplay()).toBe('Lookup (account)');
     });
 
-    it('should return both entities with separator for N:N relationship', () => {
-      const rel = new RelationshipMetadata(
-        'guid',
-        'account_contact',
-        RelationshipType.ManyToMany,
-        '',
-        '',
-        '',
-        false,
-        false,
-        'account',
-        'contact',
-        'accountcontact'
-      );
+    it('should return simple type display for non-lookup', () => {
+      const attribute = createTestAttribute('name', 'String');
 
-      expect(rel.getRelatedEntityDisplay()).toBe('account ↔ contact');
-    });
-  });
-
-  describe('getNavigableEntityNames', () => {
-    it('should return single entity for 1:N relationship', () => {
-      const rel = new RelationshipMetadata(/* 1:N params */);
-      expect(rel.getNavigableEntityNames()).toEqual(['account']);
-    });
-
-    it('should return both entities for N:N relationship', () => {
-      const rel = new RelationshipMetadata(/* N:N params */);
-      expect(rel.getNavigableEntityNames()).toEqual(['account', 'contact']);
+      expect(attribute.getTypeDisplay()).toBe('String');
     });
   });
 });
 
-describe('PrivilegeMetadata', () => {
-  describe('getDepthLabel', () => {
-    it('should return comma-separated depth levels', () => {
-      const priv = new PrivilegeMetadata('guid', 'prvRead', 'Read', true, true, false, false);
-      expect(priv.getDepthLabel()).toBe('Basic, Local');
+describe('LogicalName', () => {
+  describe('create', () => {
+    it('should create valid logical name', () => {
+      const logicalName = LogicalName.create('account');
+
+      expect(logicalName.getValue()).toBe('account');
     });
 
-    it('should return None when no depth levels available', () => {
-      const priv = new PrivilegeMetadata('guid', 'prvRead', 'Read', false, false, false, false);
-      expect(priv.getDepthLabel()).toBe('None');
-    });
-  });
-});
-
-describe('ChoiceMetadata', () => {
-  describe('getOptionCount', () => {
-    it('should return number of options', () => {
-      const options = [
-        new OptionMetadata(1, 'Option 1', '', null, false),
-        new OptionMetadata(2, 'Option 2', '', null, false)
-      ];
-      const choice = new ChoiceMetadata('guid', 'status', 'Status', '', true, false, true, options);
-
-      expect(choice.getOptionCount()).toBe(2);
+    it('should throw error for empty string', () => {
+      expect(() => LogicalName.create('')).toThrow('Logical name cannot be empty');
     });
 
-    it('should return 0 when no options', () => {
-      const choice = new ChoiceMetadata('guid', 'status', 'Status', '', true, false, true, []);
-      expect(choice.getOptionCount()).toBe(0);
+    it('should throw error for uppercase letters', () => {
+      expect(() => LogicalName.create('Account')).toThrow('Logical name must be lowercase with no spaces');
+    });
+
+    it('should throw error for spaces', () => {
+      expect(() => LogicalName.create('new entity')).toThrow('Logical name must be lowercase with no spaces');
     });
   });
 });
@@ -2605,217 +2869,178 @@ describe('ChoiceMetadata', () => {
 ### Application Tests (Target: 90% coverage)
 
 ```typescript
-// Test use case orchestration
 describe('LoadEntityTreeUseCase', () => {
   let useCase: LoadEntityTreeUseCase;
-  let mockRepository: jest.Mocked<IMetadataRepository>;
+  let mockRepository: jest.Mocked<IEntityMetadataRepository>;
   let mockLogger: jest.Mocked<ILogger>;
 
   beforeEach(() => {
     mockRepository = {
-      getEntityDefinitions: jest.fn(),
-      getGlobalOptionSets: jest.fn(),
-      getCompleteEntityMetadata: jest.fn(),
-      getEntityAttributes: jest.fn(),
-      getEntityKeys: jest.fn(),
-      getEntityRelationships: jest.fn(),
-      getEntityPrivileges: jest.fn(),
-      getOptionSetMetadata: jest.fn(),
-      clearCache: jest.fn()
-    };
-
+      getAllEntities: jest.fn()
+    } as any;
     mockLogger = {
       info: jest.fn(),
-      error: jest.fn(),
       debug: jest.fn(),
-      warn: jest.fn(),
-      trace: jest.fn()
-    };
-
+      error: jest.fn()
+    } as any;
     useCase = new LoadEntityTreeUseCase(mockRepository, mockLogger);
   });
 
-  it('should orchestrate entity and choice loading', async () => {
+  it('should load entity tree and map to ViewModels', async () => {
     const entities = [
-      new EntityMetadata('guid1', 'account', 'Account', 'Account', '', 'accounts', 'accountid', 'name', false, true, 1),
-      new EntityMetadata('guid2', 'contact', 'Contact', 'Contact', '', 'contacts', 'contactid', 'fullname', false, true, 2)
+      createTestEntity({ logicalName: 'account', isCustom: false }),
+      createTestEntity({ logicalName: 'new_customentity', isCustom: true })
     ];
 
-    const choices = [
-      new ChoiceMetadata('guid3', 'status', 'Status', '', true, false, true, [])
-    ];
-
-    mockRepository.getEntityDefinitions.mockResolvedValue(entities);
-    mockRepository.getGlobalOptionSets.mockResolvedValue(choices);
+    mockRepository.getAllEntities.mockResolvedValue(entities);
 
     const result = await useCase.execute('env-123');
 
-    expect(mockRepository.getEntityDefinitions).toHaveBeenCalledWith('env-123');
-    expect(mockRepository.getGlobalOptionSets).toHaveBeenCalledWith('env-123');
-    expect(result.entities).toHaveLength(2);
-    expect(result.choices).toHaveLength(1);
-    expect(mockLogger.info).toHaveBeenCalledWith('Entity tree loaded', expect.any(Object));
+    expect(mockRepository.getAllEntities).toHaveBeenCalledWith('env-123');
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('account');
+    expect(result[0].isCustom).toBe(false);
+    expect(result[1].id).toBe('new_customentity');
+    expect(result[1].isCustom).toBe(true);
   });
 
-  it('should sort entities by logical name', async () => {
-    const entities = [
-      new EntityMetadata('guid1', 'contact', 'Contact', 'Contact', '', 'contacts', 'contactid', 'fullname', false, true, 2),
-      new EntityMetadata('guid2', 'account', 'Account', 'Account', '', 'accounts', 'accountid', 'name', false, true, 1)
-    ];
+  it('should log loading events', async () => {
+    mockRepository.getAllEntities.mockResolvedValue([]);
 
-    mockRepository.getEntityDefinitions.mockResolvedValue(entities);
-    mockRepository.getGlobalOptionSets.mockResolvedValue([]);
+    await useCase.execute('env-123');
 
-    const result = await useCase.execute('env-123');
-
-    expect(result.entities[0].logicalName).toBe('account');
-    expect(result.entities[1].logicalName).toBe('contact');
-  });
-
-  it('should throw error when repository fails', async () => {
-    mockRepository.getEntityDefinitions.mockRejectedValue(new Error('API error'));
-
-    await expect(useCase.execute('env-123')).rejects.toThrow('API error');
-    expect(mockLogger.error).toHaveBeenCalled();
+    expect(mockLogger.info).toHaveBeenCalledWith('Loading entity tree', { environmentId: 'env-123' });
+    expect(mockLogger.info).toHaveBeenCalledWith('Entity tree loaded', { count: 0 });
   });
 });
 
-describe('LoadEntityMetadataUseCase', () => {
-  let useCase: LoadEntityMetadataUseCase;
-  let mockRepository: jest.Mocked<IMetadataRepository>;
-  let mockLogger: jest.Mocked<ILogger>;
+describe('EntityAttributeViewModelMapper', () => {
+  it('should map AttributeMetadata to ViewModel', () => {
+    const attribute = createTestAttribute('name', 'String', 'ApplicationRequired');
 
-  beforeEach(() => {
-    mockRepository = {
-      getEntityDefinitions: jest.fn(),
-      getGlobalOptionSets: jest.fn(),
-      getCompleteEntityMetadata: jest.fn(),
-      getEntityAttributes: jest.fn(),
-      getEntityKeys: jest.fn(),
-      getEntityRelationships: jest.fn(),
-      getEntityPrivileges: jest.fn(),
-      getOptionSetMetadata: jest.fn(),
-      clearCache: jest.fn()
-    };
+    const viewModel = EntityAttributeViewModelMapper.toViewModel(attribute);
 
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      warn: jest.fn(),
-      trace: jest.fn()
-    };
-
-    useCase = new LoadEntityMetadataUseCase(mockRepository, mockLogger);
+    expect(viewModel.logicalName).toBe('name');
+    expect(viewModel.type).toBe('String');
+    expect(viewModel.isRequired).toBe(true);
+    expect(viewModel.isCustom).toBe(false);
   });
 
-  it('should orchestrate complete entity metadata loading', async () => {
-    const entity = new EntityMetadata('guid', 'account', 'Account', 'Account', '', 'accounts', 'accountid', 'name', false, true, 1);
-    const attributes = [
-      new AttributeMetadata('guid1', 'name', 'Name', 'Name', '', 'String', 'StringType', RequiredLevel.None, false, false, false, false, 100)
-    ];
-    const keys: KeyMetadata[] = [];
-    const relationships: RelationshipMetadata[] = [];
-    const privileges: PrivilegeMetadata[] = [];
+  it('should format maxLength as string', () => {
+    const attribute = new AttributeMetadata(
+      LogicalName.create('name'),
+      SchemaName.create('Name'),
+      DisplayName.create('Name'),
+      null,
+      AttributeType.create('String'),
+      false,
+      RequiredLevel.create('None'),
+      LogicalName.create('account'),
+      100, // maxLength
+      null,
+      null,
+      null
+    );
 
-    const completeMetadata: CompleteEntityMetadata = {
-      entity,
-      attributes,
-      keys,
-      relationships,
-      privileges
-    };
+    const viewModel = EntityAttributeViewModelMapper.toViewModel(attribute);
 
-    mockRepository.getCompleteEntityMetadata.mockResolvedValue(completeMetadata);
+    expect(viewModel.maxLength).toBe('100');
+  });
 
-    const result = await useCase.execute({
-      environmentId: 'env-123',
-      entityLogicalName: 'account'
+  it('should handle null maxLength', () => {
+    const attribute = createTestAttribute('description', 'Memo');
+
+    const viewModel = EntityAttributeViewModelMapper.toViewModel(attribute);
+
+    expect(viewModel.maxLength).toBeNull();
+  });
+});
+```
+
+### Infrastructure Tests (Optional - only for complex logic)
+
+Test repository mapping logic if complex. Skip simple pass-through code.
+
+```typescript
+describe('DataverseEntityMetadataRepository', () => {
+  describe('mapAttributeToDomain', () => {
+    it('should map attribute DTO to domain entity', () => {
+      const dto: AttributeDto = {
+        LogicalName: 'name',
+        SchemaName: 'Name',
+        DisplayName: { UserLocalizedLabel: { Label: 'Account Name' } },
+        Description: null,
+        AttributeType: 'String',
+        IsCustomAttribute: false,
+        RequiredLevel: { Value: 'ApplicationRequired' },
+        MaxLength: 100,
+        Format: null,
+        Targets: null,
+        OptionSet: null
+      };
+
+      const repository = new DataverseEntityMetadataRepository(mockApiService, mockLogger);
+      const attribute = (repository as any).mapAttributeToDomain(dto, 'account');
+
+      expect(attribute.getLogicalName().getValue()).toBe('name');
+      expect(attribute.getType().getValue()).toBe('String');
+      expect(attribute.isRequired()).toBe(true);
+      expect(attribute.getMaxLength()).toBe(100);
     });
-
-    expect(mockRepository.getCompleteEntityMetadata).toHaveBeenCalledWith('env-123', 'account');
-    expect(result.attributes).toHaveLength(1);
-    expect(mockLogger.info).toHaveBeenCalledWith('Entity metadata loaded', expect.any(Object));
   });
 });
 ```
 
 ### Manual Testing Scenarios
 
-1. **Happy path - Browse and view entity metadata:**
-   - Open Metadata Browser panel
-   - Select environment from dropdown
-   - See tree populated with 300+ tables and choices
-   - Type "account" in search box → See filtered results
-   - Click "Account" entity → See attributes table with 50+ attributes
-   - Expand Keys section → See primary key
-   - Expand Relationships section → See 1:N and N:1 relationships
-   - Expand Privileges section → See CRUD privileges
+1. **Happy path: Browse entity metadata**
+   - Open Metadata Browser for environment
+   - Select "account" entity in tree
+   - View attributes tab (should show all account attributes)
+   - Switch to Relationships tab (should show all relationships)
+   - Switch to Keys tab (should show alternate keys)
+   - Switch to Privileges tab (should show security privileges)
+   - Click attribute display name (should open detail panel)
+   - Close detail panel
 
-2. **Happy path - Drill down into attribute details:**
-   - Select entity (e.g., "Account")
-   - Right-click on "name" attribute → Click "View Details"
-   - See detail panel open on right side
-   - See Properties tab showing all attribute properties in flat table
-   - Click "Raw Data" tab → See JSON structure
-   - Press Ctrl+A → See all text selected
-   - Click X button → See detail panel close
+2. **Edge case: Large entity (1000+ attributes)**
+   - Select entity with many attributes (e.g., custom entity with extensive metadata)
+   - Verify table loads in < 2 seconds
+   - Verify scroll performance is smooth
 
-3. **Happy path - Navigate to related entity:**
-   - Select entity (e.g., "Contact")
-   - Expand Relationships section
-   - Right-click on "account_contact" relationship → Click "Open Related Entity"
-   - See "Account" entity load with its metadata
+3. **Edge case: Empty environment**
+   - Connect to environment with no custom entities
+   - Verify tree shows only system entities
+   - Verify no errors
 
-4. **Happy path - Browse choices:**
-   - Click "Status" choice in tree
-   - See Choice Values section expand
-   - See option values (Active, Inactive) in table
+4. **Error case: API failure**
+   - Disconnect network
+   - Refresh entity tree
+   - Verify error message displayed
+   - Reconnect network and retry
 
-5. **Error case - Invalid environment:**
-   - Select environment with invalid credentials
-   - See error notification: "Failed to load tables and choices"
-
-6. **Edge case - Large entity with 100+ attributes:**
-   - Select "Opportunity" entity
-   - See all attributes load within 3 seconds
-   - Scroll through attributes table → Verify sorting and filtering work
-
-7. **Persistence - Preferences saved per environment:**
-   - Collapse Keys section
-   - Resize detail panel split ratio to 60/40
-   - Collapse left panel
-   - Switch to different environment
-   - Switch back to original environment
-   - Verify: Keys section collapsed, split ratio 60/40, left panel collapsed
+5. **Search functionality**
+   - Type "account" in search box
+   - Verify tree filters instantly (client-side)
+   - Verify search highlights matches
 
 ---
 
 ## Dependencies & Prerequisites
 
 ### External Dependencies
-- [ ] VS Code APIs: Webview, SecretStorage, Commands
-- [ ] NPM packages: None (uses existing dependencies)
-- [ ] Dataverse APIs:
-  - GET EntityDefinitions
-  - GET EntityDefinitions(LogicalName)/Attributes (with type casting for OptionSet expansion)
-  - GET EntityDefinitions(LogicalName)/Keys
-  - GET EntityDefinitions(LogicalName)/OneToManyRelationships
-  - GET EntityDefinitions(LogicalName)/ManyToOneRelationships
-  - GET EntityDefinitions(LogicalName)/ManyToManyRelationships
-  - GET EntityDefinitions(LogicalName)/Privileges
-  - GET GlobalOptionSetDefinitions
-  - GET GlobalOptionSetDefinitions(Name)
+- [ ] VS Code APIs: Webview, WebviewPanel
+- [ ] Dataverse Web API: EntityDefinitions endpoint
+- [ ] No new NPM packages required
 
 ### Internal Prerequisites
-- [ ] Existing panel framework (BasePanel, ComponentFactory, PanelComposer)
-- [ ] Existing components (EnvironmentSelector, ActionBar, DataTable, JsonViewer, SplitPanel)
-- [ ] StateManager for per-environment preferences
-- [ ] Logger for diagnostics
-- [ ] AuthenticationService for token acquisition
+- [ ] `PanelCoordinator` framework (exists)
+- [ ] `SectionCompositionBehavior` (needs three-panel layout added)
+- [ ] `IDataverseApiService` (exists)
+- [ ] `ILogger` (exists)
 
 ### Breaking Changes
-- [ ] None (new feature)
+- [ ] None
 
 ---
 
@@ -2844,7 +3069,7 @@ describe('LoadEntityMetadataUseCase', () => {
 
 **Presentation Layer:**
 - [x] Panels use use cases only (NO business logic)
-- [x] HTML extracted to separate view files
+- [x] HTML extracted to separate view files (sections/renderers)
 - [x] Dependencies point inward (pres → app → domain)
 - [x] Logging for user actions
 
@@ -2858,17 +3083,22 @@ describe('LoadEntityMetadataUseCase', () => {
 
 ## Extension Integration Checklist
 
+**REQUIRED for all panels/commands:**
+
 **Commands (for package.json):**
 - [ ] Command ID defined: `power-platform-dev-suite.metadataBrowser`
-- [ ] Command title specified: "Power Platform: Metadata Browser"
-- [ ] Command added to `"contributes.commands"` array
+- [ ] Command ID (pick environment): `power-platform-dev-suite.metadataBrowserPickEnvironment`
+- [ ] Command titles specified
+- [ ] Activation events defined
+- [ ] Commands added to `"contributes.commands"` array
 
 **Extension Registration (for extension.ts):**
 - [ ] Feature initializer function created (`initializeMetadataBrowser()`)
-- [ ] Lazy imports with dynamic `import()` for performance
-- [ ] Command handler registered
-- [ ] Command added to `context.subscriptions`
-- [ ] Error handling in command handler
+- [ ] Lazy imports with dynamic `import()`
+- [ ] Command handlers registered (both direct and pick-environment)
+- [ ] Commands added to `context.subscriptions`
+- [ ] Error handling in command handlers
+- [ ] Environment picker logic implemented
 
 **Verification:**
 - [ ] `npm run compile` passes after package.json changes
@@ -2879,78 +3109,50 @@ describe('LoadEntityMetadataUseCase', () => {
 
 ## Key Architectural Decisions
 
-### Decision 1: Rich Domain Models vs Anemic DTOs
-**Considered:** Anemic DTOs with logic in use cases
-**Chosen:** Rich domain entities with behavior methods
+### Decision 1: Three-Panel Layout
+**Considered:** Two-panel layout (tree + tabs), separate detail window
+**Chosen:** Three-panel layout (tree + tabs + detail)
 **Rationale:**
-- Business logic centralized in entities (single source of truth)
-- Reduces duplication across use cases
-- Easier to test (pure business logic)
-- Follows Clean Architecture principles
-**Tradeoffs:** Slightly more complex entity classes, but much simpler use cases and mappers
+- Keeps all metadata visible in single view
+- No context switching between windows
+- Pattern familiar from IDEs (VS Code, IntelliJ)
+**Tradeoffs:**
+- More complex layout code (new template in SectionCompositionBehavior)
+- Requires CSS grid for responsive behavior
+- Gained: Better UX, all info visible simultaneously
 
-### Decision 2: Parallel API Fetching for Entity Metadata
-**Considered:** Sequential API calls, Single API call with all data
-**Chosen:** Parallel Promise.all() for attributes, keys, relationships, privileges
+### Decision 2: Client-Side Tab Switching
+**Considered:** Backend call per tab, full page refresh per tab
+**Chosen:** Client-side tab switching (no backend call)
 **Rationale:**
-- Significant performance improvement (3x faster)
-- Dataverse API doesn't support $expand for all sections in single call
-- User experience: faster loading times
-**Tradeoffs:** Slightly more complex repository code, but worth the performance gain
+- Instant feedback (no network latency)
+- Preserves scroll position and selection
+- Reduces API calls
+**Tradeoffs:**
+- Requires all tab data loaded upfront
+- Gained: Better performance and UX
 
-### Decision 3: Client-Side Caching with 5-Minute Timeout
-**Considered:** No caching, Server-side caching, Infinite client-side caching
-**Chosen:** Client-side caching with 5-minute timeout
+### Decision 3: Repository Returns Full Entities
+**Considered:** Repository returns DTOs, use cases map to domain
+**Chosen:** Repository returns domain entities
 **Rationale:**
-- Reduces API calls for repeated views
-- 5-minute timeout balances freshness vs performance
-- User can manually refresh to bypass cache
-**Tradeoffs:** Stale data possible (mitigated by refresh button)
+- Infrastructure layer owns DTO → domain mapping
+- Use cases work with rich domain entities (business logic available)
+- Follows dependency inversion (infra implements domain contract)
+**Tradeoffs:**
+- Repository has more responsibility (mapping logic)
+- Gained: Clean separation, use cases work with rich models
 
-### Decision 4: Repository Interface in Domain Layer
-**Considered:** Repository interface in infrastructure layer
-**Chosen:** Repository interface in domain layer (IMetadataRepository)
+### Decision 4: Tree Search is Client-Side
+**Considered:** Backend filtering via API, client-side filtering
+**Chosen:** Client-side filtering
 **Rationale:**
-- Dependency inversion (domain defines contract, infrastructure implements)
-- Domain has zero infrastructure dependencies
-- Easy to test with mocks
-**Tradeoffs:** None (this is standard Clean Architecture pattern)
-
-### Decision 5: ViewModels as Simple DTOs (No Behavior)
-**Considered:** ViewModels with behavior methods
-**Chosen:** ViewModels as simple DTOs (readonly interfaces)
-**Rationale:**
-- Clear separation: Domain = behavior, ViewModels = data shape for UI
-- Mappers handle transformation only
-- Simpler to serialize and send to webview
-**Tradeoffs:** None (this is standard Clean Architecture pattern)
-
-### Decision 6: Entity/Choice Tree Rendering in JavaScript (Not Component)
-**Considered:** Creating reusable TreeViewComponent
-**Chosen:** Custom tree rendering in panel JavaScript behavior
-**Rationale:**
-- Tree has specific requirements (icons, search, dual sections)
-- Not reusable across other panels (metadata-specific)
-- Simpler to implement custom rendering inline
-**Tradeoffs:** Code is panel-specific (acceptable for unique UI)
-
-### Decision 7: Detail Panel with Split Panel Behavior
-**Considered:** Modal dialog for details, Separate panel for details
-**Chosen:** Resizable split panel (middle + right) using SplitPanelBehavior
-**Rationale:**
-- Allows side-by-side viewing (table + details)
-- User can resize split ratio
-- Consistent with other panels (plugin traces, solution explorer)
-**Tradeoffs:** More complex UI layout (acceptable for power users)
-
-### Decision 8: Context Menu for Actions (Not Inline Buttons)
-**Considered:** Inline action buttons in table rows
-**Chosen:** Context menu (right-click) for actions
-**Rationale:**
-- Reduces visual clutter in tables
-- Provides more actions without expanding table width
-- Consistent with VS Code UX patterns
-**Tradeoffs:** Slightly less discoverable (mitigated by tooltips)
+- Entity tree is small (typically < 1000 entities)
+- Instant feedback (no network latency)
+- Simpler implementation
+**Tradeoffs:**
+- All entities loaded upfront (acceptable for typical environments)
+- Gained: Better UX (instant search)
 
 ---
 
@@ -2966,36 +3168,44 @@ describe('LoadEntityMetadataUseCase', () => {
 - [ ] Slice 3 implemented and reviewed
 - [ ] Slice 4 implemented and reviewed
 - [ ] Slice 5 implemented and reviewed
-- [ ] Slice 6 implemented and reviewed
 
 ### Final Approval
 - [ ] All slices implemented
-- [ ] Tests written and passing (npm test ✅)
+- [ ] Tests written and passing (npm test)
 - [ ] Manual testing completed
 - [ ] Documentation updated (if new patterns)
 - [ ] code-guardian final approval
 
 **Status:** Pending
-**Approver:** TBD
-**Date:** TBD
+**Approver:** [Name]
+**Date:** [Date]
 
 ---
 
 ## Open Questions
 
-- [ ] Should we support entity metadata export to JSON/CSV? (Future enhancement)
-- [ ] Should we support solution-aware filtering (show only solution components)? (Future enhancement)
-- [ ] Should we cache metadata at workspace level or extension level? (Decided: Extension level with 5-minute timeout)
-- [ ] Should detail panel always start hidden or remember last state? (Decided: Always hidden - fresh start per entity)
-- [ ] Should we support global search across all entities (vs per-section search)? (Future enhancement)
+- [ ] **Question 1:** Should global option sets appear in tree under separate "Global Option Sets" node, or mixed with entities?
+  - **Recommendation:** Separate node for clarity
+
+- [ ] **Question 2:** Should detail panel show raw JSON option for advanced users?
+  - **Recommendation:** Yes, add "View JSON" button in detail panel (future enhancement)
+
+- [ ] **Question 3:** Should tree support multi-select for comparing multiple entities?
+  - **Recommendation:** No, keep simple for MVP. Can add in future enhancement.
+
+- [ ] **Question 4:** Should we cache entity metadata to avoid repeated API calls?
+  - **Recommendation:** Yes, add caching in Slice 6 (post-MVP). Cache invalidation on refresh.
+
+- [ ] **Question 5:** Should middle panel tables support sorting/filtering?
+  - **Recommendation:** Yes, reuse existing DataTableSection patterns which support sorting.
 
 ---
 
 ## References
 
-- Related features: Plugin Trace Viewer (uses similar 3-panel layout), Solution Explorer (uses tree navigation)
-- External documentation: [Dataverse Web API Metadata Reference](https://docs.microsoft.com/en-us/power-apps/developer/data-platform/webapi/web-api-metadata-operations)
-- Design inspiration: VS Code Symbol Explorer, Power Apps Maker Portal entity designer
-- Workflow guide: `.claude/workflows/DESIGN_WORKFLOW.md`
-- Architecture guide: `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md`
-- Panel guide: `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md`
+- Related features: Plugin Trace Viewer (split panel pattern)
+- External documentation: [Dataverse Web API - EntityDefinitions](https://docs.microsoft.com/en-us/power-apps/developer/data-platform/webapi/reference/entitymetadata)
+- Design inspiration: VS Code Explorer (three-panel layout)
+- Workflow guide: `.claude/WORKFLOW.md`
+- Panel patterns: `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md`
+- Clean Architecture: `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md`
