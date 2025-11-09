@@ -15,6 +15,7 @@ module.exports = (env, argv) => {
 			EnvironmentSetupBehavior: './resources/webview/js/behaviors/EnvironmentSetupBehavior.js',
 			DataTableBehavior: './resources/webview/js/behaviors/DataTableBehavior.js',
 			PluginTraceViewerBehavior: './resources/webview/js/behaviors/PluginTraceViewerBehavior.js',
+			MetadataBrowserBehavior: './resources/webview/js/behaviors/MetadataBrowserBehavior.js',
 			SolutionExplorerBehavior: './resources/webview/js/behaviors/SolutionExplorerBehavior.js',
 			ConnectionReferencesBehavior: './resources/webview/js/behaviors/ConnectionReferencesBehavior.js',
 			ImportJobViewerBehavior: './resources/webview/js/behaviors/ImportJobViewerBehavior.js',

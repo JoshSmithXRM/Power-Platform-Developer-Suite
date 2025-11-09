@@ -426,6 +426,30 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	const metadataBrowserCommand = vscode.commands.registerCommand('power-platform-dev-suite.metadataBrowser', async (environmentItem?: { envId: string }) => {
+		try {
+			void initializeMetadataBrowser(context, getEnvironments, dataverseApiServiceFactory, logger, environmentItem?.envId);
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Metadata Browser: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	const metadataBrowserPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.metadataBrowserPickEnvironment', async () => {
+		try {
+			await showEnvironmentPickerAndExecute(
+				environmentRepository,
+				'Select an environment to browse metadata',
+				async (envId) => initializeMetadataBrowser(context, getEnvironments, dataverseApiServiceFactory, logger, envId)
+			);
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				`Failed to open Metadata Browser: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
 	context.subscriptions.push(
 		outputChannel,
 		addEnvironmentCommand,
@@ -441,6 +465,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		environmentVariablesPickEnvironmentCommand,
 		pluginTraceViewerCommand,
 		pluginTraceViewerPickEnvironmentCommand,
+		metadataBrowserCommand,
+		metadataBrowserPickEnvironmentCommand,
 		removeEnvironmentCommand,
 		openMakerCommand,
 		openDynamicsCommand,
@@ -787,6 +813,45 @@ async function initializePluginTraceViewer(
 }
 
 /**
+ * Lazy-loads and initializes Metadata Browser panel.
+ */
+async function initializeMetadataBrowser(
+	context: vscode.ExtensionContext,
+	getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>,
+	dataverseApiServiceFactory: { getAccessToken: (envId: string) => Promise<string>; getDataverseUrl: (envId: string) => Promise<string> },
+	logger: ILogger,
+	initialEnvironmentId?: string
+): Promise<void> {
+	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js');
+	const { DataverseEntityMetadataRepository } = await import('./features/metadataBrowser/infrastructure/repositories/DataverseEntityMetadataRepository.js');
+	const { LoadEntityTreeUseCase } = await import('./features/metadataBrowser/application/useCases/LoadEntityTreeUseCase.js');
+	const { LoadEntityAttributesUseCase } = await import('./features/metadataBrowser/application/useCases/LoadEntityAttributesUseCase.js');
+	const { EntityTreeItemMapper } = await import('./features/metadataBrowser/application/mappers/EntityTreeItemMapper.js');
+	const { EntityAttributeMapper } = await import('./features/metadataBrowser/application/mappers/EntityAttributeMapper.js');
+	const { MetadataBrowserPanel } = await import('./features/metadataBrowser/presentation/panels/MetadataBrowserPanel.js');
+
+	const { getAccessToken, getDataverseUrl } = dataverseApiServiceFactory;
+	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
+
+	const entityMetadataRepository = new DataverseEntityMetadataRepository(dataverseApiService, logger);
+
+	const entityTreeMapper = new EntityTreeItemMapper();
+	const entityAttributeMapper = new EntityAttributeMapper();
+
+	const loadEntityTreeUseCase = new LoadEntityTreeUseCase(entityMetadataRepository, entityTreeMapper, logger);
+	const loadEntityAttributesUseCase = new LoadEntityAttributesUseCase(entityMetadataRepository, entityAttributeMapper, logger);
+
+	await MetadataBrowserPanel.createOrShow(
+		context.extensionUri,
+		getEnvironments,
+		loadEntityTreeUseCase,
+		loadEntityAttributesUseCase,
+		logger,
+		initialEnvironmentId
+	);
+}
+
+/**
  * Lazy-loads and initializes Persistence Inspector (development mode only).
  * Dynamic imports ensure production builds exclude this development-only feature entirely.
  */
@@ -858,7 +923,8 @@ class ToolsTreeProvider implements vscode.TreeDataProvider<ToolItem> {
 			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewer'),
 			new ToolItem('Connection References', 'View connection references and flows', 'connectionReferences', 'power-platform-dev-suite.connectionReferences'),
 			new ToolItem('Environment Variables', 'View environment variables', 'environmentVariables', 'power-platform-dev-suite.environmentVariables'),
-			new ToolItem('Plugin Traces', 'View and manage plugin trace logs', 'pluginTraceViewer', 'power-platform-dev-suite.pluginTraceViewer')
+			new ToolItem('Plugin Traces', 'View and manage plugin trace logs', 'pluginTraceViewer', 'power-platform-dev-suite.pluginTraceViewer'),
+			new ToolItem('Metadata Browser', 'Browse entity metadata and attributes', 'metadataBrowser', 'power-platform-dev-suite.metadataBrowser')
 		];
 	}
 }

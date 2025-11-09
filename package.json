@@ -166,6 +166,16 @@
                 "category": "Power Platform Developer Suite"
             },
             {
+                "command": "power-platform-dev-suite.metadataBrowser",
+                "title": "Metadata Browser",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.metadataBrowserPickEnvironment",
+                "title": "Metadata Browser: Choose Environment",
+                "category": "Power Platform Developer Suite"
+            },
+            {
                 "command": "power-platform-dev-suite.openPersistenceInspector",
                 "title": "Persistence Inspector (Dev Only)",
                 "category": "Power Platform Developer Suite",
