@@ -62,10 +62,11 @@ Infrastructure + Presentation Layers (adapters)
 **Reference Documents:**
 - `CLAUDE.md` - Project coding rules and architecture principles
 - `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Detailed patterns
+- `docs/architecture/PANEL_ARCHITECTURE.md` - Panel composition architecture (CRITICAL)
 - `docs/architecture/LOGGING_GUIDE.md` - Logging by layer
 - `docs/testing/TESTING_GUIDE.md` - Testing expectations
 - `.claude/templates/TECHNICAL_DESIGN_TEMPLATE.md` - Design doc format
-- `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` - Panel patterns
+- `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` - Panel decision guide
 
 ## Your Design Process (Outside-In)
 
@@ -81,37 +82,50 @@ Ask yourself:
 
 ### Step 2: Design Panel/UI (10-15 min)
 
-**Start here** - design from the user's perspective:
+**Start here** - design from the user's perspective using section composition:
 
-```html
-<!-- Create HTML mockup showing structure -->
-<div class="panel-container">
-  <div class="panel-controls">
-    <select id="envSelector"><!-- environments --></select>
-    <button id="refreshBtn">Refresh</button>
-  </div>
+**Modern Panel Architecture (PanelCoordinator + Sections):**
 
-  <div class="panel-content">
-    <table id="dataTable">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <!-- Rows populated dynamically -->
-    </table>
-  </div>
-</div>
+Panels are composed of **sections** orchestrated by **PanelCoordinator**:
+
+```typescript
+// Define sections needed for this panel
+const sections = [
+  new ActionButtonsSection({
+    buttons: [
+      { id: 'refresh', label: 'Refresh' },
+      { id: 'export', label: 'Export' }
+    ]
+  }, SectionPosition.Toolbar),
+
+  new EnvironmentSelectorSection(), // If panel operates within environment
+
+  new DataTableSection({
+    columns: [
+      { key: 'name', label: 'Name' },
+      { key: 'status', label: 'Status' }
+    ],
+    searchPlaceholder: '🔍 Search...'
+  })
+];
+
+// Compose into layout
+const composition = new SectionCompositionBehavior(
+  sections,
+  PanelLayout.SingleColumn
+);
 ```
 
 **Ask yourself:**
-- What components are needed? (selectors, tables, buttons)
-- What user interactions exist? (click, select, filter)
-- What state changes happen? (loading, empty, error, success)
+- What sections needed? (toolbar buttons, environment selector, table, filters)
+- Use shared sections or create custom?
+- Which layout? (SingleColumn [90%], SplitHorizontal, SplitVertical)
+- What commands will users trigger? (refresh, export, delete)
+- Operates within environment? (Include EnvironmentSelectorSection)
 
-**Output:** Panel mockup with component structure and interactions
+**Output:** Section composition design with layout choice
+
+**See:** `docs/architecture/PANEL_ARCHITECTURE.md` for comprehensive patterns
 
 ### Step 3: Define ViewModels (10-15 min)
 
@@ -386,11 +400,51 @@ export class ImportJobRepository implements IImportJobRepository {
 
 // ===== PRESENTATION LAYER =====
 
-export class ImportJobViewerPanel extends BasePanel {
-  private loadJobsUseCase: LoadImportJobsUseCase;
-  private viewXmlCommand: ViewJobXmlCommand;
+type ImportJobViewerCommands = 'refresh' | 'viewXml' | 'environmentChange';
 
-  /* ... */
+export class ImportJobViewerPanelComposed {
+  private readonly coordinator: PanelCoordinator<ImportJobViewerCommands>;
+  private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+
+  private createCoordinator(): {
+    coordinator: PanelCoordinator<ImportJobViewerCommands>;
+    scaffoldingBehavior: HtmlScaffoldingBehavior;
+  } {
+    // Define sections
+    const sections = [
+      new ActionButtonsSection({ buttons: [/*...*/] }),
+      new EnvironmentSelectorSection(),
+      new DataTableSection(config)
+    ];
+
+    // Compose and wrap in HTML scaffold
+    const composition = new SectionCompositionBehavior(sections, PanelLayout.SingleColumn);
+    const scaffolding = new HtmlScaffoldingBehavior(webview, composition, config);
+
+    // Create coordinator
+    const coordinator = new PanelCoordinator<ImportJobViewerCommands>({
+      panel, extensionUri, behaviors: [scaffolding], logger
+    });
+
+    return { coordinator, scaffoldingBehavior: scaffolding };
+  }
+
+  private registerCommandHandlers(): void {
+    this.coordinator.registerHandler('refresh', async () => {
+      await this.handleRefresh();
+    });
+  }
+
+  private async handleRefresh(): Promise<void> {
+    const jobs = await this.loadJobsUseCase.execute(environmentId);
+    const viewModels = jobs.map(j => this.mapper.toViewModel(j));
+
+    // Data-driven update (no HTML re-render!)
+    await this.panel.webview.postMessage({
+      command: 'updateTableData',
+      data: { viewModels, columns: this.config.columns }
+    });
+  }
 }
 ```
 
@@ -561,6 +615,101 @@ export class ImportJob {
 }
 ```
 
+### Pattern 5: Panel Composition Architecture
+
+**✅ GOOD - PanelCoordinator with section composition:**
+```typescript
+type FeaturePanelCommands = 'refresh' | 'export' | 'environmentChange';
+
+export class FeaturePanelComposed {
+  private readonly coordinator: PanelCoordinator<FeaturePanelCommands>;
+  private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+
+  private createCoordinator() {
+    // 1. Define sections (reusable UI components)
+    const sections = [
+      new ActionButtonsSection({
+        buttons: [
+          { id: 'refresh', label: 'Refresh' },
+          { id: 'export', label: 'Export' }
+        ]
+      }, SectionPosition.Toolbar),
+      new EnvironmentSelectorSection(), // Optional
+      new DataTableSection(config)
+    ];
+
+    // 2. Compose into layout
+    const composition = new SectionCompositionBehavior(
+      sections,
+      PanelLayout.SingleColumn
+    );
+
+    // 3. Wrap in HTML scaffold
+    const scaffolding = new HtmlScaffoldingBehavior(
+      this.panel.webview,
+      composition,
+      { cssUris, jsUris, cspNonce: getNonce(), title: 'Feature' }
+    );
+
+    // 4. Create coordinator
+    const coordinator = new PanelCoordinator<FeaturePanelCommands>({
+      panel: this.panel,
+      extensionUri: this.extensionUri,
+      behaviors: [scaffolding],
+      logger: this.logger
+    });
+
+    return { coordinator, scaffoldingBehavior: scaffolding };
+  }
+
+  private registerCommandHandlers(): void {
+    // Type-safe command registration
+    this.coordinator.registerHandler('refresh', async () => {
+      await this.handleRefresh();
+    });
+  }
+
+  private async handleRefresh(): Promise<void> {
+    const entities = await this.useCase.execute(envId);
+    const viewModels = entities.map(e => this.mapper.toViewModel(e));
+
+    // Data-driven update (no full HTML re-render!)
+    await this.panel.webview.postMessage({
+      command: 'updateTableData',
+      data: { viewModels, columns: this.config.columns }
+    });
+  }
+}
+```
+
+**❌ BAD - Manual HTML generation:**
+```typescript
+export class OldPanel {
+  private getHtml(): string {
+    // ❌ 800 lines of HTML strings
+    return `<html>...</html>`;
+  }
+
+  private handleMessage(message: any): void {
+    if (message.command === 'refresh') {
+      // ❌ Full HTML re-render (slow, flickers)
+      this.panel.webview.html = this.getHtml();
+    }
+  }
+}
+```
+
+**Key Points:**
+- Use **PanelCoordinator<TCommands>** for type-safe command handling
+- Compose **sections** (ActionButtonsSection, DataTableSection, custom sections)
+- Use **SectionCompositionBehavior** to arrange sections in layouts
+- Use **HtmlScaffoldingBehavior** to wrap in HTML document
+- **Data-driven updates** - send ViewModels via postMessage (no HTML re-renders)
+- Include **EnvironmentSelectorSection** if panel operates within environment (90% of panels)
+- Default layout: **PanelLayout.SingleColumn** (90% of panels)
+
+**See:** `docs/architecture/PANEL_ARCHITECTURE.md` for complete patterns and examples
+
 ## Design Checklist
 
 Before completing your design, verify:
@@ -587,10 +736,14 @@ Before completing your design, verify:
 - [ ] Mappers transform DTOs → domain entities
 
 **Presentation Layer:**
-- [ ] Panels use use cases (no business logic)
-- [ ] Components reusable where possible
-- [ ] Event handlers call use cases only
-- [ ] State managed properly
+- [ ] Panels use PanelCoordinator<TCommands> pattern
+- [ ] Sections defined (ActionButtonsSection, DataTableSection, custom sections)
+- [ ] Layout chosen (SingleColumn [default], SplitHorizontal, SplitVertical)
+- [ ] Command type defined (union of command strings)
+- [ ] Command handlers registered with coordinator
+- [ ] EnvironmentSelectorSection included if panel operates within environment
+- [ ] Data-driven updates via postMessage (no HTML re-renders)
+- [ ] Panels call use cases only (no business logic)
 
 **Type Contracts:**
 - [ ] All public method return types explicit

@@ -273,37 +273,185 @@ export class Dataverse[Entity]Repository implements I[Entity]Repository {
 
 ### Presentation Layer Types
 
-#### Panel
+#### Panel (PanelCoordinator Pattern)
+
+**See:** `docs/architecture/PANEL_ARCHITECTURE.md` for comprehensive guide
+
 ```typescript
-export class [Feature]Panel {
-  constructor(
+// Define command type (union of all commands)
+type [Feature]PanelCommands = 'refresh' | 'export' | 'delete' | 'environmentChange';
+
+export class [Feature]PanelComposed {
+  public static readonly viewType = 'powerPlatformDevSuite.[feature]';
+  private static panels = new Map<string, [Feature]PanelComposed>();
+
+  private readonly coordinator: PanelCoordinator<[Feature]PanelCommands>;
+  private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+  private currentEnvironmentId: string;
+
+  private constructor(
     private readonly panel: vscode.WebviewPanel,
+    private readonly extensionUri: vscode.Uri,
     private readonly useCase: [UseCase]UseCase,
     private readonly mapper: [Entity]ViewModelMapper,
-    private readonly logger: ILogger
-  ) {}
+    private readonly logger: ILogger,
+    environmentId: string
+  ) {
+    this.currentEnvironmentId = environmentId;
 
-  private async handleAction(params: ParamType): Promise<void> {
+    panel.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [extensionUri]
+    };
+
+    const result = this.createCoordinator();
+    this.coordinator = result.coordinator;
+    this.scaffoldingBehavior = result.scaffoldingBehavior;
+
+    this.registerCommandHandlers();
+
+    void this.initializeAndLoadData();
+  }
+
+  private createCoordinator(): {
+    coordinator: PanelCoordinator<[Feature]PanelCommands>;
+    scaffoldingBehavior: HtmlScaffoldingBehavior;
+  } {
+    // 1. Define sections
+    const sections = [
+      new ActionButtonsSection({
+        buttons: [
+          { id: 'refresh', label: 'Refresh' },
+          { id: 'export', label: 'Export' }
+        ]
+      }, SectionPosition.Toolbar),
+      new EnvironmentSelectorSection(), // Optional - if panel operates within environment
+      new DataTableSection({
+        viewType: [Feature]PanelComposed.viewType,
+        columns: [
+          { key: 'name', label: 'Name' },
+          { key: 'status', label: 'Status' }
+        ],
+        searchPlaceholder: '🔍 Search...',
+        noDataMessage: 'No items found.'
+      })
+    ];
+
+    // 2. Create composition behavior
+    const compositionBehavior = new SectionCompositionBehavior(
+      sections,
+      PanelLayout.SingleColumn // or SplitHorizontal, SplitVertical
+    );
+
+    // 3. Resolve CSS modules
+    const cssUris = resolveCssModules(
+      {
+        base: true,
+        components: ['buttons', 'inputs'],
+        sections: ['environment-selector', 'action-buttons', 'datatable']
+      },
+      this.extensionUri,
+      this.panel.webview
+    );
+
+    // 4. Create scaffolding behavior
+    const scaffoldingBehavior = new HtmlScaffoldingBehavior(
+      this.panel.webview,
+      compositionBehavior,
+      {
+        cssUris,
+        jsUris: [
+          this.panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
+          ).toString(),
+          this.panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
+          ).toString()
+        ],
+        cspNonce: getNonce(),
+        title: '[Feature]'
+      }
+    );
+
+    // 5. Create coordinator
+    const coordinator = new PanelCoordinator<[Feature]PanelCommands>({
+      panel: this.panel,
+      extensionUri: this.extensionUri,
+      behaviors: [scaffoldingBehavior],
+      logger: this.logger
+    });
+
+    return { coordinator, scaffoldingBehavior };
+  }
+
+  private registerCommandHandlers(): void {
+    this.coordinator.registerHandler('refresh', async () => {
+      await this.handleRefresh();
+    });
+
+    this.coordinator.registerHandler('environmentChange', async (data) => {
+      const environmentId = (data as { environmentId?: string })?.environmentId;
+      if (environmentId) {
+        await this.handleEnvironmentChange(environmentId);
+      }
+    });
+  }
+
+  private async handleRefresh(): Promise<void> {
+    this.logger.debug('Refreshing data');
+
     try {
-      this.logger.info('User action: [action]', { params });
-
       // 1. Call use case (returns domain entities)
-      const entities = await this.useCase.execute(params);
+      const entities = await this.useCase.execute(this.currentEnvironmentId);
 
-      // 2. Map to ViewModels (presentation DTOs)
-      const viewModels = this.mapper.toViewModels(entities);
+      // 2. Map to ViewModels
+      const viewModels = entities.map(e => this.mapper.toViewModel(e));
 
-      // 3. Send to webview
-      await this.sendMessage({ command: 'update', data: viewModels });
+      this.logger.info('Data loaded successfully', { count: viewModels.length });
 
-      this.logger.info('Action completed');
-    } catch (error) {
-      this.logger.error('Action failed', error);
-      await this.showError('Operation failed');
+      // 3. Send ViewModels to client (data-driven update - NO HTML re-render!)
+      await this.panel.webview.postMessage({
+        command: 'updateTableData',
+        data: {
+          viewModels,
+          columns: this.getTableConfig().columns
+        }
+      });
+    } catch (error: unknown) {
+      this.logger.error('Error refreshing data', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Failed to refresh: ${errorMessage}`);
     }
+  }
+
+  public static async createOrShow(/* ... */): Promise<[Feature]PanelComposed> {
+    // Singleton pattern per environment
+    const existingPanel = [Feature]PanelComposed.panels.get(environmentId);
+    if (existingPanel) {
+      existingPanel.panel.reveal();
+      return existingPanel;
+    }
+
+    const panel = vscode.window.createWebviewPanel(/* ... */);
+    const newPanel = new [Feature]PanelComposed(/* ... */);
+
+    [Feature]PanelComposed.panels.set(environmentId, newPanel);
+    panel.onDidDispose(() => {
+      [Feature]PanelComposed.panels.delete(environmentId);
+    });
+
+    return newPanel;
   }
 }
 ```
+
+**Key Architecture Decisions:**
+- **PanelCoordinator<TCommands>** - Type-safe command handling
+- **Sections** - Composable UI (ActionButtonsSection, DataTableSection, custom)
+- **SectionCompositionBehavior** - Arranges sections in layout
+- **HtmlScaffoldingBehavior** - Wraps in HTML document
+- **Data-driven updates** - postMessage with ViewModels (no HTML re-renders)
+- **EnvironmentSelectorSection** - Optional (include if panel operates within environment)
 
 ---
 
@@ -335,9 +483,10 @@ src/features/[featureName]/
 │
 └── presentation/
     ├── panels/
-    │   └── [Feature]Panel.ts        # Uses use cases, NO logic
-    └── views/
-        └── [feature]View.ts         # HTML generation (complete)
+    │   └── [Feature]PanelComposed.ts  # PanelCoordinator pattern (~300-400 lines)
+    └── sections/                      # Optional - custom sections
+        ├── [Feature]DetailSection.ts  # Feature-specific UI
+        └── [Feature]ControlsSection.ts
 ```
 
 **New Files:** [X] files
@@ -445,8 +594,14 @@ describe('[UseCase]', () => {
 - [ ] Logging for API calls
 
 **Presentation Layer:**
-- [ ] Panels use use cases only (NO business logic)
-- [ ] HTML extracted to separate view files
+- [ ] Panels use PanelCoordinator<TCommands> pattern
+- [ ] Command type defined (union of command strings)
+- [ ] Sections defined (ActionButtonsSection, DataTableSection, custom sections)
+- [ ] Layout chosen (SingleColumn [default], SplitHorizontal, SplitVertical)
+- [ ] Command handlers registered with coordinator
+- [ ] EnvironmentSelectorSection included if panel operates within environment
+- [ ] Data-driven updates via postMessage (no HTML re-renders)
+- [ ] Panels call use cases only (NO business logic)
 - [ ] Dependencies point inward (pres → app → domain)
 - [ ] Logging for user actions
 
