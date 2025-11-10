@@ -450,6 +450,75 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	// TEMPORARY: Benchmark query approaches
+	const benchmarkMetadataQueriesCommand = vscode.commands.registerCommand('power-platform-dev-suite.benchmarkMetadataQueries', async () => {
+		try {
+			const envs = await environmentRepository.getAll();
+			if (envs.length === 0) {
+				vscode.window.showErrorMessage('No environments configured');
+				return;
+			}
+
+			const items: QuickPickItemWithEnvId[] = envs.map((env: Environment) => ({
+				label: env.getName().getValue(),
+				description: env.getDataverseUrl().getValue(),
+				envId: env.getId().getValue()
+			}));
+
+			const selected = await vscode.window.showQuickPick(items, {
+				placeHolder: 'Select environment for benchmark test'
+			});
+
+			if (!selected) {
+				return;
+			}
+
+			vscode.window.showInformationMessage('Running benchmark... this will take a few seconds');
+
+			const { DataverseEntityMetadataRepository } = await import('./features/metadataBrowser/infrastructure/repositories/DataverseEntityMetadataRepository.js');
+			const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js');
+			const { LogicalName } = await import('./features/metadataBrowser/domain/valueObjects/LogicalName.js');
+
+			const dataverseApiService = new DataverseApiService(dataverseApiServiceFactory.getAccessToken, dataverseApiServiceFactory.getDataverseUrl, logger);
+			const repository = new DataverseEntityMetadataRepository(dataverseApiService, logger);
+
+			// Clear cache first
+			repository.clearCache();
+
+			// Run navigation properties approach (current)
+			const navStart = Date.now();
+			await repository.getEntityWithAttributes(selected.envId, LogicalName.create('account'));
+			const navTime = Date.now() - navStart;
+
+			// Clear cache again
+			repository.clearCache();
+
+			// Manually run $expand approach for comparison
+			const expandStart = Date.now();
+			const endpoint = `/api/data/v9.2/EntityDefinitions(LogicalName='account')?$expand=Attributes,OneToManyRelationships,ManyToOneRelationships,ManyToManyRelationships,Keys`;
+			await dataverseApiService.get(selected.envId, endpoint);
+			const expandTime = Date.now() - expandStart;
+
+			// Show results
+			const message = `Benchmark Results (Account entity):
+Navigation Properties: ${navTime}ms
+$expand: ${expandTime}ms
+Difference: ${Math.abs(navTime - expandTime)}ms ${navTime < expandTime ? '(Nav Props FASTER)' : '($expand FASTER)'}`;
+
+			vscode.window.showInformationMessage(message, { modal: true });
+			logger.info('Metadata query benchmark completed', {
+				navigationPropertiesMs: navTime,
+				expandMs: expandTime,
+				difference: Math.abs(navTime - expandTime),
+				faster: navTime < expandTime ? 'navigation' : 'expand'
+			});
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			vscode.window.showErrorMessage(`Benchmark failed: ${errorMessage}`);
+			logger.error('Benchmark failed', error);
+		}
+	});
+
 	context.subscriptions.push(
 		outputChannel,
 		addEnvironmentCommand,
@@ -471,6 +540,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		openMakerCommand,
 		openDynamicsCommand,
 		refreshEnvironmentsCommand,
+		benchmarkMetadataQueriesCommand,
 		eventPublisher
 	);
 
