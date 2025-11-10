@@ -1,0 +1,554 @@
+/**
+ * Metadata Browser Feature Styles
+ * Three-panel layout: Tree (left) | Tables (center) | Detail (right)
+ */
+
+/* ==================================================
+   Container Layout
+   ================================================== */
+
+.metadata-browser-container {
+	display: flex;
+	height: calc(100vh - 120px); /* Account for toolbar */
+	gap: 0;
+	overflow: hidden;
+}
+
+/* ==================================================
+   Left Sidebar - Tree View
+   ================================================== */
+
+.metadata-sidebar {
+	width: 300px;
+	min-width: 200px;
+	max-width: 500px;
+	border-right: 1px solid var(--vscode-panel-border);
+	display: flex;
+	flex-direction: column;
+	background: var(--vscode-sideBar-background);
+	overflow: hidden;
+}
+
+.tree-search-container {
+	padding: 8px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-sideBar-background);
+}
+
+.tree-search-input {
+	width: 100%;
+	padding: 6px 8px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 3px;
+	font-size: 13px;
+}
+
+.tree-search-input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.tree-container {
+	flex: 1;
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+/* Tree Sections */
+.tree-section {
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.tree-section-header {
+	display: flex;
+	align-items: center;
+	padding: 8px 12px;
+	cursor: pointer;
+	user-select: none;
+	background: var(--vscode-sideBarSectionHeader-background);
+	color: var(--vscode-sideBarSectionHeader-foreground);
+	font-weight: 600;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.tree-section-header:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.tree-section-icon {
+	margin-right: 6px;
+	font-size: 10px;
+	width: 12px;
+	text-align: center;
+}
+
+.tree-section-title {
+	flex: 1;
+}
+
+.tree-section-count {
+	padding: 2px 6px;
+	background: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	border-radius: 10px;
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.tree-section-content {
+	padding: 4px 0;
+}
+
+/* Tree Items */
+.tree-item {
+	display: flex;
+	align-items: center;
+	padding: 6px 12px 6px 24px;
+	cursor: pointer;
+	user-select: none;
+	color: var(--vscode-foreground);
+}
+
+.tree-item:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.tree-item.selected {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+.tree-item-icon {
+	margin-right: 8px;
+	font-size: 14px;
+}
+
+.tree-item-label {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-width: 0;
+}
+
+.tree-item-name {
+	font-size: 13px;
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tree-item-technical {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	margin-top: 2px;
+}
+
+/* ==================================================
+   Center Panel - Tabbed Content
+   ================================================== */
+
+.metadata-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	overflow: hidden;
+}
+
+/* Tab Navigation */
+.tab-navigation {
+	display: flex;
+	gap: 0;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-editor-background);
+	padding: 0 12px;
+}
+
+.tab-button {
+	padding: 10px 16px;
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 500;
+	transition: all 0.2s;
+}
+
+.tab-button:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.tab-button.active {
+	border-bottom-color: var(--vscode-focusBorder);
+	color: var(--vscode-textLink-activeForeground);
+}
+
+/* Tab Content */
+.tab-content-container {
+	flex: 1;
+	overflow: hidden;
+	position: relative;
+}
+
+.tab-panel {
+	display: none;
+	height: 100%;
+	overflow: hidden;
+}
+
+.tab-panel.active {
+	display: block;
+}
+
+/* Table Container */
+.table-container {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+}
+
+.table-toolbar {
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-editor-background);
+}
+
+.table-search {
+	width: 300px;
+	padding: 6px 8px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 3px;
+	font-size: 13px;
+}
+
+.table-search:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.table-wrapper {
+	flex: 1;
+	overflow: auto;
+}
+
+.data-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.data-table thead {
+	position: sticky;
+	top: 0;
+	background: var(--vscode-editor-background);
+	z-index: 10;
+}
+
+.data-table th {
+	padding: 10px 12px;
+	text-align: left;
+	font-weight: 600;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	color: var(--vscode-foreground);
+	white-space: nowrap;
+}
+
+.data-table th:hover {
+	background: var(--vscode-list-hoverBackground);
+	cursor: pointer;
+}
+
+.data-table tbody tr {
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.data-table tbody tr:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.data-table td {
+	padding: 8px 12px;
+	color: var(--vscode-foreground);
+	max-width: 400px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.table-link {
+	color: var(--vscode-textLink-foreground);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.table-link:hover {
+	color: var(--vscode-textLink-activeForeground);
+	text-decoration: underline;
+}
+
+.table-empty {
+	padding: 40px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* ==================================================
+   Right Panel - Detail View
+   ================================================== */
+
+.metadata-detail-panel {
+	width: 400px;
+	min-width: 300px;
+	max-width: 600px;
+	border-left: 1px solid var(--vscode-panel-border);
+	display: flex;
+	flex-direction: column;
+	background: var(--vscode-sideBar-background);
+	overflow: hidden;
+}
+
+.detail-panel-header {
+	display: flex;
+	align-items: center;
+	padding: 12px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-sideBarSectionHeader-background);
+}
+
+.detail-panel-title {
+	flex: 1;
+	font-weight: 600;
+	font-size: 13px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.detail-panel-close {
+	background: transparent;
+	border: none;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	font-size: 24px;
+	line-height: 1;
+	padding: 0;
+	width: 24px;
+	height: 24px;
+	border-radius: 3px;
+}
+
+.detail-panel-close:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+/* Detail Tabs */
+.detail-tab-navigation {
+	display: flex;
+	gap: 0;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-sideBar-background);
+	padding: 0 8px;
+}
+
+.detail-tab-button {
+	padding: 8px 12px;
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 500;
+	transition: all 0.2s;
+}
+
+.detail-tab-button:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.detail-tab-button.active {
+	border-bottom-color: var(--vscode-focusBorder);
+	color: var(--vscode-textLink-activeForeground);
+}
+
+/* Detail Content */
+.detail-content {
+	flex: 1;
+	overflow: hidden;
+	position: relative;
+}
+
+.detail-tab-panel {
+	display: none;
+	height: 100%;
+	overflow: auto;
+}
+
+.detail-tab-panel.active {
+	display: block;
+}
+
+/* Properties List */
+.properties-list {
+	padding: 8px;
+}
+
+.property-item {
+	padding: 8px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.property-item:last-child {
+	border-bottom: none;
+}
+
+.property-name {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 4px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+.property-value {
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	word-break: break-word;
+	white-space: pre-wrap;
+}
+
+/* Property Section (for tables) */
+.property-section {
+	padding: 12px 8px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.property-section:last-child {
+	border-bottom: none;
+}
+
+.property-section-title {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 8px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+/* Options Table */
+.options-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12px;
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-panel-border);
+}
+
+.options-table thead {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.options-table th {
+	padding: 6px 8px;
+	text-align: left;
+	font-weight: 600;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	border-bottom: 1px solid var(--vscode-panel-border);
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+.options-table td {
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	color: var(--vscode-foreground);
+}
+
+.options-table tbody tr:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.options-table tbody tr:last-child td {
+	border-bottom: none;
+}
+
+/* Color Badge */
+.color-badge {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border-radius: 2px;
+	margin-right: 6px;
+	vertical-align: middle;
+	border: 1px solid var(--vscode-panel-border);
+}
+
+/* Raw Data Display */
+.raw-data-display {
+	padding: 16px;
+	margin: 0;
+	font-family: var(--vscode-editor-font-family);
+	font-size: 12px;
+	color: var(--vscode-editor-foreground);
+	background: var(--vscode-editor-background);
+	overflow-x: auto;
+	white-space: pre;
+}
+
+/* Resize Handle */
+.detail-panel-resize-handle {
+	position: absolute;
+	top: 0;
+	right: 400px;
+	width: 4px;
+	height: 100%;
+	cursor: col-resize;
+	background: transparent;
+	z-index: 100;
+}
+
+.detail-panel-resize-handle:hover {
+	background: var(--vscode-focusBorder);
+}
+
+/* ==================================================
+   Responsive Adjustments
+   ================================================== */
+
+@media (max-width: 1200px) {
+	.metadata-sidebar {
+		width: 250px;
+	}
+
+	.metadata-detail-panel {
+		width: 350px;
+	}
+}
+
+@media (max-width: 900px) {
+	.metadata-sidebar {
+		width: 200px;
+	}
+
+	.metadata-detail-panel {
+		width: 300px;
+	}
+
+	.table-search {
+		width: 200px;
+	}
+}

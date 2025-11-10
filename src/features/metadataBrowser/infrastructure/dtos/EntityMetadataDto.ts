@@ -50,6 +50,7 @@ export interface EntityMetadataDto {
     ManyToOneRelationships?: OneToManyRelationshipDto[];
     ManyToManyRelationships?: ManyToManyRelationshipDto[];
     Keys?: EntityKeyDto[];
+    Privileges?: SecurityPrivilegeDto[];
 }
 
 /**
@@ -116,6 +117,21 @@ export interface GlobalOptionSetReferenceDto {
 }
 
 /**
+ * DTO representing global option set (global choice) definition from Dataverse API.
+ */
+export interface GlobalOptionSetDefinitionDto {
+    MetadataId: string;
+    Name: string;
+    DisplayName?: LabelMetadata;
+    Description?: LabelMetadata;
+    IsCustomOptionSet?: boolean;
+    IsGlobal?: boolean;
+    IsManaged?: boolean;
+    OptionSetType?: string;
+    Options?: OptionMetadataDto[];
+}
+
+/**
  * DTO representing cascade configuration.
  */
 export interface CascadeConfigurationDto {
@@ -178,4 +194,19 @@ export interface EntityKeyDto {
     KeyAttributes: string[];
     IsManaged: boolean;
     EntityKeyIndexStatus?: string;
+}
+
+/**
+ * DTO representing security privilege metadata.
+ */
+export interface SecurityPrivilegeDto {
+    PrivilegeId: string;
+    Name: string;
+    PrivilegeType: number;
+    CanBeBasic: boolean;
+    CanBeLocal: boolean;
+    CanBeDeep: boolean;
+    CanBeGlobal: boolean;
+    CanBeEntityReference?: boolean;
+    CanBeParentEntityReference?: boolean;
 }

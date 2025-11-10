@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metadata Browser</title>
+    <style>
+        body { font-family: var(--vscode-font-family); padding: 20px; }
+        h1 { color: var(--vscode-foreground); }
+        p { color: var(--vscode-descriptionForeground); }
+    </style>
+</head>
+<body>
+    <h1>Metadata Browser</h1>
+    <p>Loading metadata...</p>
+    <div id="content"></div>
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        window.addEventListener('message', event => {
+            const message = event.data;
+            const content = document.getElementById('content');
+
+            if (message.command === 'initialize') {
+                content.innerHTML = '<h2>Entities: ' + message.data.entities.length + '</h2>' +
+                                  '<h2>Choices: ' + message.data.choices.length + '</h2>';
+            }
+        });
+    </script>
+</body>
+</html>

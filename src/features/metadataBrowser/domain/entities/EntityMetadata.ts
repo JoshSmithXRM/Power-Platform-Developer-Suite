@@ -5,6 +5,7 @@ import { AttributeMetadata } from './AttributeMetadata';
 import { OneToManyRelationship } from './OneToManyRelationship';
 import { ManyToManyRelationship } from './ManyToManyRelationship';
 import { EntityKey } from './EntityKey';
+import { SecurityPrivilege } from './SecurityPrivilege';
 
 /**
  * Domain entity representing Dataverse entity metadata.
@@ -41,7 +42,9 @@ export class EntityMetadata {
         public readonly manyToOneRelationships: readonly OneToManyRelationship[],
         public readonly manyToManyRelationships: readonly ManyToManyRelationship[],
         // Keys
-        public readonly keys: readonly EntityKey[]
+        public readonly keys: readonly EntityKey[],
+        // Privileges
+        public readonly privileges: readonly SecurityPrivilege[]
     ) {}
 
     public static create(props: {
@@ -70,6 +73,7 @@ export class EntityMetadata {
         manyToOneRelationships?: readonly OneToManyRelationship[];
         manyToManyRelationships?: readonly ManyToManyRelationship[];
         keys?: readonly EntityKey[];
+        privileges?: readonly SecurityPrivilege[];
     }): EntityMetadata {
         if (!props.metadataId || props.metadataId.trim().length === 0) {
             throw new Error('Entity metadata ID cannot be empty');
@@ -108,7 +112,8 @@ export class EntityMetadata {
             props.oneToManyRelationships ?? [],
             props.manyToOneRelationships ?? [],
             props.manyToManyRelationships ?? [],
-            props.keys ?? []
+            props.keys ?? [],
+            props.privileges ?? []
         );
     }
 

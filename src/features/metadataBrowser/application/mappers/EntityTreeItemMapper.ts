@@ -1,28 +1,23 @@
-import { EntityMetadata } from '../../domain/entities/EntityMetadata';
-import { EntityTreeItemViewModel } from '../viewModels/EntityTreeItemViewModel';
+import type { EntityMetadata } from '../../domain/entities/EntityMetadata';
+import type { EntityTreeItemViewModel } from '../viewModels/EntityTreeItemViewModel';
 
 /**
- * Mapper that transforms EntityMetadata domain entities into EntityTreeItemViewModel DTOs.
- * Handles presentation formatting (display values, computed properties).
+ * Maps EntityMetadata to EntityTreeItemViewModel.
+ *
+ * Transformation rules:
+ * - displayName: entity.displayName || entity.logicalName.getValue()
+ * - icon: "🏷️" if custom, "📋" if system
  */
 export class EntityTreeItemMapper {
-    /**
-     * Maps a domain entity to a ViewModel for tree display.
-     */
     public toViewModel(entity: EntityMetadata): EntityTreeItemViewModel {
-        return {
-            logicalName: entity.logicalName.getValue(),
-            displayName: entity.displayName,
-            schemaName: entity.schemaName.getValue(),
-            isCustomEntity: entity.isCustomEntity,
-            attributeCount: entity.getAttributeCount()
-        };
-    }
+        const logicalName = entity.logicalName.getValue();
 
-    /**
-     * Maps multiple domain entities to ViewModels.
-     */
-    public toViewModels(entities: readonly EntityMetadata[]): readonly EntityTreeItemViewModel[] {
-        return entities.map(entity => this.toViewModel(entity));
+        return {
+            id: logicalName,
+            displayName: entity.displayName || logicalName,
+            logicalName,
+            isCustom: entity.isCustomEntity,
+            icon: entity.isCustomEntity ? '🏷️' : '📋'
+        };
     }
 }

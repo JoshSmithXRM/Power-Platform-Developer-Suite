@@ -32,18 +32,24 @@ export class OptionMetadata {
 export class OptionSetMetadata {
     private constructor(
         public readonly name: string | null,
+        public readonly displayName: string | null,
         public readonly isGlobal: boolean,
+        public readonly isCustom: boolean,
         public readonly options: readonly OptionMetadata[]
     ) {}
 
     public static create(props: {
         name?: string | null;
+        displayName?: string | null;
         isGlobal: boolean;
+        isCustom?: boolean;
         options: readonly OptionMetadata[];
     }): OptionSetMetadata {
         return new OptionSetMetadata(
             props.name ?? null,
+            props.displayName ?? null,
             props.isGlobal,
+            props.isCustom ?? false,
             props.options
         );
     }

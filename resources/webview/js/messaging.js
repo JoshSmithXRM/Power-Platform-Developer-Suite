@@ -42,15 +42,15 @@
 		// Register message handler if provided
 		if (typeof config.handleMessage === 'function') {
 			window.addEventListener('message', event => {
-				config.handleMessage(event.data);
+				config.handleMessage.call(config, event.data);
 			});
 		}
 
-		// Initialize when DOM is ready
+		// Initialize when DOM is ready, binding config as 'this'
 		if (document.readyState === 'loading') {
-			document.addEventListener('DOMContentLoaded', config.initialize);
+			document.addEventListener('DOMContentLoaded', () => config.initialize.call(config));
 		} else {
-			config.initialize();
+			config.initialize.call(config);
 		}
 	};
 

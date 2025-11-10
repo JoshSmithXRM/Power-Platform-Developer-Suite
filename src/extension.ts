@@ -428,7 +428,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const metadataBrowserCommand = vscode.commands.registerCommand('power-platform-dev-suite.metadataBrowser', async (environmentItem?: { envId: string }) => {
 		try {
-			void initializeMetadataBrowser(context, getEnvironments, dataverseApiServiceFactory, logger, environmentItem?.envId);
+			void initializeMetadataBrowser(context, getEnvironments, dataverseApiServiceFactory, environmentRepository, logger, environmentItem?.envId);
 		} catch (error) {
 			vscode.window.showErrorMessage(
 				`Failed to open Metadata Browser: ${error instanceof Error ? error.message : String(error)}`
@@ -441,7 +441,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			await showEnvironmentPickerAndExecute(
 				environmentRepository,
 				'Select an environment to browse metadata',
-				async (envId) => initializeMetadataBrowser(context, getEnvironments, dataverseApiServiceFactory, logger, envId)
+				async (envId) => initializeMetadataBrowser(context, getEnvironments, dataverseApiServiceFactory, environmentRepository, logger, envId)
 			);
 		} catch (error) {
 			vscode.window.showErrorMessage(
@@ -819,33 +819,92 @@ async function initializeMetadataBrowser(
 	context: vscode.ExtensionContext,
 	getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>,
 	dataverseApiServiceFactory: { getAccessToken: (envId: string) => Promise<string>; getDataverseUrl: (envId: string) => Promise<string> },
+	environmentRepository: IEnvironmentRepository,
 	logger: ILogger,
 	initialEnvironmentId?: string
 ): Promise<void> {
 	const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js');
 	const { DataverseEntityMetadataRepository } = await import('./features/metadataBrowser/infrastructure/repositories/DataverseEntityMetadataRepository.js');
-	const { LoadEntityTreeUseCase } = await import('./features/metadataBrowser/application/useCases/LoadEntityTreeUseCase.js');
-	const { LoadEntityAttributesUseCase } = await import('./features/metadataBrowser/application/useCases/LoadEntityAttributesUseCase.js');
+	const { LoadMetadataTreeUseCase } = await import('./features/metadataBrowser/application/useCases/LoadMetadataTreeUseCase.js');
+	const { LoadEntityMetadataUseCase } = await import('./features/metadataBrowser/application/useCases/LoadEntityMetadataUseCase.js');
+	const { LoadChoiceMetadataUseCase } = await import('./features/metadataBrowser/application/useCases/LoadChoiceMetadataUseCase.js');
+	const { OpenInMakerUseCase } = await import('./features/metadataBrowser/application/useCases/OpenInMakerUseCase.js');
 	const { EntityTreeItemMapper } = await import('./features/metadataBrowser/application/mappers/EntityTreeItemMapper.js');
-	const { EntityAttributeMapper } = await import('./features/metadataBrowser/application/mappers/EntityAttributeMapper.js');
+	const { ChoiceTreeItemMapper } = await import('./features/metadataBrowser/application/mappers/ChoiceTreeItemMapper.js');
+	const { AttributeRowMapper } = await import('./features/metadataBrowser/application/mappers/AttributeRowMapper.js');
+	const { KeyRowMapper } = await import('./features/metadataBrowser/application/mappers/KeyRowMapper.js');
+	const { RelationshipRowMapper } = await import('./features/metadataBrowser/application/mappers/RelationshipRowMapper.js');
+	const { PrivilegeRowMapper } = await import('./features/metadataBrowser/application/mappers/PrivilegeRowMapper.js');
+	const { ChoiceValueRowMapper } = await import('./features/metadataBrowser/application/mappers/ChoiceValueRowMapper.js');
 	const { MetadataBrowserPanel } = await import('./features/metadataBrowser/presentation/panels/MetadataBrowserPanel.js');
+	const { VSCodeBrowserService } = await import('./shared/infrastructure/services/VSCodeBrowserService.js');
 
 	const { getAccessToken, getDataverseUrl } = dataverseApiServiceFactory;
 	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
-
 	const entityMetadataRepository = new DataverseEntityMetadataRepository(dataverseApiService, logger);
+	const browserService = new VSCodeBrowserService();
 
-	const entityTreeMapper = new EntityTreeItemMapper();
-	const entityAttributeMapper = new EntityAttributeMapper();
+	// Create mappers
+	const entityTreeItemMapper = new EntityTreeItemMapper();
+	const choiceTreeItemMapper = new ChoiceTreeItemMapper();
+	const attributeRowMapper = new AttributeRowMapper();
+	const keyRowMapper = new KeyRowMapper();
+	const relationshipRowMapper = new RelationshipRowMapper();
+	const privilegeRowMapper = new PrivilegeRowMapper();
+	const choiceValueRowMapper = new ChoiceValueRowMapper();
 
-	const loadEntityTreeUseCase = new LoadEntityTreeUseCase(entityMetadataRepository, entityTreeMapper, logger);
-	const loadEntityAttributesUseCase = new LoadEntityAttributesUseCase(entityMetadataRepository, entityAttributeMapper, logger);
+	// Create use cases
+	const loadMetadataTreeUseCase = new LoadMetadataTreeUseCase(
+		entityMetadataRepository,
+		entityTreeItemMapper,
+		choiceTreeItemMapper,
+		logger
+	);
+
+	const loadEntityMetadataUseCase = new LoadEntityMetadataUseCase(
+		entityMetadataRepository,
+		entityTreeItemMapper,
+		attributeRowMapper,
+		keyRowMapper,
+		relationshipRowMapper,
+		privilegeRowMapper,
+		logger
+	);
+
+	const loadChoiceMetadataUseCase = new LoadChoiceMetadataUseCase(
+		entityMetadataRepository,
+		choiceTreeItemMapper,
+		choiceValueRowMapper,
+		logger
+	);
+
+	const openInMakerUseCase = new OpenInMakerUseCase(
+		async (envId: string) => {
+			const environment = await environmentRepository.getById(new EnvironmentId(envId));
+			return environment;
+		},
+		browserService,
+		logger
+	);
+
+	// Helper function to get environment by ID
+	const getEnvironmentById = async (envId: string): Promise<Environment | null> => {
+		const environment = await environmentRepository.getById(new EnvironmentId(envId));
+		return environment;
+	};
 
 	await MetadataBrowserPanel.createOrShow(
 		context.extensionUri,
+		context,
 		getEnvironments,
-		loadEntityTreeUseCase,
-		loadEntityAttributesUseCase,
+		getEnvironmentById,
+		{
+			loadMetadataTreeUseCase,
+			loadEntityMetadataUseCase,
+			loadChoiceMetadataUseCase,
+			openInMakerUseCase
+		},
+		entityMetadataRepository,
 		logger,
 		initialEnvironmentId
 	);

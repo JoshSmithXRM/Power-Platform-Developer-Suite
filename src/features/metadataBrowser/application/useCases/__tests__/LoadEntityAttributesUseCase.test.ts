@@ -68,7 +68,10 @@ describe('LoadEntityAttributesUseCase', () => {
     beforeEach(() => {
         repository = {
             getAllEntities: jest.fn(),
-            getEntityWithAttributes: jest.fn()
+            getEntityWithAttributes: jest.fn(),
+            getAllGlobalChoices: jest.fn(),
+            getGlobalChoiceWithOptions: jest.fn(),
+            clearCache: jest.fn()
         };
 
         mapper = {

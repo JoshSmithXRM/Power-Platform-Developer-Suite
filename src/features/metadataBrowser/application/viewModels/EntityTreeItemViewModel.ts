@@ -1,13 +1,20 @@
 /**
- * ViewModel representing an entity in the tree navigation.
- * Simple DTO for presentation layer (not a domain model).
- * Index signature required for compatibility with DataTableSection.
+ * ViewModel for displaying entity in tree.
+ * Simple DTO for presentation layer.
  */
 export interface EntityTreeItemViewModel {
-    readonly [key: string]: unknown;
-    readonly logicalName: string;
+    /** Unique identifier for tree node (same as logicalName) */
+    readonly id: string;
+
+    /** Display name shown in tree (bold) */
     readonly displayName: string;
-    readonly schemaName: string;
-    readonly isCustomEntity: boolean;
-    readonly attributeCount: number;
+
+    /** Logical name shown in tree (gray, parentheses) */
+    readonly logicalName: string;
+
+    /** Whether this is a custom entity */
+    readonly isCustom: boolean;
+
+    /** Icon emoji for tree node */
+    readonly icon: string;
 }
