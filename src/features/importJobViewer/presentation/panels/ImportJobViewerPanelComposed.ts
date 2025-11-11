@@ -148,11 +148,20 @@ export class ImportJobViewerPanelComposed {
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
-			tableData: []
+			tableData: [],
+			isLoading: true
 		});
 
 		// Load import jobs data
-		await this.handleRefresh();
+		const importJobs = await this.listImportJobsUseCase.execute(this.currentEnvironmentId);
+		const viewModels = importJobs.map(job => this.viewModelMapper.toViewModel(job));
+
+		// Re-render with actual data
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			tableData: viewModels
+		});
 	}
 
 	private createCoordinator(): { coordinator: PanelCoordinator<ImportJobViewerCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
@@ -291,7 +300,8 @@ export class ImportJobViewerPanelComposed {
 				command: 'updateTableData',
 				data: {
 					viewModels,
-					columns: this.getTableConfig().columns
+					columns: this.getTableConfig().columns,
+					isLoading: false
 				}
 			});
 		} catch (error: unknown) {

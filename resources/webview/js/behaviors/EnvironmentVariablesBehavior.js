@@ -19,15 +19,22 @@ window.createBehavior({
  * Updates table data without full page refresh.
  * Uses TableRenderer to update tbody only, preserving event listeners.
  *
- * @param {Object} data - Update data containing viewModels and columns
+ * @param {Object} data - Update data containing viewModels, columns, and optional isLoading flag
  */
 function updateTableData(data) {
-	const { viewModels, columns } = data;
+	const { viewModels, columns, isLoading } = data;
 
 	// Get table body
 	const tbody = document.querySelector('tbody');
 	if (!tbody) {
 		console.warn('[EnvironmentVariables] No tbody found for table update');
+		return;
+	}
+
+	// Show loading state if still loading
+	if (isLoading) {
+		// Pass tbody directly to showTableLoading
+		window.TableRenderer.showTableLoading(tbody, 'Loading environment variables...');
 		return;
 	}
 

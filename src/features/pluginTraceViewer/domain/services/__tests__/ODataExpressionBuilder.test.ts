@@ -278,6 +278,84 @@ describe('ODataExpressionBuilder', () => {
 			});
 		});
 
+		describe('date formatting', () => {
+			it('should format UTC ISO to OData format (remove milliseconds)', () => {
+				// FilterCondition.value is UTC ISO (converted by presentation layer)
+				const condition = new FilterCondition(
+					FilterField.CreatedOn,
+					FilterOperator.GreaterThanOrEqual,
+					'2025-11-10T16:20:00.000Z',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('createdon ge 2025-11-10T16:20:00Z');
+			});
+
+			it('should handle UTC ISO without milliseconds', () => {
+				const condition = new FilterCondition(
+					FilterField.CreatedOn,
+					FilterOperator.GreaterThanOrEqual,
+					'2024-01-01T00:00:00Z',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('createdon ge 2024-01-01T00:00:00Z');
+			});
+
+			it('should format UTC ISO with milliseconds to OData format', () => {
+				const condition = new FilterCondition(
+					FilterField.CreatedOn,
+					FilterOperator.GreaterThanOrEqual,
+					'2024-01-01T00:00:00.123Z',
+					true
+				);
+
+				// OData format removes milliseconds
+				expect(builder.buildExpression(condition)).toBe('createdon ge 2024-01-01T00:00:00Z');
+			});
+
+			it('should handle different comparison operators with dates', () => {
+				const greaterThan = new FilterCondition(
+					FilterField.CreatedOn,
+					FilterOperator.GreaterThan,
+					'2025-11-10T16:20:00.000Z',
+					true
+				);
+
+				const lessThan = new FilterCondition(
+					FilterField.CreatedOn,
+					FilterOperator.LessThan,
+					'2025-11-10T16:20:00.000Z',
+					true
+				);
+
+				expect(builder.buildExpression(greaterThan)).toBe('createdon gt 2025-11-10T16:20:00Z');
+				expect(builder.buildExpression(lessThan)).toBe('createdon lt 2025-11-10T16:20:00Z');
+			});
+
+			it('should handle midnight UTC', () => {
+				const condition = new FilterCondition(
+					FilterField.CreatedOn,
+					FilterOperator.GreaterThanOrEqual,
+					'2025-11-11T00:00:00.000Z',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('createdon ge 2025-11-11T00:00:00Z');
+			});
+
+			it('should handle end of day UTC', () => {
+				const condition = new FilterCondition(
+					FilterField.CreatedOn,
+					FilterOperator.LessThanOrEqual,
+					'2025-11-11T23:59:59.999Z',
+					true
+				);
+
+				expect(builder.buildExpression(condition)).toBe('createdon le 2025-11-11T23:59:59Z');
+			});
+		});
+
 		describe('edge cases', () => {
 
 			it('should handle zero for number fields', () => {

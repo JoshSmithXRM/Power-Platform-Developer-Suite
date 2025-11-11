@@ -1,4 +1,5 @@
 import type { FilterCondition } from '../entities/FilterCondition';
+import { DateTimeFilter } from '../../../../shared/domain/valueObjects/DateTimeFilter';
 
 /**
  * Domain Service: OData Expression Builder
@@ -11,6 +12,7 @@ import type { FilterCondition } from '../entities/FilterCondition';
  * - Comparison operators use infix notation (field operator value)
  * - Text/enum values are quoted, numbers/dates are not
  * - Single quotes in values are escaped as ''
+ * - Date values use DateTimeFilter for proper OData formatting
  */
 export class ODataExpressionBuilder {
 	/**
@@ -73,8 +75,10 @@ export class ODataExpressionBuilder {
 		} else if (fieldType === 'number') {
 			return value;
 		} else if (fieldType === 'date') {
-			// Dates use ISO format without quotes in OData v4
-			return value;
+			// Value is already in UTC ISO format (converted by presentation layer)
+			// Use DateTimeFilter to format for Dataverse OData API
+			const dateFilter = DateTimeFilter.fromUtcIso(value);
+			return dateFilter.getODataFormat();
 		}
 
 		return value;

@@ -204,7 +204,7 @@ module.exports = {
 					const allowedStaticMethods = [
 						'create', 'createFrom', 'createEmpty', 'createGlobal', 'createSecret', 'createWorkspace',
 						'from', 'fromJson', 'fromData', 'fromValue', 'fromSegments',
-						'fromNumber', 'fromMilliseconds', 'default',
+						'fromNumber', 'fromMilliseconds', 'fromUtcIso', 'fromLocalDateTime', 'default',
 						'generate', 'success', 'failure', 'successWithWarnings',
 						'allowed', 'protected', 'notFound', 'forSecret', 'parsePath',
 						'calculateSize', 'empty'

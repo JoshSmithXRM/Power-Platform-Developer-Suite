@@ -11,6 +11,8 @@
  * - Navigation via relationship links
  */
 
+import { JsonHighlighter } from '../utils/JsonHighlighter.js';
+
 window.createBehavior({
 	initialize() {
 		this.setupTreeSearch();
@@ -105,6 +107,21 @@ window.createBehavior({
 	},
 
 	/**
+	 * Shows loading state in tree sections
+	 */
+	showTreeLoading() {
+		const entitiesTree = document.getElementById('entitiesTree');
+		const choicesTree = document.getElementById('choicesTree');
+
+		if (entitiesTree) {
+			entitiesTree.innerHTML = '<div class="tree-loading">Loading entities...</div>';
+		}
+		if (choicesTree) {
+			choicesTree.innerHTML = '<div class="tree-loading">Loading choices...</div>';
+		}
+	},
+
+	/**
 	 * Sets entity mode with all tabs
 	 */
 	setEntityMode(data) {
@@ -146,18 +163,12 @@ window.createBehavior({
 	 * Used when switching environments to prevent showing stale data.
 	 */
 	clearSelection() {
-		// Clear tree items
-		const entitiesTree = document.getElementById('entitiesTree');
-		const choicesTree = document.getElementById('choicesTree');
+		// Show loading state in tree
+		this.showTreeLoading();
+
+		// Reset counts
 		const entitiesCount = document.getElementById('entitiesCount');
 		const choicesCount = document.getElementById('choicesCount');
-
-		if (entitiesTree) {
-			entitiesTree.innerHTML = '';
-		}
-		if (choicesTree) {
-			choicesTree.innerHTML = '';
-		}
 		if (entitiesCount) {
 			entitiesCount.textContent = '0';
 		}
@@ -264,7 +275,7 @@ window.createBehavior({
 		if (empty) empty.style.display = 'none';
 
 		tbody.innerHTML = relationships.map((rel, index) => `
-			<tr data-index="${index}">
+			<tr data-index="${index}" class="${index % 2 === 0 ? 'row-even' : 'row-odd'}">
 				<td>
 					<a href="#" class="table-link" data-action="openDetail" data-tab="oneToMany" data-index="${index}">
 						${escapeHtml(rel.name)}
@@ -298,7 +309,7 @@ window.createBehavior({
 		if (empty) empty.style.display = 'none';
 
 		tbody.innerHTML = relationships.map((rel, index) => `
-			<tr data-index="${index}">
+			<tr data-index="${index}" class="${index % 2 === 0 ? 'row-even' : 'row-odd'}">
 				<td>
 					<a href="#" class="table-link" data-action="openDetail" data-tab="manyToOne" data-index="${index}">
 						${escapeHtml(rel.name)}
@@ -332,7 +343,7 @@ window.createBehavior({
 		if (empty) empty.style.display = 'none';
 
 		tbody.innerHTML = relationships.map((rel, index) => `
-			<tr data-index="${index}">
+			<tr data-index="${index}" class="${index % 2 === 0 ? 'row-even' : 'row-odd'}">
 				<td>
 					<a href="#" class="table-link" data-action="openDetail" data-tab="manyToMany" data-index="${index}">
 						${escapeHtml(rel.name)}
@@ -418,7 +429,7 @@ window.createBehavior({
 		}
 
 		tbody.innerHTML = data.map((row, index) => `
-			<tr data-index="${index}">
+			<tr data-index="${index}" class="${index % 2 === 0 ? 'row-even' : 'row-odd'}">
 				${columns.map(col => {
 					const value = row[col.key];
 					if (col.isLinkable && row.isLinkable) {
@@ -950,7 +961,16 @@ window.createBehavior({
 		const container = document.getElementById('rawDataDisplay');
 		if (!container) return;
 
-		container.textContent = JSON.stringify(metadata, null, 2);
+		// Inject JSON highlighter styles if not already present
+		if (!document.getElementById('json-highlighter-styles')) {
+			const styleTag = document.createElement('style');
+			styleTag.id = 'json-highlighter-styles';
+			styleTag.textContent = JsonHighlighter.getStyles();
+			document.head.appendChild(styleTag);
+		}
+
+		// Render syntax-highlighted JSON
+		container.innerHTML = JsonHighlighter.highlight(metadata);
 	},
 
 	/**
@@ -959,6 +979,20 @@ window.createBehavior({
 	selectEntity(logicalName) {
 		// Update tree selection
 		this.updateTreeSelection('entity', logicalName);
+
+		// Show loading state in all entity tables with descriptive messages
+		const tableMessages = {
+			'attributesTable': `Loading ${logicalName} attributes...`,
+			'keysTable': `Loading ${logicalName} keys...`,
+			'oneToManyTable': `Loading ${logicalName} 1:N relationships...`,
+			'manyToOneTable': `Loading ${logicalName} N:1 relationships...`,
+			'manyToManyTable': `Loading ${logicalName} N:N relationships...`,
+			'privilegesTable': `Loading ${logicalName} privileges...`
+		};
+
+		Object.keys(tableMessages).forEach(tableId => {
+			window.TableRenderer.showTableLoading(tableId, tableMessages[tableId]);
+		});
 
 		// Notify extension
 		window.vscode.postMessage({
@@ -973,6 +1007,9 @@ window.createBehavior({
 	selectChoice(name) {
 		// Update tree selection
 		this.updateTreeSelection('choice', name);
+
+		// Show loading state in choice values table with descriptive message
+		window.TableRenderer.showTableLoading('choiceValuesTable', `Loading ${name} choice values...`);
 
 		// Notify extension
 		window.vscode.postMessage({

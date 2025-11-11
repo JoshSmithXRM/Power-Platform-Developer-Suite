@@ -12,6 +12,7 @@ export { CorrelationId } from '../domain/valueObjects/CorrelationId';
 export { PipelineStage } from '../domain/valueObjects/PipelineStage';
 export { FilterField } from '../domain/valueObjects/FilterField';
 export { FilterOperator } from '../domain/valueObjects/FilterOperator';
+export { DateTimeFilter, ValidationError } from '../../../shared/domain/valueObjects/DateTimeFilter';
 export type { ExportFormat } from '../domain/types/ExportFormat';
 export { PluginTrace } from '../domain/entities/PluginTrace';
 export { TraceFilter } from '../domain/entities/TraceFilter';

@@ -65,10 +65,11 @@ export class VSCodePanelStateRepository implements IPanelStateRepository {
 					environmentId: key.environmentId
 				});
 
-				const migratedState: PanelState = {
+				const migratedState = {
+					...rawState,
 					selectedSolutionId: DEFAULT_SOLUTION_ID,
 					lastUpdated: new Date().toISOString()
-				};
+				} as PanelState;
 
 				// Persist migrated value back to storage
 				await this.save(key, migratedState);
@@ -76,10 +77,8 @@ export class VSCodePanelStateRepository implements IPanelStateRepository {
 				return migratedState;
 			}
 
-			return {
-				selectedSolutionId: rawState.selectedSolutionId,
-				lastUpdated: rawState.lastUpdated
-			};
+			// Return all properties from rawState (including filterCriteria, autoRefreshInterval, etc.)
+			return rawState as PanelState;
 		} catch (error) {
 			if (isStorageError(error)) {
 				return null;

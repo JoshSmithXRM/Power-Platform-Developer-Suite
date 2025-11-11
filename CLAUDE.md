@@ -148,6 +148,7 @@ See `.claude/AGENTS.md` for detailed agent guide.
 - `.claude/AGENTS.md` - Agent invocation guide
 - `.claude/templates/TECHNICAL_DESIGN_TEMPLATE.md` - Design template
 - `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` - Panel patterns
+- `.claude/templates/PANEL_INITIALIZATION_PATTERN.md` - **CRITICAL** Panel initialization pattern (MUST follow)
 
 **Architecture guides:**
 - `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Detailed patterns

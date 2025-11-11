@@ -22,7 +22,14 @@ export class TraceLevelDropdownSection extends DropdownSection {
 	}
 
 	protected getButtonLabel(): string {
-		return 'Trace Level';
+		const levelNames = {
+			'0': 'Off',
+			'1': 'Exception',
+			'2': 'All'
+		};
+
+		const currentLevelName = this.currentLevel ? levelNames[this.currentLevel as keyof typeof levelNames] : '...';
+		return `Trace Level: ${currentLevelName}`;
 	}
 
 	protected getCurrentSelectionId(): string | undefined {

@@ -90,10 +90,48 @@ function updateTableFooter(count) {
 	}
 }
 
+/**
+ * Shows loading state in a table.
+ * Global utility available to all panels.
+ *
+ * @param {string|HTMLElement} tableIdOrElement - ID of the table element, or tbody/table element directly
+ * @param {string} [message='Loading...'] - Optional custom loading message
+ */
+function showTableLoading(tableIdOrElement, message = 'Loading...') {
+	let tbody;
+
+	if (typeof tableIdOrElement === 'string') {
+		// It's a table ID
+		tbody = document.querySelector(`#${tableIdOrElement} tbody`);
+	} else if (tableIdOrElement instanceof HTMLElement) {
+		// It's an element - check if it's tbody or table
+		if (tableIdOrElement.tagName === 'TBODY') {
+			tbody = tableIdOrElement;
+		} else if (tableIdOrElement.tagName === 'TABLE') {
+			tbody = tableIdOrElement.querySelector('tbody');
+		}
+	}
+
+	if (!tbody) return;
+
+	const columnCount = tbody.closest('table').querySelectorAll('thead th').length;
+	tbody.innerHTML = `
+		<tr>
+			<td colspan="${columnCount}" class="table-loading">
+				<div class="loading-container">
+					<span class="spinner"></span>
+					<span>${message}</span>
+				</div>
+			</td>
+		</tr>
+	`;
+}
+
 // Make functions available globally
 window.TableRenderer = {
 	renderTableRows,
 	renderTableRow,
 	renderNoDataRow,
-	updateTableFooter
+	updateTableFooter,
+	showTableLoading
 };

@@ -23,7 +23,15 @@ export class AutoRefreshDropdownSection extends DropdownSection {
 	}
 
 	protected getButtonLabel(): string {
-		return 'Auto-Refresh';
+		const intervalNames = {
+			'0': 'Off',
+			'10': '10s',
+			'30': '30s',
+			'60': '60s'
+		};
+
+		const currentIntervalName = this.currentInterval ? intervalNames[this.currentInterval as keyof typeof intervalNames] : '...';
+		return `Auto-Refresh: ${currentIntervalName}`;
 	}
 
 	protected getCurrentSelectionId(): string | undefined {

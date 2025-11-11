@@ -1,7 +1,7 @@
 import type { ISection } from '../../../../shared/infrastructure/ui/sections/ISection';
 import type { SectionRenderData } from '../../../../shared/infrastructure/ui/types/SectionRenderData';
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
-import { FilterField, FilterOperator } from '../../application/types';
+import { FilterField, FilterOperator, DateTimeFilter } from '../../application/types';
 import type { FilterCriteriaViewModel, FilterConditionViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
 
 /**
@@ -186,11 +186,24 @@ export class FilterPanelSection implements ISection {
 	}
 
 	private renderDateInput(condition: FilterConditionViewModel): string {
+		// condition.value is stored in UTC ISO format
+		// datetime-local inputs need local format without timezone
+		let localValue = '';
+		if (condition.value) {
+			try {
+				const dateFilter = DateTimeFilter.fromUtcIso(condition.value);
+				localValue = dateFilter.getLocalDateTime();
+			} catch {
+				// If conversion fails, use empty value
+				localValue = '';
+			}
+		}
+
 		return `
 			<input
 				type="datetime-local"
 				class="condition-value"
-				value="${this.escapeHtml(condition.value)}"
+				value="${this.escapeHtml(localValue)}"
 			/>
 		`;
 	}

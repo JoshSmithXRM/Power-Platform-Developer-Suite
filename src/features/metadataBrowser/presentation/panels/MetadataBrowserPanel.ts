@@ -635,30 +635,35 @@ export class MetadataBrowserPanel {
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		this.currentEnvironmentId = environmentId;
-		this.currentSelectionType = null;
-		this.currentSelectionId = null;
-		this.currentTab = 'attributes';
+		// Show loading spinner on refresh button
+		this.setButtonLoading('refresh', true);
 
-		// Clear cache when switching environments
-		this.entityMetadataRepository.clearCache();
+		try {
+			this.currentEnvironmentId = environmentId;
+			this.currentSelectionType = null;
+			this.currentSelectionId = null;
+			this.currentTab = 'attributes';
 
-		// Update panel title
-		const environment = await this.getEnvironmentById(environmentId);
-		if (environment) {
-			this.panel.title = `Metadata - ${environment.getName().getValue()}`;
+			// Clear cache when switching environments
+			this.entityMetadataRepository.clearCache();
+
+			// Update panel title
+			const environment = await this.getEnvironmentById(environmentId);
+			if (environment) {
+				this.panel.title = `Metadata - ${environment.getName().getValue()}`;
+			}
+
+			// Clear tables
+			await this.panel.webview.postMessage({
+				command: 'clearSelection'
+			});
+
+			// Reload tree
+			await this.handleLoadTree();
+		} finally {
+			// Disable refresh button (no selection) and stop spinner
+			this.setButtonState('refresh', true);
 		}
-
-		// Disable refresh button (no selection)
-		this.setButtonState('refresh', true);
-
-		// Clear tables
-		await this.panel.webview.postMessage({
-			command: 'clearSelection'
-		});
-
-		// Reload tree
-		await this.handleLoadTree();
 	}
 
 	/**
@@ -693,6 +698,18 @@ export class MetadataBrowserPanel {
 			buttonId,
 			disabled,
 			showSpinner: false
+		});
+	}
+
+	/**
+	 * Sets button loading state with spinner.
+	 */
+	private setButtonLoading(buttonId: string, isLoading: boolean): void {
+		this.panel.webview.postMessage({
+			command: 'setButtonState',
+			buttonId,
+			disabled: isLoading,
+			showSpinner: isLoading
 		});
 	}
 

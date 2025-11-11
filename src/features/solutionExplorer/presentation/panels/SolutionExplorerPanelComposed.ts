@@ -140,15 +140,26 @@ export class SolutionExplorerPanelComposed {
 		// Load environments first so they appear on initial render
 		const environments = await this.getEnvironments();
 
-		// Initialize coordinator with environments
+		// Initialize coordinator with environments and loading state
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
-			tableData: []
+			tableData: [],
+			isLoading: true
 		});
 
 		// Load solutions data
-		await this.handleRefresh();
+		const solutions = await this.listSolutionsUseCase.execute(this.currentEnvironmentId);
+		const viewModels = solutions
+			.map(s => this.viewModelMapper.toViewModel(s))
+			.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName));
+
+		// Re-render with actual data
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			tableData: viewModels
+		});
 	}
 
 	private createCoordinator(): { coordinator: PanelCoordinator<SolutionExplorerCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
@@ -291,7 +302,8 @@ export class SolutionExplorerPanelComposed {
 				command: 'updateTableData',
 				data: {
 					viewModels,
-					columns: this.getTableConfig().columns
+					columns: this.getTableConfig().columns,
+					isLoading: false
 				}
 			});
 		} catch (error: unknown) {

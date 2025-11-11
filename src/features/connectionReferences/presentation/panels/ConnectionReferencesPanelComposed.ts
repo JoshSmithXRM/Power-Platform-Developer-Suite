@@ -80,7 +80,7 @@ export class ConnectionReferencesPanelComposed {
 
 		this.registerPanelCommands();
 
-		void this.initialize();
+		void this.initializeAndLoadData();
 	}
 
 	public static async createOrShow(
@@ -289,7 +289,7 @@ export class ConnectionReferencesPanelComposed {
 		});
 	}
 
-	private async initialize(): Promise<void> {
+	private async initializeAndLoadData(): Promise<void> {
 		// Load saved solution selection from panel state
 		if (this.panelStateRepository) {
 			try {
@@ -314,11 +314,21 @@ export class ConnectionReferencesPanelComposed {
 			currentEnvironmentId: this.currentEnvironmentId,
 			solutions,
 			currentSolutionId: this.currentSolutionId,
-			tableData: []
+			tableData: [],
+			isLoading: true
 		});
 
-		// Load data and update table with data-driven pattern
-		await this.render();
+		// Load data
+		const data = await this.loadData();
+
+		// Re-render with actual data
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			solutions,
+			currentSolutionId: this.currentSolutionId,
+			tableData: data
+		});
 	}
 
 	private async render(): Promise<void> {

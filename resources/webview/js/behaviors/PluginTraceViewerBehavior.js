@@ -30,15 +30,22 @@ window.createBehavior({
  * Updates table data without full page refresh.
  * Uses TableRenderer to update tbody only, preserving event listeners.
  *
- * @param {Object} data - Update data containing viewModels and columns
+ * @param {Object} data - Update data containing viewModels, columns, and optional isLoading flag
  */
 function updateTableData(data) {
-	const { viewModels, columns } = data;
+	const { viewModels, columns, isLoading } = data;
 
 	// Get table body
 	const tbody = document.querySelector('tbody');
 	if (!tbody) {
 		console.warn('[PluginTraceViewer] No tbody found for table update');
+		return;
+	}
+
+	// Show loading state if still loading
+	if (isLoading) {
+		// Pass tbody directly to showTableLoading
+		window.TableRenderer.showTableLoading(tbody, 'Loading plugin traces...');
 		return;
 	}
 
@@ -340,6 +347,12 @@ function collectFilterCriteria() {
 		const operator = row.querySelector('.condition-operator')?.value || '';
 		const value = row.querySelector('.condition-value')?.value || '';
 
+		// Note: Datetime conversion is now handled by presentation layer (TypeScript)
+		// - Webview collects raw local datetime: "2025-11-10T16:46"
+		// - Presentation layer converts to UTC ISO: "2025-11-11T00:46:00.000Z"
+		// - Domain/Storage use canonical UTC ISO format
+		// - When rendering, presentation layer converts back to local
+
 		// Get logical operator from PREVIOUS row (since it's at the end of that row)
 		let logicalOperator = 'and';
 		if (index > 0) {
@@ -555,6 +568,17 @@ function formatDateTimeLocal(date) {
 	const hours = String(date.getHours()).padStart(2, '0');
 	const minutes = String(date.getMinutes()).padStart(2, '0');
 	return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+/**
+ * Converts UTC ISO datetime string to local datetime-local format.
+ * Used when restoring filter from storage.
+ * @param {string} utcIso - UTC ISO string (e.g., "2025-11-11T00:46:00.000Z")
+ * @returns {string} Local datetime string (e.g., "2025-11-10T16:46")
+ */
+function convertUTCToLocalDateTime(utcIso) {
+	const date = new Date(utcIso);
+	return formatDateTimeLocal(date);
 }
 
 /**
@@ -801,7 +825,11 @@ function createValueInputHtml(fieldType, fieldName, value) {
 		case 'enum':
 			return createEnumInputHtml(fieldName, value);
 		case 'date':
-			return `<input type="datetime-local" class="condition-value" value="${escapeHtml(value)}" />`;
+			// Convert UTC ISO format back to local datetime-local format
+			// Storage has UTC (e.g., "2025-11-11T00:46:00.000Z")
+			// Input needs local (e.g., "2025-11-10T16:46")
+			const localValue = value ? convertUTCToLocalDateTime(value) : '';
+			return `<input type="datetime-local" class="condition-value" value="${escapeHtml(localValue)}" />`;
 		case 'number':
 			const placeholder = fieldName === 'Duration (ms)' ? 'Duration in ms' : 'Enter number...';
 			return `<input type="number" class="condition-value" placeholder="${placeholder}" value="${escapeHtml(value)}" min="0" />`;

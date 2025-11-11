@@ -42,7 +42,9 @@ export class MetadataBrowserLayoutSection implements ISection {
 								<span class="tree-section-title">Entities</span>
 								<span class="tree-section-count" id="entitiesCount">0</span>
 							</div>
-							<div class="tree-section-content" id="entitiesTree"></div>
+							<div class="tree-section-content" id="entitiesTree">
+								<div class="tree-loading">Loading entities...</div>
+							</div>
 						</div>
 
 						<!-- Choices Section -->
@@ -52,7 +54,9 @@ export class MetadataBrowserLayoutSection implements ISection {
 								<span class="tree-section-title">Global Choices</span>
 								<span class="tree-section-count" id="choicesCount">0</span>
 							</div>
-							<div class="tree-section-content" id="choicesTree"></div>
+							<div class="tree-section-content" id="choicesTree">
+								<div class="tree-loading">Loading choices...</div>
+							</div>
 						</div>
 					</div>
 				</div>

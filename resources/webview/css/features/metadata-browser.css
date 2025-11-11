@@ -252,26 +252,41 @@
 .data-table thead {
 	position: sticky;
 	top: 0;
-	background: var(--vscode-editor-background);
 	z-index: 10;
 }
 
 .data-table th {
-	padding: 10px 12px;
+	padding: 8px 12px;
 	text-align: left;
 	font-weight: 600;
-	border-bottom: 1px solid var(--vscode-panel-border);
-	color: var(--vscode-foreground);
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border-bottom: 2px solid var(--vscode-panel-border);
+	border-right: 1px solid rgba(255, 255, 255, 0.1);
 	white-space: nowrap;
+	cursor: pointer;
+	user-select: none;
+}
+
+.data-table th:last-child {
+	border-right: none;
 }
 
 .data-table th:hover {
-	background: var(--vscode-list-hoverBackground);
-	cursor: pointer;
+	background: var(--vscode-button-hoverBackground);
 }
 
 .data-table tbody tr {
 	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+/* Alternating row colors for better readability */
+.data-table tbody tr.row-even {
+	background: var(--vscode-list-inactiveSelectionBackground);
+}
+
+.data-table tbody tr.row-odd {
+	background: transparent;
 }
 
 .data-table tbody tr:hover {

@@ -177,11 +177,27 @@ export class EnvironmentVariablesPanelComposed {
 			currentEnvironmentId: this.currentEnvironmentId,
 			solutions,
 			currentSolutionId: this.currentSolutionId || undefined,
-			tableData: []
+			tableData: [],
+			isLoading: true
 		});
 
 		// Load environment variables data
-		await this.handleRefresh();
+		const environmentVariables = await this.listEnvVarsUseCase.execute(
+			this.currentEnvironmentId,
+			this.currentSolutionId
+		);
+		const viewModels = environmentVariables
+			.map(envVar => this.viewModelMapper.toViewModel(envVar))
+			.sort((a, b) => a.schemaName.localeCompare(b.schemaName));
+
+		// Re-render with actual data
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			solutions,
+			currentSolutionId: this.currentSolutionId || undefined,
+			tableData: viewModels
+		});
 	}
 
 	private createCoordinator(): { coordinator: PanelCoordinator<EnvironmentVariablesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {

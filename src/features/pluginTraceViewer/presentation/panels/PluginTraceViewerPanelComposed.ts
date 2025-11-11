@@ -40,6 +40,7 @@ import { AutoRefreshDropdownSection } from '../sections/AutoRefreshDropdownSecti
 import { FilterPanelSection } from '../sections/FilterPanelSection';
 import { FilterCriteriaMapper } from '../mappers/FilterCriteriaMapper';
 import type { FilterCriteriaViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
+import { DateTimeFilter } from '../../application/types';
 
 /**
  * Commands supported by Plugin Trace Viewer panel.
@@ -202,13 +203,24 @@ export class PluginTraceViewerPanelComposed {
 	private async initializeAndLoadData(): Promise<void> {
 		const environments = await this.getEnvironments();
 
-		// Load persisted filter criteria before initial render
+		// Load persisted filter criteria and auto-refresh interval before initial render
 		await this.loadFilterCriteria();
+
+		this.logger.debug('Initializing with auto-refresh interval', { interval: this.autoRefreshInterval });
+
+		// Start auto-refresh timer if interval was persisted
+		if (this.autoRefreshInterval > 0) {
+			this.autoRefreshTimer = setInterval(() => {
+				void this.handleRefresh();
+			}, this.autoRefreshInterval * 1000);
+			this.logger.info('Auto-refresh restored from storage', { interval: this.autoRefreshInterval });
+		}
 
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			tableData: [],
+			isLoading: true,
 			state: {
 				traceLevel: this.currentTraceLevel?.value,
 				autoRefreshInterval: this.autoRefreshInterval,
@@ -232,6 +244,15 @@ export class PluginTraceViewerPanelComposed {
 				filterCriteria: this.filterCriteria
 			}
 		});
+
+		// Explicitly update dropdown state to ensure button label shows correct value
+		await this.panel.webview.postMessage({
+			command: 'updateDropdownState',
+			data: {
+				dropdownId: 'autoRefreshDropdown',
+				selectedId: this.autoRefreshInterval.toString()
+			}
+		});
 	}
 
 	private createCoordinator(): {
@@ -249,9 +270,8 @@ export class PluginTraceViewerPanelComposed {
 		const filterPanel = new FilterPanelSection();
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
-				{ id: 'refresh', label: 'Refresh' },
 				{ id: 'openMaker', label: 'Open in Maker' },
-				{ id: 'deleteSelected', label: 'Delete Selected' }
+				{ id: 'refresh', label: 'Refresh' }
 			]
 		}, SectionPosition.Toolbar);
 
@@ -260,11 +280,11 @@ export class PluginTraceViewerPanelComposed {
 
 		const compositionBehavior = new SectionCompositionBehavior(
 			[
-				exportDropdown,
-				deleteDropdown,
+				actionButtons,
 				traceLevelDropdown,
 				autoRefreshDropdown,
-				actionButtons,
+				exportDropdown,
+				deleteDropdown,
 				environmentSelector,
 				filterPanel,
 				tableSection,
@@ -458,7 +478,8 @@ export class PluginTraceViewerPanelComposed {
 				command: 'updateTableData',
 				data: {
 					viewModels,
-					columns: this.getTableConfig().columns
+					columns: this.getTableConfig().columns,
+					isLoading: false
 				}
 			});
 		} catch (error) {
@@ -560,6 +581,22 @@ export class PluginTraceViewerPanelComposed {
 	}
 
 	private async handleDeleteSelected(traceIds: string[]): Promise<void> {
+		if (traceIds.length === 0) {
+			await vscode.window.showWarningMessage('No traces selected for deletion');
+			return;
+		}
+
+		const confirmed = await vscode.window.showWarningMessage(
+			`Delete ${traceIds.length} selected trace(s)? This cannot be undone.`,
+			{ modal: true },
+			'Delete',
+			'Cancel'
+		);
+
+		if (confirmed !== 'Delete') {
+			return;
+		}
+
 		try {
 			this.logger.info('Deleting selected traces', { count: traceIds.length });
 
@@ -599,6 +636,17 @@ export class PluginTraceViewerPanelComposed {
 	}
 
 	private async handleDeleteOld(olderThanDays: number): Promise<void> {
+		const confirmed = await vscode.window.showWarningMessage(
+			`Delete all traces older than ${olderThanDays} days? This cannot be undone.`,
+			{ modal: true },
+			'Delete',
+			'Cancel'
+		);
+
+		if (confirmed !== 'Delete') {
+			return;
+		}
+
 		try {
 			this.logger.info('Deleting old traces', { olderThanDays });
 
@@ -712,10 +760,13 @@ export class PluginTraceViewerPanelComposed {
 		try {
 			this.logger.debug('Applying filters', { filterData });
 
+			// Convert local datetime values to UTC ISO before storing/processing
+			const normalizedFilterData = this.normalizeFilterDateTimes(filterData);
+
 			// Merge partial filter data with current filter criteria
 			this.filterCriteria = {
 				...this.filterCriteria,
-				...filterData
+				...normalizedFilterData
 			};
 
 			// Persist filter criteria
@@ -731,6 +782,45 @@ export class PluginTraceViewerPanelComposed {
 			this.logger.error('Failed to apply filters', error);
 			await vscode.window.showErrorMessage('Failed to apply filters');
 		}
+	}
+
+	/**
+	 * Converts local datetime values from webview to UTC ISO format.
+	 * This is the presentation layer's responsibility - converting from UI format to domain format.
+	 */
+	private normalizeFilterDateTimes(filterData: Partial<FilterCriteriaViewModel>): Partial<FilterCriteriaViewModel> {
+		if (!filterData.conditions) {
+			return filterData;
+		}
+
+		const normalizedConditions = filterData.conditions.map(condition => {
+			// Only convert datetime values for date fields
+			if (condition.field === 'Created On' && condition.value) {
+				try {
+					// Check if value is already in UTC ISO format
+					if (condition.value.includes('Z') || condition.value.includes('+')) {
+						return condition; // Already normalized
+					}
+
+					// Convert local datetime to UTC ISO
+					const dateFilter = DateTimeFilter.fromLocalDateTime(condition.value);
+					return {
+						...condition,
+						value: dateFilter.getUtcIso()
+					};
+				} catch (error) {
+					this.logger.warn('Failed to convert datetime filter', { condition, error });
+					return condition; // Keep original if conversion fails
+				}
+			}
+
+			return condition;
+		});
+
+		return {
+			...filterData,
+			conditions: normalizedConditions
+		};
 	}
 
 	private async handleClearFilters(): Promise<void> {
@@ -772,10 +862,11 @@ export class PluginTraceViewerPanelComposed {
 	}
 
 	/**
-	 * Load persisted filter criteria from storage for the current environment.
+	 * Load persisted filter criteria and auto-refresh from storage for the current environment.
 	 */
 	private async loadFilterCriteria(): Promise<void> {
 		if (!this.panelStateRepository) {
+			this.logger.warn('No panelStateRepository available');
 			return;
 		}
 
@@ -787,6 +878,11 @@ export class PluginTraceViewerPanelComposed {
 			const state = await this.panelStateRepository.load({
 				panelType: PluginTraceViewerPanelComposed.viewType,
 				environmentId: this.currentEnvironmentId
+			});
+
+			this.logger.debug('Loaded state from storage', {
+				hasState: !!state,
+				stateKeys: state ? Object.keys(state) : []
 			});
 
 			if (state?.filterCriteria) {
@@ -808,6 +904,23 @@ export class PluginTraceViewerPanelComposed {
 					hasState: !!state
 				});
 			}
+
+			// Load auto-refresh interval if persisted
+			if (state && typeof state === 'object' && 'autoRefreshInterval' in state) {
+				const interval = state.autoRefreshInterval as number;
+				this.logger.debug('Found autoRefreshInterval in state', { interval, type: typeof interval });
+				if (typeof interval === 'number' && interval >= 0) {
+					this.autoRefreshInterval = interval;
+					this.logger.info('Auto-refresh interval loaded from storage', { interval });
+				} else {
+					this.logger.warn('Invalid autoRefreshInterval in state', { interval, type: typeof interval });
+				}
+			} else {
+				this.logger.debug('No autoRefreshInterval in state', {
+					hasState: !!state,
+					hasKey: state && 'autoRefreshInterval' in state
+				});
+			}
 		} catch (error) {
 			this.logger.error('Failed to load filter criteria from storage', error);
 			// Don't throw - use default empty filter if loading fails
@@ -815,7 +928,7 @@ export class PluginTraceViewerPanelComposed {
 	}
 
 	/**
-	 * Save current filter criteria to storage for the current environment.
+	 * Save current filter criteria and auto-refresh to storage for the current environment.
 	 */
 	private async saveFilterCriteria(): Promise<void> {
 		if (!this.panelStateRepository) {
@@ -825,7 +938,8 @@ export class PluginTraceViewerPanelComposed {
 		try {
 			this.logger.debug('Saving filter criteria to storage', {
 				environmentId: this.currentEnvironmentId,
-				conditionCount: this.filterCriteria.conditions.length
+				conditionCount: this.filterCriteria.conditions.length,
+				autoRefreshInterval: this.autoRefreshInterval
 			});
 
 			// Load existing state to preserve other properties (like selectedSolutionId)
@@ -837,8 +951,14 @@ export class PluginTraceViewerPanelComposed {
 			const newState = {
 				selectedSolutionId: existingState?.selectedSolutionId || 'default',
 				lastUpdated: new Date().toISOString(),
-				filterCriteria: this.filterCriteria
+				filterCriteria: this.filterCriteria,
+				autoRefreshInterval: this.autoRefreshInterval
 			};
+
+			this.logger.debug('Saving state', {
+				stateKeys: Object.keys(newState),
+				autoRefreshInterval: newState.autoRefreshInterval
+			});
 
 			await this.panelStateRepository.save({
 				panelType: PluginTraceViewerPanelComposed.viewType,
@@ -871,15 +991,14 @@ export class PluginTraceViewerPanelComposed {
 				}, interval * 1000);
 
 				this.logger.info('Auto-refresh enabled', { interval });
-				await vscode.window.showInformationMessage(
-					`Auto-refresh enabled: every ${interval} seconds`
-				);
 			} else {
 				this.logger.info('Auto-refresh disabled');
-				await vscode.window.showInformationMessage('Auto-refresh disabled');
 			}
 
-			// Data-driven update: Send dropdown state change to frontend
+			// Persist auto-refresh interval
+			await this.saveFilterCriteria();
+
+			// Data-driven update: Send dropdown state change to frontend (button label updates to show current state)
 			await this.panel.webview.postMessage({
 				command: 'updateDropdownState',
 				data: {

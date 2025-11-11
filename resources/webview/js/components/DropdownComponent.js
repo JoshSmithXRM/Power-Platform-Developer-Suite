@@ -46,14 +46,26 @@ function setupDropdownItems() {
 			const itemId = item.getAttribute('data-dropdown-item-id');
 
 			if (dropdownId && itemId) {
-				// Optimistic update: Update UI immediately before backend confirms
-				updateDropdownState(dropdownId, itemId);
+				// Optimistic update: Only update checkmark for state dropdowns (not action dropdowns)
+				if (isStateDropdown(dropdownId)) {
+					updateDropdownState(dropdownId, itemId);
+				}
 
 				handleDropdownItemClick(dropdownId, itemId);
 				closeDropdown(dropdownId);
 			}
 		});
 	});
+}
+
+/**
+ * Checks if a dropdown represents state (should show checkmarks) vs actions (no checkmarks).
+ * State dropdowns: Trace Level, Auto-Refresh (persist user selection)
+ * Action dropdowns: Export, Delete (one-time actions)
+ */
+function isStateDropdown(dropdownId) {
+	const stateDropdowns = ['traceLevelDropdown', 'autoRefreshDropdown'];
+	return stateDropdowns.includes(dropdownId);
 }
 
 /**
@@ -176,7 +188,7 @@ function focusDropdownItem(items, index) {
 
 /**
  * Updates dropdown selected state without re-rendering.
- * Moves checkmark to newly selected item.
+ * Moves checkmark to newly selected item and updates button label.
  *
  * @param {string} dropdownId - ID of the dropdown to update
  * @param {string} selectedId - ID of the item to mark as selected
@@ -214,6 +226,48 @@ function updateDropdownState(dropdownId, selectedId) {
 			}
 		}
 	});
+
+	// Update button label for dropdowns that show current state
+	updateDropdownButtonLabel(dropdownId, selectedId);
+}
+
+/**
+ * Updates the dropdown button label to show the current selection.
+ * Only updates buttons for dropdowns that display state (trace level, auto-refresh).
+ *
+ * @param {string} dropdownId - ID of the dropdown
+ * @param {string} selectedId - ID of the selected item
+ */
+function updateDropdownButtonLabel(dropdownId, selectedId) {
+	const button = document.getElementById(dropdownId);
+	if (!button) {
+		return;
+	}
+
+	const labelSpan = button.querySelector('.dropdown-label');
+	if (!labelSpan) {
+		return;
+	}
+
+	// Define label templates for dropdowns that show state
+	const labelTemplates = {
+		'traceLevelDropdown': {
+			'0': 'Trace Level: Off',
+			'1': 'Trace Level: Exception',
+			'2': 'Trace Level: All'
+		},
+		'autoRefreshDropdown': {
+			'0': 'Auto-Refresh: Off',
+			'10': 'Auto-Refresh: 10s',
+			'30': 'Auto-Refresh: 30s',
+			'60': 'Auto-Refresh: 60s'
+		}
+	};
+
+	const templates = labelTemplates[dropdownId];
+	if (templates && templates[selectedId]) {
+		labelSpan.textContent = templates[selectedId];
+	}
 }
 
 /**
@@ -255,6 +309,7 @@ function handleDropdownItemClick(dropdownId, itemId) {
 			'json': 'exportJson'
 		},
 		'deleteDropdown': {
+			'selected': 'deleteSelected',
 			'all': 'deleteAll',
 			'old': 'deleteOld'
 		},
