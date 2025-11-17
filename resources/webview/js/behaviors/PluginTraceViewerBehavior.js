@@ -3,6 +3,15 @@
  * Handles all client-side interactions for the Plugin Trace Viewer panel.
  */
 
+import { JsonHighlighter } from '../utils/JsonHighlighter.js';
+import { renderTimeline } from './TimelineBehavior.js';
+
+// Store current trace data for display
+let currentTraceData = null;
+let currentRawEntity = null; // Raw entity data from API (not the ViewModel)
+let currentTraces = [];
+let timelineData = null;
+
 window.createBehavior({
 	initialize() {
 		setupTraceLevelButton();
@@ -22,6 +31,8 @@ window.createBehavior({
 			updateDetailPanel(message.data);
 		} else if (message.command === 'clearFilterPanel') {
 			clearFilterPanel();
+		} else if (message.command === 'updateTimeline') {
+			updateTimeline(message.data);
 		}
 	}
 });
@@ -34,6 +45,9 @@ window.createBehavior({
  */
 function updateTableData(data) {
 	const { viewModels, columns, isLoading } = data;
+
+	// Store current traces for related traces display
+	currentTraces = viewModels || [];
 
 	// Get table body
 	const tbody = document.querySelector('tbody');
@@ -85,6 +99,11 @@ function updateDetailPanel(data) {
 		console.warn('[PluginTraceViewer] No detail section found for panel update');
 		return;
 	}
+
+	// Store current trace data (ViewModel for display)
+	currentTraceData = data.trace;
+	// Store raw entity data (actual API values for Raw Data tab)
+	currentRawEntity = data.rawEntity;
 
 	// Render new detail panel HTML using DetailPanelRenderer
 	const detailHtml = window.DetailPanelRenderer.renderDetailPanel(data.trace);
@@ -146,6 +165,15 @@ function setupDetailPanelTabs() {
 			const targetContent = document.getElementById('tab-' + targetTab);
 			if (targetContent) {
 				targetContent.classList.add('active');
+			}
+
+			// Handle special tab activations
+			if (targetTab === 'raw') {
+				displayRawData();
+			} else if (targetTab === 'related' && currentTraceData) {
+				displayRelatedTraces(currentTraceData);
+			} else if (targetTab === 'timeline' && currentTraceData) {
+				displayTimeline(currentTraceData);
 			}
 		});
 	});
@@ -870,4 +898,215 @@ function escapeHtml(str) {
 	const div = document.createElement('div');
 	div.textContent = str;
 	return div.innerHTML;
+}
+
+/**
+ * Displays raw trace data with JSON syntax highlighting.
+ * Uses currentRawEntity (actual API values), NOT the ViewModel.
+ */
+function displayRawData() {
+	const container = document.getElementById('rawDataDisplay');
+	if (!container) {
+		console.warn('[PluginTraceViewer] rawDataDisplay container not found');
+		return;
+	}
+
+	if (!currentRawEntity) {
+		console.warn('[PluginTraceViewer] No raw entity data available');
+		container.innerHTML = '<div style="padding: 16px; color: var(--vscode-errorForeground);">No raw data available</div>';
+		return;
+	}
+
+	// Inject JSON highlighter styles if not already present
+	if (!document.getElementById('json-highlighter-styles')) {
+		const styleTag = document.createElement('style');
+		styleTag.id = 'json-highlighter-styles';
+		styleTag.textContent = JsonHighlighter.getStyles();
+		document.head.appendChild(styleTag);
+	}
+
+	// Render syntax-highlighted JSON from raw entity (actual API values)
+	container.innerHTML = JsonHighlighter.highlight(currentRawEntity);
+}
+
+/**
+ * Displays related traces by correlation ID.
+ * @param {Object} currentTrace - The current trace view model
+ */
+function displayRelatedTraces(currentTrace) {
+	const container = document.getElementById('relatedTracesContainer');
+	if (!container) {
+		console.warn('[PluginTraceViewer] relatedTracesContainer not found');
+		return;
+	}
+
+	// Filter traces by correlation ID
+	const correlationId = currentTrace.correlationId;
+	if (!correlationId || correlationId === 'N/A') {
+		container.innerHTML = '<div class="related-traces-empty">No correlation ID available for this trace</div>';
+		return;
+	}
+
+	// Find all traces with matching correlation ID
+	const relatedTraces = currentTraces.filter(trace =>
+		trace.correlationId === correlationId && trace.id !== currentTrace.id
+	);
+
+	if (relatedTraces.length === 0) {
+		container.innerHTML = '<div class="related-traces-empty">No other traces found with this correlation ID</div>';
+		return;
+	}
+
+	// Render related traces list
+	const relatedHtml = relatedTraces.map(trace => {
+		const statusClass = trace.status.toLowerCase().includes('exception') ? 'exception' : 'success';
+		return `
+			<div class="related-trace-item"
+			     data-command="viewTrace"
+			     data-trace-id="${escapeHtml(trace.id)}"
+			     style="cursor: pointer;">
+				<div class="related-trace-title">
+					<span class="status-indicator ${statusClass}"></span>
+					${escapeHtml(trace.pluginName)}
+				</div>
+				<div class="related-trace-meta">
+					<span>${escapeHtml(trace.messageName)}</span>
+					<span>Depth: ${escapeHtml(trace.depth)}</span>
+					<span>${escapeHtml(trace.duration)}</span>
+				</div>
+			</div>
+		`;
+	}).join('');
+
+	container.innerHTML = relatedHtml;
+
+	// Add click handlers for related trace navigation
+	container.querySelectorAll('.related-trace-item').forEach(item => {
+		item.addEventListener('click', () => {
+			const traceId = item.dataset.traceId;
+			// Send message to extension to select and display this trace
+			vscode.postMessage({
+				command: 'viewTrace',
+				data: { traceId }
+			});
+		});
+	});
+}
+
+/**
+ * Updates timeline data from extension.
+ * @param {Object} data - Timeline view model data
+ */
+function updateTimeline(data) {
+	timelineData = data;
+
+	// If timeline tab is active, render immediately
+	const timelineTab = document.querySelector('.tab-btn[data-tab="timeline"]');
+	if (timelineTab && timelineTab.classList.contains('active')) {
+		displayTimeline(currentTraceData);
+	}
+}
+
+/**
+ * Displays timeline for current trace.
+ * @param {Object} currentTrace - Current trace view model
+ */
+function displayTimeline(currentTrace) {
+	const container = document.getElementById('timelineContainer');
+	if (!container) {
+		console.warn('[PluginTraceViewer] timelineContainer not found');
+		return;
+	}
+
+	if (!timelineData) {
+		// Request timeline data from extension
+		vscode.postMessage({
+			command: 'loadTimeline',
+			data: { correlationId: currentTrace.correlationId }
+		});
+		container.innerHTML = '<div class="timeline-loading">Loading timeline...</div>';
+		return;
+	}
+
+	// Render timeline using TimelineBehavior
+	renderTimeline(timelineData, 'timelineContainer');
+}
+
+/**
+ * Helper function to render timeline from data (called by TimelineBehavior).
+ * @param {Object} timeline - Timeline view model
+ * @returns {string} HTML string
+ */
+window.renderTimelineFromData = function(timeline) {
+	if (!timeline || !timeline.nodes || timeline.nodes.length === 0) {
+		return `
+			<div class="timeline-empty">
+				<p>No timeline data available</p>
+				<p class="timeline-empty-hint">Timeline requires traces with correlation ID</p>
+			</div>
+		`;
+	}
+
+	return `
+		<div class="timeline-container">
+			<div class="timeline-header">
+				<h3>Execution Timeline</h3>
+				<div class="timeline-meta">
+					<span><strong>Correlation ID:</strong> ${escapeHtml(timeline.correlationId)}</span>
+					<span><strong>Total Duration:</strong> ${escapeHtml(timeline.totalDuration)}</span>
+					<span><strong>Traces:</strong> ${timeline.traceCount}</span>
+				</div>
+			</div>
+			<div class="timeline-content">
+				${timeline.nodes.map(node => renderTimelineNode(node)).join('')}
+			</div>
+			<div class="timeline-legend">
+				<div class="timeline-legend-item">
+					<div class="timeline-legend-bar timeline-bar-success"></div>
+					<span>Success</span>
+				</div>
+				<div class="timeline-legend-item">
+					<div class="timeline-legend-bar timeline-bar-exception"></div>
+					<span>Exception</span>
+				</div>
+			</div>
+		</div>
+	`;
+};
+
+/**
+ * Renders a timeline node recursively.
+ * @param {Object} node - Timeline node view model
+ * @returns {string} HTML string
+ */
+function renderTimelineNode(node) {
+	const statusClass = node.hasException ? 'exception' : 'success';
+	const depthClass = `timeline-item-depth-${Math.min(node.depth, 4)}`;
+	const hasChildren = node.children && node.children.length > 0;
+	const toggleIcon = hasChildren ? '▾' : '';
+
+	return `
+		<div class="timeline-item ${depthClass}" data-trace-id="${escapeHtml(node.id)}" data-depth="${node.depth}">
+			<div class="timeline-item-header">
+				${hasChildren ? `<span class="timeline-toggle">${toggleIcon}</span>` : '<span class="timeline-toggle-spacer"></span>'}
+				<span class="timeline-item-title">${escapeHtml(node.pluginName)}</span>
+				<span class="timeline-item-message">${escapeHtml(node.messageName)}</span>
+				${node.entityName !== 'N/A' ? `<span class="timeline-item-entity">(${escapeHtml(node.entityName)})</span>` : ''}
+			</div>
+			<div class="timeline-bar-container">
+				<div class="timeline-bar timeline-bar-${statusClass}"
+				     style="left: ${node.offsetPercent}%; width: ${node.widthPercent}%;"
+				     data-trace-id="${escapeHtml(node.id)}">
+					<div class="timeline-bar-fill"></div>
+				</div>
+				<div class="timeline-item-metadata">
+					<span class="timeline-time">${escapeHtml(node.time)}</span>
+					<span class="timeline-duration">${escapeHtml(node.duration)}</span>
+					<span class="timeline-mode-badge">${escapeHtml(node.mode)}</span>
+					${node.hasException ? '<span class="timeline-exception-indicator" title="Exception occurred">⚠</span>' : ''}
+				</div>
+			</div>
+			${hasChildren ? `<div class="timeline-children">${node.children.map(child => renderTimelineNode(child)).join('')}</div>` : ''}
+		</div>
+	`;
 }

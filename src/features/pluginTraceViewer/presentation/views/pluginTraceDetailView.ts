@@ -26,12 +26,18 @@ export function renderPluginTraceDetail(trace: PluginTraceDetailViewModel | null
 				<button class="tab-btn active" data-tab="overview">Overview</button>
 				<button class="tab-btn" data-tab="details">Details</button>
 				<button class="tab-btn" data-tab="configuration">Configuration</button>
+				<button class="tab-btn" data-tab="timeline">Timeline</button>
+				<button class="tab-btn" data-tab="related">Related</button>
+				<button class="tab-btn" data-tab="raw">Raw Data</button>
 			</div>
 
 			<div class="trace-detail-content">
 				${renderOverviewTab(trace)}
 				${renderDetailsTab(trace)}
 				${renderConfigurationTab(trace)}
+				${renderTimelineTabPlaceholder(trace)}
+				${renderRelatedTab(trace)}
+				${renderRawDataTab(trace)}
 			</div>
 		</div>
 	`;
@@ -155,6 +161,54 @@ function renderConfigurationTab(trace: PluginTraceDetailViewModel): string {
 
 					<div class="detail-label">Secure Configuration:</div>
 					<div class="detail-value">${trace.secureConfiguration ? escapeHtml(trace.secureConfiguration) : '<span class="empty">None</span>'}</div>
+				</div>
+			</div>
+		</div>
+	`;
+}
+
+function renderRelatedTab(trace: PluginTraceDetailViewModel): string {
+	return `
+		<div id="tab-related" class="tab-content">
+			<div class="detail-section">
+				<div class="detail-section-title">Related Traces</div>
+				<div class="detail-section-description">
+					Traces with the same Correlation ID: ${trace.correlationId !== 'N/A' ? escapeHtml(trace.correlationId) : '<span class="empty">N/A</span>'}
+				</div>
+				<div id="relatedTracesContainer" class="related-traces-container">
+					<div class="related-traces-loading">Loading related traces...</div>
+				</div>
+			</div>
+		</div>
+	`;
+}
+
+function renderTimelineTabPlaceholder(trace: PluginTraceDetailViewModel): string {
+	return `
+		<div id="tab-timeline" class="tab-content">
+			<div class="detail-section">
+				<div class="detail-section-title">Execution Timeline</div>
+				<div class="detail-section-description">
+					Traces with Correlation ID: ${trace.correlationId !== 'N/A' ? escapeHtml(trace.correlationId) : '<span class="empty">N/A</span>'}
+				</div>
+				<div id="timelineContainer" class="timeline-container-wrapper">
+					<div class="timeline-loading">Loading timeline...</div>
+				</div>
+			</div>
+		</div>
+	`;
+}
+
+function renderRawDataTab(_trace: PluginTraceDetailViewModel): string {
+	return `
+		<div id="tab-raw" class="tab-content">
+			<div class="detail-section">
+				<div class="detail-section-title">Raw Trace Data</div>
+				<div class="detail-section-description">
+					Complete trace object with syntax highlighting
+				</div>
+				<div id="rawDataDisplay" class="raw-data-display">
+					<!-- JSON will be injected here by webview behavior -->
 				</div>
 			</div>
 		</div>

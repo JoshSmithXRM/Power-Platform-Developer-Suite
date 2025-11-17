@@ -50,12 +50,18 @@ function renderDetailPanel(trace) {
 				<button class="tab-btn active" data-tab="overview">Overview</button>
 				<button class="tab-btn" data-tab="details">Details</button>
 				<button class="tab-btn" data-tab="configuration">Configuration</button>
+				<button class="tab-btn" data-tab="timeline">Timeline</button>
+				<button class="tab-btn" data-tab="related">Related</button>
+				<button class="tab-btn" data-tab="raw">Raw Data</button>
 			</div>
 
 			<div class="trace-detail-content">
 				${renderOverviewTab(trace)}
 				${renderDetailsTab(trace)}
 				${renderConfigurationTab(trace)}
+				${renderTimelineTab(trace)}
+				${renderRelatedTab(trace)}
+				${renderRawDataTab(trace)}
 			</div>
 		</div>
 	`;
@@ -188,6 +194,55 @@ function renderConfigurationTab(trace) {
 
 					<div class="detail-label">Secure Configuration:</div>
 					<div class="detail-value">${trace.secureConfiguration ? escapeHtml(trace.secureConfiguration) : '<span class="empty">None</span>'}</div>
+				</div>
+			</div>
+		</div>
+	`;
+}
+
+/**
+ * Renders the Timeline tab placeholder.
+ */
+function renderTimelineTab(trace) {
+	const correlationId = trace.correlationId !== 'N/A' ? escapeHtml(trace.correlationId) : '<span class="empty">N/A</span>';
+	return `
+		<div id="tab-timeline" class="tab-content">
+			<div class="detail-section">
+				<div class="detail-section-title">Correlation ID: ${correlationId}</div>
+				<div id="timelineContainer" class="timeline-container">
+					<div class="timeline-loading">Loading timeline...</div>
+				</div>
+			</div>
+		</div>
+	`;
+}
+
+/**
+ * Renders the Related Traces tab.
+ */
+function renderRelatedTab(trace) {
+	const correlationId = trace.correlationId !== 'N/A' ? escapeHtml(trace.correlationId) : '<span class="empty">N/A</span>';
+	return `
+		<div id="tab-related" class="tab-content">
+			<div class="detail-section">
+				<div class="detail-section-title">Correlation ID: ${correlationId}</div>
+				<div id="relatedTracesContainer" class="related-traces-container">
+					<div class="related-traces-loading">Loading related traces...</div>
+				</div>
+			</div>
+		</div>
+	`;
+}
+
+/**
+ * Renders the Raw Data tab.
+ */
+function renderRawDataTab(trace) {
+	return `
+		<div id="tab-raw" class="tab-content">
+			<div class="detail-section">
+				<div id="rawDataDisplay" class="raw-data-display">
+					<!-- JSON will be injected here by webview behavior -->
 				</div>
 			</div>
 		</div>

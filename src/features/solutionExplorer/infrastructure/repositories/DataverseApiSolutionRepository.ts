@@ -65,6 +65,20 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
     cancellationToken?: ICancellationToken
   ): Promise<Solution[]> {
     const defaultOptions: QueryOptions = {
+      select: [
+        'solutionid',
+        'uniquename',
+        'friendlyname',
+        'version',
+        'ismanaged',
+        '_publisherid_value',
+        'installedon',
+        'description',
+        'modifiedon',
+        'isvisible',
+        'isapimanaged',
+        'solutiontype'
+      ],
       expand: 'publisherid($select=friendlyname)',
       orderBy: 'friendlyname'
     };

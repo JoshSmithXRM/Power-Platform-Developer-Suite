@@ -845,6 +845,7 @@ async function initializePluginTraceViewer(
 	const { ExportTracesUseCase } = await import('./features/pluginTraceViewer/application/useCases/ExportTracesUseCase.js');
 	const { GetTraceLevelUseCase } = await import('./features/pluginTraceViewer/application/useCases/GetTraceLevelUseCase.js');
 	const { SetTraceLevelUseCase } = await import('./features/pluginTraceViewer/application/useCases/SetTraceLevelUseCase.js');
+	const { BuildTimelineUseCase } = await import('./features/pluginTraceViewer/application/useCases/BuildTimelineUseCase.js');
 	const { PluginTraceViewModelMapper } = await import('./features/pluginTraceViewer/presentation/mappers/PluginTraceViewModelMapper.js');
 	const { PluginTraceViewerPanelComposed } = await import('./features/pluginTraceViewer/presentation/panels/PluginTraceViewerPanelComposed.js');
 
@@ -859,6 +860,7 @@ async function initializePluginTraceViewer(
 	const exportTracesUseCase = new ExportTracesUseCase(pluginTraceExporter, logger);
 	const getTraceLevelUseCase = new GetTraceLevelUseCase(pluginTraceRepository, logger);
 	const setTraceLevelUseCase = new SetTraceLevelUseCase(pluginTraceRepository, logger);
+	const buildTimelineUseCase = new BuildTimelineUseCase(logger);
 
 	const viewModelMapper = new PluginTraceViewModelMapper();
 
@@ -875,6 +877,7 @@ async function initializePluginTraceViewer(
 		exportTracesUseCase,
 		getTraceLevelUseCase,
 		setTraceLevelUseCase,
+		buildTimelineUseCase,
 		viewModelMapper,
 		logger,
 		initialEnvironmentId,

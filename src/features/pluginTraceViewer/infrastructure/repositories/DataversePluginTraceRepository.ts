@@ -22,8 +22,12 @@ interface DataversePluginTraceLogsResponse {
 /**
  * DTO representing a plugin trace log from Dataverse Web API
  * Maps to the plugintracelog entity schema
+ *
+ * Fields are marked optional if they are only fetched in detail view (getTraceById)
+ * to support optimized list queries (getTraces) that exclude large text fields
  */
 interface DataversePluginTraceLogDto {
+	// Always selected (list view)
 	plugintracelogid: string;
 	createdon: string;
 	typename: string;
@@ -33,22 +37,23 @@ interface DataversePluginTraceLogDto {
 	mode: number;
 	depth: number;
 	performanceexecutionduration: number;
-	performanceconstructorduration: number;
-	performanceexecutionstarttime: string | null;
-	performanceconstructorstarttime: string | null;
-	exceptiondetails: string | null;
-	messageblock: string | null;
-	configuration: string | null;
-	secureconfiguration: string | null;
-	correlationid: string | null;
-	requestid: string | null;
-	pluginstepid: string | null;
-	persistencekey: string | null;
-	organizationid: string | null;
-	profile: string | null;
-	issystemcreated: boolean | null;
-	_createdby_value: string | null;
-	_createdonbehalfby_value: string | null;
+	// Detail view only
+	performanceconstructorduration?: number;
+	performanceexecutionstarttime?: string | null;
+	performanceconstructorstarttime?: string | null;
+	exceptiondetails?: string | null;
+	messageblock?: string | null;
+	configuration?: string | null;
+	secureconfiguration?: string | null;
+	correlationid?: string | null;
+	requestid?: string | null;
+	pluginstepid?: string | null;
+	persistencekey?: string | null;
+	organizationid?: string | null;
+	profile?: string | null;
+	issystemcreated?: boolean | null;
+	_createdby_value?: string | null;
+	_createdonbehalfby_value?: string | null;
 }
 
 /**
@@ -74,7 +79,24 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		environmentId: string,
 		filter: TraceFilter
 	): Promise<readonly PluginTrace[]> {
-		const queryParams: string[] = [`$top=${filter.top}`];
+		// Optimize query by selecting only fields needed for table view
+		// Large text fields (messageblock, configuration, secureconfiguration, profile, exceptiondetails) excluded from list view
+		const selectFields = [
+			'plugintracelogid',
+			'createdon',
+			'typename',
+			'primaryentity',
+			'messagename',
+			'operationtype',
+			'mode',
+			'depth',
+			'performanceexecutionduration'
+		].join(',');
+
+		const queryParams: string[] = [
+			`$select=${selectFields}`,
+			`$top=${filter.top}`
+		];
 
 		if (filter.orderBy) {
 			queryParams.push(`$orderby=${filter.orderBy}`);
@@ -130,7 +152,36 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		environmentId: string,
 		traceId: string
 	): Promise<PluginTrace | null> {
-		const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ENTITY_SET}(${traceId})`;
+		// Select all fields needed for detail view including large text fields
+		const selectFields = [
+			'plugintracelogid',
+			'createdon',
+			'typename',
+			'primaryentity',
+			'messagename',
+			'operationtype',
+			'mode',
+			'depth',
+			'performanceexecutionduration',
+			'performanceconstructorduration',
+			'performanceexecutionstarttime',
+			'performanceconstructorstarttime',
+			'exceptiondetails',
+			'messageblock',
+			'configuration',
+			'secureconfiguration',
+			'correlationid',
+			'requestid',
+			'pluginstepid',
+			'persistencekey',
+			'organizationid',
+			'profile',
+			'issystemcreated',
+			'_createdby_value',
+			'_createdonbehalfby_value'
+		].join(',');
+
+		const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ENTITY_SET}(${traceId})?$select=${selectFields}`;
 
 		this.logger.debug('Fetching single plugin trace from Dataverse', {
 			environmentId,
@@ -428,7 +479,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 				dto.performanceexecutionduration
 			),
 			constructorDuration: Duration.fromMilliseconds(
-				dto.performanceconstructorduration
+				dto.performanceconstructorduration ?? 0
 			),
 			executionStartTime: dto.performanceexecutionstarttime
 				? new Date(dto.performanceexecutionstarttime)
@@ -436,21 +487,21 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			constructorStartTime: dto.performanceconstructorstarttime
 				? new Date(dto.performanceconstructorstarttime)
 				: null,
-			exceptionDetails: dto.exceptiondetails,
-			messageBlock: dto.messageblock,
-			configuration: dto.configuration,
-			secureConfiguration: dto.secureconfiguration,
+			exceptionDetails: dto.exceptiondetails ?? null,
+			messageBlock: dto.messageblock ?? null,
+			configuration: dto.configuration ?? null,
+			secureConfiguration: dto.secureconfiguration ?? null,
 			correlationId: dto.correlationid
 				? CorrelationId.create(dto.correlationid)
 				: null,
-			requestId: dto.requestid,
-			pluginStepId: dto.pluginstepid,
-			persistenceKey: dto.persistencekey,
-			organizationId: dto.organizationid,
-			profile: dto.profile,
-			isSystemCreated: dto.issystemcreated,
-			createdBy: dto._createdby_value,
-			createdOnBehalfBy: dto._createdonbehalfby_value,
+			requestId: dto.requestid ?? null,
+			pluginStepId: dto.pluginstepid ?? null,
+			persistenceKey: dto.persistencekey ?? null,
+			organizationId: dto.organizationid ?? null,
+			profile: dto.profile ?? null,
+			isSystemCreated: dto.issystemcreated ?? null,
+			createdBy: dto._createdby_value ?? null,
+			createdOnBehalfBy: dto._createdonbehalfby_value ?? null,
 		});
 	}
 

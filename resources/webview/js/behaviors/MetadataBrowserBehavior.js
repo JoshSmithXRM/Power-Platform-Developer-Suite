@@ -709,7 +709,7 @@ window.createBehavior({
 	showDetailPanel(data) {
 		console.log('[MetadataBrowser] showDetailPanel called', { data });
 
-		const { tab, itemId, metadata } = data;
+		const { tab, itemId, metadata, rawEntity } = data;
 
 		if (!metadata) {
 			console.error('[MetadataBrowser] No metadata provided to showDetailPanel');
@@ -725,8 +725,8 @@ window.createBehavior({
 		// Render properties
 		this.renderProperties(metadata);
 
-		// Render raw data
-		this.renderRawData(metadata);
+		// Render raw data (use rawEntity if available, otherwise metadata)
+		this.renderRawData(rawEntity || metadata);
 
 		// Show panel
 		const panel = document.getElementById('detailPanel');

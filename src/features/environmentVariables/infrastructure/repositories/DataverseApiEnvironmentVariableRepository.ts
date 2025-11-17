@@ -44,6 +44,16 @@ export class DataverseApiEnvironmentVariableRepository implements IEnvironmentVa
 	): Promise<EnvironmentVariableDefinitionData[]> {
 		// Order by schema name to ensure consistent display order across panel refreshes
 		const defaultOptions: QueryOptions = {
+			select: [
+				'environmentvariabledefinitionid',
+				'schemaname',
+				'displayname',
+				'type',
+				'defaultvalue',
+				'ismanaged',
+				'description',
+				'modifiedon'
+			],
 			orderBy: 'schemaname'
 		};
 
@@ -96,7 +106,13 @@ export class DataverseApiEnvironmentVariableRepository implements IEnvironmentVa
 		cancellationToken?: ICancellationToken
 	): Promise<EnvironmentVariableValueData[]> {
 		// Values are joined with definitions by ID in memory, so API order doesn't matter
-		const defaultOptions: QueryOptions = {};
+		const defaultOptions: QueryOptions = {
+			select: [
+				'environmentvariablevalueid',
+				'_environmentvariabledefinitionid_value',
+				'value'
+			]
+		};
 
 		const mergedOptions: QueryOptions = {
 			...defaultOptions,

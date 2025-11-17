@@ -20,6 +20,8 @@ import type { OpenInMakerUseCase } from '../../application/useCases/OpenInMakerU
 import type { MetadataTab } from '../../application/viewModels/DetailPanelViewModel';
 import type { IEntityMetadataRepository } from '../../domain/repositories/IEntityMetadataRepository';
 import { MetadataBrowserLayoutSection } from '../sections/MetadataBrowserLayoutSection';
+import { AttributeMetadataSerializer } from '../serializers/AttributeMetadataSerializer';
+import type { AttributeMetadata } from '../../domain/entities/AttributeMetadata';
 
 /**
  * Commands supported by Metadata Browser panel.
@@ -60,6 +62,7 @@ export class MetadataBrowserPanel {
 	private readonly coordinator: PanelCoordinator<MetadataBrowserCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
 	private readonly stateRepository: VSCodePanelStateRepository;
+	private readonly attributeMetadataSerializer: AttributeMetadataSerializer;
 
 	// Current state
 	private currentEnvironmentId: string;
@@ -88,6 +91,7 @@ export class MetadataBrowserPanel {
 			context.workspaceState,
 			logger
 		);
+		this.attributeMetadataSerializer = new AttributeMetadataSerializer();
 
 		logger.debug('MetadataBrowserPanel: Initializing');
 
@@ -572,12 +576,19 @@ export class MetadataBrowserPanel {
 	): Promise<void> {
 		this.logger.debug('Opening detail panel', { tab: tab as string, itemId });
 
+		// Serialize to raw API format if it's an AttributeMetadata entity
+		let rawEntity: Record<string, unknown> | null = null;
+		if (this.isAttributeMetadata(metadata)) {
+			rawEntity = this.attributeMetadataSerializer.serializeToRaw(metadata);
+		}
+
 		const postData = {
 			command: 'showDetailPanel',
 			data: {
 				tab: tab as string,
 				itemId,
-				metadata
+				metadata,
+				rawEntity
 			}
 		};
 		await this.panel.webview.postMessage(postData);
@@ -719,5 +730,19 @@ export class MetadataBrowserPanel {
 	private isValidMetadataTab(value: string): value is MetadataTab {
 		const validTabs: readonly string[] = ['attributes', 'keys', 'relationships', 'privileges', 'choiceValues'];
 		return validTabs.includes(value);
+	}
+
+	/**
+	 * Type guard to check if metadata is AttributeMetadata entity.
+	 */
+	private isAttributeMetadata(metadata: unknown): metadata is AttributeMetadata {
+		return (
+			typeof metadata === 'object' &&
+			metadata !== null &&
+			'logicalName' in metadata &&
+			'schemaName' in metadata &&
+			'attributeType' in metadata &&
+			'metadataId' in metadata
+		);
 	}
 }

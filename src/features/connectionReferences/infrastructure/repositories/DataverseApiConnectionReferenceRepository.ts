@@ -55,6 +55,15 @@ export class DataverseApiConnectionReferenceRepository implements IConnectionRef
 		cancellationToken?: ICancellationToken
 	): Promise<ConnectionReference[]> {
 		const defaultOptions: QueryOptions = {
+			select: [
+				'connectionreferenceid',
+				'connectionreferencelogicalname',
+				'connectionreferencedisplayname',
+				'connectorid',
+				'connectionid',
+				'ismanaged',
+				'modifiedon'
+			],
 			orderBy: 'connectionreferencelogicalname'
 		};
 

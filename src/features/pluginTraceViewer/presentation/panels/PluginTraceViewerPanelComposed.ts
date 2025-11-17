@@ -27,9 +27,13 @@ import type { DeleteTracesUseCase } from '../../application/useCases/DeleteTrace
 import type { ExportTracesUseCase } from '../../application/useCases/ExportTracesUseCase';
 import type { GetTraceLevelUseCase } from '../../application/useCases/GetTraceLevelUseCase';
 import type { SetTraceLevelUseCase } from '../../application/useCases/SetTraceLevelUseCase';
+import type { BuildTimelineUseCase } from '../../application/useCases/BuildTimelineUseCase';
 import type { PluginTraceViewModelMapper } from '../mappers/PluginTraceViewModelMapper';
+import { TimelineViewModelMapper } from '../mappers/TimelineViewModelMapper';
+import { PluginTraceSerializer } from '../serializers/PluginTraceSerializer';
 import { TraceLevelFormatter } from '../utils/TraceLevelFormatter';
 import type { PluginTrace } from '../../domain/entities/PluginTrace';
+import type { TimelineNode } from '../../domain/valueObjects/TimelineNode';
 import type { ExportFormat } from '../../domain/types/ExportFormat';
 import { TraceLevel } from '../../application/types';
 import { PluginTraceDetailSection } from '../sections/PluginTraceDetailSection';
@@ -50,6 +54,7 @@ type PluginTraceViewerCommands =
 	| 'openMaker'
 	| 'environmentChange'
 	| 'viewDetail'
+	| 'viewTrace'
 	| 'closeDetail'
 	| 'deleteSelected'
 	| 'deleteAll'
@@ -59,6 +64,7 @@ type PluginTraceViewerCommands =
 	| 'setTraceLevel'
 	| 'setAutoRefresh'
 	| 'loadRelatedTraces'
+	| 'loadTimeline'
 	| 'applyFilters'
 	| 'clearFilters';
 
@@ -74,6 +80,8 @@ export class PluginTraceViewerPanelComposed {
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
 	private readonly detailSection: PluginTraceDetailSection;
 	private readonly filterCriteriaMapper: FilterCriteriaMapper;
+	private readonly timelineViewModelMapper: TimelineViewModelMapper;
+	private readonly traceSerializer: PluginTraceSerializer;
 	private currentEnvironmentId: string;
 	private traces: readonly PluginTrace[] = [];
 	private currentTraceLevel: TraceLevel | null = null;
@@ -95,6 +103,7 @@ export class PluginTraceViewerPanelComposed {
 		private readonly exportTracesUseCase: ExportTracesUseCase,
 		private readonly getTraceLevelUseCase: GetTraceLevelUseCase,
 		private readonly setTraceLevelUseCase: SetTraceLevelUseCase,
+		private readonly buildTimelineUseCase: BuildTimelineUseCase,
 		private readonly viewModelMapper: PluginTraceViewModelMapper,
 		private readonly logger: ILogger,
 		private readonly panelStateRepository: IPanelStateRepository | null,
@@ -102,6 +111,8 @@ export class PluginTraceViewerPanelComposed {
 	) {
 		this.currentEnvironmentId = environmentId;
 		this.filterCriteriaMapper = new FilterCriteriaMapper();
+		this.timelineViewModelMapper = new TimelineViewModelMapper();
+		this.traceSerializer = new PluginTraceSerializer();
 		this.filterCriteria = FilterCriteriaMapper.empty();
 		logger.debug('PluginTraceViewerPanel: Initialized with new architecture');
 
@@ -133,6 +144,7 @@ export class PluginTraceViewerPanelComposed {
 		exportTracesUseCase: ExportTracesUseCase,
 		getTraceLevelUseCase: GetTraceLevelUseCase,
 		setTraceLevelUseCase: SetTraceLevelUseCase,
+		buildTimelineUseCase: BuildTimelineUseCase,
 		viewModelMapper: PluginTraceViewModelMapper,
 		logger: ILogger,
 		initialEnvironmentId?: string,
@@ -180,6 +192,7 @@ export class PluginTraceViewerPanelComposed {
 			exportTracesUseCase,
 			getTraceLevelUseCase,
 			setTraceLevelUseCase,
+			buildTimelineUseCase,
 			viewModelMapper,
 			logger,
 			panelStateRepository || null,
@@ -375,6 +388,16 @@ export class PluginTraceViewerPanelComposed {
 			}
 		});
 
+		this.coordinator.registerHandler('viewTrace', async (data) => {
+			this.logger.info('ViewTrace command received', { data });
+			const traceId = (data as { traceId?: string })?.traceId;
+			if (traceId) {
+				await this.handleViewDetail(traceId);
+			} else {
+				this.logger.warn('ViewTrace called but no traceId in data', { data });
+			}
+		});
+
 		this.coordinator.registerHandler('closeDetail', async () => {
 			await this.handleCloseDetail();
 		});
@@ -423,6 +446,11 @@ export class PluginTraceViewerPanelComposed {
 			if (correlationId) {
 				await this.handleLoadRelatedTraces(correlationId);
 			}
+		});
+
+		this.coordinator.registerHandler('loadTimeline', async (data) => {
+			const correlationId = (data as { correlationId?: string })?.correlationId ?? null;
+			await this.handleLoadTimeline(correlationId);
 		});
 
 		this.coordinator.registerHandler('applyFilters', async (data) => {
@@ -544,10 +572,12 @@ export class PluginTraceViewerPanelComposed {
 			this.logger.info('Detail section updated, sending data to frontend');
 
 			// Data-driven update: Send detail panel data to frontend
+			// Include both the ViewModel (for display) and raw entity (for Raw Data tab)
 			await this.panel.webview.postMessage({
 				command: 'updateDetailPanel',
 				data: {
-					trace: detailViewModel
+					trace: detailViewModel,
+					rawEntity: this.traceSerializer.serializeToRaw(trace)
 				}
 			});
 
@@ -754,6 +784,62 @@ export class PluginTraceViewerPanelComposed {
 			this.logger.error('Failed to load related traces', error);
 			await vscode.window.showErrorMessage('Failed to load related traces');
 		}
+	}
+
+	private async handleLoadTimeline(correlationId: string | null): Promise<void> {
+		try {
+			this.logger.debug('Loading timeline', { correlationId });
+
+			// Build timeline hierarchy
+			const timelineNodes = this.buildTimelineUseCase.execute(this.traces, correlationId);
+
+			// Calculate total duration for the timeline
+			const totalDurationMs = this.calculateTotalDuration(timelineNodes);
+
+			// Map to view model
+			const timelineViewModel = this.timelineViewModelMapper.toViewModel(
+				timelineNodes,
+				correlationId,
+				totalDurationMs
+			);
+
+			// Send timeline data to webview
+			await this.panel.webview.postMessage({
+				command: 'updateTimeline',
+				data: timelineViewModel
+			});
+
+			this.logger.info('Timeline loaded successfully', {
+				correlationId,
+				traceCount: timelineViewModel.traceCount
+			});
+		} catch (error) {
+			this.logger.error('Failed to load timeline', error);
+			await vscode.window.showErrorMessage('Failed to load timeline');
+		}
+	}
+
+	private calculateTotalDuration(timelineNodes: readonly TimelineNode[]): number {
+		if (timelineNodes.length === 0) {
+			return 0;
+		}
+
+		// Get all traces from the tree (including children)
+		const allTraces: PluginTrace[] = [];
+		const collectTraces = (nodes: readonly TimelineNode[]): void => {
+			for (const node of nodes) {
+				allTraces.push(node.trace);
+				collectTraces(node.children);
+			}
+		};
+		collectTraces(timelineNodes);
+
+		// Find earliest and latest timestamps
+		const timestamps = allTraces.map(t => t.createdOn.getTime());
+		const earliest = Math.min(...timestamps);
+		const latest = Math.max(...timestamps);
+
+		return latest - earliest;
 	}
 
 	private async handleApplyFilters(filterData: Partial<FilterCriteriaViewModel>): Promise<void> {
