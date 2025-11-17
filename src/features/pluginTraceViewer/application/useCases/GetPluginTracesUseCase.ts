@@ -2,6 +2,7 @@ import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IPluginTraceRepository } from '../../domain/repositories/IPluginTraceRepository';
 import type { PluginTrace } from '../../domain/entities/PluginTrace';
 import { TraceFilter } from '../../domain/entities/TraceFilter';
+import type { CorrelationId } from '../../domain/valueObjects/CorrelationId';
 
 /**
  * Use case: Get Plugin Traces
@@ -52,5 +53,47 @@ export class GetPluginTracesUseCase {
 			);
 			throw error;
 		}
+	}
+
+	/**
+	 * Get a single plugin trace by ID.
+	 *
+	 * @param environmentId - The environment to query
+	 * @param traceId - The trace ID to retrieve
+	 * @returns Promise of the plugin trace, or null if not found
+	 */
+	async getTraceById(
+		environmentId: string,
+		traceId: string
+	): Promise<PluginTrace | null> {
+		this.logger.info('Fetching single plugin trace', { environmentId, traceId });
+		return await this.repository.getTraceById(environmentId, traceId);
+	}
+
+	/**
+	 * Get all plugin traces with the same correlation ID.
+	 *
+	 * @param environmentId - The environment to query
+	 * @param correlationId - The correlation ID to filter by
+	 * @param top - Maximum number of traces to return (default: 1000)
+	 * @returns Promise of readonly array of related plugin traces
+	 */
+	async getTracesByCorrelationId(
+		environmentId: string,
+		correlationId: CorrelationId,
+		top: number = 1000
+	): Promise<readonly PluginTrace[]> {
+		this.logger.info('Fetching traces by correlationId', {
+			environmentId,
+			correlationId: correlationId.value
+		});
+
+		const filter = TraceFilter.create({
+			correlationIdFilter: correlationId,
+			top,
+			orderBy: 'createdon asc'
+		});
+
+		return await this.repository.getTraces(environmentId, filter);
 	}
 }

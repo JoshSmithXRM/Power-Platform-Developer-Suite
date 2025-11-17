@@ -25,7 +25,13 @@ export class FilterCondition {
 	}
 
 	private validateInvariants(): void {
-		if (!this.value.trim()) {
+		// Null operators (IsNull, IsNotNull) don't require a value
+		const isNullOperator = this.operator.odataOperator === 'null' || this.operator.odataOperator === 'notnull';
+
+		// Equals/NotEquals operators allow empty string as a valid comparison value
+		const allowsEmptyValue = this.operator.odataOperator === 'eq' || this.operator.odataOperator === 'ne';
+
+		if (!isNullOperator && !allowsEmptyValue && !this.value.trim()) {
 			throw new ValidationError(
 				'FilterCondition',
 				'value',

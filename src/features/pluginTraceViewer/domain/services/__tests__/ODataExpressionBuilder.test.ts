@@ -208,73 +208,49 @@ describe('ODataExpressionBuilder', () => {
 			});
 		});
 
-		describe('Status field special handling', () => {
-			it('should convert Exception to exceptiondetails ne null', () => {
+		describe('null operators', () => {
+			it('should build IsNull expression', () => {
 				const condition = new FilterCondition(
-					FilterField.Status,
-					FilterOperator.Equals,
-					'Exception',
-					true
-				);
-
-				expect(builder.buildExpression(condition)).toBe('exceptiondetails ne null');
-			});
-
-			it('should convert Success to exceptiondetails eq null', () => {
-				const condition = new FilterCondition(
-					FilterField.Status,
-					FilterOperator.Equals,
-					'Success',
+					FilterField.ExceptionDetails,
+					FilterOperator.IsNull,
+					'',
 					true
 				);
 
 				expect(builder.buildExpression(condition)).toBe('exceptiondetails eq null');
 			});
 
-			it('should handle Exception with whitespace', () => {
+			it('should build IsNotNull expression', () => {
 				const condition = new FilterCondition(
-					FilterField.Status,
-					FilterOperator.Equals,
-					'  Exception  ',
+					FilterField.ExceptionDetails,
+					FilterOperator.IsNotNull,
+					'',
 					true
 				);
 
 				expect(builder.buildExpression(condition)).toBe('exceptiondetails ne null');
 			});
 
-			it('should return undefined for Status with non-Equals operator', () => {
+			it('should work with any nullable field', () => {
 				const condition = new FilterCondition(
-					FilterField.Status,
-					FilterOperator.NotEquals,
-					'Exception',
+					FilterField.EntityName,
+					FilterOperator.IsNull,
+					'',
 					true
 				);
 
-				expect(builder.buildExpression(condition)).toBeUndefined();
+				expect(builder.buildExpression(condition)).toBe('primaryentity eq null');
 			});
 
-			it('should return undefined for Status with invalid value', () => {
+			it('should build IsNotNull for correlation ID', () => {
 				const condition = new FilterCondition(
-					FilterField.Status,
-					FilterOperator.Equals,
-					'InvalidValue',
+					FilterField.CorrelationId,
+					FilterOperator.IsNotNull,
+					'',
 					true
 				);
 
-				expect(builder.buildExpression(condition)).toBeUndefined();
-			});
-
-			it('should trim whitespace from Status value', () => {
-				// Note: FilterCondition validates non-empty values, so we test trimming behavior
-				const condition = new FilterCondition(
-					FilterField.Status,
-					FilterOperator.Equals,
-					'  Success  ',
-					true
-				);
-
-				// The builder should trim the value before checking
-				expect(builder.buildExpression(condition)).toBe('exceptiondetails eq null');
+				expect(builder.buildExpression(condition)).toBe('correlationid ne null');
 			});
 		});
 

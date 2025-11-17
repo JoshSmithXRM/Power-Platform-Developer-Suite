@@ -5,7 +5,7 @@ describe('FilterOperator', () => {
 		it('should have Equals operator with correct properties', () => {
 			expect(FilterOperator.Equals.displayName).toBe('Equals');
 			expect(FilterOperator.Equals.odataOperator).toBe('eq');
-			expect(FilterOperator.Equals.applicableTypes).toEqual(['text', 'enum', 'number']);
+			expect(FilterOperator.Equals.applicableTypes).toEqual(['text', 'enum', 'number', 'boolean']);
 		});
 
 		it('should have Contains operator with correct properties', () => {
@@ -29,7 +29,7 @@ describe('FilterOperator', () => {
 		it('should have NotEquals operator with correct properties', () => {
 			expect(FilterOperator.NotEquals.displayName).toBe('Not Equals');
 			expect(FilterOperator.NotEquals.odataOperator).toBe('ne');
-			expect(FilterOperator.NotEquals.applicableTypes).toEqual(['text', 'enum', 'number']);
+			expect(FilterOperator.NotEquals.applicableTypes).toEqual(['text', 'enum', 'number', 'boolean']);
 		});
 
 		it('should have GreaterThan operator with correct properties', () => {
@@ -55,11 +55,23 @@ describe('FilterOperator', () => {
 			expect(FilterOperator.LessThanOrEqual.odataOperator).toBe('le');
 			expect(FilterOperator.LessThanOrEqual.applicableTypes).toEqual(['number', 'date']);
 		});
+
+		it('should have IsNull operator with correct properties', () => {
+			expect(FilterOperator.IsNull.displayName).toBe('Is Null');
+			expect(FilterOperator.IsNull.odataOperator).toBe('null');
+			expect(FilterOperator.IsNull.applicableTypes).toEqual(['text', 'enum', 'date', 'number', 'boolean']);
+		});
+
+		it('should have IsNotNull operator with correct properties', () => {
+			expect(FilterOperator.IsNotNull.displayName).toBe('Is Not Null');
+			expect(FilterOperator.IsNotNull.odataOperator).toBe('notnull');
+			expect(FilterOperator.IsNotNull.applicableTypes).toEqual(['text', 'enum', 'date', 'number', 'boolean']);
+		});
 	});
 
 	describe('All array', () => {
-		it('should contain all 9 operator definitions', () => {
-			expect(FilterOperator.All).toHaveLength(9);
+		it('should contain all 11 operator definitions', () => {
+			expect(FilterOperator.All).toHaveLength(11);
 		});
 
 		it('should contain all operators', () => {
@@ -72,49 +84,69 @@ describe('FilterOperator', () => {
 			expect(FilterOperator.All).toContain(FilterOperator.LessThan);
 			expect(FilterOperator.All).toContain(FilterOperator.GreaterThanOrEqual);
 			expect(FilterOperator.All).toContain(FilterOperator.LessThanOrEqual);
+			expect(FilterOperator.All).toContain(FilterOperator.IsNull);
+			expect(FilterOperator.All).toContain(FilterOperator.IsNotNull);
 		});
 	});
 
 	describe('forFieldType', () => {
-		it('should return 5 operators for text fields', () => {
+		it('should return 7 operators for text fields', () => {
 			const operators = FilterOperator.forFieldType('text');
 
-			expect(operators).toHaveLength(5);
+			expect(operators).toHaveLength(7);
 			expect(operators).toContain(FilterOperator.Equals);
 			expect(operators).toContain(FilterOperator.Contains);
 			expect(operators).toContain(FilterOperator.StartsWith);
 			expect(operators).toContain(FilterOperator.EndsWith);
 			expect(operators).toContain(FilterOperator.NotEquals);
+			expect(operators).toContain(FilterOperator.IsNull);
+			expect(operators).toContain(FilterOperator.IsNotNull);
 		});
 
-		it('should return 2 operators for enum fields', () => {
+		it('should return 4 operators for enum fields', () => {
 			const operators = FilterOperator.forFieldType('enum');
 
-			expect(operators).toHaveLength(2);
+			expect(operators).toHaveLength(4);
 			expect(operators).toContain(FilterOperator.Equals);
 			expect(operators).toContain(FilterOperator.NotEquals);
+			expect(operators).toContain(FilterOperator.IsNull);
+			expect(operators).toContain(FilterOperator.IsNotNull);
 		});
 
-		it('should return 4 operators for date fields', () => {
+		it('should return 6 operators for date fields', () => {
 			const operators = FilterOperator.forFieldType('date');
 
-			expect(operators).toHaveLength(4);
+			expect(operators).toHaveLength(6);
 			expect(operators).toContain(FilterOperator.GreaterThan);
 			expect(operators).toContain(FilterOperator.LessThan);
 			expect(operators).toContain(FilterOperator.GreaterThanOrEqual);
 			expect(operators).toContain(FilterOperator.LessThanOrEqual);
+			expect(operators).toContain(FilterOperator.IsNull);
+			expect(operators).toContain(FilterOperator.IsNotNull);
 		});
 
-		it('should return 6 operators for number fields', () => {
+		it('should return 8 operators for number fields', () => {
 			const operators = FilterOperator.forFieldType('number');
 
-			expect(operators).toHaveLength(6);
+			expect(operators).toHaveLength(8);
 			expect(operators).toContain(FilterOperator.Equals);
 			expect(operators).toContain(FilterOperator.NotEquals);
 			expect(operators).toContain(FilterOperator.GreaterThan);
 			expect(operators).toContain(FilterOperator.LessThan);
 			expect(operators).toContain(FilterOperator.GreaterThanOrEqual);
 			expect(operators).toContain(FilterOperator.LessThanOrEqual);
+			expect(operators).toContain(FilterOperator.IsNull);
+			expect(operators).toContain(FilterOperator.IsNotNull);
+		});
+
+		it('should return 4 operators for boolean fields', () => {
+			const operators = FilterOperator.forFieldType('boolean');
+
+			expect(operators).toHaveLength(4);
+			expect(operators).toContain(FilterOperator.Equals);
+			expect(operators).toContain(FilterOperator.NotEquals);
+			expect(operators).toContain(FilterOperator.IsNull);
+			expect(operators).toContain(FilterOperator.IsNotNull);
 		});
 
 		it('should not include Contains for enum fields', () => {

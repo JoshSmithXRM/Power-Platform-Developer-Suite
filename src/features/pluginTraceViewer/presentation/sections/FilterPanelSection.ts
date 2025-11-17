@@ -3,6 +3,7 @@ import type { SectionRenderData } from '../../../../shared/infrastructure/ui/typ
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
 import { FilterField, FilterOperator, DateTimeFilter } from '../../application/types';
 import type { FilterCriteriaViewModel, FilterConditionViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
+import { QUICK_FILTER_DEFINITIONS } from '../constants/QuickFilterDefinitions';
 
 /**
  * Filter Panel Section for Plugin Trace Viewer.
@@ -33,27 +34,18 @@ export class FilterPanelSection implements ISection {
 				</div>
 
 				<div class="filter-panel-body" id="filterPanelBody">
-					<div class="quick-filters">
-						<button class="quick-filter-btn" data-quick-filter="exceptions" title="Show only exceptions">
-							<span class="codicon codicon-error"></span>
-							Exceptions Only
-						</button>
-						<button class="quick-filter-btn" data-quick-filter="lastHour" title="Show traces from last hour">
-							<span class="codicon codicon-clock"></span>
-							Last Hour
-						</button>
-						<button class="quick-filter-btn" data-quick-filter="last24Hours" title="Show traces from last 24 hours">
-							<span class="codicon codicon-history"></span>
-							Last 24 Hours
-						</button>
-						<button class="quick-filter-btn" data-quick-filter="today" title="Show traces from today">
-							<span class="codicon codicon-calendar"></span>
-							Today
-						</button>
+					<div class="quick-filters-section">
+						<div class="section-label">Quick Filters</div>
+						<div class="quick-filters">
+							${QUICK_FILTER_DEFINITIONS.map(qf => this.renderQuickFilter(qf)).join('')}
+						</div>
 					</div>
 
-					<div class="filter-conditions" id="filterConditions">
-						${filterState.conditions.map((condition, index) => this.renderConditionRow(condition, index, filterState.conditions.length)).join('')}
+					<div class="advanced-filters-section">
+						<div class="section-label">Advanced Filters</div>
+						<div class="filter-conditions" id="filterConditions">
+							${filterState.conditions.map((condition, index) => this.renderConditionRow(condition, index, filterState.conditions.length)).join('')}
+						</div>
 					</div>
 
 					<div class="filter-actions">
@@ -78,8 +70,42 @@ export class FilterPanelSection implements ISection {
 							Clear All
 						</button>
 					</div>
+
+					<div class="odata-preview-section">
+						<details class="odata-preview-details">
+							<summary class="odata-preview-summary">
+								<span class="codicon codicon-code"></span>
+								Show Generated OData Query
+							</summary>
+							<div class="odata-preview-content">
+								<pre class="odata-query-text" id="odataQueryText">No filters applied</pre>
+								<button
+									class="icon-button copy-query-button"
+									id="copyODataQueryBtn"
+									title="Copy to clipboard"
+								>
+									<span class="codicon codicon-copy"></span>
+									Copy
+								</button>
+							</div>
+						</details>
+					</div>
 				</div>
 			</div>
+		`;
+	}
+
+	private renderQuickFilter(filter: typeof QUICK_FILTER_DEFINITIONS[number]): string {
+		return `
+			<label class="quick-filter-item" title="${this.escapeHtml(filter.tooltip)}">
+				<input
+					type="checkbox"
+					class="quick-filter-checkbox"
+					data-filter-id="${filter.id}"
+				/>
+				<span class="quick-filter-label">${this.escapeHtml(filter.label)}</span>
+				<span class="quick-filter-badge">${this.escapeHtml(filter.odataField)}</span>
+			</label>
 		`;
 	}
 
@@ -131,6 +157,11 @@ export class FilterPanelSection implements ISection {
 	}
 
 	private renderValueInput(condition: FilterConditionViewModel, field: FilterField | undefined): string {
+		// Null operators (Is Null, Is Not Null) don't need a value input
+		if (condition.operator === 'Is Null' || condition.operator === 'Is Not Null') {
+			return '<span class="condition-value-placeholder">(no value needed)</span>';
+		}
+
 		if (!field) {
 			// Fallback to text input
 			return `
@@ -253,7 +284,20 @@ export class FilterPanelSection implements ISection {
 		const filterObj = filterState as FilterCriteriaViewModel;
 
 		const conditions = filterObj.conditions ? [...filterObj.conditions] : [];
-		const activeCount = conditions.filter(c => c.enabled && c.value.trim()).length || 0;
+		// Count enabled conditions with values OR null operators (which don't need values)
+		// OR eq/ne operators (which allow empty string as a valid comparison value)
+		const activeCount = conditions.filter(c => {
+			if (!c.enabled) {
+				return false;
+			}
+			const operator = FilterOperator.fromDisplayName(c.operator);
+			if (!operator) {
+				return false;
+			}
+			const isNullOperator = operator.odataOperator === 'null' || operator.odataOperator === 'notnull';
+			const allowsEmptyValue = operator.odataOperator === 'eq' || operator.odataOperator === 'ne';
+			return isNullOperator || allowsEmptyValue || c.value.trim();
+		}).length || 0;
 		const totalCount = conditions.length;
 
 		return {

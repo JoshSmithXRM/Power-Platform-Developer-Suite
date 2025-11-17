@@ -70,15 +70,15 @@ describe('FilterCriteriaMapper', () => {
 			expect(result.conditions[1]?.logicalOperator).toBe('or');
 		});
 
-		it('should map Status field correctly', () => {
+		it('should map ExceptionDetails field correctly', () => {
 			const viewModel: FilterCriteriaViewModel = {
 				conditions: [
 					{
 						id: 'condition-0',
 						enabled: true,
-						field: 'Status',
-						operator: 'Equals',
-						value: 'Exception',
+						field: 'Exception Details',
+						operator: 'Contains',
+						value: 'NullReference',
 						logicalOperator: 'and'
 					}
 				],
@@ -88,8 +88,8 @@ describe('FilterCriteriaMapper', () => {
 			const result = mapper.toDomain(viewModel);
 
 			expect(result.conditions).toHaveLength(1);
-			expect(result.conditions[0]?.field).toBe(FilterField.Status);
-			expect(result.conditions[0]?.value).toBe('Exception');
+			expect(result.conditions[0]?.field).toBe(FilterField.ExceptionDetails);
+			expect(result.conditions[0]?.value).toBe('NullReference');
 		});
 
 		describe('invalid condition filtering', () => {
@@ -357,14 +357,14 @@ describe('FilterCriteriaMapper', () => {
 			expect(result.conditions[2]?.id).toBe('condition-2');
 		});
 
-		it('should map Status field to display name', () => {
+		it('should map ExceptionDetails field to display name', () => {
 			const filter = TraceFilter.create({
 				top: 100,
 				conditions: [
 					FilterCondition.create({
-						field: FilterField.Status,
-						operator: FilterOperator.Equals,
-						value: 'Exception',
+						field: FilterField.ExceptionDetails,
+						operator: FilterOperator.Contains,
+						value: 'NullReference',
 						enabled: true,
 						logicalOperator: 'and'
 					})
@@ -373,7 +373,7 @@ describe('FilterCriteriaMapper', () => {
 
 			const result = mapper.toViewModel(filter);
 
-			expect(result.conditions[0]?.field).toBe('Status');
+			expect(result.conditions[0]?.field).toBe('Exception Details');
 		});
 
 		it('should preserve logical operators', () => {

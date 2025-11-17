@@ -43,8 +43,9 @@ import { TraceLevelDropdownSection } from '../sections/TraceLevelDropdownSection
 import { AutoRefreshDropdownSection } from '../sections/AutoRefreshDropdownSection';
 import { FilterPanelSection } from '../sections/FilterPanelSection';
 import { FilterCriteriaMapper } from '../mappers/FilterCriteriaMapper';
-import type { FilterCriteriaViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
+import type { FilterCriteriaViewModel, FilterConditionViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
 import { DateTimeFilter } from '../../application/types';
+import { QUICK_FILTER_DEFINITIONS } from '../constants/QuickFilterDefinitions';
 
 /**
  * Commands supported by Plugin Trace Viewer panel.
@@ -84,10 +85,12 @@ export class PluginTraceViewerPanelComposed {
 	private readonly traceSerializer: PluginTraceSerializer;
 	private currentEnvironmentId: string;
 	private traces: readonly PluginTrace[] = [];
+	private relatedTracesCache: readonly PluginTrace[] = [];
 	private currentTraceLevel: TraceLevel | null = null;
 	private autoRefreshInterval: number = 0;
 	private autoRefreshTimer: NodeJS.Timeout | null = null;
 	private filterCriteria: FilterCriteriaViewModel;
+	private reconstructedQuickFilterIds: string[] = [];
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -173,7 +176,7 @@ export class PluginTraceViewerPanelComposed {
 
 		const panel = vscode.window.createWebviewPanel(
 			PluginTraceViewerPanelComposed.viewType,
-			`Plugin Trace Viewer - ${environmentName}`,
+			`Plugin Traces - ${environmentName}`,
 			column,
 			{
 				enableScripts: true,
@@ -266,6 +269,14 @@ export class PluginTraceViewerPanelComposed {
 				selectedId: this.autoRefreshInterval.toString()
 			}
 		});
+
+		// Send reconstructed quick filter checkbox state to webview
+		if (this.reconstructedQuickFilterIds.length > 0) {
+			await this.panel.webview.postMessage({
+				command: 'updateQuickFilterState',
+				data: { quickFilterIds: this.reconstructedQuickFilterIds }
+			});
+		}
 	}
 
 	private createCoordinator(): {
@@ -343,7 +354,7 @@ export class PluginTraceViewerPanelComposed {
 				).toString()
 			],
 			cspNonce: getNonce(),
-			title: 'Plugin Trace Viewer'
+			title: 'Plugin Traces'
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
@@ -542,7 +553,7 @@ export class PluginTraceViewerPanelComposed {
 
 			const environment = await this.getEnvironmentById(environmentId);
 			if (environment) {
-				this.panel.title = `Plugin Trace Viewer - ${environment.name}`;
+				this.panel.title = `Plugin Traces - ${environment.name}`;
 			}
 
 			await this.loadTraceLevel();
@@ -554,22 +565,50 @@ export class PluginTraceViewerPanelComposed {
 
 	private async handleViewDetail(traceId: string): Promise<void> {
 		try {
-			this.logger.info('HandleViewDetail called', { traceId, tracesCount: this.traces.length });
+			this.logger.info('HandleViewDetail called - fetching full trace from Dataverse', { traceId });
 
-			const trace = this.traces.find(t => t.id === traceId);
+			// Fetch the complete trace record from Dataverse to get all fields
+			const trace = await this.getPluginTracesUseCase.getTraceById(
+				this.currentEnvironmentId,
+				traceId
+			);
+
 			if (!trace) {
-				this.logger.warn('Trace not found', { traceId, availableIds: this.traces.map(t => t.id) });
+				this.logger.warn('Trace not found in Dataverse', { traceId });
 				await vscode.window.showWarningMessage('Trace not found');
 				return;
 			}
 
-			this.logger.info('Found trace, mapping to detail view', { traceId });
+			this.logger.info('Fetched full trace from Dataverse', {
+				traceId,
+				hasCorrelationId: !!trace.correlationId
+			});
+
+			// If trace has correlationId, fetch all related traces from Dataverse
+			if (trace.correlationId) {
+				this.logger.info('Fetching related traces by correlationId', {
+					correlationId: trace.correlationId.value
+				});
+
+				this.relatedTracesCache = await this.getPluginTracesUseCase.getTracesByCorrelationId(
+					this.currentEnvironmentId,
+					trace.correlationId,
+					1000
+				);
+
+				this.logger.info('Fetched related traces from Dataverse', {
+					count: this.relatedTracesCache.length,
+					correlationId: trace.correlationId.value
+				});
+			} else {
+				// No correlation ID - clear cache
+				this.relatedTracesCache = [];
+				this.logger.info('No correlationId - cleared related traces cache');
+			}
 
 			const detailViewModel = this.viewModelMapper.toDetailViewModel(trace);
 
-			this.detailSection.setTrace(detailViewModel);
-
-			this.logger.info('Detail section updated, sending data to frontend');
+			this.logger.info('Detail view model created, sending data to frontend');
 
 			// Data-driven update: Send detail panel data to frontend
 			// Include both the ViewModel (for display) and raw entity (for Raw Data tab)
@@ -602,8 +641,6 @@ export class PluginTraceViewerPanelComposed {
 
 	private async handleCloseDetail(): Promise<void> {
 		this.logger.debug('Closing trace detail');
-
-		this.detailSection.setTrace(null);
 
 		await this.panel.webview.postMessage({
 			command: 'hideDetailPanel'
@@ -770,14 +807,17 @@ export class PluginTraceViewerPanelComposed {
 
 	private async handleLoadRelatedTraces(correlationId: string): Promise<void> {
 		try {
-			this.logger.debug('Loading related traces', { correlationId });
+			this.logger.debug('Loading related traces from cache', {
+				correlationId,
+				cacheSize: this.relatedTracesCache.length
+			});
 
-			// Filter traces by correlation ID
-			const relatedTraces = this.traces.filter(t =>
-				t.hasCorrelationId() && t.correlationId?.value === correlationId
+			// Use the pre-fetched related traces from cache
+			const relatedViewModels = this.relatedTracesCache.map(t =>
+				this.viewModelMapper.toDetailViewModel(t)
 			);
 
-			const relatedViewModels = relatedTraces.map(t => this.viewModelMapper.toDetailViewModel(t));
+			this.logger.info('Related traces loaded', { count: relatedViewModels.length });
 
 			await vscode.window.showInformationMessage(`Found ${relatedViewModels.length} related trace(s)`);
 		} catch (error) {
@@ -788,10 +828,13 @@ export class PluginTraceViewerPanelComposed {
 
 	private async handleLoadTimeline(correlationId: string | null): Promise<void> {
 		try {
-			this.logger.debug('Loading timeline', { correlationId });
+			this.logger.debug('Loading timeline from related traces cache', {
+				correlationId,
+				cacheSize: this.relatedTracesCache.length
+			});
 
-			// Build timeline hierarchy
-			const timelineNodes = this.buildTimelineUseCase.execute(this.traces, correlationId);
+			// Build timeline hierarchy from pre-fetched related traces
+			const timelineNodes = this.buildTimelineUseCase.execute(this.relatedTracesCache, correlationId);
 
 			// Calculate total duration for the timeline
 			const totalDurationMs = this.calculateTotalDuration(timelineNodes);
@@ -842,12 +885,15 @@ export class PluginTraceViewerPanelComposed {
 		return latest - earliest;
 	}
 
-	private async handleApplyFilters(filterData: Partial<FilterCriteriaViewModel>): Promise<void> {
+	private async handleApplyFilters(filterData: Partial<FilterCriteriaViewModel> & { quickFilterIds?: string[] }): Promise<void> {
 		try {
 			this.logger.debug('Applying filters', { filterData });
 
+			// Expand quick filter IDs to conditions
+			const expandedFilterData = this.expandQuickFilters(filterData);
+
 			// Convert local datetime values to UTC ISO before storing/processing
-			const normalizedFilterData = this.normalizeFilterDateTimes(filterData);
+			const normalizedFilterData = this.normalizeFilterDateTimes(expandedFilterData);
 
 			// Merge partial filter data with current filter criteria
 			this.filterCriteria = {
@@ -858,16 +904,127 @@ export class PluginTraceViewerPanelComposed {
 			// Persist filter criteria
 			await this.saveFilterCriteria();
 
+			// Build OData query preview from current filter criteria
+			const domainFilter = this.filterCriteriaMapper.toDomain(this.filterCriteria);
+			const odataQuery = domainFilter.toODataFilter() || 'No filters applied';
+
+			// Send OData query preview to webview
+			await this.panel.webview.postMessage({
+				command: 'updateODataPreview',
+				data: { query: odataQuery }
+			});
+
 			// Refresh traces with new filter (uses data-driven update)
 			await this.handleRefresh();
 
 			this.logger.info('Filters applied successfully', {
-				filterCount: this.filterCriteriaMapper.toDomain(this.filterCriteria).getActiveFilterCount()
+				filterCount: domainFilter.getActiveFilterCount()
 			});
 		} catch (error) {
 			this.logger.error('Failed to apply filters', error);
 			await vscode.window.showErrorMessage('Failed to apply filters');
 		}
+	}
+
+	/**
+	 * Detects if a condition matches a quick filter definition (reverse mapping).
+	 * Returns the quick filter ID if match found, null otherwise.
+	 *
+	 * Matching logic:
+	 * - Static filters (exceptions, success, asyncOnly, syncOnly, recursive): match field + operator + value
+	 * - Date filters (lastHour, last24Hours, today): match field + operator only (value is dynamic)
+	 */
+	private detectQuickFilterFromCondition(condition: FilterConditionViewModel): string | null {
+		// All quick filters have exactly one condition, so we compare against the first condition
+		for (const quickFilter of QUICK_FILTER_DEFINITIONS) {
+			const qfCondition = quickFilter.conditions[0];
+			if (!qfCondition) {
+				continue;
+			}
+
+			// Field and operator must always match
+			if (condition.field !== qfCondition.field || condition.operator !== qfCondition.operator) {
+				continue;
+			}
+
+			// For date filters (Created On field), match on field + operator only (value is dynamic)
+			if (condition.field === 'Created On') {
+				return quickFilter.id;
+			}
+
+			// For static filters, value must also match
+			if (condition.value === qfCondition.value) {
+				return quickFilter.id;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Expands quick filter IDs to their corresponding filter conditions.
+	 * Merges quick filter conditions with advanced filter conditions.
+	 */
+	private expandQuickFilters(filterData: Partial<FilterCriteriaViewModel> & { quickFilterIds?: string[] }): Partial<FilterCriteriaViewModel> {
+		const { quickFilterIds, conditions = [], ...rest } = filterData;
+
+		if (!quickFilterIds || quickFilterIds.length === 0) {
+			return { ...rest, conditions };
+		}
+
+		// Expand quick filter IDs to conditions
+		const quickFilterConditions: FilterConditionViewModel[] = [];
+
+		for (const filterId of quickFilterIds) {
+			const quickFilter = QUICK_FILTER_DEFINITIONS.find(qf => qf.id === filterId);
+			if (!quickFilter) {
+				continue;
+			}
+
+			// Clone conditions and set dynamic values for date filters
+			const expandedConditions = quickFilter.conditions.map(condition => {
+				const cloned = { ...condition };
+
+				// Set dynamic datetime values for relative date filters
+				if (condition.field === 'Created On') {
+					const now = new Date();
+					if (filterId === 'lastHour') {
+						const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+						cloned.value = this.formatDateTimeLocal(oneHourAgo);
+					} else if (filterId === 'last24Hours') {
+						const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+						cloned.value = this.formatDateTimeLocal(twentyFourHoursAgo);
+					} else if (filterId === 'today') {
+						const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+						cloned.value = this.formatDateTimeLocal(startOfToday);
+					}
+				}
+
+				return cloned;
+			});
+
+			quickFilterConditions.push(...expandedConditions);
+		}
+
+		// Merge quick filter conditions with advanced conditions
+		const mergedConditions = [...quickFilterConditions, ...conditions];
+
+		return {
+			...rest,
+			conditions: mergedConditions
+		};
+	}
+
+	/**
+	 * Formats a Date object for datetime-local input.
+	 */
+	private formatDateTimeLocal(date: Date): string {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		const hours = String(date.getHours()).padStart(2, '0');
+		const minutes = String(date.getMinutes()).padStart(2, '0');
+		return `${year}-${month}-${day}T${hours}:${minutes}`;
 	}
 
 	/**
@@ -924,6 +1081,12 @@ export class PluginTraceViewerPanelComposed {
 				command: 'clearFilterPanel'
 			});
 
+			// Clear OData preview
+			await this.panel.webview.postMessage({
+				command: 'updateODataPreview',
+				data: { query: 'No filters applied' }
+			});
+
 			// Refresh traces with cleared filter (uses data-driven update)
 			await this.handleRefresh();
 
@@ -975,11 +1138,35 @@ export class PluginTraceViewerPanelComposed {
 				// Validate that the stored data matches our ViewModel structure
 				const stored = state.filterCriteria as FilterCriteriaViewModel;
 				if (stored.conditions && Array.isArray(stored.conditions)) {
-					this.filterCriteria = stored;
-					this.logger.info('Filter criteria loaded from storage', {
+					// Smart reconstruction: Detect which conditions match quick filters
+					const reconstructedQuickFilterIds: string[] = [];
+					const advancedFilterConditions: FilterConditionViewModel[] = [];
+
+					// Type-safe iteration over conditions
+					const conditions = stored.conditions as FilterConditionViewModel[];
+					for (const condition of conditions) {
+						const matchedQuickFilterId = this.detectQuickFilterFromCondition(condition);
+						if (matchedQuickFilterId) {
+							// This condition matches a quick filter - add to reconstructed IDs
+							reconstructedQuickFilterIds.push(matchedQuickFilterId);
+						} else {
+							// This is a custom/modified condition - keep as advanced filter
+							advancedFilterConditions.push(condition);
+						}
+					}
+
+					// Store reconstructed state
+					this.reconstructedQuickFilterIds = reconstructedQuickFilterIds;
+					this.filterCriteria = {
+						...stored,
+						conditions: advancedFilterConditions
+					};
+
+					this.logger.info('Filter criteria loaded and reconstructed', {
 						environmentId: this.currentEnvironmentId,
-						conditionCount: stored.conditions.length,
-						conditions: stored.conditions
+						totalConditions: conditions.length,
+						quickFilters: reconstructedQuickFilterIds,
+						advancedFilters: advancedFilterConditions.length
 					});
 				} else {
 					this.logger.warn('Invalid filter criteria in storage', { stored });

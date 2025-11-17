@@ -79,9 +79,9 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		environmentId: string,
 		filter: TraceFilter
 	): Promise<readonly PluginTrace[]> {
-		// Optimize query by selecting only fields needed for table view
-		// Large text fields (messageblock, configuration, secureconfiguration, profile, exceptiondetails) excluded from list view
-		const selectFields = [
+		// Select fields needed for table view including exceptiondetails for status determination
+		// Large text fields (messageblock, configuration, secureconfiguration, profile) excluded from list view
+		const selectFieldsStr = [
 			'plugintracelogid',
 			'createdon',
 			'typename',
@@ -90,11 +90,12 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			'operationtype',
 			'mode',
 			'depth',
-			'performanceexecutionduration'
+			'performanceexecutionduration',
+			'exceptiondetails'
 		].join(',');
 
 		const queryParams: string[] = [
-			`$select=${selectFields}`,
+			`$select=${selectFieldsStr}`,
 			`$top=${filter.top}`
 		];
 
@@ -116,7 +117,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		const queryString = queryParams.join('&');
 		const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ENTITY_SET}?${queryString}`;
 
-		this.logger.debug('Fetching plugin traces from Dataverse', {
+		this.logger.info('Fetching plugin traces from Dataverse', {
 			environmentId,
 			endpoint,
 		});
@@ -183,9 +184,10 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 
 		const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ENTITY_SET}(${traceId})?$select=${selectFields}`;
 
-		this.logger.debug('Fetching single plugin trace from Dataverse', {
+		this.logger.info('Fetching single plugin trace from Dataverse', {
 			environmentId,
 			traceId,
+			endpoint
 		});
 
 		try {
@@ -195,11 +197,18 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 					endpoint
 				);
 
+			this.logger.info('Received trace DTO from Dataverse', {
+				traceId,
+				hasExceptionDetails: !!dto.exceptiondetails,
+				exceptionDetailsLength: dto.exceptiondetails?.length ?? 0
+			});
+
 			const trace = this.mapToEntity(dto);
 
-			this.logger.debug('Fetched plugin trace from Dataverse', {
-				environmentId,
+			this.logger.info('Mapped trace entity', {
 				traceId,
+				hasException: trace.hasException(),
+				exceptionDetailsLength: trace.exceptionDetails?.length ?? 0
 			});
 
 			return trace;

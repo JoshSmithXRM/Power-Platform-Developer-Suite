@@ -33,6 +33,10 @@ window.createBehavior({
 			clearFilterPanel();
 		} else if (message.command === 'updateTimeline') {
 			updateTimeline(message.data);
+		} else if (message.command === 'updateODataPreview') {
+			updateODataPreview(message.data.query);
+		} else if (message.command === 'updateQuickFilterState') {
+			updateQuickFilterState(message.data.quickFilterIds);
 		}
 	}
 });
@@ -91,6 +95,11 @@ function updateTableData(data) {
  * Updates detail panel without full page refresh.
  * Uses DetailPanelRenderer to update detail section only.
  *
+ * Data-driven architecture:
+ * - Receives ViewModel data from extension host
+ * - Renders HTML client-side (including empty state)
+ * - Single source of truth for all detail panel rendering
+ *
  * @param {Object} data - Detail trace ViewModel
  */
 function updateDetailPanel(data) {
@@ -105,14 +114,17 @@ function updateDetailPanel(data) {
 	// Store raw entity data (actual API values for Raw Data tab)
 	currentRawEntity = data.rawEntity;
 
-	// Render new detail panel HTML using DetailPanelRenderer
+	// Render detail panel HTML using DetailPanelRenderer
+	// DetailPanelRenderer handles both empty state (null trace) and populated state
 	const detailHtml = window.DetailPanelRenderer.renderDetailPanel(data.trace);
 
 	// Update detail section (preserves event listeners on other elements)
 	detailSection.innerHTML = detailHtml;
 
-	// Re-apply tab event listeners (tabs are inside detail section)
-	setupDetailPanelTabs();
+	// Re-apply tab event listeners if detail panel has content
+	if (data.trace) {
+		setupDetailPanelTabs();
+	}
 }
 
 /**
@@ -302,14 +314,25 @@ function setupFilterPanel() {
 
 	// Clear filters button - handled by data-command attribute
 
-	// Set up quick filter buttons
-	const quickFilterButtons = document.querySelectorAll('.quick-filter-btn');
-	quickFilterButtons.forEach(btn => {
-		btn.addEventListener('click', () => {
-			const filterType = btn.dataset.quickFilter;
-			applyQuickFilter(filterType);
+	// Set up quick filter checkboxes
+	const quickFilterCheckboxes = document.querySelectorAll('.quick-filter-checkbox');
+	quickFilterCheckboxes.forEach(checkbox => {
+		checkbox.addEventListener('change', () => {
+			// Auto-apply filters when checkbox changes
+			if (applyBtn) {
+				applyBtn.click();
+			}
 		});
 	});
+
+	// Set up OData query copy button
+	const copyODataBtn = document.getElementById('copyODataQueryBtn');
+	if (copyODataBtn) {
+		copyODataBtn.addEventListener('click', (e) => {
+			e.preventDefault();
+			copyODataQueryToClipboard();
+		});
+	}
 
 	// Set up event delegation for dynamic rows
 	const filterConditions = document.getElementById('filterConditions');
@@ -366,7 +389,13 @@ function setupFilterPanel() {
  * but it logically belongs to the NEXT row for the domain model.
  */
 function collectFilterCriteria() {
-	// Collect all condition rows
+	// Collect quick filter checkbox states
+	const quickFilterCheckboxes = document.querySelectorAll('.quick-filter-checkbox');
+	const activeQuickFilters = Array.from(quickFilterCheckboxes)
+		.filter(cb => cb.checked)
+		.map(cb => cb.dataset.filterId);
+
+	// Collect all advanced condition rows
 	const conditionRows = document.querySelectorAll('.filter-condition-row');
 	const conditions = Array.from(conditionRows).map((row, index) => {
 		const id = row.dataset.conditionId;
@@ -392,9 +421,40 @@ function collectFilterCriteria() {
 	});
 
 	return {
+		quickFilterIds: activeQuickFilters,
 		conditions,
 		top: 100
 	};
+}
+
+/**
+ * Copies the OData query text to clipboard.
+ */
+function copyODataQueryToClipboard() {
+	const queryText = document.getElementById('odataQueryText');
+	if (!queryText || !queryText.textContent) {
+		return;
+	}
+
+	navigator.clipboard.writeText(queryText.textContent).then(
+		() => {
+			// Show success feedback
+			const copyBtn = document.getElementById('copyODataQueryBtn');
+			if (copyBtn) {
+				const originalHtml = copyBtn.innerHTML;
+				copyBtn.innerHTML = '<span class="codicon codicon-check"></span> Copied!';
+				copyBtn.classList.add('success');
+
+				setTimeout(() => {
+					copyBtn.innerHTML = originalHtml;
+					copyBtn.classList.remove('success');
+				}, 2000);
+			}
+		},
+		(err) => {
+			console.error('Failed to copy OData query:', err);
+		}
+	);
 }
 
 /**
@@ -480,110 +540,29 @@ function clearFilterPanel() {
 }
 
 /**
- * Applies a quick filter preset (additive - appends to existing filters).
+ * Updates the OData query preview display.
+ * @param {string} query - The OData filter query string
  */
-function applyQuickFilter(filterType) {
-	const now = new Date();
-	let newCondition = null;
-
-	switch (filterType) {
-		case 'exceptions':
-			// Status equals Exception
-			newCondition = {
-				enabled: true,
-				field: 'Status',
-				operator: 'Equals',
-				value: 'Exception',
-				logicalOperator: 'and'
-			};
-			break;
-
-		case 'lastHour':
-			// Created On >= (now - 1 hour)
-			{
-				const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-				newCondition = {
-					enabled: true,
-					field: 'Created On',
-					operator: 'Greater Than or Equal',
-					value: formatDateTimeLocal(oneHourAgo),
-					logicalOperator: 'and'
-				};
-			}
-			break;
-
-		case 'last24Hours':
-			// Created On >= (now - 24 hours)
-			{
-				const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-				newCondition = {
-					enabled: true,
-					field: 'Created On',
-					operator: 'Greater Than or Equal',
-					value: formatDateTimeLocal(twentyFourHoursAgo),
-					logicalOperator: 'and'
-				};
-			}
-			break;
-
-		case 'today':
-			// Created On >= start of today
-			{
-				const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-				newCondition = {
-					enabled: true,
-					field: 'Created On',
-					operator: 'Greater Than or Equal',
-					value: formatDateTimeLocal(startOfToday),
-					logicalOperator: 'and'
-				};
-			}
-			break;
+function updateODataPreview(query) {
+	const queryText = document.getElementById('odataQueryText');
+	if (queryText) {
+		queryText.textContent = query || 'No filters applied';
 	}
+}
 
-	if (!newCondition) {
-		return;
-	}
+/**
+ * Updates quick filter checkbox states (smart reconstruction after load).
+ * @param {string[]} quickFilterIds - Array of quick filter IDs to check
+ */
+function updateQuickFilterState(quickFilterIds) {
+	const checkboxes = document.querySelectorAll('.quick-filter-checkbox');
+	checkboxes.forEach(checkbox => {
+		const filterId = checkbox.dataset.filterId;
+		checkbox.checked = quickFilterIds.includes(filterId);
+	});
 
-	// Get existing condition rows
-	const filterConditions = document.getElementById('filterConditions');
-	if (!filterConditions) {
-		return;
-	}
-
-	const existingRows = filterConditions.querySelectorAll('.filter-condition-row');
-	const existingCount = existingRows.length;
-
-	// Generate new condition ID
-	newCondition.id = `condition-${existingCount}`;
-
-	// If there are existing rows, update the last one to show logical operator
-	if (existingCount > 0) {
-		const lastRow = existingRows[existingCount - 1];
-		const placeholder = lastRow.querySelector('.logical-operator-placeholder');
-		if (placeholder) {
-			// Replace placeholder with actual operator dropdown
-			placeholder.outerHTML = `
-				<select class="condition-logical-operator">
-					<option value="and" selected>AND</option>
-					<option value="or">OR</option>
-				</select>
-			`;
-		}
-	}
-
-	// Add the new condition (it will be the last row, so no operator at the end)
-	const isLastRow = true;
-	const html = createConditionRowHtml(newCondition, isLastRow);
-	filterConditions.insertAdjacentHTML('beforeend', html);
-
+	// Update filter count after checkbox states change
 	updateFilterCount();
-
-	// Auto-apply the filter
-	const applyBtn = document.getElementById('applyFiltersBtn');
-	if (applyBtn) {
-		applyBtn.click();
-	}
 }
 
 /**
@@ -618,18 +597,41 @@ function updateFilterCount() {
 		return;
 	}
 
-	const conditionRows = document.querySelectorAll('.filter-condition-row');
-	const totalCount = conditionRows.length;
+	// Count checked quick filter checkboxes
+	const quickFilterCheckboxes = document.querySelectorAll('.quick-filter-checkbox:checked');
+	const quickFilterCount = quickFilterCheckboxes.length;
 
-	// Count active filters (enabled + has value)
-	let activeCount = 0;
+	// Count enabled advanced filter rows
+	const conditionRows = document.querySelectorAll('.filter-condition-row');
+	let advancedFilterCount = 0;
+
 	conditionRows.forEach(row => {
 		const enabled = row.querySelector('.condition-enabled')?.checked || false;
-		const value = row.querySelector('.condition-value')?.value || '';
-		if (enabled && value.trim()) {
-			activeCount++;
+		if (!enabled) {
+			return;
+		}
+
+		// Check if operator is null/not null (doesn't require value)
+		const operator = row.querySelector('.condition-operator')?.value || '';
+		const isNullOperator = operator === 'Is Null' || operator === 'Is Not Null';
+		// Equals/Not Equals allow empty string as a valid comparison value
+		const allowsEmptyValue = operator === 'Equals' || operator === 'Not Equals';
+
+		// For null operators, just check if enabled
+		// For equals/not equals, empty value is valid
+		// For other operators, check if value is non-empty
+		if (isNullOperator || allowsEmptyValue) {
+			advancedFilterCount++;
+		} else {
+			const value = row.querySelector('.condition-value')?.value || '';
+			if (value.trim()) {
+				advancedFilterCount++;
+			}
 		}
 	});
+
+	const totalCount = quickFilterCount + advancedFilterCount;
+	const activeCount = totalCount; // All counted filters are active (enabled)
 
 	// Update header text
 	filterTitle.innerHTML = `

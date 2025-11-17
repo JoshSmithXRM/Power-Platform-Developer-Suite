@@ -52,8 +52,8 @@ describe('FilterField', () => {
 	});
 
 	describe('All array', () => {
-		it('should contain all 9 field definitions', () => {
-			expect(FilterField.All).toHaveLength(9);
+		it('should contain all 26 field definitions', () => {
+			expect(FilterField.All).toHaveLength(26);
 		});
 
 		it('should contain PluginName field', () => {
@@ -235,37 +235,51 @@ describe('FilterField', () => {
 	});
 
 	describe('field type distribution', () => {
-		it('should have 4 text fields', () => {
+		it('should have 16 text fields', () => {
 			const textFields = FilterField.All.filter(f => f.fieldType === 'text');
 
-			expect(textFields).toHaveLength(4);
+			expect(textFields).toHaveLength(16);
+			expect(textFields).toContain(FilterField.Id);
 			expect(textFields).toContain(FilterField.PluginName);
 			expect(textFields).toContain(FilterField.EntityName);
 			expect(textFields).toContain(FilterField.MessageName);
+			expect(textFields).toContain(FilterField.ExceptionDetails);
 			expect(textFields).toContain(FilterField.CorrelationId);
+			expect(textFields).toContain(FilterField.CreatedBy);
 		});
 
-		it('should have 3 enum fields', () => {
+		it('should have 2 enum fields', () => {
 			const enumFields = FilterField.All.filter(f => f.fieldType === 'enum');
 
-			expect(enumFields).toHaveLength(3);
+			expect(enumFields).toHaveLength(2);
 			expect(enumFields).toContain(FilterField.OperationType);
 			expect(enumFields).toContain(FilterField.Mode);
-			expect(enumFields).toContain(FilterField.Status);
 		});
 
-		it('should have 1 date field', () => {
+		it('should have 3 date fields', () => {
 			const dateFields = FilterField.All.filter(f => f.fieldType === 'date');
 
-			expect(dateFields).toHaveLength(1);
+			expect(dateFields).toHaveLength(3);
 			expect(dateFields).toContain(FilterField.CreatedOn);
+			expect(dateFields).toContain(FilterField.ExecutionStartTime);
+			expect(dateFields).toContain(FilterField.ConstructorStartTime);
 		});
 
-		it('should have 1 number field', () => {
+		it('should have 4 number fields', () => {
 			const numberFields = FilterField.All.filter(f => f.fieldType === 'number');
 
-			expect(numberFields).toHaveLength(1);
+			expect(numberFields).toHaveLength(4);
 			expect(numberFields).toContain(FilterField.Duration);
+			expect(numberFields).toContain(FilterField.ConstructorDuration);
+			expect(numberFields).toContain(FilterField.Stage);
+			expect(numberFields).toContain(FilterField.Depth);
+		});
+
+		it('should have 1 boolean field', () => {
+			const booleanFields = FilterField.All.filter(f => f.fieldType === 'boolean');
+
+			expect(booleanFields).toHaveLength(1);
+			expect(booleanFields).toContain(FilterField.IsSystemCreated);
 		});
 	});
 });

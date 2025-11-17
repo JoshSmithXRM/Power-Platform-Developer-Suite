@@ -43,7 +43,11 @@ export class FilterCriteriaMapper {
 			return null;
 		}
 
-		if (!conditionVM.value.trim()) {
+		// Null operators (Is Null, Is Not Null) don't require a value
+		const isNullOperator = operator.odataOperator === 'null' || operator.odataOperator === 'notnull';
+		// Equals/NotEquals operators allow empty string as a valid comparison value
+		const allowsEmptyValue = operator.odataOperator === 'eq' || operator.odataOperator === 'ne';
+		if (!isNullOperator && !allowsEmptyValue && !conditionVM.value.trim()) {
 			return null;
 		}
 

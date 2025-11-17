@@ -24,14 +24,19 @@ export class ODataExpressionBuilder {
 			return undefined;
 		}
 
-		// Special handling for Status field (Exception vs Success)
-		if (condition.field.displayName === 'Status') {
-			return this.buildStatusExpression(condition);
-		}
-
 		const fieldName = condition.field.odataName;
 		const operator = condition.operator.odataOperator;
-		const value = this.formatValue(condition.value, condition.field.fieldType);
+		const fieldType = condition.field.fieldType;
+
+		// Null operators (don't need a value)
+		if (operator === 'null') {
+			return `${fieldName} eq null`;
+		}
+		if (operator === 'notnull') {
+			return `${fieldName} ne null`;
+		}
+
+		const value = this.formatValue(condition.value, fieldType);
 
 		// Function-style operators (contains, startswith, endswith)
 		if (this.isFunctionOperator(operator)) {
@@ -43,37 +48,16 @@ export class ODataExpressionBuilder {
 	}
 
 	/**
-	 * Builds OData expression for Status field.
-	 * Status is virtual - maps to exceptiondetails null check:
-	 * - "Exception" → exceptiondetails ne null
-	 * - "Success" → exceptiondetails eq null
-	 */
-	private buildStatusExpression(condition: FilterCondition): string | undefined {
-		const value = condition.value.trim();
-		const operator = condition.operator.odataOperator;
-
-		// Only "Equals" operator makes sense for Status enum
-		if (operator !== 'eq') {
-			return undefined;
-		}
-
-		if (value === 'Exception') {
-			return 'exceptiondetails ne null';
-		} else if (value === 'Success') {
-			return 'exceptiondetails eq null';
-		}
-
-		return undefined;
-	}
-
-	/**
 	 * Formats value based on field type for OData syntax.
 	 */
-	private formatValue(value: string, fieldType: 'text' | 'enum' | 'date' | 'number'): string {
+	private formatValue(value: string, fieldType: 'text' | 'enum' | 'date' | 'number' | 'boolean'): string {
 		if (fieldType === 'text' || fieldType === 'enum') {
 			return `'${this.escapeODataString(value)}'`;
 		} else if (fieldType === 'number') {
 			return value;
+		} else if (fieldType === 'boolean') {
+			// OData boolean values are lowercase true/false
+			return value.toLowerCase();
 		} else if (fieldType === 'date') {
 			// Value is already in UTC ISO format (converted by presentation layer)
 			// Use DateTimeFilter to format for Dataverse OData API

@@ -29,15 +29,14 @@ describe('ODataQueryBuilder', () => {
 				expect(result).toBeUndefined();
 			});
 
-			it('should return undefined when first condition generates undefined expression', () => {
-				// Status with invalid operator returns undefined
+			it('should handle null operators correctly', () => {
 				const conditions = [
-					new FilterCondition(FilterField.Status, FilterOperator.NotEquals, 'Exception', true)
+					new FilterCondition(FilterField.ExceptionDetails, FilterOperator.IsNotNull, '', true)
 				];
 
 				const result = builder.buildFromConditions(conditions);
 
-				expect(result).toBeUndefined();
+				expect(result).toBe('(exceptiondetails ne null)');
 			});
 		});
 
@@ -203,10 +202,10 @@ describe('ODataQueryBuilder', () => {
 			});
 		});
 
-		describe('Status field special handling', () => {
-			it('should build Status Exception filter correctly', () => {
+		describe('Null operators', () => {
+			it('should build IsNotNull filter correctly', () => {
 				const conditions = [
-					new FilterCondition(FilterField.Status, FilterOperator.Equals, 'Exception', true, 'and')
+					new FilterCondition(FilterField.ExceptionDetails, FilterOperator.IsNotNull, '', true, 'and')
 				];
 
 				const result = builder.buildFromConditions(conditions);
@@ -214,9 +213,9 @@ describe('ODataQueryBuilder', () => {
 				expect(result).toBe('(exceptiondetails ne null)');
 			});
 
-			it('should build Status Success filter correctly', () => {
+			it('should build IsNull filter correctly', () => {
 				const conditions = [
-					new FilterCondition(FilterField.Status, FilterOperator.Equals, 'Success', true, 'and')
+					new FilterCondition(FilterField.ExceptionDetails, FilterOperator.IsNull, '', true, 'and')
 				];
 
 				const result = builder.buildFromConditions(conditions);
@@ -224,9 +223,9 @@ describe('ODataQueryBuilder', () => {
 				expect(result).toBe('(exceptiondetails eq null)');
 			});
 
-			it('should combine Status filter with other filters using AND', () => {
+			it('should combine IsNotNull filter with other filters using AND', () => {
 				const conditions = [
-					new FilterCondition(FilterField.Status, FilterOperator.Equals, 'Exception', true, 'and'),
+					new FilterCondition(FilterField.ExceptionDetails, FilterOperator.IsNotNull, '', true, 'and'),
 					new FilterCondition(FilterField.PluginName, FilterOperator.Contains, 'MyPlugin', true, 'and')
 				];
 
@@ -235,9 +234,9 @@ describe('ODataQueryBuilder', () => {
 				expect(result).toBe("(exceptiondetails ne null) and (contains(typename, 'MyPlugin'))");
 			});
 
-			it('should combine Status filter with other filters using OR', () => {
+			it('should combine IsNotNull filter with other filters using OR', () => {
 				const conditions = [
-					new FilterCondition(FilterField.Status, FilterOperator.Equals, 'Exception', true, 'and'),
+					new FilterCondition(FilterField.ExceptionDetails, FilterOperator.IsNotNull, '', true, 'and'),
 					new FilterCondition(FilterField.Duration, FilterOperator.GreaterThan, '5000', true, 'or')
 				];
 
@@ -248,10 +247,10 @@ describe('ODataQueryBuilder', () => {
 		});
 
 		describe('conditions that return undefined expressions', () => {
-			it('should skip condition that generates undefined expression', () => {
+			it('should handle disabled conditions correctly', () => {
 				const conditions = [
 					new FilterCondition(FilterField.PluginName, FilterOperator.Contains, 'Plugin1', true, 'and'),
-					new FilterCondition(FilterField.Status, FilterOperator.NotEquals, 'Exception', true, 'and'), // Invalid operator for Status
+					new FilterCondition(FilterField.ExceptionDetails, FilterOperator.IsNotNull, '', false, 'and'), // Disabled condition
 					new FilterCondition(FilterField.EntityName, FilterOperator.Equals, 'account', true, 'and')
 				];
 
@@ -260,9 +259,9 @@ describe('ODataQueryBuilder', () => {
 				expect(result).toBe("(contains(typename, 'Plugin1')) and (primaryentity eq 'account')");
 			});
 
-			it('should return undefined if only condition generates undefined', () => {
+			it('should return undefined when all conditions are disabled', () => {
 				const conditions = [
-					new FilterCondition(FilterField.Status, FilterOperator.NotEquals, 'Exception', true, 'and')
+					new FilterCondition(FilterField.ExceptionDetails, FilterOperator.IsNotNull, '', false, 'and')
 				];
 
 				const result = builder.buildFromConditions(conditions);
@@ -274,7 +273,7 @@ describe('ODataQueryBuilder', () => {
 		describe('real-world scenarios', () => {
 			it('should build complex filter: exceptions from specific plugin in last hour', () => {
 				const conditions = [
-					new FilterCondition(FilterField.Status, FilterOperator.Equals, 'Exception', true, 'and'),
+					new FilterCondition(FilterField.ExceptionDetails, FilterOperator.IsNotNull, '', true, 'and'),
 					new FilterCondition(FilterField.PluginName, FilterOperator.Contains, 'MyPlugin', true, 'and'),
 					new FilterCondition(FilterField.CreatedOn, FilterOperator.GreaterThanOrEqual, '2024-01-01T12:00:00Z', true, 'and')
 				];
@@ -304,7 +303,7 @@ describe('ODataQueryBuilder', () => {
 				const conditions = [
 					new FilterCondition(FilterField.PluginName, FilterOperator.Contains, 'MyPlugin', true, 'and'),
 					new FilterCondition(FilterField.EntityName, FilterOperator.Equals, 'account', false, 'and'),
-					new FilterCondition(FilterField.Status, FilterOperator.Equals, 'Exception', true, 'and'),
+					new FilterCondition(FilterField.ExceptionDetails, FilterOperator.IsNotNull, '', true, 'and'),
 					new FilterCondition(FilterField.MessageName, FilterOperator.Equals, 'Create', false, 'or'),
 					new FilterCondition(FilterField.Duration, FilterOperator.GreaterThan, '1000', true, 'and')
 				];

@@ -79,6 +79,26 @@ describe('FilterCondition', () => {
 			}).not.toThrow();
 		});
 
+		it('should allow empty string value for Equals operator', () => {
+			expect(() => {
+				new FilterCondition(
+					FilterField.ExceptionDetails,
+					FilterOperator.Equals,
+					'' // Empty string is valid for Equals
+				);
+			}).not.toThrow();
+		});
+
+		it('should allow empty string value for NotEquals operator', () => {
+			expect(() => {
+				new FilterCondition(
+					FilterField.ExceptionDetails,
+					FilterOperator.NotEquals,
+					'' // Empty string is valid for NotEquals
+				);
+			}).not.toThrow();
+		});
+
 		it('should allow GreaterThan operator for number fields', () => {
 			expect(() => {
 				new FilterCondition(
@@ -234,37 +254,61 @@ describe('FilterCondition', () => {
 			expect(condition.toODataExpression()).toBe("typename eq 'It''s a test''s value'");
 		});
 
-		it('should build Status Exception filter as exceptiondetails ne null', () => {
+		it('should build IsNull filter for exceptiondetails', () => {
 			const condition = new FilterCondition(
-				FilterField.Status,
-				FilterOperator.Equals,
-				'Exception',
-				true
-			);
-
-			expect(condition.toODataExpression()).toBe('exceptiondetails ne null');
-		});
-
-		it('should build Status Success filter as exceptiondetails eq null', () => {
-			const condition = new FilterCondition(
-				FilterField.Status,
-				FilterOperator.Equals,
-				'Success',
+				FilterField.ExceptionDetails,
+				FilterOperator.IsNull,
+				'',
 				true
 			);
 
 			expect(condition.toODataExpression()).toBe('exceptiondetails eq null');
 		});
 
-		it('should return undefined for Status field with non-Equals operator', () => {
+		it('should build IsNotNull filter for exceptiondetails', () => {
 			const condition = new FilterCondition(
-				FilterField.Status,
-				FilterOperator.NotEquals,
-				'Exception',
+				FilterField.ExceptionDetails,
+				FilterOperator.IsNotNull,
+				'',
 				true
 			);
 
-			expect(condition.toODataExpression()).toBeUndefined();
+			expect(condition.toODataExpression()).toBe('exceptiondetails ne null');
+		});
+
+		it('should build Equals filter with empty string for exceptiondetails', () => {
+			const condition = new FilterCondition(
+				FilterField.ExceptionDetails,
+				FilterOperator.Equals,
+				'',
+				true
+			);
+
+			// Dataverse stores empty text fields as empty string '', not null
+			expect(condition.toODataExpression()).toBe("exceptiondetails eq ''");
+		});
+
+		it('should build NotEquals filter with empty string for exceptiondetails', () => {
+			const condition = new FilterCondition(
+				FilterField.ExceptionDetails,
+				FilterOperator.NotEquals,
+				'',
+				true
+			);
+
+			// Dataverse stores empty text fields as empty string '', not null
+			expect(condition.toODataExpression()).toBe("exceptiondetails ne ''");
+		});
+
+		it('should build IsNull filter for nullable field', () => {
+			const condition = new FilterCondition(
+				FilterField.EntityName,
+				FilterOperator.IsNull,
+				'',
+				true
+			);
+
+			expect(condition.toODataExpression()).toBe('primaryentity eq null');
 		});
 	});
 
