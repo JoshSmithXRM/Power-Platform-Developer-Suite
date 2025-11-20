@@ -1000,20 +1000,16 @@ function updateOperatorsForField(fieldSelect) {
 
 /**
  * Gets field type for a field name.
+ * Uses configuration from TypeScript domain model (window.FILTER_CONFIG.fieldTypes).
  */
 function getFieldType(fieldDisplayName) {
-	const fieldTypes = {
-		'Plugin Name': 'text',
-		'Entity Name': 'text',
-		'Message Name': 'text',
-		'Operation Type': 'enum',
-		'Execution Mode': 'enum',
-		'Status': 'enum',
-		'Created On': 'date',
-		'Duration (ms)': 'number'
-	};
+	// Use field types from domain model if available, otherwise default to 'text'
+	if (window.FILTER_CONFIG && window.FILTER_CONFIG.fieldTypes) {
+		return window.FILTER_CONFIG.fieldTypes[fieldDisplayName] || 'text';
+	}
 
-	return fieldTypes[fieldDisplayName] || 'text';
+	// Fallback for backward compatibility (should never be needed)
+	return 'text';
 }
 
 /**
@@ -1063,14 +1059,11 @@ function createTextInput(value) {
 
 /**
  * Creates enum dropdown element.
+ * Uses configuration from TypeScript domain model (window.FILTER_CONFIG.enumOptions).
  */
 function createEnumInput(fieldName, value) {
-	const enumOptions = {
-		'Operation Type': ['Plugin', 'Workflow'],
-		'Execution Mode': ['Synchronous', 'Asynchronous'],
-		'Status': ['Success', 'Exception']
-	};
-
+	// Use enum options from domain model if available
+	const enumOptions = (window.FILTER_CONFIG && window.FILTER_CONFIG.enumOptions) || {};
 	const options = enumOptions[fieldName] || [];
 
 	const select = document.createElement('select');
@@ -1127,7 +1120,8 @@ function createNumberInput(fieldName, value) {
  */
 function createConditionRowHtml(condition, isLastRow = true) {
 	const applicableOperators = getApplicableOperators(condition.field);
-	const allFields = ['Plugin Name', 'Entity Name', 'Message Name', 'Operation Type', 'Execution Mode', 'Status', 'Created On', 'Duration (ms)'];
+	// Use FilterField.All from domain model (passed via window.FILTER_CONFIG)
+	const allFields = (window.FILTER_CONFIG && window.FILTER_CONFIG.fields) || [];
 	const fieldType = getFieldType(condition.field);
 	const valueInputHtml = createValueInputHtml(fieldType, condition.field, condition.value);
 
@@ -1198,12 +1192,8 @@ function createValueInputHtml(fieldType, fieldName, value) {
  * Creates HTML string for enum dropdown.
  */
 function createEnumInputHtml(fieldName, value) {
-	const enumOptions = {
-		'Operation Type': ['Plugin', 'Workflow'],
-		'Execution Mode': ['Synchronous', 'Asynchronous'],
-		'Status': ['Success', 'Exception']
-	};
-
+	// Use enum options from domain model if available (window.FILTER_CONFIG.enumOptions)
+	const enumOptions = (window.FILTER_CONFIG && window.FILTER_CONFIG.enumOptions) || {};
 	const options = enumOptions[fieldName] || [];
 
 	return `

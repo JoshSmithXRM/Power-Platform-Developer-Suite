@@ -4,6 +4,7 @@ import { SectionPosition } from '../../../../shared/infrastructure/ui/types/Sect
 import { FilterField, FilterOperator, DateTimeFilter } from '../../application/types';
 import type { FilterCriteriaViewModel, FilterConditionViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
 import { QUICK_FILTER_DEFINITIONS } from '../constants/QuickFilterDefinitions';
+import { FILTER_ENUM_OPTIONS } from '../constants/FilterFieldConfiguration';
 
 /**
  * Filter Panel Section for Plugin Trace Viewer.
@@ -195,14 +196,8 @@ export class FilterPanelSection implements ISection {
 	}
 
 	private renderEnumInput(condition: FilterConditionViewModel, field: FilterField): string {
-		// Map field names to their enum values
-		const enumOptions: Record<string, string[]> = {
-			'Operation Type': ['Plugin', 'Workflow'],
-			'Execution Mode': ['Synchronous', 'Asynchronous'],
-			'Status': ['Success', 'Exception']
-		};
-
-		const options = enumOptions[field.displayName] || [];
+		// Use centralized enum options configuration
+		const options = FILTER_ENUM_OPTIONS[field.displayName] || [];
 
 		return `
 			<select class="condition-value">

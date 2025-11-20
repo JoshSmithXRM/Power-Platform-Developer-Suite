@@ -44,8 +44,9 @@ import { AutoRefreshDropdownSection } from '../sections/AutoRefreshDropdownSecti
 import { FilterPanelSection } from '../sections/FilterPanelSection';
 import { FilterCriteriaMapper } from '../mappers/FilterCriteriaMapper';
 import type { FilterCriteriaViewModel, FilterConditionViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
-import { DateTimeFilter } from '../../application/types';
+import { DateTimeFilter, FilterField } from '../../application/types';
 import { QUICK_FILTER_DEFINITIONS } from '../constants/QuickFilterDefinitions';
+import { FILTER_ENUM_OPTIONS } from '../constants/FilterFieldConfiguration';
 
 /**
  * Commands supported by Plugin Trace Viewer panel.
@@ -345,6 +346,17 @@ export class PluginTraceViewerPanelComposed {
 			vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'plugin-trace-viewer.css')
 		).toString();
 
+		// Pass filter configuration to webview for JavaScript to use
+		// This ensures JavaScript uses the same field definitions as TypeScript domain model
+		const filterConfig = {
+			fields: FilterField.All.map(f => f.displayName),
+			fieldTypes: Object.fromEntries(
+				FilterField.All.map(f => [f.displayName, f.fieldType])
+			),
+			enumOptions: FILTER_ENUM_OPTIONS
+		};
+		const filterConfigJson = JSON.stringify(filterConfig);
+
 		const scaffoldingConfig: HtmlScaffoldingConfig = {
 			cssUris: [...cssUris, featureCssUri],
 			jsUris: [
@@ -368,7 +380,8 @@ export class PluginTraceViewerPanelComposed {
 				).toString()
 			],
 			cspNonce: getNonce(),
-			title: 'Plugin Traces'
+			title: 'Plugin Traces',
+			customJavaScript: `window.FILTER_CONFIG = ${filterConfigJson};`
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
