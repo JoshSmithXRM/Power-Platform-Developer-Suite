@@ -411,7 +411,7 @@ export class PluginTraceViewerPanelComposed {
 			} else {
 				this.logger.warn('ViewDetail called but no traceId in data', { data });
 			}
-		});
+		}, { disableOnExecute: false }); // Link in table, not a button
 
 		this.coordinator.registerHandler('viewTrace', async (data) => {
 			this.logger.info('ViewTrace command received', { data });
@@ -421,7 +421,7 @@ export class PluginTraceViewerPanelComposed {
 			} else {
 				this.logger.warn('ViewTrace called but no traceId in data', { data });
 			}
-		});
+		}, { disableOnExecute: false }); // Link in timeline/related traces, not a button
 
 		this.coordinator.registerHandler('closeDetail', async () => {
 			await this.handleCloseDetail();

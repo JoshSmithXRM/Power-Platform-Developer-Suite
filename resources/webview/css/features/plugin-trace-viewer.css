@@ -11,14 +11,22 @@
 	display: flex;
 	flex-direction: row;
 	gap: 0;
-	flex: 1;
-	min-height: 0;
+	height: calc(100vh - 120px); /* Match metadata browser - explicit height for resizable panel */
+	overflow: hidden;
 }
 
 .content-split .main-section {
 	flex: 1;
 	overflow: auto;
 	min-width: 0;
+}
+
+/* Wrapper for detail section (from split template) - properly sized for flex layout */
+.content-split > .detail-section {
+	flex: 0 0 auto; /* Don't grow/shrink, size determined by child */
+	display: flex; /* Pass flex to child */
+	min-width: 0; /* Allow shrinking below content size */
+	margin: 0; /* Override any .detail-section content rules */
 }
 
 /* Feature-specific ID selector (inherits styles from shared CSS via .resizable-detail-panel) */

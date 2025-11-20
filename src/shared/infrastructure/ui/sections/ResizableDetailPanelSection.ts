@@ -99,7 +99,7 @@ export abstract class ResizableDetailPanelSection implements ISection {
 	public render(_data: SectionRenderData): string {
 		const { featurePrefix, tabs, closeButtonLabel, resizeHandleTitle } = this.config;
 		const panelId = `${featurePrefix}DetailPanel`;
-		const defaultTab = tabs.find(t => t.isDefault) || tabs[0];
+		const defaultTab = tabs.find(t => t.isDefault) ?? tabs[0];
 
 		return `
 			<div id="${panelId}" class="resizable-detail-panel" style="display: none;">
@@ -107,7 +107,7 @@ export abstract class ResizableDetailPanelSection implements ISection {
 				<div
 					id="detailPanelResizeHandle"
 					class="detail-panel-resize-handle"
-					title="${this.escapeHtml(resizeHandleTitle || 'Drag to resize')}"
+					title="${this.escapeHtml(resizeHandleTitle ?? 'Drag to resize')}"
 				></div>
 
 				<!-- Header (title updated by JavaScript via detailPanelTitle) -->
@@ -117,7 +117,7 @@ export abstract class ResizableDetailPanelSection implements ISection {
 						id="detailPanelClose"
 						class="detail-panel-close"
 						data-command="closeDetail"
-						aria-label="${this.escapeHtml(closeButtonLabel || 'Close detail panel')}"
+						aria-label="${this.escapeHtml(closeButtonLabel ?? 'Close detail panel')}"
 					>×</button>
 				</div>
 
@@ -126,7 +126,7 @@ export abstract class ResizableDetailPanelSection implements ISection {
 					${tabs.map(tab => `
 						<button
 							class="detail-tab-button${tab.id === defaultTab?.id ? ' active' : ''}"
-							data-tab="${this.escapeHtml(tab.id)}"
+							data-tab="${tab.id}"
 						>${this.escapeHtml(tab.label)}</button>
 					`).join('')}
 				</div>
@@ -135,9 +135,9 @@ export abstract class ResizableDetailPanelSection implements ISection {
 				<div class="detail-content">
 					${tabs.map(tab => `
 						<div
-							id="${this.escapeHtml(featurePrefix + this.capitalize(tab.id) + 'Content')}"
+							id="${featurePrefix}${this.capitalize(tab.id)}Content"
 							class="detail-tab-panel${tab.id === defaultTab?.id ? ' active' : ''}"
-							data-tab="${this.escapeHtml(tab.id)}"
+							data-tab="${tab.id}"
 						></div>
 					`).join('')}
 				</div>
@@ -151,19 +151,31 @@ export abstract class ResizableDetailPanelSection implements ISection {
 	 */
 	private validateConfig(config: ResizableDetailPanelConfig): void {
 		if (!config.featurePrefix || config.featurePrefix.trim() === '') {
-			throw new Error('ResizableDetailPanelSection: featurePrefix is required and cannot be empty');
+			throw new Error('ResizableDetailPanelSection: featurePrefix cannot be empty');
 		}
 
 		if (!config.tabs || config.tabs.length === 0) {
 			throw new Error('ResizableDetailPanelSection: At least one tab is required');
 		}
 
+		// Validate each tab
+		for (const tab of config.tabs) {
+			if (!tab.id || tab.id.trim() === '') {
+				throw new Error('ResizableDetailPanelSection: Tab id cannot be empty');
+			}
+			if (!tab.label || tab.label.trim() === '') {
+				throw new Error('ResizableDetailPanelSection: Tab label cannot be empty');
+			}
+		}
+
+		// Check for duplicate tab IDs
 		const tabIds = config.tabs.map(t => t.id);
 		const duplicates = tabIds.filter((id, index) => tabIds.indexOf(id) !== index);
 		if (duplicates.length > 0) {
-			throw new Error(`ResizableDetailPanelSection: Duplicate tab IDs found: ${duplicates.join(', ')}`);
+			throw new Error(`ResizableDetailPanelSection: Duplicate tab id: ${duplicates[0]}`);
 		}
 
+		// Check for multiple default tabs
 		const defaultTabs = config.tabs.filter(t => t.isDefault);
 		if (defaultTabs.length > 1) {
 			throw new Error('ResizableDetailPanelSection: Only one tab can be marked as default');
