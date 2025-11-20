@@ -6,6 +6,7 @@
  */
 export interface PluginTraceTableRowViewModel {
 	readonly [key: string]: unknown;
+	readonly id: string; // Trace ID for navigation (Related/Timeline clicks)
 	readonly createdOn: string;
 	readonly pluginName: string;
 	readonly pluginNameHtml: string; // Clickable link

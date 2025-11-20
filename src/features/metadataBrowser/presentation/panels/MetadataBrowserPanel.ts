@@ -37,7 +37,8 @@ type MetadataBrowserCommands =
 	| 'navigateToEntityQuickPick'
 	| 'openDetailPanel'
 	| 'closeDetailPanel'
-	| 'tabChange';
+	| 'tabChange'
+	| 'saveDetailPanelWidth';
 
 /**
  * Metadata Browser panel using PanelCoordinator architecture.
@@ -69,6 +70,7 @@ export class MetadataBrowserPanel {
 	private currentSelectionType: 'entity' | 'choice' | null = null;
 	private currentSelectionId: string | null = null;
 	private currentTab: MetadataTab = 'attributes';
+	private detailPanelWidth: number | null = null;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -162,7 +164,8 @@ export class MetadataBrowserPanel {
 			{
 				enableScripts: true,
 				localResourceRoots: [extensionUri],
-				retainContextWhenHidden: true
+				retainContextWhenHidden: true,
+				enableFindWidget: true
 			}
 		);
 
@@ -364,6 +367,14 @@ export class MetadataBrowserPanel {
 				}
 			}
 		}, { disableOnExecute: false });
+
+		// Save detail panel width
+		this.coordinator.registerHandler('saveDetailPanelWidth', async (data) => {
+			const width = (data as { width?: number })?.width;
+			if (width !== undefined) {
+				await this.handleSaveDetailPanelWidth(width);
+			}
+		}, { disableOnExecute: false });
 	}
 
 	/**
@@ -403,6 +414,12 @@ export class MetadataBrowserPanel {
 			}
 		}
 
+		// Load detail panel width if persisted
+		if (state?.detailPanelWidth && typeof state.detailPanelWidth === 'number') {
+			this.detailPanelWidth = state.detailPanelWidth;
+			this.logger.info('Detail panel width loaded from storage', { width: state.detailPanelWidth });
+		}
+
 		// Load environments first
 		const environments = await this.getEnvironments();
 
@@ -414,6 +431,14 @@ export class MetadataBrowserPanel {
 
 		// Load tree data
 		await this.handleLoadTree();
+
+		// Send detail panel width to webview if it was persisted
+		if (this.detailPanelWidth) {
+			await this.panel.webview.postMessage({
+				command: 'restoreDetailPanelWidth',
+				data: { width: this.detailPanelWidth }
+			});
+		}
 
 		// Restore previous selection if it existed
 		if (restoredItemType && restoredItemId) {
@@ -593,6 +618,14 @@ export class MetadataBrowserPanel {
 		};
 		await this.panel.webview.postMessage(postData);
 
+		// Restore persisted width (deferred application after panel shown)
+		if (this.detailPanelWidth !== null) {
+			await this.panel.webview.postMessage({
+				command: 'restoreDetailPanelWidth',
+				data: { width: this.detailPanelWidth }
+			});
+		}
+
 		await this.persistState();
 	}
 
@@ -679,7 +712,7 @@ export class MetadataBrowserPanel {
 
 	/**
 	 * Persists panel state to workspace storage.
-	 * Saves: selected tab, selected entity/choice, to restore on reload.
+	 * Saves: selected tab, selected entity/choice, detail panel width to restore on reload.
 	 */
 	private async persistState(): Promise<void> {
 		// Metadata browser uses custom state stored in filterCriteria
@@ -695,9 +728,23 @@ export class MetadataBrowserPanel {
 					selectedTab: this.currentTab,
 					selectedItemType: this.currentSelectionType,
 					selectedItemId: this.currentSelectionId
-				}
+				},
+				...(this.detailPanelWidth !== null && { detailPanelWidth: this.detailPanelWidth })
 			}
 		);
+	}
+
+	/**
+	 * Save detail panel width preference to persistent storage.
+	 */
+	private async handleSaveDetailPanelWidth(width: number): Promise<void> {
+		try {
+			this.detailPanelWidth = width;
+			await this.persistState();
+			this.logger.debug('Saved detail panel width', { width });
+		} catch (error) {
+			this.logger.error('Error saving detail panel width', error);
+		}
 	}
 
 	/**

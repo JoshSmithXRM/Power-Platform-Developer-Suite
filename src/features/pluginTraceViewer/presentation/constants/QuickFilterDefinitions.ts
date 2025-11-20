@@ -11,6 +11,7 @@ export interface QuickFilterDefinition {
 	readonly odataField: string;
 	readonly tooltip: string;
 	readonly conditions: readonly FilterConditionViewModel[];
+	readonly isRelativeTime?: boolean; // If true, datetime values are recalculated on each use
 }
 
 /**
@@ -54,13 +55,14 @@ export const QUICK_FILTER_DEFINITIONS: readonly QuickFilterDefinition[] = [
 		label: 'Last Hour',
 		odataField: 'createdon',
 		tooltip: 'createdon ge (now - 1 hour)',
+		isRelativeTime: true,
 		conditions: [
 			{
 				id: 'qf-lastHour',
 				enabled: true,
 				field: 'Created On',
 				operator: 'Greater Than or Equal',
-				value: '', // Will be set dynamically
+				value: '', // Recalculated dynamically on each use
 				logicalOperator: 'and'
 			}
 		]
@@ -70,13 +72,14 @@ export const QUICK_FILTER_DEFINITIONS: readonly QuickFilterDefinition[] = [
 		label: 'Last 24 Hours',
 		odataField: 'createdon',
 		tooltip: 'createdon ge (now - 24 hours)',
+		isRelativeTime: true,
 		conditions: [
 			{
 				id: 'qf-last24Hours',
 				enabled: true,
 				field: 'Created On',
 				operator: 'Greater Than or Equal',
-				value: '', // Will be set dynamically
+				value: '', // Recalculated dynamically on each use
 				logicalOperator: 'and'
 			}
 		]
@@ -86,13 +89,14 @@ export const QUICK_FILTER_DEFINITIONS: readonly QuickFilterDefinition[] = [
 		label: 'Today',
 		odataField: 'createdon',
 		tooltip: 'createdon ge (start of today)',
+		isRelativeTime: true,
 		conditions: [
 			{
 				id: 'qf-today',
 				enabled: true,
 				field: 'Created On',
 				operator: 'Greater Than or Equal',
-				value: '', // Will be set dynamically
+				value: '', // Recalculated dynamically on each use
 				logicalOperator: 'and'
 			}
 		]

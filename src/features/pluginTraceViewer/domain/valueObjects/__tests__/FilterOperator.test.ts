@@ -5,7 +5,7 @@ describe('FilterOperator', () => {
 		it('should have Equals operator with correct properties', () => {
 			expect(FilterOperator.Equals.displayName).toBe('Equals');
 			expect(FilterOperator.Equals.odataOperator).toBe('eq');
-			expect(FilterOperator.Equals.applicableTypes).toEqual(['text', 'enum', 'number', 'boolean']);
+			expect(FilterOperator.Equals.applicableTypes).toEqual(['text', 'enum', 'number', 'boolean', 'guid']);
 		});
 
 		it('should have Contains operator with correct properties', () => {
@@ -29,7 +29,7 @@ describe('FilterOperator', () => {
 		it('should have NotEquals operator with correct properties', () => {
 			expect(FilterOperator.NotEquals.displayName).toBe('Not Equals');
 			expect(FilterOperator.NotEquals.odataOperator).toBe('ne');
-			expect(FilterOperator.NotEquals.applicableTypes).toEqual(['text', 'enum', 'number', 'boolean']);
+			expect(FilterOperator.NotEquals.applicableTypes).toEqual(['text', 'enum', 'number', 'boolean', 'guid']);
 		});
 
 		it('should have GreaterThan operator with correct properties', () => {
@@ -59,13 +59,13 @@ describe('FilterOperator', () => {
 		it('should have IsNull operator with correct properties', () => {
 			expect(FilterOperator.IsNull.displayName).toBe('Is Null');
 			expect(FilterOperator.IsNull.odataOperator).toBe('null');
-			expect(FilterOperator.IsNull.applicableTypes).toEqual(['text', 'enum', 'date', 'number', 'boolean']);
+			expect(FilterOperator.IsNull.applicableTypes).toEqual(['text', 'enum', 'date', 'number', 'boolean', 'guid']);
 		});
 
 		it('should have IsNotNull operator with correct properties', () => {
 			expect(FilterOperator.IsNotNull.displayName).toBe('Is Not Null');
 			expect(FilterOperator.IsNotNull.odataOperator).toBe('notnull');
-			expect(FilterOperator.IsNotNull.applicableTypes).toEqual(['text', 'enum', 'date', 'number', 'boolean']);
+			expect(FilterOperator.IsNotNull.applicableTypes).toEqual(['text', 'enum', 'date', 'number', 'boolean', 'guid']);
 		});
 	});
 

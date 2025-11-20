@@ -6,15 +6,15 @@ export class FilterOperator {
 	private constructor(
 		public readonly displayName: string,
 		public readonly odataOperator: string,
-		public readonly applicableTypes: readonly ('text' | 'enum' | 'date' | 'number' | 'boolean')[]
+		public readonly applicableTypes: readonly ('text' | 'enum' | 'date' | 'number' | 'boolean' | 'guid')[]
 	) {}
 
 	// Text operators
-	static readonly Equals = new FilterOperator('Equals', 'eq', ['text', 'enum', 'number', 'boolean']);
+	static readonly Equals = new FilterOperator('Equals', 'eq', ['text', 'enum', 'number', 'boolean', 'guid']);
 	static readonly Contains = new FilterOperator('Contains', 'contains', ['text']);
 	static readonly StartsWith = new FilterOperator('Starts With', 'startswith', ['text']);
 	static readonly EndsWith = new FilterOperator('Ends With', 'endswith', ['text']);
-	static readonly NotEquals = new FilterOperator('Not Equals', 'ne', ['text', 'enum', 'number', 'boolean']);
+	static readonly NotEquals = new FilterOperator('Not Equals', 'ne', ['text', 'enum', 'number', 'boolean', 'guid']);
 
 	// Numeric/Date operators
 	static readonly GreaterThan = new FilterOperator('Greater Than', 'gt', ['number', 'date']);
@@ -23,8 +23,8 @@ export class FilterOperator {
 	static readonly LessThanOrEqual = new FilterOperator('Less Than or Equal', 'le', ['number', 'date']);
 
 	// Null operators (applicable to all nullable fields)
-	static readonly IsNull = new FilterOperator('Is Null', 'null', ['text', 'enum', 'date', 'number', 'boolean']);
-	static readonly IsNotNull = new FilterOperator('Is Not Null', 'notnull', ['text', 'enum', 'date', 'number', 'boolean']);
+	static readonly IsNull = new FilterOperator('Is Null', 'null', ['text', 'enum', 'date', 'number', 'boolean', 'guid']);
+	static readonly IsNotNull = new FilterOperator('Is Not Null', 'notnull', ['text', 'enum', 'date', 'number', 'boolean', 'guid']);
 
 	/**
 	 * All available operators.
@@ -47,7 +47,7 @@ export class FilterOperator {
 	 * Gets operators applicable to a field type.
 	 */
 	// eslint-disable-next-line local-rules/no-static-entity-methods -- Lookup method for value object collection
-	static forFieldType(fieldType: 'text' | 'enum' | 'date' | 'number' | 'boolean'): FilterOperator[] {
+	static forFieldType(fieldType: 'text' | 'enum' | 'date' | 'number' | 'boolean' | 'guid'): FilterOperator[] {
 		return FilterOperator.All.filter(op => op.applicableTypes.includes(fieldType));
 	}
 

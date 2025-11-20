@@ -3,6 +3,9 @@
  * Three-panel layout: Tree (left) | Tables (center) | Detail (right)
  */
 
+/* Import shared resizable detail panel styles */
+@import url('../shared/resizable-detail-panel.css');
+
 /* ==================================================
    Container Layout
    ================================================== */
@@ -322,96 +325,9 @@
    Right Panel - Detail View
    ================================================== */
 
-.metadata-detail-panel {
-	width: 400px;
-	min-width: 300px;
-	max-width: 600px;
-	border-left: 1px solid var(--vscode-panel-border);
-	display: flex;
-	flex-direction: column;
-	background: var(--vscode-sideBar-background);
-	overflow: hidden;
-}
-
-.detail-panel-header {
-	display: flex;
-	align-items: center;
-	padding: 12px;
-	border-bottom: 1px solid var(--vscode-panel-border);
-	background: var(--vscode-sideBarSectionHeader-background);
-}
-
-.detail-panel-title {
-	flex: 1;
-	font-weight: 600;
-	font-size: 13px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.detail-panel-close {
-	background: transparent;
-	border: none;
-	color: var(--vscode-foreground);
-	cursor: pointer;
-	font-size: 24px;
-	line-height: 1;
-	padding: 0;
-	width: 24px;
-	height: 24px;
-	border-radius: 3px;
-}
-
-.detail-panel-close:hover {
-	background: var(--vscode-toolbar-hoverBackground);
-}
-
-/* Detail Tabs */
-.detail-tab-navigation {
-	display: flex;
-	gap: 0;
-	border-bottom: 1px solid var(--vscode-panel-border);
-	background: var(--vscode-sideBar-background);
-	padding: 0 8px;
-}
-
-.detail-tab-button {
-	padding: 8px 12px;
-	background: transparent;
-	border: none;
-	border-bottom: 2px solid transparent;
-	color: var(--vscode-foreground);
-	cursor: pointer;
-	font-size: 12px;
-	font-weight: 500;
-	transition: all 0.2s;
-}
-
-.detail-tab-button:hover {
-	background: var(--vscode-toolbar-hoverBackground);
-}
-
-.detail-tab-button.active {
-	border-bottom-color: var(--vscode-focusBorder);
-	color: var(--vscode-textLink-activeForeground);
-}
-
-/* Detail Content */
-.detail-content {
-	flex: 1;
-	overflow: hidden;
-	position: relative;
-}
-
-.detail-tab-panel {
-	display: none;
-	height: 100%;
-	overflow: auto;
-}
-
-.detail-tab-panel.active {
-	display: block;
+/* Feature-specific ID selector (inherits styles from shared CSS via .resizable-detail-panel) */
+#metadataDetailPanel {
+	/* Uses default 500px width from shared CSS */
 }
 
 /* Properties List */
@@ -472,16 +388,13 @@
 	border: 1px solid var(--vscode-panel-border);
 }
 
-.options-table thead {
-	background: var(--vscode-list-hoverBackground);
-}
-
 .options-table th {
 	padding: 6px 8px;
 	text-align: left;
 	font-weight: 600;
 	font-size: 11px;
-	color: var(--vscode-descriptionForeground);
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
 	border-bottom: 1px solid var(--vscode-panel-border);
 	text-transform: uppercase;
 	letter-spacing: 0.3px;
@@ -514,7 +427,7 @@
 
 /* Raw Data Display */
 .raw-data-display {
-	padding: 16px;
+	padding: 0;
 	margin: 0;
 	font-family: var(--vscode-editor-font-family);
 	font-size: 12px;
@@ -522,23 +435,9 @@
 	background: var(--vscode-editor-background);
 	overflow-x: auto;
 	white-space: pre;
+	word-wrap: break-word;
 }
 
-/* Resize Handle */
-.detail-panel-resize-handle {
-	position: absolute;
-	top: 0;
-	right: 400px;
-	width: 4px;
-	height: 100%;
-	cursor: col-resize;
-	background: transparent;
-	z-index: 100;
-}
-
-.detail-panel-resize-handle:hover {
-	background: var(--vscode-focusBorder);
-}
 
 /* ==================================================
    Responsive Adjustments
@@ -548,19 +447,11 @@
 	.metadata-sidebar {
 		width: 250px;
 	}
-
-	.metadata-detail-panel {
-		width: 350px;
-	}
 }
 
 @media (max-width: 900px) {
 	.metadata-sidebar {
 		width: 200px;
-	}
-
-	.metadata-detail-panel {
-		width: 300px;
 	}
 
 	.table-search {

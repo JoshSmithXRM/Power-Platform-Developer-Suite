@@ -251,6 +251,68 @@
                     "command": "power-platform-dev-suite.removeEnvironment",
                     "when": "view == power-platform-dev-suite-environments && viewItem == environment",
                     "group": "3_remove@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.solutionExplorerPickEnvironment",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == solutionExplorer",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.importJobViewerPickEnvironment",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == importJobViewer",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.connectionReferencesPickEnvironment",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == connectionReferences",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.environmentVariablesPickEnvironment",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == environmentVariables",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.pluginTraceViewerPickEnvironment",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == pluginTraceViewer",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.metadataBrowserPickEnvironment",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == metadataBrowser",
+                    "group": "1_environment@1"
+                }
+            ],
+            "webview/context": [
+                {
+                    "command": "power-platform-dev-suite.solutionExplorerPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.solutionExplorer'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.importJobViewerPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.importJobViewer'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.connectionReferencesPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.connectionReferences'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.environmentVariablesPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.environmentVariables'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.pluginTraceViewerPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginTraceViewer'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.metadataBrowserPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.metadataBrowser'",
+                    "group": "1_environment@1"
                 }
             ]
         }

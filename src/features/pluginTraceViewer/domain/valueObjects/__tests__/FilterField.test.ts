@@ -35,7 +35,7 @@ describe('FilterField', () => {
 		it('should have CorrelationId field with correct properties', () => {
 			expect(FilterField.CorrelationId.displayName).toBe('Correlation ID');
 			expect(FilterField.CorrelationId.odataName).toBe('correlationid');
-			expect(FilterField.CorrelationId.fieldType).toBe('text');
+			expect(FilterField.CorrelationId.fieldType).toBe('guid');
 		});
 
 		it('should have CreatedOn field with correct properties', () => {
@@ -235,17 +235,28 @@ describe('FilterField', () => {
 	});
 
 	describe('field type distribution', () => {
-		it('should have 16 text fields', () => {
+		it('should have 9 text fields', () => {
 			const textFields = FilterField.All.filter(f => f.fieldType === 'text');
 
-			expect(textFields).toHaveLength(16);
-			expect(textFields).toContain(FilterField.Id);
+			expect(textFields).toHaveLength(9);
 			expect(textFields).toContain(FilterField.PluginName);
 			expect(textFields).toContain(FilterField.EntityName);
 			expect(textFields).toContain(FilterField.MessageName);
 			expect(textFields).toContain(FilterField.ExceptionDetails);
-			expect(textFields).toContain(FilterField.CorrelationId);
-			expect(textFields).toContain(FilterField.CreatedBy);
+			expect(textFields).toContain(FilterField.PersistenceKey);
+		});
+
+		it('should have 7 guid fields', () => {
+			const guidFields = FilterField.All.filter(f => f.fieldType === 'guid');
+
+			expect(guidFields).toHaveLength(7);
+			expect(guidFields).toContain(FilterField.Id);
+			expect(guidFields).toContain(FilterField.CorrelationId);
+			expect(guidFields).toContain(FilterField.RequestId);
+			expect(guidFields).toContain(FilterField.PluginStepId);
+			expect(guidFields).toContain(FilterField.OrganizationId);
+			expect(guidFields).toContain(FilterField.CreatedBy);
+			expect(guidFields).toContain(FilterField.CreatedOnBehalfBy);
 		});
 
 		it('should have 2 enum fields', () => {

@@ -28,6 +28,7 @@ export class PluginTraceViewModelMapper {
 		const escapedName = escapeHtml(trace.pluginName);
 
 		return {
+			id: trace.id,
 			createdOn: trace.createdOn.toLocaleString(),
 			pluginName: trace.pluginName,
 			pluginNameHtml: `<a href="#" class="plugin-link" data-command="viewDetail" data-trace-id="${escapedId}">${escapedName}</a>`,

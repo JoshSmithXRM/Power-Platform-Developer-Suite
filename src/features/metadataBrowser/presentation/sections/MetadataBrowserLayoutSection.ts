@@ -2,6 +2,8 @@ import type { ISection } from '../../../../shared/infrastructure/ui/sections/ISe
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
 import type { SectionRenderData } from '../../../../shared/infrastructure/ui/types/SectionRenderData';
 
+import { MetadataBrowserDetailSection } from './MetadataBrowserDetailSection';
+
 /**
  * Custom section that renders three-panel metadata browser layout.
  *
@@ -14,10 +16,15 @@ import type { SectionRenderData } from '../../../../shared/infrastructure/ui/typ
  * - Tree filtering and navigation
  * - Tab switching
  * - Table rendering (uses TableRenderer.js)
- * - Detail panel open/close/resize (uses SplitPanelBehavior.js)
+ * - Detail panel open/close/resize
  */
 export class MetadataBrowserLayoutSection implements ISection {
 	readonly position = SectionPosition.Main;
+	private readonly detailSection: MetadataBrowserDetailSection;
+
+	constructor() {
+		this.detailSection = new MetadataBrowserDetailSection();
+	}
 
 	render(_data: SectionRenderData): string {
 		return `
@@ -284,35 +291,8 @@ export class MetadataBrowserLayoutSection implements ISection {
 					</div>
 				</div>
 
-				<!-- Right Panel: Detail View (initially hidden) -->
-				<div class="metadata-detail-panel" id="detailPanel" style="display: none;">
-					<div class="detail-panel-header">
-						<span class="detail-panel-title" id="detailPanelTitle">Details</span>
-						<button class="detail-panel-close" id="detailPanelClose" aria-label="Close detail panel">×</button>
-					</div>
-
-					<!-- Detail Tabs -->
-					<div class="detail-tab-navigation">
-						<button class="detail-tab-button active" data-detail-tab="properties">Properties</button>
-						<button class="detail-tab-button" data-detail-tab="rawData">Raw Data</button>
-					</div>
-
-					<!-- Detail Content -->
-					<div class="detail-content">
-						<!-- Properties Tab -->
-						<div class="detail-tab-panel active" data-detail-panel="properties">
-							<div class="properties-list" id="propertiesList"></div>
-						</div>
-
-						<!-- Raw Data Tab -->
-						<div class="detail-tab-panel" data-detail-panel="rawData">
-							<pre class="raw-data-display" id="rawDataDisplay"></pre>
-						</div>
-					</div>
-				</div>
-
-				<!-- Resize Handle for Detail Panel -->
-				<div class="detail-panel-resize-handle" id="detailPanelResizeHandle" style="display: none;"></div>
+				<!-- Right Panel: Resizable detail panel (rendered by MetadataBrowserDetailSection) -->
+				${this.detailSection.render(_data)}
 			</div>
 		`;
 	}

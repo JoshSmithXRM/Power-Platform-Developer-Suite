@@ -357,4 +357,72 @@ describe('ODataExpressionBuilder', () => {
 			});
 		});
 	});
+
+	describe('GUID field handling', () => {
+		it('should quote GUID field values like text values', () => {
+			const condition = new FilterCondition(
+				FilterField.CorrelationId,
+				FilterOperator.Equals,
+				'12345678-1234-1234-1234-123456789abc',
+				true
+			);
+
+			expect(builder.buildExpression(condition)).toBe("correlationid eq '12345678-1234-1234-1234-123456789abc'");
+		});
+
+		it('should support equals operator on GUID fields', () => {
+			const condition = new FilterCondition(
+				FilterField.RequestId,
+				FilterOperator.Equals,
+				'87654321-4321-4321-4321-cba987654321',
+				true
+			);
+
+			expect(builder.buildExpression(condition)).toBe("requestid eq '87654321-4321-4321-4321-cba987654321'");
+		});
+
+		it('should support not equals operator on GUID fields', () => {
+			const condition = new FilterCondition(
+				FilterField.PluginStepId,
+				FilterOperator.NotEquals,
+				'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+				true
+			);
+
+			expect(builder.buildExpression(condition)).toBe("pluginstepid ne 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'");
+		});
+
+		it('should support IsNull operator on GUID fields', () => {
+			const condition = new FilterCondition(
+				FilterField.CorrelationId,
+				FilterOperator.IsNull,
+				'',
+				true
+			);
+
+			expect(builder.buildExpression(condition)).toBe('correlationid eq null');
+		});
+
+		it('should support IsNotNull operator on GUID fields', () => {
+			const condition = new FilterCondition(
+				FilterField.OrganizationId,
+				FilterOperator.IsNotNull,
+				'',
+				true
+			);
+
+			expect(builder.buildExpression(condition)).toBe('organizationid ne null');
+		});
+
+		it('should handle GUID values with mixed case', () => {
+			const condition = new FilterCondition(
+				FilterField.CreatedBy,
+				FilterOperator.Equals,
+				'AbCdEfGh-1234-5678-90AB-CdEf12345678',
+				true
+			);
+
+			expect(builder.buildExpression(condition)).toBe("_createdby_value eq 'AbCdEfGh-1234-5678-90AB-CdEf12345678'");
+		});
+	});
 });

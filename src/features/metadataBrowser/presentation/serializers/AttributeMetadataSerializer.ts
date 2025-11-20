@@ -6,6 +6,30 @@ import type { IEntitySerializer } from '../../../../shared/presentation/serializ
  * Converts domain value objects to primitives matching actual Dataverse API response.
  */
 export class AttributeMetadataSerializer implements IEntitySerializer<AttributeMetadata> {
+	/**
+	 * Extracts string value from various forms:
+	 * - Plain string: return as-is
+	 * - Value object with getValue(): call getValue()
+	 * - JSON-serialized form: extract .value property
+	 */
+	private extractValue(field: unknown): string {
+		if (typeof field === 'string') {
+			return field;
+		}
+		if (field && typeof field === 'object') {
+			// Try getValue() method (domain value object)
+			if ('getValue' in field && typeof field.getValue === 'function') {
+				return (field.getValue as () => string)();
+			}
+			// Try .value property (JSON-serialized form)
+			if ('value' in field && typeof field.value === 'string') {
+				return field.value;
+			}
+		}
+		// Fallback to string conversion
+		return String(field);
+	}
+
 	serializeToRaw(attribute: AttributeMetadata): Record<string, unknown> {
 		// Serialize OptionSet if present
 		let optionSetRaw: Record<string, unknown> | null = null;
@@ -24,15 +48,23 @@ export class AttributeMetadataSerializer implements IEntitySerializer<AttributeM
 			};
 		}
 
+		// Handle three forms:
+		// 1. Domain entities (with value objects that have getValue())
+		// 2. JSON-serialized form from webview ({ value: 'string' })
+		// 3. Plain strings
+		const logicalName = this.extractValue(attribute.logicalName);
+		const schemaName = this.extractValue(attribute.schemaName);
+		const attributeTypeName = this.extractValue(attribute.attributeType);
+
 		// Return API format matching Dataverse AttributeMetadata response
 		return {
 			MetadataId: attribute.metadataId,
-			LogicalName: attribute.logicalName.getValue(),
-			SchemaName: attribute.schemaName.getValue(),
+			LogicalName: logicalName,
+			SchemaName: schemaName,
 			DisplayName: attribute.displayName,
 			Description: attribute.description,
 			AttributeTypeName: {
-				Value: attribute.attributeType.getValue()
+				Value: attributeTypeName
 			},
 			IsCustomAttribute: attribute.isCustomAttribute,
 			IsManaged: attribute.isManaged,

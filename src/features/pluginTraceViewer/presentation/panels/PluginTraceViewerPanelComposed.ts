@@ -64,10 +64,12 @@ type PluginTraceViewerCommands =
 	| 'exportJson'
 	| 'setTraceLevel'
 	| 'setAutoRefresh'
-	| 'loadRelatedTraces'
-	| 'loadTimeline'
 	| 'applyFilters'
-	| 'clearFilters';
+	| 'clearFilters'
+	| 'saveDetailPanelWidth'
+	| 'showDetailPanel'
+	| 'hideDetailPanel'
+	| 'restoreDetailPanelWidth';
 
 /**
  * Plugin Trace Viewer panel using new PanelCoordinator architecture.
@@ -89,8 +91,10 @@ export class PluginTraceViewerPanelComposed {
 	private currentTraceLevel: TraceLevel | null = null;
 	private autoRefreshInterval: number = 0;
 	private autoRefreshTimer: NodeJS.Timeout | null = null;
+	private detailPanelWidth: number | null = null;
 	private filterCriteria: FilterCriteriaViewModel;
 	private reconstructedQuickFilterIds: string[] = [];
+	private activeQuickFilterIds: string[] = []; // Currently active quick filter IDs (persisted, used for recalculation)
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -181,7 +185,8 @@ export class PluginTraceViewerPanelComposed {
 			{
 				enableScripts: true,
 				localResourceRoots: [extensionUri],
-				retainContextWhenHidden: true
+				retainContextWhenHidden: true,
+				enableFindWidget: true
 			}
 		);
 
@@ -240,13 +245,22 @@ export class PluginTraceViewerPanelComposed {
 			state: {
 				traceLevel: this.currentTraceLevel?.value,
 				autoRefreshInterval: this.autoRefreshInterval,
-				filterCriteria: this.filterCriteria
+				filterCriteria: this.filterCriteria,
+				detailPanelWidth: this.detailPanelWidth
 			}
 		});
 
 		await this.handleRefresh();
 
 		await this.loadTraceLevel();
+
+		// Send detail panel width to webview if it was persisted
+		if (this.detailPanelWidth !== null) {
+			await this.panel.webview.postMessage({
+				command: 'restoreDetailPanelWidth',
+				data: { width: this.detailPanelWidth }
+			});
+		}
 
 		const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
 
@@ -452,17 +466,7 @@ export class PluginTraceViewerPanelComposed {
 			}
 		});
 
-		this.coordinator.registerHandler('loadRelatedTraces', async (data) => {
-			const correlationId = (data as { correlationId?: string })?.correlationId;
-			if (correlationId) {
-				await this.handleLoadRelatedTraces(correlationId);
-			}
-		});
-
-		this.coordinator.registerHandler('loadTimeline', async (data) => {
-			const correlationId = (data as { correlationId?: string })?.correlationId ?? null;
-			await this.handleLoadTimeline(correlationId);
-		});
+		// Related traces and timeline are now sent with updateDetailPanel (no lazy loading needed)
 
 		this.coordinator.registerHandler('applyFilters', async (data) => {
 			const filterData = data as Partial<FilterCriteriaViewModel>;
@@ -471,6 +475,13 @@ export class PluginTraceViewerPanelComposed {
 
 		this.coordinator.registerHandler('clearFilters', async () => {
 			await this.handleClearFilters();
+		});
+
+		this.coordinator.registerHandler('saveDetailPanelWidth', async (data) => {
+			const width = (data as { width?: number })?.width;
+			if (width !== undefined) {
+				await this.handleSaveDetailPanelWidth(width);
+			}
 		});
 	}
 
@@ -502,8 +513,23 @@ export class PluginTraceViewerPanelComposed {
 		this.logger.debug('Refreshing plugin traces');
 
 		try {
-			// Build filter from current filter criteria
-			const filter = this.filterCriteriaMapper.toDomain(this.filterCriteria);
+			// Re-expand quick filters to recalculate relative time filters (lastHour, last24Hours, today)
+			// This ensures filters like "Last Hour" always represent current time, not stale values
+			let finalFilterCriteria = this.filterCriteria;
+			if (this.activeQuickFilterIds.length > 0) {
+				const expandedFilterData = this.expandQuickFilters({
+					quickFilterIds: this.activeQuickFilterIds,
+					conditions: this.filterCriteria.conditions
+				});
+				const normalizedFilterData = this.normalizeFilterDateTimes(expandedFilterData);
+				finalFilterCriteria = {
+					...this.filterCriteria,
+					...normalizedFilterData
+				};
+			}
+
+			// Build filter from current filter criteria (with recalculated relative time filters)
+			const filter = this.filterCriteriaMapper.toDomain(finalFilterCriteria);
 
 			const traces = await this.getPluginTracesUseCase.execute(this.currentEnvironmentId, filter);
 			this.traces = traces;
@@ -608,23 +634,47 @@ export class PluginTraceViewerPanelComposed {
 
 			const detailViewModel = this.viewModelMapper.toDetailViewModel(trace);
 
-			this.logger.info('Detail view model created, sending data to frontend');
+			// Map related traces to view models for display
+			const relatedTraceViewModels = this.relatedTracesCache
+				.filter(t => t.id !== trace.id) // Exclude the current trace from related list
+				.map(t => this.viewModelMapper.toTableRowViewModel(t));
+
+			// Build timeline from the SAME related traces cache
+			const timelineNodes = this.buildTimelineUseCase.execute(
+				this.relatedTracesCache,
+				trace.correlationId?.value ?? null
+			);
+			const totalDurationMs = this.calculateTotalDuration(timelineNodes);
+			const timelineViewModel = this.timelineViewModelMapper.toViewModel(
+				timelineNodes,
+				trace.correlationId?.value ?? null,
+				totalDurationMs
+			);
+
+			this.logger.info('Detail view model created, sending data to frontend', {
+				relatedTracesCount: relatedTraceViewModels.length,
+				timelineTraceCount: timelineViewModel.traceCount
+			});
 
 			// Data-driven update: Send detail panel data to frontend
-			// Include both the ViewModel (for display) and raw entity (for Raw Data tab)
+			// Include ViewModel, raw entity, related traces, AND timeline (all use same relatedTracesCache)
 			await this.panel.webview.postMessage({
-				command: 'updateDetailPanel',
+				command: 'showDetailPanel',
 				data: {
 					trace: detailViewModel,
-					rawEntity: this.traceSerializer.serializeToRaw(trace)
+					rawEntity: this.traceSerializer.serializeToRaw(trace),
+					relatedTraces: relatedTraceViewModels,
+					timeline: timelineViewModel
 				}
 			});
 
-			this.logger.info('Detail data sent, showing detail panel');
-
-			await this.panel.webview.postMessage({
-				command: 'showDetailPanel'
-			});
+			// Restore persisted width (deferred application after panel shown)
+			if (this.detailPanelWidth) {
+				await this.panel.webview.postMessage({
+					command: 'restoreDetailPanelWidth',
+					data: { width: this.detailPanelWidth }
+				});
+			}
 
 			// Highlight the selected row (no refresh needed, so selection persists)
 			await this.panel.webview.postMessage({
@@ -632,7 +682,7 @@ export class PluginTraceViewerPanelComposed {
 				traceId: traceId
 			});
 
-			this.logger.info('ShowDetailPanel and selectRow messages sent to webview');
+			this.logger.info('Detail panel opened', { traceId });
 		} catch (error) {
 			this.logger.error('Failed to view trace detail', error);
 			await vscode.window.showErrorMessage('Failed to load trace detail');
@@ -645,6 +695,40 @@ export class PluginTraceViewerPanelComposed {
 		await this.panel.webview.postMessage({
 			command: 'hideDetailPanel'
 		});
+	}
+
+	/**
+	 * Save detail panel width preference to persistent storage.
+	 */
+	private async handleSaveDetailPanelWidth(width: number): Promise<void> {
+		if (!this.panelStateRepository) {
+			return;
+		}
+
+		try {
+			// Load existing state to preserve other properties
+			const existingState = await this.panelStateRepository.load({
+				panelType: PluginTraceViewerPanelComposed.viewType,
+				environmentId: this.currentEnvironmentId
+			});
+
+			const newState = {
+				selectedSolutionId: existingState?.selectedSolutionId || 'default',
+				lastUpdated: new Date().toISOString(),
+				filterCriteria: existingState?.filterCriteria,
+				autoRefreshInterval: (existingState as { autoRefreshInterval?: number })?.autoRefreshInterval || 0,
+				detailPanelWidth: width
+			};
+
+			await this.panelStateRepository.save({
+				panelType: PluginTraceViewerPanelComposed.viewType,
+				environmentId: this.currentEnvironmentId
+			}, newState);
+
+			this.logger.debug('Saved detail panel width', { width });
+		} catch (error) {
+			this.logger.error('Error saving detail panel width', error);
+		}
 	}
 
 	private async handleDeleteSelected(traceIds: string[]): Promise<void> {
@@ -889,7 +973,10 @@ export class PluginTraceViewerPanelComposed {
 		try {
 			this.logger.debug('Applying filters', { filterData });
 
-			// Expand quick filter IDs to conditions
+			// Store quick filter IDs separately for recalculation on refresh
+			this.activeQuickFilterIds = filterData.quickFilterIds ?? [];
+
+			// Expand quick filter IDs to conditions (calculates relative time filters)
 			const expandedFilterData = this.expandQuickFilters(filterData);
 
 			// Convert local datetime values to UTC ISO before storing/processing
@@ -901,7 +988,7 @@ export class PluginTraceViewerPanelComposed {
 				...normalizedFilterData
 			};
 
-			// Persist filter criteria
+			// Persist filter criteria (includes quick filter IDs)
 			await this.saveFilterCriteria();
 
 			// Build OData query preview from current filter criteria
@@ -918,7 +1005,8 @@ export class PluginTraceViewerPanelComposed {
 			await this.handleRefresh();
 
 			this.logger.info('Filters applied successfully', {
-				filterCount: domainFilter.getActiveFilterCount()
+				filterCount: domainFilter.getActiveFilterCount(),
+				quickFilterIds: this.activeQuickFilterIds
 			});
 		} catch (error) {
 			this.logger.error('Failed to apply filters', error);
@@ -932,7 +1020,7 @@ export class PluginTraceViewerPanelComposed {
 	 *
 	 * Matching logic:
 	 * - Static filters (exceptions, success, asyncOnly, syncOnly, recursive): match field + operator + value
-	 * - Date filters (lastHour, last24Hours, today): match field + operator only (value is dynamic)
+	 * - Relative time filters (lastHour, last24Hours, today): match field + operator only (value changes dynamically)
 	 */
 	private detectQuickFilterFromCondition(condition: FilterConditionViewModel): string | null {
 		// All quick filters have exactly one condition, so we compare against the first condition
@@ -947,8 +1035,8 @@ export class PluginTraceViewerPanelComposed {
 				continue;
 			}
 
-			// For date filters (Created On field), match on field + operator only (value is dynamic)
-			if (condition.field === 'Created On') {
+			// For relative time filters, match on field + operator only (value is recalculated dynamically)
+			if (quickFilter.isRelativeTime) {
 				return quickFilter.id;
 			}
 
@@ -964,6 +1052,9 @@ export class PluginTraceViewerPanelComposed {
 	/**
 	 * Expands quick filter IDs to their corresponding filter conditions.
 	 * Merges quick filter conditions with advanced filter conditions.
+	 *
+	 * IMPORTANT: Relative time filters (lastHour, last24Hours, today) are recalculated
+	 * on EVERY expansion to ensure they represent current time, not stale persisted values.
 	 */
 	private expandQuickFilters(filterData: Partial<FilterCriteriaViewModel> & { quickFilterIds?: string[] }): Partial<FilterCriteriaViewModel> {
 		const { quickFilterIds, conditions = [], ...rest } = filterData;
@@ -981,12 +1072,14 @@ export class PluginTraceViewerPanelComposed {
 				continue;
 			}
 
-			// Clone conditions and set dynamic values for date filters
+			// Clone conditions and recalculate values for relative time filters
 			const expandedConditions = quickFilter.conditions.map(condition => {
 				const cloned = { ...condition };
 
-				// Set dynamic datetime values for relative date filters
-				if (condition.field === 'Created On') {
+				// Recalculate datetime values for relative time filters
+				// This happens on EVERY expansion (apply filters, auto-refresh, page load)
+				// ensuring the filter always represents "now - N hours", not a stale timestamp
+				if (quickFilter.isRelativeTime && condition.field === 'Created On') {
 					const now = new Date();
 					if (filterId === 'lastHour') {
 						const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -1070,8 +1163,9 @@ export class PluginTraceViewerPanelComposed {
 		try {
 			this.logger.debug('Clearing filters');
 
-			// Reset to empty filter criteria
+			// Reset to empty filter criteria and clear active quick filters
 			this.filterCriteria = FilterCriteriaMapper.empty();
+			this.activeQuickFilterIds = [];
 
 			// Persist empty filter criteria
 			await this.saveFilterCriteria();
@@ -1157,6 +1251,7 @@ export class PluginTraceViewerPanelComposed {
 
 					// Store reconstructed state
 					this.reconstructedQuickFilterIds = reconstructedQuickFilterIds;
+					this.activeQuickFilterIds = reconstructedQuickFilterIds; // Use reconstructed IDs as active
 					this.filterCriteria = {
 						...stored,
 						conditions: advancedFilterConditions
@@ -1193,6 +1288,12 @@ export class PluginTraceViewerPanelComposed {
 					hasState: !!state,
 					hasKey: state && 'autoRefreshInterval' in state
 				});
+			}
+
+			// Load detail panel width if persisted
+			if (state?.detailPanelWidth && typeof state.detailPanelWidth === 'number') {
+				this.detailPanelWidth = state.detailPanelWidth;
+				this.logger.info('Detail panel width loaded from storage', { width: state.detailPanelWidth });
 			}
 		} catch (error) {
 			this.logger.error('Failed to load filter criteria from storage', error);

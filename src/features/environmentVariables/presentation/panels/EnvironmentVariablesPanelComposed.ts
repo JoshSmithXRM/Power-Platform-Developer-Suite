@@ -123,7 +123,8 @@ export class EnvironmentVariablesPanelComposed {
 			{
 				enableScripts: true,
 				localResourceRoots: [extensionUri],
-				retainContextWhenHidden: true
+				retainContextWhenHidden: true,
+				enableFindWidget: true
 			}
 		);
 

@@ -3,6 +3,9 @@
  * Panel-specific styling for plugin trace viewer
  */
 
+/* Import shared resizable detail panel styles */
+@import url('../shared/resizable-detail-panel.css');
+
 /* Split panel layout */
 .content-split {
 	display: flex;
@@ -18,16 +21,9 @@
 	min-width: 0;
 }
 
-.content-split .detail-section {
-	flex: 0 0 500px;
-	overflow: auto;
-	min-width: 0;
-	border-left: 1px solid var(--vscode-panel-border);
-	background: var(--vscode-editor-background);
-}
-
-.content-split .detail-section.hidden {
-	display: none;
+/* Feature-specific ID selector (inherits styles from shared CSS via .resizable-detail-panel) */
+#pluginTraceDetailPanel {
+	/* Uses default 500px width from shared CSS */
 }
 
 /* Trace level section styling */
@@ -134,7 +130,18 @@ tbody tr.selected.row-odd:hover {
 .trace-detail-panel {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
+    position: relative;
+    height: 100%;
+}
+
+/* Sticky header container */
+.trace-detail-header-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--vscode-editorWidget-background);
+    border-bottom: 1px solid var(--vscode-editorWidget-border);
 }
 
 .trace-detail-header {
@@ -142,7 +149,6 @@ tbody tr.selected.row-odd:hover {
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    border-bottom: 1px solid var(--vscode-editorWidget-border);
     background: var(--vscode-editorWidget-background);
 }
 
@@ -153,71 +159,28 @@ tbody tr.selected.row-odd:hover {
     color: var(--vscode-foreground);
 }
 
-#closeDetailBtn {
-    background: transparent;
-    border: 1px solid var(--vscode-input-border);
-    border-radius: 4px;
-    color: var(--vscode-foreground);
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
+/* Resize handle (canonical pattern - NEVER destroyed) */
+.detail-panel-resize-handle {
+    position: absolute;
+    left: 0;
+    top: 0;
     justify-content: center;
     cursor: pointer;
-    font-size: 20px;
-    font-weight: bold;
-    transition: all 0.2s ease;
+    font-size: 24px;
+    line-height: 1;
+    padding: 0;
 }
 
 #closeDetailBtn:hover {
-    background: var(--vscode-inputValidation-errorBackground);
-    border-color: var(--vscode-inputValidation-errorBorder);
-    color: var(--vscode-errorForeground);
+    background: var(--vscode-toolbar-hoverBackground);
 }
 
-/* Tabs */
-.trace-detail-tabs {
-    display: flex;
-    gap: 4px;
-    padding: 8px 16px;
-    background: var(--vscode-editorWidget-background);
-    border-bottom: 1px solid var(--vscode-editorWidget-border);
-    overflow-x: auto;
-}
-
-.tab-btn {
-    padding: 6px 12px;
-    background: transparent;
-    border: none;
-    color: var(--vscode-foreground);
-    cursor: pointer;
-    font-size: 13px;
-    border-bottom: 2px solid transparent;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-}
-
-.tab-btn:hover {
-    background: var(--vscode-list-hoverBackground);
-}
-
-.tab-btn.active {
-    border-bottom-color: var(--vscode-focusBorder);
-    font-weight: 600;
-}
-
-.trace-detail-content {
-    flex: 1;
-    overflow: auto;
-}
-
-.tab-content {
-    display: none;
-    padding: 16px;
-}
-
-.tab-content.active {
-    display: block;
+/* Detail Panel Header (canonical pattern) */
+.detail-panel-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
 }
 
 /* Detail sections */
@@ -1030,20 +993,6 @@ tbody tr.selected.row-odd:hover {
 	color: var(--vscode-textLink-activeForeground);
 }
 
-.timeline-toggle {
-	width: 16px;
-	text-align: center;
-	font-size: 10px;
-	color: var(--vscode-foreground);
-	cursor: pointer;
-	user-select: none;
-}
-
-.timeline-toggle-spacer {
-	width: 16px;
-	display: inline-block;
-}
-
 .timeline-item-title {
 	font-weight: 600;
 	font-size: 13px;
@@ -1325,7 +1274,7 @@ tbody tr.selected.row-odd:hover {
 
 /* Raw Data Tab - JSON Display */
 .raw-data-display {
-	padding: 16px;
+	padding: 0;
 	margin: 0;
 	font-family: var(--vscode-editor-font-family);
 	font-size: 12px;
@@ -1333,6 +1282,7 @@ tbody tr.selected.row-odd:hover {
 	background: var(--vscode-editor-background);
 	overflow-x: auto;
 	white-space: pre;
+	word-wrap: break-word;
 }
 
 /* Related Traces Container */

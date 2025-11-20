@@ -127,7 +127,8 @@ export class EnvironmentSetupPanelComposed {
 			{
 				enableScripts: true,
 				localResourceRoots: [extensionUri],
-				retainContextWhenHidden: true
+				retainContextWhenHidden: true,
+				enableFindWidget: true
 			}
 		);
 

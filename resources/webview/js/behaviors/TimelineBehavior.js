@@ -28,58 +28,8 @@ export function renderTimeline(timelineData, containerId = 'timelineContainer') 
  * @param {HTMLElement} container - Timeline container
  */
 function attachTimelineEventListeners(container) {
-	// Toggle collapse/expand for child nodes
-	container.querySelectorAll('.timeline-toggle').forEach(toggle => {
-		toggle.addEventListener('click', (e) => {
-			e.stopPropagation();
-			handleToggleChildren(e.target);
-		});
-	});
-
-	// Click on header to collapse/expand
-	container.querySelectorAll('.timeline-item-header').forEach(header => {
-		header.addEventListener('click', (e) => {
-			const toggle = header.querySelector('.timeline-toggle');
-			if (toggle && toggle.textContent.trim()) {
-				handleToggleChildren(toggle);
-			}
-		});
-	});
-
-	// Click on timeline bar to select trace
-	container.querySelectorAll('.timeline-bar').forEach(bar => {
-		bar.addEventListener('click', (e) => {
-			e.stopPropagation();
-			const traceId = bar.dataset.traceId;
-			if (traceId) {
-				handleTraceSelection(traceId);
-			}
-		});
-	});
-}
-
-/**
- * Handles toggling children visibility.
- * @param {HTMLElement} toggleElement - Toggle icon element
- */
-function handleToggleChildren(toggleElement) {
-	const timelineItem = toggleElement.closest('.timeline-item');
-	if (!timelineItem) return;
-
-	const childrenContainer = timelineItem.querySelector(':scope > .timeline-children');
-	if (!childrenContainer) return;
-
-	const isExpanded = toggleElement.textContent === '▾';
-
-	if (isExpanded) {
-		// Collapse
-		childrenContainer.style.display = 'none';
-		toggleElement.textContent = '▸';
-	} else {
-		// Expand
-		childrenContainer.style.display = 'block';
-		toggleElement.textContent = '▾';
-	}
+	// No event listeners needed - timeline items are clickable via setupTimelineClickHandlers in PluginTraceViewerBehavior
+	// All timeline nodes are always visible (no collapse/expand functionality)
 }
 
 /**
@@ -94,39 +44,6 @@ function handleTraceSelection(traceId) {
 	});
 }
 
-/**
- * Expands all timeline items.
- * @param {string} containerId - Container ID
- */
-export function expandAll(containerId = 'timelineContainer') {
-	const container = document.getElementById(containerId);
-	if (!container) return;
-
-	container.querySelectorAll('.timeline-toggle').forEach(toggle => {
-		const childrenContainer = toggle.closest('.timeline-item')?.querySelector(':scope > .timeline-children');
-		if (childrenContainer) {
-			childrenContainer.style.display = 'block';
-			toggle.textContent = '▾';
-		}
-	});
-}
-
-/**
- * Collapses all timeline items.
- * @param {string} containerId - Container ID
- */
-export function collapseAll(containerId = 'timelineContainer') {
-	const container = document.getElementById(containerId);
-	if (!container) return;
-
-	container.querySelectorAll('.timeline-toggle').forEach(toggle => {
-		const childrenContainer = toggle.closest('.timeline-item')?.querySelector(':scope > .timeline-children');
-		if (childrenContainer) {
-			childrenContainer.style.display = 'none';
-			toggle.textContent = '▸';
-		}
-	});
-}
 
 /**
  * Highlights a specific trace in the timeline.

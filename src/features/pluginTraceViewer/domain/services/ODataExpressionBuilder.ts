@@ -38,7 +38,7 @@ export class ODataExpressionBuilder {
 
 		const value = this.formatValue(condition.value, fieldType);
 
-		// Function-style operators (contains, startswith, endswith)
+		// Function-style operators (contains, startswith, endswith) - text fields only
 		if (this.isFunctionOperator(operator)) {
 			return `${operator}(${fieldName}, ${value})`;
 		}
@@ -50,8 +50,9 @@ export class ODataExpressionBuilder {
 	/**
 	 * Formats value based on field type for OData syntax.
 	 */
-	private formatValue(value: string, fieldType: 'text' | 'enum' | 'date' | 'number' | 'boolean'): string {
-		if (fieldType === 'text' || fieldType === 'enum') {
+	private formatValue(value: string, fieldType: 'text' | 'enum' | 'date' | 'number' | 'boolean' | 'guid'): string {
+		if (fieldType === 'text' || fieldType === 'enum' || fieldType === 'guid') {
+			// Text, enum, and GUID values are quoted strings in OData
 			return `'${this.escapeODataString(value)}'`;
 		} else if (fieldType === 'number') {
 			return value;

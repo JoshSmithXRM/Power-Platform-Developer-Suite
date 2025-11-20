@@ -13,6 +13,7 @@ export interface PanelState {
 	selectedSolutionId: string;
 	lastUpdated: string;
 	filterCriteria?: unknown; // Optional filter criteria for panels that support filtering
+	detailPanelWidth?: number; // Optional detail panel width in pixels
 }
 
 /**

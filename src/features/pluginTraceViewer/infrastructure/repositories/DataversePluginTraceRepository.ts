@@ -80,6 +80,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		filter: TraceFilter
 	): Promise<readonly PluginTrace[]> {
 		// Select fields needed for table view including exceptiondetails for status determination
+		// correlationid included for Related/Timeline features
 		// Large text fields (messageblock, configuration, secureconfiguration, profile) excluded from list view
 		const selectFieldsStr = [
 			'plugintracelogid',
@@ -91,7 +92,8 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			'mode',
 			'depth',
 			'performanceexecutionduration',
-			'exceptiondetails'
+			'exceptiondetails',
+			'correlationid'
 		].join(',');
 
 		const queryParams: string[] = [

@@ -10,12 +10,13 @@ import { renderTimeline } from './TimelineBehavior.js';
 let currentTraceData = null;
 let currentRawEntity = null; // Raw entity data from API (not the ViewModel)
 let currentTraces = [];
+let currentRelatedTraces = []; // Related traces fetched by correlation ID (unfiltered)
 let timelineData = null;
 
 window.createBehavior({
 	initialize() {
 		setupTraceLevelButton();
-		setupDetailPanelTabs();
+		setupDetailPanelControls();
 		setupDetailPanelVisibility();
 		setupRowSelection();
 		initializeDropdowns();
@@ -27,8 +28,10 @@ window.createBehavior({
 			updateTableData(message.data);
 		} else if (message.command === 'updateDropdownState') {
 			window.updateDropdownState(message.data.dropdownId, message.data.selectedId);
-		} else if (message.command === 'updateDetailPanel') {
-			updateDetailPanel(message.data);
+		} else if (message.command === 'showDetailPanel') {
+			showDetailPanel(message.data);
+		} else if (message.command === 'hideDetailPanel') {
+			hideDetailPanel();
 		} else if (message.command === 'clearFilterPanel') {
 			clearFilterPanel();
 		} else if (message.command === 'updateTimeline') {
@@ -37,6 +40,8 @@ window.createBehavior({
 			updateODataPreview(message.data.query);
 		} else if (message.command === 'updateQuickFilterState') {
 			updateQuickFilterState(message.data.quickFilterIds);
+		} else if (message.command === 'restoreDetailPanelWidth') {
+			restoreDetailPanelWidth(message.data.width);
 		}
 	}
 });
@@ -92,39 +97,243 @@ function updateTableData(data) {
 }
 
 /**
- * Updates detail panel without full page refresh.
- * Uses DetailPanelRenderer to update detail section only.
+ * Shows detail panel with trace data.
+ * Updates INNER content only, preserves structure and event listeners.
  *
- * Data-driven architecture:
- * - Receives ViewModel data from extension host
- * - Renders HTML client-side (including empty state)
- * - Single source of truth for all detail panel rendering
+ * Architecture: Static structure pattern
+ * - Panel structure rendered once by TypeScript
+ * - This function updates INNER content containers by ID
+ * - Resize handle and event listeners NEVER destroyed
  *
- * @param {Object} data - Detail trace ViewModel
+ * @param {Object} data - Detail data { trace, rawEntity, relatedTraces, timeline }
  */
-function updateDetailPanel(data) {
-	const detailSection = document.querySelector('.detail-section');
-	if (!detailSection) {
-		console.warn('[PluginTraceViewer] No detail section found for panel update');
+function showDetailPanel(data) {
+	const panel = document.getElementById('pluginTraceDetailPanel');
+	if (!panel) {
+		console.error('[PluginTraceViewer] Detail panel element not found');
 		return;
 	}
 
-	// Store current trace data (ViewModel for display)
+	// Store current data
 	currentTraceData = data.trace;
-	// Store raw entity data (actual API values for Raw Data tab)
 	currentRawEntity = data.rawEntity;
+	currentRelatedTraces = data.relatedTraces || [];
+	timelineData = data.timeline || null;
 
-	// Render detail panel HTML using DetailPanelRenderer
-	// DetailPanelRenderer handles both empty state (null trace) and populated state
-	const detailHtml = window.DetailPanelRenderer.renderDetailPanel(data.trace);
-
-	// Update detail section (preserves event listeners on other elements)
-	detailSection.innerHTML = detailHtml;
-
-	// Re-apply tab event listeners if detail panel has content
-	if (data.trace) {
-		setupDetailPanelTabs();
+	// Update title
+	const title = document.getElementById('detailPanelTitle');
+	if (title) {
+		title.textContent = 'Trace Details';
 	}
+
+	// Update overview tab (target INNER element by ID)
+	const overviewContent = document.getElementById('pluginTraceOverviewContent');
+	if (overviewContent) {
+		overviewContent.innerHTML = renderOverviewTab(data.trace);
+	}
+
+	// Update details tab
+	const detailsContent = document.getElementById('pluginTraceDetailsContent');
+	if (detailsContent) {
+		detailsContent.innerHTML = renderDetailsTab(data.trace);
+	}
+
+	// Update timeline tab
+	const timelineContent = document.getElementById('pluginTraceTimelineContent');
+	if (timelineContent) {
+		timelineContent.innerHTML = renderTimelineTab(data.trace);
+	}
+
+	// Update raw data tab
+	const rawContent = document.getElementById('pluginTraceRawContent');
+	if (rawContent && currentRawEntity) {
+		rawContent.textContent = JSON.stringify(currentRawEntity, null, 2);
+	}
+
+	// Show panel
+	panel.style.display = 'flex';
+
+	// Setup resize handle (ONLY ONCE)
+	const resizeHandle = document.getElementById('detailPanelResizeHandle');
+	if (resizeHandle && !window.pluginTraceResizeSetup) {
+		setupDetailPanelResize(resizeHandle);
+		window.pluginTraceResizeSetup = true;
+	}
+
+	// Switch to default tab
+	switchDetailTab('overview');
+}
+
+/**
+ * Hides detail panel.
+ * NO cleanup needed - listeners remain attached.
+ */
+function hideDetailPanel() {
+	const panel = document.getElementById('pluginTraceDetailPanel');
+	if (panel) {
+		panel.style.display = 'none';
+	}
+	// Clear row selection when closing detail panel
+	clearRowSelection();
+}
+
+/**
+ * Renders overview tab content.
+ * Pure function - returns HTML string.
+ *
+ * @param {Object} trace - PluginTraceDetailViewModel
+ * @returns {string} HTML string
+ */
+function renderOverviewTab(trace) {
+	if (!trace) {
+		return '<div class="trace-detail-empty"><p>Select a trace to view details</p></div>';
+	}
+
+	const statusClass = trace.status.toLowerCase().includes('exception') ? 'exception' : 'success';
+
+	return `
+		<div class="detail-section">
+			<div class="detail-section-title">General Information</div>
+			<div class="detail-grid">
+				<div class="detail-label">Status:</div>
+				<div class="detail-value">
+					<span class="status-indicator ${statusClass}"></span>
+					${escapeHtml(trace.status)}
+				</div>
+
+				<div class="detail-label">Plugin Name:</div>
+				<div class="detail-value">${escapeHtml(trace.pluginName)}</div>
+
+				<div class="detail-label">Entity:</div>
+				<div class="detail-value">${escapeHtml(trace.entityName)}</div>
+
+				<div class="detail-label">Message:</div>
+				<div class="detail-value">${escapeHtml(trace.messageName)}</div>
+
+				<div class="detail-label">Created On:</div>
+				<div class="detail-value">${escapeHtml(trace.createdOn)}</div>
+
+				<div class="detail-label">Duration:</div>
+				<div class="detail-value">${escapeHtml(trace.duration)}</div>
+
+				<div class="detail-label">Execution Mode:</div>
+				<div class="detail-value">${escapeHtml(trace.mode)}</div>
+
+				<div class="detail-label">Operation:</div>
+				<div class="detail-value">${escapeHtml(trace.operationType)}</div>
+			</div>
+		</div>
+
+		${trace.exceptionDetails ? `
+			<div class="detail-section">
+				<div class="detail-section-title">Exception Details</div>
+				<div class="detail-code exception">${escapeHtml(trace.exceptionDetails)}</div>
+			</div>
+		` : ''}
+
+		${trace.messageBlock ? `
+			<div class="detail-section">
+				<div class="detail-section-title">Message Block</div>
+				<div class="detail-code">${escapeHtml(trace.messageBlock)}</div>
+			</div>
+		` : ''}
+	`;
+}
+
+/**
+ * Renders details tab content.
+ * Pure function - returns HTML string.
+ *
+ * @param {Object} trace - PluginTraceDetailViewModel
+ * @returns {string} HTML string
+ */
+function renderDetailsTab(trace) {
+	if (!trace) {
+		return '<div class="trace-detail-empty"><p>Select a trace to view details</p></div>';
+	}
+
+	return `
+		<div class="detail-section">
+			<div class="detail-section-title">Execution Details</div>
+			<div class="detail-grid">
+				<div class="detail-label">Depth:</div>
+				<div class="detail-value">${escapeHtml(trace.depth)}</div>
+
+				<div class="detail-label">Stage:</div>
+				<div class="detail-value">${escapeHtml(trace.stage)}</div>
+
+				<div class="detail-label">Constructor Duration:</div>
+				<div class="detail-value">${escapeHtml(trace.constructorDuration)}</div>
+
+				<div class="detail-label">Execution Start Time:</div>
+				<div class="detail-value">${escapeHtml(trace.executionStartTime)}</div>
+
+				<div class="detail-label">Constructor Start Time:</div>
+				<div class="detail-value">${escapeHtml(trace.constructorStartTime)}</div>
+
+				<div class="detail-label">Is System Created:</div>
+				<div class="detail-value">${escapeHtml(trace.isSystemCreated)}</div>
+
+				<div class="detail-label">Created By:</div>
+				<div class="detail-value code">${trace.createdBy !== 'N/A' ? escapeHtml(trace.createdBy) : '<span class="empty">N/A</span>'}</div>
+
+				<div class="detail-label">Created On Behalf By:</div>
+				<div class="detail-value code">${trace.createdOnBehalfBy !== 'N/A' ? escapeHtml(trace.createdOnBehalfBy) : '<span class="empty">N/A</span>'}</div>
+
+				<div class="detail-label">Correlation ID:</div>
+				<div class="detail-value code">${trace.correlationId !== 'N/A' ? escapeHtml(trace.correlationId) : '<span class="empty">N/A</span>'}</div>
+
+				<div class="detail-label">Request ID:</div>
+				<div class="detail-value code">${trace.requestId !== 'N/A' ? escapeHtml(trace.requestId) : '<span class="empty">N/A</span>'}</div>
+
+				<div class="detail-label">Plugin Step ID:</div>
+				<div class="detail-value code">${trace.pluginStepId !== 'N/A' ? escapeHtml(trace.pluginStepId) : '<span class="empty">N/A</span>'}</div>
+
+				<div class="detail-label">Persistence Key:</div>
+				<div class="detail-value code">${trace.persistenceKey !== 'N/A' ? escapeHtml(trace.persistenceKey) : '<span class="empty">N/A</span>'}</div>
+
+				<div class="detail-label">Organization ID:</div>
+				<div class="detail-value code">${trace.organizationId !== 'N/A' ? escapeHtml(trace.organizationId) : '<span class="empty">N/A</span>'}</div>
+
+				<div class="detail-label">Profile:</div>
+				<div class="detail-value code">${trace.profile !== 'N/A' ? escapeHtml(trace.profile) : '<span class="empty">N/A</span>'}</div>
+			</div>
+		</div>
+
+		<div class="detail-section">
+			<div class="detail-section-title">Plugin Configuration</div>
+			<div class="detail-grid">
+				<div class="detail-label">Configuration:</div>
+				<div class="detail-value">${trace.configuration ? escapeHtml(trace.configuration) : '<span class="empty">None</span>'}</div>
+
+				<div class="detail-label">Secure Configuration:</div>
+				<div class="detail-value">${trace.secureConfiguration ? escapeHtml(trace.secureConfiguration) : '<span class="empty">None</span>'}</div>
+			</div>
+		</div>
+	`;
+}
+
+/**
+ * Renders timeline tab content.
+ * Pure function - returns HTML string.
+ *
+ * @param {Object} trace - PluginTraceDetailViewModel
+ * @returns {string} HTML string
+ */
+function renderTimelineTab(trace) {
+	if (!trace) {
+		return '<div class="trace-detail-empty"><p>Select a trace to view details</p></div>';
+	}
+
+	const correlationId = trace.correlationId !== 'N/A' ? escapeHtml(trace.correlationId) : '<span class="empty">N/A</span>';
+	return `
+		<div class="detail-section">
+			<div class="detail-section-title">Correlation ID: ${correlationId}</div>
+			<div id="timelineContainer" class="timeline-container">
+				<div class="timeline-loading">Loading timeline...</div>
+			</div>
+		</div>
+	`;
 }
 
 /**
@@ -156,38 +365,61 @@ function setupTraceLevelButton() {
 }
 
 /**
- * Sets up tab switching in the detail panel.
+ * Sets up detail panel event listeners.
+ * Called ONCE during initialize().
+ * Listeners attached to static structure elements (never destroyed).
  */
-function setupDetailPanelTabs() {
-	const tabButtons = document.querySelectorAll('.tab-btn');
+function setupDetailPanelControls() {
+	// Close button
+	const closeButton = document.getElementById('detailPanelClose');
+	if (closeButton) {
+		closeButton.addEventListener('click', () => {
+			hideDetailPanel();
+			vscode.postMessage({ command: 'closeDetailPanel' });
+		});
+	}
 
-	tabButtons.forEach(btn => {
-		btn.addEventListener('click', (e) => {
-			const targetTab = e.target.dataset.tab;
-
-			// Update button states
-			tabButtons.forEach(b => b.classList.remove('active'));
-			e.target.classList.add('active');
-
-			// Update tab content visibility
-			document.querySelectorAll('.tab-content').forEach(content => {
-				content.classList.remove('active');
-			});
-
-			const targetContent = document.getElementById('tab-' + targetTab);
-			if (targetContent) {
-				targetContent.classList.add('active');
-			}
+	// Tab buttons - use event delegation on static elements
+	document.querySelectorAll('.detail-tab-button').forEach(button => {
+		button.addEventListener('click', () => {
+			const tab = button.dataset.tab;
+			switchDetailTab(tab);
 
 			// Handle special tab activations
-			if (targetTab === 'raw') {
+			if (tab === 'raw') {
 				displayRawData();
-			} else if (targetTab === 'related' && currentTraceData) {
-				displayRelatedTraces(currentTraceData);
-			} else if (targetTab === 'timeline' && currentTraceData) {
+			} else if (tab === 'timeline' && timelineData) {
 				displayTimeline(currentTraceData);
 			}
 		});
+	});
+}
+
+/**
+ * Switches active detail tab.
+ * Updates tab buttons and panel visibility.
+ *
+ * @param {string} tab - Tab ID ('overview', 'details', 'timeline', 'raw')
+ */
+function switchDetailTab(tab) {
+	// Update tab buttons
+	document.querySelectorAll('.detail-tab-button').forEach(btn => {
+		if (btn.dataset.tab === tab) {
+			btn.classList.add('active');
+		} else {
+			btn.classList.remove('active');
+		}
+	});
+
+	// Update tab panels
+	document.querySelectorAll('.detail-tab-panel').forEach(panel => {
+		if (panel.dataset.tab === tab) {
+			panel.classList.add('active');
+			panel.style.display = 'block';
+		} else {
+			panel.classList.remove('active');
+			panel.style.display = 'none';
+		}
 	});
 }
 
@@ -197,10 +429,16 @@ function setupDetailPanelTabs() {
 function setupDetailPanelVisibility() {
 	window.addEventListener('message', event => {
 		const message = event.data;
-		const detailSection = document.querySelector('.detail-section');
+		const detailSection = document.querySelector('.content-split > .detail-section');
 
 		if (message.command === 'showDetailPanel' && detailSection) {
 			detailSection.classList.remove('hidden');
+
+			// Restore persisted width when panel is shown (if available)
+			if (window.persistedDetailPanelWidth) {
+				detailSection.style.flex = `0 0 ${window.persistedDetailPanelWidth}px`;
+				console.log('[PluginTraceViewer] Restored detail panel width on show:', window.persistedDetailPanelWidth);
+			}
 		} else if (message.command === 'hideDetailPanel' && detailSection) {
 			detailSection.classList.add('hidden');
 			// Clear row selection when closing detail panel
@@ -262,6 +500,93 @@ function selectRowByTraceId(traceId) {
 			row.classList.add('selected');
 		}
 	}
+}
+
+/**
+ * Sets up detail panel resize functionality.
+ * Called ONCE on first panel show.
+ *
+ * CRITICAL: Handle must NEVER be destroyed/recreated.
+ * Listeners attached once and persist for panel lifetime.
+ *
+ * @param {HTMLElement} handle - Resize handle element
+ */
+function setupDetailPanelResize(handle) {
+	const panel = document.getElementById('pluginTraceDetailPanel');
+	if (!panel) {
+		console.error('[PluginTraceViewer] Cannot setup resize - panel not found');
+		return;
+	}
+
+	console.log('[PluginTraceViewer] Setting up detail panel resize');
+
+	let isResizing = false;
+	let startX = 0;
+	let startWidth = 0;
+
+	const MIN_WIDTH = 300;
+	const MAX_WIDTH = window.innerWidth * 0.8;
+
+	handle.addEventListener('mousedown', (e) => {
+		isResizing = true;
+		startX = e.clientX;
+		startWidth = panel.offsetWidth;
+		handle.classList.add('resizing');
+		document.body.style.cursor = 'col-resize';
+		document.body.style.userSelect = 'none';
+		e.preventDefault();
+	});
+
+	document.addEventListener('mousemove', (e) => {
+		if (!isResizing) {
+			return;
+		}
+
+		const deltaX = startX - e.clientX;
+		const newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startWidth + deltaX));
+		panel.style.width = `${newWidth}px`;
+		e.preventDefault();
+	});
+
+	document.addEventListener('mouseup', () => {
+		if (!isResizing) {
+			return;
+		}
+
+		isResizing = false;
+		handle.classList.remove('resizing');
+		document.body.style.cursor = '';
+		document.body.style.userSelect = '';
+
+		// Persist width preference via backend
+		const currentWidth = panel.offsetWidth;
+		vscode.postMessage({
+			command: 'saveDetailPanelWidth',
+			data: { width: currentWidth }
+		});
+	});
+
+	console.log('[PluginTraceViewer] Detail panel resize setup complete');
+}
+
+/**
+ * Restores detail panel width from persisted state.
+ * Called by backend after panel shown with stored width.
+ *
+ * @param {number} width - Panel width in pixels
+ */
+function restoreDetailPanelWidth(width) {
+	if (!width) {
+		return;
+	}
+
+	const panel = document.getElementById('pluginTraceDetailPanel');
+	if (!panel) {
+		return;
+	}
+
+	panel.style.width = `${width}px`;
+	console.log('[PluginTraceViewer] Restored detail panel width:', width);
 }
 
 /**
@@ -907,9 +1232,10 @@ function escapeHtml(str) {
  * Uses currentRawEntity (actual API values), NOT the ViewModel.
  */
 function displayRawData() {
-	const container = document.getElementById('rawDataDisplay');
+	// Use new ID from ResizableDetailPanelSection base class
+	const container = document.getElementById('pluginTraceRawContent');
 	if (!container) {
-		console.warn('[PluginTraceViewer] rawDataDisplay container not found');
+		console.warn('[PluginTraceViewer] pluginTraceRawContent container not found');
 		return;
 	}
 
@@ -927,12 +1253,19 @@ function displayRawData() {
 		document.head.appendChild(styleTag);
 	}
 
-	// Render syntax-highlighted JSON from raw entity (actual API values)
-	container.innerHTML = JsonHighlighter.highlight(currentRawEntity);
+	// Wrap in a pre tag for proper formatting
+	const preWrapper = document.createElement('pre');
+	preWrapper.className = 'raw-data-display';
+	preWrapper.innerHTML = JsonHighlighter.highlight(currentRawEntity);
+
+	// Clear container and add pre wrapper
+	container.innerHTML = '';
+	container.appendChild(preWrapper);
 }
 
 /**
  * Displays related traces by correlation ID.
+ * Uses the related traces fetched from backend (unfiltered, includes all traces with same correlation ID).
  * @param {Object} currentTrace - The current trace view model
  */
 function displayRelatedTraces(currentTrace) {
@@ -942,17 +1275,16 @@ function displayRelatedTraces(currentTrace) {
 		return;
 	}
 
-	// Filter traces by correlation ID
+	// Check if correlation ID is available
 	const correlationId = currentTrace.correlationId;
 	if (!correlationId || correlationId === 'N/A') {
 		container.innerHTML = '<div class="related-traces-empty">No correlation ID available for this trace</div>';
 		return;
 	}
 
-	// Find all traces with matching correlation ID
-	const relatedTraces = currentTraces.filter(trace =>
-		trace.correlationId === correlationId && trace.id !== currentTrace.id
-	);
+	// Use related traces fetched from backend (already filtered by correlation ID, unfiltered by table filters)
+	// This ensures we see ALL traces in the execution chain, even if they're filtered out of the main table
+	const relatedTraces = currentRelatedTraces;
 
 	if (relatedTraces.length === 0) {
 		container.innerHTML = '<div class="related-traces-empty">No other traces found with this correlation ID</div>';
@@ -1010,8 +1342,9 @@ function updateTimeline(data) {
 }
 
 /**
- * Displays timeline for current trace.
- * @param {Object} currentTrace - Current trace view model
+ * Displays timeline for the current trace.
+ * Timeline is already fetched and built when detail panel loads (same data as Related traces).
+ * @param {Object} currentTrace - The current trace view model
  */
 function displayTimeline(currentTrace) {
 	const container = document.getElementById('timelineContainer');
@@ -1020,18 +1353,46 @@ function displayTimeline(currentTrace) {
 		return;
 	}
 
+	// Timeline is sent with updateDetailPanel (same related traces cache)
+	// No need to lazy load - it's already available
 	if (!timelineData) {
-		// Request timeline data from extension
-		vscode.postMessage({
-			command: 'loadTimeline',
-			data: { correlationId: currentTrace.correlationId }
-		});
-		container.innerHTML = '<div class="timeline-loading">Loading timeline...</div>';
+		container.innerHTML = '<div class="timeline-empty">No timeline data available for this trace</div>';
 		return;
 	}
 
 	// Render timeline using TimelineBehavior
 	renderTimeline(timelineData, 'timelineContainer');
+
+	// Set up click handlers for timeline navigation
+	setupTimelineClickHandlers(container);
+}
+
+/**
+ * Sets up click handlers for timeline nodes to navigate to traces.
+ */
+function setupTimelineClickHandlers(container) {
+	// Find all timeline bars and items with trace IDs
+	const clickableElements = container.querySelectorAll('[data-trace-id]');
+
+	clickableElements.forEach(element => {
+		element.style.cursor = 'pointer';
+		element.addEventListener('click', (e) => {
+			const traceId = element.dataset.traceId;
+			if (!traceId) {
+				return;
+			}
+
+			console.log('[PluginTraceViewer] Timeline item clicked', { traceId });
+
+			// Send message to extension to select and display this trace
+			vscode.postMessage({
+				command: 'viewTrace',
+				data: { traceId }
+			});
+
+			e.stopPropagation();
+		});
+	});
 }
 
 /**
@@ -1052,9 +1413,7 @@ window.renderTimelineFromData = function(timeline) {
 	return `
 		<div class="timeline-container">
 			<div class="timeline-header">
-				<h3>Execution Timeline</h3>
 				<div class="timeline-meta">
-					<span><strong>Correlation ID:</strong> ${escapeHtml(timeline.correlationId)}</span>
 					<span><strong>Total Duration:</strong> ${escapeHtml(timeline.totalDuration)}</span>
 					<span><strong>Traces:</strong> ${timeline.traceCount}</span>
 				</div>
@@ -1085,12 +1444,10 @@ function renderTimelineNode(node) {
 	const statusClass = node.hasException ? 'exception' : 'success';
 	const depthClass = `timeline-item-depth-${Math.min(node.depth, 4)}`;
 	const hasChildren = node.children && node.children.length > 0;
-	const toggleIcon = hasChildren ? '▾' : '';
 
 	return `
 		<div class="timeline-item ${depthClass}" data-trace-id="${escapeHtml(node.id)}" data-depth="${node.depth}">
 			<div class="timeline-item-header">
-				${hasChildren ? `<span class="timeline-toggle">${toggleIcon}</span>` : '<span class="timeline-toggle-spacer"></span>'}
 				<span class="timeline-item-title">${escapeHtml(node.pluginName)}</span>
 				<span class="timeline-item-message">${escapeHtml(node.messageName)}</span>
 				${node.entityName !== 'N/A' ? `<span class="timeline-item-entity">(${escapeHtml(node.entityName)})</span>` : ''}

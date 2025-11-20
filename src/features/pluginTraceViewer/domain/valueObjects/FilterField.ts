@@ -7,11 +7,11 @@ export class FilterField {
 	private constructor(
 		public readonly displayName: string,
 		public readonly odataName: string,
-		public readonly fieldType: 'text' | 'enum' | 'date' | 'number' | 'boolean'
+		public readonly fieldType: 'text' | 'enum' | 'date' | 'number' | 'boolean' | 'guid'
 	) {}
 
 	// Core fields
-	static readonly Id = new FilterField('Trace ID', 'plugintracelogid', 'text');
+	static readonly Id = new FilterField('Trace ID', 'plugintracelogid', 'guid');
 	static readonly CreatedOn = new FilterField('Created On', 'createdon', 'date');
 	static readonly PluginName = new FilterField('Plugin Name', 'typename', 'text');
 	static readonly EntityName = new FilterField('Entity Name', 'primaryentity', 'text');
@@ -34,17 +34,17 @@ export class FilterField {
 	static readonly SecureConfiguration = new FilterField('Secure Configuration', 'secureconfiguration', 'text');
 	static readonly Profile = new FilterField('Profile', 'profile', 'text');
 
-	// Correlation & tracking
-	static readonly CorrelationId = new FilterField('Correlation ID', 'correlationid', 'text');
-	static readonly RequestId = new FilterField('Request ID', 'requestid', 'text');
-	static readonly PluginStepId = new FilterField('Plugin Step ID', 'pluginstepid', 'text');
+	// Correlation & tracking (GUIDs)
+	static readonly CorrelationId = new FilterField('Correlation ID', 'correlationid', 'guid');
+	static readonly RequestId = new FilterField('Request ID', 'requestid', 'guid');
+	static readonly PluginStepId = new FilterField('Plugin Step ID', 'pluginstepid', 'guid');
 	static readonly PersistenceKey = new FilterField('Persistence Key', 'persistencekey', 'text');
-	static readonly OrganizationId = new FilterField('Organization ID', 'organizationid', 'text');
+	static readonly OrganizationId = new FilterField('Organization ID', 'organizationid', 'guid');
 
-	// Audit fields
+	// Audit fields (GUID lookups)
 	static readonly IsSystemCreated = new FilterField('System Created', 'issystemcreated', 'boolean');
-	static readonly CreatedBy = new FilterField('Created By', '_createdby_value', 'text');
-	static readonly CreatedOnBehalfBy = new FilterField('Created On Behalf By', '_createdonbehalfby_value', 'text');
+	static readonly CreatedBy = new FilterField('Created By', '_createdby_value', 'guid');
+	static readonly CreatedOnBehalfBy = new FilterField('Created On Behalf By', '_createdonbehalfby_value', 'guid');
 
 	/**
 	 * All available filter fields, grouped by category.

@@ -72,6 +72,9 @@ export class GetPluginTracesUseCase {
 
 	/**
 	 * Get all plugin traces with the same correlation ID.
+	 * Returns ALL traces matching the correlation ID, ignoring any other filters.
+	 * This is critical for investigation - you want to see the full execution chain,
+	 * not just traces that match your current filter criteria.
 	 *
 	 * @param environmentId - The environment to query
 	 * @param correlationId - The correlation ID to filter by
@@ -83,11 +86,13 @@ export class GetPluginTracesUseCase {
 		correlationId: CorrelationId,
 		top: number = 1000
 	): Promise<readonly PluginTrace[]> {
-		this.logger.info('Fetching traces by correlationId', {
+		this.logger.info('Fetching traces by correlationId (unfiltered)', {
 			environmentId,
 			correlationId: correlationId.value
 		});
 
+		// Create filter with ONLY correlation ID - no other filters applied
+		// This ensures we get the complete execution chain for investigation
 		const filter = TraceFilter.create({
 			correlationIdFilter: correlationId,
 			top,

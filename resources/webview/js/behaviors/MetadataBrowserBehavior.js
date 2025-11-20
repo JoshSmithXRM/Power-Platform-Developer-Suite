@@ -42,6 +42,9 @@ window.createBehavior({
 			case 'hideDetailPanel':
 				this.hideDetailPanel();
 				break;
+			case 'restoreDetailPanelWidth':
+				this.restoreDetailPanelWidth(message.data.width);
+				break;
 		}
 	},
 
@@ -672,7 +675,7 @@ window.createBehavior({
 		// Detail tab switching
 		document.querySelectorAll('.detail-tab-button').forEach(button => {
 			button.addEventListener('click', () => {
-				const tab = button.dataset.detailTab;
+				const tab = button.dataset.tab;
 				this.switchDetailTab(tab);
 			});
 		});
@@ -684,7 +687,7 @@ window.createBehavior({
 	switchDetailTab(tab) {
 		// Update tab button active states
 		document.querySelectorAll('.detail-tab-button').forEach(btn => {
-			if (btn.dataset.detailTab === tab) {
+			if (btn.dataset.tab === tab) {
 				btn.classList.add('active');
 			} else {
 				btn.classList.remove('active');
@@ -693,7 +696,7 @@ window.createBehavior({
 
 		// Update tab panel visibility
 		document.querySelectorAll('.detail-tab-panel').forEach(panel => {
-			if (panel.dataset.detailPanel === tab) {
+			if (panel.dataset.tab === tab) {
 				panel.classList.add('active');
 				panel.style.display = 'block';
 			} else {
@@ -722,14 +725,20 @@ window.createBehavior({
 			title.textContent = this.getDetailTitle(tab, itemId);
 		}
 
-		// Render properties
-		this.renderProperties(metadata);
+		// Update properties tab content (target INNER element by ID)
+		const propertiesContent = document.getElementById('metadataPropertiesContent');
+		if (propertiesContent) {
+			this.renderProperties(metadata, propertiesContent);
+		}
 
-		// Render raw data (use rawEntity if available, otherwise metadata)
-		this.renderRawData(rawEntity || metadata);
+		// Update raw data tab content (target INNER element by ID)
+		const rawDataContent = document.getElementById('metadataRawDataContent');
+		if (rawDataContent) {
+			this.renderRawData(rawEntity || metadata, rawDataContent);
+		}
 
 		// Show panel
-		const panel = document.getElementById('detailPanel');
+		const panel = document.getElementById('metadataDetailPanel');
 		if (panel) {
 			panel.style.display = 'flex';
 			console.log('[MetadataBrowser] Detail panel displayed');
@@ -737,50 +746,106 @@ window.createBehavior({
 			console.error('[MetadataBrowser] Detail panel element not found');
 		}
 
+		// Setup resize handle (only once, on first show)
 		const resizeHandle = document.getElementById('detailPanelResizeHandle');
-		if (resizeHandle) {
-			resizeHandle.style.display = 'block';
+		if (resizeHandle && !this.resizeSetup) {
+			this.setupDetailPanelResize(resizeHandle);
+			this.resizeSetup = true;
 		}
-
-		// Re-attach detail tab event listeners (defensive programming)
-		this.attachDetailTabListeners();
 
 		// Switch to properties tab by default
 		this.switchDetailTab('properties');
 	},
 
 	/**
-	 * Attaches event listeners to detail panel tabs
-	 */
-	attachDetailTabListeners() {
-		document.querySelectorAll('.detail-tab-button').forEach(button => {
-			// Remove existing listener to avoid duplicates
-			const newButton = button.cloneNode(true);
-			button.parentNode.replaceChild(newButton, button);
-
-			newButton.addEventListener('click', () => {
-				const tab = newButton.dataset.detailTab;
-				this.switchDetailTab(tab);
-			});
-		});
-	},
-
-	/**
 	 * Hides detail panel
 	 */
 	hideDetailPanel() {
-		const panel = document.getElementById('detailPanel');
+		const panel = document.getElementById('metadataDetailPanel');
 		if (panel) {
 			panel.style.display = 'none';
 		}
 
-		const resizeHandle = document.getElementById('detailPanelResizeHandle');
-		if (resizeHandle) {
-			resizeHandle.style.display = 'none';
-		}
-
 		// Reset to properties tab for next time
 		this.switchDetailTab('properties');
+	},
+
+	/**
+	 * Restores detail panel width from persisted state.
+	 */
+	restoreDetailPanelWidth(width) {
+		if (!width) {
+			return;
+		}
+
+		const detailPanel = document.getElementById('metadataDetailPanel');
+		if (!detailPanel) {
+			return;
+		}
+
+		detailPanel.style.width = `${width}px`;
+		console.log('[MetadataBrowser] Restored detail panel width:', width);
+	},
+
+	/**
+	 * Sets up detail panel resize functionality
+	 */
+	setupDetailPanelResize(handle) {
+		const detailPanel = document.getElementById('metadataDetailPanel');
+		if (!detailPanel) {
+			console.error('[MetadataBrowser] Cannot setup resize - panel not found');
+			return;
+		}
+
+		console.log('[MetadataBrowser] Setting up detail panel resize');
+
+		let isResizing = false;
+		let startX = 0;
+		let startWidth = 0;
+
+		const MIN_WIDTH = 300;
+		const MAX_WIDTH = window.innerWidth * 0.8;
+
+		handle.addEventListener('mousedown', (e) => {
+			isResizing = true;
+			startX = e.clientX;
+			startWidth = detailPanel.offsetWidth;
+			handle.classList.add('resizing');
+			document.body.style.cursor = 'col-resize';
+			document.body.style.userSelect = 'none';
+			e.preventDefault();
+		});
+
+		document.addEventListener('mousemove', (e) => {
+			if (!isResizing) {
+				return;
+			}
+
+			const deltaX = startX - e.clientX;
+			const newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startWidth + deltaX));
+			detailPanel.style.width = `${newWidth}px`;
+			e.preventDefault();
+		});
+
+		document.addEventListener('mouseup', () => {
+			if (!isResizing) {
+				return;
+			}
+
+			isResizing = false;
+			handle.classList.remove('resizing');
+			document.body.style.cursor = '';
+			document.body.style.userSelect = '';
+
+			// Persist width preference via backend
+			const currentWidth = detailPanel.offsetWidth;
+			window.vscode.postMessage({
+				command: 'saveDetailPanelWidth',
+				data: { width: currentWidth }
+			});
+		});
+
+		console.log('[MetadataBrowser] Detail panel resize setup complete');
 	},
 
 	/**
@@ -802,9 +867,11 @@ window.createBehavior({
 	/**
 	 * Renders properties in detail panel
 	 */
-	renderProperties(metadata) {
-		const container = document.getElementById('propertiesList');
-		if (!container) return;
+	renderProperties(metadata, container) {
+		if (!container) {
+			console.error('[MetadataBrowser] Properties container not provided');
+			return;
+		}
 
 		const properties = this.flattenMetadata(metadata);
 		container.innerHTML = properties.map(prop => {
@@ -957,9 +1024,11 @@ window.createBehavior({
 	/**
 	 * Renders raw JSON data
 	 */
-	renderRawData(metadata) {
-		const container = document.getElementById('rawDataDisplay');
-		if (!container) return;
+	renderRawData(metadata, container) {
+		if (!container) {
+			console.error('[MetadataBrowser] Raw data container not provided');
+			return;
+		}
 
 		// Inject JSON highlighter styles if not already present
 		if (!document.getElementById('json-highlighter-styles')) {
@@ -969,8 +1038,14 @@ window.createBehavior({
 			document.head.appendChild(styleTag);
 		}
 
-		// Render syntax-highlighted JSON
-		container.innerHTML = JsonHighlighter.highlight(metadata);
+		// Wrap in a pre tag for proper formatting
+		const preWrapper = document.createElement('pre');
+		preWrapper.className = 'raw-data-display';
+		preWrapper.innerHTML = JsonHighlighter.highlight(metadata);
+
+		// Clear container and add pre wrapper
+		container.innerHTML = '';
+		container.appendChild(preWrapper);
 	},
 
 	/**
