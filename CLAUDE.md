@@ -86,6 +86,70 @@
 
 ---
 
+## 💻 Tech Stack
+
+- **TypeScript 5.x** (strict mode, explicit return types)
+- **Jest** (testing framework)
+- **VS Code Extension API** (panels, commands, webviews)
+- **Node 18+** (runtime)
+- **Power Platform API** (Dataverse, environments, solutions)
+
+---
+
+## 🧠 Extended Thinking
+
+For complex/uncertain problems, trigger extended thinking modes:
+
+- `"think"` - Standard extended reasoning (~10-20s extra thinking)
+- `"think hard"` - More thorough analysis (~30-60s)
+- `"think harder"` - Deep analysis (~1-2min)
+- `"ultrathink"` - Maximum reasoning (rare, very expensive, ~2-5min)
+
+**When to use:**
+- ✅ Uncertain architectural approach (think hard)
+- ✅ Complex refactoring decisions (think)
+- ✅ Breaking down large features into slices (think hard)
+- ✅ Critical production decisions (think harder)
+- ❌ Simple CRUD features (normal mode sufficient)
+
+---
+
+## 🛠️ Common Commands
+
+**Development:**
+- `npm run compile` - TypeScript compilation (run after EVERY layer)
+- `npm test` - Run all tests (must pass before commits)
+- `npm run lint` - ESLint check
+- `npm run watch` - Continuous compilation during development
+
+**VS Code:**
+- `F5` - Launch Extension Development Host (manual testing required)
+- `Ctrl+Shift+P` - Command palette (test your commands)
+
+**Claude Code:**
+- `/clear` - Reset context when switching tasks (important!)
+- `/cleanup-code` - Systematic comment/logging standards enforcement
+- `/code-review` - Invoke code-guardian for approval
+
+---
+
+## 🎯 Context Management
+
+**When to /clear:**
+- ✅ After completing feature (before starting next)
+- ✅ When context fills with irrelevant code (conversation getting bloated)
+- ✅ When switching between unrelated tasks
+- ✅ After extensive debugging session
+- ❌ Mid-feature implementation (breaks flow)
+- ❌ During multi-step refactoring
+
+**Tips:**
+- Use `/clear` liberally - it's better to lose context than work with stale/bloated context
+- After `/clear`, refer to this file (CLAUDE.md) to restore essential rules
+- Extended thinking uses more context - clear before using "think hard"
+
+---
+
 ## 🔄 Workflow Philosophy
 
 **Design outside-in** (user perspective: panel → ViewModels → use cases → domain)
@@ -94,10 +158,11 @@
 
 ### Building Features
 
-1. **Design phase** (complex features only)
-   - Invoke `design-architect` for 4+ slice features
-   - Define type contracts BEFORE implementation
-   - Skip for simple features (1-2 slices)
+1. **Design phase** (approach depends on complexity)
+   - **Simple features (1-2 files)**: Use "think" or "think hard" - no formal design needed
+   - **Medium features (3-6 files)**: Invoke `design-architect` for FIRST SLICE only, implement incrementally
+   - **Complex features (7+ files)**: Break into slices, design each slice separately (prevents overwhelming designs)
+   - **Uncertain approach**: Use "think harder" to evaluate options before committing to design
 
 2. **Implementation phase** (inside-out)
    - Domain → Application → Infrastructure → Presentation
