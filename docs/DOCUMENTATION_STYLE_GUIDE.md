@@ -27,10 +27,41 @@
 
 ## Core Philosophy
 
-### 1. **Concise, Example-Driven, Practical**
+### 1. **AI-First Documentation (Context Engineering)**
+
+**Primary Audience**: AI agents (Claude Code) working on the codebase
+
+**Secondary Audience**: Future you (reading docs via AI, not directly)
+
+**Key Principle**: Every token in context has cost. Maximize signal, minimize noise.
 
 **DO**:
-- Show working code from the actual codebase
+- Delete outdated documentation (don't archive)
+- Use real code references (`Environment.ts:45-67`) not toy examples
+- Document patterns, not specific implementations
+- Prefer tests over docs for behavior specification
+- Write for "future Claude" understanding codebase
+
+**DON'T**:
+- Keep historical documentation "just in case" (git history preserves it)
+- Create documentation for simple features (code should be self-documenting)
+- Duplicate information across files (one canonical source, link to it)
+- Write documentation that will drift from code (tests stay current, docs don't)
+
+**Rationale**:
+- AI context window is limited (every outdated doc reduces space for actual code)
+- Anthropic research: Effective context engineering = minimal tokens, maximum signal
+- Tests are executable specifications (always current, always accurate)
+- Design docs drift within days of implementation (tests don't)
+
+**See**: `docs/DOCUMENTATION_POLICY.md` for retention rules
+
+---
+
+### 2. **Concise, Example-Driven, Practical**
+
+**DO**:
+- Show working code from the actual codebase (real file paths)
 - Use ✅/❌ pattern for good/bad examples
 - Include "Why" explanations for non-obvious choices
 - Keep explanations brief, examples detailed
@@ -43,7 +74,7 @@
 
 ---
 
-### 2. **No Dates (Use Git History)**
+### 3. **No Dates (Use Git History)**
 
 **Rule**: NO "Last Updated: YYYY-MM-DD" in documentation content
 
@@ -59,7 +90,7 @@
 
 ---
 
-### 3. **Progressive Disclosure**
+### 4. **Progressive Disclosure**
 
 **Rule**: Major docs (>400 lines) MUST have Quick Reference section
 
@@ -84,21 +115,200 @@
 
 ---
 
-### 4. **Optimize for AI and Human Readers**
+### 5. **Optimize for AI and Human Readers**
 
-**For Humans**:
+**For AI Assistants (Primary)**:
+- Real code references with file paths (`src/domain/Environment.ts:45-67`)
+- Structured information (tables, decision trees, decision matrices)
+- Clear anti-patterns with ✅/❌ examples
+- Extended thinking triggers ("Think hard about..." when appropriate)
+- Links to canonical sources (no duplication)
+- Patterns over specifics (document HOW to build features, not Feature X implementation)
+
+**For Humans (Secondary)**:
 - Scannable structure (bullets, headers, tables)
 - Visual cues (✅/❌, 🚨, ⚡ emojis sparingly)
-- Quick Reference sections
+- Quick Reference sections for rapid lookup
 - Task-based navigation ("I want to...")
 
-**For AI Assistants**:
-- Comprehensive context (detailed explanations)
-- Structured information (tables, decision trees)
-- Clear anti-patterns (show what NOT to do)
-- Links to canonical sources (avoid duplication)
+**Context Engineering**:
+- Every document competes for Claude's context window
+- Outdated docs waste tokens on wrong information
+- Prefer deleting to updating (tests document behavior, code is truth)
+- One canonical source > multiple docs with same info
 
-**Balance**: Quick Reference (human-optimized) + Detailed Guide (AI-optimized)
+**Balance**: Quick Reference (human scan) + Detailed Guide (AI deep context) + Delete when outdated (preserve tokens)
+
+---
+
+## Documentation Lifecycle
+
+**Philosophy**: Documentation has a lifecycle. Most documentation should be deleted, not preserved.
+
+### When to CREATE Documentation
+
+**✅ CREATE for:**
+- **Architecture patterns** (CLEAN_ARCHITECTURE_GUIDE.md, PANEL_ARCHITECTURE.md)
+  - Living documents, updated when patterns evolve
+  - Document HOW to architect features, not specific feature implementations
+
+- **Workflow guides** (WORKFLOW.md, AGENTS.md)
+  - How to build features, run reviews, design slices
+  - Process documentation for AI-first development
+
+- **Testing guides** (TESTING_GUIDE.md)
+  - Coverage expectations, patterns, how to write tests
+
+- **Code quality standards** (CODE_QUALITY_GUIDE.md, LOGGING_GUIDE.md)
+  - Rules for comments, logging, type safety
+  - Enforced by code-guardian agent
+
+**❌ DON'T CREATE for:**
+- Simple features (1-2 files) - Code is self-documenting
+- Feature-specific implementation details - Tests document behavior
+- Historical context ("why we made decision X") - Git history preserves this
+- Temporary investigations - Delete after fixing issue
+
+### When to UPDATE Documentation
+
+**✅ UPDATE when:**
+- Architecture pattern changes (e.g., new panel initialization pattern)
+- Code examples in docs no longer match current code
+- Workflow improves (e.g., slice-based design introduced)
+- New best practice discovered
+
+**❌ DON'T UPDATE:**
+- Design docs (delete them, don't try to keep them current)
+- Historical documentation (delete it, git preserves history)
+- Examples for deprecated patterns (delete the section entirely)
+
+### When to DELETE Documentation
+
+**✅ DELETE immediately when:**
+- **Design docs** after feature implementation complete + tested
+  - Tests document behavior (executable, always current)
+  - Design drifts from implementation within days
+  - Keeping designs wastes AI context on outdated info
+
+- **Analysis docs** after issue resolved
+  - docs/analysis/*.md, docs/technical-debt/*.md (individual investigations)
+  - Consolidate findings to TECHNICAL_DEBT.md, delete investigation
+
+- **Requirements docs** after feature complete
+  - Tests are executable requirements (more reliable than docs)
+
+- **Outdated examples** when code changes
+  - Don't show old + new approach (confuses AI)
+  - Replace old example with current code reference
+
+**⚠️ CONSIDER DELETING when:**
+- Architecture guide section describes deprecated pattern
+  - Extract any still-relevant pattern wisdom
+  - Delete deprecated approach entirely
+  - Don't keep "historical" sections
+
+**Exception: Extract Pattern First**
+If design doc introduced NEW architectural pattern:
+1. Extract pattern to architecture guide (e.g., PANEL_ARCHITECTURE.md)
+2. Delete design doc specifics
+3. Architecture guide documents pattern (living doc)
+
+**See**: `docs/DOCUMENTATION_POLICY.md` for complete retention rules
+
+---
+
+## Design Documentation Strategy
+
+**Problem**: Large designs (12+ files, 100KB+) overwhelm Claude and cause implementation failure.
+
+**Solution**: Slice-based design + extended thinking
+
+### When to Use Formal Design Docs
+
+| Complexity | Approach | Design Output |
+|-----------|----------|---------------|
+| **Simple (1-2 files)** | Extended thinking only | No design doc (mental model) |
+| **Medium (3-6 files)** | Slice-based design | Small design per slice (<30KB) |
+| **Complex (7+ files)** | Extended thinking + slices | Architectural decision + slice designs |
+| **Uncertain approach** | Extended thinking first | Evaluation, then design |
+
+### Extended Thinking Integration
+
+**When documenting features that require extended thinking:**
+
+```markdown
+## Implementing Feature X
+
+**Complexity**: Complex (10+ files, new architectural pattern)
+
+**Recommended Approach**:
+1. Think harder about architecture options:
+   - Option A: Single panel with tabs
+   - Option B: Multiple coordinated panels
+   - Option C: Tree view + detail panel
+
+2. Evaluate trade-offs (maintainability, UX, testability, extensibility)
+
+3. Design Slice 1 only (MVP with 3-4 files)
+
+4. Implement → Test → Ship Slice 1
+
+5. Repeat for subsequent slices
+```
+
+**Document the PROCESS, not the specific design.**
+
+### Slice-Based Design Documentation
+
+**Wrong (Monolithic)**:
+```
+Design entire Import Job Viewer (12 files):
+- List jobs
+- Filter by status
+- Real-time updates
+- Export to CSV
+- View XML configuration
+→ Creates 100KB design doc
+→ Claude fails to implement
+→ Design document becomes waste
+```
+
+**Right (Slice-Based)**:
+```
+Design Slice 1: List jobs for environment (3 files)
+→ Small 20KB design
+→ Claude implements successfully
+→ DELETE design after Slice 1 complete
+
+Design Slice 2: Add filtering (2 files)
+→ Small 15KB design
+→ Implement
+→ DELETE design after Slice 2 complete
+
+Design Slice 3: Real-time updates (2 files)
+→ etc.
+```
+
+**Each slice:**
+- Small design (<30KB) = Claude can implement
+- Shippable = production-ready + tested
+- Delete design immediately after complete
+
+### Design Doc Deletion Workflow
+
+```
+1. design-architect creates docs/design/FEATURE_DESIGN.md
+2. Implement feature (domain → app → infra → presentation)
+3. Write tests (domain 100%, use cases 90%)
+4. Feature complete + tests pass + manual testing done
+5. code-guardian approves
+6. DELETE docs/design/FEATURE_DESIGN.md immediately
+7. If introduced new pattern:
+   - Extract to docs/architecture/*.md
+   - Delete design specifics
+```
+
+**Retention**: Zero. Design docs have 0-2 week lifespan (design → implement → delete).
 
 ---
 
@@ -584,9 +794,10 @@ Before merging new/updated documentation, verify:
 - [ ] Has Quick Reference section (if >400 lines)
 - [ ] Has "See Also" section with cross-references
 - [ ] Code examples use ✅/❌ pattern
-- [ ] Examples are from actual codebase (not toy code)
+- [ ] Examples are from actual codebase with file paths (not toy code)
 - [ ] "Why" explanations provided for non-obvious patterns
 - [ ] Anti-patterns documented (what NOT to do)
+- [ ] Real code references (`Environment.ts:45-67`) not abstractions
 
 ### Structure
 - [ ] Under 800 lines (soft limit) or planned for split
@@ -595,12 +806,21 @@ Before merging new/updated documentation, verify:
 - [ ] No duplication with other docs (links instead)
 - [ ] Stand-alone test passes (can be understood independently)
 
+### AI-First Optimization
+- [ ] **Lifecycle check**: Will this be useful 6 months from now?
+- [ ] **Redundancy check**: Does code/tests already document this?
+- [ ] **Pattern check**: Documents HOW (pattern), not WHAT (specific implementation)?
+- [ ] **Context check**: Minimizes tokens, maximizes signal?
+- [ ] **Extended thinking**: Includes "think hard" triggers where appropriate?
+- [ ] **Slice-based**: If design doc, is it small (<30KB) for single slice?
+
 ### Technical Accuracy
 - [ ] Code examples compile/work
 - [ ] Examples reflect current patterns (not deprecated)
-- [ ] Cross-references point to correct locations
+- [ ] Cross-references point to correct locations with line numbers
 - [ ] All links work (no 404s)
 - [ ] Terminology consistent with codebase
+- [ ] File paths accurate (`src/domain/Environment.ts:45-67`)
 
 ### Markdown Quality
 - [ ] Code blocks specify language (```typescript)
@@ -612,7 +832,7 @@ Before merging new/updated documentation, verify:
 ### Integration
 - [ ] README.md index updated with new doc
 - [ ] Cross-references updated in related docs
-- [ ] AI_ASSISTANT_REFERENCE.md links updated (if applicable)
+- [ ] DOCUMENTATION_POLICY.md consulted for retention
 - [ ] CHANGELOG.md updated with significant documentation changes
 
 ### Validation
@@ -620,12 +840,105 @@ Before merging new/updated documentation, verify:
 - [ ] Tested with AI assistant (Claude can find/apply patterns)
 - [ ] Examples validated against actual code
 - [ ] Links tested (all work, no broken references)
+- [ ] **Deletion plan**: If temporary doc, when will it be deleted?
 
 ---
 
 ## Common Mistakes to Avoid
 
-### ❌ Mistake 1: Adding Dates
+### ❌ AI-First Mistake 1: Keeping Outdated Documentation
+
+```markdown
+# Design doc from 3 months ago
+Feature was implemented and shipped but design doc still exists
+→ AI reads outdated design, suggests wrong patterns
+→ Wastes tokens on obsolete information
+```
+
+**Fix**: DELETE design docs immediately after feature complete
+
+**Rationale**: Tests document behavior (executable, always current). Design docs drift within days.
+
+---
+
+### ❌ AI-First Mistake 2: Documenting Simple Features
+
+```markdown
+# NEW_BUTTON_FEATURE.md
+
+## Overview
+This feature adds a "Clear All" button to the Persistence Inspector.
+
+## Implementation
+1. Add button to FilterPanelSection.ts
+2. Wire up click handler
+3. Call ClearAllStorageUseCase
+
+[50 more lines explaining 2-file change]
+```
+
+**Fix**: Don't create doc. Code is self-documenting for simple changes.
+
+**Rule**: Only document if >3 files OR introduces new pattern.
+
+---
+
+### ❌ AI-First Mistake 3: Toy Examples
+
+```typescript
+// Bad - abstract example
+const service = new MyService();
+service.doThing();
+```
+
+**Fix**: Real code with file paths
+
+```typescript
+// Good - from src/domain/Environment.ts:45-67
+export class Environment {
+    public activate(): void {
+        if (this.isActive) {
+            throw new DomainError('Environment is already active');
+        }
+        this.isActive = true;
+    }
+}
+```
+
+**Rationale**: AI learns from real patterns in codebase, not abstractions.
+
+---
+
+### ❌ AI-First Mistake 4: Updating Outdated Design Docs
+
+```markdown
+# METADATA_BROWSER_DESIGN.md (created 2 months ago)
+
+[User notices implementation diverged from design]
+[Spends 2 hours updating design doc to match current code]
+```
+
+**Fix**: DELETE the design doc. Tests already document current behavior.
+
+**Rationale**: Design docs have 0-2 week lifespan (design → implement → delete). Don't waste time keeping them current.
+
+---
+
+### ❌ AI-First Mistake 5: Large Monolithic Designs
+
+```
+Design entire feature (12 files, 100KB)
+→ Claude fails to implement
+→ Design becomes technical debt
+```
+
+**Fix**: Slice-based design (design Slice 1 only, <30KB)
+
+**See**: Design Documentation Strategy section above
+
+---
+
+### ❌ Traditional Mistake 1: Adding Dates
 
 ```markdown
 # Document Title
@@ -636,7 +949,7 @@ Last Updated: 2025-10-29  ← DON'T DO THIS
 
 ---
 
-### ❌ Mistake 2: Inconsistent Naming
+### ❌ Traditional Mistake 2: Inconsistent Naming
 
 ```markdown
 component-patterns.md           ← Wrong (lowercase)
@@ -647,7 +960,7 @@ COMPONENT_PATTERNS.md           ✅ Correct (SCREAMING_SNAKE_CASE)
 
 ---
 
-### ❌ Mistake 3: Duplicating Content
+### ❌ Traditional Mistake 3: Duplicating Content
 
 ```markdown
 # Doc A
@@ -661,7 +974,7 @@ COMPONENT_PATTERNS.md           ✅ Correct (SCREAMING_SNAKE_CASE)
 
 ---
 
-### ❌ Mistake 4: No Quick Reference (>400 lines)
+### ❌ Traditional Mistake 4: No Quick Reference (>400 lines)
 
 ```markdown
 # Very Long Document (800 lines)
@@ -673,27 +986,7 @@ COMPONENT_PATTERNS.md           ✅ Correct (SCREAMING_SNAKE_CASE)
 
 ---
 
-### ❌ Mistake 5: Toy Examples
-
-```typescript
-// Bad - toy example
-const foo = createComponent({ id: 'bar' });
-```
-
-**Fix**: Use real code from codebase
-
-```typescript
-// Good - actual code from MetadataBrowserPanel.ts
-this.environmentSelector = ComponentFactory.createEnvironmentSelector({
-    id: 'metadataBrowser-envSelector',
-    label: 'Environment',
-    onChange: (envId: string) => this.handleEnvironmentSelection(envId)
-});
-```
-
----
-
-### ❌ Mistake 6: Only Showing Good Examples
+### ❌ Traditional Mistake 5: Only Showing Good Examples
 
 ```markdown
 Use event bridges to update components:
@@ -706,7 +999,7 @@ this.dataTable.setData(newData);
 
 ---
 
-### ❌ Mistake 7: Missing "Why"
+### ❌ Traditional Mistake 6: Missing "Why"
 
 ```markdown
 Never use `any` type. Use `unknown` instead.
@@ -809,17 +1102,32 @@ Never use `any` type. Use `unknown` instead.
 
 ## Maintenance Schedule
 
+### Per Feature Completion
+- [ ] **DELETE design docs** after feature complete + tested (most important!)
+- [ ] Extract pattern to architecture guide (if new pattern introduced)
+- [ ] Update architecture guides with real code examples (if pattern changed)
+- [ ] Delete temporary analysis docs after issue resolved
+
 ### Per Pull Request
 - [ ] Update docs for new patterns introduced
-- [ ] Add examples for new components
+- [ ] Add examples for new components (with file paths)
 - [ ] Follow this style guide for all additions
 - [ ] Run review checklist before merging
+- [ ] **Delete completed design docs** (don't let them accumulate)
+
+### Monthly
+- [ ] Delete `.review/archive/` folders >6 months old
+- [ ] Review `docs/design/` - delete any lingering design docs
+- [ ] Review `docs/analysis/` - delete completed investigations
+- [ ] Consolidate findings to TECHNICAL_DEBT.md
 
 ### Quarterly Review
+- [ ] **Run `/comprehensive-review`** (8-agent production readiness check)
 - [ ] Check for docs >800 lines (consider splitting)
-- [ ] Update examples to match current code
+- [ ] Update examples to match current code (or delete if outdated)
 - [ ] Remove outdated troubleshooting entries
 - [ ] Verify all cross-references still valid
+- [ ] Review TECHNICAL_DEBT.md - delete resolved items
 - [ ] Update style guide based on lessons learned
 
 ### Annual Review
@@ -827,6 +1135,7 @@ Never use `any` type. Use `unknown` instead.
 - [ ] Reorganize if doc structure no longer fits project
 - [ ] Update Quick Reference sections
 - [ ] Review and update this style guide
+- [ ] **Aggressive pruning**: Delete any docs not referenced in 6+ months
 
 ---
 
@@ -847,6 +1156,16 @@ Never use `any` type. Use `unknown` instead.
 
 ## 🔗 See Also
 
-- [DOCUMENTATION_CLEANUP_PLAN.md](cleanup/DOCUMENTATION_CLEANUP_PLAN.md) - Plan for improving existing docs
-- [AI_ASSISTANT_REFERENCE_IMPROVEMENTS.md](cleanup/AI_ASSISTANT_REFERENCE_IMPROVEMENTS.md) - Anthropic recommendations
+**Documentation Philosophy:**
+- [DOCUMENTATION_POLICY.md](DOCUMENTATION_POLICY.md) - Retention rules (when to create/update/delete)
+- [CLAUDE.md](../CLAUDE.md) - Quick reference for AI agents (coding rules, workflow)
 - [README.md](README.md) - Master index of all documentation
+
+**Workflow & Process:**
+- [.claude/WORKFLOW.md](../.claude/WORKFLOW.md) - Feature development workflow (slice-based design)
+- [.claude/AGENTS.md](../.claude/AGENTS.md) - When to invoke specialized agents
+- [.claude/commands/comprehensive-review.md](../.claude/commands/comprehensive-review.md) - 8-agent review process
+
+**AI-First Resources:**
+- [Anthropic: Effective Context Engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
+- [Anthropic: Claude Code Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices)

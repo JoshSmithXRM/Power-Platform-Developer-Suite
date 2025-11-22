@@ -22,65 +22,208 @@
 
 ### When to Design First
 
-**Create formal design for:**
-- ✅ Complex features (4+ vertical slices)
-- ✅ New architectural patterns
-- ✅ Features touching multiple domains
-- ✅ Uncertain approach
+**Design approach depends on feature complexity:**
 
-**Skip formal design for:**
-- ❌ Simple features (1-2 slices, <1 hour)
-- ❌ Adding button or column to existing panel
-- ❌ Minor enhancements to existing features
+| Complexity | Files | Approach | Duration |
+|-----------|-------|----------|----------|
+| **Simple** | 1-2 files | Use "think" or "think hard" | 5-10 min |
+| **Medium** | 3-6 files | Slice-based design | 15-30 min per slice |
+| **Complex** | 7+ files | Slice-based design + extended thinking | 30-60 min per slice |
+| **Uncertain** | Any | "think harder" to evaluate options first | 10-20 min |
+
+**Key Insight:** Large designs (12+ files, 100KB+) overwhelm Claude and lead to implementation failure. **Break into slices instead.**
 
 ---
 
 ### Phase 1: Design (Outside-In Thinking)
 
-**Duration:** 30-60 min for complex features, 10 min for simple features
+**Duration:** Varies by complexity and approach
 
-#### Complex Features (Formal Design)
+#### Simple Features (Extended Thinking Only)
 
-**1. Invoke design-architect**
+**For 1-2 file changes:**
+
+**Approach:** Use extended thinking instead of formal design
 ```
-I need to design a {feature name} that {user goal}.
+Think about the best approach for {feature}.
 
-Requirements:
-- {Requirement 1}
-- {Requirement 2}
-- {Requirement 3}
+Consider:
+- Where does business logic live? (domain entity method)
+- What's the use case orchestration? (coordinate domain)
+- How does UI get data? (ViewModel mapping)
 
-Please create a comprehensive design covering all four layers.
+Then implement incrementally (domain → app → presentation).
 ```
 
-**2. design-architect delivers:**
-- Panel mockup (HTML/UX)
-- ViewModels (data shape for UI)
-- Use cases (user operations)
-- Domain entities (business rules with behavior)
-- Type contracts (all interfaces upfront)
-- Design document in `docs/design/{FEATURE}_DESIGN.md`
+**Extended thinking modes:**
+- `"think"` - Standard (~10-20s extra reasoning)
+- `"think hard"` - Thorough (~30-60s)
+- `"think harder"` - Deep analysis (~1-2min)
 
-**3. Review and approve design**
-- Read design document
-- Ask questions if unclear
-- Approve or request changes
-- **DO NOT START IMPLEMENTING until design approved**
+**Output:** Mental model (no document), proceed to implementation
 
-#### Simple Features (Mental Model)
+**Example:**
+```
+Think about adding a "Clear All" button to Persistence Inspector.
 
-**1. Sketch design yourself:**
-- What will user see? (panel/UI)
-- What data does UI need? (ViewModels)
-- What operations exist? (use cases)
-- What business rules? (domain entities)
+- Business rule: Can't clear protected keys (domain entity: StorageEntry.isProtected())
+- Use case: ClearAllStorageUseCase coordinates validation + deletion
+- UI: Button calls use case, shows confirmation dialog
 
-**2. Keep it simple:**
-- No formal design document needed
-- Quick mental model sufficient
-- Start implementing
+Implement domain first.
+```
 
-**Output:** Design document (complex) OR mental model (simple)
+---
+
+#### Medium Features (Slice-Based Design)
+
+**For 3-6 file features:**
+
+**Problem:** Designing all files upfront creates large design docs → Claude fails to implement
+
+**Solution:** Design and implement in slices (MVPs)
+
+**Approach:**
+1. **Think through ENTIRE feature conceptually** (high-level only)
+2. **Design SLICE 1 in detail** (MVP - minimal viable implementation)
+3. **Implement Slice 1** (domain → app → infra → presentation)
+4. **Ship Slice 1** (working, tested, committed)
+5. Repeat for Slice 2, 3, etc.
+
+**Slice 1 (MVP):**
+```
+I need to design an Import Job Viewer.
+
+FULL FEATURE (conceptual):
+- List import jobs for selected environment
+- Filter by status (pending/in-progress/completed/failed)
+- View XML configuration for each job
+- Real-time status updates
+- Export to CSV
+
+SLICE 1 (design in detail):
+- List import jobs for selected environment
+- Show status (no filtering yet)
+- Basic panel UI (no real-time updates yet)
+
+Please design ONLY Slice 1 (3-4 files: ImportJob entity, LoadImportJobsUseCase, ImportJobRepository interface, ImportJobViewerPanel)
+```
+
+**Benefits:**
+- Small design (<30KB) Claude can implement successfully
+- Ship value incrementally
+- Iterate based on real usage
+- Each slice is fully tested and production-ready
+
+**Output:** Small design document per slice, delete after implementation
+
+---
+
+#### Complex Features (Slice-Based + Extended Thinking)
+
+**For 7+ file features:**
+
+**Approach:**
+1. **"Think harder" about overall architecture first** (evaluate options)
+2. **Break into 3-5 slices** (each shippable)
+3. **Design each slice separately** (invoke design-architect per slice)
+4. **Implement incrementally** (ship each slice)
+
+**Example:**
+```
+Think harder about the best architecture for Metadata Browser.
+
+Feature needs:
+- Browse entities, attributes, relationships, choices
+- Search/filter
+- Save favorites
+- Export metadata
+- 20+ files total
+
+Options:
+1. Single panel with tabs (simpler, more coupling)
+2. Multiple coordinated panels (more complex, better separation)
+3. Tree view with detail panel (hybrid approach)
+
+Evaluate trade-offs:
+- Maintainability
+- User experience
+- Testability
+- Future extensibility
+
+[Claude thinks for 1-2 minutes, evaluates options]
+
+Recommendation: Tree view with detail panel (Option 3)
+
+Now let's design Slice 1: Entity browser only (no attributes/relationships yet)
+```
+
+**Benefits:**
+- Extended thinking prevents wrong architectural choice
+- Slices keep designs small and implementable
+- Each slice delivers user value
+- Can pivot between slices based on feedback
+
+**Output:** Architectural decision + small designs per slice
+
+---
+
+#### Uncertain Approach (Think First, Design Later)
+
+**When you don't know the best approach:**
+
+**Don't immediately invoke design-architect. Use extended thinking first.**
+
+**Example:**
+```
+Think harder about whether to use:
+1. Singleton service with event emitter (current pattern)
+2. VS Code WebviewViewProvider (official pattern)
+3. Custom panel coordinator (hybrid)
+
+for the new Data Inspector feature.
+
+Evaluate:
+- Alignment with VS Code best practices
+- Migration path from current code
+- Testability
+- Future-proofing
+
+[Claude evaluates for 1-2 min]
+
+Recommendation: [Option with rationale]
+
+Now design Slice 1 using that approach.
+```
+
+**Benefits:**
+- Prevents designing down wrong path
+- Explores trade-offs before committing
+- Claude's extended thinking is excellent for architecture evaluation
+- Saves time (don't design + implement + realize approach was wrong)
+
+---
+
+### Design Output & Retention
+
+**After feature implementation complete:**
+
+1. ✅ Feature works end-to-end
+2. ✅ Tests pass (domain 100%, use cases 90%)
+3. ✅ Manual testing complete (F5)
+4. ✅ Code review approved (code-guardian)
+5. ❌ **DELETE design document**
+
+**Rationale:**
+- Tests document behavior (executable specification)
+- Architecture guides document patterns
+- Design docs drift from implementation immediately
+- Keeping designs creates bloat (see DOCUMENTATION_POLICY.md)
+
+**Exception:** If design introduced NEW architectural pattern:
+- Extract pattern to `docs/architecture/*.md`
+- Delete design specifics
+- Architecture guide is living document
 
 ---
 

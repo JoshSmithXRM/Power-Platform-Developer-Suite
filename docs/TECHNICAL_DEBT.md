@@ -270,6 +270,58 @@ Consider branded types only if:
 
 Otherwise, **keep the current pattern indefinitely**.
 
+### DateTimeFilter Mixed Concerns in Value Object
+
+**Status**: Documented
+**Priority**: Medium
+**Effort**: Medium (2-3 hours)
+
+**Issue:** DateTimeFilter value object mixes domain, presentation, and infrastructure concerns
+
+**Location:**
+- `src/shared/domain/valueObjects/DateTimeFilter.ts`
+- `src/features/pluginTraceViewer/domain/services/ODataExpressionBuilder.ts`
+- `src/features/pluginTraceViewer/presentation/panels/PluginTraceViewerPanelComposed.ts`
+
+**Impact:**
+- **Maintenance cost:** Format conversion logic scattered across domain value object
+- **Bug risk:** Low - conversion logic is well-tested, but violates separation of concerns
+- **Size:** ~100 lines across value object and usages
+
+**Why It Exists:**
+Initial DDD value object pattern with self-contained conversions (static factories + conversion methods). ESLint flagged violations because `toLocalDateTime`, `toODataFormat` belong in presentation/infrastructure, not domain.
+
+**Proposed Solution:**
+Extract format conversion to helper functions in appropriate layers:
+
+```typescript
+// Domain: Pure value object
+class DateTimeFilter {
+    static fromUtcIso(utcIso: string): DateTimeFilter
+    getUtcIso(): string
+    isBefore(other: DateTimeFilter): boolean
+}
+
+// Application layer: Conversion helpers
+export function localDateTimeToUtc(local: string): string { }
+
+// Infrastructure layer: OData helpers
+export function formatDateForOData(utc: string): string { }
+```
+
+**When to Address:**
+- Next refactoring cycle when touching this code
+- When establishing consistent pattern for other value objects (DataverseUrl has same issue)
+
+**Decision:** Defer because:
+- Current implementation works correctly and is well-tested
+- Service pattern would introduce unnecessary complexity
+- Helper function extraction is simple refactor when needed
+
+**Mitigations:**
+- ESLint configured to allow factory methods
+- Comprehensive test coverage prevents regression
+
 ---
 
 ## Deferred Refactoring
