@@ -1,5 +1,6 @@
 import type { SectionRenderData } from '../types/SectionRenderData';
 import { SectionPosition } from '../types/SectionPosition';
+import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
 
 import type { ISection } from './ISection';
 
@@ -107,7 +108,7 @@ export abstract class ResizableDetailPanelSection implements ISection {
 				<div
 					id="detailPanelResizeHandle"
 					class="detail-panel-resize-handle"
-					title="${this.escapeHtml(resizeHandleTitle ?? 'Drag to resize')}"
+					title="${escapeHtml(resizeHandleTitle ?? 'Drag to resize')}"
 				></div>
 
 				<!-- Header (title updated by JavaScript via detailPanelTitle) -->
@@ -117,7 +118,7 @@ export abstract class ResizableDetailPanelSection implements ISection {
 						id="detailPanelClose"
 						class="detail-panel-close"
 						data-command="closeDetail"
-						aria-label="${this.escapeHtml(closeButtonLabel ?? 'Close detail panel')}"
+						aria-label="${escapeHtml(closeButtonLabel ?? 'Close detail panel')}"
 					>×</button>
 				</div>
 
@@ -127,7 +128,7 @@ export abstract class ResizableDetailPanelSection implements ISection {
 						<button
 							class="detail-tab-button${tab.id === defaultTab?.id ? ' active' : ''}"
 							data-tab="${tab.id}"
-						>${this.escapeHtml(tab.label)}</button>
+						>${escapeHtml(tab.label)}</button>
 					`).join('')}
 				</div>
 
@@ -190,17 +191,4 @@ export abstract class ResizableDetailPanelSection implements ISection {
 		return str.charAt(0).toUpperCase() + str.slice(1);
 	}
 
-	/**
-	 * Escapes HTML to prevent XSS in attribute values.
-	 */
-	private escapeHtml(text: string): string {
-		const map: Record<string, string> = {
-			'&': '&amp;',
-			'<': '&lt;',
-			'>': '&gt;',
-			'"': '&quot;',
-			"'": '&#039;'
-		};
-		return text.replace(/[&<>"']/g, char => map[char] || char);
-	}
 }

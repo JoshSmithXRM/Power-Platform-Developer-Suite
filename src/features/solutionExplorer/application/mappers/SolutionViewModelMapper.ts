@@ -1,6 +1,7 @@
 import { Solution } from '../../domain/entities/Solution';
 import { SolutionViewModel } from '../viewModels/SolutionViewModel';
 import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
+import { escapeHtml } from '../../../../../infrastructure/ui/utils/HtmlUtils';
 import type { SolutionCollectionService } from '../../domain/services/SolutionCollectionService';
 
 /**
@@ -15,8 +16,8 @@ export class SolutionViewModelMapper {
    * @returns SolutionViewModel presentation object
    */
   toViewModel(solution: Solution): SolutionViewModel {
-    const escapedName = this.escapeHtml(solution.friendlyName);
-    const escapedId = this.escapeHtml(solution.id);
+    const escapedName = escapeHtml(solution.friendlyName);
+    const escapedId = escapeHtml(solution.id);
 
     return {
       id: solution.id,
@@ -32,20 +33,6 @@ export class SolutionViewModelMapper {
       isVisible: solution.isVisible ? 'Yes' : 'No',
       isApiManaged: solution.isApiManaged ? 'Yes' : 'No',
     };
-  }
-
-  /**
-   * Escapes HTML to prevent XSS attacks.
-   */
-  private escapeHtml(text: string): string {
-    const map: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    };
-    return text.replace(/[&<>"']/g, char => map[char] || char);
   }
 
   /**

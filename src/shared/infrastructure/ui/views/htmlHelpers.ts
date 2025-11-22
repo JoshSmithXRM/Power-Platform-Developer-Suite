@@ -3,24 +3,9 @@
  * Provides safe HTML generation helpers.
  */
 
-/**
- * Escapes HTML special characters to prevent XSS.
- * @param text - Text to escape
- * @returns Escaped HTML string
- */
-export function escapeHtml(text: string | undefined | null): string {
-	if (text === undefined || text === null || text === '') {
-		return '';
-	}
+import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
 
-	const str = String(text);
-	return str
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#039;');
-}
+export { escapeHtml };
 
 /**
  * Generates CSS class string from conditional classes.

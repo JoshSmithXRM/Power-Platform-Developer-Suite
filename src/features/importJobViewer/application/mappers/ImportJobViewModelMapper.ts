@@ -3,6 +3,7 @@ import { ImportJobViewModel } from '../viewModels/ImportJobViewModel';
 import { ImportJobCollectionService } from '../../domain/services/ImportJobCollectionService';
 import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
 import { ImportJobStatusFormatter } from '../../../../shared/infrastructure/ui/utils/ImportJobStatusFormatter';
+import { escapeHtml } from '../../../../../infrastructure/ui/utils/HtmlUtils';
 
 /**
  * Maps ImportJob domain entities to ImportJobViewModel presentation objects.
@@ -16,8 +17,8 @@ export class ImportJobViewModelMapper {
 	 * @returns ImportJobViewModel presentation object
 	 */
 	toViewModel(job: ImportJob): ImportJobViewModel {
-		const escapedName = this.escapeHtml(job.solutionName);
-		const escapedId = this.escapeHtml(job.id);
+		const escapedName = escapeHtml(job.solutionName);
+		const escapedId = escapeHtml(job.id);
 		const statusLabel = ImportJobStatusFormatter.formatStatusLabel(job.statusCode);
 
 		return {
@@ -50,20 +51,6 @@ export class ImportJobViewModelMapper {
 			return 'status-in-progress';
 		}
 		return '';
-	}
-
-	/**
-	 * Escapes HTML to prevent XSS attacks.
-	 */
-	private escapeHtml(text: string): string {
-		const map: Record<string, string> = {
-			'&': '&amp;',
-			'<': '&lt;',
-			'>': '&gt;',
-			'"': '&quot;',
-			"'": '&#039;'
-		};
-		return text.replace(/[&<>"']/g, char => map[char] || char);
 	}
 
 	/**

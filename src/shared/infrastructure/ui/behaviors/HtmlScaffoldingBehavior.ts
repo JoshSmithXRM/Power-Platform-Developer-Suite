@@ -6,6 +6,7 @@
 import type * as vscode from 'vscode';
 
 import type { SectionRenderData } from '../types/SectionRenderData';
+import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
 
 import type { IPanelBehavior } from './IPanelBehavior';
 import type { SectionCompositionBehavior } from './SectionCompositionBehavior';
@@ -68,7 +69,7 @@ export class HtmlScaffoldingBehavior implements IPanelBehavior {
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${cspNonce}';">
-	<title>${this.escapeHtml(title)}</title>
+	<title>${escapeHtml(title)}</title>
 	${cssUris.map(uri => `<link rel="stylesheet" href="${uri}">`).join('\n\t')}
 	${customCss ? `<style>${customCss}</style>` : ''}
 </head>
@@ -80,17 +81,4 @@ ${customJavaScript ? `<script nonce="${cspNonce}">\n${customJavaScript}\n</scrip
 </html>`;
 	}
 
-	/**
-	 * Escapes HTML to prevent injection attacks.
-	 */
-	private escapeHtml(text: string): string {
-		const map: Record<string, string> = {
-			'&': '&amp;',
-			'<': '&lt;',
-			'>': '&gt;',
-			'"': '&quot;',
-			"'": '&#039;'
-		};
-		return text.replace(/[&<>"']/g, char => map[char] || char);
-	}
 }

@@ -1,6 +1,7 @@
 import type { ISection } from '../../../../shared/infrastructure/ui/sections/ISection';
 import type { SectionRenderData } from '../../../../shared/infrastructure/ui/types/SectionRenderData';
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
+import { escapeHtml } from '../../../../../infrastructure/ui/utils/HtmlUtils';
 import { FilterField, FilterOperator, DateTimeFilter } from '../../application/types';
 import type { FilterCriteriaViewModel, FilterConditionViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
 import { QUICK_FILTER_DEFINITIONS } from '../constants/QuickFilterDefinitions';
@@ -98,14 +99,14 @@ export class FilterPanelSection implements ISection {
 
 	private renderQuickFilter(filter: typeof QUICK_FILTER_DEFINITIONS[number]): string {
 		return `
-			<label class="quick-filter-item" title="${this.escapeHtml(filter.tooltip)}">
+			<label class="quick-filter-item" title="${escapeHtml(filter.tooltip)}">
 				<input
 					type="checkbox"
 					class="quick-filter-checkbox"
 					data-filter-id="${filter.id}"
 				/>
-				<span class="quick-filter-label">${this.escapeHtml(filter.label)}</span>
-				<span class="quick-filter-badge">${this.escapeHtml(filter.odataField)}</span>
+				<span class="quick-filter-label">${escapeHtml(filter.label)}</span>
+				<span class="quick-filter-badge">${escapeHtml(filter.odataField)}</span>
 			</label>
 		`;
 	}
@@ -127,16 +128,16 @@ export class FilterPanelSection implements ISection {
 
 				<select class="condition-field">
 					${FilterField.All.map(f => `
-						<option value="${this.escapeHtml(f.displayName)}" ${f.displayName === condition.field ? 'selected' : ''}>
-							${this.escapeHtml(f.displayName)}
+						<option value="${escapeHtml(f.displayName)}" ${f.displayName === condition.field ? 'selected' : ''}>
+							${escapeHtml(f.displayName)}
 						</option>
 					`).join('')}
 				</select>
 
 				<select class="condition-operator">
 					${applicableOperators.map(op => `
-						<option value="${this.escapeHtml(op.displayName)}" ${op.displayName === condition.operator ? 'selected' : ''}>
-							${this.escapeHtml(op.displayName)}
+						<option value="${escapeHtml(op.displayName)}" ${op.displayName === condition.operator ? 'selected' : ''}>
+							${escapeHtml(op.displayName)}
 						</option>
 					`).join('')}
 				</select>
@@ -170,7 +171,7 @@ export class FilterPanelSection implements ISection {
 					type="text"
 					class="condition-value"
 					placeholder="Enter value..."
-					value="${this.escapeHtml(condition.value)}"
+					value="${escapeHtml(condition.value)}"
 				/>
 			`;
 		}
@@ -203,8 +204,8 @@ export class FilterPanelSection implements ISection {
 			<select class="condition-value">
 				<option value="">Select...</option>
 				${options.map(opt => `
-					<option value="${this.escapeHtml(opt)}" ${opt === condition.value ? 'selected' : ''}>
-						${this.escapeHtml(opt)}
+					<option value="${escapeHtml(opt)}" ${opt === condition.value ? 'selected' : ''}>
+						${escapeHtml(opt)}
 					</option>
 				`).join('')}
 			</select>
@@ -229,7 +230,7 @@ export class FilterPanelSection implements ISection {
 			<input
 				type="datetime-local"
 				class="condition-value"
-				value="${this.escapeHtml(localValue)}"
+				value="${escapeHtml(localValue)}"
 			/>
 		`;
 	}
@@ -241,7 +242,7 @@ export class FilterPanelSection implements ISection {
 				type="number"
 				class="condition-value"
 				placeholder="${placeholder}"
-				value="${this.escapeHtml(condition.value)}"
+				value="${escapeHtml(condition.value)}"
 				min="0"
 			/>
 		`;
@@ -302,12 +303,4 @@ export class FilterPanelSection implements ISection {
 		};
 	}
 
-	private escapeHtml(str: string): string {
-		return str
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#039;');
-	}
 }

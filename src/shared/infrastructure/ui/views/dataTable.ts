@@ -517,6 +517,7 @@ export function renderDataTable(resources: DataTableViewResources): string {
 			${customJavaScript}
 		}
 
+		// Note: escapeHtml is available in browser context via DOM manipulation
 		function escapeHtml(text) {
 			if (!text) return '';
 			const div = document.createElement('div');
