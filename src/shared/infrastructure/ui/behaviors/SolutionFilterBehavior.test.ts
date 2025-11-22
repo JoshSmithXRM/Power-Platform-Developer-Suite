@@ -1,3 +1,5 @@
+import type { Webview } from 'vscode';
+
 import type { IPanelStateRepository, PanelState } from '../IPanelStateRepository';
 import type { SolutionOption } from '../DataTablePanel';
 import { DEFAULT_SOLUTION_ID } from '../../../domain/constants/SolutionConstants';
@@ -6,12 +8,17 @@ import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { SolutionFilterBehavior } from './SolutionFilterBehavior';
 import { IEnvironmentBehavior } from './IEnvironmentBehavior';
 
-function createMockWebview(): import('vscode').Webview {
-	return { postMessage: jest.fn() } as unknown as import('vscode').Webview;
+// Mock webview with only the methods needed for testing
+interface MockWebview {
+	postMessage: jest.Mock;
+}
+
+function createMockWebview(): MockWebview {
+	return { postMessage: jest.fn() };
 }
 
 describe('SolutionFilterBehavior', () => {
-	let webviewMock: import('vscode').Webview;
+	let webviewMock: MockWebview;
 	let environmentBehaviorMock: jest.Mocked<IEnvironmentBehavior>;
 	let loadSolutionsMock: jest.Mock<Promise<SolutionOption[]>>;
 	let panelStateRepositoryMock: jest.Mocked<IPanelStateRepository>;
@@ -59,8 +66,9 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('initialize - when enabled', () => {
 		beforeEach(() => {
+			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
 			behavior = new SolutionFilterBehavior(
-				webviewMock,
+				webviewMock as unknown as Webview,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -135,8 +143,9 @@ describe('SolutionFilterBehavior', () => {
 		});
 
 		it('should use default solution ID when no state repository', async () => {
+			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
 			behavior = new SolutionFilterBehavior(
-				webviewMock,
+				webviewMock as unknown as Webview,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -167,8 +176,9 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('initialize - when disabled', () => {
 		it('should do nothing when filter is disabled', async () => {
+			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
 			behavior = new SolutionFilterBehavior(
-				webviewMock,
+				webviewMock as unknown as Webview,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -188,8 +198,9 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('getCurrentSolutionId', () => {
 		beforeEach(() => {
+			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
 			behavior = new SolutionFilterBehavior(
-				webviewMock,
+				webviewMock as unknown as Webview,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -219,8 +230,9 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('setSolutionId', () => {
 		beforeEach(async () => {
+			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
 			behavior = new SolutionFilterBehavior(
-				webviewMock,
+				webviewMock as unknown as Webview,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -298,8 +310,9 @@ describe('SolutionFilterBehavior', () => {
 		});
 
 		it('should not persist when no state repository', async () => {
+			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
 			behavior = new SolutionFilterBehavior(
-				webviewMock,
+				webviewMock as unknown as Webview,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -326,8 +339,9 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('dispose', () => {
 		it('should not throw when disposing', () => {
+			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
 			behavior = new SolutionFilterBehavior(
-				webviewMock,
+				webviewMock as unknown as Webview,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -343,8 +357,9 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('persistence per environment', () => {
 		beforeEach(() => {
+			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
 			behavior = new SolutionFilterBehavior(
-				webviewMock,
+				webviewMock as unknown as Webview,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,

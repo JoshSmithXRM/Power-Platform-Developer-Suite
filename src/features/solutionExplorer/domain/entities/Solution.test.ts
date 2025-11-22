@@ -108,17 +108,14 @@ describe('Solution', () => {
     });
 
     it('should throw ValidationError with correct error details', () => {
-      try {
+      expect(() => {
         createValidSolution({ version: 'invalid' });
-        fail('Should have thrown ValidationError');
-      } catch (error) {
-        expect(error).toBeInstanceOf(ValidationError);
-        const validationError = error as ValidationError;
-        expect(validationError.entityName).toBe('Solution');
-        expect(validationError.field).toBe('version');
-        expect(validationError.value).toBe('invalid');
-        expect(validationError.constraint).toBe('Must have at least 2 numeric segments (e.g., 1.0 or 9.0.2404.3002)');
-      }
+      }).toThrow(expect.objectContaining({
+        entityName: 'Solution',
+        field: 'version',
+        value: 'invalid',
+        constraint: 'Must have at least 2 numeric segments (e.g., 1.0 or 9.0.2404.3002)'
+      }));
     });
   });
 

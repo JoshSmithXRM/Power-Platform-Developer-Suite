@@ -1,9 +1,9 @@
 import { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 import { QueryOptions } from '../../../../shared/domain/interfaces/QueryOptions';
-import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../../../../shared/infrastructure/utils/ODataQueryBuilder';
+import { CancellationHelper } from '../../../../shared/infrastructure/utils/CancellationHelper';
 import { ISolutionRepository } from '../../domain/interfaces/ISolutionRepository';
 import { Solution } from '../../domain/entities/Solution';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
@@ -93,10 +93,7 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
 
     this.logger.debug('Fetching solutions from Dataverse API', { environmentId });
 
-    if (cancellationToken?.isCancellationRequested) {
-      this.logger.debug('Repository operation cancelled before API call');
-      throw new OperationCancelledException();
-    }
+    CancellationHelper.throwIfCancelled(cancellationToken);
 
     try {
       const response = await this.apiService.get<DataverseSolutionsResponse>(
@@ -105,10 +102,7 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
         cancellationToken
       );
 
-      if (cancellationToken?.isCancellationRequested) {
-        this.logger.debug('Repository operation cancelled after API call');
-        throw new OperationCancelledException();
-      }
+      CancellationHelper.throwIfCancelled(cancellationToken);
 
       const solutions = response.value.map((dto) => this.mapToEntity(dto));
 
@@ -141,10 +135,7 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
 
     this.logger.debug('Fetching solutions for dropdown from Dataverse API', { environmentId });
 
-    if (cancellationToken?.isCancellationRequested) {
-      this.logger.debug('Repository operation cancelled before API call');
-      throw new OperationCancelledException();
-    }
+    CancellationHelper.throwIfCancelled(cancellationToken);
 
     try {
       const response = await this.apiService.get<DataverseSolutionsResponse>(
@@ -153,10 +144,7 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
         cancellationToken
       );
 
-      if (cancellationToken?.isCancellationRequested) {
-        this.logger.debug('Repository operation cancelled after API call');
-        throw new OperationCancelledException();
-      }
+      CancellationHelper.throwIfCancelled(cancellationToken);
 
       const solutions = response.value.map(dto => ({
         id: dto.solutionid,

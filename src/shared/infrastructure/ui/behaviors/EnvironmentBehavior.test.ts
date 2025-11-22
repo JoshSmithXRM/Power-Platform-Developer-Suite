@@ -1,8 +1,11 @@
+import type { Webview } from 'vscode';
+
 import type { EnvironmentOption } from '../DataTablePanel';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 import { EnvironmentBehavior, EnvironmentDetails } from './EnvironmentBehavior';
 
+// Mock webview with only the methods needed for testing
 interface MockWebview {
 	postMessage: jest.Mock;
 }
@@ -48,7 +51,8 @@ describe('EnvironmentBehavior', () => {
 	describe('initialize', () => {
 		it('should load and send environments to webview', async () => {
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -66,7 +70,8 @@ describe('EnvironmentBehavior', () => {
 
 		it('should set first environment as current when no initial environment provided', async () => {
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -84,7 +89,8 @@ describe('EnvironmentBehavior', () => {
 
 		it('should use initial environment ID if provided', async () => {
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -103,7 +109,8 @@ describe('EnvironmentBehavior', () => {
 
 		it('should update Maker button state for initial environment', async () => {
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -127,7 +134,8 @@ describe('EnvironmentBehavior', () => {
 			});
 
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -146,7 +154,8 @@ describe('EnvironmentBehavior', () => {
 			getEnvironmentsMock.mockResolvedValue([]);
 
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -163,7 +172,8 @@ describe('EnvironmentBehavior', () => {
 			getEnvironmentByIdMock.mockRejectedValue(error);
 
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -182,7 +192,8 @@ describe('EnvironmentBehavior', () => {
 	describe('getCurrentEnvironmentId', () => {
 		it('should return current environment ID', async () => {
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -199,7 +210,8 @@ describe('EnvironmentBehavior', () => {
 			getEnvironmentsMock.mockResolvedValue([]);
 
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -213,7 +225,8 @@ describe('EnvironmentBehavior', () => {
 	describe('switchEnvironment', () => {
 		beforeEach(async () => {
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -294,7 +307,8 @@ describe('EnvironmentBehavior', () => {
 	describe('dispose', () => {
 		it('should not throw when disposing', () => {
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -308,7 +322,8 @@ describe('EnvironmentBehavior', () => {
 	describe('Maker button state updates', () => {
 		beforeEach(() => {
 			behavior = new EnvironmentBehavior(
-				webviewMock as unknown as import('vscode').Webview,
+				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,

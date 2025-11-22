@@ -1,3 +1,5 @@
+import type { WebviewPanel, Uri } from 'vscode';
+
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
 import type { IPanelBehavior } from '../behaviors/IPanelBehavior';
 
@@ -10,7 +12,18 @@ jest.mock('vscode', () => ({
 	},
 }), { virtual: true });
 
-function createMockPanel(): import('vscode').WebviewPanel {
+// Mock panel with only the properties needed for testing
+interface MockWebviewPanel {
+	viewType: string;
+	webview: {
+		onDidReceiveMessage: jest.Mock;
+		postMessage: jest.Mock;
+	};
+	onDidDispose: jest.Mock;
+	reveal: jest.Mock;
+}
+
+function createMockPanel(): MockWebviewPanel {
 	return {
 		viewType: 'test.panel',
 		webview: {
@@ -23,19 +36,31 @@ function createMockPanel(): import('vscode').WebviewPanel {
 			return { dispose: jest.fn() };
 		}),
 		reveal: jest.fn(),
-	} as unknown as import('vscode').WebviewPanel;
+	};
 }
 
 describe('PanelCoordinator', () => {
-	let mockPanel: import('vscode').WebviewPanel;
-	let mockExtensionUri: import('vscode').Uri;
+	let mockPanel: MockWebviewPanel;
+	let mockExtensionUri: Pick<Uri, 'fsPath'>;
 	let logger: NullLogger;
 
 	beforeEach(() => {
 		logger = new NullLogger();
 		mockPanel = createMockPanel();
-		mockExtensionUri = { fsPath: '/test' } as import('vscode').Uri;
+		mockExtensionUri = { fsPath: '/test' };
 	});
+
+	// Helper to safely cast mocks to their expected types
+	function createConfig(behaviors: IPanelBehavior[] = []) {
+		return {
+			// Cast is safe: MockWebviewPanel implements all WebviewPanel properties used by PanelCoordinator
+			panel: mockPanel as unknown as WebviewPanel,
+			// Cast is safe: Mock implements all Uri properties used by PanelCoordinator
+			extensionUri: mockExtensionUri as unknown as Uri,
+			behaviors,
+			logger,
+		};
+	}
 
 	afterEach(() => {
 		jest.clearAllMocks();
@@ -43,34 +68,19 @@ describe('PanelCoordinator', () => {
 
 	describe('constructor', () => {
 		it('should create coordinator with no behaviors', () => {
-			const coordinator = new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator(createConfig([]));
 
 			expect(coordinator).toBeDefined();
 		});
 
 		it('should register panel disposal handler', () => {
-			new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			new PanelCoordinator(createConfig([]));
 
 			expect(mockPanel.onDidDispose).toHaveBeenCalledTimes(1);
 		});
 
 		it('should register webview message handler', () => {
-			new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			new PanelCoordinator(createConfig([]));
 
 			expect(mockPanel.webview.onDidReceiveMessage).toHaveBeenCalledTimes(1);
 		});
@@ -79,12 +89,7 @@ describe('PanelCoordinator', () => {
 			const behavior1: IPanelBehavior = {};
 			const behavior2: IPanelBehavior = { initialize: jest.fn() };
 
-			const coordinator = new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [behavior1, behavior2],
-				logger,
-			});
+			const coordinator = new PanelCoordinator(createConfig([behavior1, behavior2]));
 
 			expect(coordinator).toBeDefined();
 		});
@@ -92,12 +97,7 @@ describe('PanelCoordinator', () => {
 
 	describe('initialize', () => {
 		it('should initialize with no behaviors', async () => {
-			const coordinator = new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator(createConfig([]));
 
 			await expect(coordinator.initialize()).resolves.toBeUndefined();
 		});
@@ -110,12 +110,7 @@ describe('PanelCoordinator', () => {
 			const behavior2: IPanelBehavior = { initialize: initMock2 };
 			const behavior3: IPanelBehavior = {}; // No initialize
 
-			const coordinator = new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [behavior1, behavior2, behavior3],
-				logger,
-			});
+			const coordinator = new PanelCoordinator(createConfig([behavior1, behavior2, behavior3]));
 
 			await coordinator.initialize();
 
@@ -137,12 +132,7 @@ describe('PanelCoordinator', () => {
 				}),
 			};
 
-			const coordinator = new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [behavior1, behavior2],
-				logger,
-			});
+			const coordinator = new PanelCoordinator(createConfig([behavior1, behavior2]));
 
 			await coordinator.initialize();
 
@@ -155,12 +145,7 @@ describe('PanelCoordinator', () => {
 				initialize: jest.fn().mockRejectedValue(error),
 			};
 
-			const coordinator = new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [behavior],
-				logger,
-			});
+			const coordinator = new PanelCoordinator(createConfig([behavior]));
 
 			await expect(coordinator.initialize()).rejects.toThrow('Initialization failed');
 		});
@@ -168,12 +153,7 @@ describe('PanelCoordinator', () => {
 
 	describe('reveal', () => {
 		it('should reveal the panel', () => {
-			const coordinator = new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator(createConfig([]));
 
 			coordinator.reveal();
 
@@ -185,12 +165,7 @@ describe('PanelCoordinator', () => {
 		type TestCommands = 'test1' | 'test2';
 
 		it('should register message handler', () => {
-			const coordinator = new PanelCoordinator<TestCommands>({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator<TestCommands>(createConfig([]));
 
 			const handler = jest.fn();
 			coordinator.registerHandler('test1', handler);
@@ -200,12 +175,7 @@ describe('PanelCoordinator', () => {
 		});
 
 		it('should register multiple handlers', () => {
-			const coordinator = new PanelCoordinator<TestCommands>({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator<TestCommands>(createConfig([]));
 
 			const handler1 = jest.fn();
 			const handler2 = jest.fn();
@@ -223,12 +193,7 @@ describe('PanelCoordinator', () => {
 		type TestCommands = 'refresh' | 'delete';
 
 		it('should call registered handler', async () => {
-			const coordinator = new PanelCoordinator<TestCommands>({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator<TestCommands>(createConfig([]));
 
 			const handler = jest.fn();
 			coordinator.registerHandler('refresh', handler);
@@ -240,12 +205,7 @@ describe('PanelCoordinator', () => {
 		});
 
 		it('should call handler with payload', async () => {
-			const coordinator = new PanelCoordinator<TestCommands>({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator<TestCommands>(createConfig([]));
 
 			const handler = jest.fn();
 			coordinator.registerHandler('refresh', handler);
@@ -258,12 +218,7 @@ describe('PanelCoordinator', () => {
 		});
 
 		it('should handle missing handler gracefully', async () => {
-			const coordinator = new PanelCoordinator<TestCommands>({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator<TestCommands>(createConfig([]));
 
 			await expect(
 				coordinator.handleMessage({ command: 'refresh' })
@@ -271,12 +226,7 @@ describe('PanelCoordinator', () => {
 		});
 
 		it('should catch and log handler errors', async () => {
-			const coordinator = new PanelCoordinator<TestCommands>({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator<TestCommands>(createConfig([]));
 
 			const error = new Error('Handler failed');
 			const handler = jest.fn().mockRejectedValue(error);
@@ -291,12 +241,7 @@ describe('PanelCoordinator', () => {
 		});
 
 		it('should send loading state messages before and after handler', async () => {
-			const coordinator = new PanelCoordinator<TestCommands>({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator<TestCommands>(createConfig([]));
 
 			const handler = jest.fn();
 			coordinator.registerHandler('refresh', handler);
@@ -320,12 +265,7 @@ describe('PanelCoordinator', () => {
 		});
 
 		it('should restore button state even if handler throws', async () => {
-			const coordinator = new PanelCoordinator<TestCommands>({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator<TestCommands>(createConfig([]));
 
 			const error = new Error('Handler failed');
 			const handler = jest.fn().mockRejectedValue(error);
@@ -344,12 +284,7 @@ describe('PanelCoordinator', () => {
 		});
 
 		it('should skip loading state when disableOnExecute is false', async () => {
-			const coordinator = new PanelCoordinator<TestCommands>({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator<TestCommands>(createConfig([]));
 
 			const handler = jest.fn();
 			coordinator.registerHandler('refresh', handler, { disableOnExecute: false });
@@ -370,12 +305,7 @@ describe('PanelCoordinator', () => {
 			const behavior2: IPanelBehavior = { dispose: disposeMock2 };
 			const behavior3: IPanelBehavior = {}; // No dispose
 
-			const coordinator = new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [behavior1, behavior2, behavior3],
-				logger,
-			});
+			const coordinator = new PanelCoordinator(createConfig([behavior1, behavior2, behavior3]));
 
 			coordinator.dispose();
 
@@ -384,12 +314,7 @@ describe('PanelCoordinator', () => {
 		});
 
 		it('should dispose event listeners', () => {
-			const coordinator = new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator(createConfig([]));
 
 			coordinator.dispose();
 
@@ -405,24 +330,14 @@ describe('PanelCoordinator', () => {
 				}),
 			};
 
-			const coordinator = new PanelCoordinator({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [behavior],
-				logger,
-			});
+			const coordinator = new PanelCoordinator(createConfig([behavior]));
 
 			// Should not throw
 			expect(() => coordinator.dispose()).not.toThrow();
 		});
 
 		it('should clear message handlers', () => {
-			const coordinator = new PanelCoordinator<'test'>({
-				panel: mockPanel,
-				extensionUri: mockExtensionUri,
-				behaviors: [],
-				logger,
-			});
+			const coordinator = new PanelCoordinator<'test'>(createConfig([]));
 
 			const handler = jest.fn();
 			coordinator.registerHandler('test', handler);

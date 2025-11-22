@@ -65,17 +65,14 @@ describe('ImportJob', () => {
 		});
 
 		it('should throw ValidationError with correct error details', () => {
-			try {
+			expect(() => {
 				createValidImportJob({ progress: 150 });
-				fail('Should have thrown ValidationError');
-			} catch (error) {
-				expect(error).toBeInstanceOf(ValidationError);
-				const validationError = error as ValidationError;
-				expect(validationError.entityName).toBe('ImportJob');
-				expect(validationError.field).toBe('progress');
-				expect(validationError.value).toBe(150);
-				expect(validationError.constraint).toBe('Must be between 0 and 100');
-			}
+			}).toThrow(expect.objectContaining({
+				entityName: 'ImportJob',
+				field: 'progress',
+				value: 150,
+				constraint: 'Must be between 0 and 100'
+			}));
 		});
 	});
 

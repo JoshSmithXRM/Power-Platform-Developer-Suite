@@ -209,7 +209,7 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 	 * @param secretKeys Array of secret keys to delete
 	 */
 	public async deleteSecrets(secretKeys: string[]): Promise<void> {
-		this.logger.debug(`Deleting ${secretKeys.length} secret(s) from storage`);
+		this.logger.debug('Deleting secrets from storage', { count: secretKeys.length });
 
 		for (const key of secretKeys) {
 			await this.secrets.delete(key);

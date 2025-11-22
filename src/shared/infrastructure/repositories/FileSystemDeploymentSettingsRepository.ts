@@ -99,7 +99,7 @@ export class FileSystemDeploymentSettingsRepository implements IDeploymentSettin
 
 			return new DeploymentSettings(environmentVariables, connectionReferences);
 		} catch (error) {
-			this.logger.error(`Failed to read deployment settings from ${filePath}`, error);
+			this.logger.error('Failed to read deployment settings', { filePath, error });
 			throw error;
 		}
 	}
@@ -125,7 +125,7 @@ export class FileSystemDeploymentSettingsRepository implements IDeploymentSettin
 				connRefCount: settings.connectionReferences.length
 			});
 		} catch (error) {
-			this.logger.error(`Failed to write deployment settings to ${filePath}`, error);
+			this.logger.error('Failed to write deployment settings', { filePath, error });
 			throw error;
 		}
 	}

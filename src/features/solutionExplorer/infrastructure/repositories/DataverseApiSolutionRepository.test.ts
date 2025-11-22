@@ -249,7 +249,6 @@ describe('DataverseApiSolutionRepository', () => {
 				.rejects.toThrow(OperationCancelledException);
 
 			expect(mockApiService.get).not.toHaveBeenCalled();
-			expect(mockLogger.debug).toHaveBeenCalledWith('Repository operation cancelled before API call');
 		});
 
 		it('should throw OperationCancelledException if cancelled after API call', async () => {
@@ -270,8 +269,6 @@ describe('DataverseApiSolutionRepository', () => {
 
 			await expect(repository.findAll('env-123', undefined, mockCancellationToken))
 				.rejects.toThrow(OperationCancelledException);
-
-			expect(mockLogger.debug).toHaveBeenCalledWith('Repository operation cancelled after API call');
 		});
 
 		it('should log and rethrow API service errors', async () => {
@@ -475,7 +472,6 @@ describe('DataverseApiSolutionRepository', () => {
 				.rejects.toThrow(OperationCancelledException);
 
 			expect(mockApiService.get).not.toHaveBeenCalled();
-			expect(mockLogger.debug).toHaveBeenCalledWith('Repository operation cancelled before API call');
 		});
 
 		it('should throw OperationCancelledException if cancelled after API call', async () => {
@@ -494,8 +490,6 @@ describe('DataverseApiSolutionRepository', () => {
 
 			await expect(repository.findAllForDropdown('env-123', mockCancellationToken))
 				.rejects.toThrow(OperationCancelledException);
-
-			expect(mockLogger.debug).toHaveBeenCalledWith('Repository operation cancelled after API call');
 		});
 
 		it('should log and rethrow API service errors', async () => {

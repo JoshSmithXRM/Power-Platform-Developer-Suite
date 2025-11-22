@@ -187,7 +187,7 @@ export class PanelCoordinator<TCommands extends string = string>
 
 			await handler(data);
 		} catch (error: unknown) {
-			this.logger.error(`Error handling message '${command}'`, error);
+			this.logger.error('Error handling message', { command, error });
 			// Don't rethrow - log and continue
 		} finally {
 			// Restore button state

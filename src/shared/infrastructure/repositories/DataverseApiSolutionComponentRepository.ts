@@ -2,9 +2,9 @@ import { IDataverseApiService } from '../interfaces/IDataverseApiService';
 import { ICancellationToken } from '../../domain/interfaces/ICancellationToken';
 import { QueryOptions } from '../../domain/interfaces/QueryOptions';
 import { ISolutionComponentRepository } from '../../domain/interfaces/ISolutionComponentRepository';
-import { OperationCancelledException } from '../../domain/errors/OperationCancelledException';
 import { ILogger } from '../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../utils/ODataQueryBuilder';
+import { CancellationHelper } from '../utils/CancellationHelper';
 import { normalizeError } from '../../utils/ErrorUtils';
 
 /**
@@ -75,10 +75,7 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 			entityLogicalName
 		});
 
-		if (cancellationToken?.isCancellationRequested) {
-			this.logger.debug('Repository operation cancelled before API call');
-			throw new OperationCancelledException();
-		}
+		CancellationHelper.throwIfCancelled(cancellationToken);
 
 		try {
 			const response = await this.apiService.get<EntityDefinitionsResponse>(
@@ -87,10 +84,7 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 				cancellationToken
 			);
 
-			if (cancellationToken?.isCancellationRequested) {
-				this.logger.debug('Repository operation cancelled after API call');
-				throw new OperationCancelledException();
-			}
+			CancellationHelper.throwIfCancelled(cancellationToken);
 
 			if (response.value.length === 0) {
 				this.logger.warn('No entity definition found for logical name', { entityLogicalName });
@@ -162,10 +156,7 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 		const queryString = ODataQueryBuilder.build(mergedOptions);
 		const endpoint = `/api/data/v9.2/solutioncomponents${queryString ? '?' + queryString : ''}`;
 
-		if (cancellationToken?.isCancellationRequested) {
-			this.logger.debug('Repository operation cancelled before API call');
-			throw new OperationCancelledException();
-		}
+		CancellationHelper.throwIfCancelled(cancellationToken);
 
 		try {
 			const response = await this.apiService.get<SolutionComponentsResponse>(
@@ -174,10 +165,7 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 				cancellationToken
 			);
 
-			if (cancellationToken?.isCancellationRequested) {
-				this.logger.debug('Repository operation cancelled after API call');
-				throw new OperationCancelledException();
-			}
+			CancellationHelper.throwIfCancelled(cancellationToken);
 
 			const componentIds = response.value.map((dto) => dto.objectid);
 

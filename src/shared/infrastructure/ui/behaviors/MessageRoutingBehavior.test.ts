@@ -1,3 +1,5 @@
+import type { Webview } from 'vscode';
+
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 import { MessageRoutingBehavior } from './MessageRoutingBehavior';
@@ -24,14 +26,19 @@ jest.mock('../../../../infrastructure/ui/utils/TypeGuards', () => ({
 	})
 }));
 
-function createMockWebview(): import('vscode').Webview {
+// Mock webview with only the methods needed for testing
+interface MockWebview {
+	onDidReceiveMessage: jest.Mock;
+}
+
+function createMockWebview(): MockWebview {
 	return {
 		onDidReceiveMessage: jest.fn()
-	} as unknown as import('vscode').Webview;
+	};
 }
 
 describe('MessageRoutingBehavior', () => {
-	let webviewMock: import('vscode').Webview;
+	let webviewMock: MockWebview;
 	let loggerMock: jest.Mocked<ILogger>;
 	let behavior: MessageRoutingBehavior;
 	let messageListener: ((message: unknown) => Promise<void>) | null;
@@ -54,7 +61,8 @@ describe('MessageRoutingBehavior', () => {
 			error: jest.fn()
 		};
 
-		behavior = new MessageRoutingBehavior(webviewMock, loggerMock);
+		// Cast is safe: MockWebview implements all Webview methods used by MessageRoutingBehavior
+		behavior = new MessageRoutingBehavior(webviewMock as unknown as Webview, loggerMock);
 	});
 
 	describe('registerHandler', () => {

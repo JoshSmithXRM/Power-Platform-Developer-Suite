@@ -1,9 +1,9 @@
 import { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 import { QueryOptions } from '../../../../shared/domain/interfaces/QueryOptions';
-import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../../../../shared/infrastructure/utils/ODataQueryBuilder';
+import { CancellationHelper } from '../../../../shared/infrastructure/utils/CancellationHelper';
 import {
 	IEnvironmentVariableRepository,
 	EnvironmentVariableDefinitionData,
@@ -67,10 +67,7 @@ export class DataverseApiEnvironmentVariableRepository implements IEnvironmentVa
 
 		this.logger.debug('Fetching environment variable definitions from Dataverse API', { environmentId });
 
-		if (cancellationToken?.isCancellationRequested) {
-			this.logger.debug('Repository operation cancelled before API call');
-			throw new OperationCancelledException();
-		}
+		CancellationHelper.throwIfCancelled(cancellationToken);
 
 		try {
 			const response = await this.apiService.get<DataverseDefinitionsResponse>(
@@ -79,10 +76,7 @@ export class DataverseApiEnvironmentVariableRepository implements IEnvironmentVa
 				cancellationToken
 			);
 
-			if (cancellationToken?.isCancellationRequested) {
-				this.logger.debug('Repository operation cancelled after API call');
-				throw new OperationCancelledException();
-			}
+			CancellationHelper.throwIfCancelled(cancellationToken);
 
 			this.logger.debug('Fetched environment variable definitions from Dataverse', {
 				environmentId,
@@ -124,10 +118,7 @@ export class DataverseApiEnvironmentVariableRepository implements IEnvironmentVa
 
 		this.logger.debug('Fetching environment variable values from Dataverse API', { environmentId });
 
-		if (cancellationToken?.isCancellationRequested) {
-			this.logger.debug('Repository operation cancelled before API call');
-			throw new OperationCancelledException();
-		}
+		CancellationHelper.throwIfCancelled(cancellationToken);
 
 		try {
 			const response = await this.apiService.get<DataverseValuesResponse>(
@@ -136,10 +127,7 @@ export class DataverseApiEnvironmentVariableRepository implements IEnvironmentVa
 				cancellationToken
 			);
 
-			if (cancellationToken?.isCancellationRequested) {
-				this.logger.debug('Repository operation cancelled after API call');
-				throw new OperationCancelledException();
-			}
+			CancellationHelper.throwIfCancelled(cancellationToken);
 
 			this.logger.debug('Fetched environment variable values from Dataverse', {
 				environmentId,

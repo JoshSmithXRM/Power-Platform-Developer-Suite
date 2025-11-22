@@ -1,3 +1,5 @@
+import type { Webview } from 'vscode';
+
 import { DataTableConfig } from '../DataTablePanel';
 import { VsCodeCancellationTokenAdapter } from '../../adapters/VsCodeCancellationTokenAdapter';
 import { OperationCancelledException } from '../../../domain/errors/OperationCancelledException';
@@ -14,6 +16,7 @@ jest.mock('vscode', () => ({
 	}))
 }), { virtual: true });
 
+// Mock webview with only the methods needed for testing
 interface MockWebview {
 	postMessage: jest.Mock;
 }
@@ -58,7 +61,8 @@ describe('DataBehavior', () => {
 			toolbarButtons: []
 		};
 
-		behavior = new DataBehavior(webviewMock as unknown as import('vscode').Webview, config, dataLoaderMock, loggerMock);
+		// Cast is safe: MockWebview implements all Webview methods used by DataBehavior
+		behavior = new DataBehavior(webviewMock as unknown as Webview, config, dataLoaderMock, loggerMock);
 	});
 
 	describe('initialize', () => {
@@ -267,7 +271,8 @@ describe('DataBehavior', () => {
 			};
 			vscode.CancellationTokenSource.mockImplementation(() => mockTokenSource);
 
-			const newBehavior = new DataBehavior(webviewMock as unknown as import('vscode').Webview, config, dataLoaderMock, loggerMock);
+			// Cast is safe: MockWebview implements all Webview methods used by DataBehavior
+			const newBehavior = new DataBehavior(webviewMock as unknown as Webview, config, dataLoaderMock, loggerMock);
 			dataLoaderMock.load.mockResolvedValue([]);
 
 			// Trigger token creation
@@ -304,7 +309,8 @@ describe('DataBehavior', () => {
 				return callCount === 1 ? firstTokenSource : secondTokenSource;
 			});
 
-			const newBehavior = new DataBehavior(webviewMock as unknown as import('vscode').Webview, config, dataLoaderMock, loggerMock);
+			// Cast is safe: MockWebview implements all Webview methods used by DataBehavior
+			const newBehavior = new DataBehavior(webviewMock as unknown as Webview, config, dataLoaderMock, loggerMock);
 			dataLoaderMock.load.mockResolvedValue([]);
 
 			// First load

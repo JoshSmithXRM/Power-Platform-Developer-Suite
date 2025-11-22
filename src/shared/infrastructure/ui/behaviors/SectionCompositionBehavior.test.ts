@@ -49,6 +49,8 @@ describe('SectionCompositionBehavior', () => {
 			const behavior = new SectionCompositionBehavior([]);
 			const html = behavior.compose({});
 
+			// Testing HTML structure is necessary here because this behavior's purpose
+			// is to generate the correct HTML layout structure with specific container classes
 			expect(html).toContain('<div class="panel-container">');
 			expect(html).toContain('<div class="toolbar-section">');
 			expect(html).toContain('<div class="main-section">');

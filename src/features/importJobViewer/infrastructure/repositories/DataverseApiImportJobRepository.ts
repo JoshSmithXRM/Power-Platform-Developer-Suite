@@ -1,9 +1,9 @@
 import { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 import { QueryOptions } from '../../../../shared/domain/interfaces/QueryOptions';
-import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../../../../shared/infrastructure/utils/ODataQueryBuilder';
+import { CancellationHelper } from '../../../../shared/infrastructure/utils/CancellationHelper';
 import { IImportJobRepository } from '../../domain/interfaces/IImportJobRepository';
 import { ImportJob } from '../../domain/entities/ImportJob';
 import { ImportJobFactory, ImportJobFactoryData } from '../../domain/services/ImportJobFactory';
@@ -87,10 +87,7 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 
 		this.logger.debug('Fetching import jobs from Dataverse API', { environmentId });
 
-		if (cancellationToken?.isCancellationRequested) {
-			this.logger.debug('Repository operation cancelled before API call');
-			throw new OperationCancelledException();
-		}
+		CancellationHelper.throwIfCancelled(cancellationToken);
 
 		try {
 			const response = await this.apiService.get<DataverseImportJobsResponse>(
@@ -99,10 +96,7 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 				cancellationToken
 			);
 
-			if (cancellationToken?.isCancellationRequested) {
-				this.logger.debug('Repository operation cancelled after API call');
-				throw new OperationCancelledException();
-			}
+			CancellationHelper.throwIfCancelled(cancellationToken);
 
 			const jobs = response.value.map((dto) => this.mapToEntity(dto));
 
@@ -142,10 +136,7 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 
 		this.logger.debug('Fetching import job with log from Dataverse API', { environmentId, importJobId });
 
-		if (cancellationToken?.isCancellationRequested) {
-			this.logger.debug('Repository operation cancelled before API call');
-			throw new OperationCancelledException();
-		}
+		CancellationHelper.throwIfCancelled(cancellationToken);
 
 		try {
 			const dto = await this.apiService.get<DataverseImportJobDto>(
@@ -154,10 +145,7 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 				cancellationToken
 			);
 
-			if (cancellationToken?.isCancellationRequested) {
-				this.logger.debug('Repository operation cancelled after API call');
-				throw new OperationCancelledException();
-			}
+			CancellationHelper.throwIfCancelled(cancellationToken);
 
 			const job = this.mapToEntityWithLog(dto);
 

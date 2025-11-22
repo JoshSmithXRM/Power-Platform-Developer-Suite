@@ -1,3 +1,5 @@
+import type { WebviewPanel } from 'vscode';
+
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { IDataTableBehaviorRegistry } from '../behaviors/IDataTableBehaviorRegistry';
 import { IDataBehavior } from '../behaviors/IDataBehavior';
@@ -15,7 +17,18 @@ jest.mock('vscode', () => ({
 	}
 }), { virtual: true });
 
-function createMockPanel(): import('vscode').WebviewPanel {
+// Mock panel with only the properties needed for testing
+interface MockWebviewPanel {
+	webview: {
+		html: string;
+		postMessage: jest.Mock;
+	};
+	title: string;
+	onDidDispose: jest.Mock;
+	dispose: jest.Mock;
+}
+
+function createMockPanel(): MockWebviewPanel {
 	return {
 		webview: {
 			html: '',
@@ -26,7 +39,7 @@ function createMockPanel(): import('vscode').WebviewPanel {
 			return { dispose: jest.fn() };
 		}),
 		dispose: jest.fn()
-	} as unknown as import('vscode').WebviewPanel;
+	};
 }
 
 describe('DataTablePanelCoordinator', () => {
@@ -37,7 +50,7 @@ describe('DataTablePanelCoordinator', () => {
 	let messageRoutingBehaviorMock: jest.Mocked<IMessageRoutingBehavior>;
 	let htmlRenderingBehaviorMock: jest.Mocked<IHtmlRenderingBehavior>;
 	let panelTrackingBehaviorMock: jest.Mocked<IPanelTrackingBehavior>;
-	let panelMock: import('vscode').WebviewPanel;
+	let panelMock: MockWebviewPanel;
 	let getEnvironmentByIdMock: jest.Mock;
 	let loggerMock: jest.Mocked<ILogger>;
 	let dependencies: CoordinatorDependencies;
@@ -112,8 +125,9 @@ describe('DataTablePanelCoordinator', () => {
 			error: jest.fn()
 		};
 
+		// Cast is safe: MockWebviewPanel implements all WebviewPanel properties used by DataTablePanelCoordinator
 		dependencies = {
-			panel: panelMock,
+			panel: panelMock as unknown as WebviewPanel,
 			getEnvironmentById: getEnvironmentByIdMock,
 			logger: loggerMock
 		};
@@ -314,11 +328,12 @@ describe('DataTablePanelCoordinator', () => {
 					return { dispose: jest.fn() };
 				}),
 				dispose: jest.fn()
-			} as unknown as import('vscode').WebviewPanel;
+			};
 
+			// Cast is safe: MockWebviewPanel implements all WebviewPanel properties used by DataTablePanelCoordinator
 			const customDependencies = {
 				...dependencies,
-				panel: customPanelMock
+				panel: customPanelMock as unknown as WebviewPanel
 			};
 
 			// Create coordinator which registers disposal handler
