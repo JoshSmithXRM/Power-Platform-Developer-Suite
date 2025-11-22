@@ -1,136 +1,141 @@
 # Code Quality Review Report
 
 **Date**: 2025-11-21
-**Scope**: src/ directory (432 TypeScript files)
+**Scope**: Full codebase review (349 TypeScript source files, 107 test files)
 **Overall Assessment**: Needs Work
 
 ---
 
 ## Executive Summary
 
-The codebase demonstrates strong adherence to Clean Architecture principles and TypeScript best practices. However, there are notable patterns of code duplication, particularly in repository cancellation logic, that violate the "Three Strikes Rule". The use of `eslint-disable` comments is well-justified and documented. Overall code quality is good with room for improvement through strategic refactoring of duplicated patterns.
+The Power Platform Developer Suite demonstrates **strong adherence to Clean Architecture principles** with excellent layer separation and minimal violations. The codebase shows mature engineering practices with rich domain models, proper dependency injection, and comprehensive JSDoc documentation (99.7% of classes documented).
 
-**Critical Issues**: 0
+However, the codebase suffers from **significant code duplication issues**, particularly with the `escapeHtml` function duplicated across 7 files. This represents a **clear violation of the Three Strikes Rule** and should be addressed immediately. Additionally, there are several medium-priority issues related to file length, complexity, and technical debt acknowledgment.
+
+**Critical Issues**: 1
 **High Priority Issues**: 2
-**Medium Priority Issues**: 3
-**Low Priority Issues**: 2
+**Medium Priority Issues**: 5
+**Low Priority Issues**: 3
+
+**Production Readiness**: 7/10 - The architectural foundation is solid, but code duplication and file complexity issues need addressing before full production deployment.
 
 ---
 
 ## Critical Issues
 
-None identified.
+### Excessive Code Duplication: escapeHtml Function
+**Severity**: Critical
+**Location**: Multiple files (7 occurrences)
+**Pattern**: Code Quality
+**Description**:
+The `escapeHtml` function is duplicated across 7 different files in the codebase, violating the Three Strikes Rule (never allow 3rd duplication, refactor on 2nd). This creates maintenance issues, as security fixes or improvements must be applied in multiple locations.
+
+**Affected Files**:
+1. `src/infrastructure/ui/utils/HtmlUtils.ts:19` (canonical implementation)
+2. `src/shared/infrastructure/ui/views/htmlHelpers.ts:11`
+3. `src/shared/infrastructure/ui/views/dataTable.ts:520` (JavaScript version in template)
+4. `src/shared/infrastructure/ui/sections/ResizableDetailPanelSection.ts:196`
+5. `src/features/importJobViewer/application/mappers/ImportJobViewModelMapper.ts:58`
+6. `src/shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior.ts:86`
+7. `src/features/solutionExplorer/application/mappers/SolutionViewModelMapper.ts:40`
+8. `src/features/pluginTraceViewer/presentation/sections/FilterPanelSection.ts:305`
+
+**Recommendation**:
+Consolidate all occurrences to use the single implementation in `src/infrastructure/ui/utils/HtmlUtils.ts`. This file already exports a well-documented, type-safe version. Update all other files to import and use this version:
+
+```typescript
+// Current (bad) - Duplicated in 7 files
+private escapeHtml(text: string): string {
+    const map: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, char => map[char] || char);
+}
+
+// Recommended (good) - Import from central utility
+import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
+```
+
+**Impact**: This is a security-critical function. Having multiple implementations increases the risk that a security fix will be missed in one location.
 
 ---
 
 ## High Priority Issues
 
-### [DUPLICATION] Repository Cancellation Logic Duplicated Across 10 Files
+### Large File: extension.ts (1137 lines)
 **Severity**: High
-**Location**: Multiple files (see pattern analysis below)
+**Location**: src/extension.ts:1
 **Pattern**: Code Quality
 **Description**:
-The cancellation token check pattern is duplicated across 10 repository implementation files with identical code:
-
-```typescript
-if (cancellationToken?.isCancellationRequested) {
-    this.logger.debug('Repository operation cancelled before API call');
-    throw new OperationCancelledException();
-}
-
-// ... API call ...
-
-if (cancellationToken?.isCancellationRequested) {
-    this.logger.debug('Repository operation cancelled after API call');
-    throw new OperationCancelledException();
-}
-```
-
-This appears in:
-- `DataverseApiSolutionRepository.ts` (2 methods)
-- `DataverseApiImportJobRepository.ts` (2 methods)
-- `DataverseApiConnectionReferenceRepository.ts` (1 method)
-- `DataverseApiCloudFlowRepository.ts` (1 method)
-- `DataverseApiEnvironmentVariableRepository.ts` (2 methods)
-- `DataverseApiSolutionComponentRepository.ts` (2 methods)
-
-**Total occurrences**: 28 instances across 10 files
+The main extension entry point file is 1,137 lines, making it difficult to navigate and maintain. This file contains dependency injection setup, command registration, and feature initialization all in one location.
 
 **Recommendation**:
-Extract this pattern into a reusable helper function or decorator. This is a clear violation of the Three Strikes Rule (2nd occurrence should trigger refactoring, but we have 28 occurrences).
+Extract dependency injection container setup into a separate composition root module. Consider extracting feature initializers into dedicated modules:
+
+```typescript
+// Recommended structure:
+// src/extension.ts (entry point, ~200 lines)
+// src/infrastructure/composition/DependencyContainer.ts (DI setup)
+// src/infrastructure/composition/FeatureInitializers.ts (feature setup)
+```
 
 **Code Example**:
 ```typescript
-// Current (bad) - Repeated 28 times
-if (cancellationToken?.isCancellationRequested) {
-    this.logger.debug('Repository operation cancelled before API call');
-    throw new OperationCancelledException();
+// Current (bad) - All in extension.ts
+export function activate(context: vscode.ExtensionContext): void {
+    // 1,137 lines of DI setup, use case creation, command registration
 }
 
-// Recommended (good) - Create shared utility
-// In: src/shared/infrastructure/utils/CancellationHelper.ts
-export class CancellationHelper {
-    static checkCancellation(
-        cancellationToken: ICancellationToken | undefined,
-        logger: ILogger,
-        stage: 'before' | 'after'
-    ): void {
-        if (cancellationToken?.isCancellationRequested) {
-            logger.debug(`Repository operation cancelled ${stage} API call`);
-            throw new OperationCancelledException();
-        }
-    }
+// Recommended (good) - Extracted composition root
+// extension.ts
+export function activate(context: vscode.ExtensionContext): void {
+    const container = new DependencyContainer(context);
+    const featureManager = new FeatureManager(container);
+    featureManager.initializeAllFeatures();
 }
-
-// Usage in repositories:
-CancellationHelper.checkCancellation(cancellationToken, this.logger, 'before');
-const response = await this.apiService.get(...);
-CancellationHelper.checkCancellation(cancellationToken, this.logger, 'after');
 ```
 
 ---
 
-### [DUPLICATION] Panel Singleton Pattern Duplication
+### Large Repository File: DataverseEntityMetadataRepository.ts (813 lines)
 **Severity**: High
-**Location**: 6 panel files
+**Location**: src/features/metadataBrowser/infrastructure/repositories/DataverseEntityMetadataRepository.ts:1
 **Pattern**: Code Quality
 **Description**:
-The panel singleton pattern `private static panels = new Map<string, T>()` is duplicated across 6 panel files:
-- `PluginTraceViewerPanelComposed.ts`
-- `MetadataBrowserPanel.ts`
-- `EnvironmentVariablesPanelComposed.ts`
-- `ImportJobViewerPanelComposed.ts`
-- `SolutionExplorerPanelComposed.ts`
-- `ConnectionReferencesPanelComposed.ts`
-
-While the pattern is consistent, the Map management logic (createOrShow, disposal) is repeated in each file.
+The metadata repository is 813 lines with significant mapping logic embedded. The file contains repository logic, DTO mapping, and caching concerns all mixed together.
 
 **Recommendation**:
-Extract the panel singleton pattern into a base class or use a shared factory pattern. The pattern is simple enough that current duplication may be acceptable, but consider abstracting if more panels are added.
+Extract DTO-to-domain mapping logic into dedicated mapper classes. Consider splitting into:
+- Repository (API calls, caching)
+- EntityMetadataMapper (DTO → Domain mapping)
+- AttributeMetadataMapper (DTO → Domain mapping)
 
 **Code Example**:
 ```typescript
-// Recommended (good) - Abstract base class
-export abstract class EnvironmentScopedPanel<TPanel> {
-    private static readonly panelInstances = new Map<string, Map<string, unknown>>();
+// Current (bad) - All mapping in repository
+export class DataverseEntityMetadataRepository {
+    private mapDtoToEntity(dto: EntityMetadataDto): EntityMetadata {
+        // 100+ lines of mapping logic
+    }
+    private mapAttributeDto(dto: AttributeMetadataDto): AttributeMetadata {
+        // 50+ lines of mapping logic
+    }
+}
 
-    protected static getOrCreatePanel<T extends EnvironmentScopedPanel<T>>(
-        viewType: string,
-        environmentId: string,
-        factory: () => T
-    ): T {
-        let typePanels = this.panelInstances.get(viewType);
-        if (!typePanels) {
-            typePanels = new Map();
-            this.panelInstances.set(viewType, typePanels);
-        }
+// Recommended (good) - Separated concerns
+export class DataverseEntityMetadataRepository {
+    constructor(
+        private readonly mapper: EntityMetadataMapper,
+        // ...
+    ) {}
 
-        let panel = typePanels.get(environmentId) as T;
-        if (!panel) {
-            panel = factory();
-            typePanels.set(environmentId, panel);
-        }
-        return panel;
+    async getEntity(id: string): Promise<EntityMetadata> {
+        const dto = await this.apiService.get(...);
+        return this.mapper.toDomain(dto);
     }
 }
 ```
@@ -139,268 +144,260 @@ export abstract class EnvironmentScopedPanel<TPanel> {
 
 ## Medium Priority Issues
 
-### [CODE QUALITY] Large Panel Files
+### Large Panel Files (600-800 lines)
 **Severity**: Medium
-**Location**: src/features/pluginTraceViewer/presentation/panels/PluginTraceViewerPanelComposed.ts:1428
+**Location**: Multiple presentation panel files
 **Pattern**: Code Quality
 **Description**:
-The `PluginTraceViewerPanelComposed.ts` file is 1,428 lines long with an eslint-disable comment for max-lines. While the comment indicates "11 simple command handlers", the file's size suggests potential for extraction.
+Several panel files exceed 600 lines, though they use the coordinator pattern and have proper separation of concerns. The size is primarily due to command handler registration rather than complexity.
+
+**Affected Files**:
+- `src/features/metadataBrowser/presentation/panels/MetadataBrowserPanel.ts` (794 lines)
+- `src/features/pluginTraceViewer/presentation/panels/PluginTraceViewerPanelComposed.ts` (735 lines)
+- `src/features/environmentSetup/presentation/panels/EnvironmentSetupPanelComposed.ts` (602 lines)
+- `src/features/connectionReferences/presentation/panels/ConnectionReferencesPanelComposed.ts` (550 lines)
 
 **Recommendation**:
-Consider extracting command handlers into separate classes or grouping related functionality. The file has:
-- Filter management logic
-- Auto-refresh timer logic
-- Detail panel management
-- Timeline building logic
-
-These could be extracted into separate coordinator or behavior classes.
-
-**Code Example**:
-```typescript
-// Recommended structure
-class FilterManagementBehavior {
-    loadFilterCriteria(): Promise<void> { ... }
-    saveFilterCriteria(): Promise<void> { ... }
-    applyFilters(): Promise<void> { ... }
-    clearFilters(): Promise<void> { ... }
-}
-
-class AutoRefreshBehavior {
-    start(interval: number): void { ... }
-    stop(): void { ... }
-    updateInterval(newInterval: number): void { ... }
-}
-```
+Files are well-structured with behaviors and coordinators. Consider this acceptable given the use of composition and delegation patterns. An optional improvement would be extracting command handler registration into a separate configuration object.
 
 ---
 
-### [COMMENT QUALITY] TODO Comments in Domain Layer
+### Large Domain Entity: TraceFilter.ts (513 lines)
 **Severity**: Medium
-**Location**: src/shared/domain/valueObjects/DateTimeFilter.ts:86,111
-**Pattern**: Code Quality
+**Location**: src/features/pluginTraceViewer/domain/entities/TraceFilter.ts:1
+**Pattern**: Domain
 **Description**:
-The `DateTimeFilter` value object contains TODO comments indicating methods should be extracted to presentation/infrastructure layers:
-
-```typescript
-/**
- * TODO: Extract to presentation layer helper function (see TECHNICAL_DEBT.md)
- */
-getLocalDateTime(): string { ... }
-
-/**
- * TODO: Extract to infrastructure layer helper function (see TECHNICAL_DEBT.md)
- */
-getODataFormat(): string { ... }
-```
-
-While the TODO comments reference technical debt documentation (good practice), having presentation/infrastructure concerns in the domain layer violates Clean Architecture principles.
+The TraceFilter entity is 513 lines with extensive filtering logic. The entity contains both legacy simple filters and new condition-based filters for backward compatibility, leading to increased complexity.
 
 **Recommendation**:
-Follow through on the technical debt plan and extract these methods to appropriate layers. The domain should only contain `getUtcIso()` and construction methods.
-
-**Code Example**:
-```typescript
-// Domain layer (only UTC canonical format)
-export class DateTimeFilter {
-    getUtcIso(): string { return this.utcIsoValue; }
-}
-
-// Presentation layer
-export class DateTimePresenter {
-    static toLocalDateTime(filter: DateTimeFilter): string {
-        const date = new Date(filter.getUtcIso());
-        // ... formatting logic
-    }
-}
-
-// Infrastructure layer
-export class ODataDateFormatter {
-    static format(filter: DateTimeFilter): string {
-        return filter.getUtcIso().replace(/\.\d{3}Z$/, 'Z');
-    }
-}
-```
+The entity correctly implements rich domain model patterns with validation and behavior. The acknowledged technical debt (legacy vs. new filters) should be addressed in a future refactoring. Consider extracting filter validation logic into a separate domain service if it grows further.
 
 ---
 
-### [CODE QUALITY] Magic Numbers in Filter Logic
+### Acknowledged Technical Debt: DateTimeFilter Formatting Methods
 **Severity**: Medium
-**Location**: src/features/pluginTraceViewer/presentation/panels/PluginTraceViewerPanelComposed.ts:455,1098,1101
-**Pattern**: Code Quality
+**Location**: src/shared/domain/valueObjects/DateTimeFilter.ts:87, :113
+**Pattern**: Domain
 **Description**:
-Several magic numbers appear in the filter reconstruction logic without named constants:
-
-```typescript
-await this.handleDeleteOld(30);  // Line 455: 30 days not named
-
-const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);  // Line 1098
-const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);  // Line 1101
-```
+The DateTimeFilter value object contains presentation (`getLocalDateTime()`) and infrastructure (`getODataFormat()`) formatting methods, which technically violate Clean Architecture layer boundaries. This is acknowledged in code comments with TODO references to TECHNICAL_DEBT.md.
 
 **Recommendation**:
-Extract magic numbers to named constants for clarity and maintainability.
+The current implementation is pragmatic and well-documented. Plan future refactoring to extract these methods:
+- `getLocalDateTime()` → Move to presentation layer helper
+- `getODataFormat()` → Move to infrastructure layer helper
 
-**Code Example**:
-```typescript
-// Recommended (good)
-const DEFAULT_DELETE_OLD_DAYS = 30;
-const ONE_HOUR_IN_MS = 60 * 60 * 1000;
-const TWENTY_FOUR_HOURS_IN_MS = 24 * 60 * 60 * 1000;
+This is currently acceptable technical debt with proper documentation.
 
-await this.handleDeleteOld(DEFAULT_DELETE_OLD_DAYS);
+---
 
-const oneHourAgo = new Date(now.getTime() - ONE_HOUR_IN_MS);
-const twentyFourHoursAgo = new Date(now.getTime() - TWENTY_FOUR_HOURS_IN_MS);
-```
+### TODO/FIXME Comments Present
+**Severity**: Medium
+**Location**: src/shared/domain/valueObjects/DateTimeFilter.ts:1
+**Pattern**: Code Quality
+**Description**:
+Found 1 file with TODO comments indicating incomplete work or future refactoring needs.
+
+**Affected File**:
+- `src/shared/domain/valueObjects/DateTimeFilter.ts` (TODO comments for extracting formatting methods)
+
+**Recommendation**:
+All TODO comments are properly documented with references to technical debt documentation. Ensure these are tracked in backlog and addressed before major releases.
 
 ---
 
 ## Low Priority Issues
 
-### [CODE QUALITY] ESLint Disable Comments Well Documented
+### console.log in Test File
 **Severity**: Low
-**Location**: Multiple files (24 occurrences)
+**Location**: src/shared/infrastructure/ui/behaviors/HtmlRenderingBehavior.test.ts
 **Pattern**: Code Quality
 **Description**:
-The codebase contains 24 instances of `eslint-disable` comments. However, all instances include justification comments explaining why the rule is disabled:
-
-Examples:
-- `// eslint-disable-next-line complexity -- Complexity from formatting multiple filter types, acceptable in formatter`
-- `// eslint-disable-next-line local-rules/no-static-mapper-methods -- Factory method for creating empty condition ViewModels`
-- `/* eslint-disable max-lines -- Panel coordinator with 11 simple command handlers */`
+One test file contains `console.log` statement. While acceptable in tests for debugging, these should be removed before commits.
 
 **Recommendation**:
-This is actually a **positive finding**. All eslint-disable comments follow the project's guideline to include justification. Continue this practice. Only recommendation is to periodically review if the justifications still hold true.
+Remove `console.log` statements from test files, or use proper test logging framework if debugging output is needed.
 
 ---
 
-### [COMMENT QUALITY] Excellent JSDoc Coverage
+### Non-null Assertions in Test Files (3 occurrences)
 **Severity**: Low
-**Location**: Codebase-wide
-**Pattern**: Code Quality
+**Location**: Multiple test files
+**Pattern**: Type Safety
 **Description**:
-The codebase demonstrates excellent JSDoc coverage on public methods, interfaces, and classes. Comments focus on "WHY" rather than "WHAT" and avoid obvious placeholders.
+Three test files use non-null assertion operator (`!`). This is acceptable in test files where we control the data and know values are not null, but explicit null checks would be more robust.
 
-Examples of good comments:
-```typescript
-/**
- * Validates UTC ISO format and ensures date is valid.
- */
-private validateUtcIso(utcIso: string): void { ... }
-
-/**
- * Converts to HTML datetime-local format (local timezone without seconds).
- * Use when rendering datetime-local input values.
- */
-getLocalDateTime(): string { ... }
-```
+**Affected Files**:
+- `src/features/environmentSetup/infrastructure/repositories/EnvironmentRepository.test.ts`
+- `src/features/connectionReferences/domain/services/FlowConnectionRelationshipBuilder.test.ts`
+- `src/features/metadataBrowser/infrastructure/repositories/__tests__/DataverseEntityMetadataRepository.optionsets.test.ts`
 
 **Recommendation**:
-This is a **positive finding**. Continue maintaining this high standard of documentation.
+Consider replacing with explicit null checks in future test refactoring. Current usage is acceptable for test code.
+
+---
+
+### Minor Commented Code in Production Files
+**Severity**: Low
+**Location**: Multiple files
+**Pattern**: Code Quality
+**Description**:
+Found 263 instances of commented code patterns in 106 files. Most are legitimate explanatory comments or examples, but some may be leftover debugging code.
+
+**Recommendation**:
+Review commented code blocks during regular code cleanup. Ensure comments explain WHY, not WHAT.
 
 ---
 
 ## Positive Findings
 
-### Clean Architecture Compliance
-- **Zero violations** of layer boundaries detected
-- Domain layer has no dependencies on outer layers
-- All business logic correctly placed in domain entities and services
-- Use cases properly orchestrate without containing business logic
+The codebase demonstrates excellent engineering practices in many areas:
+
+### Excellent Clean Architecture Compliance
+- **Zero domain layer violations**: No imports of application, infrastructure, or presentation layers found in domain
+- **Zero ILogger imports in domain**: Proper dependency inversion maintained
+- **Proper layer dependency flow**: All dependencies point inward toward domain
+- Repository interfaces defined in domain, implementations in infrastructure
+
+### Rich Domain Models
+All reviewed domain entities follow rich domain model pattern:
+- **Entities with behavior**: Methods, not just data (e.g., `EntityMetadata`, `Environment`, `Solution`)
+- **Value objects with validation**: Immutable objects with business rules (e.g., `EnvironmentId`, `DataverseUrl`)
+- **Factory methods**: Static `create()` methods for complex construction (e.g., `EntityMetadata.create()`)
+- **No anemic models**: All entities have meaningful business methods
+
+### Strong Documentation
+- **99.7% JSDoc coverage**: 348 of 349 source files have JSDoc comments on classes
+- **Comprehensive method documentation**: Public methods documented with parameters and examples
+- **Architectural comments**: Files include architecture notes explaining design decisions
+
+### Use Case Orchestration Only
+Reviewed use cases properly orchestrate domain entities without business logic:
+- `ListSolutionsUseCase`: Simple orchestration, logging at boundaries
+- `ListEnvironmentVariablesUseCase`: Coordination only, business logic in factory
+- `GetPluginTracesUseCase`: Proper delegation to repository and domain services
+
+### Proper Presentation Layer Separation
+- **HTML in view files**: No HTML templates in TypeScript panel files
+- **ViewModels as DTOs**: Simple data structures, no business logic
+- **Mappers transform only**: Sorting delegated to domain services (e.g., `SolutionViewModelMapper` uses `SolutionCollectionService.sort()`)
+
+### Excellent Testing Practices
+- **107 test files**: Comprehensive test coverage
+- **Proper test patterns**: Arrange-Act-Assert structure
+- **NullLogger in tests**: Silent by default, proper isolation
+- **Test-driven patterns**: Use of `expect.any()` for flexible assertions
 
 ### Type Safety
-- **No instances** of `console.log` in production code
-- **No instances** of `any` type without justification
-- **No instances** of non-null assertions (`!`) operator
-- **Only 1 instance** of `@ts-expect-error` (in test file with proper justification)
-- Explicit return types on public methods
-- Proper type guards for runtime validation
+- **No `any` without justification**: Only 42 uses of `any`, all in comments or `expect.any()` in tests
+- **No `@ts-ignore` directives**: Zero instances found
+- **Minimal eslint-disable**: Only 18 files, all with documented reasons
+- **Proper type imports**: Using `import type` for type-only imports
 
-### Code Organization
-- Consistent mapper pattern across features
-- Rich domain models with behavior (not anemic data containers)
-- Clear separation of concerns
-- Repository pattern correctly implemented
-
-### Testing
-- Comprehensive test coverage for domain and application layers
-- Test files follow naming conventions
-- Use of `NullLogger` in tests (proper practice)
+### Panel Singleton Pattern
+All panels correctly implement singleton pattern:
+- `private static panels = new Map<string, PanelType>()`
+- `createOrShow()` factory method
+- Proper panel lifecycle management via `EnvironmentScopedPanel` base class
 
 ---
 
 ## Pattern Analysis
 
-### Pattern: Repository Cancellation Duplication
-**Occurrences**: 28
-**Impact**: High - Violates Three Strikes Rule, makes maintenance difficult
+### Pattern: escapeHtml Duplication
+**Occurrences**: 8
+**Impact**: Critical security and maintenance issue
 **Locations**:
-- `src/features/solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.ts` (2 methods)
-- `src/features/importJobViewer/infrastructure/repositories/DataverseApiImportJobRepository.ts` (2 methods)
-- `src/features/connectionReferences/infrastructure/repositories/DataverseApiConnectionReferenceRepository.ts` (1 method)
-- `src/features/connectionReferences/infrastructure/repositories/DataverseApiCloudFlowRepository.ts` (1 method)
-- `src/features/environmentVariables/infrastructure/repositories/DataverseApiEnvironmentVariableRepository.ts` (2 methods)
-- `src/shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.ts` (2 methods)
+1. `src/infrastructure/ui/utils/HtmlUtils.ts` (canonical)
+2. `src/shared/infrastructure/ui/views/htmlHelpers.ts`
+3. `src/shared/infrastructure/ui/views/dataTable.ts`
+4. `src/shared/infrastructure/ui/sections/ResizableDetailPanelSection.ts`
+5. `src/features/importJobViewer/application/mappers/ImportJobViewModelMapper.ts`
+6. `src/shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior.ts`
+7. `src/features/solutionExplorer/application/mappers/SolutionViewModelMapper.ts`
+8. `src/features/pluginTraceViewer/presentation/sections/FilterPanelSection.ts`
 
-**Recommendation**: Create `CancellationHelper` utility class to eliminate duplication
+**Recommendation**: Immediate consolidation to single implementation in `HtmlUtils.ts`. This is a security-critical function that must be maintained consistently.
 
 ---
 
-### Pattern: Panel Singleton Management
-**Occurrences**: 6
-**Impact**: Medium - Acceptable duplication but could be improved
+### Pattern: Large Panel Files (600-800 lines)
+**Occurrences**: 4
+**Impact**: Medium - files are large but well-structured
 **Locations**:
-- `src/features/pluginTraceViewer/presentation/panels/PluginTraceViewerPanelComposed.ts`
-- `src/features/metadataBrowser/presentation/panels/MetadataBrowserPanel.ts`
-- `src/features/environmentVariables/presentation/panels/EnvironmentVariablesPanelComposed.ts`
-- `src/features/importJobViewer/presentation/panels/ImportJobViewerPanelComposed.ts`
-- `src/features/solutionExplorer/presentation/panels/SolutionExplorerPanelComposed.ts`
-- `src/features/connectionReferences/presentation/panels/ConnectionReferencesPanelComposed.ts`
+- MetadataBrowserPanel.ts (794 lines)
+- PluginTraceViewerPanelComposed.ts (735 lines)
+- EnvironmentSetupPanelComposed.ts (602 lines)
+- ConnectionReferencesPanelComposed.ts (550 lines)
 
-**Recommendation**: Consider abstract base class if more panels are added
+**Recommendation**: Current structure acceptable given proper use of coordinator pattern and behavior delegation. Files marked with `/* eslint-disable max-lines */` with justification. Optional: extract command handler registration to configuration objects.
 
 ---
 
-### Pattern: Well-Justified ESLint Disables
-**Occurrences**: 24
-**Impact**: Positive - All disables have clear justifications
-**Locations**: Various files across domain and presentation layers
-**Recommendation**: Continue current practice, periodically review justifications
+### Pattern: Repository DTO Mapping
+**Occurrences**: 5
+**Impact**: Medium - consistent pattern across repositories
+**Locations**:
+- DataverseApiSolutionRepository
+- DataverseApiEnvironmentVariableRepository
+- DataverseApiConnectionReferenceRepository
+- DataverseApiCloudFlowRepository
+- DataverseApiImportJobRepository
+
+**Recommendation**: Current pattern is consistent: repositories handle API calls and basic DTO mapping. For complex mapping (like EntityMetadata), consider extracting dedicated mapper classes.
+
+---
+
+### Pattern: Environment-Scoped Panels
+**Occurrences**: 7
+**Impact**: Positive - excellent code reuse
+**Locations**: All major feature panels extend `EnvironmentScopedPanel`
+
+**Recommendation**: This is a positive pattern - continue using base class for shared panel lifecycle management.
 
 ---
 
 ## Recommendations Summary
 
-1. **[HIGH PRIORITY]** Create `CancellationHelper` utility to eliminate 28 instances of duplicated cancellation logic
-2. **[HIGH PRIORITY]** Consider abstract base class for panel singleton pattern (6 occurrences)
-3. **[MEDIUM PRIORITY]** Extract functionality from 1,428-line `PluginTraceViewerPanelComposed.ts` into behavior classes
-4. **[MEDIUM PRIORITY]** Complete technical debt plan for `DateTimeFilter` to move presentation/infrastructure methods out of domain
-5. **[MEDIUM PRIORITY]** Replace magic numbers with named constants in filter logic
-6. **[LOW PRIORITY]** Continue excellent JSDoc and comment quality practices
-7. **[LOW PRIORITY]** Periodically review eslint-disable justifications to ensure they remain valid
+### Immediate Actions (Critical)
+1. **Consolidate escapeHtml duplication** - Replace all 7 duplicated implementations with imports from `HtmlUtils.ts`
+
+### High Priority (Next Sprint)
+2. **Refactor extension.ts** - Extract DI container and feature initialization to separate modules
+3. **Split DataverseEntityMetadataRepository** - Extract mapping logic to dedicated mapper classes
+
+### Medium Priority (Backlog)
+4. **Address DateTimeFilter technical debt** - Extract formatting methods to appropriate layers (tracked in TECHNICAL_DEBT.md)
+5. **Review large panel files** - Consider extracting command handler registration to configuration objects
+6. **Clean up TODO comments** - Ensure all TODOs are tracked in backlog with implementation plans
+
+### Low Priority (Continuous Improvement)
+7. **Remove console.log from tests** - Clean up debugging statements
+8. **Review commented code** - Remove dead code blocks during regular maintenance
+9. **Replace non-null assertions in tests** - Use explicit null checks for robustness
 
 ---
 
 ## Metrics
 
-- Files Reviewed: 432
-- Critical Issues: 0
-- High Priority: 2
-- Medium Priority: 3
-- Low Priority: 2
-- Code Quality Score: 8/10
-- Production Readiness: 8/10
+- **Files Reviewed**: 349 source files, 107 test files
+- **Critical Issues**: 1 (escapeHtml duplication)
+- **High Priority**: 2 (large files needing refactoring)
+- **Medium Priority**: 5 (acceptable technical debt, large but well-structured files)
+- **Low Priority**: 3 (minor test code issues)
+- **Code Quality Score**: 8/10
+- **Production Readiness**: 7/10
+- **Clean Architecture Compliance**: 10/10
+- **Documentation Quality**: 10/10
+- **Type Safety**: 9/10
 
-**Key Strengths**:
-- Excellent Clean Architecture compliance
-- Strong type safety
-- Well-documented code
-- Proper separation of concerns
-- Good test coverage
+---
 
-**Key Weaknesses**:
-- Repository cancellation logic duplication (28 instances)
-- Some large panel files that could benefit from extraction
-- Technical debt in domain layer (DateTimeFilter)
+## Conclusion
 
-**Overall Assessment**: The codebase is well-architected and follows best practices. The main area for improvement is addressing systematic code duplication in repository cancellation logic. This should be prioritized as it violates the Three Strikes Rule and impacts maintainability. The codebase is production-ready but would benefit from the recommended refactorings.
+The Power Platform Developer Suite demonstrates **exceptional Clean Architecture implementation** with zero domain layer violations, rich domain models, and proper dependency management. Documentation is comprehensive, and the engineering practices are mature.
+
+The primary concern is **code duplication**, specifically the `escapeHtml` function duplicated 8 times. This is a **critical security issue** that must be addressed immediately. Once this duplication is resolved, the codebase will be in excellent shape for production deployment.
+
+File size issues are **acceptable given the architectural patterns used** (coordinator pattern, behavior delegation). The large files are well-structured and follow composition principles.
+
+**Overall Assessment**: With the escapeHtml duplication resolved, this codebase would achieve a 9/10 code quality score and be fully production-ready.
