@@ -65,9 +65,9 @@ export function renderDropdown(config: DropdownRenderConfig): string {
 			        data-dropdown-trigger="${escapeHtml(id)}">
 				${iconHtml}
 				<span class="dropdown-label">${escapeHtml(label)}</span>
-				<span class="codicon codicon-chevron-down"></span>
+				<span class="dropdown-chevron">▼</span>
 			</button>
-			<div class="dropdown-menu" data-dropdown-menu="${escapeHtml(id)}" style="display: none;">
+			<div class="dropdown-menu" data-dropdown-menu="${escapeHtml(id)}" style="display: none !important;">
 				${itemsHtml}
 			</div>
 		</div>

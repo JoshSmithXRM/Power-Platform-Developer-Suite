@@ -3,28 +3,14 @@ import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 import { IEntityMetadataRepository } from '../../domain/repositories/IEntityMetadataRepository';
 import { EntityMetadata } from '../../domain/entities/EntityMetadata';
-import { AttributeMetadata } from '../../domain/entities/AttributeMetadata';
-import { OneToManyRelationship } from '../../domain/entities/OneToManyRelationship';
-import { ManyToManyRelationship } from '../../domain/entities/ManyToManyRelationship';
-import { EntityKey } from '../../domain/entities/EntityKey';
-import { SecurityPrivilege } from '../../domain/entities/SecurityPrivilege';
 import { LogicalName } from '../../domain/valueObjects/LogicalName';
-import { SchemaName } from '../../domain/valueObjects/SchemaName';
-import { AttributeType } from '../../domain/valueObjects/AttributeType';
-import { CascadeConfiguration, CascadeType } from '../../domain/valueObjects/CascadeConfiguration';
-import { OptionSetMetadata, OptionMetadata } from '../../domain/valueObjects/OptionSetMetadata';
+import { OptionSetMetadata } from '../../domain/valueObjects/OptionSetMetadata';
+import { OptionSetMetadataMapper } from '../mappers/OptionSetMetadataMapper';
+import { EntityMetadataMapper } from '../mappers/EntityMetadataMapper';
 import type {
     EntityMetadataDto,
     AttributeMetadataDto,
-    OneToManyRelationshipDto,
-    ManyToManyRelationshipDto,
-    EntityKeyDto,
-    SecurityPrivilegeDto,
-    CascadeConfigurationDto,
-    OptionSetMetadataDto,
-    OptionMetadataDto,
-    GlobalOptionSetDefinitionDto,
-    LabelMetadata
+    GlobalOptionSetDefinitionDto
 } from '../dtos/EntityMetadataDto';
 
 /**
@@ -60,6 +46,8 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
 
     constructor(
         private readonly apiService: IDataverseApiService,
+        private readonly entityMapper: EntityMetadataMapper,
+        private readonly optionSetMapper: OptionSetMetadataMapper,
         private readonly logger: ILogger
     ) {}
 
@@ -82,7 +70,7 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
 
             this.logger.debug('Received entity metadata', { count: response.value.length });
 
-            const entities = response.value.map(dto => this.mapDtoToEntityWithoutAttributes(dto));
+            const entities = response.value.map(dto => this.entityMapper.mapDtoToEntityWithoutAttributes(dto));
             return entities;
         } catch (error) {
             const normalizedError = normalizeError(error);
@@ -190,7 +178,7 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
             // Enrich attributes with OptionSet data using typed metadata endpoints
             await this.enrichAttributesWithOptionSets(environmentId, logicalName.getValue(), dto);
 
-            const entity = this.mapDtoToEntityWithAttributes(dto);
+            const entity = this.entityMapper.mapDtoToEntityWithAttributes(dto);
 
             // Cache the result
             this.setCache(environmentId, logicalName.getValue(), entity);
@@ -222,7 +210,7 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
 
             this.logger.debug('Received global choice metadata', { count: response.value.length });
 
-            const globalChoices = response.value.map(dto => this.mapGlobalOptionSetDtoToValueObject(dto));
+            const globalChoices = response.value.map(dto => this.optionSetMapper.mapGlobalOptionSetDtoToValueObject(dto));
             return globalChoices;
         } catch (error) {
             const normalizedError = normalizeError(error);
@@ -251,329 +239,13 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
                 optionCount: dto.Options?.length || 0
             });
 
-            const globalChoice = this.mapGlobalOptionSetDtoToValueObject(dto);
+            const globalChoice = this.optionSetMapper.mapGlobalOptionSetDtoToValueObject(dto);
             return globalChoice;
         } catch (error) {
             const normalizedError = normalizeError(error);
             this.logger.error('Failed to fetch global choice by name', normalizedError);
             throw normalizedError;
         }
-    }
-
-    /**
-     * Maps a DTO to domain entity without attributes/relationships (for tree list).
-     */
-    private mapDtoToEntityWithoutAttributes(dto: EntityMetadataDto): EntityMetadata {
-        return EntityMetadata.create({
-            metadataId: dto.MetadataId,
-            logicalName: LogicalName.create(dto.LogicalName),
-            schemaName: SchemaName.create(dto.SchemaName),
-            displayName: this.extractLabel(dto.DisplayName) || dto.SchemaName,
-            pluralName: this.extractLabel(dto.DisplayCollectionName) || dto.SchemaName,
-            description: this.extractLabel(dto.Description),
-            isCustomEntity: dto.IsCustomEntity ?? false,
-            isManaged: dto.IsManaged ?? false,
-            ownershipType: this.mapOwnershipType(dto.OwnershipType),
-            attributes: [],
-            primaryIdAttribute: dto.PrimaryIdAttribute ?? null,
-            primaryNameAttribute: dto.PrimaryNameAttribute ?? null,
-            primaryImageAttribute: dto.PrimaryImageAttribute ?? null,
-            entitySetName: dto.EntitySetName ?? null,
-            objectTypeCode: dto.ObjectTypeCode ?? null,
-            isActivity: dto.IsActivity ?? false,
-            hasNotes: dto.HasNotes ?? false,
-            hasActivities: dto.HasActivities ?? false,
-            isValidForAdvancedFind: dto.IsValidForAdvancedFind ?? true,
-            isAuditEnabled: dto.IsAuditEnabled?.Value ?? false,
-            isValidForQueue: dto.IsValidForQueue?.Value ?? false,
-            oneToManyRelationships: [],
-            manyToOneRelationships: [],
-            manyToManyRelationships: [],
-            keys: [],
-            privileges: []
-        });
-    }
-
-    /**
-     * Maps a DTO to domain entity with full metadata (attributes, relationships, keys).
-     */
-    private mapDtoToEntityWithAttributes(dto: EntityMetadataDto): EntityMetadata {
-        const attributes = dto.Attributes?.map(attrDto => this.mapAttributeDtoToEntity(attrDto)) || [];
-        const oneToManyRels = dto.OneToManyRelationships?.map(relDto => this.mapOneToManyRelationshipDtoToEntity(relDto)) || [];
-        const manyToOneRels = dto.ManyToOneRelationships?.map(relDto => this.mapOneToManyRelationshipDtoToEntity(relDto)) || [];
-        const manyToManyRels = dto.ManyToManyRelationships?.map(relDto => this.mapManyToManyRelationshipDtoToEntity(relDto)) || [];
-        const keys = dto.Keys?.map(keyDto => this.mapEntityKeyDtoToEntity(keyDto)) || [];
-        const privileges = dto.Privileges?.map(privDto => this.mapSecurityPrivilegeDtoToEntity(privDto)) || [];
-
-        return EntityMetadata.create({
-            metadataId: dto.MetadataId,
-            logicalName: LogicalName.create(dto.LogicalName),
-            schemaName: SchemaName.create(dto.SchemaName),
-            displayName: this.extractLabel(dto.DisplayName) || dto.SchemaName,
-            pluralName: this.extractLabel(dto.DisplayCollectionName) || dto.SchemaName,
-            description: this.extractLabel(dto.Description),
-            isCustomEntity: dto.IsCustomEntity ?? false,
-            isManaged: dto.IsManaged ?? false,
-            ownershipType: this.mapOwnershipType(dto.OwnershipType),
-            attributes: attributes,
-            primaryIdAttribute: dto.PrimaryIdAttribute ?? null,
-            primaryNameAttribute: dto.PrimaryNameAttribute ?? null,
-            primaryImageAttribute: dto.PrimaryImageAttribute ?? null,
-            entitySetName: dto.EntitySetName ?? null,
-            objectTypeCode: dto.ObjectTypeCode ?? null,
-            isActivity: dto.IsActivity ?? false,
-            hasNotes: dto.HasNotes ?? false,
-            hasActivities: dto.HasActivities ?? false,
-            isValidForAdvancedFind: dto.IsValidForAdvancedFind ?? true,
-            isAuditEnabled: dto.IsAuditEnabled?.Value ?? false,
-            isValidForQueue: dto.IsValidForQueue?.Value ?? false,
-            oneToManyRelationships: oneToManyRels,
-            manyToOneRelationships: manyToOneRels,
-            manyToManyRelationships: manyToManyRels,
-            keys: keys,
-            privileges: privileges
-        });
-    }
-
-    /**
-     * Maps an attribute DTO to domain entity.
-     */
-    private mapAttributeDtoToEntity(dto: AttributeMetadataDto): AttributeMetadata {
-        const attributeType = dto.AttributeTypeName?.Value || dto.AttributeType || 'String';
-
-        // Debug logging for picklist attributes
-        if (attributeType === 'PicklistType' || attributeType === 'Picklist') {
-            this.logger.debug('Mapping picklist attribute', {
-                logicalName: dto.LogicalName,
-                hasOptionSet: !!dto.OptionSet,
-                hasGlobalOptionSet: !!dto.GlobalOptionSet,
-                optionSetName: dto.OptionSet?.Name,
-                globalOptionSetName: dto.GlobalOptionSet?.Name,
-                optionCount: dto.OptionSet?.Options?.length || 0
-            });
-        }
-
-        const optionSet = this.mapOptionSetDtoToValueObject(dto.OptionSet, dto.GlobalOptionSet);
-
-        return AttributeMetadata.create({
-            metadataId: dto.MetadataId,
-            logicalName: LogicalName.create(dto.LogicalName),
-            schemaName: SchemaName.create(dto.SchemaName),
-            displayName: this.extractLabel(dto.DisplayName) || dto.SchemaName,
-            description: this.extractLabel(dto.Description),
-            attributeType: AttributeType.create(attributeType),
-            isCustomAttribute: dto.IsCustomAttribute ?? false,
-            isManaged: dto.IsManaged ?? false,
-            isPrimaryId: dto.IsPrimaryId ?? false,
-            isPrimaryName: dto.IsPrimaryName ?? false,
-            requiredLevel: this.mapRequiredLevel(dto.RequiredLevel?.Value),
-            maxLength: dto.MaxLength ?? null,
-            targets: dto.Targets ?? null,
-            precision: dto.Precision ?? null,
-            minValue: dto.MinValue ?? null,
-            maxValue: dto.MaxValue ?? null,
-            format: dto.Format ?? null,
-            optionSet: optionSet,
-            isValidForCreate: dto.IsValidForCreate ?? true,
-            isValidForUpdate: dto.IsValidForUpdate ?? true,
-            isValidForRead: dto.IsValidForRead ?? true,
-            isValidForForm: dto.IsValidForForm ?? true,
-            isValidForGrid: dto.IsValidForGrid ?? true,
-            isSecured: dto.IsSecured ?? false,
-            canBeSecuredForRead: dto.CanBeSecuredForRead ?? false,
-            canBeSecuredForCreate: dto.CanBeSecuredForCreate ?? false,
-            canBeSecuredForUpdate: dto.CanBeSecuredForUpdate ?? false,
-            isFilterable: dto.IsFilterable ?? false,
-            isSearchable: dto.IsSearchable ?? false,
-            isRetrievable: dto.IsRetrievable ?? true
-        });
-    }
-
-    /**
-     * Maps a one-to-many relationship DTO to domain entity.
-     */
-    private mapOneToManyRelationshipDtoToEntity(dto: OneToManyRelationshipDto): OneToManyRelationship {
-        const cascadeConfig = this.mapCascadeConfigurationDtoToValueObject(dto.CascadeConfiguration);
-
-        return OneToManyRelationship.create({
-            metadataId: dto.MetadataId,
-            schemaName: dto.SchemaName,
-            referencedEntity: dto.ReferencedEntity,
-            referencedAttribute: dto.ReferencedAttribute,
-            referencingEntity: dto.ReferencingEntity,
-            referencingAttribute: dto.ReferencingAttribute,
-            isCustomRelationship: dto.IsCustomRelationship,
-            isManaged: dto.IsManaged,
-            relationshipType: dto.RelationshipType,
-            cascadeConfiguration: cascadeConfig,
-            referencedEntityNavigationPropertyName: dto.ReferencedEntityNavigationPropertyName ?? null,
-            referencingEntityNavigationPropertyName: dto.ReferencingEntityNavigationPropertyName ?? null,
-            isHierarchical: dto.IsHierarchical ?? false,
-            securityTypes: dto.SecurityTypes ?? null
-        });
-    }
-
-    /**
-     * Maps a many-to-many relationship DTO to domain entity.
-     */
-    private mapManyToManyRelationshipDtoToEntity(dto: ManyToManyRelationshipDto): ManyToManyRelationship {
-        return ManyToManyRelationship.create({
-            metadataId: dto.MetadataId,
-            schemaName: dto.SchemaName,
-            entity1LogicalName: dto.Entity1LogicalName,
-            entity1IntersectAttribute: dto.Entity1IntersectAttribute,
-            entity2LogicalName: dto.Entity2LogicalName,
-            entity2IntersectAttribute: dto.Entity2IntersectAttribute,
-            intersectEntityName: dto.IntersectEntityName,
-            isCustomRelationship: dto.IsCustomRelationship,
-            isManaged: dto.IsManaged,
-            entity1NavigationPropertyName: dto.Entity1NavigationPropertyName ?? null,
-            entity2NavigationPropertyName: dto.Entity2NavigationPropertyName ?? null
-        });
-    }
-
-    /**
-     * Maps an entity key DTO to domain entity.
-     */
-    private mapEntityKeyDtoToEntity(dto: EntityKeyDto): EntityKey {
-        return EntityKey.create({
-            metadataId: dto.MetadataId,
-            logicalName: LogicalName.create(dto.LogicalName),
-            schemaName: SchemaName.create(dto.SchemaName),
-            displayName: this.extractLabel(dto.DisplayName) || dto.SchemaName,
-            entityLogicalName: dto.EntityLogicalName,
-            keyAttributes: dto.KeyAttributes,
-            isManaged: dto.IsManaged,
-            entityKeyIndexStatus: dto.EntityKeyIndexStatus ?? null
-        });
-    }
-
-    /**
-     * Maps a security privilege DTO to domain entity.
-     */
-    private mapSecurityPrivilegeDtoToEntity(dto: SecurityPrivilegeDto): SecurityPrivilege {
-        return SecurityPrivilege.create({
-            privilegeId: dto.PrivilegeId,
-            name: dto.Name,
-            privilegeType: dto.PrivilegeType,
-            canBeBasic: dto.CanBeBasic,
-            canBeLocal: dto.CanBeLocal,
-            canBeDeep: dto.CanBeDeep,
-            canBeGlobal: dto.CanBeGlobal,
-            canBeEntityReference: dto.CanBeEntityReference ?? false,
-            canBeParentEntityReference: dto.CanBeParentEntityReference ?? false
-        });
-    }
-
-    /**
-     * Maps cascade configuration DTO to value object.
-     */
-    private mapCascadeConfigurationDtoToValueObject(dto: CascadeConfigurationDto): CascadeConfiguration {
-        return CascadeConfiguration.create({
-            assign: this.mapCascadeType(dto.Assign),
-            delete: this.mapCascadeType(dto.Delete),
-            merge: this.mapCascadeType(dto.Merge),
-            reparent: this.mapCascadeType(dto.Reparent),
-            share: this.mapCascadeType(dto.Share),
-            unshare: this.mapCascadeType(dto.Unshare),
-            archive: dto.Archive ? this.mapCascadeType(dto.Archive) : null,
-            rollupView: dto.RollupView ? this.mapCascadeType(dto.RollupView) : null
-        });
-    }
-
-    /**
-     * Maps cascade type string to typed value.
-     */
-    private mapCascadeType(cascadeType: string): CascadeType {
-        switch (cascadeType) {
-            case 'Cascade':
-            case 'NoCascade':
-            case 'Active':
-            case 'UserOwned':
-            case 'RemoveLink':
-            case 'Restrict':
-                return cascadeType;
-            default:
-                return 'NoCascade';
-        }
-    }
-
-    /**
-     * Maps option set DTO to value object.
-     * After enrichment, both optionSetDto (with options) and globalOptionSetDto (reference) may be present.
-     * Prioritize optionSetDto with actual option values.
-     */
-    private mapOptionSetDtoToValueObject(
-        optionSetDto: OptionSetMetadataDto | undefined,
-        globalOptionSetDto: { Name: string } | undefined
-    ): OptionSetMetadata | null {
-        if (!optionSetDto && !globalOptionSetDto) {
-            return null;
-        }
-
-        // If optionSetDto exists with options, use it (even if globalOptionSetDto also exists)
-        if (optionSetDto && optionSetDto.Options && optionSetDto.Options.length > 0) {
-            const options = optionSetDto.Options.map(optDto => this.mapOptionMetadataDtoToValueObject(optDto));
-            return OptionSetMetadata.create({
-                name: optionSetDto.Name ?? null,
-                displayName: null,
-                isGlobal: optionSetDto.IsGlobal ?? false,
-                isCustom: false,
-                options: options
-            });
-        }
-
-        // If optionSetDto exists but has no options, still use it for metadata
-        if (optionSetDto) {
-            const options = optionSetDto.Options?.map(optDto => this.mapOptionMetadataDtoToValueObject(optDto)) || [];
-            return OptionSetMetadata.create({
-                name: optionSetDto.Name ?? null,
-                displayName: null,
-                isGlobal: optionSetDto.IsGlobal ?? false,
-                isCustom: false,
-                options: options
-            });
-        }
-
-        // Only use globalOptionSetDto as a fallback when optionSetDto doesn't exist
-        if (globalOptionSetDto) {
-            // Global option set reference (no inline options, no display name at attribute level)
-            return OptionSetMetadata.create({
-                name: globalOptionSetDto.Name,
-                displayName: null,
-                isGlobal: true,
-                isCustom: false,
-                options: []
-            });
-        }
-
-        return null;
-    }
-
-    /**
-     * Maps option metadata DTO to value object.
-     */
-    private mapOptionMetadataDtoToValueObject(dto: OptionMetadataDto): OptionMetadata {
-        return OptionMetadata.create({
-            value: dto.Value,
-            label: this.extractLabel(dto.Label) || String(dto.Value),
-            description: this.extractLabel(dto.Description),
-            color: dto.Color ?? null
-        });
-    }
-
-    /**
-     * Maps global option set definition DTO to value object.
-     */
-    private mapGlobalOptionSetDtoToValueObject(dto: GlobalOptionSetDefinitionDto): OptionSetMetadata {
-        const options = dto.Options?.map(optDto => this.mapOptionMetadataDtoToValueObject(optDto)) || [];
-        return OptionSetMetadata.create({
-            name: dto.Name,
-            displayName: this.extractLabel(dto.DisplayName),
-            isGlobal: dto.IsGlobal ?? true,
-            isCustom: dto.IsCustomOptionSet ?? false,
-            options: options
-        });
     }
 
     /**
@@ -751,7 +423,7 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
 
                 if (globalOptionSetName) {
                     const fullOptionSet = optionSetMap.get(globalOptionSetName);
-                    if (fullOptionSet && fullOptionSet.Options) {
+                    if (fullOptionSet?.Options) {
                         // Replace the empty OptionSet with full data from global definition
                         attr.OptionSet = {
                             Name: fullOptionSet.Name,
@@ -769,45 +441,6 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
         } catch (error) {
             this.logger.warn('Failed to enrich global option sets', { error });
             // Don't throw - continue with what we have
-        }
-    }
-
-    /**
-     * Extracts the user localized label from label metadata.
-     */
-    private extractLabel(labelMetadata: LabelMetadata | undefined): string | null {
-        return labelMetadata?.UserLocalizedLabel?.Label || null;
-    }
-
-    /**
-     * Maps ownership type string to typed value.
-     */
-    private mapOwnershipType(ownershipType: string | undefined): 'UserOwned' | 'OrganizationOwned' | 'TeamOwned' | 'None' {
-        switch (ownershipType) {
-            case 'UserOwned':
-                return 'UserOwned';
-            case 'OrganizationOwned':
-                return 'OrganizationOwned';
-            case 'TeamOwned':
-                return 'TeamOwned';
-            default:
-                return 'None';
-        }
-    }
-
-    /**
-     * Maps required level string to typed value.
-     */
-    private mapRequiredLevel(requiredLevel: string | undefined): 'None' | 'SystemRequired' | 'ApplicationRequired' | 'Recommended' {
-        switch (requiredLevel) {
-            case 'SystemRequired':
-                return 'SystemRequired';
-            case 'ApplicationRequired':
-                return 'ApplicationRequired';
-            case 'Recommended':
-                return 'Recommended';
-            default:
-                return 'None';
         }
     }
 }

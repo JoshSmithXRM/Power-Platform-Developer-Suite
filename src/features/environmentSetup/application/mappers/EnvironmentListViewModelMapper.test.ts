@@ -174,7 +174,7 @@ describe('EnvironmentListViewModelMapper', () => {
 		});
 	});
 
-	describe('toSortedViewModels - collection mapping', () => {
+	describe('toViewModels - collection mapping', () => {
 		it('should map multiple environments', () => {
 			// Arrange
 			const environments = [
@@ -184,7 +184,7 @@ describe('EnvironmentListViewModelMapper', () => {
 			];
 
 			// Act
-			const result = mapper.toSortedViewModels(environments);
+			const result = mapper.toViewModels(environments, true);
 
 			// Assert
 			expect(result).toHaveLength(3);
@@ -198,7 +198,7 @@ describe('EnvironmentListViewModelMapper', () => {
 			const environments: Environment[] = [];
 
 			// Act
-			const result = mapper.toSortedViewModels(environments);
+			const result = mapper.toViewModels(environments, true);
 
 			// Assert
 			expect(result).toHaveLength(0);
@@ -210,7 +210,7 @@ describe('EnvironmentListViewModelMapper', () => {
 			const environments = [createEnvironment('env-1', 'Single')];
 
 			// Act
-			const result = mapper.toSortedViewModels(environments);
+			const result = mapper.toViewModels(environments, true);
 
 			// Assert
 			expect(result).toHaveLength(1);
@@ -226,7 +226,7 @@ describe('EnvironmentListViewModelMapper', () => {
 			const environments = [older, newer];
 
 			// Act
-			const result = mapper.toSortedViewModels(environments);
+			const result = mapper.toViewModels(environments, true);
 
 			// Assert
 			expect(result[0]?.name).toBe('Newer');
@@ -240,7 +240,7 @@ describe('EnvironmentListViewModelMapper', () => {
 			const environments = [withoutLastUsed, withLastUsed];
 
 			// Act
-			const result = mapper.toSortedViewModels(environments);
+			const result = mapper.toViewModels(environments, true);
 
 			// Assert
 			expect(result[0]?.name).toBe('Used');
@@ -255,7 +255,7 @@ describe('EnvironmentListViewModelMapper', () => {
 			const environments = [zEnv, aEnv, mEnv];
 
 			// Act
-			const result = mapper.toSortedViewModels(environments);
+			const result = mapper.toViewModels(environments, true);
 
 			// Assert
 			expect(result[0]?.name).toBe('Alpha');
@@ -272,7 +272,7 @@ describe('EnvironmentListViewModelMapper', () => {
 			const environments = [neverUsed1, used1, neverUsed2, used2];
 
 			// Act
-			const result = mapper.toSortedViewModels(environments);
+			const result = mapper.toViewModels(environments, true);
 
 			// Assert
 			expect(result[0]?.name).toBe('Used2'); // Most recent lastUsed
@@ -290,7 +290,7 @@ describe('EnvironmentListViewModelMapper', () => {
 			const environments = [env1, env2, env3];
 
 			// Act
-			const result = mapper.toSortedViewModels(environments);
+			const result = mapper.toViewModels(environments, true);
 
 			// Assert - When timestamps are equal, order is preserved (stable sort)
 			// But names should all be present
@@ -307,7 +307,7 @@ describe('EnvironmentListViewModelMapper', () => {
 			const environments = [env1, env2];
 
 			// Act
-			const result = mapper.toSortedViewModels(environments);
+			const result = mapper.toViewModels(environments, true);
 
 			// Assert
 			expect(result[0]?.id).toBe('env-2');
@@ -403,7 +403,7 @@ describe('EnvironmentListViewModelMapper', () => {
 			);
 
 			// Act
-			const result = mapper.toSortedViewModels(environments);
+			const result = mapper.toViewModels(environments, true);
 
 			// Assert
 			expect(result).toHaveLength(100);
@@ -421,7 +421,7 @@ describe('EnvironmentListViewModelMapper', () => {
 			const environments = [env1, env2];
 
 			// Act
-			const result = mapper.toSortedViewModels(environments);
+			const result = mapper.toViewModels(environments, true);
 
 			// Assert
 			expect(result[0]?.name).toBe('Second'); // More recent by milliseconds

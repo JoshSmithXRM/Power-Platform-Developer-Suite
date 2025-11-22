@@ -185,6 +185,9 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 				retainContextWhenHidden: true,
 				enableFindWidget: true
 			}
+			// Note: No onDispose callback needed - this panel has no timers, intervals,
+			// or external resources requiring cleanup. Panel state is automatically
+			// persisted via IPanelStateRepository and removed from panels map on disposal.
 		}, MetadataBrowserPanel.panels);
 	}
 

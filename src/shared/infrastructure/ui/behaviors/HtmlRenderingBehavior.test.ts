@@ -123,7 +123,7 @@ describe('HtmlRenderingBehavior', () => {
 		it('should include custom JavaScript in HTML', () => {
 			customization = {
 				...customization,
-				customJavaScript: 'console.log("custom script");'
+				customJavaScript: 'console.log("custom script");' // Test data for custom JS injection
 			};
 			behavior = new HtmlRenderingBehavior(webviewMock, extensionUri, config, customization);
 

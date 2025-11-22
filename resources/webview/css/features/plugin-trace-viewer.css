@@ -29,6 +29,11 @@
 	margin: 0; /* Override any .detail-section content rules */
 }
 
+/* Hidden state - hide the detail section wrapper */
+.content-split > .detail-section.hidden {
+	display: none;
+}
+
 /* Feature-specific ID selector (inherits styles from shared CSS via .resizable-detail-panel) */
 #pluginTraceDetailPanel {
 	/* Uses default 500px width from shared CSS */

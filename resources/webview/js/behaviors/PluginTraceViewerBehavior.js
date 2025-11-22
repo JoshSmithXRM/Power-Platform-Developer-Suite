@@ -144,14 +144,11 @@ function showDetailPanel(data) {
 		timelineContent.innerHTML = renderTimelineTab(data.trace);
 	}
 
-	// Update raw data tab
-	const rawContent = document.getElementById('pluginTraceRawContent');
-	if (rawContent && currentRawEntity) {
-		rawContent.textContent = JSON.stringify(currentRawEntity, null, 2);
-	}
+	// Update raw data tab (will be populated by displayRawData when tab is clicked)
+	// Don't populate here to avoid duplicate rendering
 
 	// Show panel
-	panel.style.display = 'flex';
+	panel.style.setProperty('display', 'flex', 'important');
 
 	// Setup resize handle (ONLY ONCE)
 	const resizeHandle = document.getElementById('detailPanelResizeHandle');
@@ -171,7 +168,7 @@ function showDetailPanel(data) {
 function hideDetailPanel() {
 	const panel = document.getElementById('pluginTraceDetailPanel');
 	if (panel) {
-		panel.style.display = 'none';
+		panel.style.setProperty('display', 'none', 'important');
 	}
 	// Clear row selection when closing detail panel
 	clearRowSelection();

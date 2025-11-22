@@ -73,6 +73,15 @@ function isClearPropertyMessage(data: unknown): data is ClearPropertyMessage {
 /**
  * Presentation layer panel for Persistence Inspector using universal panel framework.
  * Delegates all logic to use cases - NO business logic here.
+ *
+ * **Singleton Pattern (Not Environment-Scoped)**:
+ * This panel does NOT extend EnvironmentScopedPanel because it inspects ALL storage
+ * across ALL environments, not just storage for a single environment. It uses a simple
+ * singleton pattern (`currentPanel`) instead of the environment-scoped map pattern.
+ *
+ * The panel displays global storage, workspace storage, and secrets for the entire
+ * extension, making it a cross-cutting diagnostic tool rather than an environment-specific
+ * feature.
  */
 export class PersistenceInspectorPanelComposed {
 	public static readonly viewType = 'powerPlatformDevSuite.persistenceInspector';

@@ -37,8 +37,21 @@ type EnvironmentSetupCommands =
 	| 'discoverEnvironmentId'
 	| 'validateName';
 
+/**
+ * Presentation layer panel for Environment Setup using universal panel framework.
+ *
+ * **Multi-Instance Pattern (Not Environment-Scoped)**:
+ * This panel does NOT extend EnvironmentScopedPanel because it allows multiple
+ * concurrent edit panels (one per environment being edited). It uses a Map
+ * keyed by environment ID to track multiple panel instances, enabling users to
+ * edit multiple environments simultaneously without losing unsaved changes.
+ *
+ * This differs from EnvironmentScopedPanel which enforces single-instance-per-environment
+ * for data viewing panels. Environment Setup is an editing panel that benefits from
+ * allowing multiple concurrent edit sessions with proper concurrent edit detection.
+ */
 export class EnvironmentSetupPanelComposed {
-	public static currentPanels: Map<string, EnvironmentSetupPanelComposed> = new Map();
+	private static currentPanels: Map<string, EnvironmentSetupPanelComposed> = new Map();
 	private coordinator!: PanelCoordinator<EnvironmentSetupCommands>;
 	private scaffoldingBehavior!: HtmlScaffoldingBehavior;
 	private currentEnvironmentId?: string;

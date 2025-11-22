@@ -234,5 +234,20 @@ export default tseslint.config(
         }
       ]
     }
+  },
+  {
+    // Jest mock files - Need Jest globals
+    files: ['src/__mocks__/**/*.js'],
+    languageOptions: {
+      globals: {
+        jest: 'readonly',
+        module: 'writable',
+        require: 'readonly'
+      }
+    },
+    rules: {
+      // Allow unused vars in mocks (structural setup)
+      '@typescript-eslint/no-unused-vars': 'off'
+    }
   }
 );

@@ -58,6 +58,16 @@ export class HtmlScaffoldingBehavior implements IPanelBehavior {
 	/**
 	 * Wraps body HTML in full HTML document structure.
 	 * Includes <html>, <head>, CSS, JS, and CSP.
+	 *
+	 * CSP Note: 'unsafe-inline' is required for style-src because inline style
+	 * attributes (style="...") are used throughout the codebase for dynamic
+	 * visibility, widths, and positioning. These are safe because:
+	 * - All values are either static strings or calculated from validated domain data
+	 * - No user-controlled content flows into style attributes
+	 * - Nonces are used for <style> tags as defense-in-depth
+	 *
+	 * Future improvement: Refactor inline style attributes to CSS classes with
+	 * JavaScript-controlled class names to eliminate 'unsafe-inline'.
 	 */
 	private wrapInHtmlScaffolding(bodyHtml: string): string {
 		const { cssUris, jsUris, cspNonce, title, customCss, customJavaScript } = this.config;
@@ -68,10 +78,10 @@ export class HtmlScaffoldingBehavior implements IPanelBehavior {
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${cspNonce}';">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline' 'nonce-${cspNonce}'; script-src 'nonce-${cspNonce}'; font-src ${cspSource} https://unpkg.com;">
 	<title>${escapeHtml(title)}</title>
 	${cssUris.map(uri => `<link rel="stylesheet" href="${uri}">`).join('\n\t')}
-	${customCss ? `<style>${customCss}</style>` : ''}
+	${customCss ? `<style nonce="${cspNonce}">${customCss}</style>` : ''}
 </head>
 <body>
 ${bodyHtml}

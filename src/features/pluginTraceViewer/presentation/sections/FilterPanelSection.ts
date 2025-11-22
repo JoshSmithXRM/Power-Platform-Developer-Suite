@@ -31,11 +31,11 @@ export class FilterPanelSection implements ISection {
 						Filters (${filterState.activeCount} / ${filterState.totalCount})
 					</span>
 					<button class="filter-toggle-btn" id="filterToggleBtn" title="Expand/Collapse">
-						<span class="codicon codicon-chevron-down"></span>
+						<span class="codicon codicon-chevron-up"></span>
 					</button>
 				</div>
 
-				<div class="filter-panel-body" id="filterPanelBody">
+				<div class="filter-panel-body collapsed" id="filterPanelBody">
 					<div class="quick-filters-section">
 						<div class="section-label">Quick Filters</div>
 						<div class="quick-filters">

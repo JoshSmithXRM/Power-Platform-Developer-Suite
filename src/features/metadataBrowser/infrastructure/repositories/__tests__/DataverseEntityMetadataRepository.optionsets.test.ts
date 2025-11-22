@@ -2,6 +2,12 @@ import type { IDataverseApiService } from '../../../../../shared/infrastructure/
 import type { ILogger } from '../../../../../infrastructure/logging/ILogger';
 import { NullLogger } from '../../../../../infrastructure/logging/NullLogger';
 import { DataverseEntityMetadataRepository } from '../DataverseEntityMetadataRepository';
+import { OptionSetMetadataMapper } from '../../mappers/OptionSetMetadataMapper';
+import { EntityKeyMapper } from '../../mappers/EntityKeyMapper';
+import { SecurityPrivilegeMapper } from '../../mappers/SecurityPrivilegeMapper';
+import { RelationshipMetadataMapper } from '../../mappers/RelationshipMetadataMapper';
+import { AttributeMetadataMapper } from '../../mappers/AttributeMetadataMapper';
+import { EntityMetadataMapper } from '../../mappers/EntityMetadataMapper';
 import { LogicalName } from '../../../domain/valueObjects/LogicalName';
 
 /**
@@ -23,7 +29,16 @@ describe('DataverseEntityMetadataRepository - Option Set Enrichment', () => {
             get: jest.fn()
         } as unknown as jest.Mocked<IDataverseApiService>;
         logger = new NullLogger();
-        repository = new DataverseEntityMetadataRepository(mockApiService, logger);
+
+        // Create mapper chain (dependencies flow inward)
+        const optionSetMapper = new OptionSetMetadataMapper();
+        const entityKeyMapper = new EntityKeyMapper();
+        const securityPrivilegeMapper = new SecurityPrivilegeMapper();
+        const relationshipMapper = new RelationshipMetadataMapper();
+        const attributeMapper = new AttributeMetadataMapper(optionSetMapper);
+        const entityMapper = new EntityMetadataMapper(attributeMapper, relationshipMapper, entityKeyMapper, securityPrivilegeMapper);
+
+        repository = new DataverseEntityMetadataRepository(mockApiService, entityMapper, optionSetMapper, logger);
     });
 
     describe('getEntityWithAttributes - Local Option Sets', () => {

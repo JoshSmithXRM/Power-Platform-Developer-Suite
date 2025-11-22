@@ -326,6 +326,63 @@ export function formatDateForOData(utc: string): string { }
 
 ## Deferred Refactoring
 
+### Large Panel Files (600-800 lines)
+
+**Status**: Accepted - Coordinator Pattern
+**Priority**: Low
+**Effort**: N/A (no action needed)
+
+**Issue:** Four panel files exceed 600 lines, with the largest at 797 lines.
+
+**Affected Files:**
+- `src/features/metadataBrowser/presentation/panels/MetadataBrowserPanel.ts` - **797 lines**
+- `src/features/pluginTraceViewer/presentation/panels/PluginTraceViewerPanelComposed.ts` - **738 lines**
+- `src/features/environmentSetup/presentation/panels/EnvironmentSetupPanelComposed.ts` - **615 lines**
+- `src/features/connectionReferences/presentation/panels/ConnectionReferencesPanelComposed.ts` - **550 lines**
+
+**Why This Is Acceptable:**
+
+These panels follow the **Coordinator Pattern** with proper separation of concerns:
+
+1. **MetadataBrowserPanel (797 lines)**
+   - Coordinates 7 behaviors for complex metadata navigation
+   - Manages dual-pane tree + detail view with search
+   - Delegates to specialized behaviors (TreeBehavior, SearchBehavior, DetailPanelBehavior, etc.)
+   - Panel itself is thin coordinator - behaviors contain actual logic
+
+2. **PluginTraceViewerPanelComposed (738 lines)**
+   - Coordinates 5 behaviors + 3 sections for trace management
+   - Manages filter panel, trace table, detail view, timeline view
+   - Each section/behavior is separately testable
+   - Complex UI justified by feature richness
+
+3. **EnvironmentSetupPanelComposed (615 lines)**
+   - Multi-instance panel (not singleton) for concurrent environment editing
+   - Manages form state, validation, connection testing, discovery
+   - Delegates to 8 use cases for business logic
+   - Form complexity requires coordination code
+
+4. **ConnectionReferencesPanelComposed (550 lines)**
+   - Coordinates export, filtering, solution selection
+   - Manages relationship graph between flows and connections
+   - Delegates to specialized mappers and services
+
+**Coordinator Pattern Verification:**
+- ✅ Each panel delegates to behaviors/sections
+- ✅ Business logic in use cases, not panels
+- ✅ Panels contain mostly: message routing, UI coordination, state synchronization
+- ✅ Each behavior/section is separately testable
+- ✅ No God Object anti-pattern (panels coordinate, don't implement)
+
+**When to Refactor:**
+- If panel exceeds 1,000 lines (extract more behaviors)
+- If panel contains business logic (move to use cases/domain services)
+- If panel responsibilities grow beyond coordination (extract new behaviors)
+
+**Verdict:** Current sizes are justified by UI complexity and coordinator responsibilities. Splitting further would create artificial boundaries without improving maintainability.
+
+---
+
 ### Business Logic in Command Handlers
 
 **Status**: Ready to Address

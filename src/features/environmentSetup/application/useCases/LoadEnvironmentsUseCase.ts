@@ -26,7 +26,7 @@ export class LoadEnvironmentsUseCase {
 			const environments = await this.repository.getAll();
 
 			// Transform to sorted ViewModels (sorting is presentation concern handled by mapper)
-			const viewModels = this.mapper.toSortedViewModels(environments);
+			const viewModels = this.mapper.toViewModels(environments, true);
 
 			this.logger.info('Loaded environments', { count: viewModels.length });
 

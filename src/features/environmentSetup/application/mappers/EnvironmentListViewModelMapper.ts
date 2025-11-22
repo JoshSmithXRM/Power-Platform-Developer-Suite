@@ -7,15 +7,15 @@ import { RelativeTimeFormatter } from '../../../../shared/infrastructure/ui/util
  */
 export class EnvironmentListViewModelMapper {
 	/**
-	 * Transforms domain entities to sorted view models.
-	 * Sorting is a presentation concern handled by the mapper.
+	 * Transforms domain entities to view models.
 	 *
 	 * @param environments - Domain entities to transform
-	 * @returns View models sorted by last used (most recent first), then by name
+	 * @param shouldSort - If true, sorts by last used (most recent first), then by name
+	 * @returns Array of view models
 	 */
-	public toSortedViewModels(environments: Environment[]): EnvironmentListViewModel[] {
+	public toViewModels(environments: Environment[], shouldSort = false): EnvironmentListViewModel[] {
 		const viewModels = environments.map(env => this.toViewModel(env));
-		return this.sortByLastUsedThenName(viewModels);
+		return shouldSort ? this.sortByLastUsedThenName(viewModels) : viewModels;
 	}
 
 	public toViewModel(environment: Environment): EnvironmentListViewModel {

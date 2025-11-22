@@ -31,7 +31,7 @@ export function resolveCssModules(
 ): ReadonlyArray<string> {
 	const uris: string[] = [];
 
-	// 1. Base CSS (reset, typography, layout)
+	// 1. Base CSS (reset, typography, layout, codicons)
 	if (cssModules.base) {
 		uris.push(
 			webview.asWebviewUri(
@@ -42,6 +42,9 @@ export function resolveCssModules(
 			).toString(),
 			webview.asWebviewUri(
 				vscode.Uri.joinPath(extensionUri, 'resources', 'webview', 'css', 'base', 'layout.css')
+			).toString(),
+			webview.asWebviewUri(
+				vscode.Uri.joinPath(extensionUri, 'resources', 'webview', 'css', 'base', 'codicons.css')
 			).toString()
 		);
 	}

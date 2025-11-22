@@ -46,31 +46,91 @@ export interface CreatePanelConfig<TPanel extends EnvironmentScopedPanel<TPanel>
 }
 
 /**
- * Abstract base class for environment-scoped panels.
+ * Abstract base class for environment-scoped panels that display data for a single environment.
  * Provides singleton pattern management with one panel instance per environment.
  *
- * **Pattern:**
- * - Each concrete panel class maintains a Map<environmentId, PanelInstance>
- * - Calling createOrShow with an environment ID either reveals existing panel or creates new one
- * - When environment changes, panel is re-registered in the Map
- * - On disposal, panel is removed from the Map
+ * **Purpose:**
+ * This base class is designed for data viewing panels where each panel instance is tightly
+ * coupled to a specific environment. When the user switches environments within a panel,
+ * the panel re-registers itself under the new environment ID, maintaining the single-instance
+ * invariant.
  *
- * **Usage:**
+ * **Singleton Pattern (One Instance Per Environment):**
+ * - Each concrete panel class maintains `private static panels = new Map<environmentId, PanelInstance>()`
+ * - Calling `createOrShow(envId)` either reveals existing panel for that environment or creates new one
+ * - When user changes environment in panel, call `reregisterPanel()` to update the map
+ * - On disposal, panel is automatically removed from the map
+ * - This prevents duplicate panels for the same environment
+ *
+ * **Disposal Lifecycle:**
+ * 1. User closes panel OR VS Code disposes panel
+ * 2. `panel.onDidDispose()` fires automatically
+ * 3. Panel is removed from `panels` map
+ * 4. Optional `onDispose` callback executes (for cleanup like unregistering edit sessions)
+ * 5. Panel instance becomes eligible for garbage collection
+ *
+ * Subclasses do NOT need to implement custom disposal logic unless they have:
+ * - Active timers/intervals to clear
+ * - Edit session registrations to release
+ * - External resource cleanup (rare)
+ *
+ * **When to Use This Base Class:**
+ * ✅ Use for data viewing panels that display environment-specific data
+ * ✅ Use when you want single-instance-per-environment behavior
+ * ✅ Use when environment switching should re-register the panel
+ *
+ * **When NOT to Use This Base Class:**
+ * ❌ Panels that view ALL environments at once (e.g., PersistenceInspector inspects all storage)
+ * ❌ Panels that allow multiple concurrent instances per environment (e.g., EnvironmentSetup allows editing multiple environments)
+ * ❌ Panels that are completely environment-independent
+ *
+ * **Usage Example:**
  * ```typescript
  * export class MyPanel extends EnvironmentScopedPanel<MyPanel> {
  *   private static panels = new Map<string, MyPanel>();
+ *   public static readonly viewType = 'myExtension.myPanel';
  *
- *   public static async createOrShow(...deps, initialEnvironmentId?: string): Promise<MyPanel> {
+ *   public static async createOrShow(
+ *     extensionUri: vscode.Uri,
+ *     ...useCases,
+ *     initialEnvironmentId?: string
+ *   ): Promise<MyPanel> {
  *     return EnvironmentScopedPanel.createOrShowPanel({
  *       viewType: MyPanel.viewType,
  *       titlePrefix: 'My Panel',
  *       extensionUri,
- *       getEnvironments,
- *       getEnvironmentById,
+ *       getEnvironments: () => loadEnvironmentsUseCase.execute(),
+ *       getEnvironmentById: (id) => loadEnvironmentByIdUseCase.execute(id),
  *       initialEnvironmentId,
- *       panelFactory: (panel, envId) => new MyPanel(panel, extensionUri, ...deps, envId),
- *       webviewOptions: { enableScripts: true, retainContextWhenHidden: true }
+ *       panelFactory: (panel, envId) => new MyPanel(panel, extensionUri, ...useCases, envId),
+ *       webviewOptions: { enableScripts: true, retainContextWhenHidden: true },
+ *       onDispose: (panel) => panel.cleanup() // Optional cleanup callback
  *     }, MyPanel.panels);
+ *   }
+ *
+ *   private constructor(
+ *     private readonly panel: vscode.WebviewPanel,
+ *     private readonly extensionUri: vscode.Uri,
+ *     ...useCases,
+ *     private currentEnvironmentId: string
+ *   ) {
+ *     super();
+ *     panel.onDidDispose(() => this.dispose()); // Optional if additional cleanup needed
+ *   }
+ *
+ *   protected reveal(column: vscode.ViewColumn): void {
+ *     this.panel.reveal(column);
+ *   }
+ *
+ *   private handleEnvironmentChange(newEnvId: string): void {
+ *     const oldEnvId = this.currentEnvironmentId;
+ *     this.currentEnvironmentId = newEnvId;
+ *     this.reregisterPanel(MyPanel.panels, oldEnvId, newEnvId);
+ *     // Refresh panel with new environment data...
+ *   }
+ *
+ *   private dispose(): void {
+ *     // Optional: only if you have timers, intervals, or other resources to clean up
  *   }
  * }
  * ```

@@ -156,7 +156,7 @@ describe('ResizableDetailPanelSection', () => {
 
 			const html = section.render({});
 
-			expect(html).toContain('style="display: none;"');
+			expect(html).toContain('style="display: none !important;"');
 		});
 
 		it('should render resize handle with correct ID', () => {

@@ -1,0 +1,39 @@
+/**
+ * Codicons font for VS Code webviews.
+ * Uses the built-in codicon font from VS Code.
+ *
+ * Codicon classes follow the pattern: codicon codicon-{name}
+ * Example: <span class="codicon codicon-check"></span>
+ */
+
+@font-face {
+	font-family: "codicon";
+	font-display: block;
+	src: url(https://unpkg.com/@vscode/codicons@latest/dist/codicon.ttf) format("truetype");
+}
+
+.codicon[class*='codicon-'] {
+	font-family: "codicon";
+	font-size: 16px;
+	font-style: normal;
+	font-weight: normal;
+	font-variant: normal;
+	text-decoration: none;
+	text-rendering: auto;
+	text-align: center;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+}
+
+/* Individual icon definitions */
+.codicon-chevron-up:before { content: "\eb5e"; }
+.codicon-chevron-down:before { content: "\eb40"; }
+.codicon-filter:before { content: "\eb83"; }
+.codicon-add:before { content: "\ea60"; }
+.codicon-check:before { content: "\eab2"; }
+.codicon-close:before { content: "\ea76"; }
+.codicon-copy:before { content: "\ea8a"; }
+.codicon-code:before { content: "\ea8b"; }

@@ -7,13 +7,26 @@ export interface PanelStateKey {
 }
 
 /**
- * Panel state data that is persisted
+ * Panel state data that is persisted.
+ *
+ * Design Note: This interface supports partial updates where behaviors can
+ * save specific properties without providing all fields. The repository
+ * merges partial updates with existing state automatically.
+ *
+ * Core fields (selectedSolutionId, lastUpdated) are optional to support
+ * partial state updates. They are typically set during initial panel load
+ * and preserved through subsequent partial updates.
+ *
+ * The index signature allows panels to store additional custom properties
+ * beyond the defined fields, enabling extensibility without interface changes.
  */
 export interface PanelState {
-	selectedSolutionId: string;
-	lastUpdated: string;
-	filterCriteria?: unknown; // Optional filter criteria for panels that support filtering
+	selectedSolutionId?: string; // Solution filter selection (optional for partial updates)
+	lastUpdated?: string; // Last update timestamp (optional for partial updates)
+	filterCriteria?: unknown; // Must be JSON-serializable (enforced by VS Code workspace storage)
 	detailPanelWidth?: number; // Optional detail panel width in pixels
+	autoRefreshInterval?: number; // Optional auto-refresh interval in milliseconds
+	[key: string]: unknown; // Must be JSON-serializable (enforced by VS Code workspace storage)
 }
 
 /**

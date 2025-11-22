@@ -322,38 +322,6 @@ describe('TestExistingEnvironmentConnectionUseCase', () => {
 				undefined
 			);
 		});
-
-		// Skipped: Domain model prevents creating environments without required credentials
-	it.skip('should not attempt to load client secret when clientId is undefined', async () => {
-			// Arrange
-			const environment = createEnvironment(AuthenticationMethodType.ServicePrincipal);
-			const request = createRequest();
-			mockRepository.getById.mockResolvedValue(environment);
-
-			// Act
-			const result = await useCase.execute(request);
-
-			// Assert
-			expect(result.success).toBe(false);
-			expect(result.errorMessage).toContain('Client ID is required');
-			expect(mockRepository.getClientSecret).not.toHaveBeenCalled();
-		});
-
-		// Skipped: Domain model prevents creating environments without required credentials
-	it.skip('should not attempt to load password when username is undefined', async () => {
-			// Arrange
-			const environment = createEnvironment(AuthenticationMethodType.UsernamePassword);
-			const request = createRequest();
-			mockRepository.getById.mockResolvedValue(environment);
-
-			// Act
-			const result = await useCase.execute(request);
-
-			// Assert
-			expect(result.success).toBe(false);
-			expect(result.errorMessage).toContain('Username is required');
-			expect(mockRepository.getPassword).not.toHaveBeenCalled();
-		});
 	});
 
 	describe('error handling', () => {
@@ -408,23 +376,6 @@ describe('TestExistingEnvironmentConnectionUseCase', () => {
 			expect(result.userId).toBeUndefined();
 			expect(result.businessUnitId).toBeUndefined();
 			expect(result.organizationId).toBeUndefined();
-		});
-
-		// Skipped: Domain model prevents creating environments with invalid configuration
-	it.skip('should return error when environment configuration is invalid', async () => {
-			// Arrange
-			const environment = createEnvironment(AuthenticationMethodType.ServicePrincipal);
-			const request = createRequest();
-			mockRepository.getById.mockResolvedValue(environment);
-
-			// Act
-			const result = await useCase.execute(request);
-
-			// Assert
-			expect(result.success).toBe(false);
-			expect(result.errorMessage).toContain('Cannot test connection');
-			expect(result.errorMessage).toContain('Client ID is required');
-			expect(mockWhoAmIService.testConnection).not.toHaveBeenCalled();
 		});
 
 		it('should handle non-Error exceptions', async () => {

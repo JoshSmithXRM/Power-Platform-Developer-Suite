@@ -225,7 +225,10 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 				enableFindWidget: true
 			},
 			onDispose: (panelInstance) => {
-				// Clean up auto-refresh timer on disposal
+				// Required: Clean up auto-refresh timer to prevent memory leaks.
+				// The auto-refresh behavior maintains an active setInterval that must
+				// be cleared when the panel is disposed, otherwise it will continue
+				// running and attempting to refresh a disposed panel.
 				panelInstance.autoRefreshBehavior.dispose();
 			}
 		}, PluginTraceViewerPanelComposed.panels);
@@ -676,7 +679,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 
 				// Load auto-refresh interval
 				if (state && typeof state === 'object' && 'autoRefreshInterval' in state) {
-					const interval = state.autoRefreshInterval as number;
+					const interval = state.autoRefreshInterval;
 					if (typeof interval === 'number' && interval >= 0) {
 						this.autoRefreshBehavior.setInterval(interval);
 						this.logger.info('Auto-refresh interval loaded from storage', { interval });
