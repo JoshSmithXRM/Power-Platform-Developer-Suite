@@ -121,7 +121,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 
 			this.logger.info('Access token acquired successfully', {
 				authMethod,
-				tokenPreview: token.substring(0, 10) + '...'
+				tokenLength: token.length
 			});
 
 			return token;

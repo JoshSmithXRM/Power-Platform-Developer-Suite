@@ -22,8 +22,11 @@
             const content = document.getElementById('content');
 
             if (message.command === 'initialize') {
-                content.innerHTML = '<h2>Entities: ' + message.data.entities.length + '</h2>' +
-                                  '<h2>Choices: ' + message.data.choices.length + '</h2>';
+                const entitiesHeading = document.createElement('h2');
+                entitiesHeading.textContent = 'Entities: ' + message.data.entities.length;
+                const choicesHeading = document.createElement('h2');
+                choicesHeading.textContent = 'Choices: ' + message.data.choices.length;
+                content.replaceChildren(entitiesHeading, choicesHeading);
             }
         });
     </script>
