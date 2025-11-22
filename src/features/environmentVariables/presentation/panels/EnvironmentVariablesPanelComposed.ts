@@ -20,6 +20,7 @@ import type { EnvironmentVariableViewModelMapper } from '../../application/mappe
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/solutionFilterView';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
+import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 
 /**
  * Commands supported by Environment Variables panel.
@@ -29,8 +30,9 @@ type EnvironmentVariablesCommands = 'refresh' | 'openMaker' | 'syncDeploymentSet
 /**
  * Environment Variables panel using new PanelCoordinator architecture.
  * Displays list of environment variables for a specific environment with optional solution filtering.
+ * Extends EnvironmentScopedPanel for singleton pattern management.
  */
-export class EnvironmentVariablesPanelComposed {
+export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<EnvironmentVariablesPanelComposed> {
 	public static readonly viewType = 'powerPlatformDevSuite.environmentVariables';
 	private static panels = new Map<string, EnvironmentVariablesPanelComposed>();
 
@@ -44,11 +46,7 @@ export class EnvironmentVariablesPanelComposed {
 		private readonly panel: vscode.WebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
-		private readonly getEnvironmentById: (envId: string) => Promise<{
-			id: string;
-			name: string;
-			powerPlatformEnvironmentId: string | undefined;
-		} | null>,
+		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		private readonly listEnvVarsUseCase: ListEnvironmentVariablesUseCase,
 		private readonly exportToDeploymentSettingsUseCase: ExportEnvironmentVariablesToDeploymentSettingsUseCase,
 		private readonly solutionRepository: ISolutionRepository,
@@ -58,6 +56,7 @@ export class EnvironmentVariablesPanelComposed {
 		environmentId: string,
 		private readonly panelStateRepository: IPanelStateRepository | undefined
 	) {
+		super();
 		this.currentEnvironmentId = environmentId;
 		logger.debug('EnvironmentVariablesPanel: Initialized with new architecture');
 
@@ -76,14 +75,14 @@ export class EnvironmentVariablesPanelComposed {
 		void this.initializeAndLoadData();
 	}
 
+	protected reveal(column: vscode.ViewColumn): void {
+		this.panel.reveal(column);
+	}
+
 	public static async createOrShow(
 		extensionUri: vscode.Uri,
 		getEnvironments: () => Promise<EnvironmentOption[]>,
-		getEnvironmentById: (envId: string) => Promise<{
-			id: string;
-			name: string;
-			powerPlatformEnvironmentId: string | undefined;
-		} | null>,
+		getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		listEnvVarsUseCase: ListEnvironmentVariablesUseCase,
 		exportToDeploymentSettingsUseCase: ExportEnvironmentVariablesToDeploymentSettingsUseCase,
 		solutionRepository: ISolutionRepository,
@@ -93,64 +92,34 @@ export class EnvironmentVariablesPanelComposed {
 		initialEnvironmentId?: string,
 		panelStateRepository?: IPanelStateRepository
 	): Promise<EnvironmentVariablesPanelComposed> {
-		const column = vscode.ViewColumn.One;
-
-		// Determine which environment to use
-		let targetEnvironmentId = initialEnvironmentId;
-		if (!targetEnvironmentId) {
-			const environments = await getEnvironments();
-			targetEnvironmentId = environments[0]?.id;
-		}
-
-		if (!targetEnvironmentId) {
-			throw new Error('No environments available');
-		}
-
-		// Check if panel already exists for this environment
-		const existingPanel = EnvironmentVariablesPanelComposed.panels.get(targetEnvironmentId);
-		if (existingPanel) {
-			existingPanel.panel.reveal(column);
-			return existingPanel;
-		}
-
-		const environment = await getEnvironmentById(targetEnvironmentId);
-		const environmentName = environment?.name || 'Unknown';
-
-		const panel = vscode.window.createWebviewPanel(
-			EnvironmentVariablesPanelComposed.viewType,
-			`Environment Variables - ${environmentName}`,
-			column,
-			{
+		return EnvironmentScopedPanel.createOrShowPanel({
+			viewType: EnvironmentVariablesPanelComposed.viewType,
+			titlePrefix: 'Environment Variables',
+			extensionUri,
+			getEnvironments,
+			getEnvironmentById,
+			initialEnvironmentId,
+			panelFactory: (panel, envId) => new EnvironmentVariablesPanelComposed(
+				panel,
+				extensionUri,
+				getEnvironments,
+				getEnvironmentById,
+				listEnvVarsUseCase,
+				exportToDeploymentSettingsUseCase,
+				solutionRepository,
+				urlBuilder,
+				viewModelMapper,
+				logger,
+				envId,
+				panelStateRepository
+			),
+			webviewOptions: {
 				enableScripts: true,
 				localResourceRoots: [extensionUri],
 				retainContextWhenHidden: true,
 				enableFindWidget: true
 			}
-		);
-
-		const newPanel = new EnvironmentVariablesPanelComposed(
-			panel,
-			extensionUri,
-			getEnvironments,
-			getEnvironmentById,
-			listEnvVarsUseCase,
-			exportToDeploymentSettingsUseCase,
-			solutionRepository,
-			urlBuilder,
-			viewModelMapper,
-			logger,
-			targetEnvironmentId,
-			panelStateRepository
-		);
-
-		EnvironmentVariablesPanelComposed.panels.set(targetEnvironmentId, newPanel);
-
-		const envId = targetEnvironmentId; // Capture for closure
-		panel.onDidDispose(() => {
-			EnvironmentVariablesPanelComposed.panels.delete(envId);
-		});
-
-		return newPanel;
+		}, EnvironmentVariablesPanelComposed.panels);
 	}
 
 	private async initializeAndLoadData(): Promise<void> {
@@ -431,8 +400,12 @@ export class EnvironmentVariablesPanelComposed {
 		this.clearTable();
 
 		try {
+			const oldEnvironmentId = this.currentEnvironmentId;
 			this.currentEnvironmentId = environmentId;
 			this.currentSolutionId = undefined; // Reset solution filter
+
+			// Re-register panel in map for new environment
+			this.reregisterPanel(EnvironmentVariablesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
 			const environment = await this.getEnvironmentById(environmentId);
 			if (environment) {

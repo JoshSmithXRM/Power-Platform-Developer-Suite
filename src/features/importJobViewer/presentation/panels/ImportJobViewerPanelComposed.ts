@@ -17,6 +17,7 @@ import type { ListImportJobsUseCase } from '../../application/useCases/ListImpor
 import type { OpenImportLogUseCase } from '../../application/useCases/OpenImportLogUseCase';
 import type { ImportJobViewModelMapper } from '../../application/mappers/ImportJobViewModelMapper';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
+import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 
 /**
  * Commands supported by Import Job Viewer panel.
@@ -26,8 +27,9 @@ type ImportJobViewerCommands = 'refresh' | 'openMaker' | 'viewImportJob' | 'envi
 /**
  * Import Job Viewer panel using new PanelCoordinator architecture.
  * Displays list of import jobs for a specific environment.
+ * Extends EnvironmentScopedPanel for singleton pattern management.
  */
-export class ImportJobViewerPanelComposed {
+export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJobViewerPanelComposed> {
 	public static readonly viewType = 'powerPlatformDevSuite.importJobViewer';
 	private static panels = new Map<string, ImportJobViewerPanelComposed>();
 
@@ -39,11 +41,7 @@ export class ImportJobViewerPanelComposed {
 		private readonly panel: vscode.WebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
-		private readonly getEnvironmentById: (envId: string) => Promise<{
-			id: string;
-			name: string;
-			powerPlatformEnvironmentId: string | undefined;
-		} | null>,
+		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		private readonly listImportJobsUseCase: ListImportJobsUseCase,
 		private readonly openImportLogUseCase: OpenImportLogUseCase,
 		private readonly urlBuilder: IMakerUrlBuilder,
@@ -51,6 +49,7 @@ export class ImportJobViewerPanelComposed {
 		private readonly logger: ILogger,
 		environmentId: string
 	) {
+		super();
 		this.currentEnvironmentId = environmentId;
 		logger.debug('ImportJobViewerPanel: Initialized with new architecture');
 
@@ -69,14 +68,14 @@ export class ImportJobViewerPanelComposed {
 		void this.initializeAndLoadData();
 	}
 
+	protected reveal(column: vscode.ViewColumn): void {
+		this.panel.reveal(column);
+	}
+
 	public static async createOrShow(
 		extensionUri: vscode.Uri,
 		getEnvironments: () => Promise<EnvironmentOption[]>,
-		getEnvironmentById: (envId: string) => Promise<{
-			id: string;
-			name: string;
-			powerPlatformEnvironmentId: string | undefined;
-		} | null>,
+		getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		listImportJobsUseCase: ListImportJobsUseCase,
 		openImportLogUseCase: OpenImportLogUseCase,
 		urlBuilder: IMakerUrlBuilder,
@@ -84,62 +83,32 @@ export class ImportJobViewerPanelComposed {
 		logger: ILogger,
 		initialEnvironmentId?: string
 	): Promise<ImportJobViewerPanelComposed> {
-		const column = vscode.ViewColumn.One;
-
-		// Determine which environment to use
-		let targetEnvironmentId = initialEnvironmentId;
-		if (!targetEnvironmentId) {
-			const environments = await getEnvironments();
-			targetEnvironmentId = environments[0]?.id;
-		}
-
-		if (!targetEnvironmentId) {
-			throw new Error('No environments available');
-		}
-
-		// Check if panel already exists for this environment
-		const existingPanel = ImportJobViewerPanelComposed.panels.get(targetEnvironmentId);
-		if (existingPanel) {
-			existingPanel.panel.reveal(column);
-			return existingPanel;
-		}
-
-		const environment = await getEnvironmentById(targetEnvironmentId);
-		const environmentName = environment?.name || 'Unknown';
-
-		const panel = vscode.window.createWebviewPanel(
-			ImportJobViewerPanelComposed.viewType,
-			`Import Jobs - ${environmentName}`,
-			column,
-			{
+		return EnvironmentScopedPanel.createOrShowPanel({
+			viewType: ImportJobViewerPanelComposed.viewType,
+			titlePrefix: 'Import Jobs',
+			extensionUri,
+			getEnvironments,
+			getEnvironmentById,
+			initialEnvironmentId,
+			panelFactory: (panel, envId) => new ImportJobViewerPanelComposed(
+				panel,
+				extensionUri,
+				getEnvironments,
+				getEnvironmentById,
+				listImportJobsUseCase,
+				openImportLogUseCase,
+				urlBuilder,
+				viewModelMapper,
+				logger,
+				envId
+			),
+			webviewOptions: {
 				enableScripts: true,
 				localResourceRoots: [extensionUri],
 				retainContextWhenHidden: true,
 				enableFindWidget: true
 			}
-		);
-
-		const newPanel = new ImportJobViewerPanelComposed(
-			panel,
-			extensionUri,
-			getEnvironments,
-			getEnvironmentById,
-			listImportJobsUseCase,
-			openImportLogUseCase,
-			urlBuilder,
-			viewModelMapper,
-			logger,
-			targetEnvironmentId
-		);
-
-		ImportJobViewerPanelComposed.panels.set(targetEnvironmentId, newPanel);
-
-		const envId = targetEnvironmentId; // Capture for closure
-		panel.onDidDispose(() => {
-			ImportJobViewerPanelComposed.panels.delete(envId);
-		});
-
-		return newPanel;
+		}, ImportJobViewerPanelComposed.panels);
 	}
 
 	private async initializeAndLoadData(): Promise<void> {
@@ -348,7 +317,11 @@ export class ImportJobViewerPanelComposed {
 		this.clearTable();
 
 		try {
+			const oldEnvironmentId = this.currentEnvironmentId;
 			this.currentEnvironmentId = environmentId;
+
+			// Re-register panel in map for new environment
+			this.reregisterPanel(ImportJobViewerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
 			const environment = await this.getEnvironmentById(environmentId);
 			if (environment) {

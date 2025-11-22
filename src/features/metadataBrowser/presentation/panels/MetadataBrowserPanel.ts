@@ -22,6 +22,7 @@ import type { IEntityMetadataRepository } from '../../domain/repositories/IEntit
 import { MetadataBrowserLayoutSection } from '../sections/MetadataBrowserLayoutSection';
 import { AttributeMetadataSerializer } from '../serializers/AttributeMetadataSerializer';
 import type { AttributeMetadata } from '../../domain/entities/AttributeMetadata';
+import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 
 /**
  * Commands supported by Metadata Browser panel.
@@ -42,6 +43,7 @@ type MetadataBrowserCommands =
 
 /**
  * Metadata Browser panel using PanelCoordinator architecture.
+ * Extends EnvironmentScopedPanel for singleton pattern management.
  *
  * Features:
  * - Three-panel layout: Tree (left), Tables (center), Detail (right)
@@ -56,7 +58,7 @@ type MetadataBrowserCommands =
  * - Data-driven updates via postMessage (no full HTML re-renders)
  * - Workspace state persistence for user preferences
  */
-export class MetadataBrowserPanel {
+export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowserPanel> {
 	public static readonly viewType = 'powerPlatformDevSuite.metadataBrowser';
 	private static panels = new Map<string, MetadataBrowserPanel>();
 
@@ -88,6 +90,7 @@ export class MetadataBrowserPanel {
 		private readonly logger: ILogger,
 		environmentId: string
 	) {
+		super();
 		this.currentEnvironmentId = environmentId;
 		this.stateRepository = new VSCodePanelStateRepository(
 			context.workspaceState,
@@ -116,6 +119,14 @@ export class MetadataBrowserPanel {
 	}
 
 	/**
+	 * Reveals the panel in the specified column.
+	 * Required by EnvironmentScopedPanel base class.
+	 */
+	protected reveal(column: vscode.ViewColumn): void {
+		this.panel.reveal(column);
+	}
+
+	/**
 	 * Factory method implementing singleton pattern per environment.
 	 * Each environment gets its own panel instance to maintain independent state.
 	 */
@@ -134,64 +145,47 @@ export class MetadataBrowserPanel {
 		logger: ILogger,
 		initialEnvironmentId?: string
 	): Promise<MetadataBrowserPanel> {
-		const column = vscode.ViewColumn.One;
+		// Adapter: Convert Environment domain entity to EnvironmentInfo for base class
+		const getEnvironmentInfoById = async (envId: string): Promise<EnvironmentInfo | null> => {
+			const environment = await getEnvironmentById(envId);
+			if (!environment) {
+				return null;
+			}
+			const ppEnvId = environment.getPowerPlatformEnvironmentId();
+			return {
+				id: envId,
+				name: environment.getName().getValue(),
+				powerPlatformEnvironmentId: ppEnvId ?? envId
+			};
+		};
 
-		// Determine target environment
-		let targetEnvironmentId = initialEnvironmentId;
-		if (!targetEnvironmentId) {
-			const environments = await getEnvironments();
-			targetEnvironmentId = environments[0]?.id;
-		}
-
-		if (!targetEnvironmentId) {
-			throw new Error('No environments available');
-		}
-
-		// Check if panel already exists for this environment
-		const existingPanel = MetadataBrowserPanel.panels.get(targetEnvironmentId);
-		if (existingPanel) {
-			existingPanel.panel.reveal(column);
-			return existingPanel;
-		}
-
-		const environment = await getEnvironmentById(targetEnvironmentId);
-		const environmentName = environment?.getName().getValue() || 'Unknown';
-
-		const panel = vscode.window.createWebviewPanel(
-			MetadataBrowserPanel.viewType,
-			`Metadata - ${environmentName}`,
-			column,
-			{
+		return EnvironmentScopedPanel.createOrShowPanel({
+			viewType: MetadataBrowserPanel.viewType,
+			titlePrefix: 'Metadata',
+			extensionUri,
+			getEnvironments,
+			getEnvironmentById: getEnvironmentInfoById,
+			initialEnvironmentId,
+			panelFactory: (panel, envId) => new MetadataBrowserPanel(
+				panel,
+				extensionUri,
+				context,
+				getEnvironments,
+				getEnvironmentById,
+				useCases.loadMetadataTreeUseCase,
+				useCases.loadEntityMetadataUseCase,
+				useCases.loadChoiceMetadataUseCase,
+				useCases.openInMakerUseCase,
+				entityMetadataRepository,
+				logger,
+				envId
+			),
+			webviewOptions: {
 				enableScripts: true,
-				localResourceRoots: [extensionUri],
 				retainContextWhenHidden: true,
 				enableFindWidget: true
 			}
-		);
-
-		const newPanel = new MetadataBrowserPanel(
-			panel,
-			extensionUri,
-			context,
-			getEnvironments,
-			getEnvironmentById,
-			useCases.loadMetadataTreeUseCase,
-			useCases.loadEntityMetadataUseCase,
-			useCases.loadChoiceMetadataUseCase,
-			useCases.openInMakerUseCase,
-			entityMetadataRepository,
-			logger,
-			targetEnvironmentId
-		);
-
-		MetadataBrowserPanel.panels.set(targetEnvironmentId, newPanel);
-
-		const envId = targetEnvironmentId;
-		panel.onDidDispose(() => {
-			MetadataBrowserPanel.panels.delete(envId);
-		});
-
-		return newPanel;
+		}, MetadataBrowserPanel.panels);
 	}
 
 	/**
@@ -683,7 +677,12 @@ export class MetadataBrowserPanel {
 		this.setButtonLoading('refresh', true);
 
 		try {
+			const oldEnvironmentId = this.currentEnvironmentId;
 			this.currentEnvironmentId = environmentId;
+
+			// Reregister panel with new environment in singleton map
+			this.reregisterPanel(MetadataBrowserPanel.panels, oldEnvironmentId, this.currentEnvironmentId);
+
 			this.currentSelectionType = null;
 			this.currentSelectionId = null;
 			this.currentTab = 'attributes';

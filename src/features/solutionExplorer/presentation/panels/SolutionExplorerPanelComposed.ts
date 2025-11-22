@@ -15,6 +15,7 @@ import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
 import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
 import type { ListSolutionsUseCase } from '../../application/useCases/ListSolutionsUseCase';
 import type { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
+import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 
 /**
  * Commands supported by Solution Explorer panel.
@@ -24,8 +25,9 @@ type SolutionExplorerCommands = 'refresh' | 'openMaker' | 'openInMaker' | 'envir
 /**
  * Solution Explorer panel using new PanelCoordinator architecture.
  * Displays list of solutions for a specific environment.
+ * Extends EnvironmentScopedPanel for singleton pattern management.
  */
-export class SolutionExplorerPanelComposed {
+export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<SolutionExplorerPanelComposed> {
 	public static readonly viewType = 'powerPlatformDevSuite.solutionExplorer';
 	private static panels = new Map<string, SolutionExplorerPanelComposed>();
 
@@ -37,17 +39,14 @@ export class SolutionExplorerPanelComposed {
 		private readonly panel: vscode.WebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
-		private readonly getEnvironmentById: (envId: string) => Promise<{
-			id: string;
-			name: string;
-			powerPlatformEnvironmentId: string | undefined;
-		} | null>,
+		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		private readonly listSolutionsUseCase: ListSolutionsUseCase,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		private readonly viewModelMapper: SolutionViewModelMapper,
 		private readonly logger: ILogger,
 		environmentId: string
 	) {
+		super();
 		this.currentEnvironmentId = environmentId;
 		logger.debug('SolutionExplorerPanel: Initialized with new architecture');
 
@@ -66,75 +65,45 @@ export class SolutionExplorerPanelComposed {
 		void this.initializeAndLoadData();
 	}
 
+	protected reveal(column: vscode.ViewColumn): void {
+		this.panel.reveal(column);
+	}
+
 	public static async createOrShow(
 		extensionUri: vscode.Uri,
 		getEnvironments: () => Promise<EnvironmentOption[]>,
-		getEnvironmentById: (envId: string) => Promise<{
-			id: string;
-			name: string;
-			powerPlatformEnvironmentId: string | undefined;
-		} | null>,
+		getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		listSolutionsUseCase: ListSolutionsUseCase,
 		urlBuilder: IMakerUrlBuilder,
 		viewModelMapper: SolutionViewModelMapper,
 		logger: ILogger,
 		initialEnvironmentId?: string
 	): Promise<SolutionExplorerPanelComposed> {
-		const column = vscode.ViewColumn.One;
-
-		// Determine which environment to use
-		let targetEnvironmentId = initialEnvironmentId;
-		if (!targetEnvironmentId) {
-			const environments = await getEnvironments();
-			targetEnvironmentId = environments[0]?.id;
-		}
-
-		if (!targetEnvironmentId) {
-			throw new Error('No environments available');
-		}
-
-		// Check if panel already exists for this environment
-		const existingPanel = SolutionExplorerPanelComposed.panels.get(targetEnvironmentId);
-		if (existingPanel) {
-			existingPanel.panel.reveal(column);
-			return existingPanel;
-		}
-
-		const environment = await getEnvironmentById(targetEnvironmentId);
-		const environmentName = environment?.name || 'Unknown';
-
-		const panel = vscode.window.createWebviewPanel(
-			SolutionExplorerPanelComposed.viewType,
-			`Solutions - ${environmentName}`,
-			column,
-			{
+		return EnvironmentScopedPanel.createOrShowPanel({
+			viewType: SolutionExplorerPanelComposed.viewType,
+			titlePrefix: 'Solutions',
+			extensionUri,
+			getEnvironments,
+			getEnvironmentById,
+			initialEnvironmentId,
+			panelFactory: (panel, envId) => new SolutionExplorerPanelComposed(
+				panel,
+				extensionUri,
+				getEnvironments,
+				getEnvironmentById,
+				listSolutionsUseCase,
+				urlBuilder,
+				viewModelMapper,
+				logger,
+				envId
+			),
+			webviewOptions: {
 				enableScripts: true,
 				localResourceRoots: [extensionUri],
 				retainContextWhenHidden: true,
 				enableFindWidget: true
 			}
-		);
-
-		const newPanel = new SolutionExplorerPanelComposed(
-			panel,
-			extensionUri,
-			getEnvironments,
-			getEnvironmentById,
-			listSolutionsUseCase,
-			urlBuilder,
-			viewModelMapper,
-			logger,
-			targetEnvironmentId
-		);
-
-		SolutionExplorerPanelComposed.panels.set(targetEnvironmentId, newPanel);
-
-		const envId = targetEnvironmentId; // Capture for closure
-		panel.onDidDispose(() => {
-			SolutionExplorerPanelComposed.panels.delete(envId);
-		});
-
-		return newPanel;
+		}, SolutionExplorerPanelComposed.panels);
 	}
 
 	private async initializeAndLoadData(): Promise<void> {
@@ -347,7 +316,11 @@ export class SolutionExplorerPanelComposed {
 		this.clearTable();
 
 		try {
+			const oldEnvironmentId = this.currentEnvironmentId;
 			this.currentEnvironmentId = environmentId;
+
+			// Re-register panel in map for new environment
+			this.reregisterPanel(SolutionExplorerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
 			const environment = await this.getEnvironmentById(environmentId);
 			if (environment) {

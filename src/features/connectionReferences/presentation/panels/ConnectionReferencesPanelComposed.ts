@@ -25,6 +25,7 @@ import { enhanceViewModelsWithFlowLinks } from '../views/FlowLinkView';
 import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
 import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
 import type { HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
+import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 
 /**
  * Commands that the Connection References panel can receive from the webview.
@@ -34,8 +35,9 @@ type ConnectionReferencesCommands = 'refresh' | 'openMaker' | 'syncDeploymentSet
 /**
  * Presentation layer panel for Connection References.
  * Uses universal panel pattern with section composition.
+ * Extends EnvironmentScopedPanel for singleton pattern management.
  */
-export class ConnectionReferencesPanelComposed {
+export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<ConnectionReferencesPanelComposed> {
 	public static readonly viewType = 'powerPlatformDevSuite.connectionReferences';
 	private static panels = new Map<string, ConnectionReferencesPanelComposed>();
 
@@ -51,11 +53,7 @@ export class ConnectionReferencesPanelComposed {
 		private readonly panel: vscode.WebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
-		private readonly getEnvironmentById: (envId: string) => Promise<{
-			id: string;
-			name: string;
-			powerPlatformEnvironmentId: string | undefined;
-		} | null>,
+		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		private readonly listConnectionReferencesUseCase: ListConnectionReferencesUseCase,
 		private readonly exportToDeploymentSettingsUseCase: ExportConnectionReferencesToDeploymentSettingsUseCase,
 		private readonly solutionRepository: ISolutionRepository,
@@ -65,6 +63,7 @@ export class ConnectionReferencesPanelComposed {
 		environmentId: string,
 		private readonly panelStateRepository: IPanelStateRepository | undefined
 	) {
+		super();
 		this.currentEnvironmentId = environmentId;
 		this.viewModelMapper = new FlowConnectionRelationshipViewModelMapper();
 		logger.debug('ConnectionReferencesPanel: Initialized');
@@ -83,14 +82,17 @@ export class ConnectionReferencesPanelComposed {
 		void this.initializeAndLoadData();
 	}
 
+	/**
+	 * Reveals the panel in the specified column.
+	 */
+	protected reveal(column: vscode.ViewColumn): void {
+		this.panel.reveal(column);
+	}
+
 	public static async createOrShow(
 		extensionUri: vscode.Uri,
 		getEnvironments: () => Promise<EnvironmentOption[]>,
-		getEnvironmentById: (envId: string) => Promise<{
-			id: string;
-			name: string;
-			powerPlatformEnvironmentId: string | undefined;
-		} | null>,
+		getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		listConnectionReferencesUseCase: ListConnectionReferencesUseCase,
 		exportToDeploymentSettingsUseCase: ExportConnectionReferencesToDeploymentSettingsUseCase,
 		solutionRepository: ISolutionRepository,
@@ -100,56 +102,33 @@ export class ConnectionReferencesPanelComposed {
 		initialEnvironmentId?: string,
 		panelStateRepository?: IPanelStateRepository
 	): Promise<ConnectionReferencesPanelComposed> {
-		const column = vscodeImpl.ViewColumn.One;
-
-		let targetEnvironmentId = initialEnvironmentId;
-		if (!targetEnvironmentId) {
-			const environments = await getEnvironments();
-			targetEnvironmentId = environments[0]?.id;
-		}
-
-		if (!targetEnvironmentId) {
-			throw new Error('No environments available');
-		}
-
-		const existingPanel = ConnectionReferencesPanelComposed.panels.get(targetEnvironmentId);
-		if (existingPanel) {
-			existingPanel.panel.reveal(column);
-			return existingPanel;
-		}
-
-		const environment = await getEnvironmentById(targetEnvironmentId);
-		const environmentName = environment?.name || 'Unknown';
-
-		const panel = vscodeImpl.window.createWebviewPanel(
-			ConnectionReferencesPanelComposed.viewType,
-			`Connection References - ${environmentName}`,
-			column,
-			{
+		return EnvironmentScopedPanel.createOrShowPanel({
+			viewType: ConnectionReferencesPanelComposed.viewType,
+			titlePrefix: 'Connection References',
+			extensionUri,
+			getEnvironments,
+			getEnvironmentById,
+			initialEnvironmentId,
+			panelFactory: (panel, envId) => new ConnectionReferencesPanelComposed(
+				panel,
+				extensionUri,
+				getEnvironments,
+				getEnvironmentById,
+				listConnectionReferencesUseCase,
+				exportToDeploymentSettingsUseCase,
+				solutionRepository,
+				urlBuilder,
+				relationshipCollectionService,
+				logger,
+				envId,
+				panelStateRepository
+			),
+			webviewOptions: {
 				enableScripts: true,
 				localResourceRoots: [extensionUri],
 				retainContextWhenHidden: true
 			}
-		);
-
-		const newPanel = new ConnectionReferencesPanelComposed(
-			panel,
-			extensionUri,
-			getEnvironments,
-			getEnvironmentById,
-			listConnectionReferencesUseCase,
-			exportToDeploymentSettingsUseCase,
-			solutionRepository,
-			urlBuilder,
-			relationshipCollectionService,
-			logger,
-			targetEnvironmentId,
-			panelStateRepository
-		);
-
-		ConnectionReferencesPanelComposed.panels.set(targetEnvironmentId, newPanel);
-
-		return newPanel;
+		}, ConnectionReferencesPanelComposed.panels);
 	}
 
 	private getTableConfig(): DataTableConfig {
@@ -283,10 +262,7 @@ export class ConnectionReferencesPanelComposed {
 			}
 		});
 
-		// Panel disposal
-		this.panel.onDidDispose(() => {
-			ConnectionReferencesPanelComposed.panels.delete(this.currentEnvironmentId);
-		});
+		// Note: Panel disposal is handled by EnvironmentScopedPanel base class
 	}
 
 	private async initializeAndLoadData(): Promise<void> {
@@ -409,14 +385,12 @@ export class ConnectionReferencesPanelComposed {
 		this.clearTable();
 
 		try {
-			// Remove old panel from registry
-			ConnectionReferencesPanelComposed.panels.delete(this.currentEnvironmentId);
-
+			const oldEnvironmentId = this.currentEnvironmentId;
 			this.currentEnvironmentId = environmentId;
 			this.currentSolutionId = undefined;
 
-			// Add new panel to registry
-			ConnectionReferencesPanelComposed.panels.set(this.currentEnvironmentId, this);
+			// Re-register panel in map for new environment
+			this.reregisterPanel(ConnectionReferencesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
 			const environment = await this.getEnvironmentById(environmentId);
 			this.panel.title = `Connection References - ${environment?.name || 'Unknown'}`;
