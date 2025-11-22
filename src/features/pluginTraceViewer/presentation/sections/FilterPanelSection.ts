@@ -1,7 +1,7 @@
 import type { ISection } from '../../../../shared/infrastructure/ui/sections/ISection';
 import type { SectionRenderData } from '../../../../shared/infrastructure/ui/types/SectionRenderData';
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
-import { escapeHtml } from '../../../../../infrastructure/ui/utils/HtmlUtils';
+import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
 import { FilterField, FilterOperator, DateTimeFilter } from '../../application/types';
 import type { FilterCriteriaViewModel, FilterConditionViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
 import { QUICK_FILTER_DEFINITIONS } from '../constants/QuickFilterDefinitions';
@@ -190,7 +190,7 @@ export class FilterPanelSection implements ISection {
 						type="text"
 						class="condition-value"
 						placeholder="Enter value..."
-						value="${this.escapeHtml(condition.value)}"
+						value="${escapeHtml(condition.value)}"
 					/>
 				`;
 		}

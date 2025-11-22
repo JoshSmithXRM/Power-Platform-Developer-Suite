@@ -3,7 +3,7 @@ import { ImportJobViewModel } from '../viewModels/ImportJobViewModel';
 import { ImportJobCollectionService } from '../../domain/services/ImportJobCollectionService';
 import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
 import { ImportJobStatusFormatter } from '../../../../shared/infrastructure/ui/utils/ImportJobStatusFormatter';
-import { escapeHtml } from '../../../../../infrastructure/ui/utils/HtmlUtils';
+import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
 
 /**
  * Maps ImportJob domain entities to ImportJobViewModel presentation objects.

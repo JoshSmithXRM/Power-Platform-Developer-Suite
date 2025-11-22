@@ -10,9 +10,10 @@ import type { ChoiceValueRowViewModel } from '../viewModels/ChoiceValueRowViewMo
  *
  * Orchestration:
  * 1. Fetch choice metadata from repository
- * 2. Sort choice values by label ascending
- * 3. Map to ViewModels
- * 4. Return ViewModels
+ * 2. Map to ViewModels
+ * 3. Return ViewModels
+ *
+ * Note: Sorting is handled by the presentation layer, not here.
  */
 export class LoadChoiceMetadataUseCase {
     constructor(
@@ -35,14 +36,9 @@ export class LoadChoiceMetadataUseCase {
                 name
             );
 
-            // Sort choice values before mapping
-            const sortedValues = [...choice.options].sort((a, b) =>
-                a.label.localeCompare(b.label)
-            );
-
             // Map to ViewModels
             const choiceVM = this.choiceTreeItemMapper.toViewModel(choice);
-            const valueVMs = sortedValues.map(val =>
+            const valueVMs = choice.options.map(val =>
                 this.choiceValueRowMapper.toViewModel(val)
             );
 

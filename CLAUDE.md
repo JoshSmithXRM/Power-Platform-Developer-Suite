@@ -130,6 +130,56 @@ For complex/uncertain problems, trigger extended thinking modes:
 - `/clear` - Reset context when switching tasks (important!)
 - `/cleanup-code` - Systematic comment/logging standards enforcement
 - `/code-review` - Invoke code-guardian for approval
+- `/review-technical-debt` - Audit technical debt, clean up resolved items
+- `/fix-technical-debt` - Interactively fix technical debt items
+
+---
+
+## ⚡ Parallel Execution (Maximize Efficiency)
+
+**ALWAYS use parallel tool calls when operations are independent:**
+
+**✅ DO parallelize:**
+- Reading multiple unrelated files
+- Multiple grep searches for different patterns
+- Multiple glob searches
+- Independent bash commands (git status + git diff + git log)
+- Analysis tasks that don't depend on each other
+
+**❌ DON'T parallelize:**
+- Operations where second depends on first result
+- Write then Read same file
+- Compile then test (sequential dependency)
+- Create directory then write file to it
+
+**Examples:**
+
+**✅ GOOD - Parallel reads:**
+```
+Read Environment.ts
+Read EnvironmentRepository.ts
+Read EnvironmentMapper.ts
+(All in single message - 3 tool calls)
+```
+
+**✅ GOOD - Parallel searches:**
+```
+Grep for "StorageEntry" pattern
+Grep for "StorageCollection" pattern
+Glob for "*Storage*.ts" files
+(All in single message - 3 tool calls)
+```
+
+**❌ BAD - False parallelization:**
+```
+Write new file
+Read same file (depends on write completing)
+(Must be sequential)
+```
+
+**Rule of thumb:** If tool call B doesn't need the result of tool call A, parallelize them.
+
+**See:** `.claude/WORKFLOW.md` for detailed parallel execution patterns
 
 ---
 

@@ -1,7 +1,7 @@
 import { Solution } from '../../domain/entities/Solution';
 import { SolutionViewModel } from '../viewModels/SolutionViewModel';
 import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
-import { escapeHtml } from '../../../../../infrastructure/ui/utils/HtmlUtils';
+import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
 import type { SolutionCollectionService } from '../../domain/services/SolutionCollectionService';
 
 /**

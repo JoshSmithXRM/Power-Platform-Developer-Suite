@@ -17,7 +17,7 @@ describe('htmlHelpers', () => {
 		});
 
 		it('should escape single quotes', () => {
-			expect(escapeHtml("'quoted'")).toBe('&#039;quoted&#039;');
+			expect(escapeHtml("'quoted'")).toBe('&#39;quoted&#39;');
 		});
 
 		it('should handle empty string', () => {

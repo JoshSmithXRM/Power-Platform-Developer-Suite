@@ -207,7 +207,7 @@ describe('LoadEntityMetadataUseCase', () => {
             );
         });
 
-        it('should sort attributes by display name before mapping', async () => {
+        it('should map all attributes without sorting', async () => {
             const attr1 = createTestAttribute('zebra', 'Zebra Field');
             const attr2 = createTestAttribute('alpha', 'Alpha Field');
             const attr3 = createTestAttribute('middle', 'Middle Field');
@@ -217,16 +217,17 @@ describe('LoadEntityMetadataUseCase', () => {
             entityTreeItemMapper.toViewModel.mockReturnValue({ logicalName: 'account' } as never);
             attributeRowMapper.toViewModel.mockImplementation((attr) => ({ logicalName: attr.logicalName.getValue() } as never));
 
-            await useCase.execute('env-123', 'account');
+            const result = await useCase.execute('env-123', 'account');
 
-            // Verify attributes were sorted before mapping
-            const mapperCalls = attributeRowMapper.toViewModel.mock.calls;
-            expect(mapperCalls[0]?.[0].displayName).toBe('Alpha Field');
-            expect(mapperCalls[1]?.[0].displayName).toBe('Middle Field');
-            expect(mapperCalls[2]?.[0].displayName).toBe('Zebra Field');
+            // Verify all attributes were mapped (order not guaranteed)
+            expect(result.attributes).toHaveLength(3);
+            expect(attributeRowMapper.toViewModel).toHaveBeenCalledTimes(3);
+            expect(attributeRowMapper.toViewModel).toHaveBeenCalledWith(attr1);
+            expect(attributeRowMapper.toViewModel).toHaveBeenCalledWith(attr2);
+            expect(attributeRowMapper.toViewModel).toHaveBeenCalledWith(attr3);
         });
 
-        it('should sort keys by logical name before mapping', async () => {
+        it('should map all keys without sorting', async () => {
             const key1 = createTestKey('zebra_key');
             const key2 = createTestKey('alpha_key');
             const key3 = createTestKey('middle_key');
@@ -236,16 +237,17 @@ describe('LoadEntityMetadataUseCase', () => {
             entityTreeItemMapper.toViewModel.mockReturnValue({ logicalName: 'account' } as never);
             keyRowMapper.toViewModel.mockImplementation((key) => ({ logicalName: key.logicalName.getValue() } as never));
 
-            await useCase.execute('env-123', 'account');
+            const result = await useCase.execute('env-123', 'account');
 
-            // Verify keys were sorted before mapping
-            const mapperCalls = keyRowMapper.toViewModel.mock.calls;
-            expect(mapperCalls[0]?.[0].logicalName.getValue()).toBe('alpha_key');
-            expect(mapperCalls[1]?.[0].logicalName.getValue()).toBe('middle_key');
-            expect(mapperCalls[2]?.[0].logicalName.getValue()).toBe('zebra_key');
+            // Verify all keys were mapped (order not guaranteed)
+            expect(result.keys).toHaveLength(3);
+            expect(keyRowMapper.toViewModel).toHaveBeenCalledTimes(3);
+            expect(keyRowMapper.toViewModel).toHaveBeenCalledWith(key1);
+            expect(keyRowMapper.toViewModel).toHaveBeenCalledWith(key2);
+            expect(keyRowMapper.toViewModel).toHaveBeenCalledWith(key3);
         });
 
-        it('should sort privileges by name before mapping', async () => {
+        it('should map all privileges without sorting', async () => {
             const priv1 = createTestPrivilege('prvWrite', 3);
             const priv2 = createTestPrivilege('prvCreate', 1);
             const priv3 = createTestPrivilege('prvRead', 2);
@@ -255,13 +257,14 @@ describe('LoadEntityMetadataUseCase', () => {
             entityTreeItemMapper.toViewModel.mockReturnValue({ logicalName: 'account' } as never);
             privilegeRowMapper.toViewModel.mockImplementation((priv) => ({ name: priv.name } as never));
 
-            await useCase.execute('env-123', 'account');
+            const result = await useCase.execute('env-123', 'account');
 
-            // Verify privileges were sorted before mapping
-            const mapperCalls = privilegeRowMapper.toViewModel.mock.calls;
-            expect(mapperCalls[0]?.[0].name).toBe('prvCreate');
-            expect(mapperCalls[1]?.[0].name).toBe('prvRead');
-            expect(mapperCalls[2]?.[0].name).toBe('prvWrite');
+            // Verify all privileges were mapped (order not guaranteed)
+            expect(result.privileges).toHaveLength(3);
+            expect(privilegeRowMapper.toViewModel).toHaveBeenCalledTimes(3);
+            expect(privilegeRowMapper.toViewModel).toHaveBeenCalledWith(priv1);
+            expect(privilegeRowMapper.toViewModel).toHaveBeenCalledWith(priv2);
+            expect(privilegeRowMapper.toViewModel).toHaveBeenCalledWith(priv3);
         });
 
         it('should map one-to-many relationships with correct mapper method', async () => {

@@ -2,11 +2,6 @@ import type { IEntityMetadataRepository } from '../../domain/repositories/IEntit
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { LogicalName } from '../../domain/valueObjects/LogicalName';
 import type { EntityMetadata } from '../../domain/entities/EntityMetadata';
-import type { AttributeMetadata } from '../../domain/entities/AttributeMetadata';
-import type { EntityKey } from '../../domain/entities/EntityKey';
-import type { SecurityPrivilege } from '../../domain/entities/SecurityPrivilege';
-import type { OneToManyRelationship } from '../../domain/entities/OneToManyRelationship';
-import type { ManyToManyRelationship } from '../../domain/entities/ManyToManyRelationship';
 import { EntityTreeItemMapper } from '../mappers/EntityTreeItemMapper';
 import { AttributeRowMapper } from '../mappers/AttributeRowMapper';
 import { KeyRowMapper } from '../mappers/KeyRowMapper';
@@ -24,9 +19,10 @@ import type { PrivilegeRowViewModel } from '../viewModels/PrivilegeRowViewModel'
  * Orchestration:
  * 1. Fetch entity metadata from repository (includes all relationships, keys, etc.)
  * 2. Extract data for each tab
- * 3. Sort data before mapping
- * 4. Map to ViewModels
- * 5. Return all ViewModels
+ * 3. Map to ViewModels
+ * 4. Return all ViewModels
+ *
+ * Note: Sorting is handled by the presentation layer, not here.
  */
 export class LoadEntityMetadataUseCase {
     constructor(
@@ -71,21 +67,19 @@ export class LoadEntityMetadataUseCase {
     }
 
     private mapEntityToViewModels(entity: EntityMetadata): LoadEntityMetadataResponse {
-        const sortedAttributes = this.sortAttributes(entity.attributes);
-        const sortedKeys = this.sortKeys(entity.keys);
-        const sortedPrivileges = this.sortPrivileges(entity.privileges);
-        const sortedOneToMany = this.sortRelationships(entity.oneToManyRelationships);
-        const sortedManyToOne = this.sortRelationships(entity.manyToOneRelationships);
-        const sortedManyToMany = this.sortManyToManyRelationships(entity.manyToManyRelationships);
+        const attributeVMs = entity.attributes.map(attr => this.attributeRowMapper.toViewModel(attr));
+        const keyVMs = entity.keys.map(key => this.keyRowMapper.toViewModel(key));
+        const privilegeVMs = entity.privileges.map(priv => this.privilegeRowMapper.toViewModel(priv));
 
-        const attributeVMs = sortedAttributes.map(attr => this.attributeRowMapper.toViewModel(attr));
-        const keyVMs = sortedKeys.map(key => this.keyRowMapper.toViewModel(key));
-        const privilegeVMs = sortedPrivileges.map(priv => this.privilegeRowMapper.toViewModel(priv));
-
-        // Map relationships after sorting
-        const oneToManyVMs = sortedOneToMany.map(rel => this.relationshipRowMapper.toOneToManyViewModel(rel));
-        const manyToOneVMs = sortedManyToOne.map(rel => this.relationshipRowMapper.toManyToOneViewModel(rel));
-        const manyToManyVMs = sortedManyToMany.map(rel => this.relationshipRowMapper.toManyToManyViewModel(rel));
+        const oneToManyVMs = entity.oneToManyRelationships.map(rel =>
+            this.relationshipRowMapper.toOneToManyViewModel(rel)
+        );
+        const manyToOneVMs = entity.manyToOneRelationships.map(rel =>
+            this.relationshipRowMapper.toManyToOneViewModel(rel)
+        );
+        const manyToManyVMs = entity.manyToManyRelationships.map(rel =>
+            this.relationshipRowMapper.toManyToManyViewModel(rel)
+        );
 
         return {
             entity: this.entityTreeItemMapper.toViewModel(entity),
@@ -96,32 +90,6 @@ export class LoadEntityMetadataUseCase {
             manyToManyRelationships: manyToManyVMs,
             privileges: privilegeVMs
         };
-    }
-
-    private sortAttributes(attributes: readonly AttributeMetadata[]): AttributeMetadata[] {
-        return [...attributes].sort((a, b) =>
-            (a.displayName || a.logicalName.getValue()).localeCompare(
-                b.displayName || b.logicalName.getValue()
-            )
-        );
-    }
-
-    private sortKeys(keys: readonly EntityKey[]): EntityKey[] {
-        return [...keys].sort((a, b) =>
-            a.logicalName.getValue().localeCompare(b.logicalName.getValue())
-        );
-    }
-
-    private sortPrivileges(privileges: readonly SecurityPrivilege[]): SecurityPrivilege[] {
-        return [...privileges].sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    private sortRelationships(relationships: readonly OneToManyRelationship[]): OneToManyRelationship[] {
-        return [...relationships].sort((a, b) => a.schemaName.localeCompare(b.schemaName));
-    }
-
-    private sortManyToManyRelationships(relationships: readonly ManyToManyRelationship[]): ManyToManyRelationship[] {
-        return [...relationships].sort((a, b) => a.schemaName.localeCompare(b.schemaName));
     }
 }
 

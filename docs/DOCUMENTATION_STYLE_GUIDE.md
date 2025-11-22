@@ -217,6 +217,84 @@ If design doc introduced NEW architectural pattern:
 
 ---
 
+### Documentation Decision Tree
+
+**Use this flowchart to decide whether to create documentation:**
+
+```
+┌─────────────────────────────────────┐
+│ I need to document something...     │
+└───────────────┬─────────────────────┘
+                │
+                ▼
+    ┌───────────────────────────┐
+    │ Is it an ARCHITECTURAL    │ YES → CREATE living doc
+    │ PATTERN used across       │       (CLEAN_ARCHITECTURE_GUIDE.md,
+    │ multiple features?        │        PANEL_ARCHITECTURE.md)
+    └────────┬──────────────────┘       Document HOW, not WHAT
+             │ NO
+             ▼
+    ┌───────────────────────────┐
+    │ Is it a WORKFLOW/PROCESS  │ YES → CREATE/UPDATE workflow doc
+    │ for building features?    │       (WORKFLOW.md, AGENTS.md)
+    └────────┬──────────────────┘
+             │ NO
+             ▼
+    ┌───────────────────────────┐
+    │ Is it CODE QUALITY rules  │ YES → CREATE/UPDATE standards doc
+    │ enforced across codebase? │       (CODE_QUALITY_GUIDE.md,
+    └────────┬──────────────────┘        LOGGING_GUIDE.md)
+             │ NO
+             ▼
+    ┌───────────────────────────┐
+    │ Is it a DESIGN for a      │ YES → Create small slice design
+    │ complex feature (7+ files)│       DELETE after implementation
+    └────────┬──────────────────┘       Lifespan: 0-2 weeks
+             │ NO
+             ▼
+    ┌───────────────────────────┐
+    │ Is it TESTING guidance?   │ YES → UPDATE TESTING_GUIDE.md
+    │                           │       Don't create separate test docs
+    └────────┬──────────────────┘
+             │ NO
+             ▼
+    ┌───────────────────────────┐
+    │ Is it a temporary         │ YES → Create in docs/technical-debt/
+    │ INVESTIGATION/ANALYSIS?   │       DELETE after issue resolved
+    └────────┬──────────────────┘       Consolidate findings to
+             │ NO                        TECHNICAL_DEBT.md
+             ▼
+    ┌───────────────────────────┐
+    │ Is it a simple feature    │ YES → DON'T CREATE
+    │ (1-2 files)?              │       Code is self-documenting
+    └────────┬──────────────────┘       Tests document behavior
+             │ NO
+             ▼
+    ┌───────────────────────────┐
+    │ Is it implementation      │ YES → DON'T CREATE
+    │ details for Feature X?    │       Tests document behavior
+    └────────┬──────────────────┘       Code is truth
+             │ NO
+             ▼
+    ┌───────────────────────────┐
+    │ DON'T CREATE              │
+    │ Ask: "Will this be useful │
+    │ in 6 months?"             │
+    │ If NO → Don't create      │
+    └───────────────────────────┘
+```
+
+**Key Questions Before Creating Docs:**
+
+1. **Will this be useful 6 months from now?** (If NO → Don't create)
+2. **Will this be updated regularly?** (If NO → Consider temporary)
+3. **Do tests/code already document this?** (If YES → Don't create)
+4. **Is this a pattern or a specific implementation?** (Pattern → CREATE, Implementation → DON'T)
+
+**See**: `docs/DOCUMENTATION_POLICY.md` for detailed retention rules
+
+---
+
 ## Design Documentation Strategy
 
 **Problem**: Large designs (12+ files, 100KB+) overwhelm Claude and cause implementation failure.

@@ -108,7 +108,7 @@ describe('LoadMetadataTreeUseCase', () => {
             expect(repository.getAllGlobalChoices).toHaveBeenCalledWith('env-123');
         });
 
-        it('should sort entities by display name before mapping', async () => {
+        it('should map all entities without sorting', async () => {
             const entity1 = createTestEntity('account', 'Zebra Account');
             const entity2 = createTestEntity('contact', 'Alpha Contact');
             const entity3 = createTestEntity('lead', 'Middle Lead');
@@ -117,16 +117,17 @@ describe('LoadMetadataTreeUseCase', () => {
             repository.getAllGlobalChoices.mockResolvedValue([]);
             entityTreeItemMapper.toViewModel.mockImplementation((e) => ({ displayName: e.displayName } as never));
 
-            await useCase.execute('env-123');
+            const result = await useCase.execute('env-123');
 
-            // Verify entities were sorted before mapping
-            const mapperCalls = entityTreeItemMapper.toViewModel.mock.calls;
-            expect(mapperCalls[0]?.[0].displayName).toBe('Alpha Contact');
-            expect(mapperCalls[1]?.[0].displayName).toBe('Middle Lead');
-            expect(mapperCalls[2]?.[0].displayName).toBe('Zebra Account');
+            // Verify all entities were mapped (order not guaranteed)
+            expect(result.entities).toHaveLength(3);
+            expect(entityTreeItemMapper.toViewModel).toHaveBeenCalledTimes(3);
+            expect(entityTreeItemMapper.toViewModel).toHaveBeenCalledWith(entity1);
+            expect(entityTreeItemMapper.toViewModel).toHaveBeenCalledWith(entity2);
+            expect(entityTreeItemMapper.toViewModel).toHaveBeenCalledWith(entity3);
         });
 
-        it('should sort choices by display name before mapping', async () => {
+        it('should map all choices without sorting', async () => {
             const choice1 = createTestChoice('choice1', 'Zebra Choice');
             const choice2 = createTestChoice('choice2', 'Alpha Choice');
             const choice3 = createTestChoice('choice3', 'Middle Choice');
@@ -135,16 +136,17 @@ describe('LoadMetadataTreeUseCase', () => {
             repository.getAllGlobalChoices.mockResolvedValue([choice1, choice2, choice3]);
             choiceTreeItemMapper.toViewModel.mockImplementation((c) => ({ displayName: c.displayName } as never));
 
-            await useCase.execute('env-123');
+            const result = await useCase.execute('env-123');
 
-            // Verify choices were sorted before mapping
-            const mapperCalls = choiceTreeItemMapper.toViewModel.mock.calls;
-            expect(mapperCalls[0]?.[0].displayName).toBe('Alpha Choice');
-            expect(mapperCalls[1]?.[0].displayName).toBe('Middle Choice');
-            expect(mapperCalls[2]?.[0].displayName).toBe('Zebra Choice');
+            // Verify all choices were mapped (order not guaranteed)
+            expect(result.choices).toHaveLength(3);
+            expect(choiceTreeItemMapper.toViewModel).toHaveBeenCalledTimes(3);
+            expect(choiceTreeItemMapper.toViewModel).toHaveBeenCalledWith(choice1);
+            expect(choiceTreeItemMapper.toViewModel).toHaveBeenCalledWith(choice2);
+            expect(choiceTreeItemMapper.toViewModel).toHaveBeenCalledWith(choice3);
         });
 
-        it('should handle choices with null display name using name instead', async () => {
+        it('should map choices with null display name', async () => {
             const choice1 = createTestChoice('zebra_choice', null);
             const choice2 = createTestChoice('alpha_choice', null);
             const choice3 = createTestChoice('middle_choice', 'Middle Choice');
@@ -153,13 +155,14 @@ describe('LoadMetadataTreeUseCase', () => {
             repository.getAllGlobalChoices.mockResolvedValue([choice1, choice2, choice3]);
             choiceTreeItemMapper.toViewModel.mockImplementation((c) => ({ name: c.name } as never));
 
-            await useCase.execute('env-123');
+            const result = await useCase.execute('env-123');
 
-            // Verify choices were sorted using name as fallback
-            const mapperCalls = choiceTreeItemMapper.toViewModel.mock.calls;
-            expect(mapperCalls[0]?.[0].name).toBe('alpha_choice');
-            expect(mapperCalls[1]?.[0].displayName).toBe('Middle Choice');
-            expect(mapperCalls[2]?.[0].name).toBe('zebra_choice');
+            // Verify all choices were mapped (order not guaranteed)
+            expect(result.choices).toHaveLength(3);
+            expect(choiceTreeItemMapper.toViewModel).toHaveBeenCalledTimes(3);
+            expect(choiceTreeItemMapper.toViewModel).toHaveBeenCalledWith(choice1);
+            expect(choiceTreeItemMapper.toViewModel).toHaveBeenCalledWith(choice2);
+            expect(choiceTreeItemMapper.toViewModel).toHaveBeenCalledWith(choice3);
         });
 
         it('should handle empty entities and choices', async () => {
@@ -246,7 +249,7 @@ describe('LoadMetadataTreeUseCase', () => {
             expect(choiceTreeItemMapper.toViewModel).toHaveBeenCalledTimes(1);
         });
 
-        it('should preserve sorted order with many entities', async () => {
+        it('should map all entities regardless of count', async () => {
             const entities = [
                 createTestEntity('zebra', 'Z Entity'),
                 createTestEntity('alpha', 'A Entity'),
@@ -261,13 +264,13 @@ describe('LoadMetadataTreeUseCase', () => {
             const result = await useCase.execute('env-123');
 
             expect(result.entities).toHaveLength(4);
-            expect(result.entities[0]?.displayName).toBe('A Entity');
-            expect(result.entities[1]?.displayName).toBe('B Entity');
-            expect(result.entities[2]?.displayName).toBe('M Entity');
-            expect(result.entities[3]?.displayName).toBe('Z Entity');
+            expect(entityTreeItemMapper.toViewModel).toHaveBeenCalledTimes(4);
+            entities.forEach(entity => {
+                expect(entityTreeItemMapper.toViewModel).toHaveBeenCalledWith(entity);
+            });
         });
 
-        it('should handle case-insensitive sorting correctly', async () => {
+        it('should map entities with varying case', async () => {
             const entities = [
                 createTestEntity('entity1', 'zebra'),
                 createTestEntity('entity2', 'Alpha'),
@@ -278,12 +281,13 @@ describe('LoadMetadataTreeUseCase', () => {
             repository.getAllGlobalChoices.mockResolvedValue([]);
             entityTreeItemMapper.toViewModel.mockImplementation((e) => ({ displayName: e.displayName } as never));
 
-            await useCase.execute('env-123');
+            const result = await useCase.execute('env-123');
 
-            const mapperCalls = entityTreeItemMapper.toViewModel.mock.calls;
-            expect(mapperCalls[0]?.[0].displayName).toBe('Alpha');
-            expect(mapperCalls[1]?.[0].displayName).toBe('BETA');
-            expect(mapperCalls[2]?.[0].displayName).toBe('zebra');
+            expect(result.entities).toHaveLength(3);
+            expect(entityTreeItemMapper.toViewModel).toHaveBeenCalledTimes(3);
+            expect(entityTreeItemMapper.toViewModel).toHaveBeenCalledWith(entities[0]);
+            expect(entityTreeItemMapper.toViewModel).toHaveBeenCalledWith(entities[1]);
+            expect(entityTreeItemMapper.toViewModel).toHaveBeenCalledWith(entities[2]);
         });
     });
 });

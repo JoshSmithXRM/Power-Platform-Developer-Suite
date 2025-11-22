@@ -11,10 +11,10 @@ import type { ChoiceTreeItemViewModel } from '../viewModels/ChoiceTreeItemViewMo
  * Orchestration:
  * 1. Fetch all entities from repository
  * 2. Fetch all global choices from repository
- * 3. Sort entities alphabetically by display name
- * 4. Sort choices alphabetically by display name
- * 5. Map to tree item ViewModels
- * 6. Return ViewModels
+ * 3. Map to tree item ViewModels
+ * 4. Return ViewModels
+ *
+ * Note: Sorting is handled by the presentation layer, not here.
  */
 export class LoadMetadataTreeUseCase {
     constructor(
@@ -34,21 +34,11 @@ export class LoadMetadataTreeUseCase {
                 this.repository.getAllGlobalChoices(environmentId)
             ]);
 
-            // Sort before mapping (data preparation)
-            const sortedEntities = [...entities].sort((a, b) =>
-                a.displayName.localeCompare(b.displayName)
-            );
-            const sortedChoices = [...choices].sort((a, b) => {
-                const aName = a.displayName || a.name || '';
-                const bName = b.displayName || b.name || '';
-                return aName.localeCompare(bName);
-            });
-
             // Map to ViewModels
-            const entityViewModels = sortedEntities.map(e =>
+            const entityViewModels = entities.map(e =>
                 this.entityTreeItemMapper.toViewModel(e)
             );
-            const choiceViewModels = sortedChoices.map(c =>
+            const choiceViewModels = choices.map(c =>
                 this.choiceTreeItemMapper.toViewModel(c)
             );
 

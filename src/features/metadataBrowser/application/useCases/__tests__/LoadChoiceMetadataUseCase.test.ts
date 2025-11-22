@@ -82,7 +82,7 @@ describe('LoadChoiceMetadataUseCase', () => {
             expect(repository.getGlobalChoiceWithOptions).toHaveBeenCalledWith('env-123', 'statuscode');
         });
 
-        it('should sort choice values by label before mapping', async () => {
+        it('should map all choice values without sorting', async () => {
             const option1 = createTestOption(1, 'Zebra');
             const option2 = createTestOption(2, 'Alpha');
             const option3 = createTestOption(3, 'Middle');
@@ -92,14 +92,14 @@ describe('LoadChoiceMetadataUseCase', () => {
             choiceTreeItemMapper.toViewModel.mockReturnValue({ name: 'testchoice' } as never);
             choiceValueRowMapper.toViewModel.mockImplementation((opt) => ({ label: opt.label } as never));
 
-            await useCase.execute('env-123', 'testchoice');
+            const result = await useCase.execute('env-123', 'testchoice');
 
-            // Verify values were sorted before mapping
-            const mapperCalls = choiceValueRowMapper.toViewModel.mock.calls;
-            expect(mapperCalls).toHaveLength(3);
-            expect(mapperCalls[0]?.[0]?.label).toBe('Alpha');
-            expect(mapperCalls[1]?.[0]?.label).toBe('Middle');
-            expect(mapperCalls[2]?.[0]?.label).toBe('Zebra');
+            // Verify all values were mapped (order not guaranteed)
+            expect(result.choiceValues).toHaveLength(3);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledTimes(3);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledWith(option1);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledWith(option2);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledWith(option3);
         });
 
         it('should handle choice with empty options', async () => {
@@ -183,7 +183,7 @@ describe('LoadChoiceMetadataUseCase', () => {
             expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledTimes(1);
         });
 
-        it('should preserve sorting order with many options', async () => {
+        it('should map all options regardless of count', async () => {
             const options = [
                 createTestOption(10, 'Z Option'),
                 createTestOption(20, 'A Option'),
@@ -197,19 +197,17 @@ describe('LoadChoiceMetadataUseCase', () => {
             choiceTreeItemMapper.toViewModel.mockReturnValue({ name: 'testchoice' } as never);
             choiceValueRowMapper.toViewModel.mockImplementation((opt) => ({ label: opt.label } as never));
 
-            await useCase.execute('env-123', 'testchoice');
+            const result = await useCase.execute('env-123', 'testchoice');
 
-            // Verify all values were sorted correctly
-            const mapperCalls = choiceValueRowMapper.toViewModel.mock.calls;
-            expect(mapperCalls).toHaveLength(5);
-            expect(mapperCalls[0]?.[0]?.label).toBe('A Option');
-            expect(mapperCalls[1]?.[0]?.label).toBe('B Option');
-            expect(mapperCalls[2]?.[0]?.label).toBe('M Option');
-            expect(mapperCalls[3]?.[0]?.label).toBe('Y Option');
-            expect(mapperCalls[4]?.[0]?.label).toBe('Z Option');
+            // Verify all values were mapped (order not guaranteed)
+            expect(result.choiceValues).toHaveLength(5);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledTimes(5);
+            options.forEach(option => {
+                expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledWith(option);
+            });
         });
 
-        it('should handle case-insensitive sorting correctly', async () => {
+        it('should map options with varying case', async () => {
             const options = [
                 createTestOption(1, 'zebra'),
                 createTestOption(2, 'Alpha'),
@@ -221,17 +219,17 @@ describe('LoadChoiceMetadataUseCase', () => {
             choiceTreeItemMapper.toViewModel.mockReturnValue({ name: 'testchoice' } as never);
             choiceValueRowMapper.toViewModel.mockImplementation((opt) => ({ label: opt.label } as never));
 
-            await useCase.execute('env-123', 'testchoice');
+            const result = await useCase.execute('env-123', 'testchoice');
 
-            // Verify case-insensitive sorting
-            const mapperCalls = choiceValueRowMapper.toViewModel.mock.calls;
-            expect(mapperCalls).toHaveLength(3);
-            expect(mapperCalls[0]?.[0]?.label).toBe('Alpha');
-            expect(mapperCalls[1]?.[0]?.label).toBe('BETA');
-            expect(mapperCalls[2]?.[0]?.label).toBe('zebra');
+            // Verify all options were mapped (order not guaranteed)
+            expect(result.choiceValues).toHaveLength(3);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledTimes(3);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledWith(options[0]);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledWith(options[1]);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledWith(options[2]);
         });
 
-        it('should return view models in sorted order', async () => {
+        it('should map all options to view models', async () => {
             const options = [
                 createTestOption(3, 'C'),
                 createTestOption(1, 'A'),
@@ -246,9 +244,10 @@ describe('LoadChoiceMetadataUseCase', () => {
             const result = await useCase.execute('env-123', 'testchoice');
 
             expect(result.choiceValues).toHaveLength(3);
-            expect(result.choiceValues[0]?.label).toBe('A');
-            expect(result.choiceValues[1]?.label).toBe('B');
-            expect(result.choiceValues[2]?.label).toBe('C');
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledTimes(3);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledWith(options[0]);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledWith(options[1]);
+            expect(choiceValueRowMapper.toViewModel).toHaveBeenCalledWith(options[2]);
         });
     });
 });
