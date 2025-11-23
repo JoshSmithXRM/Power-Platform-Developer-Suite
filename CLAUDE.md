@@ -133,6 +133,19 @@ For complex/uncertain problems, trigger extended thinking modes:
 - `/review-technical-debt` - Audit technical debt, clean up resolved items
 - `/fix-technical-debt` - Interactively fix technical debt items
 
+**Code Quality & Dead Code Detection:**
+- `npx ts-prune` - Find unused exports (dead code detection)
+- `npx depcheck` - Find unused npm dependencies
+- `npx madge --circular src/ --extensions ts` - Detect circular dependencies (should always be 0)
+- `npx madge --circular src/ --extensions ts > madge-report.txt` - Save circular dependency report
+- `/comprehensive-review` - 8-agent parallel code review (quarterly, pre-production only)
+
+**When to run:**
+- **Monthly**: Quick `ts-prune` check for unused exports
+- **Before cleanup sprints**: Generate all 3 reports (ts-prune, depcheck, madge)
+- **After major refactors**: Run `madge --circular` to verify no new circular dependencies
+- **Quarterly**: Run `/comprehensive-review` for full production readiness assessment
+
 ---
 
 ## 📦 Version Management & Local Installation
