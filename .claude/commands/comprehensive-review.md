@@ -203,6 +203,108 @@ After all agents complete, analyze for patterns:
 
 ---
 
+## File Retention Policy
+
+**After comprehensive review cycle completes (all issues resolved):**
+
+### Keep (Permanent Archive - Committed to Git)
+
+**Archive summary to `docs/quality/`:**
+```bash
+# 1. Create archive file
+cat .review/PROGRESS_TRACKER.md > docs/quality/YYYY-QN-review.md
+
+# 2. Edit to add metadata header (review date, scores, timeline)
+
+# 3. Commit the archive
+git add docs/quality/YYYY-QN-review.md
+git commit -m "docs(quality): archive QN YYYY comprehensive review results"
+```
+
+**What to archive:**
+- Overall score (initial → final)
+- Issue counts by severity (critical/high/medium/low)
+- Resolution timeline (start date → completion date)
+- Test suite growth (before → after counts)
+- Key improvements and achievements
+- Notable patterns or learnings
+
+**Retention period:**
+- Keep last 4 quarters (1 year rolling window)
+- OR keep all if project < 2 years old
+- Delete archives > 2 years old (unless milestone releases)
+
+### Delete (Scratch Work - Not Committed)
+
+**Remove detailed agent reports:**
+```bash
+# Delete after all issues resolved
+rm -rf .review/results/
+rm .review/SUMMARY.md
+rm .review/CODE_REVIEW_GUIDE.md
+rm .review/README.md
+```
+
+**What to delete:**
+- Detailed agent reports (8 files, ~500KB total)
+- Verbose findings and analysis
+- Temporary review scaffolding
+
+**Why delete:**
+- Too verbose for long-term value (summaries sufficient)
+- Bloat prevention (keeps repository lean)
+- Summary preserves key insights without detail overload
+
+### Keep (Living Document - Tracked in Git)
+
+**Current tracker during active review:**
+- `.review/PROGRESS_TRACKER.md` - stays during active review cycle
+- After 100% completion → migrate to `docs/quality/` as archive
+- Can reset for next review or keep as template
+
+### Gitignore Configuration
+
+**Add to `.gitignore`:**
+```gitignore
+# Review working files (scratch work, delete after use)
+.review/results/
+.review/SUMMARY.md
+.review/CODE_REVIEW_GUIDE.md
+.review/README.md
+```
+
+**DO NOT gitignore:**
+- `.review/PROGRESS_TRACKER.md` - living document during active review
+
+**After archiving:**
+- Either commit PROGRESS_TRACKER.md as-is (shows active work)
+- Or delete and regenerate fresh for next review
+
+---
+
+## Archive Benefits
+
+**Historical tracking:**
+- Compare quality scores quarter-over-quarter (8.4/10 → 10/10)
+- Track test suite growth (3,033 → 4,929 tests)
+- Identify systemic patterns (recurring issue categories)
+- Celebrate progress (issue reduction, score improvements)
+
+**Team learning:**
+- New team members see quality journey
+- Learn from past issues and resolutions
+- Understand architectural evolution decisions
+
+**Lightweight approach:**
+- Summaries only (5-50KB each, not 500KB of verbose reports)
+- No repository bloat
+- Git history preserves all context
+- Easy to review in pull requests
+
+**Example archive:** See `docs/quality/2025-11-review.md` for reference structure
+
+---
+
 ## Scope Options
 
 **Default: Full Codebase**

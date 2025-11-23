@@ -31,3 +31,10 @@ docs/technical-debt/*.json
 docs/technical-debt/*.txt
 docs/technical-debt/TECHNICAL_DEBT_REVIEW_*.md
 docs/technical-debt/DEAD_CODE_*.md
+
+# Review working files (scratch work, delete after use)
+# Archive summaries to docs/quality/ after review completion
+.review/results/
+.review/SUMMARY.md
+.review/CODE_REVIEW_GUIDE.md
+.review/README.md
