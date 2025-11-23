@@ -143,7 +143,7 @@ function toggleDropdown(dropdownId) {
 function openDropdown(dropdownId) {
 	const menu = document.querySelector(`[data-dropdown-menu="${dropdownId}"]`);
 	if (menu) {
-		menu.style.setProperty('display', 'block', 'important');
+		menu.style.display = 'block';
 	}
 }
 
@@ -153,7 +153,7 @@ function openDropdown(dropdownId) {
 function closeDropdown(dropdownId) {
 	const menu = document.querySelector(`[data-dropdown-menu="${dropdownId}"]`);
 	if (menu) {
-		menu.style.setProperty('display', 'none', 'important');
+		menu.style.display = 'none';
 
 		// Remove focus from items
 		const items = menu.querySelectorAll('.dropdown-item--focused');
@@ -167,7 +167,7 @@ function closeDropdown(dropdownId) {
 function closeAllDropdowns() {
 	const menus = document.querySelectorAll('.dropdown-menu');
 	menus.forEach(menu => {
-		menu.style.setProperty('display', 'none', 'important');
+		menu.style.display = 'none';
 
 		// Remove focus from items
 		const items = menu.querySelectorAll('.dropdown-item--focused');

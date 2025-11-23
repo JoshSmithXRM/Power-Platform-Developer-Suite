@@ -147,11 +147,12 @@ export class PluginTraceFilterManagementBehavior {
 	 * Loads persisted filter criteria from storage for the current environment.
 	 *
 	 * @param environmentId - Current environment ID
+	 * @returns The loaded auto-refresh interval (or 0 if none persisted)
 	 */
-	public async loadFilterCriteria(environmentId: string): Promise<void> {
+	public async loadFilterCriteria(environmentId: string): Promise<number> {
 		if (!this.panelStateRepository) {
 			this.logger.warn('No panelStateRepository available');
-			return;
+			return 0;
 		}
 
 		try {
@@ -166,6 +167,11 @@ export class PluginTraceFilterManagementBehavior {
 				hasState: !!state,
 				stateKeys: state ? Object.keys(state) : []
 			});
+
+			// Extract auto-refresh interval from state (type-safely)
+			const autoRefreshInterval = typeof state === 'object' && state !== null && 'autoRefreshInterval' in state && typeof state.autoRefreshInterval === 'number'
+				? state.autoRefreshInterval
+				: 0;
 
 			if (state?.filterCriteria) {
 				// Validate that the stored data matches our ViewModel structure
@@ -203,13 +209,17 @@ export class PluginTraceFilterManagementBehavior {
 						advancedFilters: advancedFilterConditions.length
 					});
 				} else {
-					this.logger.warn('Invalid filter criteria in storage', { stored });
+					this.logger.warn('Invalid filter criteria in storage');
 				}
 			} else {
 				this.logger.debug('No filter criteria found in storage');
 			}
+
+			// Return the auto-refresh interval regardless of filter criteria validity
+			return autoRefreshInterval;
 		} catch (error) {
 			this.logger.error('Failed to load filter criteria', error);
+			return 0;
 		}
 	}
 

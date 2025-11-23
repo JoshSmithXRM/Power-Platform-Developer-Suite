@@ -59,15 +59,29 @@ export class HtmlScaffoldingBehavior implements IPanelBehavior {
 	 * Wraps body HTML in full HTML document structure.
 	 * Includes <html>, <head>, CSS, JS, and CSP.
 	 *
-	 * CSP Note: 'unsafe-inline' is required for style-src because inline style
-	 * attributes (style="...") are used throughout the codebase for dynamic
-	 * visibility, widths, and positioning. These are safe because:
-	 * - All values are either static strings or calculated from validated domain data
-	 * - No user-controlled content flows into style attributes
-	 * - Nonces are used for <style> tags as defense-in-depth
+	 * CSP Security Analysis:
 	 *
-	 * Future improvement: Refactor inline style attributes to CSS classes with
-	 * JavaScript-controlled class names to eliminate 'unsafe-inline'.
+	 * 'unsafe-inline' is required for style-src because inline style attributes
+	 * (style="...") are used throughout the codebase for:
+	 * - Dynamic visibility: style="display: none" / style="display: flex"
+	 * - Dynamic widths: style="width: 400px" (from user resize, validated min/max)
+	 * - Dynamic positioning: style="flex: 0 0 300px" (calculated from layout)
+	 *
+	 * Security justification:
+	 * - All values are either static strings ("none", "flex", "block") or
+	 *   calculated from validated domain data (numeric widths clamped to min/max)
+	 * - No user-controlled content flows into style attributes (no innerHTML injection)
+	 * - Example safe usage: panel.style.width = `${Math.max(300, width)}px`
+	 * - XSS tests verify proper escaping (ResizableDetailPanelSection.test.ts)
+	 *
+	 * Nonce usage:
+	 * - script-src: Nonce required for all inline scripts (prevents XSS)
+	 * - style-src: Nonce NOT used (would block all inline styles per CSP spec)
+	 * - When nonce is present in style-src, 'unsafe-inline' is ignored by browsers
+	 * - We removed nonce from style-src to allow these safe inline styles
+	 *
+	 * Future improvement: Refactor to CSS classes with JavaScript-controlled
+	 * class names to eliminate 'unsafe-inline' (e.g., .panel-hidden, .panel-width-300).
 	 */
 	private wrapInHtmlScaffolding(bodyHtml: string): string {
 		const { cssUris, jsUris, cspNonce, title, customCss, customJavaScript } = this.config;
@@ -78,7 +92,8 @@ export class HtmlScaffoldingBehavior implements IPanelBehavior {
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline' 'nonce-${cspNonce}'; script-src 'nonce-${cspNonce}'; font-src ${cspSource} https://unpkg.com;">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline' https://unpkg.com; script-src 'nonce-${cspNonce}'; font-src ${cspSource} https://unpkg.com;">
+	<meta id="vscode-csp-nonce" content="${cspNonce}">
 	<title>${escapeHtml(title)}</title>
 	${cssUris.map(uri => `<link rel="stylesheet" href="${uri}">`).join('\n\t')}
 	${customCss ? `<style nonce="${cspNonce}">${customCss}</style>` : ''}

@@ -148,7 +148,7 @@ function showDetailPanel(data) {
 	// Don't populate here to avoid duplicate rendering
 
 	// Show panel
-	panel.style.setProperty('display', 'flex', 'important');
+	panel.style.display = 'flex';
 
 	// Setup resize handle (ONLY ONCE)
 	const resizeHandle = document.getElementById('detailPanelResizeHandle');
@@ -168,7 +168,7 @@ function showDetailPanel(data) {
 function hideDetailPanel() {
 	const panel = document.getElementById('pluginTraceDetailPanel');
 	if (panel) {
-		panel.style.setProperty('display', 'none', 'important');
+		panel.style.display = 'none';
 	}
 	// Clear row selection when closing detail panel
 	clearRowSelection();
@@ -434,7 +434,6 @@ function setupDetailPanelVisibility() {
 			// Restore persisted width when panel is shown (if available)
 			if (window.persistedDetailPanelWidth) {
 				detailSection.style.flex = `0 0 ${window.persistedDetailPanelWidth}px`;
-				console.log('[PluginTraceViewer] Restored detail panel width on show:', window.persistedDetailPanelWidth);
 			}
 		} else if (message.command === 'hideDetailPanel' && detailSection) {
 			detailSection.classList.add('hidden');
@@ -515,8 +514,6 @@ function setupDetailPanelResize(handle) {
 		return;
 	}
 
-	console.log('[PluginTraceViewer] Setting up detail panel resize');
-
 	let isResizing = false;
 	let startX = 0;
 	let startWidth = 0;
@@ -562,8 +559,6 @@ function setupDetailPanelResize(handle) {
 			data: { width: currentWidth }
 		});
 	});
-
-	console.log('[PluginTraceViewer] Detail panel resize setup complete');
 }
 
 /**
@@ -583,7 +578,6 @@ function restoreDetailPanelWidth(width) {
 	}
 
 	panel.style.width = `${width}px`;
-	console.log('[PluginTraceViewer] Restored detail panel width:', width);
 }
 
 /**
@@ -1234,8 +1228,14 @@ function displayRawData() {
 
 	// Inject JSON highlighter styles if not already present
 	if (!document.getElementById('json-highlighter-styles')) {
+		const nonceMeta = document.getElementById('vscode-csp-nonce');
+		const nonce = nonceMeta ? nonceMeta.getAttribute('content') : '';
+
 		const styleTag = document.createElement('style');
 		styleTag.id = 'json-highlighter-styles';
+		if (nonce) {
+			styleTag.setAttribute('nonce', nonce);
+		}
 		styleTag.textContent = JsonHighlighter.getStyles();
 		document.head.appendChild(styleTag);
 	}
@@ -1368,8 +1368,6 @@ function setupTimelineClickHandlers(container) {
 			if (!traceId) {
 				return;
 			}
-
-			console.log('[PluginTraceViewer] Timeline item clicked', { traceId });
 
 			// Send message to extension to select and display this trace
 			vscode.postMessage({

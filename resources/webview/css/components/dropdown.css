@@ -60,13 +60,6 @@
 	flex: 1;
 }
 
-/* Dropdown chevron (down arrow) */
-.dropdown-chevron {
-	font-size: 10px;
-	opacity: 0.8;
-	margin-left: 4px;
-}
-
 /* Dropdown menu */
 .dropdown-menu {
 	position: absolute;
@@ -80,6 +73,7 @@
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 	z-index: 1000;
 	overflow: hidden;
+	display: none; /* Hidden by default, shown via JS */
 }
 
 /* Dropdown item */

@@ -55,6 +55,7 @@ export class PanelCoordinator<TCommands extends string = string>
 	private readonly extensionUri: vscode.Uri;
 	private readonly behaviors: ReadonlyArray<IPanelBehavior>;
 	private readonly logger: ILogger;
+	private readonly viewType: string;
 	private readonly messageHandlers = new Map<
 		TCommands,
 		{
@@ -69,6 +70,7 @@ export class PanelCoordinator<TCommands extends string = string>
 		this.extensionUri = config.extensionUri;
 		this.behaviors = config.behaviors;
 		this.logger = config.logger;
+		this.viewType = config.panel.viewType; // Cache before disposal
 
 		const logger: ILogger = this.logger;  // Capture for use in callbacks
 
@@ -94,7 +96,7 @@ export class PanelCoordinator<TCommands extends string = string>
 		);
 
 		logger.debug('PanelCoordinator created', {
-			viewType: this.panel.viewType,
+			viewType: this.viewType,
 			behaviorCount: this.behaviors.length,
 		});
 	}
@@ -105,7 +107,7 @@ export class PanelCoordinator<TCommands extends string = string>
 	 */
 	public async initialize(): Promise<void> {
 		this.logger.debug('Initializing PanelCoordinator', {
-			viewType: this.panel.viewType,
+			viewType: this.viewType,
 		});
 
 		try {
@@ -117,7 +119,7 @@ export class PanelCoordinator<TCommands extends string = string>
 			}
 
 			this.logger.debug('PanelCoordinator initialized successfully', {
-				viewType: this.panel.viewType,
+				viewType: this.viewType,
 			});
 		} catch (error: unknown) {
 			this.logger.error(
@@ -134,7 +136,7 @@ export class PanelCoordinator<TCommands extends string = string>
 	public reveal(): void {
 		this.panel.reveal();
 		this.logger.debug('Panel revealed', {
-			viewType: this.panel.viewType,
+			viewType: this.viewType,
 		});
 	}
 
@@ -219,7 +221,7 @@ export class PanelCoordinator<TCommands extends string = string>
 	 */
 	public dispose(): void {
 		this.logger.debug('Disposing PanelCoordinator', {
-			viewType: this.panel.viewType,
+			viewType: this.viewType,
 		});
 
 		// Dispose behaviors (if they have dispose method)
@@ -246,7 +248,7 @@ export class PanelCoordinator<TCommands extends string = string>
 		this.messageHandlers.clear();
 
 		this.logger.debug('PanelCoordinator disposed', {
-			viewType: this.panel.viewType,
+			viewType: this.viewType,
 		});
 	}
 }

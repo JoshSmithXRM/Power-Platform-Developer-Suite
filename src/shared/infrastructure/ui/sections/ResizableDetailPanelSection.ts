@@ -103,7 +103,7 @@ export abstract class ResizableDetailPanelSection implements ISection {
 		const defaultTab = tabs.find(t => t.isDefault) ?? tabs[0];
 
 		return `
-			<div id="${panelId}" class="resizable-detail-panel" style="display: none !important;">
+			<div id="${panelId}" class="resizable-detail-panel" style="display: none;">
 				<!-- Resize Handle (NEVER destroyed - listeners persist) -->
 				<div
 					id="detailPanelResizeHandle"

@@ -238,7 +238,14 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		const environments = await this.getEnvironments();
 
 		// Load persisted filter criteria and auto-refresh interval before initial render
-		await this.filterManagementBehavior.loadFilterCriteria(this.currentEnvironmentId);
+		const persistedAutoRefreshInterval = await this.filterManagementBehavior.loadFilterCriteria(
+			this.currentEnvironmentId
+		);
+
+		// Set the loaded interval on the auto-refresh behavior
+		if (persistedAutoRefreshInterval > 0) {
+			this.autoRefreshBehavior.setInterval(persistedAutoRefreshInterval);
+		}
 
 		this.logger.debug('Initializing with auto-refresh interval', {
 			interval: this.autoRefreshBehavior.getInterval()

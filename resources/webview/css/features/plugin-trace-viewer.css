@@ -1291,7 +1291,7 @@ tbody tr.selected.row-odd:hover {
 	margin: 0;
 	font-family: var(--vscode-editor-font-family);
 	font-size: 12px;
-	color: var(--vscode-editor-foreground);
+	/* color removed - let JsonHighlighter styles control color */
 	background: var(--vscode-editor-background);
 	overflow-x: auto;
 	white-space: pre;

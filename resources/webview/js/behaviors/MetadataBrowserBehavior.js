@@ -251,7 +251,6 @@ window.createBehavior({
 	 * Renders keys table
 	 */
 	renderKeysTable(keys) {
-		console.log('[MetadataBrowser] renderKeysTable', { count: keys.length });
 		this.renderTable('keysTable', keys, [
 			{ key: 'name', isLinkable: true },
 			{ key: 'type' },
@@ -263,7 +262,6 @@ window.createBehavior({
 	 * Renders 1:N relationships table
 	 */
 	renderOneToManyRelationshipsTable(relationships) {
-		console.log('[MetadataBrowser] renderOneToManyRelationshipsTable', { count: relationships.length });
 		const tbody = document.querySelector('#oneToManyTable tbody');
 		const empty = document.querySelector('#oneToManyTable').closest('.tab-panel').querySelector('.table-empty');
 
@@ -297,7 +295,6 @@ window.createBehavior({
 	 * Renders N:1 relationships table
 	 */
 	renderManyToOneRelationshipsTable(relationships) {
-		console.log('[MetadataBrowser] renderManyToOneRelationshipsTable', { count: relationships.length });
 		const tbody = document.querySelector('#manyToOneTable tbody');
 		const empty = document.querySelector('#manyToOneTable').closest('.tab-panel').querySelector('.table-empty');
 
@@ -331,7 +328,6 @@ window.createBehavior({
 	 * Renders N:N relationships table
 	 */
 	renderManyToManyRelationshipsTable(relationships) {
-		console.log('[MetadataBrowser] renderManyToManyRelationshipsTable', { count: relationships.length });
 		const tbody = document.querySelector('#manyToManyTable tbody');
 		const empty = document.querySelector('#manyToManyTable').closest('.tab-panel').querySelector('.table-empty');
 
@@ -379,7 +375,6 @@ window.createBehavior({
 	 * Renders privileges table
 	 */
 	renderPrivilegesTable(privileges) {
-		console.log('[MetadataBrowser] renderPrivilegesTable', { count: privileges.length });
 		this.renderTable('privilegesTable', privileges, [
 			{ key: 'name', isLinkable: true },
 			{ key: 'privilegeType' },
@@ -402,8 +397,6 @@ window.createBehavior({
 	 * Generic table rendering
 	 */
 	renderTable(tableId, data, columns, tab) {
-		console.log('[MetadataBrowser] renderTable', { tableId, tab, dataCount: data?.length });
-
 		const tbody = document.querySelector(`#${tableId} tbody`);
 		const empty = document.querySelector(`#${tableId}`).closest('.tab-panel').querySelector('.table-empty');
 
@@ -419,17 +412,6 @@ window.createBehavior({
 		}
 
 		if (empty) empty.style.display = 'none';
-
-		// Check first row for debugging
-		if (data.length > 0) {
-			console.log('[MetadataBrowser] First row sample', {
-				tableId,
-				hasIsLinkable: 'isLinkable' in data[0],
-				isLinkable: data[0].isLinkable,
-				hasMetadata: 'metadata' in data[0],
-				keys: Object.keys(data[0])
-			});
-		}
 
 		tbody.innerHTML = data.map((row, index) => `
 			<tr data-index="${index}" class="${index % 2 === 0 ? 'row-even' : 'row-odd'}">
@@ -458,7 +440,6 @@ window.createBehavior({
 		}
 
 		const links = tbody.querySelectorAll('a.table-link');
-		console.log('[MetadataBrowser] attachTableHandlers', { tableId, tab, linkCount: links.length, dataLength: data.length });
 
 		links.forEach(link => {
 			link.addEventListener('click', (e) => {
@@ -467,7 +448,6 @@ window.createBehavior({
 
 				if (action === 'openDetail') {
 					const index = parseInt(link.dataset.index);
-					console.log('[MetadataBrowser] Opening detail panel', { tab, index, dataLength: data.length });
 
 					if (index < 0 || index >= data.length) {
 						console.error('[MetadataBrowser] Invalid index', { index, dataLength: data.length });
@@ -488,7 +468,6 @@ window.createBehavior({
 						return;
 					}
 
-					console.log('[MetadataBrowser] Sending openDetailPanel message', { tab, itemId });
 					this.openDetailPanel(tab, itemId, metadata);
 				} else if (action === 'navigate') {
 					const target = link.dataset.target;
@@ -710,8 +689,6 @@ window.createBehavior({
 	 * Shows detail panel with metadata
 	 */
 	showDetailPanel(data) {
-		console.log('[MetadataBrowser] showDetailPanel called', { data });
-
 		const { tab, itemId, metadata, rawEntity } = data;
 
 		if (!metadata) {
@@ -741,7 +718,6 @@ window.createBehavior({
 		const panel = document.getElementById('metadataDetailPanel');
 		if (panel) {
 			panel.style.display = 'flex';
-			console.log('[MetadataBrowser] Detail panel displayed');
 		} else {
 			console.error('[MetadataBrowser] Detail panel element not found');
 		}
@@ -784,7 +760,6 @@ window.createBehavior({
 		}
 
 		detailPanel.style.width = `${width}px`;
-		console.log('[MetadataBrowser] Restored detail panel width:', width);
 	},
 
 	/**
@@ -796,8 +771,6 @@ window.createBehavior({
 			console.error('[MetadataBrowser] Cannot setup resize - panel not found');
 			return;
 		}
-
-		console.log('[MetadataBrowser] Setting up detail panel resize');
 
 		let isResizing = false;
 		let startX = 0;
@@ -844,8 +817,6 @@ window.createBehavior({
 				data: { width: currentWidth }
 			});
 		});
-
-		console.log('[MetadataBrowser] Detail panel resize setup complete');
 	},
 
 	/**
@@ -1032,8 +1003,14 @@ window.createBehavior({
 
 		// Inject JSON highlighter styles if not already present
 		if (!document.getElementById('json-highlighter-styles')) {
+			const nonceMeta = document.getElementById('vscode-csp-nonce');
+			const nonce = nonceMeta ? nonceMeta.getAttribute('content') : '';
+
 			const styleTag = document.createElement('style');
 			styleTag.id = 'json-highlighter-styles';
+			if (nonce) {
+				styleTag.setAttribute('nonce', nonce);
+			}
 			styleTag.textContent = JsonHighlighter.getStyles();
 			document.head.appendChild(styleTag);
 		}
@@ -1113,7 +1090,6 @@ window.createBehavior({
 	 * Opens detail panel
 	 */
 	openDetailPanel(tab, itemId, metadata) {
-		console.log('[MetadataBrowser] openDetailPanel - posting message to extension', { tab, itemId, hasMetadata: !!metadata });
 		window.vscode.postMessage({
 			command: 'openDetailPanel',
 			data: { tab, itemId, metadata }
