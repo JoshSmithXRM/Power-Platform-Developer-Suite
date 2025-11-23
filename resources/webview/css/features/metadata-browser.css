@@ -12,7 +12,7 @@
 
 .metadata-browser-container {
 	display: flex;
-	height: calc(100vh - 120px); /* Account for toolbar */
+	height: 100%; /* Fill parent height (main-section) */
 	gap: 0;
 	overflow: hidden;
 }
@@ -30,12 +30,14 @@
 	flex-direction: column;
 	background: var(--vscode-sideBar-background);
 	overflow: hidden;
+	min-height: 0; /* Prevent flex overflow - allows tree-container to scroll properly */
 }
 
 .tree-search-container {
 	padding: 8px;
 	border-bottom: 1px solid var(--vscode-panel-border);
 	background: var(--vscode-sideBar-background);
+	flex-shrink: 0; /* Don't shrink - maintain fixed height */
 }
 
 .tree-search-input {
@@ -163,8 +165,57 @@
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
+	min-height: 0; /* Prevent flex overflow */
 	overflow: hidden;
 }
+
+/* ==================================================
+   Selection Header (Breadcrumb)
+   ================================================== */
+
+.selection-header {
+	display: flex;
+	align-items: center;
+	padding: 10px 16px;
+	background: var(--vscode-editor-background);
+	border-bottom: 1px solid var(--vscode-panel-border);
+	gap: 10px;
+	flex-shrink: 0; /* Don't shrink - maintain fixed height */
+}
+
+.selection-icon {
+	font-size: 18px;
+	flex-shrink: 0;
+}
+
+.selection-info {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	flex: 1;
+}
+
+.selection-name {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.selection-technical {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	margin-top: 2px;
+}
+
+/* ==================================================
+   Tab Navigation
+   ================================================== */
 
 /* Tab Navigation */
 .tab-navigation {
@@ -173,6 +224,7 @@
 	border-bottom: 1px solid var(--vscode-panel-border);
 	background: var(--vscode-editor-background);
 	padding: 0 12px;
+	flex-shrink: 0; /* Don't shrink - maintain fixed height */
 }
 
 .tab-button {
@@ -199,6 +251,7 @@
 /* Tab Content */
 .tab-content-container {
 	flex: 1;
+	min-height: 0; /* Critical: allows nested flex children to scroll */
 	overflow: hidden;
 	position: relative;
 }
@@ -218,12 +271,14 @@
 	height: 100%;
 	display: flex;
 	flex-direction: column;
+	min-height: 0; /* Critical: allows table-wrapper to scroll independently */
 }
 
 .table-toolbar {
 	padding: 8px 12px;
 	border-bottom: 1px solid var(--vscode-panel-border);
 	background: var(--vscode-editor-background);
+	flex-shrink: 0; /* Don't shrink - maintain fixed height */
 }
 
 .table-search {

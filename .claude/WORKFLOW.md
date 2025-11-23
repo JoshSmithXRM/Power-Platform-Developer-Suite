@@ -218,7 +218,7 @@ Now design Slice 1 using that approach.
 - Tests document behavior (executable specification)
 - Architecture guides document patterns
 - Design docs drift from implementation immediately
-- Keeping designs creates bloat (see DOCUMENTATION_POLICY.md)
+- Delete designs after feature complete to avoid bloat
 
 **Exception:** If design introduced NEW architectural pattern:
 - Extract pattern to `docs/architecture/*.md`

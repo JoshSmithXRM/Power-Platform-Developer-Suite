@@ -54,8 +54,6 @@
 - Tests are executable specifications (always current, always accurate)
 - Design docs drift within days of implementation (tests don't)
 
-**See**: `docs/DOCUMENTATION_POLICY.md` for retention rules
-
 ---
 
 ### 2. **Concise, Example-Driven, Practical**
@@ -191,8 +189,8 @@
   - Keeping designs wastes AI context on outdated info
 
 - **Analysis docs** after issue resolved
-  - docs/analysis/*.md, docs/technical-debt/*.md (individual investigations)
-  - Consolidate findings to TECHNICAL_DEBT.md, delete investigation
+  - docs/analysis/*.md (individual investigations)
+  - Add findings to appropriate technical-debt/ category, delete investigation
 
 - **Requirements docs** after feature complete
   - Tests are executable requirements (more reliable than docs)
@@ -212,8 +210,6 @@ If design doc introduced NEW architectural pattern:
 1. Extract pattern to architecture guide (e.g., PANEL_ARCHITECTURE.md)
 2. Delete design doc specifics
 3. Architecture guide documents pattern (living doc)
-
-**See**: `docs/DOCUMENTATION_POLICY.md` for complete retention rules
 
 ---
 
@@ -259,10 +255,10 @@ If design doc introduced NEW architectural pattern:
              │ NO
              ▼
     ┌───────────────────────────┐
-    │ Is it a temporary         │ YES → Create in docs/technical-debt/
+    │ Is it a temporary         │ YES → Create in docs/analysis/
     │ INVESTIGATION/ANALYSIS?   │       DELETE after issue resolved
-    └────────┬──────────────────┘       Consolidate findings to
-             │ NO                        TECHNICAL_DEBT.md
+    └────────┬──────────────────┘       Add findings to technical-debt/
+             │ NO                        (categorized by priority)
              ▼
     ┌───────────────────────────┐
     │ Is it a simple feature    │ YES → DON'T CREATE
@@ -290,8 +286,6 @@ If design doc introduced NEW architectural pattern:
 2. **Will this be updated regularly?** (If NO → Consider temporary)
 3. **Do tests/code already document this?** (If YES → Don't create)
 4. **Is this a pattern or a specific implementation?** (Pattern → CREATE, Implementation → DON'T)
-
-**See**: `docs/DOCUMENTATION_POLICY.md` for detailed retention rules
 
 ---
 
@@ -910,7 +904,6 @@ Before merging new/updated documentation, verify:
 ### Integration
 - [ ] README.md index updated with new doc
 - [ ] Cross-references updated in related docs
-- [ ] DOCUMENTATION_POLICY.md consulted for retention
 - [ ] CHANGELOG.md updated with significant documentation changes
 
 ### Validation
@@ -1197,7 +1190,7 @@ Never use `any` type. Use `unknown` instead.
 - [ ] Delete `.review/archive/` folders >6 months old
 - [ ] Review `docs/design/` - delete any lingering design docs
 - [ ] Review `docs/analysis/` - delete completed investigations
-- [ ] Consolidate findings to TECHNICAL_DEBT.md
+- [ ] Add findings to technical-debt/ (categorized: accepted, scheduled, low-priority)
 
 ### Quarterly Review
 - [ ] **Run `/comprehensive-review`** (8-agent production readiness check)
@@ -1205,7 +1198,7 @@ Never use `any` type. Use `unknown` instead.
 - [ ] Update examples to match current code (or delete if outdated)
 - [ ] Remove outdated troubleshooting entries
 - [ ] Verify all cross-references still valid
-- [ ] Review TECHNICAL_DEBT.md - delete resolved items
+- [ ] Run `/review-technical-debt` - delete resolved items, update review dates
 - [ ] Update style guide based on lessons learned
 
 ### Annual Review
@@ -1235,7 +1228,6 @@ Never use `any` type. Use `unknown` instead.
 ## 🔗 See Also
 
 **Documentation Philosophy:**
-- [DOCUMENTATION_POLICY.md](DOCUMENTATION_POLICY.md) - Retention rules (when to create/update/delete)
 - [CLAUDE.md](../CLAUDE.md) - Quick reference for AI agents (coding rules, workflow)
 - [README.md](README.md) - Master index of all documentation
 

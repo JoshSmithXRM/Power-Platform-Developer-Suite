@@ -104,12 +104,8 @@ Start with CLAUDE.md to understand the project's core principles, then refer to 
   - Examples with ✅/❌ pattern
 
 ### Technical Debt
-- [technical-debt/](technical-debt/) - Categorized technical debt tracking (7 items)
-  - **Accepted Tradeoffs** (3 items) - Keep indefinitely (0 bugs, high cost)
-  - **Will Not Implement** (1 item) - Rejected suggestions
-  - **Scheduled** (2 items) - Fix in 1-2 sprints
-  - **Low Priority** (1 item) - Fix opportunistically
-  - See [technical-debt/README.md](technical-debt/README.md) for full index
+- [technical-debt/](technical-debt/) - Categorized technical debt tracking
+  - See [technical-debt/README.md](technical-debt/README.md) for complete index and current counts
 
 ---
 

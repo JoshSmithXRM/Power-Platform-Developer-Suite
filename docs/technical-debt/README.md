@@ -1,7 +1,7 @@
 # Technical Debt Inventory
 
 **Last Updated:** 2025-11-23
-**Total Items:** 4 (6 items resolved/reclassified today)
+**Total Items:** 6 (6 items resolved/reclassified earlier today, 1 low-priority item added)
 
 ---
 
@@ -12,7 +12,7 @@
 | **Accepted Tradeoffs** | 4 | Keep indefinitely (conscious decisions) |
 | **Will Not Implement** | 1 | Rejected (over-engineering) |
 | **Scheduled** | 0 | Fix in next 1-2 sprints (all items resolved) |
-| **Low Priority** | 0 | Fix when naturally touching code |
+| **Low Priority** | 1 | Fix when naturally touching code |
 
 ---
 
@@ -83,11 +83,15 @@ Items with clear triggers or timelines for fixing.
 
 ---
 
-## 🔵 Low Priority (0 items)
+## 🔵 Low Priority (1 item)
 
 Fix when it becomes a problem or when naturally touching the code.
 
-**All low priority items resolved:**
+| Item | Type | Effort | Trigger |
+|------|------|--------|---------|
+| [Notification Service Abstraction](low-priority/notification-service-abstraction.md) | Refactoring (consistency enforcement) | 4-6 hours | When refactoring 10+ notification callsites |
+
+**Previously resolved items:**
 
 ✅ **Cross-Feature DTO Coupling** (resolved 2025-11-23)
 - Created `src/shared/application/dtos/EnvironmentConnectionDto.ts`
@@ -101,24 +105,25 @@ Fix when it becomes a problem or when naturally touching the code.
 ### Debt by Category (Visual)
 
 ```
-Accepted Tradeoffs: ████   4 items (100%)
-Will Not Implement: -      0 items (0%)
+Accepted Tradeoffs: ████   4 items (67%)
+Will Not Implement: █      1 item  (17%)
 Scheduled:          -      0 items (0%)
-Low Priority:       -      0 items (0%)
+Low Priority:       █      1 item  (17%)
 ```
 
 ### Decision Quality
 
 | Metric | Value | Assessment |
 |--------|-------|------------|
-| **Items with zero bugs** | 4/4 (100%) | ✅ Excellent - all decisions validated |
+| **Items with zero bugs** | 6/6 (100%) | ✅ Excellent - all decisions validated |
 | **Patterns promoted to architecture docs** | 2 items | ✅ Industry standards (static factories, OData) |
 | **Rejected over-engineering** | 1 item | ✅ Good judgment (avoided cargo cult patterns) |
 | **Items resolved in last review** | 4 items | ✅ Proactive (DateTimeFilter, split guide, shared DTO, ESLint rule) |
 | **Documentation quality** | 29/29 suppressions documented | ✅ Perfect (100% documented) |
 | **ESLint rule quality** | Prefix matching (future-proof) | ✅ Improved (12 suppressions eliminated) |
+| **Notification consistency** | 99% (1/95 fixed) | ✅ Excellent (abstraction deferred, not urgent) |
 
-**Overall Health:** 🟢 Excellent (6 items resolved/reclassified today)
+**Overall Health:** 🟢 Excellent (6 items total: 4 accepted, 1 rejected over-engineering, 1 low-priority future improvement)
 
 ---
 
@@ -170,7 +175,7 @@ docs/technical-debt/
 │   └── (empty - all items resolved)
 │
 └── low-priority/                                # Opportunistic fix
-    └── (empty - all items resolved)
+    └── notification-service-abstraction.md      # 95+ callsites, defer until refactoring
 
 Reclassified as architectural patterns (moved to docs/architecture/):
 - static-factory-methods.md → STATIC_FACTORY_PATTERN.md

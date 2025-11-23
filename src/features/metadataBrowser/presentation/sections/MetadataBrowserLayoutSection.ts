@@ -70,6 +70,15 @@ export class MetadataBrowserLayoutSection implements ISection {
 
 				<!-- Center Panel: Tabbed Content -->
 				<div class="metadata-content">
+					<!-- Selection Header (Breadcrumb) -->
+					<div class="selection-header" id="selectionHeader" style="display: none;">
+						<span class="selection-icon" id="selectionIcon"></span>
+						<div class="selection-info">
+							<span class="selection-name" id="selectionName"></span>
+							<span class="selection-technical" id="selectionTechnical"></span>
+						</div>
+					</div>
+
 					<!-- Tab Navigation -->
 					<div class="tab-navigation" id="tabNavigation">
 						<!-- Tabs will be dynamically shown/hidden based on selection type -->

@@ -198,11 +198,14 @@ export interface EntityKeyDto {
 
 /**
  * DTO representing security privilege metadata.
+ * Note: PrivilegeType can be string or number depending on entity type.
+ * Most entities return number (0-8), but some system entities (e.g., PrincipalObjectAttributeAccess)
+ * return string values ("Create", "Read", etc.).
  */
 export interface SecurityPrivilegeDto {
     PrivilegeId: string;
     Name: string;
-    PrivilegeType: number;
+    PrivilegeType: number | string;
     CanBeBasic: boolean;
     CanBeLocal: boolean;
     CanBeDeep: boolean;

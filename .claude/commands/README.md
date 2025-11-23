@@ -35,7 +35,7 @@ Type `/` in Claude Code to see all available commands.
 **Duration:** ~15 minutes
 
 ### `/review-technical-debt`
-**Purpose:** Audit TECHNICAL_DEBT.md, verify issues still exist, clean up resolved items
+**Purpose:** Audit categorized technical debt items, verify issues still exist, clean up resolved items
 **Frequency:** Quarterly or before major releases
 **Duration:** 5-10 minutes
 

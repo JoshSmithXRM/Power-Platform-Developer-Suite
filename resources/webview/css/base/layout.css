@@ -17,6 +17,7 @@
 	border-bottom: 1px solid var(--vscode-panel-border);
 	background: var(--vscode-editor-background);
 	gap: 12px;
+	flex-shrink: 0; /* Don't shrink - maintain fixed height */
 }
 
 .header-section,
@@ -27,5 +28,6 @@
 
 .main-section {
 	flex: 1;
-	overflow: auto;
+	overflow: hidden; /* Don't scroll here - let children scroll independently */
+	min-height: 0; /* Allow flex children to shrink and scroll */
 }

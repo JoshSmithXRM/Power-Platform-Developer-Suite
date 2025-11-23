@@ -643,6 +643,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			if (level.isPerformanceIntensive()) {
 				const confirmed = await vscode.window.showWarningMessage(
 					'Setting trace level to "All" will log all plugin executions and may impact performance. Continue?',
+					{ modal: true },
 					'Yes',
 					'No'
 				);

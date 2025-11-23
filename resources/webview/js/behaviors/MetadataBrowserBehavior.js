@@ -128,7 +128,17 @@ window.createBehavior({
 	 * Sets entity mode with all tabs
 	 */
 	setEntityMode(data) {
-		const { attributes, keys, oneToManyRelationships, manyToOneRelationships, manyToManyRelationships, privileges, selectedTab } = data;
+		const { entity, attributes, keys, oneToManyRelationships, manyToOneRelationships, manyToManyRelationships, privileges, selectedTab } = data;
+
+		// Update selection header
+		if (entity) {
+			this.updateSelectionHeader({
+				type: 'entity',
+				icon: entity.icon || '📊',
+				displayName: entity.displayName || 'Entity',
+				technicalName: entity.logicalName || ''
+			});
+		}
 
 		// Show entity tabs, hide choice tabs
 		this.showEntityTabs();
@@ -149,7 +159,17 @@ window.createBehavior({
 	 * Sets choice mode
 	 */
 	setChoiceMode(data) {
-		const { choiceValues } = data;
+		const { choice, choiceValues } = data;
+
+		// Update selection header
+		if (choice) {
+			this.updateSelectionHeader({
+				type: 'choice',
+				icon: choice.icon || '🎨',
+				displayName: choice.displayName || 'Global Choice',
+				technicalName: choice.name || ''
+			});
+		}
 
 		// Show choice tabs, hide entity tabs
 		this.showChoiceTabs();
@@ -192,8 +212,35 @@ window.createBehavior({
 			item.classList.remove('selected');
 		});
 
+		// Hide selection header
+		const selectionHeader = document.getElementById('selectionHeader');
+		if (selectionHeader) {
+			selectionHeader.style.display = 'none';
+		}
+
 		// Hide detail panel
 		this.hideDetailPanel();
+	},
+
+	/**
+	 * Updates the selection header with current entity/choice information.
+	 * Shows breadcrumb with icon, display name, and technical name.
+	 */
+	updateSelectionHeader(selection) {
+		const header = document.getElementById('selectionHeader');
+		const icon = document.getElementById('selectionIcon');
+		const name = document.getElementById('selectionName');
+		const technical = document.getElementById('selectionTechnical');
+
+		if (!header || !icon || !name || !technical) return;
+
+		// Populate header content
+		icon.textContent = selection.icon;
+		name.textContent = selection.displayName;
+		technical.textContent = selection.technicalName;
+
+		// Show header
+		header.style.display = 'flex';
 	},
 
 	/**
