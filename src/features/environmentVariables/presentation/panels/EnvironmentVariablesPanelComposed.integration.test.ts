@@ -18,6 +18,7 @@ import { EnvironmentVariable, EnvironmentVariableType } from '../../domain/entit
 import type { EnvironmentOption } from '../../../../shared/infrastructure/ui/DataTablePanel';
 import type { EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/solutionFilterView';
+import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 
 // Mock VS Code module
 const ViewColumn = {
@@ -271,7 +272,7 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 
 			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
-				undefined
+				DEFAULT_SOLUTION_ID
 			);
 			expect(mockViewModelMapper.toViewModel).toHaveBeenCalledTimes(2);
 		});
@@ -376,7 +377,7 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 			// Verify the use case was called with empty result
 			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
-				undefined
+				DEFAULT_SOLUTION_ID
 			);
 		});
 
@@ -453,10 +454,15 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 
 			await createPanelAndWait();
 
-			// Should load without solution filter
-			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith(
-				TEST_ENVIRONMENT_ID,
-				undefined
+			// Should fallback to DEFAULT_SOLUTION_ID and save corrected state
+			expect(mockPanelStateRepository.save).toHaveBeenCalledWith(
+				{
+					panelType: 'environmentVariables',
+					environmentId: TEST_ENVIRONMENT_ID
+				},
+				expect.objectContaining({
+					selectedSolutionId: DEFAULT_SOLUTION_ID
+				})
 			);
 		});
 
@@ -496,25 +502,30 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 			);
 		});
 
-		it('should clear panel state when solution filter is removed', async () => {
+		it('should save DEFAULT_SOLUTION_ID when solution filter is reset', async () => {
 			await createPanelAndWait();
 
 			// Clear previous calls
 			jest.clearAllMocks();
 
-			// Simulate clearing solution filter
+			// Simulate resetting solution filter to DEFAULT_SOLUTION_ID
 			if (messageCallback) {
-				await messageCallback({ command: 'solutionChange', data: { solutionId: undefined } });
+				await messageCallback({ command: 'solutionChange', data: { solutionId: DEFAULT_SOLUTION_ID } });
 			}
 
 			// Wait for async handler
 			await new Promise(resolve => process.nextTick(resolve));
 			await new Promise(resolve => process.nextTick(resolve));
 
-			expect(mockPanelStateRepository.clear).toHaveBeenCalledWith({
-				panelType: 'environmentVariables',
-				environmentId: TEST_ENVIRONMENT_ID
-			});
+			expect(mockPanelStateRepository.save).toHaveBeenCalledWith(
+				{
+					panelType: 'environmentVariables',
+					environmentId: TEST_ENVIRONMENT_ID
+				},
+				expect.objectContaining({
+					selectedSolutionId: DEFAULT_SOLUTION_ID
+				})
+			);
 		});
 	});
 
@@ -539,7 +550,7 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 			await new Promise(resolve => process.nextTick(resolve));
 			await new Promise(resolve => process.nextTick(resolve));
 
-			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith('env2', undefined);
+			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith('env2', DEFAULT_SOLUTION_ID);
 			expect(mockSolutionRepository.findAllForDropdown).toHaveBeenCalledWith('env2');
 		});
 
@@ -563,8 +574,8 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 			await new Promise(resolve => process.nextTick(resolve));
 			await new Promise(resolve => process.nextTick(resolve));
 
-			// Should load without solution filter in new environment
-			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith('env2', undefined);
+			// Should load with DEFAULT_SOLUTION_ID in new environment
+			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith('env2', DEFAULT_SOLUTION_ID);
 		});
 	});
 
@@ -709,7 +720,7 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 
 			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
-				undefined
+				DEFAULT_SOLUTION_ID
 			);
 
 			expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
@@ -744,7 +755,7 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 
 			expect(mockUrlBuilder.buildEnvironmentVariablesObjectsUrl).toHaveBeenCalledWith(
 				'pp-test-env-123',
-				undefined
+				DEFAULT_SOLUTION_ID
 			);
 			expect(vscode.env.openExternal).toHaveBeenCalled();
 		});

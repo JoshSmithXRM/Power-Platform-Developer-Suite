@@ -6,6 +6,7 @@ import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
 import { EnvironmentVariable, EnvironmentVariableType } from '../../domain/entities/EnvironmentVariable';
 import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import type { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
+import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 
 describe('ListEnvironmentVariablesUseCase', () => {
 	let useCase: ListEnvironmentVariablesUseCase;
@@ -74,7 +75,7 @@ describe('ListEnvironmentVariablesUseCase', () => {
 	}
 
 	describe('successful listing - all environment variables', () => {
-		it('should list all environment variables when no solution filter is provided', async () => {
+		it('should list all environment variables using DEFAULT_SOLUTION_ID', async () => {
 			// Arrange
 			const environmentId = 'env-123';
 			const definitions = [
@@ -87,9 +88,11 @@ describe('ListEnvironmentVariablesUseCase', () => {
 
 			mockEnvVarRepository.findAllDefinitions.mockResolvedValue(definitions);
 			mockEnvVarRepository.findAllValues.mockResolvedValue(values);
+			// Mock solution filtering to return all definition IDs (DEFAULT_SOLUTION_ID contains everything)
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1', 'def-2']);
 
 			// Act
-			const result = await useCase.execute(environmentId);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result).toHaveLength(2);
@@ -101,7 +104,14 @@ describe('ListEnvironmentVariablesUseCase', () => {
 
 			expect(mockEnvVarRepository.findAllDefinitions).toHaveBeenCalledWith(environmentId, undefined, undefined);
 			expect(mockEnvVarRepository.findAllValues).toHaveBeenCalledWith(environmentId, undefined, undefined);
-			expect(mockSolutionComponentRepository.findComponentIdsBySolution).not.toHaveBeenCalled();
+			// Solution filtering is now always applied
+			expect(mockSolutionComponentRepository.findComponentIdsBySolution).toHaveBeenCalledWith(
+				environmentId,
+				DEFAULT_SOLUTION_ID,
+				'environmentvariabledefinition',
+				undefined,
+				undefined
+			);
 		});
 
 		it('should handle environment with no environment variables', async () => {
@@ -111,7 +121,8 @@ describe('ListEnvironmentVariablesUseCase', () => {
 			mockEnvVarRepository.findAllValues.mockResolvedValue([]);
 
 			// Act
-			const result = await useCase.execute(environmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1', 'def-2']);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result).toHaveLength(0);
@@ -133,9 +144,11 @@ describe('ListEnvironmentVariablesUseCase', () => {
 
 			mockEnvVarRepository.findAllDefinitions.mockResolvedValue(definitions);
 			mockEnvVarRepository.findAllValues.mockResolvedValue(values);
+			// Mock solution filtering to return all definition IDs
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1', 'def-2', 'def-3']);
 
 			// Act
-			const result = await useCase.execute(environmentId);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result).toHaveLength(3);
@@ -158,9 +171,11 @@ describe('ListEnvironmentVariablesUseCase', () => {
 
 			mockEnvVarRepository.findAllDefinitions.mockResolvedValue(definitions);
 			mockEnvVarRepository.findAllValues.mockResolvedValue([]);
+			// Mock solution filtering to return all definition IDs
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1', 'def-2', 'def-3', 'def-4', 'def-5', 'def-6']);
 
 			// Act
-			const result = await useCase.execute(environmentId);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result).toHaveLength(6);
@@ -257,7 +272,7 @@ describe('ListEnvironmentVariablesUseCase', () => {
 			const cancellationToken = createCancellationToken(true);
 
 			// Act & Assert
-			await expect(useCase.execute(environmentId, undefined, cancellationToken))
+			await expect(useCase.execute(environmentId, DEFAULT_SOLUTION_ID, cancellationToken))
 				.rejects
 				.toThrow(OperationCancelledException);
 
@@ -286,8 +301,11 @@ describe('ListEnvironmentVariablesUseCase', () => {
 				return values;
 			});
 
+			// Mock solution component repository for DEFAULT_SOLUTION_ID
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1']);
+
 			// Act & Assert
-			await expect(useCase.execute(environmentId, undefined, cancellationToken))
+			await expect(useCase.execute(environmentId, DEFAULT_SOLUTION_ID, cancellationToken))
 				.rejects
 				.toThrow(OperationCancelledException);
 
@@ -332,9 +350,11 @@ describe('ListEnvironmentVariablesUseCase', () => {
 
 			mockEnvVarRepository.findAllDefinitions.mockResolvedValue(definitions);
 			mockEnvVarRepository.findAllValues.mockResolvedValue([]);
+			// Mock solution component repository for DEFAULT_SOLUTION_ID
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1']);
 
 			// Act
-			const result = await useCase.execute(environmentId, undefined, cancellationToken);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID, cancellationToken);
 
 			// Assert
 			expect(result).toHaveLength(1);
@@ -349,7 +369,7 @@ describe('ListEnvironmentVariablesUseCase', () => {
 			mockEnvVarRepository.findAllDefinitions.mockRejectedValue(error);
 
 			// Act & Assert
-			await expect(useCase.execute(environmentId))
+			await expect(useCase.execute(environmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Failed to fetch definitions');
 		});
@@ -364,7 +384,7 @@ describe('ListEnvironmentVariablesUseCase', () => {
 			mockEnvVarRepository.findAllValues.mockRejectedValue(error);
 
 			// Act & Assert
-			await expect(useCase.execute(environmentId))
+			await expect(useCase.execute(environmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Failed to fetch values');
 		});
@@ -392,7 +412,7 @@ describe('ListEnvironmentVariablesUseCase', () => {
 			mockEnvVarRepository.findAllDefinitions.mockRejectedValue('String error');
 
 			// Act & Assert
-			await expect(useCase.execute(environmentId))
+			await expect(useCase.execute(environmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow();
 		});
@@ -419,9 +439,11 @@ describe('ListEnvironmentVariablesUseCase', () => {
 				callOrder.push('findAllValues-end');
 				return values;
 			});
+			// Mock solution component repository
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1', 'def-2']);
 
 			// Act
-			await useCase.execute(environmentId);
+			await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert - Calls should be interleaved (parallel execution)
 			expect(callOrder[0]).toBe('findAllDefinitions-start');
@@ -518,7 +540,8 @@ describe('ListEnvironmentVariablesUseCase', () => {
 			mockEnvVarRepository.findAllValues.mockResolvedValue([]);
 
 			// Act
-			const result = await useCase.execute(environmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1', 'def-2']);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result).toHaveLength(1);
@@ -537,7 +560,8 @@ describe('ListEnvironmentVariablesUseCase', () => {
 			mockEnvVarRepository.findAllValues.mockResolvedValue([]);
 
 			// Act
-			const result = await useCase.execute(environmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1', 'def-2']);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result).toHaveLength(2);
@@ -555,7 +579,8 @@ describe('ListEnvironmentVariablesUseCase', () => {
 			mockEnvVarRepository.findAllValues.mockResolvedValue(values);
 
 			// Act
-			const result = await useCase.execute(environmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1', 'def-2']);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result).toHaveLength(1);
@@ -574,7 +599,8 @@ describe('ListEnvironmentVariablesUseCase', () => {
 			mockEnvVarRepository.findAllValues.mockResolvedValue([]);
 
 			// Act
-			const result = await useCase.execute(environmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1', 'def-2']);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result).toHaveLength(1);
@@ -595,7 +621,8 @@ describe('ListEnvironmentVariablesUseCase', () => {
 			mockEnvVarRepository.findAllValues.mockResolvedValue(values);
 
 			// Act
-			const result = await useCase.execute(environmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1', 'def-2']);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert - Orphaned values are ignored (left join on definitions)
 			expect(result).toHaveLength(1);
@@ -616,9 +643,12 @@ describe('ListEnvironmentVariablesUseCase', () => {
 
 			mockEnvVarRepository.findAllDefinitions.mockResolvedValue(definitions);
 			mockEnvVarRepository.findAllValues.mockResolvedValue(values);
+			// Mock solution filtering to return all definition IDs
+			const allDefinitionIds = Array.from({ length: 500 }, (_, i) => `def-${i}`);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(allDefinitionIds);
 
 			// Act
-			const result = await useCase.execute(environmentId);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result).toHaveLength(500);
@@ -663,7 +693,8 @@ describe('ListEnvironmentVariablesUseCase', () => {
 			mockEnvVarRepository.findAllValues.mockResolvedValue(values);
 
 			// Act
-			const result = await useCase.execute(environmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['def-1', 'def-2']);
+			const result = await useCase.execute(environmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result).toHaveLength(2);

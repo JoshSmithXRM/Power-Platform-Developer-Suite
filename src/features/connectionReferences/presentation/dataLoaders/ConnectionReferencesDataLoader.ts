@@ -5,6 +5,7 @@ import { ListConnectionReferencesUseCase } from '../../application/useCases/List
 import { FlowConnectionRelationshipViewModelMapper } from '../../application/mappers/FlowConnectionRelationshipViewModelMapper';
 import { FlowConnectionRelationshipCollectionService } from '../../domain/services/FlowConnectionRelationshipCollectionService';
 import { enhanceViewModelsWithFlowLinks } from '../views/FlowLinkView';
+import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 
 /**
  * Data loader for Connection References panel.
@@ -43,7 +44,7 @@ export class ConnectionReferencesDataLoader implements IDataLoader {
 
 		const result = await this.listConnectionReferencesUseCase.execute(
 			environmentId,
-			solutionId || undefined,
+			solutionId || DEFAULT_SOLUTION_ID,
 			cancellationToken
 		);
 

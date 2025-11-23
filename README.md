@@ -64,9 +64,32 @@ npm install
 npm run compile
 ```
 
+**Requirements:**
+- Node.js 20.x (recommended) or 18.x
+- Note: Node.js 22+ has module resolution issues with vsce packaging tools
+
 **Run in Development**
 - Start watch mode: `npm run watch`
 - Launch Extension Development Host: press **F5**
+
+**Local Extension Installation**
+
+Install your local development version in VS Code (as if published):
+```bash
+npm run local
+```
+This builds, packages, and installs the extension locally. Use it to test your changes in your actual VS Code environment.
+
+Revert to the published marketplace version:
+```bash
+npm run marketplace
+```
+This uninstalls your local version and reinstalls the official published version from the VS Code Marketplace.
+
+**When to Use Each:**
+- **F5 (Extension Development Host)**: Active development with hot reload - fastest iteration
+- **`npm run local`**: Test production-like build in your main VS Code - validate packaging
+- **`npm run marketplace`**: Return to stable published version - when local has issues
 
 ## 🔗 Documentation
 

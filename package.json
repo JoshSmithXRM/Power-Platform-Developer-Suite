@@ -336,6 +336,9 @@
         "test-release": "npm run package && npm run vsce-package && npm run install-local",
         "install-local": "code --install-extension power-platform-developer-suite-${npm_package_version}.vsix --force",
         "uninstall-local": "code --uninstall-extension JoshSmithXRM.power-platform-developer-suite",
+        "revert-to-marketplace": "npm run uninstall-local && code --install-extension JoshSmithXRM.power-platform-developer-suite && echo Successfully reverted to marketplace version",
+        "local": "npm run test-release",
+        "marketplace": "npm run revert-to-marketplace",
         "clean-install": "npm run uninstall-local && npm run test-release",
         "test-fresh": "npm run clean-install && code --new-window",
         "dead-code:check": "ts-prune",
@@ -349,11 +352,7 @@
         "maintenance:full": "npm run maintenance:monthly"
     },
     "dependencies": {
-        "@azure/msal-node": "^2.13.0",
-        "@types/node-fetch": "^2.6.13",
-        "axios": "^1.7.7",
-        "node-fetch": "^3.3.2",
-        "node-persist": "^4.0.2"
+        "@azure/msal-node": "^2.13.0"
     },
     "devDependencies": {
         "@eslint/js": "^9.35.0",
@@ -362,11 +361,13 @@
         "@types/vscode": "^1.74.0",
         "@typescript-eslint/eslint-plugin": "^8.43.0",
         "@typescript-eslint/parser": "^8.43.0",
+        "@vscode/vsce": "^3.2.1",
         "eslint-plugin-import": "^2.32.0",
         "eslint-plugin-local-rules": "^3.0.2",
         "jest": "^30.2.0",
         "ts-jest": "^29.4.5",
         "ts-loader": "^9.5.4",
+        "tslib": "^2.8.1",
         "typescript": "^4.9.4",
         "typescript-eslint": "^8.43.0",
         "webpack": "^5.101.3",

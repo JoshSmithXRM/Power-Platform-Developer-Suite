@@ -151,6 +151,8 @@
 
 	/**
 	 * Wires up solution filter dropdown.
+	 * Always sends a concrete solution ID (never undefined).
+	 * Default Solution is always the first option with a concrete GUID.
 	 */
 	function wireSolutionSelector() {
 		const solutionSelect = document.getElementById('solutionSelect');
@@ -162,7 +164,7 @@
 			vscode.postMessage({
 				command: 'solutionChange',
 				data: {
-					solutionId: solutionSelect.value || undefined
+					solutionId: solutionSelect.value
 				}
 			});
 		});

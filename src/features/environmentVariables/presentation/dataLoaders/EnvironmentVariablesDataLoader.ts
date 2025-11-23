@@ -41,7 +41,7 @@ export class EnvironmentVariablesDataLoader implements IDataLoader {
 
 		const environmentVariables = await this.listEnvVarsUseCase.execute(
 			environmentId,
-			solutionId || undefined,
+			solutionId,
 			cancellationToken
 		);
 

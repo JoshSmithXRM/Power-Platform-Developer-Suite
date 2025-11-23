@@ -26,13 +26,13 @@ export class ListEnvironmentVariablesUseCase {
 	/**
 	 * Executes the use case to list environment variables.
 	 * @param environmentId - Power Platform environment GUID
-	 * @param solutionId - Optional solution GUID to filter by
+	 * @param solutionId - Solution GUID to filter by (use DEFAULT_SOLUTION_ID to show all)
 	 * @param cancellationToken - Optional token to cancel the operation
 	 * @returns Promise resolving to array of EnvironmentVariable entities
 	 */
 	async execute(
 		environmentId: string,
-		solutionId?: string,
+		solutionId: string,
 		cancellationToken?: ICancellationToken
 	): Promise<EnvironmentVariable[]> {
 		this.logger.info('ListEnvironmentVariablesUseCase started', { environmentId, solutionId });
@@ -91,13 +91,9 @@ export class ListEnvironmentVariablesUseCase {
 	private async filterBySolution(
 		definitions: EnvironmentVariableDefinitionData[],
 		environmentId: string,
-		solutionId?: string,
+		solutionId: string,
 		cancellationToken?: ICancellationToken
 	): Promise<EnvironmentVariableDefinitionData[]> {
-		if (!solutionId) {
-			return definitions;
-		}
-
 		const componentIds = await this.solutionComponentRepository.findComponentIdsBySolution(
 			environmentId,
 			solutionId,

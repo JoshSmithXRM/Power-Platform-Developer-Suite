@@ -26,6 +26,7 @@ import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/Cs
 import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
 import type { HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 
 /**
  * Commands that the Connection References panel can receive from the webview.
@@ -44,7 +45,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	private coordinator!: PanelCoordinator<ConnectionReferencesCommands>;
 	private scaffoldingBehavior!: HtmlScaffoldingBehavior;
 	private currentEnvironmentId: string;
-	private currentSolutionId: string | undefined;
+	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
 	private connectionReferences: ConnectionReference[] = [];
 	private solutionOptions: SolutionOption[] = [];
 	private readonly viewModelMapper: FlowConnectionRelationshipViewModelMapper;
@@ -244,7 +245,9 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 
 		this.coordinator.registerHandler('solutionChange', async (data) => {
 			const solutionId = (data as { solutionId?: string })?.solutionId;
-			await this.handleSolutionChange(solutionId || undefined);
+			if (solutionId) {
+				await this.handleSolutionChange(solutionId);
+			}
 		});
 
 		this.coordinator.registerHandler('openMaker', async () => {
@@ -266,7 +269,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	}
 
 	private async initializeAndLoadData(): Promise<void> {
-		// Load saved solution selection from panel state
+		// Load persisted solution ID immediately (optimistic - no validation yet)
 		if (this.panelStateRepository) {
 			try {
 				const state = await this.panelStateRepository.load({
@@ -274,35 +277,59 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 					environmentId: this.currentEnvironmentId
 				});
 				if (state && typeof state === 'object' && 'selectedSolutionId' in state) {
-					this.currentSolutionId = state.selectedSolutionId as string | undefined;
+					const savedId = state.selectedSolutionId as string | undefined;
+					if (savedId) {
+						this.currentSolutionId = savedId;
+					}
 				}
 			} catch (error) {
 				this.logger.warn('Failed to load panel state', error);
 			}
 		}
 
-		// Initial HTML scaffolding (environments, solutions, empty table)
+		// Show initial loading state with known solution ID
 		const environments = await this.getEnvironments();
-		const solutions = await this.loadSolutions();
-
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
-			solutions,
+			solutions: [],
 			currentSolutionId: this.currentSolutionId,
 			tableData: [],
 			isLoading: true
 		});
 
-		// Load data
-		const data = await this.loadData();
+		// PARALLEL LOADING - Don't wait for solutions to load data!
+		const [solutions, data] = await Promise.all([
+			this.loadSolutions(),
+			this.loadData()
+		]);
 
-		// Re-render with actual data
+		// Post-load validation: Check if persisted solution still exists
+		let finalSolutionId = this.currentSolutionId;
+		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+			if (!solutions.some(s => s.id === this.currentSolutionId)) {
+				this.logger.warn('Persisted solution no longer exists, falling back to default', {
+					invalidSolutionId: this.currentSolutionId
+				});
+				finalSolutionId = DEFAULT_SOLUTION_ID;
+				this.currentSolutionId = DEFAULT_SOLUTION_ID;
+
+				// Save corrected state
+				if (this.panelStateRepository) {
+					await this.panelStateRepository.save(
+						{ panelType: 'connectionReferences', environmentId: this.currentEnvironmentId },
+						{ selectedSolutionId: DEFAULT_SOLUTION_ID, lastUpdated: new Date().toISOString() }
+					);
+				}
+			}
+		}
+
+		// Final render with both solutions and data
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			solutions,
-			currentSolutionId: this.currentSolutionId,
+			currentSolutionId: finalSolutionId,
 			tableData: data
 		});
 	}
@@ -353,7 +380,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		try {
 			const result = await this.listConnectionReferencesUseCase.execute(
 				this.currentEnvironmentId,
-				this.currentSolutionId || undefined,
+				this.currentSolutionId,
 				cancellationToken
 			);
 
@@ -387,7 +414,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		try {
 			const oldEnvironmentId = this.currentEnvironmentId;
 			this.currentEnvironmentId = environmentId;
-			this.currentSolutionId = undefined;
+			this.currentSolutionId = DEFAULT_SOLUTION_ID;
 
 			// Re-register panel in map for new environment
 			this.reregisterPanel(ConnectionReferencesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
@@ -403,7 +430,10 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 						environmentId: this.currentEnvironmentId
 					});
 					if (state && typeof state === 'object' && 'selectedSolutionId' in state) {
-						this.currentSolutionId = state.selectedSolutionId as string | undefined;
+						const savedId = state.selectedSolutionId as string | undefined;
+						if (savedId) {
+							this.currentSolutionId = savedId;
+						}
 					}
 				} catch (error) {
 					this.logger.warn('Failed to load panel state for new environment', error);
@@ -416,23 +446,16 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		}
 	}
 
-	private async handleSolutionChange(solutionId: string | undefined): Promise<void> {
+	private async handleSolutionChange(solutionId: string): Promise<void> {
 		this.currentSolutionId = solutionId;
 		this.clearTable();
 
-		// Save solution selection to panel state
+		// Always save concrete solution selection to panel state
 		if (this.panelStateRepository) {
-			if (solutionId) {
-				await this.panelStateRepository.save(
-					{ panelType: 'connectionReferences', environmentId: this.currentEnvironmentId },
-					{ selectedSolutionId: solutionId, lastUpdated: new Date().toISOString() }
-				);
-			} else {
-				await this.panelStateRepository.clear({
-					panelType: 'connectionReferences',
-					environmentId: this.currentEnvironmentId
-				});
-			}
+			await this.panelStateRepository.save(
+				{ panelType: 'connectionReferences', environmentId: this.currentEnvironmentId },
+				{ selectedSolutionId: solutionId, lastUpdated: new Date().toISOString() }
+			);
 		}
 
 		await this.handleRefresh();
@@ -448,12 +471,6 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		if (!environment?.powerPlatformEnvironmentId) {
 			this.logger.warn('Cannot open flow: Environment ID not configured');
 			vscodeImpl.window.showErrorMessage('Cannot open in Maker Portal: Environment ID not configured. Edit environment to add one.');
-			return;
-		}
-
-		if (!this.currentSolutionId) {
-			this.logger.warn('Cannot open flow: No solution selected');
-			vscodeImpl.window.showWarningMessage('Please select a solution to open flows.');
 			return;
 		}
 
@@ -477,7 +494,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 
 		const url = this.urlBuilder.buildConnectionReferencesUrl(
 			environment.powerPlatformEnvironmentId,
-			this.currentSolutionId || undefined
+			this.currentSolutionId
 		);
 		await vscodeImpl.env.openExternal(vscodeImpl.Uri.parse(url));
 		this.logger.info('Opened connection references in Maker Portal', { environmentId: this.currentEnvironmentId, solutionId: this.currentSolutionId });

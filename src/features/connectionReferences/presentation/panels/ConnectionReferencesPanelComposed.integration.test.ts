@@ -20,6 +20,7 @@ import { CloudFlow } from '../../domain/entities/CloudFlow';
 import { FlowConnectionRelationship } from '../../domain/valueObjects/FlowConnectionRelationship';
 import type { EnvironmentOption, SolutionOption } from '../../../../shared/infrastructure/ui/DataTablePanel';
 import type { EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 
 // Mock VS Code module
 const ViewColumn = {
@@ -248,7 +249,7 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 			expect(mockSolutionRepository.findAllForDropdown).toHaveBeenCalledWith(TEST_ENVIRONMENT_ID);
 			expect(mockListConnectionReferencesUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
-				undefined,
+				DEFAULT_SOLUTION_ID,
 				expect.any(Object)
 			);
 		});
@@ -440,7 +441,7 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 
 			expect(mockListConnectionReferencesUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
-				undefined,
+				DEFAULT_SOLUTION_ID,
 				expect.any(Object)
 			);
 		});
@@ -454,20 +455,27 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 			expect(typeof onDidReceiveMessageCalls[0][0]).toBe('function');
 		});
 
-		it('should clear panel state when solution filter is cleared', async () => {
+		it('should save DEFAULT_SOLUTION_ID when solution filter is reset', async () => {
 			await createPanelAndWait();
 
-			// Simulate solution change to undefined (clear filter)
+			// Simulate solution change to DEFAULT_SOLUTION_ID (reset to default)
 			const messageHandler = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
 			await messageHandler({
 				command: 'solutionChange',
-				solutionId: undefined
+				data: {
+					solutionId: DEFAULT_SOLUTION_ID
+				}
 			});
 
-			expect(mockPanelStateRepository.clear).toHaveBeenCalledWith({
-				panelType: 'connectionReferences',
-				environmentId: TEST_ENVIRONMENT_ID
-			});
+			expect(mockPanelStateRepository.save).toHaveBeenCalledWith(
+				{
+					panelType: 'connectionReferences',
+					environmentId: TEST_ENVIRONMENT_ID
+				},
+				expect.objectContaining({
+					selectedSolutionId: DEFAULT_SOLUTION_ID
+				})
+			);
 		});
 	});
 

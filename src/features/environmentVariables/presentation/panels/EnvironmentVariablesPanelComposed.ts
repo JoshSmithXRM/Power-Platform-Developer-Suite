@@ -21,6 +21,7 @@ import type { ISolutionRepository } from '../../../solutionExplorer/domain/inter
 import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/solutionFilterView';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 
 /**
  * Commands supported by Environment Variables panel.
@@ -39,7 +40,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	private readonly coordinator: PanelCoordinator<EnvironmentVariablesCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
 	private currentEnvironmentId: string;
-	private currentSolutionId: string | undefined;
+	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
 	private solutionOptions: SolutionOption[] = [];
 
 	private constructor(
@@ -123,49 +124,67 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	}
 
 	private async initializeAndLoadData(): Promise<void> {
-		// Load environments and solutions first
-		const environments = await this.getEnvironments();
-		const solutions = await this.loadSolutions();
-
-		// Load saved solution selection from panel state
+		// Load persisted solution ID immediately (optimistic - no validation yet)
 		if (this.panelStateRepository) {
 			const savedState = await this.panelStateRepository.load({
 				panelType: 'environmentVariables',
 				environmentId: this.currentEnvironmentId
 			});
 			if (savedState?.selectedSolutionId) {
-				// Verify the solution still exists
-				if (solutions.some(s => s.id === savedState.selectedSolutionId)) {
-					this.currentSolutionId = savedState.selectedSolutionId;
-				}
+				this.currentSolutionId = savedState.selectedSolutionId;
 			}
 		}
 
-		// Initialize coordinator with environments and solutions
+		// Show initial loading state with known solution ID
+		const environments = await this.getEnvironments();
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
-			solutions,
-			currentSolutionId: this.currentSolutionId || undefined,
+			solutions: [],
+			currentSolutionId: this.currentSolutionId,
 			tableData: [],
 			isLoading: true
 		});
 
-		// Load environment variables data
-		const environmentVariables = await this.listEnvVarsUseCase.execute(
-			this.currentEnvironmentId,
-			this.currentSolutionId
-		);
+		// PARALLEL LOADING - Don't wait for solutions to load data!
+		const [solutions, environmentVariables] = await Promise.all([
+			this.loadSolutions(),
+			this.listEnvVarsUseCase.execute(
+				this.currentEnvironmentId,
+				this.currentSolutionId
+			)
+		]);
+
+		// Post-load validation: Check if persisted solution still exists
+		let finalSolutionId = this.currentSolutionId;
+		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+			if (!solutions.some(s => s.id === this.currentSolutionId)) {
+				this.logger.warn('Persisted solution no longer exists, falling back to default', {
+					invalidSolutionId: this.currentSolutionId
+				});
+				finalSolutionId = DEFAULT_SOLUTION_ID;
+				this.currentSolutionId = DEFAULT_SOLUTION_ID;
+
+				// Save corrected state
+				if (this.panelStateRepository) {
+					await this.panelStateRepository.save(
+						{ panelType: 'environmentVariables', environmentId: this.currentEnvironmentId },
+						{ selectedSolutionId: DEFAULT_SOLUTION_ID, lastUpdated: new Date().toISOString() }
+					);
+				}
+			}
+		}
+
 		const viewModels = environmentVariables
 			.map(envVar => this.viewModelMapper.toViewModel(envVar))
 			.sort((a, b) => a.schemaName.localeCompare(b.schemaName));
 
-		// Re-render with actual data
+		// Final render with both solutions and data
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			solutions,
-			currentSolutionId: this.currentSolutionId || undefined,
+			currentSolutionId: finalSolutionId,
 			tableData: viewModels
 		});
 	}
@@ -269,7 +288,9 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		// Solution change
 		this.coordinator.registerHandler('solutionChange', async (data) => {
 			const solutionId = (data as { solutionId?: string })?.solutionId;
-			await this.handleSolutionChange(solutionId || undefined);
+			if (solutionId) {
+				await this.handleSolutionChange(solutionId);
+			}
 		});
 	}
 
@@ -346,7 +367,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 
 		const url = this.urlBuilder.buildEnvironmentVariablesObjectsUrl(
 			environment.powerPlatformEnvironmentId,
-			this.currentSolutionId || undefined
+			this.currentSolutionId
 		);
 		await vscode.env.openExternal(vscode.Uri.parse(url));
 		this.logger.info('Opened environment variables in Maker Portal');
@@ -402,7 +423,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		try {
 			const oldEnvironmentId = this.currentEnvironmentId;
 			this.currentEnvironmentId = environmentId;
-			this.currentSolutionId = undefined; // Reset solution filter
+			this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
 
 			// Re-register panel in map for new environment
 			this.reregisterPanel(EnvironmentVariablesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
@@ -420,7 +441,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		}
 	}
 
-	private async handleSolutionChange(solutionId: string | undefined): Promise<void> {
+	private async handleSolutionChange(solutionId: string): Promise<void> {
 		this.logger.debug('Solution filter changed', { solutionId });
 
 		this.setButtonLoading('refresh', true);
@@ -429,25 +450,18 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		try {
 			this.currentSolutionId = solutionId;
 
-			// Save solution selection to panel state
+			// Always save concrete solution selection to panel state
 			if (this.panelStateRepository) {
-				if (solutionId) {
-					await this.panelStateRepository.save(
-						{
-							panelType: 'environmentVariables',
-							environmentId: this.currentEnvironmentId
-						},
-						{
-							selectedSolutionId: solutionId,
-							lastUpdated: new Date().toISOString()
-						}
-					);
-				} else {
-					await this.panelStateRepository.clear({
+				await this.panelStateRepository.save(
+					{
 						panelType: 'environmentVariables',
 						environmentId: this.currentEnvironmentId
-					});
-				}
+					},
+					{
+						selectedSolutionId: solutionId,
+						lastUpdated: new Date().toISOString()
+					}
+				);
 			}
 
 			await this.handleRefresh();

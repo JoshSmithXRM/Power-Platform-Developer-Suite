@@ -30,13 +30,13 @@ export class ListConnectionReferencesUseCase {
 	/**
 	 * Lists flow-connection reference relationships.
 	 * @param environmentId - Power Platform environment GUID
-	 * @param solutionId - Optional solution GUID to filter by
+	 * @param solutionId - Solution GUID to filter by (use DEFAULT_SOLUTION_ID to show all)
 	 * @param cancellationToken - Optional token to cancel the operation
 	 * @returns Relationships and filtered connection references
 	 */
 	async execute(
 		environmentId: string,
-		solutionId?: string,
+		solutionId: string,
 		cancellationToken?: ICancellationToken
 	): Promise<ListConnectionReferencesResult> {
 		this.logger.info('ListConnectionReferencesUseCase started', { environmentId, solutionId });
@@ -51,15 +51,13 @@ export class ListConnectionReferencesUseCase {
 
 			this.checkCancellation(cancellationToken, 'after fetching data');
 
-			const [filteredFlows, filteredConnectionRefs] = solutionId
-				? await this.filterBySolution(
-						environmentId,
-						solutionId,
-						flows,
-						connectionRefs,
-						cancellationToken
-				  )
-				: [flows, connectionRefs];
+			const [filteredFlows, filteredConnectionRefs] = await this.filterBySolution(
+				environmentId,
+				solutionId,
+				flows,
+				connectionRefs,
+				cancellationToken
+			);
 
 			const relationships = this.relationshipBuilder.buildRelationships(
 				filteredFlows,

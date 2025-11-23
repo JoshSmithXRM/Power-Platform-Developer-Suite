@@ -3,13 +3,13 @@
  * Generates HTML for solution dropdown filter.
  */
 
+import { escapeHtml } from './htmlHelpers';
+
 export interface SolutionOption {
 	readonly id: string;
 	readonly name: string;
 	readonly uniqueName: string;
 }
-
-import { escapeHtml } from './htmlHelpers';
 
 /**
  * Renders solution filter dropdown.

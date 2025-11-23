@@ -9,6 +9,7 @@ import { ConnectionReference } from '../../domain/entities/ConnectionReference';
 import { FlowConnectionRelationship } from '../../domain/valueObjects/FlowConnectionRelationship';
 import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 import type { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
+import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 
 describe('ListConnectionReferencesUseCase', () => {
 	let useCase: ListConnectionReferencesUseCase;
@@ -138,9 +139,11 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockFlowRepository.findAll.mockResolvedValue(flows);
 			mockConnectionRefRepository.findAll.mockResolvedValue(connectionRefs);
 			mockRelationshipBuilder.buildRelationships.mockReturnValue(relationships);
+			// Mock solution component repository for DEFAULT_SOLUTION_ID
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result.relationships).toHaveLength(2);
@@ -170,7 +173,8 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result.relationships).toHaveLength(0);
@@ -186,7 +190,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
 
 			// Act
-			await useCase.execute(testEnvironmentId, undefined, cancellationToken);
+			await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, cancellationToken);
 
 			// Assert
 			expect(mockFlowRepository.findAll).toHaveBeenCalledWith(
@@ -329,7 +333,8 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue(expectedRelationships);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(mockRelationshipBuilder.buildRelationships).toHaveBeenCalledTimes(1);
@@ -358,7 +363,8 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue(relationships);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result.relationships).toHaveLength(3);
@@ -374,7 +380,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			const cancellationToken = createCancellationToken(true);
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId, undefined, cancellationToken))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, cancellationToken))
 				.rejects
 				.toThrow(OperationCancelledException);
 
@@ -397,7 +403,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockConnectionRefRepository.findAll.mockResolvedValue([]);
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId, undefined, cancellationToken))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, cancellationToken))
 				.rejects
 				.toThrow(OperationCancelledException);
 
@@ -440,7 +446,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId, undefined, cancellationToken);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, cancellationToken);
 
 			// Assert
 			expect(result.relationships).toHaveLength(0);
@@ -455,7 +461,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockFlowRepository.findAll.mockRejectedValue(error);
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Repository connection failed');
 		});
@@ -467,7 +473,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockConnectionRefRepository.findAll.mockRejectedValue(error);
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Connection reference fetch failed');
 		});
@@ -495,7 +501,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			});
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Relationship building failed');
 		});
@@ -505,7 +511,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockFlowRepository.findAll.mockRejectedValue('String error');
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow(Error);
 		});
@@ -530,7 +536,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
 
 			// Act
-			await useCase.execute(testEnvironmentId);
+			await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(callOrder[0]).toBe('flows-start');
@@ -575,7 +581,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			});
 
 			// Act
-			await useCase.execute(testEnvironmentId);
+			await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(callOrder).toEqual(['flows', 'connRefs', 'relationships']);
@@ -600,7 +606,8 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue(relationships);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result.relationships).toHaveLength(1);
@@ -619,7 +626,8 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result.connectionReferences).toHaveLength(1);
@@ -643,7 +651,8 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue(relationships);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result.connectionReferences[0]!.isManaged).toBe(true);
@@ -665,9 +674,17 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockFlowRepository.findAll.mockResolvedValue(flows);
 			mockConnectionRefRepository.findAll.mockResolvedValue(connectionRefs);
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+			// Mock solution filtering to return all IDs
+			const allFlowIds = Array.from({ length: 100 }, (_, i) => `flow-${i}`);
+			const allCrIds = Array.from({ length: 50 }, (_, i) => `cr-${i}`);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockImplementation((envId, solId, componentType) => {
+				if (componentType === 'subscription') return Promise.resolve(allFlowIds);
+				if (componentType === 'connectionreference') return Promise.resolve(allCrIds);
+				return Promise.resolve([]);
+			});
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(mockRelationshipBuilder.buildRelationships).toHaveBeenCalledWith(
@@ -711,7 +728,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
 
 			// Act
-			await useCase.execute(testEnvironmentId);
+			await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(mockFlowRepository.findAll).toHaveBeenCalledWith(
@@ -740,7 +757,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
 
 			// Act
-			await useCase.execute(testEnvironmentId);
+			await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(mockConnectionRefRepository.findAll).toHaveBeenCalledWith(
@@ -776,7 +793,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockFlowRepository.findAll.mockRejectedValue(timeoutError);
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Network timeout fetching flows');
 		});
@@ -788,7 +805,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockConnectionRefRepository.findAll.mockRejectedValue(timeoutError);
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Network timeout fetching connection references');
 		});
@@ -799,7 +816,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockFlowRepository.findAll.mockRejectedValue(authError);
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Authentication token expired');
 		});
@@ -810,7 +827,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockFlowRepository.findAll.mockRejectedValue(permissionError);
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Insufficient privileges to read flows');
 		});
@@ -822,7 +839,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockFlowRepository.findAll.mockRejectedValue(rateLimitError);
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('API rate limit exceeded');
 		});
@@ -851,8 +868,11 @@ describe('ListConnectionReferencesUseCase', () => {
 				throw builderError;
 			});
 
+			// Mock solution component repository
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'cr-1']);
+
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Failed to parse flow client data');
 		});
@@ -871,9 +891,11 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockImplementation(() => {
 				throw new Error('Relationship building failed');
 			});
+			// Mock solution component repository
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'cr-1']);
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Relationship building failed');
 		});
@@ -885,12 +907,14 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockFlowRepository.findAll.mockResolvedValue([]);
 			mockConnectionRefRepository.findAll.mockResolvedValue([]);
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+			// Mock solution component repository
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue([]);
 
 			// Act - Execute concurrently
 			const [result1, result2, result3] = await Promise.all([
-				useCase.execute(testEnvironmentId),
-				useCase.execute(testEnvironmentId),
-				useCase.execute(testEnvironmentId)
+				useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID),
+				useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID),
+				useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID)
 			]);
 
 			// Assert
@@ -914,7 +938,8 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert - Should work with snapshot at time of fetch
 			expect(result.relationships).toHaveLength(0);
@@ -929,7 +954,8 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result.relationships).toHaveLength(0);
@@ -951,7 +977,8 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result.relationships).toHaveLength(0);
@@ -969,7 +996,8 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result.connectionReferences).toHaveLength(1);
@@ -983,7 +1011,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockFlowRepository.findAll.mockRejectedValue(validationError);
 
 			// Act & Assert
-			await expect(useCase.execute(invalidEnvId))
+			await expect(useCase.execute(invalidEnvId, DEFAULT_SOLUTION_ID))
 				.rejects
 				.toThrow('Invalid environment ID');
 		});
@@ -1014,9 +1042,17 @@ describe('ListConnectionReferencesUseCase', () => {
 			mockFlowRepository.findAll.mockResolvedValue(flows);
 			mockConnectionRefRepository.findAll.mockResolvedValue(connectionRefs);
 			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+			// Mock solution filtering to return all IDs
+			const allFlowIds = Array.from({ length: 5000 }, (_, i) => `flow-${i}`);
+			const allCrIds = Array.from({ length: 2000 }, (_, i) => `cr-${i}`);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockImplementation((envId, solId, componentType) => {
+				if (componentType === 'subscription') return Promise.resolve(allFlowIds);
+				if (componentType === 'connectionreference') return Promise.resolve(allCrIds);
+				return Promise.resolve([]);
+			});
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(mockRelationshipBuilder.buildRelationships).toHaveBeenCalledWith(
@@ -1042,7 +1078,8 @@ describe('ListConnectionReferencesUseCase', () => {
 			]);
 
 			// Act
-			const result = await useCase.execute(testEnvironmentId);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['flow-1', 'flow-2', 'cr-1', 'cr-2']);
+			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
 			// Assert
 			expect(result.relationships).toHaveLength(1);
