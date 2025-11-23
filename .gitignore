@@ -9,6 +9,7 @@ dist/
 out/
 coverage/
 .dev-version
+package.json.backup
 
 # Extension packaging
 *.vsix
