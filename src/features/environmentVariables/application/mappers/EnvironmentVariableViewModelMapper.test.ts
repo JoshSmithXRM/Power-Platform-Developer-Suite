@@ -2,14 +2,16 @@ import { EnvironmentVariableViewModelMapper } from './EnvironmentVariableViewMod
 import { EnvironmentVariable, EnvironmentVariableType } from '../../domain/entities/EnvironmentVariable';
 import { EnvironmentVariableCollectionService } from '../../domain/services/EnvironmentVariableCollectionService';
 
+type MockCollectionService = Pick<EnvironmentVariableCollectionService, 'sort'>;
+
 describe('EnvironmentVariableViewModelMapper', () => {
 	let mapper: EnvironmentVariableViewModelMapper;
-	let mockCollectionService: jest.Mocked<EnvironmentVariableCollectionService>;
+	let mockCollectionService: jest.Mocked<MockCollectionService>;
 
 	beforeEach(() => {
 		mockCollectionService = {
 			sort: jest.fn((vars) => vars)
-		} as unknown as jest.Mocked<EnvironmentVariableCollectionService>;
+		} as jest.Mocked<MockCollectionService>;
 
 		mapper = new EnvironmentVariableViewModelMapper(mockCollectionService);
 	});

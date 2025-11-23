@@ -6,7 +6,7 @@ import { normalizeError, isError } from './ErrorUtils';
 
 describe('ErrorUtils', () => {
 	describe('normalizeError', () => {
-		it('should return Error instance unchanged', () => {
+		it('should return Error instance unchanged when Error provided', () => {
 			const error = new Error('Test error');
 			const result = normalizeError(error);
 
@@ -14,21 +14,21 @@ describe('ErrorUtils', () => {
 			expect(result.message).toBe('Test error');
 		});
 
-		it('should convert string to Error', () => {
+		it('should convert string to Error when string provided', () => {
 			const result = normalizeError('String error message');
 
 			expect(result).toBeInstanceOf(Error);
 			expect(result.message).toBe('String error message');
 		});
 
-		it('should convert empty string to Error', () => {
+		it('should convert empty string to Error when empty string provided', () => {
 			const result = normalizeError('');
 
 			expect(result).toBeInstanceOf(Error);
 			expect(result.message).toBe('');
 		});
 
-		it('should extract message from object with message property', () => {
+		it('should extract message from object when object has message property', () => {
 			const errorObj = { message: 'Error from object' };
 			const result = normalizeError(errorObj);
 
@@ -36,7 +36,7 @@ describe('ErrorUtils', () => {
 			expect(result.message).toBe('Error from object');
 		});
 
-		it('should extract message even if object has other properties', () => {
+		it('should extract message when object has message and other properties', () => {
 			const errorObj = {
 				message: 'Error message',
 				code: 500,
@@ -48,7 +48,7 @@ describe('ErrorUtils', () => {
 			expect(result.message).toBe('Error message');
 		});
 
-		it('should stringify object without message property', () => {
+		it('should stringify object when object lacks message property', () => {
 			const errorObj = { code: 404, reason: 'Not found' };
 			const result = normalizeError(errorObj);
 

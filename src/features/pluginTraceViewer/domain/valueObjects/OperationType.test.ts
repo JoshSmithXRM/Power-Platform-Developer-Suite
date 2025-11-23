@@ -2,44 +2,39 @@ import { OperationType } from './OperationType';
 
 describe('OperationType', () => {
 	describe('constants', () => {
-		it('should have Plugin constant with value 1', () => {
-			expect(OperationType.Plugin.value).toBe(1);
-		});
-
-		it('should have Workflow constant with value 2', () => {
-			expect(OperationType.Workflow.value).toBe(2);
+		test.each([
+			[OperationType.Plugin, 1],
+			[OperationType.Workflow, 2]
+		])('should have constant with value %i', (type, expectedValue) => {
+			expect(type.value).toBe(expectedValue);
 		});
 	});
 
 	describe('fromNumber', () => {
-		it('should create Plugin from 1', () => {
-			const type = OperationType.fromNumber(1);
-			expect(type).toBe(OperationType.Plugin);
+		test.each([
+			[1, OperationType.Plugin],
+			[2, OperationType.Workflow]
+		])('should create correct type from number %i', (value, expectedType) => {
+			const type = OperationType.fromNumber(value);
+			expect(type).toBe(expectedType);
 		});
 
-		it('should create Workflow from 2', () => {
-			const type = OperationType.fromNumber(2);
-			expect(type).toBe(OperationType.Workflow);
-		});
-
-		it('should throw error for invalid value', () => {
-			expect(() => OperationType.fromNumber(0)).toThrow('Invalid operation type: 0');
-		});
-
-		it('should throw error for value 3', () => {
-			expect(() => OperationType.fromNumber(3)).toThrow('Invalid operation type: 3');
+		test.each([
+			[0, 'Invalid operation type: 0'],
+			[3, 'Invalid operation type: 3']
+		])('should throw error for invalid value %i', (value, expectedError) => {
+			expect(() => OperationType.fromNumber(value)).toThrow(expectedError);
 		});
 	});
 
 	describe('equals', () => {
-		it('should return true for same operation type', () => {
-			expect(OperationType.Plugin.equals(OperationType.Plugin)).toBe(true);
-			expect(OperationType.Workflow.equals(OperationType.Workflow)).toBe(true);
-		});
-
-		it('should return false for different operation types', () => {
-			expect(OperationType.Plugin.equals(OperationType.Workflow)).toBe(false);
-			expect(OperationType.Workflow.equals(OperationType.Plugin)).toBe(false);
+		test.each([
+			[OperationType.Plugin, OperationType.Plugin, true],
+			[OperationType.Workflow, OperationType.Workflow, true],
+			[OperationType.Plugin, OperationType.Workflow, false],
+			[OperationType.Workflow, OperationType.Plugin, false]
+		])('should return %s when comparing types', (type1, type2, expected) => {
+			expect(type1.equals(type2)).toBe(expected);
 		});
 
 		it('should return false for null', () => {

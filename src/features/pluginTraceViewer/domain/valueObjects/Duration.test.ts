@@ -2,17 +2,17 @@ import { Duration } from './Duration';
 
 describe('Duration', () => {
 	describe('fromMilliseconds', () => {
-		it('should create duration from valid milliseconds', () => {
+		it('should create duration when valid milliseconds provided', () => {
 			const duration = Duration.fromMilliseconds(1000);
 			expect(duration.milliseconds).toBe(1000);
 		});
 
-		it('should create duration from zero milliseconds', () => {
+		it('should create duration when zero milliseconds provided', () => {
 			const duration = Duration.fromMilliseconds(0);
 			expect(duration.milliseconds).toBe(0);
 		});
 
-		it('should throw error for negative milliseconds', () => {
+		it('should throw error when negative milliseconds provided', () => {
 			expect(() => Duration.fromMilliseconds(-1)).toThrow('Cannot be negative');
 		});
 	});
@@ -38,14 +38,14 @@ describe('Duration', () => {
 	});
 
 	describe('add', () => {
-		it('should add two durations', () => {
+		it('should add two durations when both are valid', () => {
 			const duration1 = Duration.fromMilliseconds(500);
 			const duration2 = Duration.fromMilliseconds(300);
 			const result = duration1.add(duration2);
 			expect(result.milliseconds).toBe(800);
 		});
 
-		it('should return new duration instance', () => {
+		it('should return new duration instance when adding durations', () => {
 			const duration1 = Duration.fromMilliseconds(500);
 			const duration2 = Duration.fromMilliseconds(300);
 			const result = duration1.add(duration2);
@@ -53,7 +53,7 @@ describe('Duration', () => {
 			expect(result).not.toBe(duration2);
 		});
 
-		it('should not modify original durations', () => {
+		it('should not modify original durations when adding', () => {
 			const duration1 = Duration.fromMilliseconds(500);
 			const duration2 = Duration.fromMilliseconds(300);
 			duration1.add(duration2);
@@ -61,7 +61,7 @@ describe('Duration', () => {
 			expect(duration2.milliseconds).toBe(300);
 		});
 
-		it('should handle adding zero duration', () => {
+		it('should handle adding zero duration when zero is added', () => {
 			const duration = Duration.fromMilliseconds(500);
 			const zero = Duration.fromMilliseconds(0);
 			const result = duration.add(zero);

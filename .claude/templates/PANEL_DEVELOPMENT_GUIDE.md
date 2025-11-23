@@ -506,4 +506,20 @@ Which sections do you need?
 
 ---
 
+---
+
+## Panel Initialization Naming
+
+**See detailed guide:** `docs/patterns/PANEL_INITIALIZATION_GUIDE.md`
+
+Quick reference for naming initialization methods:
+
+| Pattern | Method Name | When to Use |
+|---------|------------|-------------|
+| Simple | `initializePanel()` | Basic setup, no data/state |
+| Stateful | `initializeWithPersistedState()` | Restore workspace state |
+| Data-Driven | `initializeAndLoadData()` | Fetch API data before render |
+
+---
+
 **Questions?** See `.claude/workflows/NEW_FEATURE_WORKFLOW.md` for complete panel implementation workflow.

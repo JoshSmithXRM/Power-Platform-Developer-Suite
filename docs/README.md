@@ -59,10 +59,12 @@ Start with CLAUDE.md to understand the project's core principles, then refer to 
   - Examples with ✅/❌ pattern
 
 ### Technical Debt
-- [TECHNICAL_DEBT.md](TECHNICAL_DEBT.md) - Known technical debt and deferred improvements
-  - Cross-feature DTO coupling (deferred, low priority)
-  - Rationale for deferring each item
-  - Conditions for addressing in the future
+- [technical-debt/](technical-debt/) - Categorized technical debt tracking (7 items)
+  - **Accepted Tradeoffs** (3 items) - Keep indefinitely (0 bugs, high cost)
+  - **Will Not Implement** (1 item) - Rejected suggestions
+  - **Scheduled** (2 items) - Fix in 1-2 sprints
+  - **Low Priority** (1 item) - Fix opportunistically
+  - See [technical-debt/README.md](technical-debt/README.md) for full index
 
 ---
 
@@ -85,7 +87,7 @@ Start with CLAUDE.md to understand the project's core principles, then refer to 
 
 **Meta** - Documentation about documentation
 - DOCUMENTATION_STYLE_GUIDE.md
-- TECHNICAL_DEBT.md
+- technical-debt/ (categorized debt tracking)
 - README.md (this file)
 
 ---
@@ -96,7 +98,7 @@ Start with CLAUDE.md to understand the project's core principles, then refer to 
 docs/
 ├── README.md                          (this file - master index)
 ├── DOCUMENTATION_STYLE_GUIDE.md       (how to write docs)
-├── TECHNICAL_DEBT.md                  (deferred improvements)
+├── technical-debt/                    (categorized debt tracking)
 ├── architecture/
 │   ├── CLEAN_ARCHITECTURE_GUIDE.md    (implementation patterns)
 │   └── LOGGING_GUIDE.md               (logging architecture)
@@ -127,7 +129,7 @@ docs/
 → Follow [DOCUMENTATION_STYLE_GUIDE.md](DOCUMENTATION_STYLE_GUIDE.md)
 
 **Understand why something was deferred**
-→ Check [TECHNICAL_DEBT.md](TECHNICAL_DEBT.md)
+→ Check [technical-debt/README.md](technical-debt/README.md)
 
 ---
 

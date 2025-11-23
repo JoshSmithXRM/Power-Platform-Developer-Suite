@@ -2,14 +2,16 @@ import { ImportJobViewModelMapper } from './ImportJobViewModelMapper';
 import { ImportJob } from '../../domain/entities/ImportJob';
 import { ImportJobCollectionService } from '../../domain/services/ImportJobCollectionService';
 
+type MockCollectionService = Pick<ImportJobCollectionService, 'sort'>;
+
 describe('ImportJobViewModelMapper', () => {
 	let mapper: ImportJobViewModelMapper;
-	let mockCollectionService: jest.Mocked<ImportJobCollectionService>;
+	let mockCollectionService: jest.Mocked<MockCollectionService>;
 
 	beforeEach(() => {
 		mockCollectionService = {
 			sort: jest.fn((jobs) => jobs)
-		} as unknown as jest.Mocked<ImportJobCollectionService>;
+		} as jest.Mocked<MockCollectionService>;
 
 		mapper = new ImportJobViewModelMapper(mockCollectionService);
 	});

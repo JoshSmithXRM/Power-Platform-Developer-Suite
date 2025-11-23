@@ -14,7 +14,10 @@
 
 **1. Read current technical debt:**
 ```bash
-Read docs/TECHNICAL_DEBT.md
+Read docs/technical-debt/README.md
+# Then read individual files from relevant categories:
+Read docs/technical-debt/scheduled/*.md
+Read docs/technical-debt/low-priority/*.md
 ```
 
 **2. Present interactive list to user:**
@@ -200,9 +203,12 @@ Please review for Clean Architecture compliance.
 
 **11. If code-guardian approves:**
 
-Update TECHNICAL_DEBT.md:
-```markdown
-Remove the "DateTimeFilter Mixed Concerns" section entirely.
+Update technical debt files:
+```bash
+# Delete the resolved item file
+git rm docs/technical-debt/scheduled/datetime-filter-mixed-concerns.md
+
+# Update README.md (remove row from table, update counts)
 
 Add a note at the top of the file:
 "Last cleanup: 2025-11-22 - Resolved DateTimeFilter mixed concerns"
@@ -222,7 +228,7 @@ Add a note at the top of the file:
 - All tests passing (242/242)
 - Clean Architecture compliance verified
 
-**Updated:** docs/TECHNICAL_DEBT.md (removed resolved item)
+**Updated:** docs/technical-debt/ (deleted resolved item file, updated README.md)
 
 Ready to commit? I can create a commit with these changes.
 ```
@@ -314,7 +320,7 @@ Evidence:
 - Helpers already exist in application layer
 
 Would you like me to:
-1. Remove this item from TECHNICAL_DEBT.md
+1. Remove this item (delete file + update README.md)
 2. Select a different item to fix
 3. Cancel
 ```
@@ -358,14 +364,14 @@ I'll fix these issues and re-submit for review.
 - ✅ Get user approval for solution plan
 - ✅ Run compile + test after each layer
 - ✅ Invoke code-guardian for review
-- ✅ Update TECHNICAL_DEBT.md after resolution
+- ✅ Delete resolved debt item file after resolution
 
 **DON'T:**
 - ❌ Auto-fix without user confirmation (keep user in control)
 - ❌ Skip verification (issue might already be fixed)
 - ❌ Skip extended thinking (rushed fixes create new debt)
 - ❌ Skip code-guardian review (quality gate is mandatory)
-- ❌ Forget to update TECHNICAL_DEBT.md (creates stale documentation)
+- ❌ Forget to delete resolved item file and update README.md (creates stale documentation)
 
 ---
 
@@ -440,7 +446,7 @@ Invoking code-guardian for review...
 
 Technical debt item resolved!
 
-Updated docs/TECHNICAL_DEBT.md (removed resolved item)
+Updated docs/technical-debt/ (deleted item file, updated README.md)
 
 Ready to commit? (yes/no)
 ```
@@ -468,7 +474,7 @@ Technical debt item "DateTimeFilter Mixed Concerns" successfully resolved.
 4. ✅ Implementation follows Clean Architecture (inside-out)
 5. ✅ All tests pass (npm run compile + npm test)
 6. ✅ code-guardian approved changes
-7. ✅ TECHNICAL_DEBT.md updated (item removed)
+7. ✅ Technical debt files updated (item file deleted, README.md updated)
 8. ✅ Changes committed (if user requested)
 
 **Typical duration:** 2-6 hours (depending on debt item complexity)

@@ -298,15 +298,25 @@ export function isWebviewLogMessage(message: unknown): message is WebviewLogMess
 		return false;
 	}
 
-	const msg = message as WebviewLogMessage;
+	// Validate properties exist and have correct types before asserting
+	const hasValidLevel =
+		'level' in message &&
+		typeof (message as { level: unknown }).level === 'string' &&
+		['debug', 'info', 'warn', 'error'].includes((message as { level: string }).level);
 
-	return (
-		typeof msg.level === 'string' &&
-		['debug', 'info', 'warn', 'error'].includes(msg.level) &&
-		typeof msg.message === 'string' &&
-		typeof msg.componentName === 'string' &&
-		typeof msg.timestamp === 'string'
-	);
+	const hasValidMessage =
+		'message' in message &&
+		typeof (message as { message: unknown }).message === 'string';
+
+	const hasValidComponentName =
+		'componentName' in message &&
+		typeof (message as { componentName: unknown }).componentName === 'string';
+
+	const hasValidTimestamp =
+		'timestamp' in message &&
+		typeof (message as { timestamp: unknown }).timestamp === 'string';
+
+	return hasValidLevel && hasValidMessage && hasValidComponentName && hasValidTimestamp;
 }
 
 export interface RefreshDataMessage {
@@ -428,13 +438,16 @@ export function isClearPropertyMessage(message: unknown): message is ClearProper
 		return false;
 	}
 
-	const msg = message as unknown as { key?: unknown; path?: unknown };
-	return (
+	// Validate properties exist and have correct types before asserting
+	const hasValidKey =
 		'key' in message &&
-		typeof msg.key === 'string' &&
+		typeof (message as { key: unknown }).key === 'string';
+
+	const hasValidPath =
 		'path' in message &&
-		typeof msg.path === 'string'
-	);
+		typeof (message as { path: unknown }).path === 'string';
+
+	return hasValidKey && hasValidPath;
 }
 
 export interface ViewImportJobMessage {

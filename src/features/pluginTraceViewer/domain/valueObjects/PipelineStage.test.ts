@@ -2,264 +2,74 @@ import { PipelineStage } from './PipelineStage';
 
 describe('PipelineStage Value Object', () => {
 	describe('Static Instance Properties', () => {
-		it('should provide PreValidation static instance with value 10', () => {
-			// Act
-			const stage = PipelineStage.PreValidation;
-
-			// Assert
-			expect(stage.value).toBe(10);
-			expect(stage.name).toBe('PreValidation');
-		});
-
-		it('should provide PreOperation static instance with value 20', () => {
-			// Act
-			const stage = PipelineStage.PreOperation;
-
-			// Assert
-			expect(stage.value).toBe(20);
-			expect(stage.name).toBe('PreOperation');
-		});
-
-		it('should provide PostOperation static instance with value 30', () => {
-			// Act
-			const stage = PipelineStage.PostOperation;
-
-			// Assert
-			expect(stage.value).toBe(30);
-			expect(stage.name).toBe('PostOperation');
-		});
-
-		it('should provide PostOperationDeprecated static instance with value 40', () => {
-			// Act
-			const stage = PipelineStage.PostOperationDeprecated;
-
-			// Assert
-			expect(stage.value).toBe(40);
-			expect(stage.name).toBe('PostOperationDeprecated');
+		test.each([
+			[PipelineStage.PreValidation, 10, 'PreValidation'],
+			[PipelineStage.PreOperation, 20, 'PreOperation'],
+			[PipelineStage.PostOperation, 30, 'PostOperation'],
+			[PipelineStage.PostOperationDeprecated, 40, 'PostOperationDeprecated']
+		])('should provide static instance with value %i and name %s', (stage, expectedValue, expectedName) => {
+			expect(stage.value).toBe(expectedValue);
+			expect(stage.name).toBe(expectedName);
 		});
 	});
 
 	describe('fromNumber Factory Method', () => {
-		it('should create PreValidation stage from number 10', () => {
-			// Act
-			const stage = PipelineStage.fromNumber(10);
-
-			// Assert
-			expect(stage).toBe(PipelineStage.PreValidation);
-			expect(stage.value).toBe(10);
-			expect(stage.name).toBe('PreValidation');
+		test.each([
+			[10, PipelineStage.PreValidation, 'PreValidation'],
+			[20, PipelineStage.PreOperation, 'PreOperation'],
+			[30, PipelineStage.PostOperation, 'PostOperation'],
+			[40, PipelineStage.PostOperationDeprecated, 'PostOperationDeprecated']
+		])('should create %s stage from number %i', (value, expectedStage, expectedName) => {
+			const stage = PipelineStage.fromNumber(value);
+			expect(stage).toBe(expectedStage);
+			expect(stage.value).toBe(value);
+			expect(stage.name).toBe(expectedName);
 		});
 
-		it('should create PreOperation stage from number 20', () => {
-			// Act
-			const stage = PipelineStage.fromNumber(20);
-
-			// Assert
-			expect(stage).toBe(PipelineStage.PreOperation);
-			expect(stage.value).toBe(20);
-			expect(stage.name).toBe('PreOperation');
-		});
-
-		it('should create PostOperation stage from number 30', () => {
-			// Act
-			const stage = PipelineStage.fromNumber(30);
-
-			// Assert
-			expect(stage).toBe(PipelineStage.PostOperation);
-			expect(stage.value).toBe(30);
-			expect(stage.name).toBe('PostOperation');
-		});
-
-		it('should create PostOperationDeprecated stage from number 40', () => {
-			// Act
-			const stage = PipelineStage.fromNumber(40);
-
-			// Assert
-			expect(stage).toBe(PipelineStage.PostOperationDeprecated);
-			expect(stage.value).toBe(40);
-			expect(stage.name).toBe('PostOperationDeprecated');
-		});
-
-		it('should throw error for invalid negative pipeline stage number', () => {
-			// Act & Assert
-			expect(() => PipelineStage.fromNumber(-1)).toThrow(
-				new Error('Invalid pipeline stage: -1')
-			);
-		});
-
-		it('should throw error for invalid zero pipeline stage number', () => {
-			// Act & Assert
-			expect(() => PipelineStage.fromNumber(0)).toThrow(
-				new Error('Invalid pipeline stage: 0')
-			);
-		});
-
-		it('should throw error for invalid positive pipeline stage number', () => {
-			// Act & Assert
-			expect(() => PipelineStage.fromNumber(50)).toThrow(
-				new Error('Invalid pipeline stage: 50')
-			);
-		});
-
-		it('should throw error for invalid pipeline stage number 15', () => {
-			// Act & Assert
-			expect(() => PipelineStage.fromNumber(15)).toThrow(
-				new Error('Invalid pipeline stage: 15')
-			);
-		});
-
-		it('should throw error for invalid pipeline stage number 25', () => {
-			// Act & Assert
-			expect(() => PipelineStage.fromNumber(25)).toThrow(
-				new Error('Invalid pipeline stage: 25')
-			);
-		});
-
-		it('should throw error for very large pipeline stage number', () => {
-			// Act & Assert
-			expect(() => PipelineStage.fromNumber(999999)).toThrow(
-				new Error('Invalid pipeline stage: 999999')
-			);
+		test.each([
+			[-1, 'Invalid pipeline stage: -1'],
+			[0, 'Invalid pipeline stage: 0'],
+			[15, 'Invalid pipeline stage: 15'],
+			[25, 'Invalid pipeline stage: 25'],
+			[50, 'Invalid pipeline stage: 50'],
+			[999999, 'Invalid pipeline stage: 999999']
+		])('should throw error for invalid pipeline stage number %i', (value, expectedError) => {
+			expect(() => PipelineStage.fromNumber(value)).toThrow(new Error(expectedError));
 		});
 	});
 
 	describe('equals Method', () => {
 		it('should return true when comparing stage with itself', () => {
-			// Arrange
 			const stage = PipelineStage.PreValidation;
-
-			// Act
-			const result = stage.equals(stage);
-
-			// Assert
-			expect(result).toBe(true);
+			expect(stage.equals(stage)).toBe(true);
 		});
 
-		it('should return true when comparing two instances of same stage', () => {
-			// Arrange
-			const stage1 = PipelineStage.fromNumber(10);
-			const stage2 = PipelineStage.PreValidation;
-
-			// Act
-			const result = stage1.equals(stage2);
-
-			// Assert
-			expect(result).toBe(true);
-		});
-
-		it('should return true when comparing PreValidation stages created differently', () => {
-			// Arrange
-			const stage1 = PipelineStage.fromNumber(10);
-			const stage2 = PipelineStage.fromNumber(10);
-
-			// Act
-			const result = stage1.equals(stage2);
-
-			// Assert
-			expect(result).toBe(true);
-		});
-
-		it('should return false when comparing different pipeline stages', () => {
-			// Arrange
-			const preValidation = PipelineStage.PreValidation;
-			const preOperation = PipelineStage.PreOperation;
-
-			// Act
-			const result = preValidation.equals(preOperation);
-
-			// Assert
-			expect(result).toBe(false);
+		test.each([
+			[PipelineStage.fromNumber(10), PipelineStage.PreValidation, true],
+			[PipelineStage.fromNumber(10), PipelineStage.fromNumber(10), true],
+			[PipelineStage.PreValidation, PipelineStage.PreOperation, false],
+			[PipelineStage.PostOperation, PipelineStage.fromNumber(30), true],
+			[PipelineStage.fromNumber(20), PipelineStage.fromNumber(30), false]
+		])('should return correct equality result when comparing stages', (stage1, stage2, expected) => {
+			expect(stage1.equals(stage2)).toBe(expected);
 		});
 
 		it('should return false when comparing with null', () => {
-			// Arrange
 			const stage = PipelineStage.PreValidation;
-
-			// Act
-			const result = stage.equals(null);
-
-			// Assert
-			expect(result).toBe(false);
-		});
-
-		it('should return true when comparing PostOperation stages with different creation methods', () => {
-			// Arrange
-			const stage1 = PipelineStage.PostOperation;
-			const stage2 = PipelineStage.fromNumber(30);
-
-			// Act
-			const result = stage1.equals(stage2);
-
-			// Assert
-			expect(result).toBe(true);
-		});
-
-		it('should return false when comparing PreOperation with PostOperation', () => {
-			// Arrange
-			const preOperation = PipelineStage.fromNumber(20);
-			const postOperation = PipelineStage.fromNumber(30);
-
-			// Act
-			const result = preOperation.equals(postOperation);
-
-			// Assert
-			expect(result).toBe(false);
+			expect(stage.equals(null)).toBe(false);
 		});
 	});
 
 	describe('isDeprecated Method', () => {
-		it('should return false for PreValidation stage', () => {
-			// Act
-			const result = PipelineStage.PreValidation.isDeprecated();
-
-			// Assert
-			expect(result).toBe(false);
-		});
-
-		it('should return false for PreOperation stage', () => {
-			// Act
-			const result = PipelineStage.PreOperation.isDeprecated();
-
-			// Assert
-			expect(result).toBe(false);
-		});
-
-		it('should return false for PostOperation stage', () => {
-			// Act
-			const result = PipelineStage.PostOperation.isDeprecated();
-
-			// Assert
-			expect(result).toBe(false);
-		});
-
-		it('should return true for PostOperationDeprecated stage', () => {
-			// Act
-			const result = PipelineStage.PostOperationDeprecated.isDeprecated();
-
-			// Assert
-			expect(result).toBe(true);
-		});
-
-		it('should return false for PreValidation created via fromNumber', () => {
-			// Arrange
-			const stage = PipelineStage.fromNumber(10);
-
-			// Act
-			const result = stage.isDeprecated();
-
-			// Assert
-			expect(result).toBe(false);
-		});
-
-		it('should return true for PostOperationDeprecated created via fromNumber', () => {
-			// Arrange
-			const stage = PipelineStage.fromNumber(40);
-
-			// Act
-			const result = stage.isDeprecated();
-
-			// Assert
-			expect(result).toBe(true);
+		test.each([
+			[PipelineStage.PreValidation, false],
+			[PipelineStage.PreOperation, false],
+			[PipelineStage.PostOperation, false],
+			[PipelineStage.PostOperationDeprecated, true],
+			[PipelineStage.fromNumber(10), false],
+			[PipelineStage.fromNumber(40), true]
+		])('should return %s for stage deprecation status', (stage, expected) => {
+			expect(stage.isDeprecated()).toBe(expected);
 		});
 	});
 

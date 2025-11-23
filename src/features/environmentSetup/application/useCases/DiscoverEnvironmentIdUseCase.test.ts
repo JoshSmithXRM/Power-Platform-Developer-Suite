@@ -6,11 +6,13 @@ import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
 
 import { DiscoverEnvironmentIdUseCase, DiscoverEnvironmentIdRequest } from './DiscoverEnvironmentIdUseCase';
 
+type MockCancellationToken = Pick<ICancellationToken, 'isCancellationRequested' | 'onCancellationRequested'>;
+
 describe('DiscoverEnvironmentIdUseCase', () => {
 	let useCase: DiscoverEnvironmentIdUseCase;
 	let mockPowerPlatformApiService: jest.Mocked<IPowerPlatformApiService>;
 	let mockRepository: jest.Mocked<IEnvironmentRepository>;
-	let mockCancellationToken: jest.Mocked<ICancellationToken>;
+	let mockCancellationToken: jest.Mocked<MockCancellationToken>;
 
 	beforeEach(() => {
 		mockPowerPlatformApiService = {
@@ -33,7 +35,7 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 		mockCancellationToken = {
 			isCancellationRequested: false,
 			onCancellationRequested: jest.fn()
-		} as unknown as jest.Mocked<ICancellationToken>;
+		} as jest.Mocked<MockCancellationToken>;
 
 		useCase = new DiscoverEnvironmentIdUseCase(
 			mockPowerPlatformApiService,

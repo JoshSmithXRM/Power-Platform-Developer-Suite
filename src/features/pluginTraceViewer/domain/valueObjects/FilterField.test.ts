@@ -3,276 +3,77 @@ import { FilterField } from './FilterField';
 describe('FilterField', () => {
 	// ===== CORE FIELDS TESTS =====
 	describe('Core Fields', () => {
-		test('should have Id field with correct properties', () => {
-			// Arrange
-			const field = FilterField.Id;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Trace ID');
-			expect(field.odataName).toBe('plugintracelogid');
-			expect(field.fieldType).toBe('guid');
-		});
-
-		test('should have CreatedOn field with correct properties', () => {
-			// Arrange
-			const field = FilterField.CreatedOn;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Created On');
-			expect(field.odataName).toBe('createdon');
-			expect(field.fieldType).toBe('date');
-		});
-
-		test('should have PluginName field with correct properties', () => {
-			// Arrange
-			const field = FilterField.PluginName;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Plugin Name');
-			expect(field.odataName).toBe('typename');
-			expect(field.fieldType).toBe('text');
-		});
-
-		test('should have EntityName field with correct properties', () => {
-			// Arrange
-			const field = FilterField.EntityName;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Entity Name');
-			expect(field.odataName).toBe('primaryentity');
-			expect(field.fieldType).toBe('text');
-		});
-
-		test('should have MessageName field with correct properties', () => {
-			// Arrange
-			const field = FilterField.MessageName;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Message Name');
-			expect(field.odataName).toBe('messagename');
-			expect(field.fieldType).toBe('text');
-		});
-
-		test('should have OperationType field with correct properties', () => {
-			// Arrange
-			const field = FilterField.OperationType;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Operation Type');
-			expect(field.odataName).toBe('operationtype');
-			expect(field.fieldType).toBe('enum');
-		});
-
-		test('should have Mode field with correct properties', () => {
-			// Arrange
-			const field = FilterField.Mode;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Mode');
-			expect(field.odataName).toBe('mode');
-			expect(field.fieldType).toBe('enum');
-		});
-
-		test('should have Stage field with correct properties', () => {
-			// Arrange
-			const field = FilterField.Stage;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Stage');
-			expect(field.odataName).toBe('stage');
-			expect(field.fieldType).toBe('number');
-		});
-
-		test('should have Depth field with correct properties', () => {
-			// Arrange
-			const field = FilterField.Depth;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Depth');
-			expect(field.odataName).toBe('depth');
-			expect(field.fieldType).toBe('number');
+		test.each([
+			[FilterField.Id, 'Trace ID', 'plugintracelogid', 'guid'],
+			[FilterField.CreatedOn, 'Created On', 'createdon', 'date'],
+			[FilterField.PluginName, 'Plugin Name', 'typename', 'text'],
+			[FilterField.EntityName, 'Entity Name', 'primaryentity', 'text'],
+			[FilterField.MessageName, 'Message Name', 'messagename', 'text'],
+			[FilterField.OperationType, 'Operation Type', 'operationtype', 'enum'],
+			[FilterField.Mode, 'Mode', 'mode', 'enum'],
+			[FilterField.Stage, 'Stage', 'stage', 'number'],
+			[FilterField.Depth, 'Depth', 'depth', 'number']
+		])('should have field with correct properties', (field, displayName, odataName, fieldType) => {
+			expect(field.displayName).toBe(displayName);
+			expect(field.odataName).toBe(odataName);
+			expect(field.fieldType).toBe(fieldType);
 		});
 	});
 
 	// ===== PERFORMANCE FIELDS TESTS =====
 	describe('Performance Fields', () => {
-		test('should have Duration field with correct properties', () => {
-			// Arrange
-			const field = FilterField.Duration;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Duration (ms)');
-			expect(field.odataName).toBe('performanceexecutionduration');
-			expect(field.fieldType).toBe('number');
-		});
-
-		test('should have ConstructorDuration field with correct properties', () => {
-			// Arrange
-			const field = FilterField.ConstructorDuration;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Constructor Duration (ms)');
-			expect(field.odataName).toBe('performanceconstructorduration');
-			expect(field.fieldType).toBe('number');
-		});
-
-		test('should have ExecutionStartTime field with correct properties', () => {
-			// Arrange
-			const field = FilterField.ExecutionStartTime;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Execution Start Time');
-			expect(field.odataName).toBe('performanceexecutionstarttime');
-			expect(field.fieldType).toBe('date');
-		});
-
-		test('should have ConstructorStartTime field with correct properties', () => {
-			// Arrange
-			const field = FilterField.ConstructorStartTime;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Constructor Start Time');
-			expect(field.odataName).toBe('performanceconstructorstarttime');
-			expect(field.fieldType).toBe('date');
+		test.each([
+			[FilterField.Duration, 'Duration (ms)', 'performanceexecutionduration', 'number'],
+			[FilterField.ConstructorDuration, 'Constructor Duration (ms)', 'performanceconstructorduration', 'number'],
+			[FilterField.ExecutionStartTime, 'Execution Start Time', 'performanceexecutionstarttime', 'date'],
+			[FilterField.ConstructorStartTime, 'Constructor Start Time', 'performanceconstructorstarttime', 'date']
+		])('should have field with correct properties', (field, displayName, odataName, fieldType) => {
+			expect(field.displayName).toBe(displayName);
+			expect(field.odataName).toBe(odataName);
+			expect(field.fieldType).toBe(fieldType);
 		});
 	});
 
 	// ===== EXECUTION DETAILS TESTS =====
 	describe('Execution Details Fields', () => {
-		test('should have ExceptionDetails field with correct properties', () => {
-			// Arrange
-			const field = FilterField.ExceptionDetails;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Exception Details');
-			expect(field.odataName).toBe('exceptiondetails');
-			expect(field.fieldType).toBe('text');
-		});
-
-		test('should have MessageBlock field with correct properties', () => {
-			// Arrange
-			const field = FilterField.MessageBlock;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Message Block');
-			expect(field.odataName).toBe('messageblock');
-			expect(field.fieldType).toBe('text');
-		});
-
-		test('should have Configuration field with correct properties', () => {
-			// Arrange
-			const field = FilterField.Configuration;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Configuration');
-			expect(field.odataName).toBe('configuration');
-			expect(field.fieldType).toBe('text');
-		});
-
-		test('should have SecureConfiguration field with correct properties', () => {
-			// Arrange
-			const field = FilterField.SecureConfiguration;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Secure Configuration');
-			expect(field.odataName).toBe('secureconfiguration');
-			expect(field.fieldType).toBe('text');
-		});
-
-		test('should have Profile field with correct properties', () => {
-			// Arrange
-			const field = FilterField.Profile;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Profile');
-			expect(field.odataName).toBe('profile');
-			expect(field.fieldType).toBe('text');
+		test.each([
+			[FilterField.ExceptionDetails, 'Exception Details', 'exceptiondetails', 'text'],
+			[FilterField.MessageBlock, 'Message Block', 'messageblock', 'text'],
+			[FilterField.Configuration, 'Configuration', 'configuration', 'text'],
+			[FilterField.SecureConfiguration, 'Secure Configuration', 'secureconfiguration', 'text'],
+			[FilterField.Profile, 'Profile', 'profile', 'text']
+		])('should have field with correct properties', (field, displayName, odataName, fieldType) => {
+			expect(field.displayName).toBe(displayName);
+			expect(field.odataName).toBe(odataName);
+			expect(field.fieldType).toBe(fieldType);
 		});
 	});
 
 	// ===== CORRELATION & TRACKING TESTS =====
 	describe('Correlation & Tracking Fields', () => {
-		test('should have CorrelationId field with correct properties', () => {
-			// Arrange
-			const field = FilterField.CorrelationId;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Correlation ID');
-			expect(field.odataName).toBe('correlationid');
-			expect(field.fieldType).toBe('guid');
-		});
-
-		test('should have RequestId field with correct properties', () => {
-			// Arrange
-			const field = FilterField.RequestId;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Request ID');
-			expect(field.odataName).toBe('requestid');
-			expect(field.fieldType).toBe('guid');
-		});
-
-		test('should have PluginStepId field with correct properties', () => {
-			// Arrange
-			const field = FilterField.PluginStepId;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Plugin Step ID');
-			expect(field.odataName).toBe('pluginstepid');
-			expect(field.fieldType).toBe('guid');
-		});
-
-		test('should have PersistenceKey field with correct properties', () => {
-			// Arrange
-			const field = FilterField.PersistenceKey;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Persistence Key');
-			expect(field.odataName).toBe('persistencekey');
-			expect(field.fieldType).toBe('text');
-		});
-
-		test('should have OrganizationId field with correct properties', () => {
-			// Arrange
-			const field = FilterField.OrganizationId;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Organization ID');
-			expect(field.odataName).toBe('organizationid');
-			expect(field.fieldType).toBe('guid');
+		test.each([
+			[FilterField.CorrelationId, 'Correlation ID', 'correlationid', 'guid'],
+			[FilterField.RequestId, 'Request ID', 'requestid', 'guid'],
+			[FilterField.PluginStepId, 'Plugin Step ID', 'pluginstepid', 'guid'],
+			[FilterField.PersistenceKey, 'Persistence Key', 'persistencekey', 'text'],
+			[FilterField.OrganizationId, 'Organization ID', 'organizationid', 'guid']
+		])('should have field with correct properties', (field, displayName, odataName, fieldType) => {
+			expect(field.displayName).toBe(displayName);
+			expect(field.odataName).toBe(odataName);
+			expect(field.fieldType).toBe(fieldType);
 		});
 	});
 
 	// ===== AUDIT FIELDS TESTS =====
 	describe('Audit Fields', () => {
-		test('should have IsSystemCreated field with correct properties', () => {
-			// Arrange
-			const field = FilterField.IsSystemCreated;
-
-			// Act & Assert
-			expect(field.displayName).toBe('System Created');
-			expect(field.odataName).toBe('issystemcreated');
-			expect(field.fieldType).toBe('boolean');
-		});
-
-		test('should have CreatedBy field with correct properties', () => {
-			// Arrange
-			const field = FilterField.CreatedBy;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Created By');
-			expect(field.odataName).toBe('_createdby_value');
-			expect(field.fieldType).toBe('guid');
-		});
-
-		test('should have CreatedOnBehalfBy field with correct properties', () => {
-			// Arrange
-			const field = FilterField.CreatedOnBehalfBy;
-
-			// Act & Assert
-			expect(field.displayName).toBe('Created On Behalf By');
-			expect(field.odataName).toBe('_createdonbehalfby_value');
-			expect(field.fieldType).toBe('guid');
+		test.each([
+			[FilterField.IsSystemCreated, 'System Created', 'issystemcreated', 'boolean'],
+			[FilterField.CreatedBy, 'Created By', '_createdby_value', 'guid'],
+			[FilterField.CreatedOnBehalfBy, 'Created On Behalf By', '_createdonbehalfby_value', 'guid']
+		])('should have field with correct properties', (field, displayName, odataName, fieldType) => {
+			expect(field.displayName).toBe(displayName);
+			expect(field.odataName).toBe(odataName);
+			expect(field.fieldType).toBe(fieldType);
 		});
 	});
 
@@ -461,118 +262,44 @@ describe('FilterField', () => {
 
 	// ===== LOOKUP METHODS TESTS =====
 	describe('fromODataName', () => {
-		test('should find field by valid odata name', () => {
-			// Arrange & Act
-			const field = FilterField.fromODataName('plugintracelogid');
-
-			// Assert
-			expect(field).toBe(FilterField.Id);
+		test.each([
+			['plugintracelogid', FilterField.Id],
+			['performanceexecutionduration', FilterField.Duration],
+			['correlationid', FilterField.CorrelationId],
+			['_createdby_value', FilterField.CreatedBy]
+		])('should find field by odata name "%s"', (odataName, expectedField) => {
+			const field = FilterField.fromODataName(odataName);
+			expect(field).toBe(expectedField);
 		});
 
-		test('should find field by performance duration odata name', () => {
-			// Arrange & Act
-			const field = FilterField.fromODataName('performanceexecutionduration');
-
-			// Assert
-			expect(field).toBe(FilterField.Duration);
-		});
-
-		test('should find field by guid correlation id odata name', () => {
-			// Arrange & Act
-			const field = FilterField.fromODataName('correlationid');
-
-			// Assert
-			expect(field).toBe(FilterField.CorrelationId);
-		});
-
-		test('should find field by audit guid odata name', () => {
-			// Arrange & Act
-			const field = FilterField.fromODataName('_createdby_value');
-
-			// Assert
-			expect(field).toBe(FilterField.CreatedBy);
-		});
-
-		test('should return undefined for non-existent odata name', () => {
-			// Arrange & Act
-			const field = FilterField.fromODataName('nonexistent');
-
-			// Assert
-			expect(field).toBeUndefined();
-		});
-
-		test('should return undefined for empty odata name', () => {
-			// Arrange & Act
-			const field = FilterField.fromODataName('');
-
-			// Assert
-			expect(field).toBeUndefined();
-		});
-
-		test('should be case-sensitive for odata name lookup', () => {
-			// Arrange & Act
-			const field = FilterField.fromODataName('PluginTraceLogId');
-
-			// Assert
-			expect(field).toBeUndefined();
+		test.each([
+			['nonexistent', undefined],
+			['', undefined],
+			['PluginTraceLogId', undefined]
+		])('should return undefined for invalid odata name "%s"', (odataName, expected) => {
+			const field = FilterField.fromODataName(odataName);
+			expect(field).toBe(expected);
 		});
 	});
 
 	describe('fromDisplayName', () => {
-		test('should find field by valid display name', () => {
-			// Arrange & Act
-			const field = FilterField.fromDisplayName('Trace ID');
-
-			// Assert
-			expect(field).toBe(FilterField.Id);
+		test.each([
+			['Trace ID', FilterField.Id],
+			['Duration (ms)', FilterField.Duration],
+			['Correlation ID', FilterField.CorrelationId],
+			['Created By', FilterField.CreatedBy]
+		])('should find field by display name "%s"', (displayName, expectedField) => {
+			const field = FilterField.fromDisplayName(displayName);
+			expect(field).toBe(expectedField);
 		});
 
-		test('should find field by performance display name', () => {
-			// Arrange & Act
-			const field = FilterField.fromDisplayName('Duration (ms)');
-
-			// Assert
-			expect(field).toBe(FilterField.Duration);
-		});
-
-		test('should find field by guid display name', () => {
-			// Arrange & Act
-			const field = FilterField.fromDisplayName('Correlation ID');
-
-			// Assert
-			expect(field).toBe(FilterField.CorrelationId);
-		});
-
-		test('should find field by audit guid display name', () => {
-			// Arrange & Act
-			const field = FilterField.fromDisplayName('Created By');
-
-			// Assert
-			expect(field).toBe(FilterField.CreatedBy);
-		});
-
-		test('should return undefined for non-existent display name', () => {
-			// Arrange & Act
-			const field = FilterField.fromDisplayName('Nonexistent Field');
-
-			// Assert
-			expect(field).toBeUndefined();
-		});
-
-		test('should return undefined for empty display name', () => {
-			// Arrange & Act
-			const field = FilterField.fromDisplayName('');
-
-			// Assert
-			expect(field).toBeUndefined();
-		});
-
-		test('should be case-sensitive for display name lookup', () => {
-			// Arrange & Act
-			const field = FilterField.fromDisplayName('trace id');
-
-			// Assert
-			expect(field).toBeUndefined();
+		test.each([
+			['Nonexistent Field', undefined],
+			['', undefined],
+			['trace id', undefined]
+		])('should return undefined for invalid display name "%s"', (displayName, expected) => {
+			const field = FilterField.fromDisplayName(displayName);
+			expect(field).toBe(expected);
 		});
 	});
 
@@ -689,56 +416,30 @@ describe('FilterField', () => {
 
 	// ===== EDGE CASES TESTS =====
 	describe('Edge Cases', () => {
-		test('should handle lookup with whitespace in odata name', () => {
-			// Arrange & Act
-			const field = FilterField.fromODataName(' plugintracelogid');
-
-			// Assert
+		test.each([
+			['odata', ' plugintracelogid', FilterField.fromODataName],
+			['display', ' Trace ID', FilterField.fromDisplayName]
+		])('should handle lookup with whitespace in %s name', (type, name, lookupFn) => {
+			const field = lookupFn(name);
 			expect(field).toBeUndefined();
 		});
 
-		test('should handle lookup with whitespace in display name', () => {
-			// Arrange & Act
-			const field = FilterField.fromDisplayName(' Trace ID');
-
-			// Assert
-			expect(field).toBeUndefined();
-		});
-
-		test('should maintain consistent field references across calls', () => {
-			// Arrange & Act
-			const field1 = FilterField.fromODataName('plugintracelogid');
-			const field2 = FilterField.fromODataName('plugintracelogid');
-
-			// Assert
+		test.each([
+			['odata', 'plugintracelogid', FilterField.fromODataName],
+			['display', 'Trace ID', FilterField.fromDisplayName]
+		])('should maintain consistent field references across %s name calls', (type, name, lookupFn) => {
+			const field1 = lookupFn(name);
+			const field2 = lookupFn(name);
 			expect(field1).toBe(field2);
 		});
 
-		test('should maintain consistent display name references across calls', () => {
-			// Arrange & Act
-			const field1 = FilterField.fromDisplayName('Trace ID');
-			const field2 = FilterField.fromDisplayName('Trace ID');
-
-			// Assert
-			expect(field1).toBe(field2);
-		});
-
-		test('All collection should not have duplicate fields', () => {
-			// Arrange & Act
+		test.each([
+			['fields', (f: typeof FilterField.Id) => f.odataName],
+			['display names', (f: typeof FilterField.Id) => f.displayName]
+		])('All collection should not have duplicate %s', (description, mapper) => {
 			const allFields = FilterField.All;
-			const uniqueODataNames = new Set(allFields.map(f => f.odataName));
-
-			// Assert
-			expect(uniqueODataNames.size).toBe(allFields.length);
-		});
-
-		test('All collection should not have duplicate display names', () => {
-			// Arrange & Act
-			const allFields = FilterField.All;
-			const uniqueDisplayNames = new Set(allFields.map(f => f.displayName));
-
-			// Assert
-			expect(uniqueDisplayNames.size).toBe(allFields.length);
+			const uniqueValues = new Set(allFields.map(mapper));
+			expect(uniqueValues.size).toBe(allFields.length);
 		});
 	});
 });

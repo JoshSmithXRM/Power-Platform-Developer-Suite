@@ -1,44 +1,11 @@
 import { ValidationError } from '../../../../shared/domain/errors/ValidationError';
-import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
+import { createTestSolution } from '../../../../shared/testing';
 
 import { Solution } from './Solution';
 
 describe('Solution', () => {
-  function createValidSolution(overrides?: Partial<{
-    id: string;
-    uniqueName: string;
-    friendlyName: string;
-    version: string;
-    isManaged: boolean;
-    publisherId: string;
-    publisherName: string;
-    installedOn: Date | null;
-    description: string;
-    modifiedOn: Date;
-    isVisible: boolean;
-    isApiManaged: boolean;
-    solutionType: string | null;
-  }>): Solution {
-    const installedOn: Date | null = overrides && 'installedOn' in overrides
-      ? overrides.installedOn!
-      : null;
-
-    return new Solution(
-      overrides?.id ?? DEFAULT_SOLUTION_ID,
-      overrides?.uniqueName ?? 'TestSolution',
-      overrides?.friendlyName ?? 'Test Solution',
-      overrides?.version ?? '1.0.0.0',
-      overrides?.isManaged ?? false,
-      overrides?.publisherId ?? 'pub-123',
-      overrides?.publisherName ?? 'Test Publisher',
-      installedOn,
-      overrides?.description ?? 'A test solution',
-      overrides?.modifiedOn ?? new Date('2024-01-15T10:00:00Z'),
-      overrides?.isVisible ?? true,
-      overrides?.isApiManaged ?? false,
-      overrides?.solutionType ?? null
-    );
-  }
+  // Use shared test factory
+  const createValidSolution = createTestSolution;
 
   describe('constructor', () => {
     it('should create solution with valid version format X.X.X.X', () => {

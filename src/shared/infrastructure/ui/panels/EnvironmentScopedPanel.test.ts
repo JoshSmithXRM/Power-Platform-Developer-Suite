@@ -296,7 +296,7 @@ describe('EnvironmentScopedPanel', () => {
 					'test.panel',
 					expect.any(String),
 					ViewColumn.One,
-					expect.any(Object)
+					expect.objectContaining({ enableScripts: true })
 				);
 			});
 
@@ -311,8 +311,8 @@ describe('EnvironmentScopedPanel', () => {
 				expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
 					expect.any(String),
 					'Test Panel - Environment 1',
-					expect.any(Number),
-					expect.any(Object)
+					ViewColumn.One,
+					expect.objectContaining({ enableScripts: true })
 				);
 			});
 
@@ -329,8 +329,8 @@ describe('EnvironmentScopedPanel', () => {
 				expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
 					expect.any(String),
 					'Test Panel - Unknown',
-					expect.any(Number),
-					expect.any(Object)
+					ViewColumn.One,
+					expect.objectContaining({ enableScripts: true })
 				);
 			});
 
@@ -345,7 +345,7 @@ describe('EnvironmentScopedPanel', () => {
 				expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
 					expect.any(String),
 					expect.any(String),
-					expect.any(Number),
+					ViewColumn.One,
 					{
 						enableScripts: true,
 						localResourceRoots: [mockExtensionUri],
@@ -401,7 +401,7 @@ describe('EnvironmentScopedPanel', () => {
 				expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
 					expect.any(String),
 					expect.any(String),
-					expect.any(Number),
+					ViewColumn.One,
 					{
 						enableScripts: true,
 						localResourceRoots: [mockExtensionUri],

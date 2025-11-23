@@ -1,26 +1,8 @@
-import { ConnectionReference } from './ConnectionReference';
+import { createTestConnectionReference } from '../../../../shared/testing';
 
 describe('ConnectionReference', () => {
-	// Test data factory
-	function createConnectionReference(overrides?: {
-		id?: string;
-		connectionReferenceLogicalName?: string;
-		displayName?: string;
-		connectorId?: string | null;
-		connectionId?: string | null;
-		isManaged?: boolean;
-		modifiedOn?: Date;
-	}): ConnectionReference {
-		return new ConnectionReference(
-			overrides && 'id' in overrides ? overrides.id! : 'cr-00000000-0000-0000-0000-000000000001',
-			overrides && 'connectionReferenceLogicalName' in overrides ? overrides.connectionReferenceLogicalName! : 'cr_test_connection',
-			overrides && 'displayName' in overrides ? overrides.displayName! : 'Test Connection Reference',
-			overrides && 'connectorId' in overrides ? overrides.connectorId! : 'connector-00000000-0000-0000-0000-000000000001',
-			overrides && 'connectionId' in overrides ? overrides.connectionId! : 'connection-00000000-0000-0000-0000-000000000001',
-			overrides && 'isManaged' in overrides ? overrides.isManaged! : false,
-			overrides && 'modifiedOn' in overrides ? overrides.modifiedOn! : new Date('2024-01-01T10:00:00Z')
-		);
-	}
+	// Use shared test factory
+	const createConnectionReference = createTestConnectionReference;
 
 	describe('constructor', () => {
 		describe('successful creation', () => {

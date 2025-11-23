@@ -1,6 +1,7 @@
 import { FlowConnectionRelationshipBuilder } from './FlowConnectionRelationshipBuilder';
 import { CloudFlow } from '../entities/CloudFlow';
 import { ConnectionReference } from '../entities/ConnectionReference';
+import { assertDefined } from '../../../../shared/testing/assertions/assertDefined';
 
 describe('FlowConnectionRelationshipBuilder', () => {
 	let builder: FlowConnectionRelationshipBuilder;
@@ -24,7 +25,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				expect(relationships).toHaveLength(1);
-				expect(relationships[0]!.relationshipType).toBe('flow-to-cr');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('flow-to-cr');
 			});
 
 			it('should create multiple relationships when flow references multiple connection references', () => {
@@ -82,7 +84,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([flow], [cr]);
 
 				// Assert
-				const relationship = relationships[0]!;
+				assertDefined(relationships[0]);
+				const relationship = relationships[0];
 				expect(relationship.flowId).toBe(flowId);
 				expect(relationship.flowName).toBe(flowName);
 				expect(relationship.flowModifiedOn).toBe(flowModifiedOn);
@@ -109,7 +112,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([flow], [cr]);
 
 				// Assert
-				const relationship = relationships[0]!;
+				assertDefined(relationships[0]);
+				const relationship = relationships[0];
 				expect(relationship.connectionReferenceId).toBe(crId);
 				expect(relationship.connectionReferenceLogicalName).toBe(crLogicalName);
 				expect(relationship.connectionReferenceDisplayName).toBe(crDisplayName);
@@ -131,7 +135,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				expect(relationships).toHaveLength(1);
-				expect(relationships[0]!.relationshipType).toBe('flow-to-cr');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('flow-to-cr');
 			});
 
 			it('should match connection reference with uppercase logical name', () => {
@@ -146,7 +151,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				expect(relationships).toHaveLength(1);
-				expect(relationships[0]!.relationshipType).toBe('flow-to-cr');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('flow-to-cr');
 			});
 
 			it('should match connection reference with mixed case logical name', () => {
@@ -161,7 +167,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				expect(relationships).toHaveLength(1);
-				expect(relationships[0]!.relationshipType).toBe('flow-to-cr');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('flow-to-cr');
 			});
 		});
 
@@ -175,7 +182,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				expect(relationships).toHaveLength(1);
-				expect(relationships[0]!.relationshipType).toBe('orphaned-flow');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('orphaned-flow');
 			});
 
 			it('should set connection reference id to null for orphaned flow', () => {
@@ -186,7 +194,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([flow], []);
 
 				// Assert
-				expect(relationships[0]!.connectionReferenceId).toBeNull();
+				assertDefined(relationships[0]);
+				expect(relationships[0].connectionReferenceId).toBeNull();
 			});
 
 			it('should set connection reference display name to missing message for orphaned flow', () => {
@@ -198,7 +207,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([flow], []);
 
 				// Assert
-				expect(relationships[0]!.connectionReferenceDisplayName).toBe(`(Missing: ${missingCrName})`);
+				assertDefined(relationships[0]);
+				expect(relationships[0].connectionReferenceDisplayName).toBe(`(Missing: ${missingCrName})`);
 			});
 
 			it('should preserve connection reference logical name for orphaned flow', () => {
@@ -210,7 +220,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([flow], []);
 
 				// Assert
-				expect(relationships[0]!.connectionReferenceLogicalName).toBe(missingCrName);
+				assertDefined(relationships[0]);
+				expect(relationships[0].connectionReferenceLogicalName).toBe(missingCrName);
 			});
 
 			it('should set connection reference properties to null for orphaned flow', () => {
@@ -221,8 +232,10 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([flow], []);
 
 				// Assert
-				expect(relationships[0]!.connectionReferenceIsManaged).toBeNull();
-				expect(relationships[0]!.connectionReferenceModifiedOn).toBeNull();
+				assertDefined(relationships[0]);
+				expect(relationships[0].connectionReferenceIsManaged).toBeNull();
+				assertDefined(relationships[0]);
+				expect(relationships[0].connectionReferenceModifiedOn).toBeNull();
 			});
 
 			it('should preserve flow properties for orphaned flow', () => {
@@ -242,7 +255,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([flow], []);
 
 				// Assert
-				const relationship = relationships[0]!;
+				assertDefined(relationships[0]);
+				const relationship = relationships[0];
 				expect(relationship.flowId).toBe(flowId);
 				expect(relationship.flowName).toBe(flowName);
 				expect(relationship.flowModifiedOn).toBe(flowModifiedOn);
@@ -290,7 +304,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				expect(relationships).toHaveLength(1);
-				expect(relationships[0]!.relationshipType).toBe('orphaned-cr');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('orphaned-cr');
 			});
 
 			it('should set flow id to null for orphaned connection reference', () => {
@@ -303,7 +318,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([], [cr]);
 
 				// Assert
-				expect(relationships[0]!.flowId).toBeNull();
+				assertDefined(relationships[0]);
+				expect(relationships[0].flowId).toBeNull();
 			});
 
 			it('should set flow name to no flow message for orphaned connection reference', () => {
@@ -316,7 +332,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([], [cr]);
 
 				// Assert
-				expect(relationships[0]!.flowName).toBe('(No flow uses this)');
+				assertDefined(relationships[0]);
+				expect(relationships[0].flowName).toBe('(No flow uses this)');
 			});
 
 			it('should set flow properties to null for orphaned connection reference', () => {
@@ -329,8 +346,10 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([], [cr]);
 
 				// Assert
-				expect(relationships[0]!.flowIsManaged).toBeNull();
-				expect(relationships[0]!.flowModifiedOn).toBeNull();
+				assertDefined(relationships[0]);
+				expect(relationships[0].flowIsManaged).toBeNull();
+				assertDefined(relationships[0]);
+				expect(relationships[0].flowModifiedOn).toBeNull();
 			});
 
 			it('should preserve connection reference properties for orphaned CR', () => {
@@ -352,7 +371,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([], [cr]);
 
 				// Assert
-				const relationship = relationships[0]!;
+				assertDefined(relationships[0]);
+				const relationship = relationships[0];
 				expect(relationship.connectionReferenceId).toBe(crId);
 				expect(relationship.connectionReferenceLogicalName).toBe(crLogicalName);
 				expect(relationship.connectionReferenceDisplayName).toBe(crDisplayName);
@@ -389,7 +409,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				expect(relationships).toHaveLength(1);
-				expect(relationships[0]!.relationshipType).toBe('flow-to-cr');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('flow-to-cr');
 			});
 
 			it('should create mixed relationships with used and unused connection references', () => {
@@ -423,7 +444,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				expect(relationships).toHaveLength(1);
-				expect(relationships[0]!.relationshipType).toBe('flow-to-cr');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('flow-to-cr');
 			});
 		});
 
@@ -464,7 +486,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				expect(relationships).toHaveLength(1);
-				expect(relationships[0]!.relationshipType).toBe('orphaned-cr');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('orphaned-cr');
 			});
 
 			it('should skip flows with null client data', () => {
@@ -479,7 +502,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				expect(relationships).toHaveLength(1);
-				expect(relationships[0]!.relationshipType).toBe('orphaned-cr');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('orphaned-cr');
 			});
 
 			it('should skip flows with empty client data', () => {
@@ -494,7 +518,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				expect(relationships).toHaveLength(1);
-				expect(relationships[0]!.relationshipType).toBe('orphaned-cr');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('orphaned-cr');
 			});
 
 			it('should handle duplicate connection reference logical names by using first match', () => {
@@ -516,7 +541,8 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const flowToCrRelationships = relationships.filter(r => r.relationshipType === 'flow-to-cr');
 				expect(flowToCrRelationships).toHaveLength(1);
 				// Should match the last one in the map (Map overwrites duplicates with last value)
-				expect(flowToCrRelationships[0]!.connectionReferenceId).toBe('cr-second');
+				assertDefined(flowToCrRelationships[0]);
+				expect(flowToCrRelationships[0].connectionReferenceId).toBe('cr-second');
 			});
 
 			it('should handle flow referencing same connection reference multiple times', () => {
@@ -595,8 +621,10 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([flow], [crUsed, crUnused]);
 
 				// Assert
-				expect(relationships[0]!.relationshipType).toBe('flow-to-cr');
-				expect(relationships[1]!.relationshipType).toBe('orphaned-cr');
+				assertDefined(relationships[0]);
+				expect(relationships[0].relationshipType).toBe('flow-to-cr');
+				assertDefined(relationships[1]);
+				expect(relationships[1].relationshipType).toBe('orphaned-cr');
 			});
 
 			it('should preserve order of flows in flow relationships', () => {
@@ -612,9 +640,12 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				const relationships = builder.buildRelationships([flow1, flow2, flow3], [cr]);
 
 				// Assert
-				expect(relationships[0]!.flowId).toBe('flow-1');
-				expect(relationships[1]!.flowId).toBe('flow-2');
-				expect(relationships[2]!.flowId).toBe('flow-3');
+				assertDefined(relationships[0]);
+				expect(relationships[0].flowId).toBe('flow-1');
+				assertDefined(relationships[1]);
+				expect(relationships[1].flowId).toBe('flow-2');
+				assertDefined(relationships[2]);
+				expect(relationships[2].flowId).toBe('flow-3');
 			});
 		});
 	});

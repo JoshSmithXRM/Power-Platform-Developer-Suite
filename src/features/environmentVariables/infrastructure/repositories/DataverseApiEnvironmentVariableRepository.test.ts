@@ -154,7 +154,7 @@ describe('DataverseApiEnvironmentVariableRepository', () => {
 			// Assert
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				'env-123',
-				expect.any(String),
+				expect.stringContaining('/api/data/v9.2/environmentvariabledefinitions'),
 				mockCancellationToken
 			);
 		});
@@ -324,7 +324,7 @@ describe('DataverseApiEnvironmentVariableRepository', () => {
 			// Assert
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				'env-123',
-				expect.any(String),
+				expect.stringContaining('/api/data/v9.2/environmentvariablevalues'),
 				mockCancellationToken
 			);
 		});

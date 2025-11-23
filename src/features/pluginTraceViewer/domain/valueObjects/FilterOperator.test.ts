@@ -6,122 +6,21 @@ import { FilterOperator } from './FilterOperator';
 
 describe('FilterOperator', () => {
 	describe('Operator Definitions', () => {
-		it('should define Equals operator with correct properties', () => {
-			// Arrange & Act
-			const op = FilterOperator.Equals;
-
-			// Assert
-			expect(op.displayName).toBe('Equals');
-			expect(op.odataOperator).toBe('eq');
-			expect(op.applicableTypes).toContain('text');
-			expect(op.applicableTypes).toContain('enum');
-			expect(op.applicableTypes).toContain('number');
-			expect(op.applicableTypes).toContain('boolean');
-			expect(op.applicableTypes).toContain('guid');
-		});
-
-		it('should define Contains operator with correct properties', () => {
-			// Arrange & Act
-			const op = FilterOperator.Contains;
-
-			// Assert
-			expect(op.displayName).toBe('Contains');
-			expect(op.odataOperator).toBe('contains');
-			expect(op.applicableTypes).toEqual(['text']);
-		});
-
-		it('should define StartsWith operator with correct properties', () => {
-			// Arrange & Act
-			const op = FilterOperator.StartsWith;
-
-			// Assert
-			expect(op.displayName).toBe('Starts With');
-			expect(op.odataOperator).toBe('startswith');
-			expect(op.applicableTypes).toEqual(['text']);
-		});
-
-		it('should define EndsWith operator with correct properties', () => {
-			// Arrange & Act
-			const op = FilterOperator.EndsWith;
-
-			// Assert
-			expect(op.displayName).toBe('Ends With');
-			expect(op.odataOperator).toBe('endswith');
-			expect(op.applicableTypes).toEqual(['text']);
-		});
-
-		it('should define NotEquals operator with correct properties', () => {
-			// Arrange & Act
-			const op = FilterOperator.NotEquals;
-
-			// Assert
-			expect(op.displayName).toBe('Not Equals');
-			expect(op.odataOperator).toBe('ne');
-			expect(op.applicableTypes).toContain('text');
-			expect(op.applicableTypes).toContain('enum');
-			expect(op.applicableTypes).toContain('number');
-			expect(op.applicableTypes).toContain('boolean');
-			expect(op.applicableTypes).toContain('guid');
-		});
-
-		it('should define GreaterThan operator with correct properties', () => {
-			// Arrange & Act
-			const op = FilterOperator.GreaterThan;
-
-			// Assert
-			expect(op.displayName).toBe('Greater Than');
-			expect(op.odataOperator).toBe('gt');
-			expect(op.applicableTypes).toEqual(['number', 'date']);
-		});
-
-		it('should define LessThan operator with correct properties', () => {
-			// Arrange & Act
-			const op = FilterOperator.LessThan;
-
-			// Assert
-			expect(op.displayName).toBe('Less Than');
-			expect(op.odataOperator).toBe('lt');
-			expect(op.applicableTypes).toEqual(['number', 'date']);
-		});
-
-		it('should define GreaterThanOrEqual operator with correct properties', () => {
-			// Arrange & Act
-			const op = FilterOperator.GreaterThanOrEqual;
-
-			// Assert
-			expect(op.displayName).toBe('Greater Than or Equal');
-			expect(op.odataOperator).toBe('ge');
-			expect(op.applicableTypes).toEqual(['number', 'date']);
-		});
-
-		it('should define LessThanOrEqual operator with correct properties', () => {
-			// Arrange & Act
-			const op = FilterOperator.LessThanOrEqual;
-
-			// Assert
-			expect(op.displayName).toBe('Less Than or Equal');
-			expect(op.odataOperator).toBe('le');
-			expect(op.applicableTypes).toEqual(['number', 'date']);
-		});
-
-		it('should define IsNull operator with correct properties', () => {
-			// Arrange & Act
-			const op = FilterOperator.IsNull;
-
-			// Assert
-			expect(op.displayName).toBe('Is Null');
-			expect(op.odataOperator).toBe('null');
-			expect(op.applicableTypes).toEqual(['text', 'enum', 'date', 'number', 'boolean', 'guid']);
-		});
-
-		it('should define IsNotNull operator with correct properties', () => {
-			// Arrange & Act
-			const op = FilterOperator.IsNotNull;
-
-			// Assert
-			expect(op.displayName).toBe('Is Not Null');
-			expect(op.odataOperator).toBe('notnull');
-			expect(op.applicableTypes).toEqual(['text', 'enum', 'date', 'number', 'boolean', 'guid']);
+		test.each([
+			[FilterOperator.Equals, 'eq', ['text', 'enum', 'number', 'boolean', 'guid']],
+			[FilterOperator.NotEquals, 'ne', ['text', 'enum', 'number', 'boolean', 'guid']],
+			[FilterOperator.Contains, 'contains', ['text']],
+			[FilterOperator.StartsWith, 'startswith', ['text']],
+			[FilterOperator.EndsWith, 'endswith', ['text']],
+			[FilterOperator.GreaterThan, 'gt', ['number', 'date']],
+			[FilterOperator.LessThan, 'lt', ['number', 'date']],
+			[FilterOperator.GreaterThanOrEqual, 'ge', ['number', 'date']],
+			[FilterOperator.LessThanOrEqual, 'le', ['number', 'date']],
+			[FilterOperator.IsNull, 'null', ['text', 'enum', 'date', 'number', 'boolean', 'guid']],
+			[FilterOperator.IsNotNull, 'notnull', ['text', 'enum', 'date', 'number', 'boolean', 'guid']]
+		])('should define operator with odata "%s"', (operator, odataOp, applicableTypes) => {
+			expect(operator.odataOperator).toBe(odataOp);
+			expect(operator.applicableTypes).toEqual(applicableTypes);
 		});
 	});
 
@@ -265,338 +164,117 @@ describe('FilterOperator', () => {
 	});
 
 	describe('fromDisplayName() - Operator lookup by display name', () => {
-		it('should find Equals operator by display name', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromDisplayName('Equals');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.Equals);
+		test.each([
+			['Equals', FilterOperator.Equals],
+			['Contains', FilterOperator.Contains],
+			['Starts With', FilterOperator.StartsWith],
+			['Ends With', FilterOperator.EndsWith],
+			['Not Equals', FilterOperator.NotEquals],
+			['Greater Than', FilterOperator.GreaterThan],
+			['Is Null', FilterOperator.IsNull]
+		])('should find operator by display name "%s"', (displayName, expectedOperator) => {
+			const operator = FilterOperator.fromDisplayName(displayName);
+			expect(operator).toBe(expectedOperator);
 		});
 
-		it('should find Contains operator by display name', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromDisplayName('Contains');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.Contains);
-		});
-
-		it('should find StartsWith operator by display name', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromDisplayName('Starts With');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.StartsWith);
-		});
-
-		it('should find EndsWith operator by display name', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromDisplayName('Ends With');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.EndsWith);
-		});
-
-		it('should find NotEquals operator by display name', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromDisplayName('Not Equals');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.NotEquals);
-		});
-
-		it('should find GreaterThan operator by display name', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromDisplayName('Greater Than');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.GreaterThan);
-		});
-
-		it('should find IsNull operator by display name', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromDisplayName('Is Null');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.IsNull);
-		});
-
-		it('should return undefined for unknown display name', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromDisplayName('UnknownOperator');
-
-			// Assert
-			expect(operator).toBeUndefined();
-		});
-
-		it('should be case-sensitive when finding by display name', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromDisplayName('equals');
-
-			// Assert
-			expect(operator).toBeUndefined();
-		});
-
-		it('should return undefined for empty display name', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromDisplayName('');
-
-			// Assert
-			expect(operator).toBeUndefined();
+		test.each([
+			['UnknownOperator', undefined],
+			['equals', undefined],
+			['', undefined]
+		])('should return undefined for invalid display name "%s"', (displayName, expected) => {
+			const operator = FilterOperator.fromDisplayName(displayName);
+			expect(operator).toBe(expected);
 		});
 	});
 
 	describe('fromODataOperator() - Operator lookup by OData string', () => {
-		it('should find Equals operator by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('eq');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.Equals);
+		test.each([
+			['eq', FilterOperator.Equals],
+			['contains', FilterOperator.Contains],
+			['startswith', FilterOperator.StartsWith],
+			['endswith', FilterOperator.EndsWith],
+			['ne', FilterOperator.NotEquals],
+			['gt', FilterOperator.GreaterThan],
+			['lt', FilterOperator.LessThan],
+			['ge', FilterOperator.GreaterThanOrEqual],
+			['le', FilterOperator.LessThanOrEqual],
+			['null', FilterOperator.IsNull],
+			['notnull', FilterOperator.IsNotNull]
+		])('should find operator by OData operator "%s"', (odataOp, expectedOperator) => {
+			const operator = FilterOperator.fromODataOperator(odataOp);
+			expect(operator).toBe(expectedOperator);
 		});
 
-		it('should find Contains operator by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('contains');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.Contains);
-		});
-
-		it('should find StartsWith operator by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('startswith');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.StartsWith);
-		});
-
-		it('should find EndsWith operator by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('endswith');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.EndsWith);
-		});
-
-		it('should find NotEquals operator by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('ne');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.NotEquals);
-		});
-
-		it('should find GreaterThan operator by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('gt');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.GreaterThan);
-		});
-
-		it('should find LessThan operator by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('lt');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.LessThan);
-		});
-
-		it('should find GreaterThanOrEqual operator by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('ge');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.GreaterThanOrEqual);
-		});
-
-		it('should find LessThanOrEqual operator by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('le');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.LessThanOrEqual);
-		});
-
-		it('should find IsNull operator by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('null');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.IsNull);
-		});
-
-		it('should find IsNotNull operator by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('notnull');
-
-			// Assert
-			expect(operator).toBe(FilterOperator.IsNotNull);
-		});
-
-		it('should return undefined for unknown OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('unknown');
-
-			// Assert
-			expect(operator).toBeUndefined();
-		});
-
-		it('should be case-sensitive when finding by OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('EQ');
-
-			// Assert
-			expect(operator).toBeUndefined();
-		});
-
-		it('should return undefined for empty OData operator', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator('');
-
-			// Assert
-			expect(operator).toBeUndefined();
+		test.each([
+			['unknown', undefined],
+			['EQ', undefined],
+			['', undefined]
+		])('should return undefined for invalid OData operator "%s"', (odataOp, expected) => {
+			const operator = FilterOperator.fromODataOperator(odataOp);
+			expect(operator).toBe(expected);
 		});
 	});
 
 	describe('equals() - Value object equality', () => {
-		it('should return true when comparing same operator instances', () => {
-			// Arrange
-			const op1 = FilterOperator.Equals;
-			const op2 = FilterOperator.Equals;
-
-			// Act & Assert
-			expect(op1.equals(op2)).toBe(true);
-		});
-
-		it('should return true when comparing operators with same OData value', () => {
-			// Arrange
-			const op1 = FilterOperator.fromODataOperator('eq');
-			const op2 = FilterOperator.Equals;
-
-			// Act & Assert
-			expect(op1?.equals(op2)).toBe(true);
-		});
-
-		it('should return false when comparing different operators', () => {
-			// Arrange
-			const op1 = FilterOperator.Equals;
-			const op2 = FilterOperator.Contains;
-
-			// Act & Assert
-			expect(op1.equals(op2)).toBe(false);
+		test.each([
+			[FilterOperator.Equals, FilterOperator.Equals, true],
+			[FilterOperator.fromODataOperator('eq')!, FilterOperator.Equals, true],
+			[FilterOperator.Equals, FilterOperator.Contains, false],
+			[FilterOperator.Contains, FilterOperator.fromDisplayName('Contains')!, true],
+			[FilterOperator.GreaterThan, FilterOperator.LessThan, false],
+			[FilterOperator.IsNull, FilterOperator.fromODataOperator('null')!, true]
+		])('should return correct equality result', (op1, op2, expected) => {
+			expect(op1.equals(op2)).toBe(expected);
 		});
 
 		it('should return false when comparing with null', () => {
-			// Arrange
 			const op = FilterOperator.Equals;
-
-			// Act & Assert
 			expect(op.equals(null)).toBe(false);
-		});
-
-		it('should return true for Contains vs Contains', () => {
-			// Arrange
-			const op1 = FilterOperator.Contains;
-			const op2 = FilterOperator.fromDisplayName('Contains');
-
-			// Act & Assert
-			expect(op1.equals(op2!)).toBe(true);
-		});
-
-		it('should return false for GreaterThan vs LessThan', () => {
-			// Arrange
-			const op1 = FilterOperator.GreaterThan;
-			const op2 = FilterOperator.LessThan;
-
-			// Act & Assert
-			expect(op1.equals(op2)).toBe(false);
-		});
-
-		it('should return true for IsNull vs IsNull', () => {
-			// Arrange
-			const op1 = FilterOperator.IsNull;
-			const op2 = FilterOperator.fromODataOperator('null');
-
-			// Act & Assert
-			expect(op1.equals(op2!)).toBe(true);
 		});
 	});
 
 	describe('Value object properties', () => {
-		it('should have immutable displayName property that does not change', () => {
-			// Arrange
+		test.each([
+			['displayName', 'Equals'],
+			['odataOperator', 'eq']
+		])('should have immutable %s property', (property, expectedValue) => {
 			const op = FilterOperator.Equals;
-			const originalName = op.displayName;
-
-			// Act & Assert
-			expect(op.displayName).toBe(originalName);
-			expect(op.displayName).toBe('Equals');
-		});
-
-		it('should have immutable odataOperator property that does not change', () => {
-			// Arrange
-			const op = FilterOperator.Equals;
-			const originalOperator = op.odataOperator;
-
-			// Act & Assert
-			expect(op.odataOperator).toBe(originalOperator);
-			expect(op.odataOperator).toBe('eq');
+			const originalValue = op[property as keyof typeof op];
+			expect(op[property as keyof typeof op]).toBe(originalValue);
+			expect(op[property as keyof typeof op]).toBe(expectedValue);
 		});
 
 		it('should have immutable applicableTypes property that does not change', () => {
-			// Arrange
 			const op = FilterOperator.Equals;
 			const originalTypes = op.applicableTypes;
-
-			// Act & Assert
 			expect(op.applicableTypes).toBe(originalTypes);
 			expect(op.applicableTypes).toHaveLength(5);
 		});
 	});
 
 	describe('Edge cases', () => {
-		it('should handle whitespace in display name lookup', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromDisplayName(' Equals ');
-
-			// Assert
+		test.each([
+			['displayName', ' Equals '],
+			['odataOperator', ' eq ']
+		])('should handle whitespace in %s lookup', (lookupType, value) => {
+			const operator = lookupType === 'displayName'
+				? FilterOperator.fromDisplayName(value)
+				: FilterOperator.fromODataOperator(value);
 			expect(operator).toBeUndefined();
 		});
 
-		it('should handle whitespace in OData operator lookup', () => {
-			// Arrange & Act
-			const operator = FilterOperator.fromODataOperator(' eq ');
-
-			// Assert
-			expect(operator).toBeUndefined();
-		});
-
-		it('should have unique OData operators across all operators', () => {
-			// Arrange
+		test.each([
+			['OData operators', (op: typeof FilterOperator.Equals) => op.odataOperator],
+			['display names', (op: typeof FilterOperator.Equals) => op.displayName]
+		])('should have unique %s across all operators', (description, mapper) => {
 			const operators = FilterOperator.All;
-			const odataOps = operators.map(op => op.odataOperator);
-
-			// Act & Assert
-			expect(new Set(odataOps).size).toBe(odataOps.length);
-		});
-
-		it('should have unique display names across all operators', () => {
-			// Arrange
-			const operators = FilterOperator.All;
-			const displayNames = operators.map(op => op.displayName);
-
-			// Act & Assert
-			expect(new Set(displayNames).size).toBe(displayNames.length);
+			const values = operators.map(mapper);
+			expect(new Set(values).size).toBe(values.length);
 		});
 
 		it('should return consistent singleton instances for static operators', () => {
-			// Arrange & Act
 			const equals1 = FilterOperator.Equals;
 			const equals2 = FilterOperator.Equals;
-
-			// Assert
 			expect(equals1).toBe(equals2);
 		});
 	});

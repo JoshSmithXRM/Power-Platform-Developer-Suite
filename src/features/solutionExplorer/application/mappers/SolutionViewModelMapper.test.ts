@@ -2,14 +2,16 @@ import { SolutionViewModelMapper } from './SolutionViewModelMapper';
 import { Solution } from '../../domain/entities/Solution';
 import { SolutionCollectionService } from '../../domain/services/SolutionCollectionService';
 
+type MockCollectionService = Pick<SolutionCollectionService, 'sort'>;
+
 describe('SolutionViewModelMapper', () => {
 	let mapper: SolutionViewModelMapper;
-	let mockCollectionService: jest.Mocked<SolutionCollectionService>;
+	let mockCollectionService: jest.Mocked<MockCollectionService>;
 
 	beforeEach(() => {
 		mockCollectionService = {
 			sort: jest.fn((solutions) => solutions)
-		} as unknown as jest.Mocked<SolutionCollectionService>;
+		} as jest.Mocked<MockCollectionService>;
 
 		mapper = new SolutionViewModelMapper(mockCollectionService);
 	});

@@ -16,7 +16,9 @@ import { LoadEnvironmentByIdUseCase, LoadEnvironmentByIdRequest } from './LoadEn
 describe('LoadEnvironmentByIdUseCase', () => {
 	let useCase: LoadEnvironmentByIdUseCase;
 	let mockRepository: jest.Mocked<IEnvironmentRepository>;
-	let mockMapper: jest.Mocked<EnvironmentFormViewModelMapper>;
+	let mockMapper: {
+		toFormViewModel: jest.Mock<EnvironmentFormViewModel, [Environment, boolean?, boolean?]>;
+	} & EnvironmentFormViewModelMapper;
 
 	beforeEach(() => {
 		mockRepository = {
@@ -34,7 +36,9 @@ describe('LoadEnvironmentByIdUseCase', () => {
 
 		mockMapper = {
 			toFormViewModel: jest.fn()
-		} as unknown as jest.Mocked<EnvironmentFormViewModelMapper>;
+		} as {
+			toFormViewModel: jest.Mock<EnvironmentFormViewModel, [Environment, boolean?, boolean?]>;
+		} & EnvironmentFormViewModelMapper;
 
 		useCase = new LoadEnvironmentByIdUseCase(
 			mockRepository,

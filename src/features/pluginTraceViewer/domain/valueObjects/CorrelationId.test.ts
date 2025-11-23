@@ -2,21 +2,21 @@ import { CorrelationId } from './CorrelationId';
 
 describe('CorrelationId', () => {
 	describe('create', () => {
-		it('should create correlation ID from valid string', () => {
+		it('should create correlation ID when valid string provided', () => {
 			const id = CorrelationId.create('abc-123');
 			expect(id.value).toBe('abc-123');
 		});
 
-		it('should preserve whitespace in value', () => {
+		it('should preserve whitespace in value when string contains whitespace', () => {
 			const id = CorrelationId.create('  abc-123  ');
 			expect(id.value).toBe('  abc-123  ');
 		});
 
-		it('should throw error for empty string', () => {
+		it('should throw error when empty string provided', () => {
 			expect(() => CorrelationId.create('')).toThrow('Cannot be empty');
 		});
 
-		it('should throw error for whitespace-only string', () => {
+		it('should throw error when whitespace-only string provided', () => {
 			expect(() => CorrelationId.create('   ')).toThrow('Cannot be empty');
 		});
 	});
@@ -54,12 +54,12 @@ describe('CorrelationId', () => {
 	});
 
 	describe('toString', () => {
-		it('should return string value', () => {
+		it('should return string value when converted to string', () => {
 			const id = CorrelationId.create('abc-123');
 			expect(id.toString()).toBe('abc-123');
 		});
 
-		it('should return exact value including whitespace', () => {
+		it('should return exact value including whitespace when value contains whitespace', () => {
 			const id = CorrelationId.create('  abc-123  ');
 			expect(id.toString()).toBe('  abc-123  ');
 		});

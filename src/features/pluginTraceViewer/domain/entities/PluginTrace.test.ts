@@ -1,26 +1,11 @@
-import { PluginTrace } from './PluginTrace';
 import { ExecutionMode } from '../valueObjects/ExecutionMode';
-import { OperationType } from '../valueObjects/OperationType';
-import { Duration } from '../valueObjects/Duration';
 import { CorrelationId } from '../valueObjects/CorrelationId';
 import { TraceStatus } from '../valueObjects/TraceStatus';
+import { createTestPluginTrace } from '../../../../shared/testing';
 
 describe('PluginTrace', () => {
-	// Test data factory
-	function createValidTrace(overrides?: Partial<Parameters<typeof PluginTrace.create>[0]>): PluginTrace {
-		return PluginTrace.create({
-			id: 'trace-123',
-			createdOn: new Date('2024-01-01T10:00:00Z'),
-			pluginName: 'MyPlugin',
-			entityName: 'account',
-			messageName: 'Create',
-			operationType: OperationType.Plugin,
-			mode: ExecutionMode.Synchronous,
-			duration: Duration.fromMilliseconds(125),
-			constructorDuration: Duration.fromMilliseconds(50),
-			...overrides
-		});
-	}
+	// Use shared test factory
+	const createValidTrace = createTestPluginTrace;
 
 	describe('create', () => {
 		it('should create trace with all required fields', () => {

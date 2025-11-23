@@ -11,22 +11,22 @@ import { ValidationResult } from './ValidationResult';
 describe('ValueObjects', () => {
 	describe('DataverseUrl', () => {
 		describe('constructor', () => {
-			it('should create valid Dataverse URL', () => {
+			it('should create valid Dataverse URL when valid URL provided', () => {
 				const url = new DataverseUrl('https://org.crm.dynamics.com');
 				expect(url.getValue()).toBe('https://org.crm.dynamics.com');
 			});
 
-			it('should normalize URL by removing trailing slash', () => {
+			it('should normalize URL by removing trailing slash when URL has trailing slash', () => {
 				const url = new DataverseUrl('https://org.crm.dynamics.com/');
 				expect(url.getValue()).toBe('https://org.crm.dynamics.com');
 			});
 
-			it('should upgrade http to https', () => {
+			it('should upgrade http to https when http URL provided', () => {
 				const url = new DataverseUrl('http://org.crm.dynamics.com');
 				expect(url.getValue()).toBe('https://org.crm.dynamics.com');
 			});
 
-			it('should accept regional URLs', () => {
+			it('should accept regional URLs when regional URL provided', () => {
 				const url1 = new DataverseUrl('https://org.crm4.dynamics.com');
 				expect(url1.getValue()).toBe('https://org.crm4.dynamics.com');
 
@@ -34,12 +34,12 @@ describe('ValueObjects', () => {
 				expect(url2.getValue()).toBe('https://org.crm.uk.dynamics.com');
 			});
 
-			it('should throw error for empty URL', () => {
+			it('should throw error when empty URL provided', () => {
 				expect(() => new DataverseUrl('')).toThrow(DomainError);
 				expect(() => new DataverseUrl('   ')).toThrow(DomainError);
 			});
 
-			it('should throw error for invalid URL format', () => {
+			it('should throw error when invalid URL format provided', () => {
 				expect(() => new DataverseUrl('https://example.com')).toThrow(DomainError);
 				expect(() => new DataverseUrl('not-a-url')).toThrow(DomainError);
 				expect(() => new DataverseUrl('ftp://org.crm.dynamics.com')).toThrow(DomainError);

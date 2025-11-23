@@ -180,12 +180,6 @@
                 "title": "Persistence Inspector (Dev Only)",
                 "category": "Power Platform Developer Suite",
                 "enablement": "powerPlatformDevSuite.isDevelopment"
-            },
-            {
-                "command": "power-platform-dev-suite.benchmarkMetadataQueries",
-                "title": "TEMP: Benchmark Metadata Query Approaches",
-                "category": "Power Platform Developer Suite",
-                "enablement": "powerPlatformDevSuite.isDevelopment"
             }
         ],
         "viewsContainers": {

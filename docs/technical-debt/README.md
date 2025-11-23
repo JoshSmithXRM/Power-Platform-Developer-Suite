@@ -1,201 +1,276 @@
-# Technical Debt Documentation
+# Technical Debt Inventory
 
-This directory contains analysis and tracking of technical debt, dead code, and cleanup tasks.
-
----
-
-## 📚 Dead Code Analysis (2025-11-22)
-
-### Quick Links
-
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| **[DEAD_CODE_SUMMARY.md](DEAD_CODE_SUMMARY.md)** | 🎯 **START HERE** - Quick overview and priorities | Decision makers |
-| **[DEAD_CODE_CLEANUP_REPORT.md](DEAD_CODE_CLEANUP_REPORT.md)** | 📊 Comprehensive analysis (400+ lines) | Developers |
-| **[CLEANUP_CHECKLIST.md](CLEANUP_CHECKLIST.md)** | ✅ Step-by-step execution plan | Implementers |
-
-### Raw Reports
-
-| File | Tool | Description |
-|------|------|-------------|
-| `ts-prune-report.txt` | ts-prune | Unused TypeScript exports (85 items) |
-| `depcheck-report.json` | depcheck | Unused npm dependencies (4 packages) |
-| `madge-report.txt` | madge | Circular dependencies (3 cycles) |
+**Last Updated:** 2025-11-22
+**Total Items:** 7
 
 ---
 
-## 🎯 Key Findings
+## 📊 Quick Summary
 
-### Unused npm Dependencies (High Priority)
+| Category | Count | Action Timeline |
+|----------|-------|-----------------|
+| **Accepted Tradeoffs** | 3 | Keep indefinitely (conscious decisions) |
+| **Will Not Implement** | 1 | Rejected (over-engineering) |
+| **Scheduled** | 2 | Fix in next 1-2 sprints |
+| **Low Priority** | 1 | Fix when naturally touching code |
+
+---
+
+## 📖 What Goes Where?
+
+This folder tracks **architectural technical debt** - conscious design decisions and trade-offs.
+
+For **code quality debt** (dead code, unused dependencies, circular dependencies), see:
+- [CLEANUP_CHECKLIST.md](CLEANUP_CHECKLIST.md) - Step-by-step execution plan
+- [POST_REFACTOR_CLEANUP.md](POST_REFACTOR_CLEANUP.md) - Post-refactor tracking
+
+---
+
+## ✅ Accepted Tradeoffs (3 items)
+
+These are **conscious decisions to keep** based on cost/benefit analysis. Zero bugs found, high refactoring cost not justified.
+
+| Item | Effort to Fix | Bugs Found | Decision |
+|------|---------------|------------|----------|
+| [getValue() Pattern](accepted-tradeoffs/getValue-pattern.md) | 6-8 hours | 0 | Not justified |
+| [Large Panel Files](accepted-tradeoffs/large-panel-files.md) | N/A | 0 | Coordinator pattern |
+| [Unsafe Type Assertions](accepted-tradeoffs/unsafe-type-assertions.md) | 8-12 hours | 0 | Repositories validate |
+
+### When to Revisit
+- **getValue():** Only if multiple bugs found due to ID mixing
+- **Large Panels:** Only if panel exceeds 1,000 lines or contains business logic
+- **Type Assertions:** Only if API contract violations cause runtime errors
+
+---
+
+## 🚫 Will Not Implement (1 item)
+
+Correctly rejected suggestions that would add ceremony without benefit.
+
+| Item | Suggested By | Reason Rejected |
+|------|--------------|-----------------|
+| [XML Formatter Interface](will-not-implement/xml-formatter-interface.md) | Code Guardian | Cargo cult DIP (infrastructure → infrastructure) |
+
+**Message:** Good architectural judgment - avoided over-engineering.
+
+---
+
+## 📅 Scheduled (2 items)
+
+Items with clear triggers or timelines for fixing.
+
+| Item | Priority | Timeline | Trigger |
+|------|----------|----------|---------|
+| [Clean Architecture Guide Length](scheduled/clean-architecture-guide-length.md) | **Medium** | Next doc sprint | Already 1,708 lines (42% over limit) |
+| [DateTime Filter Mixed Concerns](scheduled/datetime-filter-mixed-concerns.md) | Medium | When touching code | Next filter feature or refactor |
+
+### Details
+
+**Clean Architecture Guide:**
+- **Status:** 1,708 lines (approaching 2,000 threshold)
+- **Growth:** +21% in one cycle (was 1,403 lines)
+- **Action:** Split into 3 documents (~500-600 lines each)
+- **Effort:** 2-3 hours
+
+**DateTime Filter:**
+- **Status:** Format conversion methods in domain layer
+- **Impact:** Low (works correctly, well-tested)
+- **Action:** Extract helpers to application/infrastructure layers
+- **Effort:** 2-3 hours
+
+---
+
+## 🔵 Low Priority (1 item)
+
+Fix when it becomes a problem or when naturally touching the code.
+
+| Item | Fix When | Effort |
+|------|----------|--------|
+| [Cross-Feature DTO Coupling](low-priority/cross-feature-dto-coupling.md) | 3rd feature needs environment data | 15-20 min |
+
+**Details:**
+- **Current:** Persistence Inspector imports EnvironmentConnectionDto from environmentSetup
+- **Why acceptable:** Infrastructure → infrastructure coupling allowed in Clean Architecture
+- **When to fix:** Wait for 3rd feature (don't abstract until you need it twice)
+
+---
+
+## 📈 Trends & Health
+
+### Debt by Category (Visual)
+
+```
+Accepted Tradeoffs: ███ 3 items (43%)
+Will Not Implement: █   1 item  (14%)
+Scheduled:          ██  2 items (29%)
+Low Priority:       █   1 item  (14%)
+```
+
+### Decision Quality
+
+| Metric | Value | Assessment |
+|--------|-------|------------|
+| **Items with zero bugs** | 6/7 (86%) | ✅ Excellent - decisions validated by reality |
+| **Rejected over-engineering** | 1 item | ✅ Good judgment (avoided cargo cult patterns) |
+| **Scheduled with clear triggers** | 2 items | ✅ Actionable (not vague "someday" items) |
+| **Low-priority deferred** | 1 item | ✅ Pragmatic (YAGNI principle applied) |
+
+**Overall Health:** 🟢 Excellent
+
+---
+
+## 🔄 Lifecycle Management
+
+### Adding New Technical Debt
+
+1. **Create file** in appropriate category folder
+2. **Use template** (see [TEMPLATE.md](TEMPLATE.md))
+3. **Update this README** (add row to appropriate table)
+4. **Link related items** (cross-reference if applicable)
+
+### Moving Between Categories
+
 ```bash
-npm uninstall axios node-fetch @types/node-fetch node-persist
+# Example: Scheduled → Accepted Tradeoffs (after deciding not to fix)
+git mv scheduled/some-item.md accepted-tradeoffs/
+# Update README.md tables
 ```
-**Impact**: 4 packages, ~600KB, ZERO risk to remove
 
-### Circular Dependencies
-1. **Domain Layer** (FIX FIRST): `FilterCondition ↔ ODataExpressionBuilder`
-2. **UI Layer**: `EnvironmentSelectorSection ↔ environmentSelectorView`
-3. **UI Layer**: `DropdownSection ↔ dropdownView`
-
-### Unused TypeScript Exports
-- **85 total exports flagged**
-- **~20 actually dead** (rest are false positives)
-- **Categories**:
-  - Type-only exports (keep)
-  - VS Code API contracts (keep)
-  - Data loader classes (decision needed: delete or wire up)
-  - Dead utilities (safe to delete)
-
----
-
-## 📊 Cleanup Impact
-
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| npm packages | 45 | 41 | -4 |
-| TypeScript files | 530 | ~520 | -10 |
-| Lines of code | 66,571 | ~65,500 | -1,000 |
-| Unused exports | 85 | ~20 | -76% |
-| Circular deps | 3 | 0 | -100% |
-
-**Estimated cleanup time**: 6 hours
-**Risk level**: Low (most changes are deletions)
-
----
-
-## 🚀 Quick Start
-
-### Want to start NOW? (5 minutes)
+### Resolving Technical Debt
 
 ```bash
-# Phase 1: Remove unused npm packages (ZERO RISK)
-npm uninstall axios node-fetch @types/node-fetch node-persist
-npm run compile && npm test
-git commit -am "chore: remove unused npm dependencies"
+# Delete the file when resolved
+git rm accepted-tradeoffs/some-item.md
+# Update README.md (remove row from table)
+# Commit with message: "fix: resolve [item name] technical debt"
 ```
-
-### Full Cleanup (6 hours)
-
-Follow **[CLEANUP_CHECKLIST.md](CLEANUP_CHECKLIST.md)** for step-by-step guide.
 
 ---
 
-## 🔍 Analysis Tools Used
+## 📋 File Structure
 
-### ts-prune
-Finds unused TypeScript exports across the codebase.
+```
+docs/technical-debt/
+├── README.md                                    # This file (index)
+├── TEMPLATE.md                                  # Template for new items
+│
+├── accepted-tradeoffs/                          # Indefinite (keep)
+│   ├── getValue-pattern.md
+│   ├── large-panel-files.md
+│   └── unsafe-type-assertions.md
+│
+├── will-not-implement/                          # Rejected suggestions
+│   └── xml-formatter-interface.md
+│
+├── scheduled/                                   # Has timeline
+│   ├── clean-architecture-guide-length.md
+│   └── datetime-filter-mixed-concerns.md
+│
+└── low-priority/                                # Opportunistic fix
+    └── cross-feature-dto-coupling.md
+```
 
+---
+
+## 🎯 Quick Actions
+
+### View All Scheduled Items
 ```bash
-npx ts-prune > ts-prune-report.txt
+ls docs/technical-debt/scheduled/
 ```
 
-**Note**: Reports many false positives (type-only imports, VS Code API contracts, etc.)
-
-### depcheck
-Finds unused npm dependencies.
-
+### Find All Medium Priority Items
 ```bash
-npx depcheck --json > depcheck-report.json
+grep -r "Priority: Medium" docs/technical-debt/
 ```
 
-**100% accurate** for unused dependencies.
-
-### madge
-Analyzes module dependencies and finds circular references.
-
+### Check When Item Was Last Reviewed
 ```bash
-# Find circular dependencies
-npx madge --circular src/ --extensions ts
+grep "Last Reviewed" docs/technical-debt/scheduled/clean-architecture-guide-length.md
+```
 
-# Generate summary
-npx madge --summary src/ --extensions ts
-
-# Generate visual graph
-npx madge --image graph.png src/ --extensions ts
+### List All Items by Category
+```bash
+find docs/technical-debt -name "*.md" -not -name "README.md" -not -name "TEMPLATE.md" -not -name "CLEANUP_CHECKLIST.md" -not -name "POST_REFACTOR_CLEANUP.md" | sort
 ```
 
 ---
 
-## 📅 Cleanup Schedule
+## 📚 Related Documentation
 
-### Immediate (This Week)
-- [x] Generate analysis reports ✅
-- [x] Document findings ✅
-- [ ] Remove unused npm packages (30 min)
-- [ ] Decide on data loader classes (1 hour)
-
-### Short-term (Next Sprint)
-- [ ] Fix domain layer circular dependency (1 hour) - **HIGH PRIORITY**
-- [ ] Delete dead view functions (30 min)
-- [ ] Fix UI layer circular dependencies (1 hour)
-- [ ] Delete dead utilities (2 hours)
-
-### Long-term (Next Quarter)
-- [ ] Add CI/CD checks for dead code
-- [ ] Quarterly cleanup audits
-- [ ] Document export policies
+| Document | Purpose |
+|----------|---------|
+| [CLEANUP_CHECKLIST.md](CLEANUP_CHECKLIST.md) | Code quality cleanup (dead code, unused deps, circular deps) |
+| [POST_REFACTOR_CLEANUP.md](POST_REFACTOR_CLEANUP.md) | Post-refactor documentation cleanup tracking |
+| [TEMPLATE.md](TEMPLATE.md) | Template for adding new technical debt items |
+| `docs/TECHNICAL_DEBT.md` | **DEPRECATED** - Now split into categorized files |
 
 ---
 
-## 🎓 Lessons Learned
+## ❓ FAQ
 
-### Common Causes of Dead Code
+### Q: When should I add something to technical debt?
 
-1. **Feature exploration** - Tried multiple approaches, kept all code
-2. **Refactoring incomplete** - Started migration, never finished
-3. **Copy-paste from examples** - Brought in unused dependencies
-4. **Over-engineering** - Built abstractions never used (data loaders)
+**A:** Add when you make a **conscious decision to defer** a fix for valid reasons:
+- ✅ High effort, low/zero bugs → Accepted Tradeoff
+- ✅ Suggested improvement you rejected → Will Not Implement
+- ✅ Has clear trigger to fix → Scheduled
+- ✅ Wait for pattern to emerge → Low Priority
 
-### Prevention Strategies
-
-1. **Delete aggressively** - If you replace code, delete the old version
-2. **YAGNI principle** - Don't build abstractions until you need them
-3. **Regular audits** - Run cleanup quarterly
-4. **CI/CD checks** - Automate detection
-
----
-
-## 📖 Related Documentation
-
-- [DUPLICATE_RENDERING_INVENTORY.md](DUPLICATE_RENDERING_INVENTORY.md) - Duplicate code analysis
-- [../../CLAUDE.md](../../CLAUDE.md) - Coding standards (prevents future debt)
-- [../../.eslintrc.json](../../eslint.config.mjs) - Code quality rules
+❌ **Don't add:**
+- TODO comments (those go in code or issues)
+- Bugs (those go in bug tracker)
+- Feature requests (those go in product backlog)
 
 ---
 
-## 🤝 Contributing to Cleanup
+### Q: How is this different from code quality debt?
 
-### Before You Delete
+**A:**
 
-1. **Search for usages**: `grep -r "ClassName" src/ --include="*.ts"`
-2. **Check tests**: Deleted code might be tested
-3. **Run compilation**: `npm run compile`
-4. **Run tests**: `npm test`
-5. **Manual smoke test**: Press F5, test affected panels
-
-### Commit Message Format
-
-```
-chore: remove unused [category]
-
-- Delete [specific item]
-- Delete [specific item]
-
-Verified: npm run compile && npm test passed
-```
-
-Examples:
-- `chore: remove unused npm dependencies (axios, node-fetch)`
-- `chore: remove unused DataLoader classes`
-- `refactor: resolve FilterCondition circular dependency`
+| Type | Examples | Detection | Location |
+|------|----------|-----------|----------|
+| **Architectural Debt** | getValue() pattern, cross-feature coupling | Manual review, architectural decisions | This folder (categorized files) |
+| **Code Quality Debt** | Dead code, unused deps, circular dependencies | Automated tools (ts-prune, depcheck, madge) | CLEANUP_CHECKLIST.md |
 
 ---
 
-## ❓ Questions?
+### Q: What if I disagree with an "Accepted Tradeoff"?
 
-See **[DEAD_CODE_CLEANUP_REPORT.md](DEAD_CODE_CLEANUP_REPORT.md)** section 9 for open questions and decision points.
+**A:**
+1. Read the full item file (has detailed reasoning)
+2. Check "Bugs Found" (usually zero)
+3. Check "Effort to Fix" (usually high)
+4. If you still disagree, propose a discussion with evidence
 
 ---
 
-**Last Updated**: 2025-11-22
-**Next Review**: 2025-02-22 (quarterly)
+### Q: How often should we review technical debt?
+
+**A:**
+- **Quarterly** (every 3 months) - Full review of all items
+- **On-demand** - When touching related code
+- **Before major releases** - Ensure nothing critical deferred
+
+---
+
+### Q: Can I delete items from "Will Not Implement"?
+
+**A:** Only after significant time (1+ year) when context is no longer relevant. These serve as **architectural decision records** to prevent re-suggesting the same rejected ideas.
+
+---
+
+## 🔍 Quarterly Review Checklist
+
+Run this checklist every 3 months:
+
+- [ ] Review all **Scheduled** items - Are timelines still accurate?
+- [ ] Review all **Accepted Tradeoffs** - Have bugs appeared? (If yes, reconsider)
+- [ ] Review all **Low Priority** items - Has trigger occurred?
+- [ ] Update "Last Reviewed" dates in each file
+- [ ] Update this README with current counts
+- [ ] Generate fresh code quality reports (see CLEANUP_CHECKLIST.md)
+
+---
+
+**Next Review:** 2026-02-22 (quarterly)

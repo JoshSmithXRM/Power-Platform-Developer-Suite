@@ -373,90 +373,6 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// TEMPORARY: Benchmark query approaches
-	const benchmarkMetadataQueriesCommand = vscode.commands.registerCommand('power-platform-dev-suite.benchmarkMetadataQueries', async () => {
-		try {
-			const envs = await container.environmentRepository.getAll();
-			if (envs.length === 0) {
-				vscode.window.showErrorMessage('No environments configured');
-				return;
-			}
-
-			const items: QuickPickItemWithEnvId[] = envs.map((env: Environment) => ({
-				label: env.getName().getValue(),
-				description: env.getDataverseUrl().getValue(),
-				envId: env.getId().getValue()
-			}));
-
-			const selected = await vscode.window.showQuickPick(items, {
-				placeHolder: 'Select environment for benchmark test'
-			});
-
-			if (!selected) {
-				return;
-			}
-
-			vscode.window.showInformationMessage('Running benchmark... this will take a few seconds');
-
-			const { DataverseEntityMetadataRepository } = await import('./features/metadataBrowser/infrastructure/repositories/DataverseEntityMetadataRepository.js');
-			const { OptionSetMetadataMapper } = await import('./features/metadataBrowser/infrastructure/mappers/OptionSetMetadataMapper.js');
-			const { EntityKeyMapper } = await import('./features/metadataBrowser/infrastructure/mappers/EntityKeyMapper.js');
-			const { SecurityPrivilegeMapper } = await import('./features/metadataBrowser/infrastructure/mappers/SecurityPrivilegeMapper.js');
-			const { RelationshipMetadataMapper } = await import('./features/metadataBrowser/infrastructure/mappers/RelationshipMetadataMapper.js');
-			const { AttributeMetadataMapper } = await import('./features/metadataBrowser/infrastructure/mappers/AttributeMetadataMapper.js');
-			const { EntityMetadataMapper } = await import('./features/metadataBrowser/infrastructure/mappers/EntityMetadataMapper.js');
-			const { DataverseApiService } = await import('./shared/infrastructure/services/DataverseApiService.js');
-			const { LogicalName } = await import('./features/metadataBrowser/domain/valueObjects/LogicalName.js');
-
-			const dataverseApiService = new DataverseApiService(factories.dataverseApiServiceFactory.getAccessToken, factories.dataverseApiServiceFactory.getDataverseUrl, container.logger);
-
-			// Create mapper chain for benchmark
-			const optionSetMapper = new OptionSetMetadataMapper();
-			const entityKeyMapper = new EntityKeyMapper();
-			const securityPrivilegeMapper = new SecurityPrivilegeMapper();
-			const relationshipMapper = new RelationshipMetadataMapper();
-			const attributeMapper = new AttributeMetadataMapper(optionSetMapper);
-			const entityMapper = new EntityMetadataMapper(attributeMapper, relationshipMapper, entityKeyMapper, securityPrivilegeMapper);
-
-			const repository = new DataverseEntityMetadataRepository(dataverseApiService, entityMapper, optionSetMapper, container.logger);
-
-			// Clear cache first
-			repository.clearCache();
-
-			// Run navigation properties approach (current)
-			const navStart = Date.now();
-			await repository.getEntityWithAttributes(selected.envId, LogicalName.create('account'));
-			const navTime = Date.now() - navStart;
-
-			// Clear cache again
-			repository.clearCache();
-
-			// Manually run $expand approach for comparison
-			const expandStart = Date.now();
-			const endpoint = `/api/data/v9.2/EntityDefinitions(LogicalName='account')?$expand=Attributes,OneToManyRelationships,ManyToOneRelationships,ManyToManyRelationships,Keys`;
-			await dataverseApiService.get(selected.envId, endpoint);
-			const expandTime = Date.now() - expandStart;
-
-			// Show results
-			const message = `Benchmark Results (Account entity):
-Navigation Properties: ${navTime}ms
-$expand: ${expandTime}ms
-Difference: ${Math.abs(navTime - expandTime)}ms ${navTime < expandTime ? '(Nav Props FASTER)' : '($expand FASTER)'}`;
-
-			vscode.window.showInformationMessage(message, { modal: true });
-			container.logger.info('Metadata query benchmark completed', {
-				navigationPropertiesMs: navTime,
-				expandMs: expandTime,
-				difference: Math.abs(navTime - expandTime),
-				faster: navTime < expandTime ? 'navigation' : 'expand'
-			});
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			vscode.window.showErrorMessage(`Benchmark failed: ${errorMessage}`);
-			container.logger.error('Benchmark failed', error);
-		}
-	});
-
 	// Register all disposables with VS Code's extension context.
 	// When the extension deactivates, VS Code automatically calls .dispose() on each
 	// registered disposable in reverse order, ensuring proper cleanup of:
@@ -485,7 +401,6 @@ Difference: ${Math.abs(navTime - expandTime)}ms ${navTime < expandTime ? '(Nav P
 		openMakerCommand,
 		openDynamicsCommand,
 		refreshEnvironmentsCommand,
-		benchmarkMetadataQueriesCommand,
 		container.eventPublisher
 	);
 

@@ -14,12 +14,15 @@ import { ValidationResult } from '../../domain/valueObjects/ValidationResult';
 
 import { SaveEnvironmentUseCase, SaveEnvironmentRequest } from './SaveEnvironmentUseCase';
 
+type MockValidationService = Pick<EnvironmentValidationService, 'validateForSave'>;
+type MockCacheInvalidationService = Pick<AuthenticationCacheInvalidationService, 'shouldInvalidateCache'>;
+
 describe('SaveEnvironmentUseCase', () => {
 	let useCase: SaveEnvironmentUseCase;
 	let mockRepository: jest.Mocked<IEnvironmentRepository>;
-	let mockValidationService: jest.Mocked<EnvironmentValidationService>;
+	let mockValidationService: jest.Mocked<MockValidationService>;
 	let mockEventPublisher: jest.Mocked<IDomainEventPublisher>;
-	let mockCacheInvalidationService: jest.Mocked<AuthenticationCacheInvalidationService>;
+	let mockCacheInvalidationService: jest.Mocked<MockCacheInvalidationService>;
 
 	beforeEach(() => {
 		mockRepository = {
@@ -37,7 +40,7 @@ describe('SaveEnvironmentUseCase', () => {
 
 		mockValidationService = {
 			validateForSave: jest.fn()
-		} as unknown as jest.Mocked<EnvironmentValidationService>;
+		} as jest.Mocked<MockValidationService>;
 
 		mockEventPublisher = {
 			publish: jest.fn(),
@@ -46,7 +49,7 @@ describe('SaveEnvironmentUseCase', () => {
 
 		mockCacheInvalidationService = {
 			shouldInvalidateCache: jest.fn()
-		} as unknown as jest.Mocked<AuthenticationCacheInvalidationService>;
+		} as jest.Mocked<MockCacheInvalidationService>;
 
 		useCase = new SaveEnvironmentUseCase(
 			mockRepository,

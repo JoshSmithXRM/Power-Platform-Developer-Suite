@@ -234,7 +234,7 @@ describe('DataverseApiSolutionRepository', () => {
 
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				'env-123',
-				expect.any(String),
+				expect.stringContaining('/api/data/v9.2/solutions'),
 				mockCancellationToken
 			);
 		});
@@ -552,7 +552,7 @@ describe('DataverseApiSolutionRepository', () => {
 
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				'env-123',
-				expect.any(String),
+				expect.stringContaining('/api/data/v9.2/solutions'),
 				mockCancellationToken
 			);
 		});

@@ -1,33 +1,10 @@
-import { EnvironmentVariable, EnvironmentVariableType } from './EnvironmentVariable';
+import { EnvironmentVariableType } from './EnvironmentVariable';
 import { ValidationError } from '../../../../shared/domain/errors/ValidationError';
+import { createTestEnvironmentVariable } from '../../../../shared/testing';
 
 describe('EnvironmentVariable', () => {
-	// Test data factory
-	function createValidVariable(overrides?: {
-		definitionId?: string;
-		schemaName?: string;
-		displayName?: string;
-		type?: EnvironmentVariableType;
-		defaultValue?: string | null;
-		currentValue?: string | null;
-		isManaged?: boolean;
-		description?: string;
-		modifiedOn?: Date;
-		valueId?: string | null;
-	}): EnvironmentVariable {
-		return new EnvironmentVariable(
-			overrides?.definitionId ?? 'def-123',
-			overrides?.schemaName ?? 'env_test_variable',
-			overrides?.displayName ?? 'Test Variable',
-			overrides?.type ?? EnvironmentVariableType.String,
-			overrides && 'defaultValue' in overrides ? overrides.defaultValue : 'default-value',
-			overrides && 'currentValue' in overrides ? overrides.currentValue : null,
-			overrides?.isManaged ?? false,
-			overrides?.description ?? 'Test description',
-			overrides?.modifiedOn ?? new Date('2024-01-01T10:00:00Z'),
-			overrides && 'valueId' in overrides ? overrides.valueId : null
-		);
-	}
+	// Use shared test factory
+	const createValidVariable = createTestEnvironmentVariable;
 
 	describe('constructor', () => {
 		describe('successful creation', () => {

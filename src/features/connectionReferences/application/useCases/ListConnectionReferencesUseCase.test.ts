@@ -35,7 +35,13 @@ describe('ListConnectionReferencesUseCase', () => {
 		};
 
 		mockRelationshipBuilder = {
-			buildRelationships: jest.fn()
+			buildRelationships: jest.fn(),
+			createCaseInsensitiveConnectionReferenceMap: jest.fn(),
+			buildFlowRelationships: jest.fn(),
+			buildRelationshipsForFlow: jest.fn(),
+			createFlowToConnectionReferenceRelationship: jest.fn(),
+			buildManyToManyRelationships: jest.fn(),
+			createConnectionReferenceToFlowsRelationship: jest.fn()
 		} as unknown as jest.Mocked<FlowConnectionRelationshipBuilder>;
 
 		useCase = new ListConnectionReferencesUseCase(

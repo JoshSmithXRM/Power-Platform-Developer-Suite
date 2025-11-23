@@ -2,54 +2,48 @@ import { ExecutionMode } from './ExecutionMode';
 
 describe('ExecutionMode', () => {
 	describe('constants', () => {
-		it('should have Synchronous constant with value 0', () => {
-			expect(ExecutionMode.Synchronous.value).toBe(0);
-		});
-
-		it('should have Asynchronous constant with value 1', () => {
-			expect(ExecutionMode.Asynchronous.value).toBe(1);
+		test.each([
+			[ExecutionMode.Synchronous, 0],
+			[ExecutionMode.Asynchronous, 1]
+		])('should have constant with value %i', (mode, expectedValue) => {
+			expect(mode.value).toBe(expectedValue);
 		});
 	});
 
 	describe('fromNumber', () => {
-		it('should create Synchronous from 0', () => {
-			const mode = ExecutionMode.fromNumber(0);
-			expect(mode).toBe(ExecutionMode.Synchronous);
+		test.each([
+			[0, ExecutionMode.Synchronous],
+			[1, ExecutionMode.Asynchronous]
+		])('should create correct mode from number %i', (value, expectedMode) => {
+			const mode = ExecutionMode.fromNumber(value);
+			expect(mode).toBe(expectedMode);
 		});
 
-		it('should create Asynchronous from 1', () => {
-			const mode = ExecutionMode.fromNumber(1);
-			expect(mode).toBe(ExecutionMode.Asynchronous);
-		});
-
-		it('should throw error for invalid value', () => {
-			expect(() => ExecutionMode.fromNumber(2)).toThrow('Invalid execution mode: 2');
-		});
-
-		it('should throw error for negative value', () => {
-			expect(() => ExecutionMode.fromNumber(-1)).toThrow('Invalid execution mode: -1');
+		test.each([
+			[2, 'Invalid execution mode: 2'],
+			[-1, 'Invalid execution mode: -1']
+		])('should throw error for invalid value %i', (value, expectedError) => {
+			expect(() => ExecutionMode.fromNumber(value)).toThrow(expectedError);
 		});
 	});
 
 	describe('isSynchronous', () => {
-		it('should return true for Synchronous mode', () => {
-			expect(ExecutionMode.Synchronous.isSynchronous()).toBe(true);
-		});
-
-		it('should return false for Asynchronous mode', () => {
-			expect(ExecutionMode.Asynchronous.isSynchronous()).toBe(false);
+		test.each([
+			[ExecutionMode.Synchronous, true],
+			[ExecutionMode.Asynchronous, false]
+		])('should return %s for mode', (mode, expected) => {
+			expect(mode.isSynchronous()).toBe(expected);
 		});
 	});
 
 	describe('equals', () => {
-		it('should return true for same execution mode', () => {
-			expect(ExecutionMode.Synchronous.equals(ExecutionMode.Synchronous)).toBe(true);
-			expect(ExecutionMode.Asynchronous.equals(ExecutionMode.Asynchronous)).toBe(true);
-		});
-
-		it('should return false for different execution modes', () => {
-			expect(ExecutionMode.Synchronous.equals(ExecutionMode.Asynchronous)).toBe(false);
-			expect(ExecutionMode.Asynchronous.equals(ExecutionMode.Synchronous)).toBe(false);
+		test.each([
+			[ExecutionMode.Synchronous, ExecutionMode.Synchronous, true],
+			[ExecutionMode.Asynchronous, ExecutionMode.Asynchronous, true],
+			[ExecutionMode.Synchronous, ExecutionMode.Asynchronous, false],
+			[ExecutionMode.Asynchronous, ExecutionMode.Synchronous, false]
+		])('should return %s when comparing modes', (mode1, mode2, expected) => {
+			expect(mode1.equals(mode2)).toBe(expected);
 		});
 
 		it('should return false for null', () => {
