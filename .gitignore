@@ -27,13 +27,6 @@ package.json.backup
 Thumbs.db
 nul
 
-# Technical debt analysis artifacts (generate on-demand, don't commit)
-docs/technical-debt/*-report.*
-docs/technical-debt/*.json
-docs/technical-debt/*.txt
-docs/technical-debt/TECHNICAL_DEBT_REVIEW_*.md
-docs/technical-debt/DEAD_CODE_*.md
-
 # Review working files (scratch work, delete after use)
 # Archive summaries to docs/quality/ after review completion
 .review/results/
