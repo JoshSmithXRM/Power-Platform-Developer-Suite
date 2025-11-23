@@ -1,6 +1,7 @@
 import { FlowConnectionRelationshipBuilder } from './FlowConnectionRelationshipBuilder';
 import { CloudFlow } from '../entities/CloudFlow';
 import { ConnectionReference } from '../entities/ConnectionReference';
+import { FlowConnectionRelationship } from '../valueObjects/FlowConnectionRelationship';
 import { assertDefined } from '../../../../shared/testing/assertions/assertDefined';
 
 describe('FlowConnectionRelationshipBuilder', () => {
@@ -123,44 +124,16 @@ describe('FlowConnectionRelationshipBuilder', () => {
 		});
 
 		describe('case-insensitive matching', () => {
-			it('should match connection reference with lowercase logical name', () => {
+			test.each<{ crName: string; flowName: string; scenario: string }>([
+				{ crName: 'CR_SharePoint', flowName: 'cr_sharepoint', scenario: 'CR uppercase, flow lowercase' },
+				{ crName: 'cr_sharepoint', flowName: 'CR_SHAREPOINT', scenario: 'CR lowercase, flow uppercase' },
+				{ crName: 'Cr_SharePoint', flowName: 'cR_sHAREpOINT', scenario: 'mixed case variations' }
+			])('should match connection reference: $scenario', ({ crName, flowName }) => {
 				// Arrange
 				const cr = createConnectionReference({
-					connectionReferenceLogicalName: 'CR_SharePoint' // uppercase
+					connectionReferenceLogicalName: crName
 				});
-				const flow = createCloudFlowWithConnectionReferences(['cr_sharepoint']); // lowercase
-
-				// Act
-				const relationships = builder.buildRelationships([flow], [cr]);
-
-				// Assert
-				expect(relationships).toHaveLength(1);
-				assertDefined(relationships[0]);
-				expect(relationships[0].relationshipType).toBe('flow-to-cr');
-			});
-
-			it('should match connection reference with uppercase logical name', () => {
-				// Arrange
-				const cr = createConnectionReference({
-					connectionReferenceLogicalName: 'cr_sharepoint' // lowercase
-				});
-				const flow = createCloudFlowWithConnectionReferences(['CR_SHAREPOINT']); // uppercase
-
-				// Act
-				const relationships = builder.buildRelationships([flow], [cr]);
-
-				// Assert
-				expect(relationships).toHaveLength(1);
-				assertDefined(relationships[0]);
-				expect(relationships[0].relationshipType).toBe('flow-to-cr');
-			});
-
-			it('should match connection reference with mixed case logical name', () => {
-				// Arrange
-				const cr = createConnectionReference({
-					connectionReferenceLogicalName: 'Cr_SharePoint' // mixed case
-				});
-				const flow = createCloudFlowWithConnectionReferences(['cR_sHAREpOINT']); // different mixed case
+				const flow = createCloudFlowWithConnectionReferences([flowName]);
 
 				// Act
 				const relationships = builder.buildRelationships([flow], [cr]);
@@ -186,7 +159,23 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				expect(relationships[0].relationshipType).toBe('orphaned-flow');
 			});
 
-			it('should set connection reference id to null for orphaned flow', () => {
+			test.each<{ property: string; expectedValue: string | null; getValue: (rel: FlowConnectionRelationship) => string | null }>([
+				{
+					property: 'connectionReferenceId',
+					expectedValue: null,
+					getValue: (rel) => rel.connectionReferenceId
+				},
+				{
+					property: 'connectionReferenceDisplayName',
+					expectedValue: '(Missing: cr_missing)',
+					getValue: (rel) => rel.connectionReferenceDisplayName
+				},
+				{
+					property: 'connectionReferenceLogicalName',
+					expectedValue: 'cr_missing',
+					getValue: (rel) => rel.connectionReferenceLogicalName
+				}
+			])('should set $property correctly for orphaned flow', ({ getValue, expectedValue }) => {
 				// Arrange
 				const flow = createCloudFlowWithConnectionReferences(['cr_missing']);
 
@@ -195,33 +184,7 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				assertDefined(relationships[0]);
-				expect(relationships[0].connectionReferenceId).toBeNull();
-			});
-
-			it('should set connection reference display name to missing message for orphaned flow', () => {
-				// Arrange
-				const missingCrName = 'cr_missing';
-				const flow = createCloudFlowWithConnectionReferences([missingCrName]);
-
-				// Act
-				const relationships = builder.buildRelationships([flow], []);
-
-				// Assert
-				assertDefined(relationships[0]);
-				expect(relationships[0].connectionReferenceDisplayName).toBe(`(Missing: ${missingCrName})`);
-			});
-
-			it('should preserve connection reference logical name for orphaned flow', () => {
-				// Arrange
-				const missingCrName = 'cr_missing';
-				const flow = createCloudFlowWithConnectionReferences([missingCrName]);
-
-				// Act
-				const relationships = builder.buildRelationships([flow], []);
-
-				// Assert
-				assertDefined(relationships[0]);
-				expect(relationships[0].connectionReferenceLogicalName).toBe(missingCrName);
+				expect(getValue(relationships[0])).toBe(expectedValue);
 			});
 
 			it('should set connection reference properties to null for orphaned flow', () => {
@@ -308,7 +271,18 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				expect(relationships[0].relationshipType).toBe('orphaned-cr');
 			});
 
-			it('should set flow id to null for orphaned connection reference', () => {
+			test.each<{ property: string; expectedValue: string | null; getValue: (rel: FlowConnectionRelationship) => string | null }>([
+				{
+					property: 'flowId',
+					expectedValue: null,
+					getValue: (rel) => rel.flowId
+				},
+				{
+					property: 'flowName',
+					expectedValue: '(No flow uses this)',
+					getValue: (rel) => rel.flowName
+				}
+			])('should set $property correctly for orphaned connection reference', ({ getValue, expectedValue }) => {
 				// Arrange
 				const cr = createConnectionReference({
 					connectionReferenceLogicalName: 'cr_unused'
@@ -319,21 +293,7 @@ describe('FlowConnectionRelationshipBuilder', () => {
 
 				// Assert
 				assertDefined(relationships[0]);
-				expect(relationships[0].flowId).toBeNull();
-			});
-
-			it('should set flow name to no flow message for orphaned connection reference', () => {
-				// Arrange
-				const cr = createConnectionReference({
-					connectionReferenceLogicalName: 'cr_unused'
-				});
-
-				// Act
-				const relationships = builder.buildRelationships([], [cr]);
-
-				// Assert
-				assertDefined(relationships[0]);
-				expect(relationships[0].flowName).toBe('(No flow uses this)');
+				expect(getValue(relationships[0])).toBe(expectedValue);
 			});
 
 			it('should set flow properties to null for orphaned connection reference', () => {
@@ -450,11 +410,10 @@ describe('FlowConnectionRelationshipBuilder', () => {
 		});
 
 		describe('edge cases', () => {
-			it('should return empty array when both flows and connection references are empty', () => {
-				// Arrange
-				const flows: CloudFlow[] = [];
-				const crs: ConnectionReference[] = [];
-
+			test.each<{ scenario: string; flows: CloudFlow[]; crs: ConnectionReference[] }>([
+				{ scenario: 'both flows and connection references are empty', flows: [], crs: [] },
+				{ scenario: 'flows is empty and no orphaned CRs exist', flows: [], crs: [] }
+			])('should return empty array when $scenario', ({ flows, crs }) => {
 				// Act
 				const relationships = builder.buildRelationships(flows, crs);
 
@@ -462,21 +421,25 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				expect(relationships).toEqual([]);
 			});
 
-			it('should return empty array when flows is empty and no orphaned CRs exist', () => {
+			test.each<{ scenario: string; createFlow: () => CloudFlow; expectedCrType: string }>([
+				{
+					scenario: 'flows without connection references',
+					createFlow: () => createCloudFlowWithConnectionReferences([]),
+					expectedCrType: 'orphaned-cr'
+				},
+				{
+					scenario: 'flows with null client data',
+					createFlow: () => createCloudFlow({ clientData: null }),
+					expectedCrType: 'orphaned-cr'
+				},
+				{
+					scenario: 'flows with empty client data',
+					createFlow: () => createCloudFlow({ clientData: '' }),
+					expectedCrType: 'orphaned-cr'
+				}
+			])('should skip $scenario', ({ createFlow, expectedCrType }) => {
 				// Arrange
-				const flows: CloudFlow[] = [];
-				const crs: ConnectionReference[] = [];
-
-				// Act
-				const relationships = builder.buildRelationships(flows, crs);
-
-				// Assert
-				expect(relationships).toEqual([]);
-			});
-
-			it('should skip flows without connection references', () => {
-				// Arrange
-				const flowWithoutCrs = createCloudFlowWithConnectionReferences([]);
+				const flowWithoutCrs = createFlow();
 				const cr = createConnectionReference({
 					connectionReferenceLogicalName: 'cr_unused'
 				});
@@ -487,39 +450,7 @@ describe('FlowConnectionRelationshipBuilder', () => {
 				// Assert
 				expect(relationships).toHaveLength(1);
 				assertDefined(relationships[0]);
-				expect(relationships[0].relationshipType).toBe('orphaned-cr');
-			});
-
-			it('should skip flows with null client data', () => {
-				// Arrange
-				const flow = createCloudFlow({ clientData: null });
-				const cr = createConnectionReference({
-					connectionReferenceLogicalName: 'cr_unused'
-				});
-
-				// Act
-				const relationships = builder.buildRelationships([flow], [cr]);
-
-				// Assert
-				expect(relationships).toHaveLength(1);
-				assertDefined(relationships[0]);
-				expect(relationships[0].relationshipType).toBe('orphaned-cr');
-			});
-
-			it('should skip flows with empty client data', () => {
-				// Arrange
-				const flow = createCloudFlow({ clientData: '' });
-				const cr = createConnectionReference({
-					connectionReferenceLogicalName: 'cr_unused'
-				});
-
-				// Act
-				const relationships = builder.buildRelationships([flow], [cr]);
-
-				// Assert
-				expect(relationships).toHaveLength(1);
-				assertDefined(relationships[0]);
-				expect(relationships[0].relationshipType).toBe('orphaned-cr');
+				expect(relationships[0].relationshipType).toBe(expectedCrType);
 			});
 
 			it('should handle duplicate connection reference logical names by using first match', () => {

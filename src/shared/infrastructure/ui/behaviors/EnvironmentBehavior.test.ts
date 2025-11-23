@@ -51,7 +51,7 @@ describe('EnvironmentBehavior', () => {
 	describe('initialize', () => {
 		it('should load and send environments to webview', async () => {
 			behavior = new EnvironmentBehavior(
-				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+				// Safely cast to Webview interface - only uses postMessage which is mocked
 			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
@@ -70,7 +70,7 @@ describe('EnvironmentBehavior', () => {
 
 		it('should set first environment as current when no initial environment provided', async () => {
 			behavior = new EnvironmentBehavior(
-				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
+				// Safely cast to Webview interface - only uses postMessage which is mocked
 			webviewMock as unknown as Webview,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,

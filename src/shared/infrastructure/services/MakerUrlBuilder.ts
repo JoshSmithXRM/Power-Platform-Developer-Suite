@@ -5,7 +5,7 @@ import { IMakerUrlBuilder } from '../../domain/interfaces/IMakerUrlBuilder';
  * Constructs Power Platform Maker Portal URLs with support for sovereign clouds.
  */
 export class MakerUrlBuilder implements IMakerUrlBuilder {
-  constructor(private readonly baseUrl: string = 'https://make.powerapps.com') {}
+  constructor(private readonly baseUrl = 'https://make.powerapps.com') {}
 
   /**
    * Builds Power Platform Maker Portal URL for a solution.

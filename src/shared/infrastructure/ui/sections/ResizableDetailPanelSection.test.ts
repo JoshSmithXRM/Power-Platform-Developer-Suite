@@ -48,7 +48,7 @@ describe('ResizableDetailPanelSection', () => {
 				tabs: []
 			};
 
-			expect(() => new TestDetailSection(config)).toThrow('At least one tab is required');
+			expect(() => new TestDetailSection(config)).toThrow('Invalid ResizableDetailPanelSection config: at least one tab is required');
 		});
 
 		it('should reject tabs with empty id', () => {
@@ -57,7 +57,7 @@ describe('ResizableDetailPanelSection', () => {
 				tabs: [{ id: '', label: 'Tab 1' }]
 			};
 
-			expect(() => new TestDetailSection(config)).toThrow('Tab id cannot be empty');
+			expect(() => new TestDetailSection(config)).toThrow('Invalid ResizableDetailPanelSection config: tab id cannot be empty');
 		});
 
 		it('should reject tabs with whitespace-only id', () => {
@@ -66,7 +66,7 @@ describe('ResizableDetailPanelSection', () => {
 				tabs: [{ id: '  ', label: 'Tab 1' }]
 			};
 
-			expect(() => new TestDetailSection(config)).toThrow('Tab id cannot be empty');
+			expect(() => new TestDetailSection(config)).toThrow('Invalid ResizableDetailPanelSection config: tab id cannot be empty');
 		});
 
 		it('should reject tabs with empty label', () => {
@@ -75,7 +75,7 @@ describe('ResizableDetailPanelSection', () => {
 				tabs: [{ id: 'tab1', label: '' }]
 			};
 
-			expect(() => new TestDetailSection(config)).toThrow('Tab label cannot be empty');
+			expect(() => new TestDetailSection(config)).toThrow('Invalid ResizableDetailPanelSection config: tab label cannot be empty');
 		});
 
 		it('should reject tabs with whitespace-only label', () => {
@@ -84,7 +84,7 @@ describe('ResizableDetailPanelSection', () => {
 				tabs: [{ id: 'tab1', label: '   ' }]
 			};
 
-			expect(() => new TestDetailSection(config)).toThrow('Tab label cannot be empty');
+			expect(() => new TestDetailSection(config)).toThrow('Invalid ResizableDetailPanelSection config: tab label cannot be empty');
 		});
 
 		it('should reject duplicate tab ids', () => {
@@ -96,7 +96,7 @@ describe('ResizableDetailPanelSection', () => {
 				]
 			};
 
-			expect(() => new TestDetailSection(config)).toThrow('Duplicate tab id: duplicate');
+			expect(() => new TestDetailSection(config)).toThrow('Invalid ResizableDetailPanelSection config: duplicate tab id "duplicate"');
 		});
 
 		it('should reject multiple default tabs', () => {
@@ -108,7 +108,7 @@ describe('ResizableDetailPanelSection', () => {
 				]
 			};
 
-			expect(() => new TestDetailSection(config)).toThrow('Only one tab can be marked as default');
+			expect(() => new TestDetailSection(config)).toThrow('Invalid ResizableDetailPanelSection config: only one tab can be marked as default');
 		});
 
 		it('should accept valid single tab config', () => {

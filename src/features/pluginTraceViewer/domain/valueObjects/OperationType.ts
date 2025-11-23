@@ -12,6 +12,11 @@ export class OperationType {
 	static readonly Workflow = new OperationType(2);
 
 	/**
+	 * Factory method to create OperationType from numeric value.
+	 * Maps Dataverse operation type codes to value objects.
+	 *
+	 * @param value - Numeric operation type (1 = Plugin, 2 = Workflow)
+	 * @returns OperationType instance
 	 * @throws Error if value is not a valid operation type
 	 */
 	static fromNumber(value: number): OperationType {
@@ -21,17 +26,20 @@ export class OperationType {
 			case 2:
 				return OperationType.Workflow;
 			default:
-				throw new Error(`Invalid operation type: ${value}`);
+				throw new Error(`Invalid OperationType: unknown numeric value ${value}`);
 		}
 	}
 
 	/**
 	 * Creates OperationType from string value.
+	 * Useful for deserializing from JSON or parsing user input.
+	 *
+	 * @param value - String operation type ('Plugin' or 'Workflow')
+	 * @returns OperationType instance
 	 * @throws Error if value is not valid
 	 *
 	 * NOTE: Factory method for value object - standard pattern, to be reviewed by code-guardian
 	 */
-	// eslint-disable-next-line local-rules/no-static-entity-methods
 	static fromString(value: string): OperationType {
 		switch (value) {
 			case 'Plugin':
@@ -39,12 +47,15 @@ export class OperationType {
 			case 'Workflow':
 				return OperationType.Workflow;
 			default:
-				throw new Error(`Invalid operation type: ${value}`);
+				throw new Error(`Invalid OperationType: unknown string value "${value}"`);
 		}
 	}
 
 	/**
 	 * Converts to number for OData queries.
+	 * Required for building Dataverse API filter expressions.
+	 *
+	 * @returns Numeric operation type (1 or 2)
 	 *
 	 * NOTE: Conversion for OData queries is business logic, not presentation - to be reviewed by code-guardian
 	 */
@@ -55,11 +66,19 @@ export class OperationType {
 
 	/**
 	 * Converts to string for display.
+	 *
+	 * @returns String representation ('Plugin' or 'Workflow')
 	 */
 	toString(): string {
 		return this.value === 1 ? 'Plugin' : 'Workflow';
 	}
 
+	/**
+	 * Checks equality with another OperationType.
+	 *
+	 * @param other - OperationType to compare with (or null)
+	 * @returns True if values are equal
+	 */
 	equals(other: OperationType | null): boolean {
 		return other !== null && this.value === other.value;
 	}

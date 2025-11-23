@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
-import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
+import type { IPanelStateRepository, PanelState } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { FilterCriteriaMapper } from '../mappers/FilterCriteriaMapper';
 import type { FilterCriteriaViewModel, FilterConditionViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
-import { DateTimeFilter } from '../../application/types';
 import { QUICK_FILTER_DEFINITIONS } from '../constants/QuickFilterDefinitions';
+import { localDateTimeToUtc } from '../../../../shared/presentation/utils/DateTimeFormatters';
 
 /**
  * Behavior: Plugin Trace Filter Management
@@ -87,7 +87,7 @@ export class PluginTraceFilterManagementBehavior {
 
 			// Build OData query preview from current filter criteria
 			const domainFilter = this.filterCriteriaMapper.toDomain(this.filterCriteria);
-			const odataQuery = domainFilter.toODataFilter() || 'No filters applied';
+			const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
 
 			// Send OData query preview to webview
 			await this.webview.postMessage({
@@ -254,12 +254,11 @@ export class PluginTraceFilterManagementBehavior {
 					panelType: this.viewType,
 					environmentId
 				},
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
 				{
-					...(existingState || {}),
+					...(existingState ?? ({} as PanelState)),
 					filterCriteria: expandedData,
 					autoRefreshInterval
-				} as any // eslint-disable-line @typescript-eslint/no-explicit-any
+				}
 			);
 
 			this.logger.debug('Filter criteria saved', {
@@ -367,15 +366,21 @@ export class PluginTraceFilterManagementBehavior {
 		};
 	}
 
+	/** Minimum width for zero-padded date/time components (2 digits: "01", "09", "23") */
+	private static readonly DATE_TIME_PAD_WIDTH = 2;
+
+	/** Zero character used for padding ("0" in "01", "09") */
+	private static readonly ZERO_PAD_CHAR = '0';
+
 	/**
 	 * Formats a Date object for datetime-local input.
 	 */
 	private formatDateTimeLocal(date: Date): string {
 		const year = date.getFullYear();
-		const month = String(date.getMonth() + 1).padStart(2, '0');
-		const day = String(date.getDate()).padStart(2, '0');
-		const hours = String(date.getHours()).padStart(2, '0');
-		const minutes = String(date.getMinutes()).padStart(2, '0');
+		const month = String(date.getMonth() + 1).padStart(PluginTraceFilterManagementBehavior.DATE_TIME_PAD_WIDTH, PluginTraceFilterManagementBehavior.ZERO_PAD_CHAR);
+		const day = String(date.getDate()).padStart(PluginTraceFilterManagementBehavior.DATE_TIME_PAD_WIDTH, PluginTraceFilterManagementBehavior.ZERO_PAD_CHAR);
+		const hours = String(date.getHours()).padStart(PluginTraceFilterManagementBehavior.DATE_TIME_PAD_WIDTH, PluginTraceFilterManagementBehavior.ZERO_PAD_CHAR);
+		const minutes = String(date.getMinutes()).padStart(PluginTraceFilterManagementBehavior.DATE_TIME_PAD_WIDTH, PluginTraceFilterManagementBehavior.ZERO_PAD_CHAR);
 		return `${year}-${month}-${day}T${hours}:${minutes}`;
 	}
 
@@ -402,10 +407,10 @@ export class PluginTraceFilterManagementBehavior {
 					}
 
 					// Convert local datetime to UTC ISO
-					const dateFilter = DateTimeFilter.fromLocalDateTime(condition.value);
+					const utcIso = localDateTimeToUtc(condition.value);
 					return {
 						...condition,
-						value: dateFilter.getUtcIso()
+						value: utcIso
 					};
 				} catch (error) {
 					this.logger.warn('Failed to convert datetime filter', { condition, error });

@@ -81,7 +81,7 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 			expect(result.success).toBe(true);
 			expect(result.environmentId).toBe('env-id-123');
 			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				'super-secret',
 				undefined,
 				undefined
@@ -105,7 +105,7 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 			expect(result.success).toBe(true);
 			expect(result.environmentId).toBe('env-id-456');
 			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				undefined,
 				'secret-password',
 				undefined
@@ -156,7 +156,7 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 			expect(result.success).toBe(true);
 			expect(mockRepository.getClientSecret).toHaveBeenCalledWith('12345678-1234-1234-1234-123456789abc');
 			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				'stored-secret',
 				undefined,
 				undefined
@@ -177,7 +177,7 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 			expect(result.success).toBe(true);
 			expect(mockRepository.getPassword).toHaveBeenCalledWith('admin@contoso.com');
 			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				undefined,
 				'stored-password',
 				undefined
@@ -198,7 +198,7 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 			// Should use provided secret, not stored
 			expect(mockRepository.getClientSecret).not.toHaveBeenCalled();
 			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				'new-secret',
 				undefined,
 				undefined
@@ -228,7 +228,7 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 			await useCase.execute(request, undefined);
 
 			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				undefined,
 				undefined,
 				undefined
@@ -244,14 +244,14 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 			await useCase.execute(request, mockCancellationToken);
 
 			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				undefined,
 				undefined,
 				mockCancellationToken
 			);
 		});
 
-		it('should work without cancellation token', async () => {
+		it('should successfully discover environment ID when cancellation token is not provided', async () => {
 			const request = createValidRequest();
 			mockPowerPlatformApiService.discoverEnvironmentId.mockResolvedValue('env-id');
 
@@ -259,7 +259,7 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 
 			expect(result.success).toBe(true);
 			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				undefined,
 				undefined,
 				undefined

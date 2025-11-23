@@ -9,6 +9,7 @@ import { ExecutionMode } from '../../domain/valueObjects/ExecutionMode';
 import { OperationType } from '../../domain/valueObjects/OperationType';
 import { Duration } from '../../domain/valueObjects/Duration';
 import type { ExportFormat } from '../../domain/types/ExportFormat';
+import { assertDefined } from '../../../../shared/testing';
 
 describe('PluginTraceExportBehavior', () => {
 	let behavior: PluginTraceExportBehavior;
@@ -138,7 +139,7 @@ describe('PluginTraceExportBehavior', () => {
 
 			expect(mockExportTracesUseCase.exportToCsv).toHaveBeenCalledWith(
 				traces,
-				expect.any(String)
+				expect.stringMatching(/.+/)
 			);
 		});
 	});
@@ -195,8 +196,10 @@ describe('PluginTraceExportBehavior', () => {
 
 			const exportedTraces = mockExportTracesUseCase.exportToCsv.mock.calls[0]![0] as readonly PluginTrace[];
 			expect(exportedTraces).toHaveLength(2);
-			expect(exportedTraces[0]!.id).toBe('trace-2');
-			expect(exportedTraces[1]!.id).toBe('trace-4');
+			assertDefined(exportedTraces[0]);
+			expect(exportedTraces[0].id).toBe('trace-2');
+			assertDefined(exportedTraces[1]);
+			expect(exportedTraces[1].id).toBe('trace-4');
 		});
 
 		it('should handle IDs in different order than traces array', async () => {
@@ -213,8 +216,10 @@ describe('PluginTraceExportBehavior', () => {
 			const exportedTraces = mockExportTracesUseCase.exportToJson.mock.calls[0]![0] as readonly PluginTrace[];
 			expect(exportedTraces).toHaveLength(2);
 			// Should maintain order from original traces array
-			expect(exportedTraces[0]!.id).toBe('trace-1');
-			expect(exportedTraces[1]!.id).toBe('trace-3');
+			assertDefined(exportedTraces[0]);
+			expect(exportedTraces[0].id).toBe('trace-1');
+			assertDefined(exportedTraces[1]);
+			expect(exportedTraces[1].id).toBe('trace-3');
 		});
 
 		it('should ignore non-existent trace IDs', async () => {
@@ -229,8 +234,10 @@ describe('PluginTraceExportBehavior', () => {
 
 			const exportedTraces = mockExportTracesUseCase.exportToCsv.mock.calls[0]![0] as readonly PluginTrace[];
 			expect(exportedTraces).toHaveLength(2);
-			expect(exportedTraces[0]!.id).toBe('trace-1');
-			expect(exportedTraces[1]!.id).toBe('trace-2');
+			assertDefined(exportedTraces[0]);
+			expect(exportedTraces[0].id).toBe('trace-1');
+			assertDefined(exportedTraces[1]);
+			expect(exportedTraces[1].id).toBe('trace-2');
 		});
 	});
 
@@ -295,7 +302,7 @@ describe('PluginTraceExportBehavior', () => {
 
 			expect(mockExportTracesUseCase.exportToJson).toHaveBeenCalledWith(
 				traces,
-				expect.any(String)
+				expect.stringMatching(/.+/)
 			);
 			expect(showInfoSpy).toHaveBeenCalledWith('Exported 1 trace(s) as JSON');
 			showInfoSpy.mockRestore();
@@ -316,7 +323,7 @@ describe('PluginTraceExportBehavior', () => {
 
 			expect(mockExportTracesUseCase.exportToCsv).toHaveBeenCalledWith(
 				traces,
-				expect.any(String)
+				expect.stringMatching(/.+/)
 			);
 		});
 
@@ -333,7 +340,7 @@ describe('PluginTraceExportBehavior', () => {
 
 			expect(mockExportTracesUseCase.exportToJson).toHaveBeenCalledWith(
 				traces,
-				expect.any(String)
+				expect.stringMatching(/.+/)
 			);
 		});
 	});
@@ -358,7 +365,7 @@ describe('PluginTraceExportBehavior', () => {
 
 			expect(mockExportTracesUseCase.exportToCsv).toHaveBeenCalledWith(
 				traces,
-				expect.any(String)
+				expect.stringMatching(/.+/)
 			);
 			expect(showInfoSpy).toHaveBeenCalledWith('Exported 1000 trace(s) as CSV');
 			showInfoSpy.mockRestore();

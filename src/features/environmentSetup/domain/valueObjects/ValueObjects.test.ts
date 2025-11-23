@@ -26,23 +26,27 @@ describe('ValueObjects', () => {
 				expect(url.getValue()).toBe('https://org.crm.dynamics.com');
 			});
 
-			it('should accept regional URLs when regional URL provided', () => {
-				const url1 = new DataverseUrl('https://org.crm4.dynamics.com');
-				expect(url1.getValue()).toBe('https://org.crm4.dynamics.com');
-
-				const url2 = new DataverseUrl('https://org.crm.uk.dynamics.com');
-				expect(url2.getValue()).toBe('https://org.crm.uk.dynamics.com');
+			it.each<{ url: string }>([
+				{ url: 'https://org.crm4.dynamics.com' },
+				{ url: 'https://org.crm.uk.dynamics.com' }
+			])('should accept regional URL: $url', ({ url }) => {
+				const dataverseUrl = new DataverseUrl(url);
+				expect(dataverseUrl.getValue()).toBe(url);
 			});
 
-			it('should throw error when empty URL provided', () => {
-				expect(() => new DataverseUrl('')).toThrow(DomainError);
-				expect(() => new DataverseUrl('   ')).toThrow(DomainError);
+			it.each<{ input: string }>([
+				{ input: '' },
+				{ input: '   ' }
+			])('should throw error when empty URL provided: $input', ({ input }) => {
+				expect(() => new DataverseUrl(input)).toThrow(DomainError);
 			});
 
-			it('should throw error when invalid URL format provided', () => {
-				expect(() => new DataverseUrl('https://example.com')).toThrow(DomainError);
-				expect(() => new DataverseUrl('not-a-url')).toThrow(DomainError);
-				expect(() => new DataverseUrl('ftp://org.crm.dynamics.com')).toThrow(DomainError);
+			it.each<{ input: string }>([
+				{ input: 'https://example.com' },
+				{ input: 'not-a-url' },
+				{ input: 'ftp://org.crm.dynamics.com' }
+			])('should throw error when invalid URL format provided: $input', ({ input }) => {
+				expect(() => new DataverseUrl(input)).toThrow(DomainError);
 			});
 		});
 
@@ -59,12 +63,12 @@ describe('ValueObjects', () => {
 				expect(url.getApiBaseUrl()).toBe('https://org.crm.dynamics.com/api/data/v9.2');
 			});
 
-			it('should return API base URL for regional instances', () => {
-				const url1 = new DataverseUrl('https://myorg.crm4.dynamics.com');
-				expect(url1.getApiBaseUrl()).toBe('https://myorg.crm4.dynamics.com/api/data/v9.2');
-
-				const url2 = new DataverseUrl('https://myorg.crm.uk.dynamics.com');
-				expect(url2.getApiBaseUrl()).toBe('https://myorg.crm.uk.dynamics.com/api/data/v9.2');
+			it.each<{ url: string; expected: string }>([
+				{ url: 'https://myorg.crm4.dynamics.com', expected: 'https://myorg.crm4.dynamics.com/api/data/v9.2' },
+				{ url: 'https://myorg.crm.uk.dynamics.com', expected: 'https://myorg.crm.uk.dynamics.com/api/data/v9.2' }
+			])('should return API base URL for regional instance: $url', ({ url, expected }) => {
+				const dataverseUrl = new DataverseUrl(url);
+				expect(dataverseUrl.getApiBaseUrl()).toBe(expected);
 			});
 		});
 
@@ -74,15 +78,13 @@ describe('ValueObjects', () => {
 				expect(url.getOrganizationName()).toBe('contoso');
 			});
 
-			it('should extract organization name from regional URLs', () => {
-				const url1 = new DataverseUrl('https://contoso.crm4.dynamics.com');
-				expect(url1.getOrganizationName()).toBe('contoso');
-
-				const url2 = new DataverseUrl('https://fabrikam.crm.uk.dynamics.com');
-				expect(url2.getOrganizationName()).toBe('fabrikam');
-
-				const url3 = new DataverseUrl('https://adventureworks.crm11.de.dynamics.com');
-				expect(url3.getOrganizationName()).toBe('adventureworks');
+			it.each<{ url: string; expected: string }>([
+				{ url: 'https://contoso.crm4.dynamics.com', expected: 'contoso' },
+				{ url: 'https://fabrikam.crm.uk.dynamics.com', expected: 'fabrikam' },
+				{ url: 'https://adventureworks.crm11.de.dynamics.com', expected: 'adventureworks' }
+			])('should extract organization name from regional URL: $url -> $expected', ({ url, expected }) => {
+				const dataverseUrl = new DataverseUrl(url);
+				expect(dataverseUrl.getOrganizationName()).toBe(expected);
 			});
 
 			it('should extract organization name with hyphens', () => {
@@ -135,62 +137,45 @@ describe('ValueObjects', () => {
 				expect(url.getValue()).toBe('https://org.crm.dynamics.com');
 			});
 
-			it('should throw for URL without protocol', () => {
-				expect(() => new DataverseUrl('org.crm.dynamics.com')).toThrow(DomainError);
-			});
-
-			it('should throw for non-dynamics.com domain', () => {
-				expect(() => new DataverseUrl('https://org.crm.microsoft.com')).toThrow(DomainError);
-			});
-
-			it('should throw for URL with path segments', () => {
-				expect(() => new DataverseUrl('https://org.crm.dynamics.com/some/path')).toThrow(DomainError);
-			});
-
-			it('should throw for URL with query parameters', () => {
-				expect(() => new DataverseUrl('https://org.crm.dynamics.com?param=value')).toThrow(DomainError);
+			it.each<{ input: string; description: string }>([
+				{ input: 'org.crm.dynamics.com', description: 'URL without protocol' },
+				{ input: 'https://org.crm.microsoft.com', description: 'non-dynamics.com domain' },
+				{ input: 'https://org.crm.dynamics.com/some/path', description: 'URL with path segments' },
+				{ input: 'https://org.crm.dynamics.com?param=value', description: 'URL with query parameters' }
+			])('should throw for $description: $input', ({ input }) => {
+				expect(() => new DataverseUrl(input)).toThrow(DomainError);
 			});
 		});
 	});
 
 	describe('TenantId', () => {
 		describe('constructor', () => {
-			it('should create valid tenant ID', () => {
-				const tenantId = new TenantId('00000000-0000-0000-0000-000000000000');
-				expect(tenantId.getValue()).toBe('00000000-0000-0000-0000-000000000000');
+			it.each<{ input: string; expected: string }>([
+				{ input: '00000000-0000-0000-0000-000000000000', expected: '00000000-0000-0000-0000-000000000000' },
+				{ input: 'ABCDEF12-3456-7890-ABCD-EF1234567890', expected: 'abcdef12-3456-7890-abcd-ef1234567890' },
+				{ input: '  00000000-0000-0000-0000-000000000000  ', expected: '00000000-0000-0000-0000-000000000000' }
+			])('should create valid tenant ID with normalization: $input -> $expected', ({ input, expected }) => {
+				const tenantId = new TenantId(input);
+				expect(tenantId.getValue()).toBe(expected);
 			});
 
-			it('should normalize to lowercase', () => {
-				const tenantId = new TenantId('ABCDEF12-3456-7890-ABCD-EF1234567890');
-				expect(tenantId.getValue()).toBe('abcdef12-3456-7890-abcd-ef1234567890');
+			it.each<{ input: string | undefined }>([
+				{ input: '' },
+				{ input: '   ' },
+				{ input: undefined }
+			])('should allow empty tenant ID (uses organizations authority): $input', ({ input }) => {
+				const tenantId = new TenantId(input);
+				expect(tenantId.getValue()).toBeUndefined();
+				expect(tenantId.isValid()).toBe(true);
+				expect(tenantId.isProvided()).toBe(false);
 			});
 
-			it('should trim whitespace', () => {
-				const tenantId = new TenantId('  00000000-0000-0000-0000-000000000000  ');
-				expect(tenantId.getValue()).toBe('00000000-0000-0000-0000-000000000000');
-			});
-
-			it('should allow empty tenant ID (uses organizations authority)', () => {
-				const tenantId1 = new TenantId('');
-				expect(tenantId1.getValue()).toBeUndefined();
-				expect(tenantId1.isValid()).toBe(true);
-				expect(tenantId1.isProvided()).toBe(false);
-
-				const tenantId2 = new TenantId('   ');
-				expect(tenantId2.getValue()).toBeUndefined();
-				expect(tenantId2.isValid()).toBe(true);
-				expect(tenantId2.isProvided()).toBe(false);
-
-				const tenantId3 = new TenantId(undefined);
-				expect(tenantId3.getValue()).toBeUndefined();
-				expect(tenantId3.isValid()).toBe(true);
-				expect(tenantId3.isProvided()).toBe(false);
-			});
-
-			it('should throw error for invalid GUID format', () => {
-				expect(() => new TenantId('not-a-guid')).toThrow(DomainError);
-				expect(() => new TenantId('00000000')).toThrow(DomainError);
-				expect(() => new TenantId('00000000-0000-0000-0000')).toThrow(DomainError);
+			it.each<{ input: string }>([
+				{ input: 'not-a-guid' },
+				{ input: '00000000' },
+				{ input: '00000000-0000-0000-0000' }
+			])('should throw error for invalid GUID format: $input', ({ input }) => {
+				expect(() => new TenantId(input)).toThrow(DomainError);
 			});
 		});
 
@@ -204,29 +189,22 @@ describe('ValueObjects', () => {
 
 	describe('ClientId', () => {
 		describe('constructor', () => {
-			it('should create valid client ID', () => {
-				const clientId = new ClientId('11111111-1111-1111-1111-111111111111');
-				expect(clientId.getValue()).toBe('11111111-1111-1111-1111-111111111111');
+			it.each<{ input: string; expected: string }>([
+				{ input: '11111111-1111-1111-1111-111111111111', expected: '11111111-1111-1111-1111-111111111111' },
+				{ input: 'ABCDEF12-3456-7890-ABCD-EF1234567890', expected: 'abcdef12-3456-7890-abcd-ef1234567890' },
+				{ input: '  11111111-1111-1111-1111-111111111111  ', expected: '11111111-1111-1111-1111-111111111111' }
+			])('should create valid client ID with normalization: $input -> $expected', ({ input, expected }) => {
+				const clientId = new ClientId(input);
+				expect(clientId.getValue()).toBe(expected);
 			});
 
-			it('should normalize to lowercase', () => {
-				const clientId = new ClientId('ABCDEF12-3456-7890-ABCD-EF1234567890');
-				expect(clientId.getValue()).toBe('abcdef12-3456-7890-abcd-ef1234567890');
-			});
-
-			it('should trim whitespace', () => {
-				const clientId = new ClientId('  11111111-1111-1111-1111-111111111111  ');
-				expect(clientId.getValue()).toBe('11111111-1111-1111-1111-111111111111');
-			});
-
-			it('should throw error for empty client ID', () => {
-				expect(() => new ClientId('')).toThrow(DomainError);
-				expect(() => new ClientId('   ')).toThrow(DomainError);
-			});
-
-			it('should throw error for invalid GUID format', () => {
-				expect(() => new ClientId('not-a-guid')).toThrow(DomainError);
-				expect(() => new ClientId('11111111')).toThrow(DomainError);
+			it.each<{ input: string }>([
+				{ input: '' },
+				{ input: '   ' },
+				{ input: 'not-a-guid' },
+				{ input: '11111111' }
+			])('should throw error for invalid client ID: $input', ({ input }) => {
+				expect(() => new ClientId(input)).toThrow(DomainError);
 			});
 		});
 
@@ -262,9 +240,11 @@ describe('ValueObjects', () => {
 				expect(name.getValue()).toBe('Development');
 			});
 
-			it('should throw error for empty name', () => {
-				expect(() => new EnvironmentName('')).toThrow(DomainError);
-				expect(() => new EnvironmentName('   ')).toThrow(DomainError);
+			it.each<{ input: string }>([
+				{ input: '' },
+				{ input: '   ' }
+			])('should throw error for empty name: $input', ({ input }) => {
+				expect(() => new EnvironmentName(input)).toThrow(DomainError);
 			});
 
 			it('should throw error for name exceeding 100 characters', () => {
@@ -305,9 +285,11 @@ describe('ValueObjects', () => {
 				expect(id.getValue()).toBe('env-123-abc');
 			});
 
-			it('should throw error for empty ID', () => {
-				expect(() => new EnvironmentId('')).toThrow(DomainError);
-				expect(() => new EnvironmentId('   ')).toThrow(DomainError);
+			it.each<{ input: string }>([
+				{ input: '' },
+				{ input: '   ' }
+			])('should throw error for empty ID: $input', ({ input }) => {
+				expect(() => new EnvironmentId(input)).toThrow(DomainError);
 			});
 		});
 
@@ -344,153 +326,97 @@ describe('ValueObjects', () => {
 
 	describe('AuthenticationMethod', () => {
 		describe('constructor', () => {
-			it('should create Interactive auth method', () => {
-				const method = new AuthenticationMethod(AuthenticationMethodType.Interactive);
-				expect(method.getType()).toBe(AuthenticationMethodType.Interactive);
-			});
-
-			it('should create ServicePrincipal auth method', () => {
-				const method = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
-				expect(method.getType()).toBe(AuthenticationMethodType.ServicePrincipal);
-			});
-
-			it('should create UsernamePassword auth method', () => {
-				const method = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
-				expect(method.getType()).toBe(AuthenticationMethodType.UsernamePassword);
-			});
-
-			it('should create DeviceCode auth method', () => {
-				const method = new AuthenticationMethod(AuthenticationMethodType.DeviceCode);
-				expect(method.getType()).toBe(AuthenticationMethodType.DeviceCode);
+			it.each<{ type: AuthenticationMethodType }>([
+				{ type: AuthenticationMethodType.Interactive },
+				{ type: AuthenticationMethodType.ServicePrincipal },
+				{ type: AuthenticationMethodType.UsernamePassword },
+				{ type: AuthenticationMethodType.DeviceCode }
+			])('should create $type auth method', ({ type }) => {
+				const method = new AuthenticationMethod(type);
+				expect(method.getType()).toBe(type);
 			});
 		});
 
 		describe('requiresCredentials', () => {
-			it('should return false for Interactive', () => {
-				const method = new AuthenticationMethod(AuthenticationMethodType.Interactive);
-				expect(method.requiresCredentials()).toBe(false);
-			});
-
-			it('should return false for DeviceCode', () => {
-				const method = new AuthenticationMethod(AuthenticationMethodType.DeviceCode);
-				expect(method.requiresCredentials()).toBe(false);
-			});
-
-			it('should return true for ServicePrincipal', () => {
-				const method = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
-				expect(method.requiresCredentials()).toBe(true);
-			});
-
-			it('should return true for UsernamePassword', () => {
-				const method = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
-				expect(method.requiresCredentials()).toBe(true);
+			it.each<{ type: AuthenticationMethodType; expected: boolean }>([
+				{ type: AuthenticationMethodType.Interactive, expected: false },
+				{ type: AuthenticationMethodType.DeviceCode, expected: false },
+				{ type: AuthenticationMethodType.ServicePrincipal, expected: true },
+				{ type: AuthenticationMethodType.UsernamePassword, expected: true }
+			])('should return $expected for $type', ({ type, expected }) => {
+				const method = new AuthenticationMethod(type);
+				expect(method.requiresCredentials()).toBe(expected);
 			});
 		});
 
 		describe('requiresClientCredentials', () => {
-			it('should return true only for ServicePrincipal', () => {
-				const sp = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
-				expect(sp.requiresClientCredentials()).toBe(true);
-
-				const interactive = new AuthenticationMethod(AuthenticationMethodType.Interactive);
-				expect(interactive.requiresClientCredentials()).toBe(false);
-
-				const upw = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
-				expect(upw.requiresClientCredentials()).toBe(false);
+			it.each<{ type: AuthenticationMethodType; expected: boolean }>([
+				{ type: AuthenticationMethodType.ServicePrincipal, expected: true },
+				{ type: AuthenticationMethodType.Interactive, expected: false },
+				{ type: AuthenticationMethodType.UsernamePassword, expected: false },
+				{ type: AuthenticationMethodType.DeviceCode, expected: false }
+			])('should return $expected for $type', ({ type, expected }) => {
+				const method = new AuthenticationMethod(type);
+				expect(method.requiresClientCredentials()).toBe(expected);
 			});
 		});
 
 		describe('requiresUsernamePassword', () => {
-			it('should return true only for UsernamePassword', () => {
-				const upw = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
-				expect(upw.requiresUsernamePassword()).toBe(true);
-
-				const interactive = new AuthenticationMethod(AuthenticationMethodType.Interactive);
-				expect(interactive.requiresUsernamePassword()).toBe(false);
-
-				const sp = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
-				expect(sp.requiresUsernamePassword()).toBe(false);
+			it.each<{ type: AuthenticationMethodType; expected: boolean }>([
+				{ type: AuthenticationMethodType.UsernamePassword, expected: true },
+				{ type: AuthenticationMethodType.Interactive, expected: false },
+				{ type: AuthenticationMethodType.ServicePrincipal, expected: false },
+				{ type: AuthenticationMethodType.DeviceCode, expected: false }
+			])('should return $expected for $type', ({ type, expected }) => {
+				const method = new AuthenticationMethod(type);
+				expect(method.requiresUsernamePassword()).toBe(expected);
 			});
 		});
 
 		describe('isInteractiveFlow', () => {
-			it('should return true for Interactive and DeviceCode', () => {
-				const interactive = new AuthenticationMethod(AuthenticationMethodType.Interactive);
-				expect(interactive.isInteractiveFlow()).toBe(true);
-
-				const deviceCode = new AuthenticationMethod(AuthenticationMethodType.DeviceCode);
-				expect(deviceCode.isInteractiveFlow()).toBe(true);
-			});
-
-			it('should return false for ServicePrincipal and UsernamePassword', () => {
-				const sp = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
-				expect(sp.isInteractiveFlow()).toBe(false);
-
-				const upw = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
-				expect(upw.isInteractiveFlow()).toBe(false);
+			it.each<{ type: AuthenticationMethodType; expected: boolean }>([
+				{ type: AuthenticationMethodType.Interactive, expected: true },
+				{ type: AuthenticationMethodType.DeviceCode, expected: true },
+				{ type: AuthenticationMethodType.ServicePrincipal, expected: false },
+				{ type: AuthenticationMethodType.UsernamePassword, expected: false }
+			])('should return $expected for $type', ({ type, expected }) => {
+				const method = new AuthenticationMethod(type);
+				expect(method.isInteractiveFlow()).toBe(expected);
 			});
 		});
 
 		describe('toString', () => {
-			it('should return string representation', () => {
-				const method = new AuthenticationMethod(AuthenticationMethodType.Interactive);
-				expect(method.toString()).toBe('Interactive');
-			});
-
-			it('should return string representation for all auth types', () => {
-				const sp = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
-				expect(sp.toString()).toBe('ServicePrincipal');
-
-				const upw = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
-				expect(upw.toString()).toBe('UsernamePassword');
-
-				const deviceCode = new AuthenticationMethod(AuthenticationMethodType.DeviceCode);
-				expect(deviceCode.toString()).toBe('DeviceCode');
+			it.each<{ type: AuthenticationMethodType; expected: string }>([
+				{ type: AuthenticationMethodType.Interactive, expected: 'Interactive' },
+				{ type: AuthenticationMethodType.ServicePrincipal, expected: 'ServicePrincipal' },
+				{ type: AuthenticationMethodType.UsernamePassword, expected: 'UsernamePassword' },
+				{ type: AuthenticationMethodType.DeviceCode, expected: 'DeviceCode' }
+			])('should return string representation for $expected auth type', ({ type, expected }) => {
+				const method = new AuthenticationMethod(type);
+				expect(method.toString()).toBe(expected);
 			});
 		});
 
 		describe('equals', () => {
-			it('should return true for same auth method types', () => {
-				const method1 = new AuthenticationMethod(AuthenticationMethodType.Interactive);
-				const method2 = new AuthenticationMethod(AuthenticationMethodType.Interactive);
+			it.each<{ type: AuthenticationMethodType }>([
+				{ type: AuthenticationMethodType.Interactive },
+				{ type: AuthenticationMethodType.ServicePrincipal },
+				{ type: AuthenticationMethodType.UsernamePassword },
+				{ type: AuthenticationMethodType.DeviceCode }
+			])('should return true for same auth method types: $type', ({ type }) => {
+				const method1 = new AuthenticationMethod(type);
+				const method2 = new AuthenticationMethod(type);
 				expect(method1.equals(method2)).toBe(true);
 			});
 
-			it('should return false for different auth method types', () => {
-				const interactive = new AuthenticationMethod(AuthenticationMethodType.Interactive);
-				const sp = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
-				expect(interactive.equals(sp)).toBe(false);
-			});
-
-			it('should work for ServicePrincipal comparison', () => {
-				const sp1 = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
-				const sp2 = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
-				expect(sp1.equals(sp2)).toBe(true);
-			});
-
-			it('should work for UsernamePassword comparison', () => {
-				const upw1 = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
-				const upw2 = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
-				expect(upw1.equals(upw2)).toBe(true);
-			});
-
-			it('should work for DeviceCode comparison', () => {
-				const dc1 = new AuthenticationMethod(AuthenticationMethodType.DeviceCode);
-				const dc2 = new AuthenticationMethod(AuthenticationMethodType.DeviceCode);
-				expect(dc1.equals(dc2)).toBe(true);
-			});
-
-			it('should return false when comparing different non-interactive types', () => {
-				const sp = new AuthenticationMethod(AuthenticationMethodType.ServicePrincipal);
-				const upw = new AuthenticationMethod(AuthenticationMethodType.UsernamePassword);
-				expect(sp.equals(upw)).toBe(false);
-			});
-		});
-
-		describe('requiresClientCredentials - comprehensive coverage', () => {
-			it('should return false for DeviceCode', () => {
-				const deviceCode = new AuthenticationMethod(AuthenticationMethodType.DeviceCode);
-				expect(deviceCode.requiresClientCredentials()).toBe(false);
+			it.each<{ type1: AuthenticationMethodType; type2: AuthenticationMethodType }>([
+				{ type1: AuthenticationMethodType.Interactive, type2: AuthenticationMethodType.ServicePrincipal },
+				{ type1: AuthenticationMethodType.ServicePrincipal, type2: AuthenticationMethodType.UsernamePassword },
+				{ type1: AuthenticationMethodType.UsernamePassword, type2: AuthenticationMethodType.DeviceCode }
+			])('should return false for different auth method types: $type1 vs $type2', ({ type1, type2 }) => {
+				const method1 = new AuthenticationMethod(type1);
+				const method2 = new AuthenticationMethod(type2);
+				expect(method1.equals(method2)).toBe(false);
 			});
 		});
 	});

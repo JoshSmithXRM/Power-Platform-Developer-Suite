@@ -349,7 +349,7 @@ describe('ClearValidationResult', () => {
 			expect(results[2]?.reason).toContain('not found');
 		});
 
-		it('should work with error handling patterns', () => {
+		it('should provide meaningful error messages when validation fails for protected keys', () => {
 			// Arrange
 			const result = ClearValidationResult.protected('systemKey');
 

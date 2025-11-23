@@ -213,6 +213,10 @@ export class TimelineHierarchyService {
 
 	/**
 	 * Gets the total duration from first trace start to last trace end.
+	 * Calculates the span of time covering all trace executions in the set.
+	 *
+	 * @param traces - Array of plugin traces
+	 * @returns Total duration in milliseconds, or 0 if no traces
 	 */
 	getTotalDuration(traces: readonly PluginTrace[]): number {
 		if (traces.length === 0) {
@@ -225,7 +229,11 @@ export class TimelineHierarchyService {
 	}
 
 	/**
-	 * Counts total nodes in a hierarchy.
+	 * Counts total nodes in a hierarchy including all descendants.
+	 * Useful for metrics and performance analysis of trace hierarchies.
+	 *
+	 * @param roots - Array of root timeline nodes
+	 * @returns Total count of all nodes (roots and descendants)
 	 */
 	countTotalNodes(roots: readonly TimelineNode[]): number {
 		return roots.reduce((sum, root) => sum + root.getTotalNodeCount(), 0);

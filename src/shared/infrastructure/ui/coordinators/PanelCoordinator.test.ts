@@ -53,10 +53,10 @@ describe('PanelCoordinator', () => {
 	// Helper to safely cast mocks to their expected types
 	function createConfig(behaviors: IPanelBehavior[] = []) {
 		return {
-			// Cast is safe: MockWebviewPanel implements all WebviewPanel properties used by PanelCoordinator
+			// Safely cast to WebviewPanel interface - only uses properties that are mocked
 			panel: mockPanel as unknown as WebviewPanel,
-			// Cast is safe: Mock implements all Uri properties used by PanelCoordinator
-			extensionUri: mockExtensionUri as unknown as Uri,
+			// Safely cast to Uri interface - only uses fsPath property
+			extensionUri: mockExtensionUri as Uri,
 			behaviors,
 			logger,
 		};
@@ -85,7 +85,7 @@ describe('PanelCoordinator', () => {
 			expect(mockPanel.webview.onDidReceiveMessage).toHaveBeenCalledTimes(1);
 		});
 
-		it('should work with multiple behaviors', () => {
+		it('should initialize successfully when multiple behaviors are provided', () => {
 			const behavior1: IPanelBehavior = {};
 			const behavior2: IPanelBehavior = { initialize: jest.fn() };
 

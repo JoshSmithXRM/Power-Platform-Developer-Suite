@@ -13,10 +13,22 @@ import { OptionSetMetadataMapper } from './OptionSetMetadataMapper';
  * Handles all attribute types including option sets, lookups, and primitives.
  */
 export class AttributeMetadataMapper {
+	/**
+	 * Creates an AttributeMetadataMapper instance.
+	 *
+	 * @param optionSetMapper - Mapper for option set metadata
+	 */
 	constructor(private readonly optionSetMapper: OptionSetMetadataMapper) {}
 
 	/**
 	 * Maps an attribute DTO to domain entity.
+	 *
+	 * Transforms Dataverse API attribute metadata into domain entity with proper
+	 * value objects and typed metadata. Handles all attribute types including
+	 * primitives, option sets, lookups, and special types.
+	 *
+	 * @param dto - Attribute metadata DTO from Dataverse API
+	 * @returns AttributeMetadata domain entity
 	 */
 	public mapDtoToEntity(dto: AttributeMetadataDto): AttributeMetadata {
 		const attributeType = dto.AttributeTypeName?.Value || dto.AttributeType || 'String';

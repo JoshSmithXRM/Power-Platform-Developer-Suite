@@ -62,7 +62,7 @@ describe('MessageRoutingBehavior', () => {
 		};
 
 		// Cast is safe: MockWebview implements all Webview methods used by MessageRoutingBehavior
-		behavior = new MessageRoutingBehavior(webviewMock as unknown as Webview, loggerMock);
+		behavior = new MessageRoutingBehavior(webviewMock  as unknown as Webview, loggerMock);
 	});
 
 	describe('registerHandler', () => {

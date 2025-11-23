@@ -129,7 +129,7 @@ describe('SchemaName', () => {
             const value = '';
 
             // Act & Assert
-            expect(() => SchemaName.create(value)).toThrow('Schema name cannot be empty');
+            expect(() => SchemaName.create(value)).toThrow('Invalid SchemaName: cannot be empty');
         });
 
         it('should throw error for whitespace only string', () => {
@@ -137,7 +137,7 @@ describe('SchemaName', () => {
             const value = '   ';
 
             // Act & Assert
-            expect(() => SchemaName.create(value)).toThrow('Schema name cannot be empty');
+            expect(() => SchemaName.create(value)).toThrow('Invalid SchemaName: cannot be empty');
         });
 
         it('should throw error for string starting with number', () => {
@@ -146,7 +146,7 @@ describe('SchemaName', () => {
 
             // Act & Assert
             expect(() => SchemaName.create(value)).toThrow(
-                'Invalid schema name format: "2Account". Must start with a letter and contain only letters, numbers, and underscores.'
+                'Invalid SchemaName format: "2Account" must start with a letter and contain only letters, numbers, and underscores'
             );
         });
 
@@ -156,7 +156,7 @@ describe('SchemaName', () => {
 
             // Act & Assert
             expect(() => SchemaName.create(value)).toThrow(
-                'Invalid schema name format: "_Account". Must start with a letter and contain only letters, numbers, and underscores.'
+                'Invalid SchemaName format: "_Account" must start with a letter and contain only letters, numbers, and underscores'
             );
         });
 
@@ -166,7 +166,7 @@ describe('SchemaName', () => {
 
             // Act & Assert
             expect(() => SchemaName.create(value)).toThrow(
-                'Invalid schema name format: "Account Owner". Must start with a letter and contain only letters, numbers, and underscores.'
+                'Invalid SchemaName format: "Account Owner" must start with a letter and contain only letters, numbers, and underscores'
             );
         });
 
@@ -176,7 +176,7 @@ describe('SchemaName', () => {
 
             // Act & Assert
             expect(() => SchemaName.create(value)).toThrow(
-                'Invalid schema name format: "Account-Owner". Must start with a letter and contain only letters, numbers, and underscores.'
+                'Invalid SchemaName format: "Account-Owner" must start with a letter and contain only letters, numbers, and underscores'
             );
         });
 
@@ -186,7 +186,7 @@ describe('SchemaName', () => {
 
             // Act & Assert
             expect(() => SchemaName.create(value)).toThrow(
-                'Invalid schema name format: "Account@Owner". Must start with a letter and contain only letters, numbers, and underscores.'
+                'Invalid SchemaName format: "Account@Owner" must start with a letter and contain only letters, numbers, and underscores'
             );
         });
 
@@ -196,7 +196,7 @@ describe('SchemaName', () => {
 
             // Act & Assert
             expect(() => SchemaName.create(value)).toThrow(
-                'Invalid schema name format: "Account.Owner". Must start with a letter and contain only letters, numbers, and underscores.'
+                'Invalid SchemaName format: "Account.Owner" must start with a letter and contain only letters, numbers, and underscores'
             );
         });
 
@@ -206,7 +206,7 @@ describe('SchemaName', () => {
 
             // Act & Assert
             expect(() => SchemaName.create(value)).toThrow(
-                'Invalid schema name format: "Account(Owner)". Must start with a letter and contain only letters, numbers, and underscores.'
+                'Invalid SchemaName format: "Account(Owner)" must start with a letter and contain only letters, numbers, and underscores'
             );
         });
 
@@ -216,7 +216,7 @@ describe('SchemaName', () => {
             const value = null as any;
 
             // Act & Assert
-            expect(() => SchemaName.create(value)).toThrow('Schema name cannot be empty');
+            expect(() => SchemaName.create(value)).toThrow('Invalid SchemaName: cannot be empty');
         });
 
         it('should throw error for undefined value', () => {
@@ -225,7 +225,7 @@ describe('SchemaName', () => {
             const value = undefined as any;
 
             // Act & Assert
-            expect(() => SchemaName.create(value)).toThrow('Schema name cannot be empty');
+            expect(() => SchemaName.create(value)).toThrow('Invalid SchemaName: cannot be empty');
         });
     });
 
@@ -318,7 +318,7 @@ describe('SchemaName', () => {
             expect(result).toBe('TestSchema');
         });
 
-        it('should work in string concatenation', () => {
+        it('should implicitly convert to string when used in template literals', () => {
             // Arrange
             const schemaName = SchemaName.create('Account');
 

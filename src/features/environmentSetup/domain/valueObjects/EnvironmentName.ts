@@ -18,14 +18,20 @@ import { DomainError } from '../errors/DomainError';
  * @throws {DomainError} If name is empty or exceeds 100 characters
  */
 export class EnvironmentName {
+	/**
+	 * Maximum allowed length for environment names.
+	 * Prevents excessively long names that could cause UI/storage issues.
+	 */
+	private static readonly MAX_LENGTH = 100;
+
 	private readonly value: string;
 
 	constructor(value: string) {
 		if (!value || value.trim() === '') {
 			throw new DomainError('Environment name cannot be empty');
 		}
-		if (value.length > 100) {
-			throw new DomainError('Environment name cannot exceed 100 characters');
+		if (value.length > EnvironmentName.MAX_LENGTH) {
+			throw new DomainError(`Environment name cannot exceed ${EnvironmentName.MAX_LENGTH} characters`);
 		}
 		this.value = value.trim();
 	}
@@ -35,7 +41,7 @@ export class EnvironmentName {
 	}
 
 	public isValid(): boolean {
-		return this.value.length > 0 && this.value.length <= 100;
+		return this.value.length > 0 && this.value.length <= EnvironmentName.MAX_LENGTH;
 	}
 
 	public equals(other: string | EnvironmentName): boolean {

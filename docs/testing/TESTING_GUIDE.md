@@ -431,7 +431,11 @@ constructor(private readonly logger: ILogger) {}  // No logic
 
 ### Test Data Factories
 
-Create reusable factories for domain entities:
+**Purpose**: Create realistic test data consistently across tests
+
+#### Pattern 1: Simple Factory Function
+
+**When to use**: Simple entities with few fields
 
 ```typescript
 // src/features/importJobs/domain/entities/ImportJob.test.ts
@@ -448,25 +452,339 @@ function createValidImportJob(overrides?: Partial<ImportJobProps>): ImportJob {
 const job = createValidImportJob({ progress: new Progress(50) });
 ```
 
-### Mock Helpers
+#### Pattern 2: Integration Test Data Factories
+
+**When to use**: Integration tests needing realistic domain entities
 
 ```typescript
-function createMockLogger(): jest.Mocked<ILogger> {
+// ConnectionReferences integration test factory
+function createMockConnectionReference(
+  id: string,
+  logicalName: string,
+  displayName: string
+): ConnectionReference {
+  return new ConnectionReference(
+    id,
+    logicalName,
+    displayName,
+    'connector-123',
+    'connection-456',
+    false,
+    new Date()
+  );
+}
+
+// CloudFlow integration test factory
+function createMockFlow(
+  id: string,
+  name: string,
+  connectionRefName: string
+): CloudFlow {
+  const clientData = JSON.stringify({
+    properties: {
+      connectionReferences: {
+        [connectionRefName]: {
+          connection: {
+            connectionReferenceLogicalName: connectionRefName
+          }
+        }
+      }
+    }
+  });
+
+  return new CloudFlow(
+    id,
+    name,
+    new Date(),
+    false,
+    'John Doe',
+    clientData
+  );
+}
+
+// Usage in tests
+const mockRef = createMockConnectionReference('cr-1', 'cr_test', 'Test CR');
+const mockFlow = createMockFlow('flow-1', 'Test Flow', 'cr_test');
+```
+
+#### Pattern 3: ViewModel Factories
+
+**When to use**: Testing mappers or UI components
+
+```typescript
+// Entity tree item factory
+function createEntityTreeItem(
+  logicalName: string,
+  displayName: string
+): EntityTreeItemViewModel {
   return {
-    info: jest.fn(),
-    error: jest.fn(),
+    id: logicalName,
+    displayName,
+    logicalName,
+    isCustom: false,
+    icon: '📋'
+  };
+}
+
+// Attribute row factory
+function createAttributeRow(
+  logicalName: string,
+  displayName: string,
+  type: string = 'String'
+): AttributeRowViewModel {
+  return {
+    id: logicalName,
+    logicalName,
+    displayName,
+    type,
+    required: 'None',
+    maxLength: '-',
+    isLinkable: true,
+    metadata: {} as never
+  };
+}
+
+// Usage
+const entityItem = createEntityTreeItem('account', 'Account');
+const attribute = createAttributeRow('name', 'Account Name');
+```
+
+#### Pattern 4: Builder Pattern for Complex Objects
+
+**When to use**: Complex objects with many optional fields
+
+```typescript
+class EnvironmentBuilder {
+  private name = 'Test Environment';
+  private dataverseUrl = 'https://test.crm.dynamics.com';
+  private tenantId = 'tenant-123';
+  private authMethod = AuthenticationMethodType.Interactive;
+  private publicClientId = 'client-123';
+  private powerPlatformEnvId?: string;
+
+  withName(name: string): this {
+    this.name = name;
+    return this;
+  }
+
+  withDataverseUrl(url: string): this {
+    this.dataverseUrl = url;
+    return this;
+  }
+
+  withServicePrincipal(clientId: string): this {
+    this.authMethod = AuthenticationMethodType.ServicePrincipal;
+    this.publicClientId = clientId;
+    return this;
+  }
+
+  build(): Environment {
+    return Environment.create({
+      name: this.name,
+      dataverseUrl: this.dataverseUrl,
+      tenantId: this.tenantId,
+      authenticationMethod: this.authMethod,
+      publicClientId: this.publicClientId,
+      powerPlatformEnvironmentId: this.powerPlatformEnvId
+    });
+  }
+}
+
+// Usage
+const env = new EnvironmentBuilder()
+  .withName('Production')
+  .withServicePrincipal('sp-client-123')
+  .build();
+```
+
+### Shared Testing Setup Helpers
+
+**Location**: `src/shared/testing/setup/`
+
+These helpers provide consistent mock setup across the codebase:
+
+#### Pattern 1: Logger Setup
+
+```typescript
+// src/shared/testing/setup/loggerSetup.ts
+export function createMockLogger(): jest.Mocked<ILogger> {
+  return {
+    trace: jest.fn(),
     debug: jest.fn(),
-    warn: jest.fn()
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn()
   } as jest.Mocked<ILogger>;
 }
 
-function createMockRepository(): jest.Mocked<IImportJobRepository> {
+// Usage
+import { createMockLogger } from '../../../shared/testing/setup';
+
+beforeEach(() => {
+  mockLogger = createMockLogger();
+});
+```
+
+#### Pattern 2: Dataverse API Service Setup
+
+```typescript
+// src/shared/testing/setup/dataverseApiServiceSetup.ts
+export function createMockDataverseApiService(): jest.Mocked<IDataverseApiService> {
+  return {
+    get: jest.fn(),
+    post: jest.fn(),
+    patch: jest.fn(),
+    delete: jest.fn(),
+    batchDelete: jest.fn()
+  } as jest.Mocked<IDataverseApiService>;
+}
+
+// Usage
+import { createMockDataverseApiService } from '../../../shared/testing/setup';
+
+beforeEach(() => {
+  mockApiService = createMockDataverseApiService();
+});
+```
+
+#### Pattern 3: Cancellation Token Setup
+
+```typescript
+// src/shared/testing/setup/cancellationTokenSetup.ts
+export function createMockCancellationToken(
+  isCancelled = false
+): jest.Mocked<ICancellationToken> {
+  return {
+    isCancellationRequested: isCancelled,
+    onCancellationRequested: jest.fn()
+  } as jest.Mocked<ICancellationToken>;
+}
+
+// Usage for testing cancellation
+const mockToken = createMockCancellationToken(true);
+await expect(useCase.execute('env-123', mockToken))
+  .rejects.toThrow(OperationCancelledException);
+```
+
+#### Pattern 4: Repository Setup
+
+```typescript
+// src/shared/testing/setup/repositorySetup.ts
+export function createMockRepository<T>(): jest.Mocked<T> {
   return {
     findAll: jest.fn(),
     findById: jest.fn(),
-    save: jest.fn()
-  } as jest.Mocked<IImportJobRepository>;
+    save: jest.fn(),
+    delete: jest.fn()
+  } as jest.Mocked<T>;
 }
+
+// Usage with specific repository interface
+const mockSolutionRepo = createMockRepository<ISolutionRepository>();
+mockSolutionRepo.findAll.mockResolvedValue([createMockSolution()]);
+```
+
+### Mock Factory Patterns
+
+#### Pattern 1: Environment Mock Factory
+
+```typescript
+function createMockEnvironment(
+  id: string,
+  name: string,
+  ppEnvId?: string
+): jest.Mocked<Environment> {
+  return {
+    getId: jest.fn().mockReturnValue(new EnvironmentId(id)),
+    getName: jest.fn().mockReturnValue(new EnvironmentName(name)),
+    getDataverseUrl: jest.fn().mockReturnValue('https://test.crm.dynamics.com'),
+    getPowerPlatformEnvironmentId: jest.fn().mockReturnValue(ppEnvId),
+    getAuthenticationMethod: jest.fn().mockReturnValue(
+      AuthenticationMethod.create(AuthenticationMethodType.Interactive)
+    )
+  } as never;
+}
+```
+
+#### Pattern 2: Use Case Mock Factory
+
+```typescript
+function createMockLoadUseCase<TResponse>(): jest.Mocked<{ execute: jest.Mock<Promise<TResponse>> }> {
+  return {
+    execute: jest.fn()
+  };
+}
+
+// Usage
+const mockLoadUseCase = createMockLoadUseCase<EntityMetadata[]>();
+mockLoadUseCase.execute.mockResolvedValue([createMockEntity()]);
+```
+
+#### Pattern 3: Panel State Repository Mock
+
+```typescript
+function createMockPanelStateRepository(): jest.Mocked<IPanelStateRepository> {
+  return {
+    load: jest.fn().mockResolvedValue(null),
+    save: jest.fn().mockResolvedValue(undefined),
+    clear: jest.fn().mockResolvedValue(undefined)
+  } as jest.Mocked<IPanelStateRepository>;
+}
+
+// Usage with persisted state
+mockPanelStateRepository.load.mockResolvedValueOnce({
+  selectedSolutionId: 'sol-123',
+  lastUpdated: new Date().toISOString()
+});
+```
+
+### Test Helper Functions
+
+#### flushPromises Helper
+
+**Purpose**: Ensure all async operations complete before assertions
+
+```typescript
+/**
+ * Flushes all pending promises in the event loop.
+ * Use when testing async initialization or command handling.
+ */
+async function flushPromises(): Promise<void> {
+  return new Promise((resolve) => {
+    setImmediate(() => {
+      setImmediate(() => {
+        setImmediate(() => {
+          resolve();
+        });
+      });
+    });
+  });
+}
+
+// Usage
+it('should load data asynchronously', async () => {
+  await Panel.createOrShow(/* ... */);
+  await flushPromises();  // ✅ Wait for async initialization
+
+  expect(mockUseCase.execute).toHaveBeenCalled();
+});
+```
+
+#### assertDefined Helper
+
+**Purpose**: Type-safe assertion that value is not null/undefined
+
+```typescript
+export function assertDefined<T>(value: T | null | undefined): asserts value is T {
+  if (value === null || value === undefined) {
+    throw new Error('Expected value to be defined');
+  }
+}
+
+// Usage
+const result = await repository.findById('id-123');
+assertDefined(result);  // ✅ TypeScript knows result is not null
+expect(result.getId()).toBe('id-123');
 ```
 
 ---

@@ -27,6 +27,12 @@ export enum ImportJobStatus {
  * - Calculate duration
  */
 export class ImportJob {
+	/** Maximum valid progress percentage (100%) */
+	private static readonly MAX_PROGRESS_PERCENTAGE = 100;
+
+	/** Minimum valid progress percentage (0%) */
+	private static readonly MIN_PROGRESS_PERCENTAGE = 0;
+
 	/**
 	 * Creates a new ImportJob entity.
 	 * @param id - Import job GUID
@@ -55,8 +61,13 @@ export class ImportJob {
 		public readonly operationContext: string | null,
 		public readonly importLogXml: string | null = null
 	) {
-		if (progress < 0 || progress > 100) {
-			throw new ValidationError('ImportJob', 'progress', progress, 'Must be between 0 and 100');
+		if (progress < ImportJob.MIN_PROGRESS_PERCENTAGE || progress > ImportJob.MAX_PROGRESS_PERCENTAGE) {
+			throw new ValidationError(
+				'ImportJob',
+				'progress',
+				progress,
+				`Must be between ${ImportJob.MIN_PROGRESS_PERCENTAGE} and ${ImportJob.MAX_PROGRESS_PERCENTAGE}`
+			);
 		}
 	}
 

@@ -84,7 +84,7 @@ export class GetPluginTracesUseCase {
 	async getTracesByCorrelationId(
 		environmentId: string,
 		correlationId: CorrelationId,
-		top: number = 1000
+		top = 1000
 	): Promise<readonly PluginTrace[]> {
 		this.logger.info('Fetching traces by correlationId (unfiltered)', {
 			environmentId,

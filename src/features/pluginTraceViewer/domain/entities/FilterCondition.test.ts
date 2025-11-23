@@ -110,7 +110,7 @@ describe('FilterCondition', () => {
 		});
 	});
 
-	describe('toODataExpression', () => {
+	describe('buildExpression', () => {
 		it('should return undefined when condition is disabled', () => {
 			const condition = new FilterCondition(
 				FilterField.PluginName,
@@ -119,7 +119,7 @@ describe('FilterCondition', () => {
 				false
 			);
 
-			expect(condition.toODataExpression()).toBeUndefined();
+			expect(condition.buildExpression()).toBeUndefined();
 		});
 
 		it('should build Contains function for text fields', () => {
@@ -130,7 +130,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe("contains(typename, 'MyPlugin')");
+			expect(condition.buildExpression()).toBe("contains(typename, 'MyPlugin')");
 		});
 
 		it('should build StartsWith function for text fields', () => {
@@ -141,7 +141,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe("startswith(primaryentity, 'account')");
+			expect(condition.buildExpression()).toBe("startswith(primaryentity, 'account')");
 		});
 
 		it('should build EndsWith function for text fields', () => {
@@ -152,7 +152,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe("endswith(messagename, 'Update')");
+			expect(condition.buildExpression()).toBe("endswith(messagename, 'Update')");
 		});
 
 		it('should build Equals comparison for text fields', () => {
@@ -163,7 +163,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe("typename eq 'MyPlugin'");
+			expect(condition.buildExpression()).toBe("typename eq 'MyPlugin'");
 		});
 
 		it('should build NotEquals comparison for text fields', () => {
@@ -174,7 +174,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe("typename ne 'MyPlugin'");
+			expect(condition.buildExpression()).toBe("typename ne 'MyPlugin'");
 		});
 
 		it('should build Equals comparison for enum fields with quotes', () => {
@@ -185,7 +185,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe("operationtype eq 'Plugin'");
+			expect(condition.buildExpression()).toBe("operationtype eq 'Plugin'");
 		});
 
 		it('should build GreaterThan comparison for number fields without quotes', () => {
@@ -196,7 +196,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe('performanceexecutionduration gt 1000');
+			expect(condition.buildExpression()).toBe('performanceexecutionduration gt 1000');
 		});
 
 		it('should build LessThan comparison for number fields without quotes', () => {
@@ -207,7 +207,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe('performanceexecutionduration lt 5000');
+			expect(condition.buildExpression()).toBe('performanceexecutionduration lt 5000');
 		});
 
 		it('should build GreaterThanOrEqual comparison for date fields', () => {
@@ -218,7 +218,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe('createdon ge 2024-01-01T00:00:00Z');
+			expect(condition.buildExpression()).toBe('createdon ge 2024-01-01T00:00:00Z');
 		});
 
 		it('should build LessThanOrEqual comparison for date fields', () => {
@@ -229,7 +229,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe('createdon le 2024-12-31T23:59:59Z');
+			expect(condition.buildExpression()).toBe('createdon le 2024-12-31T23:59:59Z');
 		});
 
 		it('should escape single quotes in values', () => {
@@ -240,7 +240,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe("contains(typename, 'O''Brien')");
+			expect(condition.buildExpression()).toBe("contains(typename, 'O''Brien')");
 		});
 
 		it('should escape multiple single quotes in values', () => {
@@ -251,7 +251,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe("typename eq 'It''s a test''s value'");
+			expect(condition.buildExpression()).toBe("typename eq 'It''s a test''s value'");
 		});
 
 		it('should build IsNull filter for exceptiondetails', () => {
@@ -262,7 +262,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe('exceptiondetails eq null');
+			expect(condition.buildExpression()).toBe('exceptiondetails eq null');
 		});
 
 		it('should build IsNotNull filter for exceptiondetails', () => {
@@ -273,7 +273,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe('exceptiondetails ne null');
+			expect(condition.buildExpression()).toBe('exceptiondetails ne null');
 		});
 
 		it('should build Equals filter with empty string for exceptiondetails', () => {
@@ -285,7 +285,7 @@ describe('FilterCondition', () => {
 			);
 
 			// Dataverse stores empty text fields as empty string '', not null
-			expect(condition.toODataExpression()).toBe("exceptiondetails eq ''");
+			expect(condition.buildExpression()).toBe("exceptiondetails eq ''");
 		});
 
 		it('should build NotEquals filter with empty string for exceptiondetails', () => {
@@ -297,7 +297,7 @@ describe('FilterCondition', () => {
 			);
 
 			// Dataverse stores empty text fields as empty string '', not null
-			expect(condition.toODataExpression()).toBe("exceptiondetails ne ''");
+			expect(condition.buildExpression()).toBe("exceptiondetails ne ''");
 		});
 
 		it('should build IsNull filter for nullable field', () => {
@@ -308,7 +308,7 @@ describe('FilterCondition', () => {
 				true
 			);
 
-			expect(condition.toODataExpression()).toBe('primaryentity eq null');
+			expect(condition.buildExpression()).toBe('primaryentity eq null');
 		});
 	});
 

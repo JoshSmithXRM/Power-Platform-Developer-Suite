@@ -201,19 +201,25 @@ module.exports = {
 			return {
 				MethodDefinition(node) {
 					// Allow factory/creation methods (common value object patterns)
-					const allowedStaticMethods = [
-						'create', 'createFrom', 'createEmpty', 'createGlobal', 'createSecret', 'createWorkspace',
-						'from', 'fromJson', 'fromData', 'fromValue', 'fromSegments',
-						'fromNumber', 'fromMilliseconds', 'fromUtcIso', 'fromLocalDateTime', 'default',
-						'generate', 'success', 'failure', 'successWithWarnings',
-						'allowed', 'protected', 'notFound', 'forSecret', 'parsePath',
+					const allowedPrefixes = [
+						'create', 'from', 'generate', 'default', 'for'
+					];
+
+					const allowedExactMethods = [
+						'success', 'failure', 'successWithWarnings',
+						'allowed', 'protected', 'notFound', 'parsePath',
 						'calculateSize', 'empty'
 					];
+
 					const methodName = node.key.name;
+
+					// Check if method is allowed (either by prefix or exact match)
+					const isAllowed = allowedPrefixes.some(prefix => methodName.startsWith(prefix)) ||
+					                  allowedExactMethods.includes(methodName);
 
 					if (node.static &&
 						node.kind === 'method' &&
-						!allowedStaticMethods.includes(methodName)) {
+						!isAllowed) {
 						const className = node.parent.parent.id?.name || 'Unknown';
 						context.report({
 							node,

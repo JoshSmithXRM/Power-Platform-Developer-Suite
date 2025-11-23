@@ -52,35 +52,35 @@ describe('TimelineNode', () => {
 		it('should throw error for negative depth', () => {
 			const trace = createValidTrace();
 			expect(() => TimelineNode.create(trace, [], -1, 10, 50)).toThrow(
-				'Timeline depth cannot be negative'
+				'Invalid TimelineNode: depth cannot be negative'
 			);
 		});
 
 		it('should throw error for negative offset', () => {
 			const trace = createValidTrace();
 			expect(() => TimelineNode.create(trace, [], 0, -1, 50)).toThrow(
-				'Timeline offset must be between 0 and 100'
+				'Invalid TimelineNode: offsetPercent must be between 0 and 100'
 			);
 		});
 
 		it('should throw error for offset greater than 100', () => {
 			const trace = createValidTrace();
 			expect(() => TimelineNode.create(trace, [], 0, 101, 50)).toThrow(
-				'Timeline offset must be between 0 and 100'
+				'Invalid TimelineNode: offsetPercent must be between 0 and 100'
 			);
 		});
 
 		it('should throw error for negative width', () => {
 			const trace = createValidTrace();
 			expect(() => TimelineNode.create(trace, [], 0, 10, -1)).toThrow(
-				'Timeline width must be between 0 and 100'
+				'Invalid TimelineNode: widthPercent must be between 0 and 100'
 			);
 		});
 
 		it('should throw error for width greater than 100', () => {
 			const trace = createValidTrace();
 			expect(() => TimelineNode.create(trace, [], 0, 10, 101)).toThrow(
-				'Timeline width must be between 0 and 100'
+				'Invalid TimelineNode: widthPercent must be between 0 and 100'
 			);
 		});
 

@@ -1,36 +1,19 @@
 import { GetPluginTracesUseCase } from './GetPluginTracesUseCase';
-import type { IPluginTraceRepository } from './../../domain/repositories/IPluginTraceRepository';
-import type { ILogger } from './../../../../infrastructure/logging/ILogger';
 import { PluginTrace } from './../../domain/entities/PluginTrace';
 import { TraceFilter } from './../../domain/entities/TraceFilter';
 import { Duration } from './../../domain/valueObjects/Duration';
 import { ExecutionMode } from './../../domain/valueObjects/ExecutionMode';
 import { OperationType } from './../../domain/valueObjects/OperationType';
+import { createMockPluginTraceRepository, createMockLogger } from '../../../../shared/testing';
 
 describe('GetPluginTracesUseCase', () => {
 	let useCase: GetPluginTracesUseCase;
-	let mockRepository: jest.Mocked<IPluginTraceRepository>;
-	let mockLogger: jest.Mocked<ILogger>;
+	let mockRepository: ReturnType<typeof createMockPluginTraceRepository>;
+	let mockLogger: ReturnType<typeof createMockLogger>;
 
 	beforeEach(() => {
-		mockRepository = {
-			getTraces: jest.fn(),
-			getTraceById: jest.fn(),
-			deleteTrace: jest.fn(),
-			deleteTraces: jest.fn(),
-			deleteAllTraces: jest.fn(),
-			deleteOldTraces: jest.fn(),
-			getTraceLevel: jest.fn(),
-			setTraceLevel: jest.fn(),
-		};
-
-		mockLogger = {
-			trace: jest.fn(),
-		debug: jest.fn(),
-			info: jest.fn(),
-			warn: jest.fn(),
-			error: jest.fn(),
-		};
+		mockRepository = createMockPluginTraceRepository();
+		mockLogger = createMockLogger();
 
 		useCase = new GetPluginTracesUseCase(mockRepository, mockLogger);
 	});
@@ -63,7 +46,7 @@ describe('GetPluginTracesUseCase', () => {
 			);
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				'GetPluginTracesUseCase: Starting trace retrieval',
-				expect.any(Object)
+				expect.objectContaining({})
 			);
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				`GetPluginTracesUseCase: Retrieved ${mockTraces.length} traces`,

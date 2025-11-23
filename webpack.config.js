@@ -27,10 +27,13 @@ const config = {
         rules: [
             {
                 test: /\.ts$/,
-                exclude: [/node_modules/, /Old/],
+                exclude: [/node_modules/, /Old/, /\.test\.ts$/, /\.spec\.ts$/],
                 use: [
                     {
-                        loader: 'ts-loader'
+                        loader: 'ts-loader',
+                        options: {
+                            configFile: 'tsconfig.build.json'
+                        }
                     }
                 ]
             }

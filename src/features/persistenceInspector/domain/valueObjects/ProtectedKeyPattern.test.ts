@@ -2,7 +2,7 @@ import { ProtectedKeyPattern } from './ProtectedKeyPattern';
 
 describe('ProtectedKeyPattern', () => {
 	describe('Exact match patterns (no wildcard)', () => {
-		test('matches exact key for power-platform-dev-suite-environments', () => {
+		test('should matches exact key for power-platform-dev-suite-environments', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-environments');
 
@@ -13,7 +13,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('does not match partial key when pattern is exact', () => {
+		test('should does not match partial key when pattern is exact', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-environments');
 
@@ -24,7 +24,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('does not match key with extra suffix when pattern is exact', () => {
+		test('should does not match key with extra suffix when pattern is exact', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-environments');
 
@@ -35,7 +35,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('does not match key with extra prefix when pattern is exact', () => {
+		test('should does not match key with extra prefix when pattern is exact', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-environments');
 
@@ -46,7 +46,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('is case-sensitive for exact matches', () => {
+		test('should is case-sensitive for exact matches', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-environments');
 
@@ -59,7 +59,7 @@ describe('ProtectedKeyPattern', () => {
 	});
 
 	describe('Wildcard pattern matching: power-platform-dev-suite-*', () => {
-		test('matches exact key with power-platform-dev-suite prefix', () => {
+		test('should matches exact key with power-platform-dev-suite prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-*');
 
@@ -70,7 +70,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('matches secret key with power-platform-dev-suite-secret prefix', () => {
+		test('should matches secret key with power-platform-dev-suite-secret prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-*');
 
@@ -81,7 +81,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('matches password key with power-platform-dev-suite-password prefix', () => {
+		test('should matches password key with power-platform-dev-suite-password prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-*');
 
@@ -92,7 +92,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('matches key immediately after prefix with wildcard', () => {
+		test('should matches key immediately after prefix with wildcard', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-*');
 
@@ -103,7 +103,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('matches key with empty string after prefix', () => {
+		test('should matches key with empty string after prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-*');
 
@@ -114,7 +114,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('does not match key without power-platform-dev-suite prefix', () => {
+		test('should does not match key without power-platform-dev-suite prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-*');
 
@@ -125,7 +125,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('does not match partial prefix', () => {
+		test('should does not match partial prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-*');
 
@@ -136,7 +136,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('is case-sensitive for wildcard patterns', () => {
+		test('should is case-sensitive for wildcard patterns', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-*');
 
@@ -147,7 +147,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('matches key with multiple dashes after prefix', () => {
+		test('should matches key with multiple dashes after prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-*');
 
@@ -158,7 +158,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('matches key with numbers after prefix', () => {
+		test('should matches key with numbers after prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-*');
 
@@ -169,7 +169,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('matches key with special characters after prefix', () => {
+		test('should matches key with special characters after prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-*');
 
@@ -182,7 +182,7 @@ describe('ProtectedKeyPattern', () => {
 	});
 
 	describe('Wildcard pattern matching: power-platform-dev-suite-secret-*', () => {
-		test('matches secret key with numeric suffix', () => {
+		test('should matches secret key with numeric suffix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-secret-*');
 
@@ -193,7 +193,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('matches secret key with alphanumeric suffix', () => {
+		test('should matches secret key with alphanumeric suffix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-secret-*');
 
@@ -204,7 +204,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('does not match password key when pattern is secret', () => {
+		test('should does not match password key when pattern is secret', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-secret-*');
 
@@ -215,7 +215,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('does not match base prefix without secret', () => {
+		test('should does not match base prefix without secret', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-secret-*');
 
@@ -228,7 +228,7 @@ describe('ProtectedKeyPattern', () => {
 	});
 
 	describe('Wildcard pattern matching: power-platform-dev-suite-password-*', () => {
-		test('matches password key with suffix', () => {
+		test('should matches password key with suffix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-password-*');
 
@@ -239,7 +239,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('matches password key with numeric suffix', () => {
+		test('should matches password key with numeric suffix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-password-*');
 
@@ -250,7 +250,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('does not match secret key when pattern is password', () => {
+		test('should does not match secret key when pattern is password', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('power-platform-dev-suite-password-*');
 
@@ -263,7 +263,7 @@ describe('ProtectedKeyPattern', () => {
 	});
 
 	describe('Regex metacharacter handling (escaping)', () => {
-		test('matches key with literal dot in pattern', () => {
+		test('should matches key with literal dot in pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app.config.setting');
 
@@ -274,7 +274,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('does not treat dot as regex wildcard in exact pattern', () => {
+		test('should does not treat dot as regex wildcard in exact pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app.config.setting');
 
@@ -285,7 +285,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('handles literal plus sign in pattern', () => {
+		test('should handle literal plus sign in pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app+config');
 
@@ -296,7 +296,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('handles literal question mark in pattern', () => {
+		test('should handle literal question mark in pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app?config');
 
@@ -307,7 +307,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('handles literal caret in pattern', () => {
+		test('should handle literal caret in pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app^config');
 
@@ -318,7 +318,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('handles literal dollar sign in pattern', () => {
+		test('should handle literal dollar sign in pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app$config');
 
@@ -329,7 +329,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('handles literal curly braces in pattern', () => {
+		test('should handle literal curly braces in pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app{config}');
 
@@ -340,7 +340,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('handles literal parentheses in pattern', () => {
+		test('should handle literal parentheses in pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app(config)');
 
@@ -351,7 +351,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('handles literal pipe in pattern', () => {
+		test('should handle literal pipe in pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app|config');
 
@@ -362,7 +362,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('handles literal square brackets in pattern', () => {
+		test('should handle literal square brackets in pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app[config]');
 
@@ -373,7 +373,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('handles literal backslash in pattern', () => {
+		test('should handle literal backslash in pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app\\config');
 
@@ -386,7 +386,7 @@ describe('ProtectedKeyPattern', () => {
 	});
 
 	describe('Wildcard with special characters', () => {
-		test('matches wildcard pattern with dot prefix', () => {
+		test('should matches wildcard pattern with dot prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app.config.*');
 
@@ -397,7 +397,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('does not treat dot as wildcard in prefix', () => {
+		test('should does not treat dot as wildcard in prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app.config.*');
 
@@ -408,7 +408,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('matches wildcard pattern with plus in prefix', () => {
+		test('should matches wildcard pattern with plus in prefix', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app+config-*');
 
@@ -421,7 +421,7 @@ describe('ProtectedKeyPattern', () => {
 	});
 
 	describe('Edge cases: empty strings and whitespace', () => {
-		test('matches exact empty string pattern', () => {
+		test('should matches exact empty string pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('');
 
@@ -432,7 +432,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('does not match non-empty key against empty pattern', () => {
+		test('should does not match non-empty key against empty pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('');
 
@@ -443,7 +443,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('matches pattern with whitespace', () => {
+		test('should matches pattern with whitespace', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app config');
 
@@ -454,7 +454,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('does not match with different whitespace', () => {
+		test('should does not match with different whitespace', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('app config');
 
@@ -465,7 +465,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('matches wildcard-only pattern', () => {
+		test('should matches wildcard-only pattern', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('*');
 
@@ -477,7 +477,7 @@ describe('ProtectedKeyPattern', () => {
 	});
 
 	describe('Multiple wildcards in pattern', () => {
-		test('matches pattern with multiple wildcards', () => {
+		test('should matches pattern with multiple wildcards', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('prefix-*-middle-*-suffix');
 
@@ -488,7 +488,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('matches pattern with consecutive wildcards', () => {
+		test('should matches pattern with consecutive wildcards', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('prefix-**-suffix');
 
@@ -499,7 +499,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(true);
 		});
 
-		test('does not match pattern with multiple wildcards if prefix mismatch', () => {
+		test('should does not match pattern with multiple wildcards if prefix mismatch', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('prefix-*-middle-*-suffix');
 
@@ -510,7 +510,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(result).toBe(false);
 		});
 
-		test('does not match pattern with multiple wildcards if suffix mismatch', () => {
+		test('should does not match pattern with multiple wildcards if suffix mismatch', () => {
 			// Arrange
 			const pattern = ProtectedKeyPattern.create('prefix-*-middle-*-suffix');
 
@@ -523,7 +523,7 @@ describe('ProtectedKeyPattern', () => {
 	});
 
 	describe('Factory method', () => {
-		test('creates pattern instance successfully', () => {
+		test('should create pattern instance successfully', () => {
 			// Arrange & Act
 			const pattern = ProtectedKeyPattern.create('test-pattern');
 
@@ -532,7 +532,7 @@ describe('ProtectedKeyPattern', () => {
 			expect(pattern).toBeInstanceOf(ProtectedKeyPattern);
 		});
 
-		test('creates separate instances for different patterns', () => {
+		test('should create separate instances for different patterns', () => {
 			// Arrange & Act
 			const pattern1 = ProtectedKeyPattern.create('pattern1');
 			const pattern2 = ProtectedKeyPattern.create('pattern2');

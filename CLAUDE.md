@@ -266,10 +266,19 @@ See `.claude/AGENTS.md` for detailed agent guide.
 - `.claude/templates/PANEL_INITIALIZATION_PATTERN.md` - **CRITICAL** Panel initialization pattern (MUST follow)
 
 **Architecture guides:**
-- `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Detailed patterns
+- `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Core architectural patterns
 - `docs/architecture/CODE_QUALITY_GUIDE.md` - Comment & code quality standards
 - `docs/architecture/LOGGING_GUIDE.md` - Logging by layer
-- `docs/testing/TESTING_GUIDE.md` - Testing patterns
+
+**Detailed pattern guides:**
+- `docs/architecture/VALUE_OBJECT_PATTERNS.md` - Value object implementation patterns
+- `docs/architecture/DOMAIN_SERVICE_PATTERNS.md` - Domain service patterns
+- `docs/architecture/MAPPER_PATTERNS.md` - **Read this first** to avoid sorting mistakes
+- `docs/architecture/REPOSITORY_PATTERNS.md` - Repository implementation patterns
+
+**Testing guides:**
+- `docs/testing/TESTING_GUIDE.md` - Unit testing patterns and test factories
+- `docs/testing/INTEGRATION_TESTING_GUIDE.md` - Panel integration testing patterns
 
 ---
 

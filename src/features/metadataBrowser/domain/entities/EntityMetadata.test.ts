@@ -83,15 +83,15 @@ describe('EntityMetadata', () => {
         });
 
         it('should throw error when metadataId is empty', () => {
-            expect(() => createValidEntity({ metadataId: '' })).toThrow('Entity metadata ID cannot be empty');
+            expect(() => createValidEntity({ metadataId: '' })).toThrow('Invalid EntityMetadata: metadataId cannot be empty');
         });
 
         it('should throw error when displayName is empty', () => {
-            expect(() => createValidEntity({ displayName: '' })).toThrow('Entity display name cannot be empty');
+            expect(() => createValidEntity({ displayName: '' })).toThrow('Invalid EntityMetadata: displayName cannot be empty');
         });
 
         it('should throw error when pluralName is empty', () => {
-            expect(() => createValidEntity({ pluralName: '' })).toThrow('Entity plural name cannot be empty');
+            expect(() => createValidEntity({ pluralName: '' })).toThrow('Invalid EntityMetadata: pluralName cannot be empty');
         });
     });
 
@@ -532,6 +532,235 @@ describe('EntityMetadata', () => {
         it('should return empty array when no active keys', () => {
             const entity = createValidEntity();
             expect(entity.getActiveKeys()).toEqual([]);
+        });
+    });
+
+    describe('edge cases', () => {
+        describe('unicode and special characters', () => {
+            it('should handle unicode characters in display name', () => {
+                const entity = createValidEntity({ displayName: '账户实体 🏢 Счет' });
+                expect(entity.displayName).toBe('账户实体 🏢 Счет');
+            });
+
+            it('should handle special characters in plural name', () => {
+                const entity = createValidEntity({ pluralName: 'Accounts & Contacts™' });
+                expect(entity.pluralName).toBe('Accounts & Contacts™');
+            });
+
+            it('should handle unicode in description', () => {
+                const description = 'A business account entity with unicode: 测试 • тест • δοκιμή';
+                const entity = createValidEntity({ description });
+                expect(entity.description).toBe(description);
+            });
+
+            it('should handle emoji in entity names', () => {
+                const entity = createValidEntity({
+                    displayName: '📊 Account',
+                    pluralName: '📊 Accounts'
+                });
+                expect(entity.displayName).toBe('📊 Account');
+                expect(entity.pluralName).toBe('📊 Accounts');
+            });
+        });
+
+        describe('very long strings', () => {
+            it('should handle very long display name (1000+ chars)', () => {
+                const longName = 'Entity '.repeat(200);
+                const entity = createValidEntity({ displayName: longName });
+                expect(entity.displayName).toBe(longName);
+                expect(entity.displayName.length).toBeGreaterThan(1000);
+            });
+
+            it('should handle very long description (5000+ chars)', () => {
+                const longDescription = 'This is a description. '.repeat(250);
+                const entity = createValidEntity({ description: longDescription });
+                expect(entity.description).toBe(longDescription);
+                expect(entity.description!.length).toBeGreaterThan(5000);
+            });
+
+            it('should handle very long entitySetName', () => {
+                const longSetName = 'accounts_' + 'x'.repeat(1000);
+                const entity = createValidEntity({ entitySetName: longSetName });
+                expect(entity.entitySetName).toBe(longSetName);
+            });
+        });
+
+        describe('boundary values', () => {
+            it('should handle empty attributes array', () => {
+                const entity = createValidEntity({ attributes: [] });
+                expect(entity.hasAttributes()).toBe(false);
+                expect(entity.getAttributeCount()).toBe(0);
+                expect(entity.getRequiredAttributes()).toEqual([]);
+                expect(entity.getCustomAttributes()).toEqual([]);
+                expect(entity.getLookupAttributes()).toEqual([]);
+            });
+
+            it('should handle maximum number of attributes', () => {
+                const attributes = Array.from({ length: 1000 }, (_, i) =>
+                    createAttribute(`attr${i}`)
+                );
+                const entity = createValidEntity({ attributes });
+                expect(entity.getAttributeCount()).toBe(1000);
+                expect(entity.hasAttributes()).toBe(true);
+            });
+
+            it('should handle objectTypeCode at boundary values', () => {
+                const entity1 = createValidEntity({ objectTypeCode: 0 });
+                const entity2 = createValidEntity({ objectTypeCode: 999999 });
+                const entity3 = createValidEntity({ objectTypeCode: -1 });
+
+                expect(entity1.objectTypeCode).toBe(0);
+                expect(entity2.objectTypeCode).toBe(999999);
+                expect(entity3.objectTypeCode).toBe(-1);
+            });
+
+            it('should handle empty relationships arrays', () => {
+                const entity = createValidEntity({
+                    oneToManyRelationships: [],
+                    manyToOneRelationships: [],
+                    manyToManyRelationships: []
+                });
+
+                expect(entity.hasRelationships()).toBe(false);
+                expect(entity.getRelationshipCount()).toBe(0);
+            });
+        });
+
+        describe('null and undefined handling', () => {
+            it('should handle all nullable fields as null', () => {
+                const entity = createValidEntity({
+                    description: null,
+                    primaryIdAttribute: null,
+                    primaryNameAttribute: null,
+                    primaryImageAttribute: null,
+                    entitySetName: null,
+                    objectTypeCode: null
+                });
+
+                expect(entity.description).toBeNull();
+                expect(entity.primaryIdAttribute).toBeNull();
+                expect(entity.primaryNameAttribute).toBeNull();
+                expect(entity.primaryImageAttribute).toBeNull();
+                expect(entity.entitySetName).toBeNull();
+                expect(entity.objectTypeCode).toBeNull();
+            });
+
+            it('should return null for missing primary ID attribute', () => {
+                const entity = createValidEntity({
+                    primaryIdAttribute: 'accountid',
+                    attributes: []
+                });
+
+                expect(entity.getPrimaryIdAttributeMetadata()).toBeNull();
+            });
+
+            it('should return null for missing primary name attribute', () => {
+                const entity = createValidEntity({
+                    primaryNameAttribute: 'name',
+                    attributes: []
+                });
+
+                expect(entity.getPrimaryNameAttributeMetadata()).toBeNull();
+            });
+        });
+
+        describe('immutability', () => {
+            it('should maintain immutability of attributes array', () => {
+                const attributes = [createAttribute('name'), createAttribute('email')];
+                const entity = createValidEntity({ attributes });
+
+                expect(entity.attributes).toBe(attributes);
+                expect(entity.attributes.length).toBe(2);
+            });
+
+            it('should maintain immutability of relationships arrays', () => {
+                const rel = OneToManyRelationship.create({
+                    metadataId: 'rel-1',
+                    schemaName: 'test_rel',
+                    referencedEntity: 'account',
+                    referencedAttribute: 'accountid',
+                    referencingEntity: 'contact',
+                    referencingAttribute: 'parentcustomerid',
+                    isCustomRelationship: false,
+                    isManaged: true,
+                    relationshipType: 'OneToManyRelationship',
+                    cascadeConfiguration: CascadeConfiguration.create({
+                        assign: 'NoCascade',
+                        delete: 'NoCascade',
+                        merge: 'NoCascade',
+                        reparent: 'NoCascade',
+                        share: 'NoCascade',
+                        unshare: 'NoCascade'
+                    })
+                });
+
+                const entity = createValidEntity({ oneToManyRelationships: [rel] });
+                expect(entity.oneToManyRelationships[0]).toBe(rel);
+            });
+
+            it('should maintain immutability of metadata ID', () => {
+                const entity = createValidEntity({ metadataId: 'immutable-123' });
+                const id1 = entity.metadataId;
+                const id2 = entity.metadataId;
+                expect(id1).toBe(id2);
+                expect(id1).toBe('immutable-123');
+            });
+        });
+
+        describe('attribute filtering edge cases', () => {
+            it('should handle filtering with no matches', () => {
+                const entity = createValidEntity({
+                    attributes: [
+                        createAttribute('name', { attributeType: AttributeType.create('StringType') })
+                    ]
+                });
+
+                expect(entity.getAttributesByType('IntegerType')).toEqual([]);
+            });
+
+            it('should handle mixed custom and system attributes', () => {
+                const entity = createValidEntity({
+                    attributes: [
+                        createAttribute('name', { isCustomAttribute: false }),
+                        createAttribute('custom1', { isCustomAttribute: true }),
+                        createAttribute('email', { isCustomAttribute: false }),
+                        createAttribute('custom2', { isCustomAttribute: true })
+                    ]
+                });
+
+                const customAttrs = entity.getCustomAttributes();
+                expect(customAttrs).toHaveLength(2);
+                expect(customAttrs[0]!.logicalName.getValue()).toBe('custom1');
+                expect(customAttrs[1]!.logicalName.getValue()).toBe('custom2');
+            });
+
+            it('should handle all lookup type variations', () => {
+                const entity = createValidEntity({
+                    attributes: [
+                        createAttribute('owner', { attributeType: AttributeType.create('LookupType') }),
+                        createAttribute('customer', { attributeType: AttributeType.create('CustomerType') }),
+                        createAttribute('owner2', { attributeType: AttributeType.create('OwnerType') }),
+                        createAttribute('name', { attributeType: AttributeType.create('StringType') })
+                    ]
+                });
+
+                const lookups = entity.getLookupAttributes();
+                expect(lookups.length).toBeGreaterThan(0);
+            });
+        });
+
+        describe('ownership type edge cases', () => {
+            it('should handle all ownership types', () => {
+                const userOwned = createValidEntity({ ownershipType: 'UserOwned' });
+                const orgOwned = createValidEntity({ ownershipType: 'OrganizationOwned' });
+                const teamOwned = createValidEntity({ ownershipType: 'TeamOwned' });
+                const none = createValidEntity({ ownershipType: 'None' });
+
+                expect(userOwned.ownershipType).toBe('UserOwned');
+                expect(orgOwned.ownershipType).toBe('OrganizationOwned');
+                expect(teamOwned.ownershipType).toBe('TeamOwned');
+                expect(none.ownershipType).toBe('None');
+            });
         });
     });
 });

@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 
 import { IEnvironmentRepository } from '../../features/environmentSetup/domain/interfaces/IEnvironmentRepository';
 import { EnvironmentListViewModelMapper } from '../../features/environmentSetup/application/mappers/EnvironmentListViewModelMapper';
-import { EnvironmentListViewModel } from '../../features/environmentSetup/application/viewModels/EnvironmentListViewModel';
 
 /**
  * Tools tree view provider.
@@ -62,7 +61,7 @@ export class EnvironmentsTreeProvider implements vscode.TreeDataProvider<Environ
 			];
 		}
 		return environments.map(env => {
-			const vm: EnvironmentListViewModel = this.mapper.toViewModel(env);
+			const vm = this.mapper.toViewModel(env);
 			return new EnvironmentItem(vm.name, vm.dataverseUrl, 'environment', vm.id);
 		});
 	}

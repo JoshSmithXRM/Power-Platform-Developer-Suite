@@ -3,6 +3,7 @@ import type { IDataverseApiService } from './../../../../shared/infrastructure/i
 import type { ILogger } from './../../../../infrastructure/logging/ILogger';
 import { TraceFilter } from './../../domain/entities/TraceFilter';
 import { TraceLevel } from './../../domain/valueObjects/TraceLevel';
+import { createMockDataverseApiService, createMockLogger } from '../../../../shared/testing';
 
 describe('DataversePluginTraceRepository', () => {
 	let repository: DataversePluginTraceRepository;
@@ -31,26 +32,9 @@ describe('DataversePluginTraceRepository', () => {
 	};
 
 	beforeEach(() => {
-		mockApiService = {
-			get: jest.fn(),
-			post: jest.fn(),
-			patch: jest.fn(),
-			delete: jest.fn(),
-			batchDelete: jest.fn(),
-		};
-
-		mockLogger = {
-			trace: jest.fn(),
-		debug: jest.fn(),
-			info: jest.fn(),
-			warn: jest.fn(),
-			error: jest.fn(),
-		};
-
-		repository = new DataversePluginTraceRepository(
-			mockApiService,
-			mockLogger
-		);
+		mockApiService = createMockDataverseApiService();
+		mockLogger = createMockLogger();
+		repository = new DataversePluginTraceRepository(mockApiService, mockLogger);
 	});
 
 	describe('getTraces', () => {
@@ -186,7 +170,7 @@ describe('DataversePluginTraceRepository', () => {
 			);
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				expect.stringContaining('Deleted'),
-				expect.any(Object)
+				expect.objectContaining({})
 			);
 		});
 
@@ -336,6 +320,364 @@ describe('DataversePluginTraceRepository', () => {
 				'Failed to delete old plugin traces from Dataverse',
 				expect.any(Error)
 			);
+		});
+	});
+
+	describe('Query Options - $select combinations', () => {
+		it('should use optimized $select fields for list view (excludes large text fields)', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.default();
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				environmentId,
+				expect.stringContaining('$select=')
+			);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('plugintracelogid');
+			expect(callArg).toContain('typename');
+			expect(callArg).toContain('exceptiondetails');
+			expect(callArg).not.toContain('messageblock');
+			expect(callArg).not.toContain('configuration');
+			expect(callArg).not.toContain('secureconfiguration');
+		});
+
+		it('should use full $select fields for detail view (includes all fields)', async () => {
+			const environmentId = 'env-123';
+			const traceId = 'trace-123';
+
+			mockApiService.get.mockResolvedValue(mockTraceDto);
+
+			await repository.getTraceById(environmentId, traceId);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$select=');
+			expect(callArg).toContain('messageblock');
+			expect(callArg).toContain('configuration');
+			expect(callArg).toContain('secureconfiguration');
+			expect(callArg).toContain('profile');
+			expect(callArg).toContain('performanceconstructorduration');
+		});
+
+		it('should use minimal $select for deleteAllTraces (only ID)', async () => {
+			const environmentId = 'env-123';
+
+			mockApiService.get.mockResolvedValue({
+				value: [{ plugintracelogid: 'trace-1' }],
+			});
+			mockApiService.batchDelete.mockResolvedValue(1);
+
+			await repository.deleteAllTraces(environmentId);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$select=plugintracelogid');
+			expect(callArg).not.toContain('typename');
+			expect(callArg).not.toContain('createdon');
+		});
+	});
+
+	describe('Query Options - $filter combinations', () => {
+		it('should build OData filter with single plugin name condition', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 100,
+				pluginNameFilter: 'TestPlugin',
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$filter=');
+			expect(callArg).toContain('typename');
+		});
+
+		it('should build OData filter with multiple AND conditions', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 100,
+				pluginNameFilter: 'TestPlugin',
+				entityNameFilter: 'account',
+				messageNameFilter: 'Create',
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$filter=');
+			expect(callArg).toMatch(/typename.*and.*primaryentity.*and.*messagename/i);
+		});
+
+		it('should handle date filter with ISO 8601 format', async () => {
+			const environmentId = 'env-123';
+			const fromDate = new Date('2025-01-01T00:00:00Z');
+			const toDate = new Date('2025-01-31T23:59:59Z');
+			const filter = TraceFilter.create({
+				top: 100,
+				createdOnFrom: fromDate,
+				createdOnTo: toDate,
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$filter=');
+			expect(callArg).toContain('createdon');
+		});
+
+		it('should handle duration range filter', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 100,
+				durationMin: 100,
+				durationMax: 5000,
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$filter=');
+			expect(callArg).toContain('performanceexecutionduration');
+		});
+
+		it('should handle boolean filter (hasException)', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 100,
+				hasExceptionFilter: true,
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$filter=');
+			expect(callArg).toContain('exceptiondetails');
+		});
+
+		it('should handle correlation ID filter', async () => {
+			const environmentId = 'env-123';
+			const correlationId = 'abc123-def456-ghi789';
+			const filter = TraceFilter.create({
+				top: 100,
+				correlationIdFilter: {
+					getValue: () => correlationId,
+					isEmpty: () => false,
+					equals: jest.fn().mockReturnValue(true),
+					value: correlationId
+				},
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$filter=');
+			expect(callArg).toContain('correlationid');
+		});
+	});
+
+	describe('Query Options - $orderby combinations', () => {
+		it('should apply default orderby (createdon desc)', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.default();
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$orderby=createdon desc');
+		});
+
+		it('should apply custom orderby (typename asc)', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 100,
+				orderBy: 'typename asc',
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$orderby=typename asc');
+		});
+
+		it('should apply multiple field orderby', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 100,
+				orderBy: 'typename asc,createdon desc',
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$orderby=typename asc,createdon desc');
+		});
+	});
+
+	describe('Query Options - $top boundary conditions', () => {
+		it('should handle minimum $top value (1)', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({ top: 1 });
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$top=1');
+		});
+
+		it('should handle typical $top value (100)', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({ top: 100 });
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$top=100');
+		});
+
+		it('should handle maximum $top value (5000)', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({ top: 5000 });
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$top=5000');
+		});
+	});
+
+	describe('Query Options - Complex combinations', () => {
+		it('should combine $select, $filter, $orderby, and $top', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 50,
+				orderBy: 'createdon desc',
+				pluginNameFilter: 'TestPlugin',
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$select=');
+			expect(callArg).toContain('$filter=');
+			expect(callArg).toContain('$orderby=');
+			expect(callArg).toContain('$top=50');
+		});
+
+		it('should handle query with all filter types combined', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 100,
+				orderBy: 'createdon desc',
+				pluginNameFilter: 'TestPlugin',
+				entityNameFilter: 'account',
+				messageNameFilter: 'Create',
+				createdOnFrom: new Date('2025-01-01'),
+				createdOnTo: new Date('2025-01-31'),
+				durationMin: 100,
+				durationMax: 5000,
+				hasExceptionFilter: true,
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$select=');
+			expect(callArg).toContain('$filter=');
+			expect(callArg).toContain('$orderby=');
+			expect(callArg).toContain('$top=100');
+		});
+	});
+
+	describe('OData URL encoding edge cases', () => {
+		it('should handle special characters in filter values', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 100,
+				pluginNameFilter: "Test'Plugin",
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$filter=');
+		});
+
+		it('should handle spaces in filter values', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 100,
+				pluginNameFilter: 'Test Plugin Name',
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$filter=');
+		});
+
+		it('should handle ampersand in filter values', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 100,
+				entityNameFilter: 'sales&marketing',
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$filter=');
+		});
+
+		it('should handle percent sign in filter values', async () => {
+			const environmentId = 'env-123';
+			const filter = TraceFilter.create({
+				top: 100,
+				pluginNameFilter: '100% Complete',
+			});
+
+			mockApiService.get.mockResolvedValue({ value: [] });
+
+			await repository.getTraces(environmentId, filter);
+
+			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			expect(callArg).toContain('$filter=');
 		});
 	});
 

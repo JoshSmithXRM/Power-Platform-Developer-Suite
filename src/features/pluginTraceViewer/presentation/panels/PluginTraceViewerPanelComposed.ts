@@ -237,15 +237,34 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	private async initializeAndLoadData(): Promise<void> {
 		const environments = await this.getEnvironments();
 
-		// Load persisted filter criteria and auto-refresh interval before initial render
-		const persistedAutoRefreshInterval = await this.filterManagementBehavior.loadFilterCriteria(
+		// Load persisted state from repository once, then distribute to behaviors
+		if (this.panelStateRepository) {
+			try {
+				const state = await this.panelStateRepository.load({
+					panelType: PluginTraceViewerPanelComposed.viewType,
+					environmentId: this.currentEnvironmentId
+				});
+
+				if (state) {
+					// Set auto-refresh interval
+					if (state.autoRefreshInterval && typeof state.autoRefreshInterval === 'number' && state.autoRefreshInterval > 0) {
+						this.autoRefreshBehavior.setInterval(state.autoRefreshInterval);
+					}
+
+					// Set detail panel width
+					if (state.detailPanelWidth && typeof state.detailPanelWidth === 'number') {
+						this.detailPanelBehavior.setDetailPanelWidth(state.detailPanelWidth);
+					}
+				}
+			} catch (error) {
+				this.logger.warn('Failed to load panel state from storage', { error });
+			}
+		}
+
+		// Load persisted filter criteria (may also load from repository if available)
+		await this.filterManagementBehavior.loadFilterCriteria(
 			this.currentEnvironmentId
 		);
-
-		// Set the loaded interval on the auto-refresh behavior
-		if (persistedAutoRefreshInterval > 0) {
-			this.autoRefreshBehavior.setInterval(persistedAutoRefreshInterval);
-		}
 
 		this.logger.debug('Initializing with auto-refresh interval', {
 			interval: this.autoRefreshBehavior.getInterval()

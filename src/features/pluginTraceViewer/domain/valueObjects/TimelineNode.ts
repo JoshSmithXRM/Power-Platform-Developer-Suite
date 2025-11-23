@@ -29,15 +29,15 @@ export class TimelineNode {
 		widthPercent: number
 	): TimelineNode {
 		if (depth < 0) {
-			throw new Error('Timeline depth cannot be negative');
+			throw new Error('Invalid TimelineNode: depth cannot be negative');
 		}
 
 		if (offsetPercent < 0 || offsetPercent > 100) {
-			throw new Error('Timeline offset must be between 0 and 100');
+			throw new Error('Invalid TimelineNode: offsetPercent must be between 0 and 100');
 		}
 
 		if (widthPercent < 0 || widthPercent > 100) {
-			throw new Error('Timeline width must be between 0 and 100');
+			throw new Error('Invalid TimelineNode: widthPercent must be between 0 and 100');
 		}
 
 		return new TimelineNode(trace, children, depth, offsetPercent, widthPercent);
@@ -45,6 +45,11 @@ export class TimelineNode {
 
 	/**
 	 * Creates a new node with updated positioning while preserving trace and children.
+	 * Immutable update pattern (returns new instance rather than mutating).
+	 *
+	 * @param offsetPercent - Horizontal position in timeline (0-100%)
+	 * @param widthPercent - Width of execution bar (0-100%)
+	 * @returns New TimelineNode with updated positioning
 	 */
 	withPositioning(offsetPercent: number, widthPercent: number): TimelineNode {
 		return new TimelineNode(
@@ -58,6 +63,10 @@ export class TimelineNode {
 
 	/**
 	 * Creates a new node with updated children while preserving trace and positioning.
+	 * Immutable update pattern (returns new instance rather than mutating).
+	 *
+	 * @param children - New child nodes
+	 * @returns New TimelineNode with updated children
 	 */
 	withChildren(children: readonly TimelineNode[]): TimelineNode {
 		return new TimelineNode(
@@ -71,6 +80,9 @@ export class TimelineNode {
 
 	/**
 	 * Gets all descendant nodes in depth-first order.
+	 * Useful for flattening the hierarchy for iteration or analysis.
+	 *
+	 * @returns Readonly array of all descendant nodes (excludes this node)
 	 */
 	getAllDescendants(): readonly TimelineNode[] {
 		const descendants: TimelineNode[] = [];
@@ -85,21 +97,29 @@ export class TimelineNode {
 	}
 
 	/**
-	 * Counts total nodes in this subtree (including this node).
+	 * Counts total nodes in this subtree including this node.
+	 * Recursively counts all descendants.
+	 *
+	 * @returns Total count of nodes in subtree
 	 */
 	getTotalNodeCount(): number {
 		return 1 + this.children.reduce((sum, child) => sum + child.getTotalNodeCount(), 0);
 	}
 
 	/**
-	 * Checks if this node has any exception.
+	 * Checks if this node's trace has any exception.
+	 * Delegates to the underlying PluginTrace entity.
+	 *
+	 * @returns True if trace recorded an exception
 	 */
 	hasException(): boolean {
 		return this.trace.hasException();
 	}
 
 	/**
-	 * Gets the correlation ID if available.
+	 * Gets the correlation ID from the underlying trace if available.
+	 *
+	 * @returns Correlation ID string or null if not present
 	 */
 	getCorrelationId(): string | null {
 		return this.trace.correlationId?.value ?? null;

@@ -38,7 +38,7 @@ describe('DataverseApiService', () => {
 	});
 
 	describe('batchDelete', () => {
-		it('should perform batch delete with correct OData format', async () => {
+		it('should construct batch delete request with multipart OData format and return success count', async () => {
 			const mockResponse = {
 				ok: true,
 				text: jest.fn().mockResolvedValue('HTTP/1.1 204\r\nHTTP/1.1 204\r\n')
@@ -64,14 +64,14 @@ describe('DataverseApiService', () => {
 			);
 		});
 
-		it('should handle empty entity IDs array', async () => {
+		it('should return zero and skip API call when entity IDs array is empty', async () => {
 			const result = await service.batchDelete('env-123', 'plugintracelogs', []);
 
 			expect(result).toBe(0);
 			expect(global.fetch).not.toHaveBeenCalled();
 		});
 
-		it('should parse partial success responses', async () => {
+		it('should count only successful 204 responses when batch contains mixed success and failure', async () => {
 			const mockResponse = {
 				ok: true,
 				text: jest.fn().mockResolvedValue('HTTP/1.1 204\r\nHTTP/1.1 404\r\nHTTP/1.1 204\r\n')
@@ -87,7 +87,7 @@ describe('DataverseApiService', () => {
 			expect(result).toBe(2);
 		});
 
-		it('should throw error when batch request fails', async () => {
+		it('should throw error and log failure when batch request returns 500 status', async () => {
 			const mockResponse = {
 				ok: false,
 				status: 500,
@@ -102,7 +102,7 @@ describe('DataverseApiService', () => {
 			expect(mockLogger.error).toHaveBeenCalled();
 		});
 
-		it('should throw OperationCancelledException when cancelled', async () => {
+		it('should throw OperationCancelledException immediately when cancellation token is already set', async () => {
 			const mockCancellationToken: ICancellationToken = {
 				isCancellationRequested: true,
 				onCancellationRequested: jest.fn()
@@ -115,7 +115,7 @@ describe('DataverseApiService', () => {
 			expect(global.fetch).not.toHaveBeenCalled();
 		});
 
-		it('should throw OperationCancelledException when cancelled after token retrieval', async () => {
+		it('should throw OperationCancelledException when operation cancelled during token retrieval', async () => {
 			let cancelled = false;
 			const mockCancellationToken: ICancellationToken = {
 				get isCancellationRequested() { return cancelled; },
@@ -132,7 +132,7 @@ describe('DataverseApiService', () => {
 			).rejects.toThrow(OperationCancelledException);
 		});
 
-		it('should log batch delete operations', async () => {
+		it('should log batch delete operation details at debug level for troubleshooting', async () => {
 			const mockResponse = {
 				ok: true,
 				text: jest.fn().mockResolvedValue('HTTP/1.1 204\r\n')
@@ -143,13 +143,13 @@ describe('DataverseApiService', () => {
 
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				expect.stringContaining('Batch DELETE'),
-				expect.any(Object)
+				expect.objectContaining({})
 			);
 		});
 	});
 
 	describe('retry logic', () => {
-		it('should retry on 429 rate limiting', async () => {
+		it('should automatically retry request after receiving 429 rate limiting response', async () => {
 			const mockFailureResponse = {
 				ok: false,
 				status: 429,
@@ -173,11 +173,11 @@ describe('DataverseApiService', () => {
 			expect(global.fetch).toHaveBeenCalledTimes(2);
 			expect(mockLogger.warn).toHaveBeenCalledWith(
 				expect.stringContaining('Retrying request'),
-				expect.any(Object)
+				expect.objectContaining({})
 			);
 		});
 
-		it('should retry on 503 service unavailable', async () => {
+		it('should automatically retry request after receiving 503 service unavailable response', async () => {
 			const mockFailureResponse = {
 				ok: false,
 				status: 503,
@@ -201,7 +201,7 @@ describe('DataverseApiService', () => {
 			expect(global.fetch).toHaveBeenCalledTimes(2);
 		});
 
-		it('should use exponential backoff for retries', async () => {
+		it('should apply exponential backoff delays between multiple retry attempts', async () => {
 			const mockFailureResponse = {
 				ok: false,
 				status: 503,
@@ -228,7 +228,7 @@ describe('DataverseApiService', () => {
 			expect(duration).toBeGreaterThanOrEqual(3000);
 		});
 
-		it('should not retry on 404 not found', async () => {
+		it('should not retry non-transient 404 errors to avoid unnecessary load', async () => {
 			const mockResponse = {
 				ok: false,
 				status: 404,
@@ -244,7 +244,7 @@ describe('DataverseApiService', () => {
 			expect(global.fetch).toHaveBeenCalledTimes(1);
 		});
 
-		it('should fail after maximum retry attempts', async () => {
+		it('should throw error after exhausting maximum retry attempts for 503 errors', async () => {
 			const mockResponse = {
 				ok: false,
 				status: 503,
@@ -261,7 +261,7 @@ describe('DataverseApiService', () => {
 			expect(mockLogger.error).toHaveBeenCalled();
 		});
 
-		it('should retry on network timeout errors', async () => {
+		it('should retry automatically after transient network timeout errors', async () => {
 			const timeoutError = new Error('fetch failed');
 
 			const mockSuccessResponse = {
@@ -280,7 +280,7 @@ describe('DataverseApiService', () => {
 			expect(global.fetch).toHaveBeenCalledTimes(2);
 		});
 
-		it('should not retry on OperationCancelledException', async () => {
+		it('should abort retry logic when operation is cancelled via cancellation token', async () => {
 			let cancelled = false;
 			const mockCancellationToken: ICancellationToken = {
 				get isCancellationRequested() { return cancelled; },
@@ -308,7 +308,7 @@ describe('DataverseApiService', () => {
 	});
 
 	describe('HTTP methods', () => {
-		it('should perform GET request', async () => {
+		it('should execute GET request with authorization header and parse JSON response', async () => {
 			const mockResponse = {
 				ok: true,
 				status: 200,
@@ -327,7 +327,7 @@ describe('DataverseApiService', () => {
 			);
 		});
 
-		it('should perform POST request with body', async () => {
+		it('should execute POST request with JSON-serialized body and return created resource', async () => {
 			const mockResponse = {
 				ok: true,
 				status: 200,
@@ -348,7 +348,7 @@ describe('DataverseApiService', () => {
 			);
 		});
 
-		it('should perform PATCH request', async () => {
+		it('should execute PATCH request to update existing resource with partial data', async () => {
 			const mockResponse = {
 				ok: true,
 				status: 200,
@@ -367,7 +367,7 @@ describe('DataverseApiService', () => {
 			);
 		});
 
-		it('should perform DELETE request', async () => {
+		it('should execute DELETE request to remove resource from Dataverse', async () => {
 			const mockResponse = {
 				ok: true,
 				status: 204
@@ -384,7 +384,7 @@ describe('DataverseApiService', () => {
 			);
 		});
 
-		it('should return undefined for 204 No Content', async () => {
+		it('should return undefined when API responds with 204 No Content status', async () => {
 			const mockResponse = {
 				ok: true,
 				status: 204
@@ -396,7 +396,7 @@ describe('DataverseApiService', () => {
 			expect(result).toBeUndefined();
 		});
 
-		it('should validate response is an object', async () => {
+		it('should throw validation error when API returns non-object JSON response', async () => {
 			const mockResponse = {
 				ok: true,
 				status: 200,
@@ -405,7 +405,7 @@ describe('DataverseApiService', () => {
 			(global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
 			await expect(service.get('env-123', '/api/data/v9.2/test'))
-				.rejects.toThrow('Invalid API response structure');
+				.rejects.toThrow('Invalid Dataverse API response: expected JSON object');
 		});
 	});
 });

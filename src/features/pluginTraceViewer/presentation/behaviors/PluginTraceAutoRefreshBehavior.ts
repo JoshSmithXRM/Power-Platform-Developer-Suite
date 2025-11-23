@@ -15,7 +15,7 @@ import type { ILogger } from '../../../../infrastructure/logging/ILogger';
  */
 export class PluginTraceAutoRefreshBehavior {
 	private autoRefreshTimer: NodeJS.Timeout | null = null;
-	private autoRefreshInterval: number = 0;
+	private autoRefreshInterval = 0;
 
 	// Named constants for time-based operations
 	private static readonly MILLISECONDS_PER_SECOND = 1000;

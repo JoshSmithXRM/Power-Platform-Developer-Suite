@@ -35,7 +35,7 @@ function createMockUri(path: string): import('vscode').Uri {
 	return {
 		toString: () => path,
 		fsPath: path
-	} as unknown as import('vscode').Uri;
+	} as import('vscode').Uri;
 }
 
 describe('HtmlRenderingBehavior', () => {

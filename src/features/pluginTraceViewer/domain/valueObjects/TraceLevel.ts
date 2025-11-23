@@ -28,7 +28,7 @@ export class TraceLevel {
 			case 2:
 				return TraceLevel.All;
 			default:
-				throw new Error(`Invalid trace level: ${value}`);
+				throw new Error(`Invalid TraceLevel: unknown numeric value ${value}`);
 		}
 	}
 
@@ -37,7 +37,6 @@ export class TraceLevel {
 	 * Factory method for value object construction (legitimate pattern).
 	 * @throws Error if value is not a valid trace level string
 	 */
-	// eslint-disable-next-line local-rules/no-static-entity-methods
 	static fromString(value: string): TraceLevel {
 		switch (value) {
 			case 'Off':
@@ -47,7 +46,7 @@ export class TraceLevel {
 			case 'All':
 				return TraceLevel.All;
 			default:
-				throw new Error(`Invalid trace level string: ${value}`);
+				throw new Error(`Invalid TraceLevel: unknown string value "${value}"`);
 		}
 	}
 

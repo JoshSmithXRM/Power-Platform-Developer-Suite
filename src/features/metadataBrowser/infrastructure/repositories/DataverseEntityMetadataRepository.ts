@@ -41,8 +41,13 @@ interface CacheEntry<T> {
  * Implements 5-minute in-memory caching for entity metadata to improve performance.
  */
 export class DataverseEntityMetadataRepository implements IEntityMetadataRepository {
+    /**
+     * Cache duration in milliseconds (5 minutes).
+     * Balances performance improvement with data freshness for metadata that rarely changes.
+     */
+    private static readonly CACHE_DURATION_MS = 5 * 60 * 1000;
+
     private readonly entityCache = new Map<string, CacheEntry<EntityMetadata>>();
-    private readonly CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
     constructor(
         private readonly apiService: IDataverseApiService,
@@ -65,7 +70,7 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
             const response = await this.apiService.get<EntityDefinitionsResponse>(environmentId, endpoint);
 
             if (!response?.value) {
-                throw new Error('Invalid response from Dataverse Metadata API');
+                throw new Error('Cannot fetch entities: invalid response structure from Dataverse Metadata API');
             }
 
             this.logger.debug('Received entity metadata', { count: response.value.length });
@@ -90,7 +95,7 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
      * Checks if a cache entry is still valid based on timestamp.
      */
     private isCacheValid(timestamp: number): boolean {
-        return Date.now() - timestamp < this.CACHE_DURATION_MS;
+        return Date.now() - timestamp < DataverseEntityMetadataRepository.CACHE_DURATION_MS;
     }
 
     /**
@@ -163,7 +168,7 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
             const dto = await this.apiService.get<EntityMetadataDto>(environmentId, endpoint);
 
             if (!dto) {
-                throw new Error(`Entity not found: ${logicalName.getValue()}`);
+                throw new Error(`Cannot fetch entity: entity "${logicalName.getValue()}" not found in Dataverse`);
             }
 
             this.logger.debug('Received full entity metadata', {
@@ -205,7 +210,7 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
             const response = await this.apiService.get<GlobalOptionSetDefinitionsResponse>(environmentId, endpoint);
 
             if (!response?.value) {
-                throw new Error('Invalid response from Dataverse Metadata API');
+                throw new Error('Cannot fetch global choices: invalid response structure from Dataverse Metadata API');
             }
 
             this.logger.debug('Received global choice metadata', { count: response.value.length });
@@ -231,7 +236,7 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
             const dto = await this.apiService.get<GlobalOptionSetDefinitionDto>(environmentId, endpoint);
 
             if (!dto) {
-                throw new Error(`Global choice not found: ${name}`);
+                throw new Error(`Cannot fetch global choice: choice "${name}" not found in Dataverse`);
             }
 
             this.logger.debug('Received global choice metadata', {

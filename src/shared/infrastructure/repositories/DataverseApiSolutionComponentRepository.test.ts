@@ -3,6 +3,7 @@ import { IDataverseApiService } from '../interfaces/IDataverseApiService';
 import { ILogger } from '../../../infrastructure/logging/ILogger';
 import { ICancellationToken } from '../../domain/interfaces/ICancellationToken';
 import { OperationCancelledException } from '../../domain/errors/OperationCancelledException';
+import { createMockDataverseApiService, createMockLogger } from '../../testing';
 
 describe('DataverseApiSolutionComponentRepository', () => {
 	let repository: DataverseApiSolutionComponentRepository;
@@ -10,22 +11,8 @@ describe('DataverseApiSolutionComponentRepository', () => {
 	let mockLogger: jest.Mocked<ILogger>;
 
 	beforeEach(() => {
-		mockApiService = {
-			get: jest.fn(),
-			post: jest.fn(),
-			patch: jest.fn(),
-			delete: jest.fn(),
-			batchDelete: jest.fn()
-		};
-
-		mockLogger = {
-			trace: jest.fn(),
-			debug: jest.fn(),
-			info: jest.fn(),
-			warn: jest.fn(),
-			error: jest.fn()
-		};
-
+		mockApiService = createMockDataverseApiService();
+		mockLogger = createMockLogger();
 		repository = new DataverseApiSolutionComponentRepository(mockApiService, mockLogger);
 	});
 

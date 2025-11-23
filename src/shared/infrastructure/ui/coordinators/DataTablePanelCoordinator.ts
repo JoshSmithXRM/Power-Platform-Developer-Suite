@@ -27,6 +27,15 @@ export interface CoordinatorDependencies {
 export class DataTablePanelCoordinator implements IDataTablePanelCoordinator {
 	private disposables: vscode.Disposable[] = [];
 
+	/**
+	 * Creates a DataTablePanelCoordinator instance.
+	 *
+	 * Sets up panel disposal tracking and initializes the coordinator with
+	 * required behaviors and dependencies.
+	 *
+	 * @param registry - Behavior registry containing all panel behaviors
+	 * @param dependencies - Required dependencies (panel, environment lookup, logger)
+	 */
 	constructor(
 		private readonly registry: IDataTableBehaviorRegistry,
 		private readonly dependencies: CoordinatorDependencies
@@ -111,6 +120,9 @@ export class DataTablePanelCoordinator implements IDataTablePanelCoordinator {
 
 	/**
 	 * Registers command handlers with message routing behavior.
+	 *
+	 * Sets up handlers for refresh, environment change, and solution filter change.
+	 * These handlers coordinate behavior updates and data reloading.
 	 */
 	private registerCommandHandlers(): void {
 		this.registry.messageRoutingBehavior.registerHandler('refresh', async () => {
@@ -132,6 +144,11 @@ export class DataTablePanelCoordinator implements IDataTablePanelCoordinator {
 
 	/**
 	 * Handles environment switch: updates tracking, solution filter, title, and reloads data.
+	 *
+	 * Coordinates panel re-initialization when user switches environments. Ensures
+	 * proper cleanup of old environment tracking and setup of new environment state.
+	 *
+	 * @param newEnvironmentId - ID of newly selected environment
 	 */
 	private async handleEnvironmentChange(newEnvironmentId: string): Promise<void> {
 		const oldEnvironmentId = this.registry.environmentBehavior.getCurrentEnvironmentId();
@@ -155,6 +172,11 @@ export class DataTablePanelCoordinator implements IDataTablePanelCoordinator {
 
 	/**
 	 * Handles solution filter change: persists selection and reloads data.
+	 *
+	 * Updates the solution filter selection and triggers data reload.
+	 * The solution filter behavior manages persistence and state updates.
+	 *
+	 * @param solutionId - ID of newly selected solution (or 'all' for no filter)
 	 */
 	private async handleSolutionChange(solutionId: string): Promise<void> {
 		await this.registry.solutionFilterBehavior.setSolutionId(solutionId);
@@ -162,6 +184,9 @@ export class DataTablePanelCoordinator implements IDataTablePanelCoordinator {
 
 	/**
 	 * Updates panel tab title with current environment name.
+	 *
+	 * Fetches environment details and appends environment name to panel title.
+	 * Provides visual feedback about which environment the panel is connected to.
 	 */
 	private async updateTabTitle(): Promise<void> {
 		const { panel, getEnvironmentById, logger } = this.dependencies;

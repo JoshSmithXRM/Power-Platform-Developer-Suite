@@ -25,7 +25,7 @@ describe('TraceFilter', () => {
 
 		it('should generate no OData filter', () => {
 			const filter = TraceFilter.default();
-			expect(filter.toODataFilter()).toBeUndefined();
+			expect(filter.buildFilterExpression()).toBeUndefined();
 		});
 	});
 
@@ -77,10 +77,10 @@ describe('TraceFilter', () => {
 		});
 	});
 
-	describe('toODataFilter', () => {
+	describe('buildFilterExpression', () => {
 		it('should build OData filter for plugin name (contains)', () => {
 			const filter = TraceFilter.create({ pluginNameFilter: 'MyPlugin' });
-			const odata = filter.toODataFilter();
+			const odata = filter.buildFilterExpression();
 			expect(odata).toContain('typename');
 			expect(odata).toContain('MyPlugin');
 			expect(odata).toContain('contains');
@@ -88,7 +88,7 @@ describe('TraceFilter', () => {
 
 		it('should build OData filter for entity name (contains)', () => {
 			const filter = TraceFilter.create({ entityNameFilter: 'account' });
-			const odata = filter.toODataFilter();
+			const odata = filter.buildFilterExpression();
 			expect(odata).toContain('primaryentity');
 			expect(odata).toContain('account');
 			expect(odata).toContain('contains');
@@ -96,7 +96,7 @@ describe('TraceFilter', () => {
 
 		it('should build OData filter for mode', () => {
 			const filter = TraceFilter.create({ modeFilter: ExecutionMode.Synchronous });
-			const odata = filter.toODataFilter();
+			const odata = filter.buildFilterExpression();
 			expect(odata).toContain('mode eq 0');
 		});
 
@@ -105,7 +105,7 @@ describe('TraceFilter', () => {
 				pluginNameFilter: 'MyPlugin',
 				modeFilter: ExecutionMode.Asynchronous
 			});
-			const odata = filter.toODataFilter();
+			const odata = filter.buildFilterExpression();
 			expect(odata).toContain(' and ');
 			expect(odata).toContain('typename');
 			expect(odata).toContain('mode eq 1');
@@ -113,13 +113,13 @@ describe('TraceFilter', () => {
 
 		it('should escape single quotes in filter values', () => {
 			const filter = TraceFilter.create({ pluginNameFilter: "It's Plugin" });
-			const odata = filter.toODataFilter();
+			const odata = filter.buildFilterExpression();
 			expect(odata).toContain("It''s Plugin");
 		});
 
 		it('should return undefined for empty filter', () => {
 			const filter = TraceFilter.default();
-			expect(filter.toODataFilter()).toBeUndefined();
+			expect(filter.buildFilterExpression()).toBeUndefined();
 		});
 	});
 
@@ -277,7 +277,7 @@ describe('TraceFilter', () => {
 				conditions: [condition],
 			});
 
-			expect(filter.toODataFilter()).toBe("(contains(typename, 'MyPlugin'))");
+			expect(filter.buildFilterExpression()).toBe("(contains(typename, 'MyPlugin'))");
 		});
 
 		it('should build OData filter from multiple conditions with AND', () => {
@@ -300,7 +300,7 @@ describe('TraceFilter', () => {
 				conditions: [condition1, condition2],
 			});
 
-			expect(filter.toODataFilter()).toBe(
+			expect(filter.buildFilterExpression()).toBe(
 				"(contains(typename, 'MyPlugin')) and (primaryentity eq 'account')"
 			);
 		});
@@ -326,7 +326,7 @@ describe('TraceFilter', () => {
 				conditions: [condition1, condition2],
 			});
 
-			expect(filter.toODataFilter()).toBe(
+			expect(filter.buildFilterExpression()).toBe(
 				"(contains(typename, 'Plugin1')) or (contains(typename, 'Plugin2'))"
 			);
 		});
@@ -351,7 +351,7 @@ describe('TraceFilter', () => {
 				conditions: [condition1, condition2],
 			});
 
-			expect(filter.toODataFilter()).toBe("(contains(typename, 'MyPlugin'))");
+			expect(filter.buildFilterExpression()).toBe("(contains(typename, 'MyPlugin'))");
 		});
 
 		it('should build query with mix of enabled and disabled conditions', () => {
@@ -381,7 +381,7 @@ describe('TraceFilter', () => {
 				conditions: [condition1, condition2, condition3],
 			});
 
-			expect(filter.toODataFilter()).toBe(
+			expect(filter.buildFilterExpression()).toBe(
 				"(contains(typename, 'Plugin1')) and (startswith(messagename, 'Create'))"
 			);
 		});
@@ -406,7 +406,7 @@ describe('TraceFilter', () => {
 				conditions: [condition1, condition2],
 			});
 
-			expect(filter.toODataFilter()).toBeUndefined();
+			expect(filter.buildFilterExpression()).toBeUndefined();
 		});
 
 		it('should return undefined when conditions array is empty', () => {
@@ -415,7 +415,7 @@ describe('TraceFilter', () => {
 				conditions: [],
 			});
 
-			expect(filter.toODataFilter()).toBeUndefined();
+			expect(filter.buildFilterExpression()).toBeUndefined();
 		});
 
 		it('should wrap each condition in parentheses', () => {
@@ -438,7 +438,7 @@ describe('TraceFilter', () => {
 				conditions: [condition1, condition2],
 			});
 
-			expect(filter.toODataFilter()).toBe(
+			expect(filter.buildFilterExpression()).toBe(
 				'(performanceexecutionduration gt 1000) and (performanceexecutionduration lt 5000)'
 			);
 		});
@@ -464,7 +464,7 @@ describe('TraceFilter', () => {
 				conditions: [condition1, condition2],
 			});
 
-			expect(filter.toODataFilter()).toBe(
+			expect(filter.buildFilterExpression()).toBe(
 				"(operationtype eq 'Plugin') or (operationtype eq 'Workflow')"
 			);
 		});
@@ -496,7 +496,7 @@ describe('TraceFilter', () => {
 				conditions: [textCondition, enumCondition, numberCondition],
 			});
 
-			expect(filter.toODataFilter()).toBe(
+			expect(filter.buildFilterExpression()).toBe(
 				"(contains(typename, 'MyPlugin')) and (operationtype eq 'Plugin') and (performanceexecutionduration gt 1000)"
 			);
 		});
@@ -546,7 +546,7 @@ describe('TraceFilter', () => {
 			});
 
 			// Should use conditions, not legacy filter
-			expect(filter.toODataFilter()).toBe("(contains(typename, 'NewPlugin'))");
+			expect(filter.buildFilterExpression()).toBe("(contains(typename, 'NewPlugin'))");
 		});
 
 		it('should fall back to legacy filters when no conditions', () => {
@@ -557,7 +557,7 @@ describe('TraceFilter', () => {
 			});
 
 			// Should use legacy filter
-			expect(filter.toODataFilter()).toBe("contains(typename, 'MyPlugin')");
+			expect(filter.buildFilterExpression()).toBe("contains(typename, 'MyPlugin')");
 		});
 	});
 });

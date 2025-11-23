@@ -5,7 +5,7 @@ import { DomainError } from './DomainError';
  * Used to distinguish cancellation from other error conditions.
  */
 export class OperationCancelledException extends DomainError {
-	constructor(message: string = 'Operation was cancelled') {
+	constructor(message = 'Operation was cancelled') {
 		super(message);
 	}
 }

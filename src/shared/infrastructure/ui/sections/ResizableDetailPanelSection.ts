@@ -152,20 +152,20 @@ export abstract class ResizableDetailPanelSection implements ISection {
 	 */
 	private validateConfig(config: ResizableDetailPanelConfig): void {
 		if (!config.featurePrefix || config.featurePrefix.trim() === '') {
-			throw new Error('ResizableDetailPanelSection: featurePrefix cannot be empty');
+			throw new Error('Invalid ResizableDetailPanelSection config: featurePrefix cannot be empty');
 		}
 
 		if (!config.tabs || config.tabs.length === 0) {
-			throw new Error('ResizableDetailPanelSection: At least one tab is required');
+			throw new Error('Invalid ResizableDetailPanelSection config: at least one tab is required');
 		}
 
 		// Validate each tab
 		for (const tab of config.tabs) {
 			if (!tab.id || tab.id.trim() === '') {
-				throw new Error('ResizableDetailPanelSection: Tab id cannot be empty');
+				throw new Error('Invalid ResizableDetailPanelSection config: tab id cannot be empty');
 			}
 			if (!tab.label || tab.label.trim() === '') {
-				throw new Error('ResizableDetailPanelSection: Tab label cannot be empty');
+				throw new Error('Invalid ResizableDetailPanelSection config: tab label cannot be empty');
 			}
 		}
 
@@ -173,13 +173,13 @@ export abstract class ResizableDetailPanelSection implements ISection {
 		const tabIds = config.tabs.map(t => t.id);
 		const duplicates = tabIds.filter((id, index) => tabIds.indexOf(id) !== index);
 		if (duplicates.length > 0) {
-			throw new Error(`ResizableDetailPanelSection: Duplicate tab id: ${duplicates[0]}`);
+			throw new Error(`Invalid ResizableDetailPanelSection config: duplicate tab id "${duplicates[0]}"`);
 		}
 
 		// Check for multiple default tabs
 		const defaultTabs = config.tabs.filter(t => t.isDefault);
 		if (defaultTabs.length > 1) {
-			throw new Error('ResizableDetailPanelSection: Only one tab can be marked as default');
+			throw new Error('Invalid ResizableDetailPanelSection config: only one tab can be marked as default');
 		}
 	}
 

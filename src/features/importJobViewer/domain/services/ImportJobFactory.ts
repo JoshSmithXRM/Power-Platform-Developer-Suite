@@ -37,6 +37,12 @@ export interface ImportJobFactoryData {
  * because the Dataverse importjobs entity lacks a statuscode field.
  */
 export class ImportJobFactory {
+	/** Maximum valid progress percentage (100%) */
+	private static readonly MAX_PROGRESS_PERCENTAGE = 100;
+
+	/** Minimum valid progress percentage (0%) */
+	private static readonly MIN_PROGRESS_PERCENTAGE = 0;
+
 	/**
 	 * Creates ImportJob entity with status derived from provided data.
 	 *
@@ -101,8 +107,13 @@ export class ImportJobFactory {
 	 * @throws {ValidationError} When progress is out of range
 	 */
 	private validateProgress(progress: number): void {
-		if (progress < 0 || progress > 100) {
-			throw new ValidationError('ImportJobFactory', 'progress', progress, 'Progress must be between 0 and 100');
+		if (progress < ImportJobFactory.MIN_PROGRESS_PERCENTAGE || progress > ImportJobFactory.MAX_PROGRESS_PERCENTAGE) {
+			throw new ValidationError(
+				'ImportJobFactory',
+				'progress',
+				progress,
+				`Progress must be between ${ImportJobFactory.MIN_PROGRESS_PERCENTAGE} and ${ImportJobFactory.MAX_PROGRESS_PERCENTAGE}`
+			);
 		}
 	}
 
@@ -124,12 +135,12 @@ export class ImportJobFactory {
 	): ImportJobStatus {
 		// If job has completed
 		if (completedOn) {
-			return progress < 100 ? ImportJobStatus.Failed : ImportJobStatus.Completed;
+			return progress < ImportJobFactory.MAX_PROGRESS_PERCENTAGE ? ImportJobStatus.Failed : ImportJobStatus.Completed;
 		}
 
 		// If job has started but not completed
 		if (startedOn) {
-			return progress === 0 ? ImportJobStatus.Failed : ImportJobStatus.InProgress;
+			return progress === ImportJobFactory.MIN_PROGRESS_PERCENTAGE ? ImportJobStatus.Failed : ImportJobStatus.InProgress;
 		}
 
 		// Job hasn't started yet

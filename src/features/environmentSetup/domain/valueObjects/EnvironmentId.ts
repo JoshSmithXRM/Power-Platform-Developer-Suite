@@ -25,6 +25,22 @@ export class EnvironmentId {
 	}
 
 	/**
+	 * Radix (base) for generating alphanumeric random strings.
+	 * Base 36 includes digits 0-9 and letters a-z.
+	 */
+	private static readonly RANDOM_STRING_RADIX = 36;
+
+	/**
+	 * Start index for extracting random substring (skip "0." prefix from Math.random).
+	 */
+	private static readonly RANDOM_SUBSTRING_START = 2;
+
+	/**
+	 * End index for extracting random substring (9 characters for uniqueness).
+	 */
+	private static readonly RANDOM_SUBSTRING_END = 11;
+
+	/**
 	 * Generates a new unique environment ID.
 	 *
 	 * Format: `env-{timestamp}-{random}`
@@ -36,7 +52,12 @@ export class EnvironmentId {
 	 */
 	public static generate(): EnvironmentId {
 		const timestamp = Date.now();
-		const random = Math.random().toString(36).substring(2, 11);
+		const random = Math.random()
+			.toString(EnvironmentId.RANDOM_STRING_RADIX)
+			.substring(
+				EnvironmentId.RANDOM_SUBSTRING_START,
+				EnvironmentId.RANDOM_SUBSTRING_END
+			);
 		return new EnvironmentId(`env-${timestamp}-${random}`);
 	}
 

@@ -14,6 +14,18 @@ import { ILogger } from '../../../../infrastructure/logging/ILogger';
  * Handles token acquisition for different authentication methods with token caching
  */
 export class MsalAuthenticationService implements IAuthenticationService {
+	/**
+	 * Port for OAuth redirect URI in interactive authentication flow.
+	 * Configurable to support future environment variable override for different deployment scenarios.
+	 */
+	private static readonly DEFAULT_OAUTH_REDIRECT_PORT = 3000;
+
+	/**
+	 * Timeout duration for interactive authentication in milliseconds.
+	 * User must complete browser authentication within this window.
+	 */
+	private static readonly INTERACTIVE_AUTH_TIMEOUT_MS = 90000;
+
 	private clientAppCache: Map<string, msal.PublicClientApplication> = new Map();
 
 	constructor(private readonly logger: ILogger) {}
@@ -90,8 +102,6 @@ export class MsalAuthenticationService implements IAuthenticationService {
 		this.logger.debug('Acquiring access token', {
 			tenantId: environment.getTenantId().getValue(),
 			authMethod,
-			hasClientSecret: !!clientSecret,
-			hasPassword: !!password,
 			scope: customScope || 'dataverse'
 		});
 
@@ -415,7 +425,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				};
 
 				const server = http.createServer((req, res) => {
-					const url = new URL(req.url || '', 'http://localhost:3000');
+					const url = new URL(req.url || '', `http://localhost:${MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT}`);
 					const code = url.searchParams.get('code');
 
 					if (code) {
@@ -453,7 +463,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 					}
 				});
 
-				server.listen(3000);
+				server.listen(MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT);
 
 				server.on('error', (err: Error) => {
 					server.close();
@@ -469,12 +479,12 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				timeoutHandle = setTimeout(() => {
 					server.close();
 					rejectWithCleanup(new Error('Authentication timeout - no response received within 90 seconds. If you opened the wrong browser, click Cancel and try again.'));
-				}, 90000);
+				}, MsalAuthenticationService.INTERACTIVE_AUTH_TIMEOUT_MS);
 			});
 
 			const authCodeUrlParameters: msal.AuthorizationUrlRequest = {
 				scopes: scopes,
-				redirectUri: 'http://localhost:3000',
+				redirectUri: `http://localhost:${MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT}`,
 				prompt: 'select_account'
 			};
 
@@ -490,7 +500,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			const tokenRequest: msal.AuthorizationCodeRequest = {
 				code: code,
 				scopes: scopes,
-				redirectUri: 'http://localhost:3000'
+				redirectUri: `http://localhost:${MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT}`
 			};
 
 			const response = await clientApp.acquireTokenByCode(tokenRequest);

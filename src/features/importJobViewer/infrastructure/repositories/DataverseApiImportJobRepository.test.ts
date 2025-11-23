@@ -4,6 +4,7 @@ import { OperationCancelledException } from '../../../../shared/domain/errors/Op
 import { ValidationError } from '../../../../shared/domain/errors/ValidationError';
 import { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import { ImportJob, ImportJobStatus } from '../../domain/entities/ImportJob';
+import { assertDefined, createMockDataverseApiService, createMockLogger } from '../../../../shared/testing';
 
 import { DataverseApiImportJobRepository } from './DataverseApiImportJobRepository';
 
@@ -13,22 +14,8 @@ describe('DataverseApiImportJobRepository', () => {
 	let mockLogger: jest.Mocked<ILogger>;
 
 	beforeEach(() => {
-		mockApiService = {
-			get: jest.fn(),
-			post: jest.fn(),
-			patch: jest.fn(),
-			delete: jest.fn(),
-			batchDelete: jest.fn()
-		};
-
-		mockLogger = {
-			trace: jest.fn(),
-		debug: jest.fn(),
-			info: jest.fn(),
-			warn: jest.fn(),
-			error: jest.fn()
-		};
-
+		mockApiService = createMockDataverseApiService();
+		mockLogger = createMockLogger();
 		repository = new DataverseApiImportJobRepository(mockApiService, mockLogger);
 	});
 
@@ -62,14 +49,14 @@ describe('DataverseApiImportJobRepository', () => {
 				undefined
 			);
 			expect(result).toHaveLength(1);
-			expect(result[0]).toBeDefined();
+			assertDefined(result[0]);
 			expect(result[0]).toBeInstanceOf(ImportJob);
-			expect(result[0]!.id).toBe('job-1');
-			expect(result[0]!.name).toBe('Test Import');
-			expect(result[0]!.solutionName).toBe('TestSolution');
-			expect(result[0]!.progress).toBe(100);
-			expect(result[0]!.statusCode).toBe(ImportJobStatus.Completed);
-			expect(result[0]!.createdBy).toBe('Test User');
+			expect(result[0].id).toBe('job-1');
+			expect(result[0].name).toBe('Test Import');
+			expect(result[0].solutionName).toBe('TestSolution');
+			expect(result[0].progress).toBe(100);
+			expect(result[0].statusCode).toBe(ImportJobStatus.Completed);
+			expect(result[0].createdBy).toBe('Test User');
 		});
 
 		it('should handle null completedOn date and derive InProgress status', async () => {
@@ -95,9 +82,9 @@ describe('DataverseApiImportJobRepository', () => {
 
 			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0]).toBeDefined();
-			expect(result[0]!.completedOn).toBeNull();
-			expect(result[0]!.statusCode).toBe(ImportJobStatus.InProgress);
+			assertDefined(result[0]);
+			expect(result[0].completedOn).toBeNull();
+			expect(result[0].statusCode).toBe(ImportJobStatus.InProgress);
 		});
 
 		it('should handle missing job name with default value', async () => {
@@ -123,8 +110,8 @@ describe('DataverseApiImportJobRepository', () => {
 
 			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0]).toBeDefined();
-			expect(result[0]!.name).toBe('Unnamed Import');
+			assertDefined(result[0]);
+			expect(result[0].name).toBe('Unnamed Import');
 		});
 
 		it('should handle missing solution name with default value', async () => {
@@ -150,8 +137,8 @@ describe('DataverseApiImportJobRepository', () => {
 
 			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0]).toBeDefined();
-			expect(result[0]!.solutionName).toBe('Unknown Solution');
+			assertDefined(result[0]);
+			expect(result[0].solutionName).toBe('Unknown Solution');
 		});
 
 		it('should handle missing createdby fullname with default value', async () => {
@@ -174,8 +161,8 @@ describe('DataverseApiImportJobRepository', () => {
 
 			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0]).toBeDefined();
-			expect(result[0]!.createdBy).toBe('Unknown User');
+			assertDefined(result[0]);
+			expect(result[0].createdBy).toBe('Unknown User');
 		});
 
 		it('should derive status from completedOn and progress', async () => {
@@ -207,8 +194,8 @@ describe('DataverseApiImportJobRepository', () => {
 
 				const result = await repository.findAll('env-123', undefined, undefined);
 
-				expect(result[0]).toBeDefined();
-				expect(result[0]!.statusCode).toBe(testCase.expected);
+				assertDefined(result[0]);
+				expect(result[0].statusCode).toBe(testCase.expected);
 			}
 		});
 
@@ -245,10 +232,10 @@ describe('DataverseApiImportJobRepository', () => {
 			const result = await repository.findAll('env-123', undefined, undefined);
 
 			expect(result).toHaveLength(2);
-			expect(result[0]).toBeDefined();
-			expect(result[0]!.name).toBe('Import 1');
-			expect(result[1]).toBeDefined();
-			expect(result[1]!.name).toBe('Import 2');
+			assertDefined(result[0]);
+			expect(result[0].name).toBe('Import 1');
+			assertDefined(result[1]);
+			expect(result[1].name).toBe('Import 2');
 		});
 
 		it('should handle empty job list', async () => {

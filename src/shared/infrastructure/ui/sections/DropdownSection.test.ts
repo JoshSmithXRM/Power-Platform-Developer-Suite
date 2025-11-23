@@ -9,7 +9,7 @@ class TestDropdownSection extends DropdownSection {
 		dropdownId: string,
 		icon?: string,
 		private readonly items: ReadonlyArray<DropdownItem> = [],
-		private readonly buttonLabel: string = 'Test Dropdown',
+		private readonly buttonLabel = 'Test Dropdown',
 		private readonly currentSelectionId?: string,
 		private readonly variant: 'default' | 'primary' | 'danger' = 'default'
 	) {

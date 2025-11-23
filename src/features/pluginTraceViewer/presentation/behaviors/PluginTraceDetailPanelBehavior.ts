@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
-import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
+import type { IPanelStateRepository, PanelState } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import type { GetPluginTracesUseCase } from '../../application/useCases/GetPluginTracesUseCase';
 import type { BuildTimelineUseCase } from '../../application/useCases/BuildTimelineUseCase';
 import type { PluginTraceViewModelMapper } from '../mappers/PluginTraceViewModelMapper';
@@ -191,11 +191,10 @@ export class PluginTraceDetailPanelBehavior {
 					panelType: this.viewType,
 					environmentId
 				},
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
 				{
-					...(existingState || {}),
+					...(existingState ?? ({} as PanelState)),
 					detailPanelWidth: width
-				} as any // eslint-disable-line @typescript-eslint/no-explicit-any
+				}
 			);
 
 			this.detailPanelWidth = width;

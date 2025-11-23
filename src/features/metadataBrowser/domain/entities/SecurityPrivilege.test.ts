@@ -67,7 +67,7 @@ describe('SecurityPrivilege', () => {
                     canBeDeep: false,
                     canBeGlobal: false
                 })
-            ).toThrow('Privilege ID cannot be empty');
+            ).toThrow('Invalid SecurityPrivilege: privilegeId cannot be empty');
         });
 
         it('should throw error when privilegeId is whitespace only', () => {
@@ -81,7 +81,7 @@ describe('SecurityPrivilege', () => {
                     canBeDeep: false,
                     canBeGlobal: false
                 })
-            ).toThrow('Privilege ID cannot be empty');
+            ).toThrow('Invalid SecurityPrivilege: privilegeId cannot be empty');
         });
 
         it('should throw error when name is empty string', () => {
@@ -95,7 +95,7 @@ describe('SecurityPrivilege', () => {
                     canBeDeep: false,
                     canBeGlobal: false
                 })
-            ).toThrow('Privilege name cannot be empty');
+            ).toThrow('Invalid SecurityPrivilege: name cannot be empty');
         });
 
         it('should throw error when name is whitespace only', () => {
@@ -109,7 +109,7 @@ describe('SecurityPrivilege', () => {
                     canBeDeep: false,
                     canBeGlobal: false
                 })
-            ).toThrow('Privilege name cannot be empty');
+            ).toThrow('Invalid SecurityPrivilege: name cannot be empty');
         });
     });
 

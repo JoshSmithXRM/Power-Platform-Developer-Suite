@@ -1,8 +1,8 @@
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
-import { Solution } from '../../domain/entities/Solution';
 import { ISolutionRepository } from '../../domain/interfaces/ISolutionRepository';
+import { createTestSolution } from '../../../../shared/testing/factories/SolutionFactory';
 
 import { ListSolutionsUseCase } from './ListSolutionsUseCase';
 
@@ -28,43 +28,11 @@ describe('ListSolutionsUseCase', () => {
 		useCase = new ListSolutionsUseCase(mockRepository, mockLogger);
 	});
 
-	function createSolution(overrides?: Partial<{
-		id: string;
-		uniqueName: string;
-		friendlyName: string;
-		version: string;
-		isManaged: boolean;
-		publisherId: string;
-		publisherName: string;
-		installedOn: Date | null;
-		description: string;
-		modifiedOn: Date;
-		isVisible: boolean;
-		isApiManaged: boolean;
-		solutionType: string | null;
-	}>): Solution {
-		return new Solution(
-			overrides?.id ?? 'solution-1',
-			overrides?.uniqueName ?? 'TestSolution',
-			overrides?.friendlyName ?? 'Test Solution',
-			overrides?.version ?? '1.0.0.0',
-			overrides?.isManaged ?? false,
-			overrides?.publisherId ?? 'pub-1',
-			overrides?.publisherName ?? 'Test Publisher',
-			overrides?.installedOn ?? null,
-			overrides?.description ?? 'Test description',
-			overrides?.modifiedOn ?? new Date('2024-01-15T10:00:00Z'),
-			overrides?.isVisible ?? true,
-			overrides?.isApiManaged ?? false,
-			overrides?.solutionType ?? null
-		);
-	}
-
 	describe('execute', () => {
 		it('should fetch and return solutions from repository', async () => {
 			const solutions = [
-				createSolution({ uniqueName: 'Solution1', friendlyName: 'Solution A' }),
-				createSolution({ uniqueName: 'Solution2', friendlyName: 'Solution B' })
+				createTestSolution({ uniqueName: 'Solution1', friendlyName: 'Solution A' }),
+				createTestSolution({ uniqueName: 'Solution2', friendlyName: 'Solution B' })
 			];
 
 			mockRepository.findAll.mockResolvedValue(solutions);
@@ -79,28 +47,25 @@ describe('ListSolutionsUseCase', () => {
 
 		it('should return solutions in the order provided by repository', async () => {
 			const solutions = [
-				createSolution({ uniqueName: 'Zebra', friendlyName: 'Zebra Solution' }),
-				createSolution({ uniqueName: 'Default', friendlyName: 'Default' }),
-				createSolution({ uniqueName: 'Alpha', friendlyName: 'Alpha Solution' })
+				createTestSolution({ uniqueName: 'Zebra', friendlyName: 'Zebra Solution' }),
+				createTestSolution({ uniqueName: 'Default', friendlyName: 'Default' }),
+				createTestSolution({ uniqueName: 'Alpha', friendlyName: 'Alpha Solution' })
 			];
 
 			mockRepository.findAll.mockResolvedValue(solutions);
 
 			const result = await useCase.execute('env-123', undefined);
 
-			expect(result[0]).toBeDefined();
 			expect(result[0]!.uniqueName).toBe('Zebra');
-			expect(result[1]).toBeDefined();
 			expect(result[1]!.uniqueName).toBe('Default');
-			expect(result[2]).toBeDefined();
 			expect(result[2]!.uniqueName).toBe('Alpha');
 			expect(result.length).toBe(3);
 		});
 
 		it('should not mutate the original array from repository', async () => {
 			const solutions = [
-				createSolution({ uniqueName: 'Zebra', friendlyName: 'Zebra' }),
-				createSolution({ uniqueName: 'Alpha', friendlyName: 'Alpha' })
+				createTestSolution({ uniqueName: 'Zebra', friendlyName: 'Zebra' }),
+				createTestSolution({ uniqueName: 'Alpha', friendlyName: 'Alpha' })
 			];
 
 			mockRepository.findAll.mockResolvedValue(solutions);

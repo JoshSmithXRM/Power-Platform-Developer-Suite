@@ -11,6 +11,23 @@ import { FlowConnectionRelationship } from '../valueObjects/FlowConnectionRelati
  * 3. orphaned-cr: Connection reference exists but no flow uses it
  */
 export class FlowConnectionRelationshipBuilder {
+	/**
+	 * Builds relationships between flows and connection references.
+	 *
+	 * Analyzes flow dependencies and connection reference availability to create
+	 * a complete picture of flow-connection relationships. Identifies orphaned
+	 * flows (missing CRs) and orphaned CRs (unused by flows).
+	 *
+	 * Business Logic:
+	 * - Matches flows to CRs by logical name (case-insensitive)
+	 * - Creates flow-to-cr relationships for valid matches
+	 * - Creates orphaned-flow relationships for missing CRs
+	 * - Creates orphaned-cr relationships for unused CRs
+	 *
+	 * @param flows - Array of cloud flows to analyze
+	 * @param connectionRefs - Array of available connection references
+	 * @returns Array of all relationships (valid, orphaned flows, orphaned CRs)
+	 */
 	buildRelationships(
 		flows: CloudFlow[],
 		connectionRefs: ConnectionReference[]

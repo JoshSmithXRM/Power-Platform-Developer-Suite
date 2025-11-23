@@ -213,7 +213,7 @@ describe('StorageType', () => {
 	});
 
 	describe('Type discrimination methods', () => {
-		it('isGlobal() should return true only for global storage type', () => {
+		it('should isGlobal() should return true only for global storage type', () => {
 			// Arrange
 			const globalType = StorageType.createGlobal();
 			const workspaceType = StorageType.createWorkspace();
@@ -225,7 +225,7 @@ describe('StorageType', () => {
 			expect(secretType.isGlobal()).toBe(false);
 		});
 
-		it('isWorkspace() should return true only for workspace storage type', () => {
+		it('should isWorkspace() should return true only for workspace storage type', () => {
 			// Arrange
 			const globalType = StorageType.createGlobal();
 			const workspaceType = StorageType.createWorkspace();
@@ -237,7 +237,7 @@ describe('StorageType', () => {
 			expect(secretType.isWorkspace()).toBe(false);
 		});
 
-		it('isSecret() should return true only for secret storage type', () => {
+		it('should isSecret() should return true only for secret storage type', () => {
 			// Arrange
 			const globalType = StorageType.createGlobal();
 			const workspaceType = StorageType.createWorkspace();
@@ -271,7 +271,7 @@ describe('StorageType', () => {
 	});
 
 	describe('Value object consistency', () => {
-		it('create() with constant should produce same type as dedicated factory', () => {
+		it('should create() with constant should produce same type as dedicated factory', () => {
 			// Arrange & Act
 			const globalViaCreate = StorageType.create(StorageType.GLOBAL);
 			const globalViaDedicatedFactory = StorageType.createGlobal();
@@ -281,7 +281,7 @@ describe('StorageType', () => {
 			expect(globalViaCreate.isGlobal()).toBe(globalViaDedicatedFactory.isGlobal());
 		});
 
-		it('all factory methods should create valid instances', () => {
+		it('should all factory methods should create valid instances', () => {
 			// Arrange & Act
 			const globalType = StorageType.createGlobal();
 			const workspaceType = StorageType.createWorkspace();
@@ -333,7 +333,7 @@ describe('StorageType', () => {
 			expect(globalType1.value).toBe(globalType2.value); // Same value
 		});
 
-		it('should work correctly with spread operator and array operations', () => {
+		it('should maintain type identity when used with spread operator and array operations', () => {
 			// Arrange & Act
 			const allTypes: StorageType[] = [
 				StorageType.createGlobal(),

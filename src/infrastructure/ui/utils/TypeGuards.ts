@@ -168,8 +168,21 @@ export interface DeleteEnvironmentMessage {
 	data?: never;
 }
 
+/**
+ * Type guard for DeleteEnvironmentMessage with command validation.
+ *
+ * Validates message structure for deleting a Power Platform environment.
+ * This is a simple message with no required data payload.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches DeleteEnvironmentMessage structure
+ */
 export function isDeleteEnvironmentMessage(message: unknown): message is DeleteEnvironmentMessage {
-	return isWebviewMessage(message) && message.command === 'delete-environment';
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	return message.command === 'delete-environment';
 }
 
 /**
@@ -246,6 +259,15 @@ export interface CheckUniqueNameMessage {
 	};
 }
 
+/**
+ * Type guard for CheckUniqueNameMessage with multi-property validation.
+ *
+ * Validates message structure for checking if an environment name is unique.
+ * Optional currentId allows validation during editing (excludes current entry from uniqueness check).
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches CheckUniqueNameMessage structure
+ */
 export function isCheckUniqueNameMessage(message: unknown): message is CheckUniqueNameMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -257,12 +279,16 @@ export function isCheckUniqueNameMessage(message: unknown): message is CheckUniq
 
 	const data = message.data;
 
-	return (
-		typeof data === 'object' &&
-		data !== null &&
+	if (typeof data !== 'object' || data === null) {
+		return false;
+	}
+
+	// Validate required property exists and has correct type before asserting
+	const hasValidName =
 		'name' in data &&
-		typeof data.name === 'string'
-	);
+		typeof (data as { name: unknown }).name === 'string';
+
+	return hasValidName;
 }
 
 export type WebviewLogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -323,8 +349,21 @@ export interface RefreshDataMessage {
 	command: 'refresh';
 }
 
+/**
+ * Type guard for RefreshDataMessage with command validation.
+ *
+ * Validates message structure for refreshing UI data in the webview.
+ * This is a simple message with no required data payload.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches RefreshDataMessage structure
+ */
 export function isRefreshDataMessage(message: unknown): message is RefreshDataMessage {
-	return isWebviewMessage(message) && message.command === 'refresh';
+	if (!isWebviewMessage(message)) {
+		return false;
+	}
+
+	return message.command === 'refresh';
 }
 
 export interface EnvironmentChangedMessage {
@@ -334,6 +373,15 @@ export interface EnvironmentChangedMessage {
 	};
 }
 
+/**
+ * Type guard for EnvironmentChangedMessage with multi-property validation.
+ *
+ * Validates message structure when Power Platform environment changes externally.
+ * Used to sync webview state with extension changes to active environment.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches EnvironmentChangedMessage structure
+ */
 export function isEnvironmentChangedMessage(message: unknown): message is EnvironmentChangedMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -345,12 +393,16 @@ export function isEnvironmentChangedMessage(message: unknown): message is Enviro
 
 	const data = message.data;
 
-	return (
-		typeof data === 'object' &&
-		data !== null &&
+	if (typeof data !== 'object' || data === null) {
+		return false;
+	}
+
+	// Validate property exists and has correct type before asserting
+	const hasValidEnvironmentId =
 		'environmentId' in data &&
-		typeof (data as { environmentId: string }).environmentId === 'string'
-	);
+		typeof (data as { environmentId: unknown }).environmentId === 'string';
+
+	return hasValidEnvironmentId;
 }
 
 export interface EnvironmentChangeMessage {
@@ -360,6 +412,15 @@ export interface EnvironmentChangeMessage {
 	};
 }
 
+/**
+ * Type guard for EnvironmentChangeMessage with multi-property validation.
+ *
+ * Validates message structure when user initiates environment change in webview.
+ * Signals selection of a different Power Platform environment context.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches EnvironmentChangeMessage structure
+ */
 export function isEnvironmentChangeMessage(message: unknown): message is EnvironmentChangeMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -371,12 +432,16 @@ export function isEnvironmentChangeMessage(message: unknown): message is Environ
 
 	const data = message.data;
 
-	return (
-		typeof data === 'object' &&
-		data !== null &&
+	if (typeof data !== 'object' || data === null) {
+		return false;
+	}
+
+	// Validate property exists and has correct type before asserting
+	const hasValidEnvironmentId =
 		'environmentId' in data &&
-		typeof (data as { environmentId: string }).environmentId === 'string'
-	);
+		typeof (data as { environmentId: unknown }).environmentId === 'string';
+
+	return hasValidEnvironmentId;
 }
 
 export interface RevealSecretMessage {
@@ -384,6 +449,15 @@ export interface RevealSecretMessage {
 	key: string;
 }
 
+/**
+ * Type guard for RevealSecretMessage with multi-property validation.
+ *
+ * Validates message structure for revealing masked secret values in webview.
+ * Used to display sensitive configuration values (passwords, API keys) on demand.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches RevealSecretMessage structure
+ */
 export function isRevealSecretMessage(message: unknown): message is RevealSecretMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -393,7 +467,12 @@ export function isRevealSecretMessage(message: unknown): message is RevealSecret
 		return false;
 	}
 
-	return 'key' in message && typeof (message as { key: string }).key === 'string';
+	// Validate property exists and has correct type before asserting
+	const hasValidKey =
+		'key' in message &&
+		typeof (message as { key: unknown }).key === 'string';
+
+	return hasValidKey;
 }
 
 export interface ClearEntryMessage {
@@ -401,6 +480,15 @@ export interface ClearEntryMessage {
 	key: string;
 }
 
+/**
+ * Type guard for ClearEntryMessage with multi-property validation.
+ *
+ * Validates message structure for clearing an entire entry from deployment settings.
+ * Removes the entry and all its properties from storage.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches ClearEntryMessage structure
+ */
 export function isClearEntryMessage(message: unknown): message is ClearEntryMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -410,7 +498,12 @@ export function isClearEntryMessage(message: unknown): message is ClearEntryMess
 		return false;
 	}
 
-	return 'key' in message && typeof (message as { key: string }).key === 'string';
+	// Validate property exists and has correct type before asserting
+	const hasValidKey =
+		'key' in message &&
+		typeof (message as { key: unknown }).key === 'string';
+
+	return hasValidKey;
 }
 
 export interface ClearPropertyMessage {
@@ -457,6 +550,15 @@ export interface ViewImportJobMessage {
 	};
 }
 
+/**
+ * Type guard for ViewImportJobMessage with multi-property validation.
+ *
+ * Validates message structure for viewing import job details in Dataverse.
+ * Opens import job record in Power Apps maker portal to view import logs and results.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches ViewImportJobMessage structure
+ */
 export function isViewImportJobMessage(message: unknown): message is ViewImportJobMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -468,12 +570,16 @@ export function isViewImportJobMessage(message: unknown): message is ViewImportJ
 
 	const data = message.data;
 
-	return (
-		typeof data === 'object' &&
-		data !== null &&
+	if (typeof data !== 'object' || data === null) {
+		return false;
+	}
+
+	// Validate property exists and has correct type before asserting
+	const hasValidImportJobId =
 		'importJobId' in data &&
-		typeof (data as { importJobId: string }).importJobId === 'string'
-	);
+		typeof (data as { importJobId: unknown }).importJobId === 'string';
+
+	return hasValidImportJobId;
 }
 
 export interface OpenInMakerMessage {
@@ -483,6 +589,15 @@ export interface OpenInMakerMessage {
 	};
 }
 
+/**
+ * Type guard for OpenInMakerMessage with multi-property validation.
+ *
+ * Validates message structure for opening a solution in Power Apps maker portal.
+ * Navigates to solution editor to view or modify solution components.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches OpenInMakerMessage structure
+ */
 export function isOpenInMakerMessage(message: unknown): message is OpenInMakerMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -494,12 +609,16 @@ export function isOpenInMakerMessage(message: unknown): message is OpenInMakerMe
 
 	const data = message.data;
 
-	return (
-		typeof data === 'object' &&
-		data !== null &&
+	if (typeof data !== 'object' || data === null) {
+		return false;
+	}
+
+	// Validate property exists and has correct type before asserting
+	const hasValidSolutionId =
 		'solutionId' in data &&
-		typeof (data as { solutionId: string }).solutionId === 'string'
-	);
+		typeof (data as { solutionId: unknown }).solutionId === 'string';
+
+	return hasValidSolutionId;
 }
 
 export interface OpenFlowMessage {
@@ -509,6 +628,15 @@ export interface OpenFlowMessage {
 	};
 }
 
+/**
+ * Type guard for OpenFlowMessage with multi-property validation.
+ *
+ * Validates message structure for opening a cloud flow in Power Automate.
+ * Displays flow details and execution history in Power Automate maker portal.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches OpenFlowMessage structure
+ */
 export function isOpenFlowMessage(message: unknown): message is OpenFlowMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -520,12 +648,16 @@ export function isOpenFlowMessage(message: unknown): message is OpenFlowMessage 
 
 	const data = message.data;
 
-	return (
-		typeof data === 'object' &&
-		data !== null &&
+	if (typeof data !== 'object' || data === null) {
+		return false;
+	}
+
+	// Validate property exists and has correct type before asserting
+	const hasValidFlowId =
 		'flowId' in data &&
-		typeof (data as { flowId: string }).flowId === 'string'
-	);
+		typeof (data as { flowId: unknown }).flowId === 'string';
+
+	return hasValidFlowId;
 }
 
 export interface SolutionChangedMessage {
@@ -535,6 +667,15 @@ export interface SolutionChangedMessage {
 	};
 }
 
+/**
+ * Type guard for SolutionChangedMessage with multi-property validation.
+ *
+ * Validates message structure when a Power Platform solution changes externally.
+ * Used to sync webview state with extension changes to active solution context.
+ *
+ * @param message - Unknown message from webview to validate
+ * @returns True if message matches SolutionChangedMessage structure
+ */
 export function isSolutionChangedMessage(message: unknown): message is SolutionChangedMessage {
 	if (!isWebviewMessage(message)) {
 		return false;
@@ -546,10 +687,14 @@ export function isSolutionChangedMessage(message: unknown): message is SolutionC
 
 	const data = message.data;
 
-	return (
-		typeof data === 'object' &&
-		data !== null &&
+	if (typeof data !== 'object' || data === null) {
+		return false;
+	}
+
+	// Validate property exists and has correct type before asserting
+	const hasValidSolutionId =
 		'solutionId' in data &&
-		typeof (data as { solutionId: string }).solutionId === 'string'
-	);
+		typeof (data as { solutionId: unknown }).solutionId === 'string';
+
+	return hasValidSolutionId;
 }

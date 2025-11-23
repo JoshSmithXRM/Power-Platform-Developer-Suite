@@ -145,25 +145,25 @@ describe('LoadEntityMetadataUseCase', () => {
 
         entityTreeItemMapper = {
             toViewModel: jest.fn()
-        } as unknown as jest.Mocked<EntityTreeItemMapper>;
+        } as jest.Mocked<EntityTreeItemMapper>;
 
         attributeRowMapper = {
             toViewModel: jest.fn()
-        } as unknown as jest.Mocked<AttributeRowMapper>;
+        } as jest.Mocked<AttributeRowMapper>;
 
         keyRowMapper = {
             toViewModel: jest.fn()
-        } as unknown as jest.Mocked<KeyRowMapper>;
+        } as jest.Mocked<KeyRowMapper>;
 
         relationshipRowMapper = {
             toOneToManyViewModel: jest.fn(),
             toManyToOneViewModel: jest.fn(),
             toManyToManyViewModel: jest.fn()
-        } as unknown as jest.Mocked<RelationshipRowMapper>;
+        } as jest.Mocked<RelationshipRowMapper>;
 
         privilegeRowMapper = {
             toViewModel: jest.fn()
-        } as unknown as jest.Mocked<PrivilegeRowMapper>;
+        } as jest.Mocked<PrivilegeRowMapper>;
 
         logger = new NullLogger();
         jest.spyOn(logger, 'debug');

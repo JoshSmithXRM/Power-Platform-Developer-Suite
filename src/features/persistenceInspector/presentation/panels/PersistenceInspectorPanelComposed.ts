@@ -169,6 +169,7 @@ export class PersistenceInspectorPanelComposed {
 
 	private async initializePanel(): Promise<void> {
 		await this.scaffoldingBehavior.refresh({});
+		await this.handleRefresh();
 	}
 
 	private createCoordinator(): {
@@ -492,6 +493,8 @@ export class PersistenceInspectorPanelComposed {
 			PersistenceInspectorPanelComposed.currentPanel = undefined;
 		}
 
-		this.panel.dispose();
+		// Don't call this.panel.dispose() here to avoid circular disposal loop
+		// The panel disposal is triggered externally, and this method is called
+		// by the onDidDispose handler registered in the constructor
 	}
 }

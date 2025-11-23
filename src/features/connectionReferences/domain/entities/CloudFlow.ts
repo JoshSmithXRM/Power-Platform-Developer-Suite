@@ -32,6 +32,12 @@ export class CloudFlow {
 		}
 	}
 
+	/**
+	 * Type guard to check if clientData is loaded.
+	 * Narrows the type to ensure clientData is a non-null string.
+	 *
+	 * @returns True if clientData is present and non-empty
+	 */
 	hasClientData(): this is CloudFlow & { clientData: string } {
 		return this.clientData !== null && this.clientData.length > 0;
 	}
@@ -90,6 +96,12 @@ export class CloudFlow {
 		);
 	}
 
+	/**
+	 * Determines if this flow has any connection references.
+	 * Convenience method that checks if extracted connection reference names are present.
+	 *
+	 * @returns True if flow uses at least one connection reference
+	 */
 	hasConnectionReferences(): boolean {
 		return this.extractConnectionReferenceNames().length > 0;
 	}

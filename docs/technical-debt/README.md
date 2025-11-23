@@ -1,7 +1,7 @@
 # Technical Debt Inventory
 
-**Last Updated:** 2025-11-22
-**Total Items:** 7
+**Last Updated:** 2025-11-23
+**Total Items:** 4 (6 items resolved/reclassified today)
 
 ---
 
@@ -9,10 +9,10 @@
 
 | Category | Count | Action Timeline |
 |----------|-------|-----------------|
-| **Accepted Tradeoffs** | 3 | Keep indefinitely (conscious decisions) |
+| **Accepted Tradeoffs** | 4 | Keep indefinitely (conscious decisions) |
 | **Will Not Implement** | 1 | Rejected (over-engineering) |
-| **Scheduled** | 2 | Fix in next 1-2 sprints |
-| **Low Priority** | 1 | Fix when naturally touching code |
+| **Scheduled** | 0 | Fix in next 1-2 sprints (all items resolved) |
+| **Low Priority** | 0 | Fix when naturally touching code |
 
 ---
 
@@ -26,20 +26,26 @@ For **code quality debt** (dead code, unused dependencies, circular dependencies
 
 ---
 
-## ✅ Accepted Tradeoffs (3 items)
+## ✅ Accepted Tradeoffs (4 items)
 
-These are **conscious decisions to keep** based on cost/benefit analysis. Zero bugs found, high refactoring cost not justified.
+These are **conscious decisions to keep** based on cost/benefit analysis.
 
-| Item | Effort to Fix | Bugs Found | Decision |
-|------|---------------|------------|----------|
-| [getValue() Pattern](accepted-tradeoffs/getValue-pattern.md) | 6-8 hours | 0 | Not justified |
-| [Large Panel Files](accepted-tradeoffs/large-panel-files.md) | N/A | 0 | Coordinator pattern |
-| [Unsafe Type Assertions](accepted-tradeoffs/unsafe-type-assertions.md) | 8-12 hours | 0 | Repositories validate |
+| Item | Type | Bugs Found | Decision |
+|------|------|------------|----------|
+| [getValue() Pattern](accepted-tradeoffs/getValue-pattern.md) | Tradeoff (effort vs benefit) | 0 | Not justified |
+| [Large Panel Files](accepted-tradeoffs/large-panel-files.md) | Tradeoff (coordinator pattern) | 0 | Acceptable |
+| [Unsafe Type Assertions](accepted-tradeoffs/unsafe-type-assertions.md) | Tradeoff (repositories validate) | 0 | Safe |
+| [ESLint Suppressions](accepted-tradeoffs/eslint-suppressions.md) | Documentation (29 suppressions, 12 removed) | 0 | All justified |
+
+### Reclassified as Architectural Patterns (No Longer Debt)
+- **Static Factory Methods** → See [docs/architecture/STATIC_FACTORY_PATTERN.md](../architecture/STATIC_FACTORY_PATTERN.md)
+- **OData Query Building** → See [docs/architecture/ODATA_DOMAIN_PATTERN.md](../architecture/ODATA_DOMAIN_PATTERN.md)
 
 ### When to Revisit
 - **getValue():** Only if multiple bugs found due to ID mixing
 - **Large Panels:** Only if panel exceeds 1,000 lines or contains business logic
 - **Type Assertions:** Only if API contract violations cause runtime errors
+- **ESLint Suppressions:** Quarterly review (ensure all still justified)
 
 ---
 
@@ -55,43 +61,38 @@ Correctly rejected suggestions that would add ceremony without benefit.
 
 ---
 
-## 📅 Scheduled (2 items)
+## 📅 Scheduled (0 items)
 
 Items with clear triggers or timelines for fixing.
 
-| Item | Priority | Timeline | Trigger |
-|------|----------|----------|---------|
-| [Clean Architecture Guide Length](scheduled/clean-architecture-guide-length.md) | **Medium** | Next doc sprint | Already 1,708 lines (42% over limit) |
-| [DateTime Filter Mixed Concerns](scheduled/datetime-filter-mixed-concerns.md) | Medium | When touching code | Next filter feature or refactor |
+**All scheduled items resolved:**
 
-### Details
+✅ **Clean Architecture Guide Split** (completed 2025-11-23)
+- Split into 3 focused documents:
+  - `CLEAN_ARCHITECTURE_GUIDE.md` - 495 lines (Core principles)
+  - `CLEAN_ARCHITECTURE_EXAMPLES.md` - 695 lines (Production examples)
+  - `CLEAN_ARCHITECTURE_PATTERNS.md` - 773 lines (Mistakes & anti-patterns)
+- Total: 1,963 lines (well-organized, each <800 lines)
 
-**Clean Architecture Guide:**
-- **Status:** 1,708 lines (approaching 2,000 threshold)
-- **Growth:** +21% in one cycle (was 1,403 lines)
-- **Action:** Split into 3 documents (~500-600 lines each)
-- **Effort:** 2-3 hours
-
-**DateTime Filter:**
-- **Status:** Format conversion methods in domain layer
-- **Impact:** Low (works correctly, well-tested)
-- **Action:** Extract helpers to application/infrastructure layers
-- **Effort:** 2-3 hours
+✅ **DateTimeFilter Mixed Concerns** (resolved 2025-11-23)
+- Extracted presentation helpers to `src/shared/presentation/utils/DateTimeFormatters.ts`
+- Extracted domain helpers to `src/features/pluginTraceViewer/domain/utils/ODataFormatters.ts`
+- DateTimeFilter now pure domain value object (UTC ISO only)
+- Updated 3 callsites and comprehensive test suite
+- Clean layer separation achieved
 
 ---
 
-## 🔵 Low Priority (1 item)
+## 🔵 Low Priority (0 items)
 
 Fix when it becomes a problem or when naturally touching the code.
 
-| Item | Fix When | Effort |
-|------|----------|--------|
-| [Cross-Feature DTO Coupling](low-priority/cross-feature-dto-coupling.md) | 3rd feature needs environment data | 15-20 min |
+**All low priority items resolved:**
 
-**Details:**
-- **Current:** Persistence Inspector imports EnvironmentConnectionDto from environmentSetup
-- **Why acceptable:** Infrastructure → infrastructure coupling allowed in Clean Architecture
-- **When to fix:** Wait for 3rd feature (don't abstract until you need it twice)
+✅ **Cross-Feature DTO Coupling** (resolved 2025-11-23)
+- Created `src/shared/application/dtos/EnvironmentConnectionDto.ts`
+- Updated 4 import statements across codebase
+- Features now independent, no cross-feature coupling
 
 ---
 
@@ -100,22 +101,24 @@ Fix when it becomes a problem or when naturally touching the code.
 ### Debt by Category (Visual)
 
 ```
-Accepted Tradeoffs: ███ 3 items (43%)
-Will Not Implement: █   1 item  (14%)
-Scheduled:          ██  2 items (29%)
-Low Priority:       █   1 item  (14%)
+Accepted Tradeoffs: ████   4 items (100%)
+Will Not Implement: -      0 items (0%)
+Scheduled:          -      0 items (0%)
+Low Priority:       -      0 items (0%)
 ```
 
 ### Decision Quality
 
 | Metric | Value | Assessment |
 |--------|-------|------------|
-| **Items with zero bugs** | 6/7 (86%) | ✅ Excellent - decisions validated by reality |
+| **Items with zero bugs** | 4/4 (100%) | ✅ Excellent - all decisions validated |
+| **Patterns promoted to architecture docs** | 2 items | ✅ Industry standards (static factories, OData) |
 | **Rejected over-engineering** | 1 item | ✅ Good judgment (avoided cargo cult patterns) |
-| **Scheduled with clear triggers** | 2 items | ✅ Actionable (not vague "someday" items) |
-| **Low-priority deferred** | 1 item | ✅ Pragmatic (YAGNI principle applied) |
+| **Items resolved in last review** | 4 items | ✅ Proactive (DateTimeFilter, split guide, shared DTO, ESLint rule) |
+| **Documentation quality** | 29/29 suppressions documented | ✅ Perfect (100% documented) |
+| **ESLint rule quality** | Prefix matching (future-proof) | ✅ Improved (12 suppressions eliminated) |
 
-**Overall Health:** 🟢 Excellent
+**Overall Health:** 🟢 Excellent (6 items resolved/reclassified today)
 
 ---
 
@@ -157,17 +160,26 @@ docs/technical-debt/
 ├── accepted-tradeoffs/                          # Indefinite (keep)
 │   ├── getValue-pattern.md
 │   ├── large-panel-files.md
-│   └── unsafe-type-assertions.md
+│   ├── unsafe-type-assertions.md
+│   └── eslint-suppressions.md                  # 29 suppressions (12 removed 2025-11-23)
 │
 ├── will-not-implement/                          # Rejected suggestions
 │   └── xml-formatter-interface.md
 │
 ├── scheduled/                                   # Has timeline
-│   ├── clean-architecture-guide-length.md
-│   └── datetime-filter-mixed-concerns.md
+│   └── (empty - all items resolved)
 │
 └── low-priority/                                # Opportunistic fix
-    └── cross-feature-dto-coupling.md
+    └── (empty - all items resolved)
+
+Reclassified as architectural patterns (moved to docs/architecture/):
+- static-factory-methods.md → STATIC_FACTORY_PATTERN.md
+- odata-query-building.md → ODATA_DOMAIN_PATTERN.md
+
+Resolved:
+- clean-architecture-guide-length.md → Split completed
+- cross-feature-dto-coupling.md → Shared DTO created
+- datetime-filter-mixed-concerns.md → Extracted to presentation/domain helpers
 ```
 
 ---

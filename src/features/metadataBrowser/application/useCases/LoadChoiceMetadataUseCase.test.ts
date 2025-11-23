@@ -43,11 +43,11 @@ describe('LoadChoiceMetadataUseCase', () => {
 
         choiceTreeItemMapper = {
             toViewModel: jest.fn()
-        } as unknown as jest.Mocked<ChoiceTreeItemMapper>;
+        } as jest.Mocked<ChoiceTreeItemMapper>;
 
         choiceValueRowMapper = {
             toViewModel: jest.fn()
-        } as unknown as jest.Mocked<ChoiceValueRowMapper>;
+        } as jest.Mocked<ChoiceValueRowMapper>;
 
         logger = new NullLogger();
         jest.spyOn(logger, 'debug');

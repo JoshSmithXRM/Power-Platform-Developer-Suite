@@ -144,7 +144,7 @@ describe('OpenImportLogUseCase', () => {
 
 			// Act & Assert
 			await expect(useCase.execute(environmentId, importJobId))
-				.rejects.toThrow('Import job has no log data available');
+				.rejects.toThrow('Cannot open import log: no log data available for this import job');
 
 			expect(mockEditorService.openXmlInNewTab).not.toHaveBeenCalled();
 			expect(mockLogger.warn).toHaveBeenCalledWith('Import job has no log data', { importJobId });
@@ -161,7 +161,7 @@ describe('OpenImportLogUseCase', () => {
 
 			// Act & Assert
 			await expect(useCase.execute(environmentId, importJobId))
-				.rejects.toThrow('Import job has no log data available');
+				.rejects.toThrow('Cannot open import log: no log data available for this import job');
 
 			expect(mockEditorService.openXmlInNewTab).not.toHaveBeenCalled();
 			expect(mockLogger.warn).toHaveBeenCalledWith('Import job has no log data', { importJobId });

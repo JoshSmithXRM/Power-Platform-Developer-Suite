@@ -67,7 +67,10 @@ export class PluginTrace {
 	) {}
 
 	/**
+	 * Determines if the trace recorded an exception.
 	 * A trace with empty or null exceptionDetails is successful.
+	 *
+	 * @returns True if exception details are present and non-empty
 	 */
 	hasException(): boolean {
 		return (
@@ -76,10 +79,20 @@ export class PluginTrace {
 		);
 	}
 
+	/**
+	 * Determines if the trace completed successfully without exceptions.
+	 *
+	 * @returns True if no exception occurred during execution
+	 */
 	isSuccessful(): boolean {
 		return !this.hasException();
 	}
 
+	/**
+	 * Gets the execution status of the trace.
+	 *
+	 * @returns TraceStatus.Exception if exception occurred, TraceStatus.Success otherwise
+	 */
 	getStatus(): TraceStatus {
 		return this.hasException()
 			? TraceStatus.Exception
@@ -87,7 +100,12 @@ export class PluginTrace {
 	}
 
 	/**
-	 * Related traces share the same correlationId.
+	 * Determines if this trace is related to another trace.
+	 * Related traces share the same correlationId and are part of the same
+	 * logical transaction or workflow in Dataverse.
+	 *
+	 * @param other - Trace to compare with
+	 * @returns True if both traces share the same correlation ID
 	 */
 	isRelatedTo(other: PluginTrace): boolean {
 		if (this.correlationId === null || other.correlationId === null) {
@@ -97,20 +115,38 @@ export class PluginTrace {
 	}
 
 	/**
-	 * Depth > 1 indicates plugin was called from another plugin.
+	 * Determines if this plugin was called from within another plugin.
+	 * Depth > 1 indicates plugin was called from another plugin (nested execution).
+	 *
+	 * @returns True if depth is greater than 1
 	 */
 	isNested(): boolean {
 		return this.depth > 1;
 	}
 
+	/**
+	 * Determines if the plugin executed synchronously.
+	 *
+	 * @returns True if execution mode is synchronous
+	 */
 	isSynchronous(): boolean {
 		return this.mode.equals(ExecutionMode.Synchronous);
 	}
 
+	/**
+	 * Determines if the plugin executed asynchronously.
+	 *
+	 * @returns True if execution mode is asynchronous
+	 */
 	isAsynchronous(): boolean {
 		return this.mode.equals(ExecutionMode.Asynchronous);
 	}
 
+	/**
+	 * Determines if the trace has a correlation ID.
+	 *
+	 * @returns True if correlation ID is present and non-empty
+	 */
 	hasCorrelationId(): boolean {
 		return this.correlationId !== null && !this.correlationId.isEmpty();
 	}

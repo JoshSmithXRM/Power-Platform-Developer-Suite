@@ -1,6 +1,5 @@
 import type { IDataverseApiService } from './../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import type { ILogger } from './../../../../infrastructure/logging/ILogger';
-import { NullLogger } from './../../../../infrastructure/logging/NullLogger';
 import { DataverseEntityMetadataRepository } from './DataverseEntityMetadataRepository';
 import { OptionSetMetadataMapper } from './../mappers/OptionSetMetadataMapper';
 import { EntityKeyMapper } from './../mappers/EntityKeyMapper';
@@ -9,7 +8,7 @@ import { RelationshipMetadataMapper } from './../mappers/RelationshipMetadataMap
 import { AttributeMetadataMapper } from './../mappers/AttributeMetadataMapper';
 import { EntityMetadataMapper } from './../mappers/EntityMetadataMapper';
 import { LogicalName } from './../../domain/valueObjects/LogicalName';
-import { assertDefined } from './../../../../shared/testing/assertions/assertDefined';
+import { assertDefined, createMockDataverseApiService, createNullLogger } from '../../../../shared/testing';
 
 /**
  * Tests for option set enrichment in DataverseEntityMetadataRepository.
@@ -26,10 +25,8 @@ describe('DataverseEntityMetadataRepository - Option Set Enrichment', () => {
     let repository: DataverseEntityMetadataRepository;
 
     beforeEach(() => {
-        mockApiService = {
-            get: jest.fn()
-        } as unknown as jest.Mocked<IDataverseApiService>;
-        logger = new NullLogger();
+        mockApiService = createMockDataverseApiService();
+        logger = createNullLogger();
 
         // Create mapper chain (dependencies flow inward)
         const optionSetMapper = new OptionSetMetadataMapper();
@@ -409,6 +406,418 @@ describe('DataverseEntityMetadataRepository - Option Set Enrichment', () => {
             expect(attribute.optionSet).not.toBeNull();
             expect(attribute.optionSet?.getOptionCount()).toBe(1);
             expect(attribute.optionSet?.options[0]?.label).toBe('Option 1');
+        });
+    });
+
+    describe('Query Options - $select combinations', () => {
+        it('should use minimal $select fields for getAllEntities (tree display)', async () => {
+            mockApiService.get.mockResolvedValue({
+                value: [
+                    {
+                        MetadataId: 'entity-123',
+                        LogicalName: 'account',
+                        SchemaName: 'Account',
+                        DisplayName: { UserLocalizedLabel: { Label: 'Account' } },
+                        IsCustomEntity: false
+                    }
+                ]
+            });
+
+            await repository.getAllEntities('env-123');
+
+            expect(mockApiService.get).toHaveBeenCalledWith(
+                'env-123',
+                expect.stringContaining('$select=MetadataId,LogicalName,SchemaName,DisplayName,IsCustomEntity')
+            );
+
+            const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+            expect(callArg).not.toContain('Attributes');
+            expect(callArg).not.toContain('Relationships');
+        });
+
+        it('should use minimal $select for getAllGlobalChoices (tree display)', async () => {
+            mockApiService.get.mockResolvedValue({
+                value: [
+                    {
+                        Name: 'et_accounttype',
+                        DisplayName: { UserLocalizedLabel: { Label: 'Account Type' } },
+                        IsCustomOptionSet: true
+                    }
+                ]
+            });
+
+            await repository.getAllGlobalChoices('env-123');
+
+            const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+            expect(callArg).toContain('$select=Name,DisplayName,IsCustomOptionSet');
+            expect(callArg).not.toContain('Options');
+            expect(callArg).not.toContain('OptionSetType');
+        });
+
+        it('should fetch full fields for getGlobalChoiceWithOptions', async () => {
+            const globalOptionSetDto = {
+                Name: 'et_accounttype',
+                DisplayName: { UserLocalizedLabel: { Label: 'Account Type' } },
+                IsGlobal: true,
+                IsCustomOptionSet: true,
+                OptionSetType: 'Picklist',
+                Options: [
+                    {
+                        Value: 1,
+                        Label: { UserLocalizedLabel: { Label: 'Option 1' } },
+                        Color: '#0000ff'
+                    }
+                ]
+            };
+
+            mockApiService.get.mockResolvedValue(globalOptionSetDto);
+
+            await repository.getGlobalChoiceWithOptions('env-123', 'et_accounttype');
+
+            const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+            expect(callArg).toContain("GlobalOptionSetDefinitions(Name='et_accounttype')");
+            expect(callArg).not.toContain('$select');
+        });
+    });
+
+    describe('Query Options - $expand combinations', () => {
+        it('should use $expand for Attributes and Relationships in getEntityWithAttributes', async () => {
+            const entityDto = {
+                MetadataId: 'entity-123',
+                LogicalName: 'account',
+                SchemaName: 'Account',
+                DisplayName: { UserLocalizedLabel: { Label: 'Account' } },
+                Attributes: [],
+                OneToManyRelationships: [],
+                ManyToOneRelationships: [],
+                ManyToManyRelationships: [],
+                Keys: [],
+                Privileges: []
+            };
+
+            mockApiService.get
+                .mockResolvedValueOnce(entityDto)
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] });
+
+            await repository.getEntityWithAttributes('env-123', LogicalName.create('account'));
+
+            const mainQueryCall = mockApiService.get.mock.calls[0]?.[1] as string;
+            expect(mainQueryCall).toContain('$expand=Attributes,OneToManyRelationships,ManyToOneRelationships,ManyToManyRelationships,Keys');
+        });
+
+        it('should use $expand=OptionSet,GlobalOptionSet for PicklistAttributeMetadata', async () => {
+            const entityDto = {
+                MetadataId: 'entity-123',
+                LogicalName: 'account',
+                SchemaName: 'Account',
+                DisplayName: { UserLocalizedLabel: { Label: 'Account' } },
+                Attributes: [
+                    {
+                        MetadataId: 'attr-123',
+                        LogicalName: 'industrycode',
+                        SchemaName: 'IndustryCode',
+                        AttributeTypeName: { Value: 'PicklistType' },
+                        DisplayName: { UserLocalizedLabel: { Label: 'Industry' } },
+                        OptionSet: null,
+                        GlobalOptionSet: null
+                    }
+                ],
+                OneToManyRelationships: [],
+                ManyToOneRelationships: [],
+                ManyToManyRelationships: [],
+                Keys: [],
+                Privileges: []
+            };
+
+            mockApiService.get
+                .mockResolvedValueOnce(entityDto)
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] });
+
+            await repository.getEntityWithAttributes('env-123', LogicalName.create('account'));
+
+            const picklistCall = mockApiService.get.mock.calls[1]?.[1] as string;
+            expect(picklistCall).toContain('PicklistAttributeMetadata');
+            expect(picklistCall).toContain('$expand=OptionSet,GlobalOptionSet');
+        });
+
+        it('should fetch all typed metadata endpoints in parallel', async () => {
+            const entityDto = {
+                MetadataId: 'entity-123',
+                LogicalName: 'account',
+                SchemaName: 'Account',
+                DisplayName: { UserLocalizedLabel: { Label: 'Account' } },
+                Attributes: [
+                    {
+                        MetadataId: 'attr-123',
+                        LogicalName: 'testfield',
+                        SchemaName: 'TestField',
+                        AttributeTypeName: { Value: 'PicklistType' },
+                        DisplayName: { UserLocalizedLabel: { Label: 'Test' } },
+                        OptionSet: null,
+                        GlobalOptionSet: null
+                    }
+                ],
+                OneToManyRelationships: [],
+                ManyToOneRelationships: [],
+                ManyToManyRelationships: [],
+                Keys: [],
+                Privileges: []
+            };
+
+            mockApiService.get
+                .mockResolvedValueOnce(entityDto)
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] });
+
+            await repository.getEntityWithAttributes('env-123', LogicalName.create('account'));
+
+            const calls = mockApiService.get.mock.calls;
+            expect(calls.length).toBeGreaterThanOrEqual(6);
+        });
+    });
+
+    describe('Query Options - Filter by logical name', () => {
+        it('should filter entity by LogicalName in getEntityWithAttributes', async () => {
+            const entityDto = {
+                MetadataId: 'entity-123',
+                LogicalName: 'account',
+                SchemaName: 'Account',
+                DisplayName: { UserLocalizedLabel: { Label: 'Account' } },
+                Attributes: [],
+                OneToManyRelationships: [],
+                ManyToOneRelationships: [],
+                ManyToManyRelationships: [],
+                Keys: [],
+                Privileges: []
+            };
+
+            mockApiService.get
+                .mockResolvedValueOnce(entityDto)
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] });
+
+            await repository.getEntityWithAttributes('env-123', LogicalName.create('account'));
+
+            const mainQueryCall = mockApiService.get.mock.calls[0]?.[1] as string;
+            expect(mainQueryCall).toContain("EntityDefinitions(LogicalName='account')");
+        });
+
+        it('should filter global choice by Name in getGlobalChoiceWithOptions', async () => {
+            const globalOptionSetDto = {
+                Name: 'et_accounttype',
+                DisplayName: { UserLocalizedLabel: { Label: 'Account Type' } },
+                IsGlobal: true,
+                IsCustomOptionSet: true,
+                OptionSetType: 'Picklist',
+                Options: []
+            };
+
+            mockApiService.get.mockResolvedValue(globalOptionSetDto);
+
+            await repository.getGlobalChoiceWithOptions('env-123', 'et_accounttype');
+
+            const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+            expect(callArg).toContain("GlobalOptionSetDefinitions(Name='et_accounttype')");
+        });
+    });
+
+    describe('Query Options - Complex entity queries', () => {
+        it('should combine filter, expand in single query for entity metadata', async () => {
+            const entityDto = {
+                MetadataId: 'entity-123',
+                LogicalName: 'contact',
+                SchemaName: 'Contact',
+                DisplayName: { UserLocalizedLabel: { Label: 'Contact' } },
+                Attributes: [],
+                OneToManyRelationships: [],
+                ManyToOneRelationships: [],
+                ManyToManyRelationships: [],
+                Keys: [],
+                Privileges: []
+            };
+
+            mockApiService.get
+                .mockResolvedValueOnce(entityDto)
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] });
+
+            await repository.getEntityWithAttributes('env-123', LogicalName.create('contact'));
+
+            const mainQueryCall = mockApiService.get.mock.calls[0]?.[1] as string;
+            expect(mainQueryCall).toContain("EntityDefinitions(LogicalName='contact')");
+            expect(mainQueryCall).toContain('$expand=');
+            expect(mainQueryCall).toContain('Attributes');
+            expect(mainQueryCall).toContain('OneToManyRelationships');
+            expect(mainQueryCall).toContain('ManyToOneRelationships');
+            expect(mainQueryCall).toContain('ManyToManyRelationships');
+            expect(mainQueryCall).toContain('Keys');
+        });
+
+        it('should handle complex query with expand and enrichment', async () => {
+            const entityDto = {
+                MetadataId: 'entity-123',
+                LogicalName: 'lead',
+                SchemaName: 'Lead',
+                DisplayName: { UserLocalizedLabel: { Label: 'Lead' } },
+                Attributes: [
+                    {
+                        MetadataId: 'attr-123',
+                        LogicalName: 'industrycode',
+                        SchemaName: 'IndustryCode',
+                        AttributeTypeName: { Value: 'PicklistType' },
+                        DisplayName: { UserLocalizedLabel: { Label: 'Industry' } },
+                        OptionSet: null,
+                        GlobalOptionSet: null
+                    }
+                ],
+                OneToManyRelationships: [],
+                ManyToOneRelationships: [],
+                ManyToManyRelationships: [],
+                Keys: [],
+                Privileges: []
+            };
+
+            mockApiService.get
+                .mockResolvedValueOnce(entityDto)
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] });
+
+            await repository.getEntityWithAttributes('env-123', LogicalName.create('lead'));
+
+            const mainQueryCall = mockApiService.get.mock.calls[0]?.[1] as string;
+            expect(mainQueryCall).toContain("EntityDefinitions(LogicalName='lead')");
+            expect(mainQueryCall).toContain('$expand=');
+        });
+    });
+
+    describe('Query Options - Special characters in names', () => {
+        it('should handle entity names with underscores', async () => {
+            const entityDto = {
+                MetadataId: 'entity-123',
+                LogicalName: 'et_custom_entity',
+                SchemaName: 'et_CustomEntity',
+                DisplayName: { UserLocalizedLabel: { Label: 'Custom Entity' } },
+                Attributes: [],
+                OneToManyRelationships: [],
+                ManyToOneRelationships: [],
+                ManyToManyRelationships: [],
+                Keys: [],
+                Privileges: []
+            };
+
+            mockApiService.get
+                .mockResolvedValueOnce(entityDto)
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] });
+
+            await repository.getEntityWithAttributes('env-123', LogicalName.create('et_custom_entity'));
+
+            const mainQueryCall = mockApiService.get.mock.calls[0]?.[1] as string;
+            expect(mainQueryCall).toContain("EntityDefinitions(LogicalName='et_custom_entity')");
+        });
+
+        it('should handle global choice names with special prefixes', async () => {
+            const globalOptionSetDto = {
+                Name: 'cr123_accounttype',
+                DisplayName: { UserLocalizedLabel: { Label: 'Account Type' } },
+                IsGlobal: true,
+                IsCustomOptionSet: true,
+                OptionSetType: 'Picklist',
+                Options: []
+            };
+
+            mockApiService.get.mockResolvedValue(globalOptionSetDto);
+
+            await repository.getGlobalChoiceWithOptions('env-123', 'cr123_accounttype');
+
+            const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+            expect(callArg).toContain("GlobalOptionSetDefinitions(Name='cr123_accounttype')");
+        });
+    });
+
+    describe('Query Options - Cache behavior', () => {
+        it('should use cached entity on subsequent calls (no new API call)', async () => {
+            const entityDto = {
+                MetadataId: 'entity-123',
+                LogicalName: 'account',
+                SchemaName: 'Account',
+                DisplayName: { UserLocalizedLabel: { Label: 'Account' } },
+                Attributes: [],
+                OneToManyRelationships: [],
+                ManyToOneRelationships: [],
+                ManyToManyRelationships: [],
+                Keys: [],
+                Privileges: []
+            };
+
+            mockApiService.get
+                .mockResolvedValueOnce(entityDto)
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] })
+                .mockResolvedValueOnce({ value: [] });
+
+            await repository.getEntityWithAttributes('env-123', LogicalName.create('account'));
+            const callCountAfterFirst = mockApiService.get.mock.calls.length;
+
+            await repository.getEntityWithAttributes('env-123', LogicalName.create('account'));
+            const callCountAfterSecond = mockApiService.get.mock.calls.length;
+
+            expect(callCountAfterSecond).toBe(callCountAfterFirst);
+        });
+
+        it('should clear cache and fetch fresh data after clearCache()', async () => {
+            const entityDto = {
+                MetadataId: 'entity-123',
+                LogicalName: 'account',
+                SchemaName: 'Account',
+                DisplayName: { UserLocalizedLabel: { Label: 'Account' } },
+                Attributes: [],
+                OneToManyRelationships: [],
+                ManyToOneRelationships: [],
+                ManyToManyRelationships: [],
+                Keys: [],
+                Privileges: []
+            };
+
+            mockApiService.get.mockResolvedValue({ value: [] });
+            mockApiService.get.mockResolvedValueOnce(entityDto);
+
+            await repository.getEntityWithAttributes('env-123', LogicalName.create('account'));
+            const callCountAfterFirst = mockApiService.get.mock.calls.length;
+
+            repository.clearCache();
+
+            mockApiService.get.mockResolvedValueOnce(entityDto);
+
+            await repository.getEntityWithAttributes('env-123', LogicalName.create('account'));
+            const callCountAfterClear = mockApiService.get.mock.calls.length;
+
+            expect(callCountAfterClear).toBeGreaterThan(callCountAfterFirst);
         });
     });
 });

@@ -2,18 +2,17 @@ import { LoadMetadataTreeUseCase } from './LoadMetadataTreeUseCase';
 import { IEntityMetadataRepository } from './../../domain/repositories/IEntityMetadataRepository';
 import { EntityTreeItemMapper } from './../mappers/EntityTreeItemMapper';
 import { ChoiceTreeItemMapper } from './../mappers/ChoiceTreeItemMapper';
-import { ILogger } from './../../../../infrastructure/logging/ILogger';
 import { EntityMetadata } from './../../domain/entities/EntityMetadata';
 import { OptionSetMetadata } from './../../domain/valueObjects/OptionSetMetadata';
 import { LogicalName } from './../../domain/valueObjects/LogicalName';
 import { SchemaName } from './../../domain/valueObjects/SchemaName';
-import { NullLogger } from './../../../../infrastructure/logging/NullLogger';
+import { createMockLogger } from '../../../../shared/testing';
 
 describe('LoadMetadataTreeUseCase', () => {
     let repository: jest.Mocked<IEntityMetadataRepository>;
     let entityTreeItemMapper: jest.Mocked<EntityTreeItemMapper>;
     let choiceTreeItemMapper: jest.Mocked<ChoiceTreeItemMapper>;
-    let logger: ILogger;
+    let logger: ReturnType<typeof createMockLogger>;
     let useCase: LoadMetadataTreeUseCase;
 
     const createTestEntity = (logicalName: string, displayName: string): EntityMetadata => {
@@ -54,16 +53,13 @@ describe('LoadMetadataTreeUseCase', () => {
 
         entityTreeItemMapper = {
             toViewModel: jest.fn()
-        } as unknown as jest.Mocked<EntityTreeItemMapper>;
+        } as jest.Mocked<EntityTreeItemMapper>;
 
         choiceTreeItemMapper = {
             toViewModel: jest.fn()
-        } as unknown as jest.Mocked<ChoiceTreeItemMapper>;
+        } as jest.Mocked<ChoiceTreeItemMapper>;
 
-        logger = new NullLogger();
-        jest.spyOn(logger, 'debug');
-        jest.spyOn(logger, 'info');
-        jest.spyOn(logger, 'error');
+        logger = createMockLogger();
 
         useCase = new LoadMetadataTreeUseCase(
             repository,

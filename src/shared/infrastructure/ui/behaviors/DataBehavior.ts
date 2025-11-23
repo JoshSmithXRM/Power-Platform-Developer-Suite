@@ -38,7 +38,7 @@ export class DataBehavior implements IDataBehavior {
 	public async loadData(): Promise<void> {
 		try {
 			this.setLoading(true);
-			const cancellationToken: VsCodeCancellationTokenAdapter = this.createCancellationToken();
+			const cancellationToken = this.createCancellationToken();
 
 			const data = await this.dataLoader.load(cancellationToken);
 

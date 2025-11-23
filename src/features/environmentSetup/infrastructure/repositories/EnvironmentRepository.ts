@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { IEnvironmentRepository } from '../../domain/interfaces/IEnvironmentRepository';
 import { Environment } from '../../domain/entities/Environment';
 import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
-import { EnvironmentConnectionDto } from '../dtos/EnvironmentConnectionDto';
+import { EnvironmentConnectionDto } from '../../../../shared/application/dtos/EnvironmentConnectionDto';
 import { EnvironmentDomainMapper } from '../mappers/EnvironmentDomainMapper';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
@@ -81,7 +81,7 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 		environment: Environment,
 		clientSecret?: string,
 		password?: string,
-		preserveExistingCredentials: boolean = false
+		preserveExistingCredentials = false
 	): Promise<void> {
 		const envId = environment.getId().getValue();
 		const envName = environment.getName().getValue();

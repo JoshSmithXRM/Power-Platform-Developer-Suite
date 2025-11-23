@@ -23,7 +23,7 @@ export function renderSolutionFilter(
 	solutions: ReadonlyArray<SolutionOption>,
 	currentSolutionId: string | undefined,
 	label: string,
-	includeAllOption: boolean = true
+	includeAllOption = true
 ): string {
 	if (solutions.length === 0) {
 		return '';

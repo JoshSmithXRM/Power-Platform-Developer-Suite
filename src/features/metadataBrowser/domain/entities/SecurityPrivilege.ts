@@ -27,11 +27,11 @@ export class SecurityPrivilege {
         canBeParentEntityReference?: boolean;
     }): SecurityPrivilege {
         if (!props.privilegeId || props.privilegeId.trim().length === 0) {
-            throw new Error('Privilege ID cannot be empty');
+            throw new Error('Invalid SecurityPrivilege: privilegeId cannot be empty');
         }
 
         if (!props.name || props.name.trim().length === 0) {
-            throw new Error('Privilege name cannot be empty');
+            throw new Error('Invalid SecurityPrivilege: name cannot be empty');
         }
 
         return new SecurityPrivilege(

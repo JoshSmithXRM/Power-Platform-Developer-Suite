@@ -31,11 +31,11 @@ export class ManyToManyRelationship {
         entity2NavigationPropertyName?: string | null;
     }): ManyToManyRelationship {
         if (!props.metadataId || props.metadataId.trim().length === 0) {
-            throw new Error('Relationship metadata ID cannot be empty');
+            throw new Error('Invalid ManyToManyRelationship: metadataId cannot be empty');
         }
 
         if (!props.schemaName || props.schemaName.trim().length === 0) {
-            throw new Error('Relationship schema name cannot be empty');
+            throw new Error('Invalid ManyToManyRelationship: schemaName cannot be empty');
         }
 
         return new ManyToManyRelationship(

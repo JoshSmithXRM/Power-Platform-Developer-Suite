@@ -133,7 +133,7 @@ export class TestConnectionUseCase {
 		// Environment constructor validates this invariant (Environment.ts lines 114-124).
 		const clientIdObj = environment.getClientId();
 		if (!clientIdObj) {
-			throw new Error('Client ID is required for client credentials authentication');
+			throw new Error('Cannot test connection: Client ID is required for client credentials authentication');
 		}
 		const clientId = clientIdObj.getValue();
 
@@ -164,7 +164,7 @@ export class TestConnectionUseCase {
 		// Environment constructor validates this invariant (Environment.ts lines 126-136).
 		const username = environment.getUsername();
 		if (!username) {
-			throw new Error('Username is required for username/password authentication');
+			throw new Error('Cannot test connection: username is required for username/password authentication');
 		}
 
 		const password = await this.repository.getPassword(username);

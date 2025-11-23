@@ -7,8 +7,8 @@ import { EnvironmentFormViewModel } from '../viewModels/EnvironmentFormViewModel
 export class EnvironmentFormViewModelMapper {
 	public toFormViewModel(
 		environment: Environment,
-		hasStoredClientSecret: boolean = false,
-		hasStoredPassword: boolean = false
+		hasStoredClientSecret = false,
+		hasStoredPassword = false
 	): EnvironmentFormViewModel {
 		const authMethod = environment.getAuthenticationMethod();
 		const powerPlatformEnvironmentId = environment.getPowerPlatformEnvironmentId();

@@ -1,4 +1,5 @@
 import { PipelineStage } from './PipelineStage';
+import { assertDefined } from '../../../../shared/testing';
 
 describe('PipelineStage Value Object', () => {
 	describe('Static Instance Properties', () => {
@@ -131,10 +132,14 @@ describe('PipelineStage Value Object', () => {
 			];
 
 			// Act & Assert
-			expect(stages[0]!.isDeprecated()).toBe(false);
-			expect(stages[1]!.isDeprecated()).toBe(false);
-			expect(stages[2]!.isDeprecated()).toBe(false);
-			expect(stages[3]!.isDeprecated()).toBe(true);
+			assertDefined(stages[0]);
+			expect(stages[0].isDeprecated()).toBe(false);
+			assertDefined(stages[1]);
+			expect(stages[1].isDeprecated()).toBe(false);
+			assertDefined(stages[2]);
+			expect(stages[2].isDeprecated()).toBe(false);
+			assertDefined(stages[3]);
+			expect(stages[3].isDeprecated()).toBe(true);
 		});
 
 		it('should have correct stage progression with numeric values', () => {
@@ -147,9 +152,13 @@ describe('PipelineStage Value Object', () => {
 			];
 
 			// Act & Assert
-			expect(stages[0]!.value).toBeLessThan(stages[1]!.value);
-			expect(stages[1]!.value).toBeLessThan(stages[2]!.value);
-			expect(stages[2]!.value).toBeLessThan(stages[3]!.value);
+			assertDefined(stages[0]);
+			assertDefined(stages[1]);
+			expect(stages[0].value).toBeLessThan(stages[1].value);
+			assertDefined(stages[2]);
+			expect(stages[1].value).toBeLessThan(stages[2].value);
+			assertDefined(stages[3]);
+			expect(stages[2].value).toBeLessThan(stages[3].value);
 		});
 	});
 });

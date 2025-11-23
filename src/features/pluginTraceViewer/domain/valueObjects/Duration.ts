@@ -18,16 +18,34 @@ export class Duration {
 		}
 	}
 
+	/**
+	 * Factory method to create a Duration from milliseconds.
+	 *
+	 * @param ms - Duration in milliseconds (must be non-negative)
+	 * @returns New Duration instance
+	 * @throws {ValidationError} If milliseconds is negative
+	 */
 	static fromMilliseconds(ms: number): Duration {
 		return new Duration(ms);
 	}
 
+	/**
+	 * Compares this duration to another to determine if it's slower (longer).
+	 * Useful for performance analysis and identifying slow operations.
+	 *
+	 * @param other - Duration to compare against
+	 * @returns True if this duration is longer than the other
+	 */
 	isSlowerThan(other: Duration): boolean {
 		return this.milliseconds > other.milliseconds;
 	}
 
 	/**
-	 * Returns a new Duration (immutable).
+	 * Adds another duration to this one.
+	 * Returns a new Duration (immutable value object pattern).
+	 *
+	 * @param other - Duration to add
+	 * @returns New Duration representing the sum
 	 */
 	add(other: Duration): Duration {
 		return new Duration(this.milliseconds + other.milliseconds);

@@ -63,23 +63,23 @@ describe('EntityKey', () => {
         });
 
         it('should throw error when metadataId is empty string', () => {
-            expect(() => createValidEntityKey({ metadataId: '' })).toThrow('Entity key metadata ID cannot be empty');
+            expect(() => createValidEntityKey({ metadataId: '' })).toThrow('Invalid EntityKey: metadataId cannot be empty');
         });
 
         it('should throw error when metadataId is whitespace', () => {
-            expect(() => createValidEntityKey({ metadataId: '   ' })).toThrow('Entity key metadata ID cannot be empty');
+            expect(() => createValidEntityKey({ metadataId: '   ' })).toThrow('Invalid EntityKey: metadataId cannot be empty');
         });
 
         it('should throw error when displayName is empty string', () => {
-            expect(() => createValidEntityKey({ displayName: '' })).toThrow('Entity key display name cannot be empty');
+            expect(() => createValidEntityKey({ displayName: '' })).toThrow('Invalid EntityKey: displayName cannot be empty');
         });
 
         it('should throw error when displayName is whitespace', () => {
-            expect(() => createValidEntityKey({ displayName: '   ' })).toThrow('Entity key display name cannot be empty');
+            expect(() => createValidEntityKey({ displayName: '   ' })).toThrow('Invalid EntityKey: displayName cannot be empty');
         });
 
         it('should throw error when keyAttributes array is empty', () => {
-            expect(() => createValidEntityKey({ keyAttributes: [] })).toThrow('Entity key must have at least one attribute');
+            expect(() => createValidEntityKey({ keyAttributes: [] })).toThrow('Invalid EntityKey: must have at least one attribute');
         });
     });
 

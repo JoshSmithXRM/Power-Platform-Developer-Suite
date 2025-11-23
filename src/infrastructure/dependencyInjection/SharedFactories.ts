@@ -69,7 +69,7 @@ export class SharedFactories {
 			const environments = await this.environmentRepository.getAll();
 			const environment = environments.find(env => env.getId().getValue() === envId);
 			if (!environment) {
-				throw new Error(`Environment not found: ${envId}`);
+				throw new Error(`Cannot access Dataverse: environment "${envId}" not found`);
 			}
 			return environment;
 		};

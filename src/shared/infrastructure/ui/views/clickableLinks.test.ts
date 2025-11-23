@@ -133,7 +133,7 @@ describe('clickableLinks', () => {
 	});
 
 	describe('Integration', () => {
-		it('should work together for complete link functionality', () => {
+		it('should render link HTML and click handler that work together for complete functionality', () => {
 			const linkHtml = renderDataTableLink('solution-link', 'abc-123', 'My Solution');
 			const handlerJs = renderLinkClickHandler('.solution-link', 'openInMaker', 'solutionId');
 

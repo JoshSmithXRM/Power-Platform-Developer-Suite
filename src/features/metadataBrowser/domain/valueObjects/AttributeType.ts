@@ -15,7 +15,7 @@ export class AttributeType {
      */
     public static create(value: string): AttributeType {
         if (!value || value.trim().length === 0) {
-            throw new Error('Attribute type cannot be empty');
+            throw new Error('Invalid AttributeType: cannot be empty');
         }
 
         const validTypes = [
@@ -72,7 +72,7 @@ export class AttributeType {
         ];
 
         if (!validTypes.includes(value)) {
-            throw new Error(`Unknown attribute type: "${value}"`);
+            throw new Error(`Invalid AttributeType: unknown type "${value}"`);
         }
 
         return new AttributeType(value);

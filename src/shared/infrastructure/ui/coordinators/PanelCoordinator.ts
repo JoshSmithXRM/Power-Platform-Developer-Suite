@@ -72,7 +72,7 @@ export class PanelCoordinator<TCommands extends string = string>
 		this.logger = config.logger;
 		this.viewType = config.panel.viewType; // Cache before disposal
 
-		const logger: ILogger = this.logger;  // Capture for use in callbacks
+		const logger = this.logger;  // Capture for use in callbacks
 
 		// Register panel disposal
 		this.disposables.push(

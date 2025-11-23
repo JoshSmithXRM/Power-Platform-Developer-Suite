@@ -2,10 +2,11 @@ import type { ISection } from '../../../../shared/infrastructure/ui/sections/ISe
 import type { SectionRenderData } from '../../../../shared/infrastructure/ui/types/SectionRenderData';
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
 import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
-import { FilterField, FilterOperator, DateTimeFilter } from '../../application/types';
+import { FilterField, FilterOperator } from '../../application/types';
 import type { FilterCriteriaViewModel, FilterConditionViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
 import { QUICK_FILTER_DEFINITIONS } from '../constants/QuickFilterDefinitions';
 import { FILTER_ENUM_OPTIONS } from '../constants/FilterFieldConfiguration';
+import { utcToLocalDateTime } from '../../../../shared/presentation/utils/DateTimeFormatters';
 
 /**
  * Filter Panel Section for Plugin Trace Viewer.
@@ -218,8 +219,7 @@ export class FilterPanelSection implements ISection {
 		let localValue = '';
 		if (condition.value) {
 			try {
-				const dateFilter = DateTimeFilter.fromUtcIso(condition.value);
-				localValue = dateFilter.getLocalDateTime();
+				localValue = utcToLocalDateTime(condition.value);
 			} catch {
 				// If conversion fails, use empty value
 				localValue = '';

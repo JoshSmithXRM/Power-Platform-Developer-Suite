@@ -5,7 +5,7 @@ import { DataverseUrl } from '../../domain/valueObjects/DataverseUrl';
 import { TenantId } from '../../domain/valueObjects/TenantId';
 import { ClientId } from '../../domain/valueObjects/ClientId';
 import { AuthenticationMethod, AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
-import { EnvironmentConnectionDto, PowerPlatformSettingsDto } from '../dtos/EnvironmentConnectionDto';
+import { EnvironmentConnectionDto, PowerPlatformSettingsDto } from '../../../../shared/application/dtos/EnvironmentConnectionDto';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 /**

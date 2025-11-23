@@ -52,7 +52,7 @@ describe('PluginTraceDeleteBehavior', () => {
 
 		it('should show confirmation dialog before deleting', async () => {
 			const traceIds = ['trace-1', 'trace-2', 'trace-3'];
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue(undefined);
 
 			await behavior.deleteSelected(TEST_ENVIRONMENT_ID, traceIds);
@@ -69,7 +69,7 @@ describe('PluginTraceDeleteBehavior', () => {
 
 		it('should not delete when user cancels', async () => {
 			const traceIds = ['trace-1', 'trace-2'];
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue(undefined);
 
 			await behavior.deleteSelected(TEST_ENVIRONMENT_ID, traceIds);
@@ -84,7 +84,7 @@ describe('PluginTraceDeleteBehavior', () => {
 			const traceIds = ['trace-1', 'trace-2', 'trace-3'];
 			mockDeleteTracesUseCase.deleteMultiple.mockResolvedValueOnce(3);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			const showInfoSpy = jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -101,7 +101,7 @@ describe('PluginTraceDeleteBehavior', () => {
 			const traceIds = ['trace-1'];
 			mockDeleteTracesUseCase.deleteMultiple.mockResolvedValueOnce(1);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -116,7 +116,7 @@ describe('PluginTraceDeleteBehavior', () => {
 			const traceIds = ['trace-1', 'trace-2'];
 			mockDeleteTracesUseCase.deleteMultiple.mockRejectedValueOnce(new Error('Delete failed'));
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			const showErrorSpy = jest.spyOn(vscode.window, 'showErrorMessage').mockResolvedValue(undefined);
 
@@ -133,7 +133,7 @@ describe('PluginTraceDeleteBehavior', () => {
 			const traceIds = ['trace-1'];
 			mockDeleteTracesUseCase.deleteMultiple.mockResolvedValueOnce(1);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			const showInfoSpy = jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -141,7 +141,7 @@ describe('PluginTraceDeleteBehavior', () => {
 
 			expect(showWarningSpy).toHaveBeenCalledWith(
 				'Delete 1 selected trace(s)? This cannot be undone.',
-				expect.any(Object),
+				expect.objectContaining({}),
 				'Delete',
 				'Cancel'
 			);
@@ -155,7 +155,7 @@ describe('PluginTraceDeleteBehavior', () => {
 			const traceIds = ['trace-1', 'trace-2', 'trace-3'];
 			mockDeleteTracesUseCase.deleteMultiple.mockResolvedValueOnce(2); // Only 2 deleted
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			const showInfoSpy = jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -170,7 +170,7 @@ describe('PluginTraceDeleteBehavior', () => {
 
 	describe('deleteAll', () => {
 		it('should show confirmation dialog with correct message', async () => {
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue(undefined);
 
 			await behavior.deleteAll(TEST_ENVIRONMENT_ID);
@@ -186,7 +186,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		});
 
 		it('should not delete when user cancels', async () => {
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue(undefined);
 
 			await behavior.deleteAll(TEST_ENVIRONMENT_ID);
@@ -200,7 +200,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should delete all traces when user confirms with "Delete All"', async () => {
 			mockDeleteTracesUseCase.deleteAll.mockResolvedValueOnce(150);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete All');
 			const showInfoSpy = jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -216,7 +216,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should refresh after successful deletion', async () => {
 			mockDeleteTracesUseCase.deleteAll.mockResolvedValueOnce(100);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete All');
 			jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -230,7 +230,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should show error message on failure', async () => {
 			mockDeleteTracesUseCase.deleteAll.mockRejectedValueOnce(new Error('Delete failed'));
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete All');
 			const showErrorSpy = jest.spyOn(vscode.window, 'showErrorMessage').mockResolvedValue(undefined);
 
@@ -246,7 +246,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should handle zero traces deleted', async () => {
 			mockDeleteTracesUseCase.deleteAll.mockResolvedValueOnce(0);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete All');
 			const showInfoSpy = jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -261,7 +261,7 @@ describe('PluginTraceDeleteBehavior', () => {
 
 	describe('deleteOld', () => {
 		it('should show confirmation dialog with days parameter', async () => {
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue(undefined);
 
 			await behavior.deleteOld(TEST_ENVIRONMENT_ID, 30);
@@ -277,7 +277,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		});
 
 		it('should not delete when user cancels', async () => {
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue(undefined);
 
 			await behavior.deleteOld(TEST_ENVIRONMENT_ID, 30);
@@ -291,7 +291,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should delete old traces when user confirms', async () => {
 			mockDeleteTracesUseCase.deleteOldTraces.mockResolvedValueOnce(45);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			const showInfoSpy = jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -307,7 +307,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should show specific message when no old traces found', async () => {
 			mockDeleteTracesUseCase.deleteOldTraces.mockResolvedValueOnce(0);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			const showInfoSpy = jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -322,7 +322,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should refresh after successful deletion', async () => {
 			mockDeleteTracesUseCase.deleteOldTraces.mockResolvedValueOnce(20);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -336,7 +336,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should refresh even when zero traces deleted', async () => {
 			mockDeleteTracesUseCase.deleteOldTraces.mockResolvedValueOnce(0);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -350,7 +350,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should show error message on failure', async () => {
 			mockDeleteTracesUseCase.deleteOldTraces.mockRejectedValueOnce(new Error('Delete failed'));
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			const showErrorSpy = jest.spyOn(vscode.window, 'showErrorMessage').mockResolvedValue(undefined);
 
@@ -366,7 +366,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should handle different day values', async () => {
 			mockDeleteTracesUseCase.deleteOldTraces.mockResolvedValueOnce(10);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			const showInfoSpy = jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -374,7 +374,7 @@ describe('PluginTraceDeleteBehavior', () => {
 
 			expect(showWarningSpy).toHaveBeenCalledWith(
 				'Delete all traces older than 90 days? This cannot be undone.',
-				expect.any(Object),
+				expect.objectContaining({}),
 				'Delete',
 				'Cancel'
 			);
@@ -388,7 +388,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should handle single day parameter', async () => {
 			mockDeleteTracesUseCase.deleteOldTraces.mockResolvedValueOnce(5);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			const showInfoSpy = jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -396,7 +396,7 @@ describe('PluginTraceDeleteBehavior', () => {
 
 			expect(showWarningSpy).toHaveBeenCalledWith(
 				'Delete all traces older than 1 days? This cannot be undone.',
-				expect.any(Object),
+				expect.objectContaining({}),
 				'Delete',
 				'Cancel'
 			);
@@ -440,7 +440,7 @@ describe('PluginTraceDeleteBehavior', () => {
 		it('should handle use case returning negative count', async () => {
 			mockDeleteTracesUseCase.deleteMultiple.mockResolvedValueOnce(-1);
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			const showInfoSpy = jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 
@@ -456,7 +456,7 @@ describe('PluginTraceDeleteBehavior', () => {
 			mockDeleteTracesUseCase.deleteMultiple.mockResolvedValueOnce(1);
 			mockOnRefreshNeeded.mockRejectedValueOnce(new Error('Refresh failed'));
 
-			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as unknown as jest.SpyInstance<Promise<MessageResponse>>;
+			const showWarningSpy = jest.spyOn(vscode.window, 'showWarningMessage') as jest.SpyInstance<Promise<MessageResponse>>;
 			showWarningSpy.mockResolvedValue('Delete');
 			jest.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
 

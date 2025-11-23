@@ -127,23 +127,23 @@ describe('AttributeMetadata', () => {
         });
 
         it('should throw error when metadataId is empty', () => {
-            expect(() => createValidAttribute({ metadataId: '' })).toThrow('Attribute metadata ID cannot be empty');
+            expect(() => createValidAttribute({ metadataId: '' })).toThrow('Invalid AttributeMetadata: metadataId cannot be empty');
         });
 
         it('should throw error when metadataId is whitespace', () => {
-            expect(() => createValidAttribute({ metadataId: '   ' })).toThrow('Attribute metadata ID cannot be empty');
+            expect(() => createValidAttribute({ metadataId: '   ' })).toThrow('Invalid AttributeMetadata: metadataId cannot be empty');
         });
 
         it('should throw error when displayName is empty', () => {
-            expect(() => createValidAttribute({ displayName: '' })).toThrow('Attribute display name cannot be empty');
+            expect(() => createValidAttribute({ displayName: '' })).toThrow('Invalid AttributeMetadata: displayName cannot be empty');
         });
 
         it('should throw error when displayName is whitespace', () => {
-            expect(() => createValidAttribute({ displayName: '   ' })).toThrow('Attribute display name cannot be empty');
+            expect(() => createValidAttribute({ displayName: '   ' })).toThrow('Invalid AttributeMetadata: displayName cannot be empty');
         });
 
         it('should throw error when maxLength is negative', () => {
-            expect(() => createValidAttribute({ maxLength: -1 })).toThrow('Attribute max length cannot be negative');
+            expect(() => createValidAttribute({ maxLength: -1 })).toThrow('Invalid AttributeMetadata: maxLength cannot be negative');
         });
 
         it('should allow maxLength of zero', () => {

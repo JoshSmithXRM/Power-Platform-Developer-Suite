@@ -34,7 +34,16 @@ function isWhoAmIApiResponse(data: unknown): data is WhoAmIApiResponse {
  * Tests connection using Dataverse WhoAmI API
  */
 export class WhoAmIService implements IWhoAmIService {
+	/**
+	 * Timeout duration for WhoAmI API request in milliseconds.
+	 * Connection test fails if no response received within this window.
+	 */
 	private static readonly TIMEOUT_MS = 10000;
+
+	/**
+	 * Length of token prefix to log for debugging (truncated for security).
+	 */
+	private static readonly TOKEN_PREFIX_LOG_LENGTH = 10;
 
 	constructor(
 		private readonly authService: IAuthenticationService,
@@ -69,7 +78,7 @@ export class WhoAmIService implements IWhoAmIService {
 			);
 
 			this.logger.debug('WhoAmIService: Access token acquired', {
-				tokenPrefix: token.substring(0, 10) + '...'
+				tokenPrefix: token.substring(0, WhoAmIService.TOKEN_PREFIX_LOG_LENGTH) + '...'
 			});
 
 			const controller = new AbortController();

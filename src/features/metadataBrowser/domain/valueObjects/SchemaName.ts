@@ -15,7 +15,7 @@ export class SchemaName {
      */
     public static create(value: string): SchemaName {
         if (!value || value.trim().length === 0) {
-            throw new Error('Schema name cannot be empty');
+            throw new Error('Invalid SchemaName: cannot be empty');
         }
 
         // Schema names must be alphanumeric (with underscores allowed)
@@ -23,21 +23,37 @@ export class SchemaName {
         const validPattern = /^[A-Za-z][A-Za-z0-9_]*$/;
         if (!validPattern.test(value)) {
             throw new Error(
-                `Invalid schema name format: "${value}". Must start with a letter and contain only letters, numbers, and underscores.`
+                `Invalid SchemaName format: "${value}" must start with a letter and contain only letters, numbers, and underscores`
             );
         }
 
         return new SchemaName(value);
     }
 
+    /**
+     * Gets the underlying string value of the schema name.
+     *
+     * @returns PascalCase schema name string
+     */
     public getValue(): string {
         return this.value;
     }
 
+    /**
+     * Checks equality with another SchemaName.
+     *
+     * @param other - SchemaName to compare with
+     * @returns True if values are identical
+     */
     public equals(other: SchemaName): boolean {
         return this.value === other.value;
     }
 
+    /**
+     * Returns string representation of the schema name.
+     *
+     * @returns PascalCase schema name string
+     */
     public toString(): string {
         return this.value;
     }

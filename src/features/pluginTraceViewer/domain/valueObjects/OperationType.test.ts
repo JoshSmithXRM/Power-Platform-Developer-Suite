@@ -20,8 +20,8 @@ describe('OperationType', () => {
 		});
 
 		test.each([
-			[0, 'Invalid operation type: 0'],
-			[3, 'Invalid operation type: 3']
+			[0, 'Invalid OperationType: unknown numeric value 0'],
+			[3, 'Invalid OperationType: unknown numeric value 3']
 		])('should throw error for invalid value %i', (value, expectedError) => {
 			expect(() => OperationType.fromNumber(value)).toThrow(expectedError);
 		});

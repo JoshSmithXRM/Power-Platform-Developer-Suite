@@ -22,8 +22,8 @@ describe('TraceLevel', () => {
 		});
 
 		test.each([
-			[3, 'Invalid trace level: 3'],
-			[-1, 'Invalid trace level: -1']
+			[3, 'Invalid TraceLevel: unknown numeric value 3'],
+			[-1, 'Invalid TraceLevel: unknown numeric value -1']
 		])('should throw error for invalid value %i', (value, expectedError) => {
 			expect(() => TraceLevel.fromNumber(value)).toThrow(expectedError);
 		});
@@ -40,8 +40,8 @@ describe('TraceLevel', () => {
 		});
 
 		test.each([
-			['Invalid', 'Invalid trace level string: Invalid'],
-			['all', 'Invalid trace level string: all']
+			['Invalid', 'Invalid TraceLevel: unknown string value "Invalid"'],
+			['all', 'Invalid TraceLevel: unknown string value "all"']
 		])('should throw error for invalid string "%s"', (value, expectedError) => {
 			expect(() => TraceLevel.fromString(value)).toThrow(expectedError);
 		});

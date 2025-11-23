@@ -31,6 +31,12 @@ export interface DropdownItem {
 export abstract class DropdownSection implements ISection {
 	public readonly position = SectionPosition.Toolbar;
 
+	/**
+	 * Creates a DropdownSection instance.
+	 *
+	 * @param dropdownId - Unique ID for the dropdown element
+	 * @param icon - Optional icon name for the dropdown button
+	 */
 	constructor(
 		protected readonly dropdownId: string,
 		protected readonly icon?: string
@@ -38,17 +44,31 @@ export abstract class DropdownSection implements ISection {
 
 	/**
 	 * Subclasses must provide dropdown items.
+	 *
+	 * Defines the list of options displayed in the dropdown menu.
+	 * Items can include separators, icons, and disabled states.
+	 *
+	 * @returns Array of dropdown items to display
 	 */
 	protected abstract getDropdownItems(): ReadonlyArray<DropdownItem>;
 
 	/**
 	 * Subclasses must provide button label (shows current selection).
+	 *
+	 * The label is displayed on the dropdown button and typically
+	 * reflects the current selection state.
+	 *
+	 * @returns Label text for the dropdown button
 	 */
 	protected abstract getButtonLabel(): string;
 
 	/**
 	 * Optional: Get current selection ID (for checkmark indicator).
-	 * Default: no selection highlighted
+	 *
+	 * When provided, the item matching this ID will show a checkmark
+	 * in the dropdown menu to indicate current selection.
+	 *
+	 * @returns ID of currently selected item, or undefined for no selection
 	 */
 	protected getCurrentSelectionId(): string | undefined {
 		return undefined;
@@ -56,7 +76,11 @@ export abstract class DropdownSection implements ISection {
 
 	/**
 	 * Optional: Button variant (default, primary, danger).
-	 * Default: 'default'
+	 *
+	 * Controls the visual style of the dropdown button.
+	 * Default variant is used unless overridden by subclass.
+	 *
+	 * @returns Button variant style
 	 */
 	protected getButtonVariant(): 'default' | 'primary' | 'danger' {
 		return 'default';
@@ -64,7 +88,13 @@ export abstract class DropdownSection implements ISection {
 
 	/**
 	 * Renders dropdown HTML using shared view utility.
-	 * Final - subclasses customize via abstract methods, not by overriding render.
+	 *
+	 * Final method - subclasses customize behavior via abstract methods
+	 * rather than overriding render directly. This ensures consistent
+	 * rendering logic across all dropdown sections.
+	 *
+	 * @param _data - Section render data (unused by base implementation)
+	 * @returns HTML string for the dropdown section
 	 */
 	public render(_data: SectionRenderData): string {
 		const icon = this.icon;

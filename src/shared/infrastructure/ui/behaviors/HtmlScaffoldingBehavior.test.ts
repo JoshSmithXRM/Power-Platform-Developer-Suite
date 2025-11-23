@@ -12,7 +12,7 @@ const createMockWebview = (): vscode.Webview => ({
 	onDidReceiveMessage: jest.fn(),
 	postMessage: jest.fn(),
 	options: {}
-} as unknown as vscode.Webview);
+} as vscode.Webview);
 
 describe('HtmlScaffoldingBehavior', () => {
 	describe('initialize', () => {

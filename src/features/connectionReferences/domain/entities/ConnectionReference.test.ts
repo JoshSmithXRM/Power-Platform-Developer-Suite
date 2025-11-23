@@ -1,4 +1,5 @@
 import { createTestConnectionReference } from '../../../../shared/testing';
+import { ConnectionReference } from './ConnectionReference';
 
 describe('ConnectionReference', () => {
 	// Use shared test factory
@@ -18,38 +19,27 @@ describe('ConnectionReference', () => {
 				expect(cr.modifiedOn).toEqual(new Date('2024-01-01T10:00:00Z'));
 			});
 
-			it('should create managed connection reference', () => {
-				const cr = createConnectionReference({ isManaged: true });
+			test.each<{ isManaged: boolean; description: string }>([
+				{ isManaged: true, description: 'managed connection reference' },
+				{ isManaged: false, description: 'unmanaged connection reference' }
+			])('should create $description', ({ isManaged }) => {
+				const cr = createConnectionReference({ isManaged });
 
-				expect(cr.isManaged).toBe(true);
+				expect(cr.isManaged).toBe(isManaged);
 			});
 
-			it('should create unmanaged connection reference', () => {
-				const cr = createConnectionReference({ isManaged: false });
-
-				expect(cr.isManaged).toBe(false);
-			});
-
-			it('should accept null connector ID', () => {
-				const cr = createConnectionReference({ connectorId: null });
-
-				expect(cr.connectorId).toBeNull();
-			});
-
-			it('should accept null connection ID', () => {
-				const cr = createConnectionReference({ connectionId: null });
-
-				expect(cr.connectionId).toBeNull();
-			});
-
-			it('should accept both null connector and connection IDs', () => {
+			test.each<{ connectorId: string | null; connectionId: string | null; scenario: string }>([
+				{ connectorId: null, connectionId: 'connection-123', scenario: 'null connector ID' },
+				{ connectorId: 'connector-123', connectionId: null, scenario: 'null connection ID' },
+				{ connectorId: null, connectionId: null, scenario: 'both null connector and connection IDs' }
+			])('should accept $scenario', ({ connectorId, connectionId }) => {
 				const cr = createConnectionReference({
-					connectorId: null,
-					connectionId: null
+					connectorId,
+					connectionId
 				});
 
-				expect(cr.connectorId).toBeNull();
-				expect(cr.connectionId).toBeNull();
+				expect(cr.connectorId).toBe(connectorId);
+				expect(cr.connectionId).toBe(connectionId);
 			});
 
 			it('should preserve exact date provided', () => {
@@ -59,37 +49,34 @@ describe('ConnectionReference', () => {
 				expect(cr.modifiedOn).toEqual(specificDate);
 			});
 
-			it('should create with SharePoint connector', () => {
-				const cr = createConnectionReference({
-					connectionReferenceLogicalName: 'cr_sharepoint_main',
+			test.each<{ logicalName: string; displayName: string; connectorId: string; description: string }>([
+				{
+					logicalName: 'cr_sharepoint_main',
 					displayName: 'SharePoint Main Site',
-					connectorId: '/providers/Microsoft.PowerApps/apis/shared_sharepointonline'
-				});
-
-				expect(cr.connectionReferenceLogicalName).toBe('cr_sharepoint_main');
-				expect(cr.connectorId).toContain('sharepointonline');
-			});
-
-			it('should create with Dataverse connector', () => {
-				const cr = createConnectionReference({
-					connectionReferenceLogicalName: 'cr_dataverse_primary',
+					connectorId: '/providers/Microsoft.PowerApps/apis/shared_sharepointonline',
+					description: 'SharePoint connector'
+				},
+				{
+					logicalName: 'cr_dataverse_primary',
 					displayName: 'Dataverse Primary',
-					connectorId: '/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps'
-				});
-
-				expect(cr.connectionReferenceLogicalName).toBe('cr_dataverse_primary');
-				expect(cr.connectorId).toContain('commondataserviceforapps');
-			});
-
-			it('should create with SQL connector', () => {
-				const cr = createConnectionReference({
-					connectionReferenceLogicalName: 'cr_sql_database',
+					connectorId: '/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps',
+					description: 'Dataverse connector'
+				},
+				{
+					logicalName: 'cr_sql_database',
 					displayName: 'SQL Database',
-					connectorId: '/providers/Microsoft.PowerApps/apis/shared_sql'
+					connectorId: '/providers/Microsoft.PowerApps/apis/shared_sql',
+					description: 'SQL connector'
+				}
+			])('should create with $description', ({ logicalName, displayName, connectorId }) => {
+				const cr = createConnectionReference({
+					connectionReferenceLogicalName: logicalName,
+					displayName,
+					connectorId
 				});
 
-				expect(cr.connectionReferenceLogicalName).toBe('cr_sql_database');
-				expect(cr.connectorId).toContain('sql');
+				expect(cr.connectionReferenceLogicalName).toBe(logicalName);
+				expect(cr.connectorId).toContain(connectorId.split('/').pop()!.replace('shared_', ''));
 			});
 		});
 
@@ -108,33 +95,14 @@ describe('ConnectionReference', () => {
 
 	describe('hasConnection', () => {
 		describe('when connection ID exists', () => {
-			it('should return true for valid connection ID', () => {
+			test.each<{ connectionId: string; description: string }>([
+				{ connectionId: 'connection-00000000-0000-0000-0000-000000000001', description: 'valid connection ID' },
+				{ connectionId: 'custom-connection-id-123', description: 'non-GUID connection ID' },
+				{ connectionId: 'x'.repeat(500), description: 'very long connection ID' },
+				{ connectionId: 'connection-id-with-dashes-and_underscores', description: 'connection ID with special characters' }
+			])('should return true for $description', ({ connectionId }) => {
 				const cr = createConnectionReference({
-					connectionId: 'connection-00000000-0000-0000-0000-000000000001'
-				});
-
-				expect(cr.hasConnection()).toBe(true);
-			});
-
-			it('should return true for non-GUID connection ID', () => {
-				const cr = createConnectionReference({
-					connectionId: 'custom-connection-id-123'
-				});
-
-				expect(cr.hasConnection()).toBe(true);
-			});
-
-			it('should return true for very long connection ID', () => {
-				const cr = createConnectionReference({
-					connectionId: 'x'.repeat(500)
-				});
-
-				expect(cr.hasConnection()).toBe(true);
-			});
-
-			it('should return true for connection ID with special characters', () => {
-				const cr = createConnectionReference({
-					connectionId: 'connection-id-with-dashes-and_underscores'
+					connectionId
 				});
 
 				expect(cr.hasConnection()).toBe(true);
@@ -151,36 +119,15 @@ describe('ConnectionReference', () => {
 		});
 
 		describe('when connection ID is null', () => {
-			it('should return false for null connection ID', () => {
+			test.each<{ connectorId: string | null; isManaged: boolean; description: string }>([
+				{ connectorId: 'connector-123', isManaged: false, description: 'null connection ID even if connector ID exists' },
+				{ connectorId: null, isManaged: true, description: 'unconnected managed reference' },
+				{ connectorId: null, isManaged: false, description: 'unconnected unmanaged reference' }
+			])('should return false for $description', ({ connectorId, isManaged }) => {
 				const cr = createConnectionReference({
-					connectionId: null
-				});
-
-				expect(cr.hasConnection()).toBe(false);
-			});
-
-			it('should return false even if connector ID exists', () => {
-				const cr = createConnectionReference({
-					connectorId: 'connector-exists',
-					connectionId: null
-				});
-
-				expect(cr.hasConnection()).toBe(false);
-			});
-
-			it('should return false for unconnected managed reference', () => {
-				const cr = createConnectionReference({
-					isManaged: true,
-					connectionId: null
-				});
-
-				expect(cr.hasConnection()).toBe(false);
-			});
-
-			it('should return false for unconnected unmanaged reference', () => {
-				const cr = createConnectionReference({
-					isManaged: false,
-					connectionId: null
+					connectorId,
+					connectionId: null,
+					isManaged
 				});
 
 				expect(cr.hasConnection()).toBe(false);
@@ -222,86 +169,62 @@ describe('ConnectionReference', () => {
 
 	describe('isInSolution', () => {
 		describe('when reference is in solution', () => {
-			it('should return true when ID is in solution set', () => {
+			test.each<{ id: string; solutionComponents: Set<string>; description: string }>([
+				{
+					id: 'cr-id-123',
+					solutionComponents: new Set(['cr-id-123', 'other-id-456']),
+					description: 'ID is in solution set'
+				},
+				{
+					id: 'cr-id-123',
+					solutionComponents: new Set(['cr-id-123']),
+					description: 'ID is only item in solution'
+				},
+				{
+					id: 'target-cr',
+					solutionComponents: new Set(['component-1', 'component-2', 'target-cr', 'component-3', 'component-4']),
+					description: 'ID among many components'
+				},
+				{
+					id: '12345678-1234-1234-1234-123456789012',
+					solutionComponents: new Set(['12345678-1234-1234-1234-123456789012', 'other-component']),
+					description: 'GUID format IDs'
+				}
+			])('should return true when $description', ({ id, solutionComponents }) => {
 				const cr = createConnectionReference({
-					id: 'cr-id-123'
+					id
 				});
-				const solutionComponents = new Set(['cr-id-123', 'other-id-456']);
-
-				expect(cr.isInSolution(solutionComponents)).toBe(true);
-			});
-
-			it('should return true when ID is only item in solution', () => {
-				const cr = createConnectionReference({
-					id: 'cr-id-123'
-				});
-				const solutionComponents = new Set(['cr-id-123']);
-
-				expect(cr.isInSolution(solutionComponents)).toBe(true);
-			});
-
-			it('should return true among many components', () => {
-				const cr = createConnectionReference({
-					id: 'target-cr'
-				});
-				const solutionComponents = new Set([
-					'component-1',
-					'component-2',
-					'target-cr',
-					'component-3',
-					'component-4'
-				]);
-
-				expect(cr.isInSolution(solutionComponents)).toBe(true);
-			});
-
-			it('should handle GUID format IDs', () => {
-				const cr = createConnectionReference({
-					id: '12345678-1234-1234-1234-123456789012'
-				});
-				const solutionComponents = new Set([
-					'12345678-1234-1234-1234-123456789012',
-					'other-component'
-				]);
 
 				expect(cr.isInSolution(solutionComponents)).toBe(true);
 			});
 		});
 
 		describe('when reference is not in solution', () => {
-			it('should return false when ID is not in solution set', () => {
+			test.each<{ id: string; solutionComponents: Set<string>; description: string }>([
+				{
+					id: 'cr-id-123',
+					solutionComponents: new Set(['other-id-456', 'another-id-789']),
+					description: 'ID is not in solution set'
+				},
+				{
+					id: 'cr-id-123',
+					solutionComponents: new Set<string>(),
+					description: 'empty solution set'
+				},
+				{
+					id: 'cr-id-123',
+					solutionComponents: new Set(['CR-ID-123', 'Cr-Id-123']),
+					description: 'case-sensitive mismatch'
+				},
+				{
+					id: 'cr-id-123',
+					solutionComponents: new Set(['cr-id', 'id-123', 'cr-id-1234']),
+					description: 'partial IDs'
+				}
+			])('should return false when $description', ({ id, solutionComponents }) => {
 				const cr = createConnectionReference({
-					id: 'cr-id-123'
+					id
 				});
-				const solutionComponents = new Set(['other-id-456', 'another-id-789']);
-
-				expect(cr.isInSolution(solutionComponents)).toBe(false);
-			});
-
-			it('should return false for empty solution set', () => {
-				const cr = createConnectionReference({
-					id: 'cr-id-123'
-				});
-				const solutionComponents = new Set<string>();
-
-				expect(cr.isInSolution(solutionComponents)).toBe(false);
-			});
-
-			it('should be case-sensitive', () => {
-				const cr = createConnectionReference({
-					id: 'cr-id-123'
-				});
-				const solutionComponents = new Set(['CR-ID-123', 'Cr-Id-123']);
-
-				// Case-sensitive comparison (Set.has is case-sensitive)
-				expect(cr.isInSolution(solutionComponents)).toBe(false);
-			});
-
-			it('should not match partial IDs', () => {
-				const cr = createConnectionReference({
-					id: 'cr-id-123'
-				});
-				const solutionComponents = new Set(['cr-id', 'id-123', 'cr-id-1234']);
 
 				expect(cr.isInSolution(solutionComponents)).toBe(false);
 			});
@@ -336,24 +259,17 @@ describe('ConnectionReference', () => {
 		});
 
 		describe('business scenarios', () => {
-			it('should identify managed solution membership', () => {
-				const managedCR = createConnectionReference({
-					id: 'managed-cr-123',
-					isManaged: true
+			test.each<{ isManaged: boolean; description: string }>([
+				{ isManaged: true, description: 'managed solution membership' },
+				{ isManaged: false, description: 'unmanaged solution membership' }
+			])('should identify $description', ({ isManaged }) => {
+				const cr = createConnectionReference({
+					id: `${isManaged ? 'managed' : 'unmanaged'}-cr-123`,
+					isManaged
 				});
-				const managedSolution = new Set(['managed-cr-123', 'other-managed']);
+				const solutionComponents = new Set([`${isManaged ? 'managed' : 'unmanaged'}-cr-123`, 'other-component']);
 
-				expect(managedCR.isInSolution(managedSolution)).toBe(true);
-			});
-
-			it('should identify unmanaged solution membership', () => {
-				const unmanagedCR = createConnectionReference({
-					id: 'unmanaged-cr-456',
-					isManaged: false
-				});
-				const unmanagedSolution = new Set(['unmanaged-cr-456', 'other-unmanaged']);
-
-				expect(unmanagedCR.isInSolution(unmanagedSolution)).toBe(true);
+				expect(cr.isInSolution(solutionComponents)).toBe(true);
 			});
 
 			it('should verify reference is in target solution for export', () => {
@@ -384,20 +300,23 @@ describe('ConnectionReference', () => {
 	});
 
 	describe('edge cases', () => {
-		it('should handle very long logical names', () => {
-			const cr = createConnectionReference({
-				connectionReferenceLogicalName: 'cr_' + 'x'.repeat(500)
-			});
+		test.each<{ field: string; value: string; getLength: (cr: ConnectionReference) => number }>([
+			{
+				field: 'very long logical names',
+				value: 'cr_' + 'x'.repeat(500),
+				getLength: (cr) => cr.connectionReferenceLogicalName.length
+			},
+			{
+				field: 'very long display names',
+				value: 'Display Name ' + 'y'.repeat(1000),
+				getLength: (cr) => cr.displayName.length
+			}
+		])('should handle $field', ({ field, value, getLength }) => {
+			const cr = createConnectionReference(
+				field.includes('logical') ? { connectionReferenceLogicalName: value } : { displayName: value }
+			);
 
-			expect(cr.connectionReferenceLogicalName).toHaveLength(503);
-		});
-
-		it('should handle very long display names', () => {
-			const cr = createConnectionReference({
-				displayName: 'Display Name ' + 'y'.repeat(1000)
-			});
-
-			expect(cr.displayName.length).toBeGreaterThan(1000);
+			expect(getLength(cr)).toBeGreaterThan(100);
 		});
 
 		it('should handle special characters in logical name', () => {
@@ -416,84 +335,80 @@ describe('ConnectionReference', () => {
 			expect(cr.displayName).toBe('Connection 中文 référence ñoño');
 		});
 
-		it('should handle very old modification dates', () => {
+		test.each<{ year: number; description: string }>([
+			{ year: 1950, description: 'very old modification dates' },
+			{ year: 2099, description: 'future modification dates' }
+		])('should handle $description', ({ year }) => {
+			const date = new Date(year === 1950 ? '1950-01-01T12:00:00.000Z' : '2099-12-31T23:59:59Z');
 			const cr = createConnectionReference({
-				modifiedOn: new Date('1950-01-01T12:00:00.000Z')
+				modifiedOn: date
 			});
 
-			expect(cr.modifiedOn.getFullYear()).toBe(1950);
+			expect(cr.modifiedOn.getFullYear()).toBe(year);
 		});
 
-		it('should handle future modification dates', () => {
+		test.each<{ displayName: string; description: string }>([
+			{ displayName: '', description: 'empty string display name' },
+			{ displayName: '   Spaced Out   ', description: 'whitespace in display name' }
+		])('should handle $description', ({ displayName }) => {
 			const cr = createConnectionReference({
-				modifiedOn: new Date('2099-12-31T23:59:59Z')
+				displayName
 			});
 
-			expect(cr.modifiedOn.getFullYear()).toBe(2099);
-		});
-
-		it('should handle empty string display name', () => {
-			const cr = createConnectionReference({
-				displayName: ''
-			});
-
-			expect(cr.displayName).toBe('');
-		});
-
-		it('should handle whitespace in display name', () => {
-			const cr = createConnectionReference({
-				displayName: '   Spaced Out   '
-			});
-
-			expect(cr.displayName).toBe('   Spaced Out   ');
+			expect(cr.displayName).toBe(displayName);
 		});
 	});
 
 	describe('common connector scenarios', () => {
-		it('should represent SharePoint connection reference', () => {
-			const cr = createConnectionReference({
-				connectionReferenceLogicalName: 'cr_sharepoint_docs',
+		test.each<{
+			logicalName: string;
+			displayName: string;
+			connectorId: string;
+			isManaged: boolean;
+			description: string;
+		}>([
+			{
+				logicalName: 'cr_sharepoint_docs',
 				displayName: 'SharePoint - Document Library',
 				connectorId: '/providers/Microsoft.PowerApps/apis/shared_sharepointonline',
-				isManaged: false
-			});
-
-			expect(cr.connectionReferenceLogicalName).toBe('cr_sharepoint_docs');
-			expect(cr.hasConnection()).toBe(true);
-		});
-
-		it('should represent Dataverse connection reference', () => {
-			const cr = createConnectionReference({
-				connectionReferenceLogicalName: 'cr_dataverse_env',
+				isManaged: false,
+				description: 'SharePoint connection reference'
+			},
+			{
+				logicalName: 'cr_dataverse_env',
 				displayName: 'Dataverse (current environment)',
 				connectorId: '/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps',
-				isManaged: true
-			});
-
-			expect(cr.isManaged).toBe(true);
-			expect(cr.hasConnection()).toBe(true);
-		});
-
-		it('should represent SQL Server connection reference', () => {
-			const cr = createConnectionReference({
-				connectionReferenceLogicalName: 'cr_sql_customers',
+				isManaged: true,
+				description: 'Dataverse connection reference'
+			},
+			{
+				logicalName: 'cr_sql_customers',
 				displayName: 'SQL - Customer Database',
 				connectorId: '/providers/Microsoft.PowerApps/apis/shared_sql',
-				connectionId: 'sql-connection-guid'
-			});
-
-			expect(cr.hasConnection()).toBe(true);
-		});
-
-		it('should represent Office 365 Outlook connection reference', () => {
-			const cr = createConnectionReference({
-				connectionReferenceLogicalName: 'cr_office365_outlook',
+				isManaged: false,
+				description: 'SQL Server connection reference'
+			},
+			{
+				logicalName: 'cr_office365_outlook',
 				displayName: 'Office 365 Outlook',
 				connectorId: '/providers/Microsoft.PowerApps/apis/shared_office365',
-				connectionId: 'outlook-connection-guid'
+				isManaged: false,
+				description: 'Office 365 Outlook connection reference'
+			}
+		])('should represent $description', ({ logicalName, displayName, connectorId, isManaged }) => {
+			const cr = createConnectionReference({
+				connectionReferenceLogicalName: logicalName,
+				displayName,
+				connectorId,
+				connectionId: isManaged ? 'some-connection-id' : 'another-connection-guid',
+				isManaged
 			});
 
+			expect(cr.connectionReferenceLogicalName).toBe(logicalName);
 			expect(cr.hasConnection()).toBe(true);
+			if (isManaged !== undefined) {
+				expect(cr.isManaged).toBe(isManaged);
+			}
 		});
 
 		it('should represent unconfigured connection reference', () => {

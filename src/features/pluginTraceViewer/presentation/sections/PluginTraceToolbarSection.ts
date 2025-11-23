@@ -9,7 +9,7 @@ import { renderPluginTraceToolbar } from '../views/pluginTraceToolbarView';
 export class PluginTraceToolbarSection implements ISection {
 	public readonly position = SectionPosition.Header;
 
-	private traceLevel: string = 'Loading...';
+	private traceLevel = 'Loading...';
 
 	/**
 	 * Updates the current trace level display

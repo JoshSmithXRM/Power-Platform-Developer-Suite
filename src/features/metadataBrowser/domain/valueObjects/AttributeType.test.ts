@@ -168,28 +168,28 @@ describe('AttributeType', () => {
 
         it('should throw error for empty string', () => {
             // Arrange, Act & Assert
-            expect(() => AttributeType.create('')).toThrow('Attribute type cannot be empty');
+            expect(() => AttributeType.create('')).toThrow('Invalid AttributeType: cannot be empty');
         });
 
         it('should throw error for whitespace-only string', () => {
             // Arrange, Act & Assert
-            expect(() => AttributeType.create('   ')).toThrow('Attribute type cannot be empty');
+            expect(() => AttributeType.create('   ')).toThrow('Invalid AttributeType: cannot be empty');
         });
 
         it('should throw error for null/undefined', () => {
             // Arrange, Act & Assert
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Testing null input validation
-            expect(() => AttributeType.create(null as any)).toThrow('Attribute type cannot be empty');
+            expect(() => AttributeType.create(null as any)).toThrow('Invalid AttributeType: cannot be empty');
         });
 
         it('should throw error for unknown attribute type', () => {
             // Arrange, Act & Assert
-            expect(() => AttributeType.create('UnknownType')).toThrow('Unknown attribute type: "UnknownType"');
+            expect(() => AttributeType.create('UnknownType')).toThrow('Invalid AttributeType: unknown type "UnknownType"');
         });
 
         it('should throw error for invalid type with mixed case', () => {
             // Arrange, Act & Assert
-            expect(() => AttributeType.create('stringtype')).toThrow('Unknown attribute type: "stringtype"');
+            expect(() => AttributeType.create('stringtype')).toThrow('Invalid AttributeType: unknown type "stringtype"');
         });
     });
 

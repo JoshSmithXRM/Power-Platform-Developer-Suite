@@ -107,19 +107,19 @@ describe('OneToManyRelationship', () => {
         });
 
         it('should throw error when metadataId is empty string', () => {
-            expect(() => createValidRelationship({ metadataId: '' })).toThrow('Relationship metadata ID cannot be empty');
+            expect(() => createValidRelationship({ metadataId: '' })).toThrow('Invalid OneToManyRelationship: metadataId cannot be empty');
         });
 
         it('should throw error when metadataId is whitespace', () => {
-            expect(() => createValidRelationship({ metadataId: '   ' })).toThrow('Relationship metadata ID cannot be empty');
+            expect(() => createValidRelationship({ metadataId: '   ' })).toThrow('Invalid OneToManyRelationship: metadataId cannot be empty');
         });
 
         it('should throw error when schemaName is empty string', () => {
-            expect(() => createValidRelationship({ schemaName: '' })).toThrow('Relationship schema name cannot be empty');
+            expect(() => createValidRelationship({ schemaName: '' })).toThrow('Invalid OneToManyRelationship: schemaName cannot be empty');
         });
 
         it('should throw error when schemaName is whitespace', () => {
-            expect(() => createValidRelationship({ schemaName: '   ' })).toThrow('Relationship schema name cannot be empty');
+            expect(() => createValidRelationship({ schemaName: '   ' })).toThrow('Invalid OneToManyRelationship: schemaName cannot be empty');
         });
     });
 

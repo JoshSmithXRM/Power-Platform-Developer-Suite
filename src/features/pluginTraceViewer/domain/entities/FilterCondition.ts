@@ -18,7 +18,7 @@ export class FilterCondition {
 		public readonly field: FilterField,
 		public readonly operator: FilterOperator,
 		public readonly value: string,
-		public readonly enabled: boolean = true,
+		public readonly enabled = true,
 		public readonly logicalOperator: 'and' | 'or' = 'and'
 	) {
 		this.validateInvariants();
@@ -55,8 +55,7 @@ export class FilterCondition {
 	 * Delegates to ODataExpressionBuilder domain service.
 	 * Returns undefined if condition is disabled.
 	 */
-	// eslint-disable-next-line local-rules/no-presentation-methods-in-domain -- OData query building is domain logic (design decision, see technical design doc)
-	public toODataExpression(): string | undefined {
+	public buildExpression(): string | undefined {
 		const builder = new ODataExpressionBuilder();
 		return builder.buildExpression(this);
 	}
@@ -109,7 +108,6 @@ export class FilterCondition {
 	 * Factory: Creates default condition (Plugin Name Contains empty string, disabled).
 	 * Used for initializing new condition rows in UI.
 	 */
-	// eslint-disable-next-line local-rules/no-static-entity-methods -- Factory method for entity creation
 	static createDefault(): FilterCondition {
 		return new FilterCondition(
 			FilterField.PluginName,

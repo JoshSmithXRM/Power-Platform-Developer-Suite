@@ -28,15 +28,15 @@ export class EntityKey {
         entityKeyIndexStatus?: string | null;
     }): EntityKey {
         if (!props.metadataId || props.metadataId.trim().length === 0) {
-            throw new Error('Entity key metadata ID cannot be empty');
+            throw new Error('Invalid EntityKey: metadataId cannot be empty');
         }
 
         if (!props.displayName || props.displayName.trim().length === 0) {
-            throw new Error('Entity key display name cannot be empty');
+            throw new Error('Invalid EntityKey: displayName cannot be empty');
         }
 
         if (!props.keyAttributes || props.keyAttributes.length === 0) {
-            throw new Error('Entity key must have at least one attribute');
+            throw new Error('Invalid EntityKey: must have at least one attribute');
         }
 
         return new EntityKey(

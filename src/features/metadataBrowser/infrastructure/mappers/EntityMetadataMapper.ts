@@ -15,6 +15,14 @@ import { SecurityPrivilegeMapper } from './SecurityPrivilegeMapper';
  * Composes all sub-mappers to transform complete entity DTOs to domain entities.
  */
 export class EntityMetadataMapper {
+	/**
+	 * Creates an EntityMetadataMapper instance.
+	 *
+	 * @param attributeMapper - Mapper for attribute metadata
+	 * @param relationshipMapper - Mapper for relationship metadata
+	 * @param keyMapper - Mapper for entity key metadata
+	 * @param privilegeMapper - Mapper for security privilege metadata
+	 */
 	constructor(
 		private readonly attributeMapper: AttributeMetadataMapper,
 		private readonly relationshipMapper: RelationshipMetadataMapper,
@@ -24,6 +32,12 @@ export class EntityMetadataMapper {
 
 	/**
 	 * Maps a DTO to domain entity without attributes/relationships (for tree list).
+	 *
+	 * Lightweight mapping for metadata tree view where full attribute/relationship
+	 * details are not needed. Provides entity-level metadata only.
+	 *
+	 * @param dto - Entity metadata DTO from Dataverse API
+	 * @returns EntityMetadata domain entity with empty collections
 	 */
 	public mapDtoToEntityWithoutAttributes(dto: EntityMetadataDto): EntityMetadata {
 		return EntityMetadata.create({
@@ -58,6 +72,12 @@ export class EntityMetadataMapper {
 
 	/**
 	 * Maps a DTO to domain entity with full metadata (attributes, relationships, keys).
+	 *
+	 * Complete mapping for detail view including all attributes, relationships,
+	 * keys, and privileges. Composes sub-mappers to build full entity metadata.
+	 *
+	 * @param dto - Entity metadata DTO from Dataverse API
+	 * @returns EntityMetadata domain entity with complete metadata
 	 */
 	public mapDtoToEntityWithAttributes(dto: EntityMetadataDto): EntityMetadata {
 		const attributes = dto.Attributes?.map(attrDto => this.attributeMapper.mapDtoToEntity(attrDto)) || [];

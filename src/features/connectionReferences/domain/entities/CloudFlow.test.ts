@@ -24,26 +24,15 @@ describe('CloudFlow', () => {
 			expect(flow.clientData).toBe(clientData);
 		});
 
-		it('should create cloud flow with null client data', () => {
-			// Arrange
-			const clientData = null;
-
+		test.each<{ clientData: string | null; description: string }>([
+			{ clientData: null, description: 'null client data' },
+			{ clientData: '', description: 'empty string client data' }
+		])('should create cloud flow with $description', ({ clientData }) => {
 			// Act
 			const flow = createCloudFlow({ clientData });
 
 			// Assert
-			expect(flow.clientData).toBeNull();
-		});
-
-		it('should create cloud flow with empty string client data', () => {
-			// Arrange
-			const clientData = '';
-
-			// Act
-			const flow = createCloudFlow({ clientData });
-
-			// Assert
-			expect(flow.clientData).toBe('');
+			expect(flow.clientData).toBe(clientData);
 		});
 
 		it('should create unmanaged cloud flow', () => {
@@ -57,10 +46,10 @@ describe('CloudFlow', () => {
 			expect(flow.isManaged).toBe(false);
 		});
 
-		it('should throw ValidationError when client data is invalid JSON', () => {
-			// Arrange
-			const invalidJson = '{invalid json}';
-
+		test.each<{ invalidJson: string; description: string }>([
+			{ invalidJson: '{invalid json}', description: 'malformed JSON' },
+			{ invalidJson: 'not json at all', description: 'non-JSON string' }
+		])('should throw ValidationError when client data is $description', ({ invalidJson }) => {
 			// Act & Assert
 			expect(() => {
 				new CloudFlow(
@@ -137,37 +126,19 @@ describe('CloudFlow', () => {
 	});
 
 	describe('hasClientData', () => {
-		it('should return true when client data is non-empty string', () => {
+		test.each<{ clientData: string | null; expected: boolean; description: string }>([
+			{ clientData: '{"properties":{}}', expected: true, description: 'non-empty string' },
+			{ clientData: null, expected: false, description: 'null' },
+			{ clientData: '', expected: false, description: 'empty string' }
+		])('should return $expected when client data is $description', ({ clientData, expected }) => {
 			// Arrange
-			const flow = createCloudFlow({ clientData: '{"properties":{}}' });
+			const flow = createCloudFlow({ clientData });
 
 			// Act
 			const result = flow.hasClientData();
 
 			// Assert
-			expect(result).toBe(true);
-		});
-
-		it('should return false when client data is null', () => {
-			// Arrange
-			const flow = createCloudFlow({ clientData: null });
-
-			// Act
-			const result = flow.hasClientData();
-
-			// Assert
-			expect(result).toBe(false);
-		});
-
-		it('should return false when client data is empty string', () => {
-			// Arrange
-			const flow = createCloudFlow({ clientData: '' });
-
-			// Act
-			const result = flow.hasClientData();
-
-			// Assert
-			expect(result).toBe(false);
+			expect(result).toBe(expected);
 		});
 
 		it('should act as type guard narrowing client data to string', () => {
@@ -241,9 +212,32 @@ describe('CloudFlow', () => {
 			expect(names).toContain('cr_outlook');
 		});
 
-		it('should return empty array when client data is null', () => {
+		test.each<{ scenario: string; getClientData: () => string | null }>([
+			{ scenario: 'client data is null', getClientData: () => null },
+			{ scenario: 'client data is empty string', getClientData: () => '' },
+			{
+				scenario: 'properties is missing',
+				getClientData: () => JSON.stringify({ otherField: 'value' })
+			},
+			{
+				scenario: 'connectionReferences is missing',
+				getClientData: () => JSON.stringify({ properties: { otherField: 'value' } })
+			},
+			{
+				scenario: 'connectionReferences is null',
+				getClientData: () => JSON.stringify({ properties: { connectionReferences: null } })
+			},
+			{
+				scenario: 'connectionReferences is not an object',
+				getClientData: () => JSON.stringify({ properties: { connectionReferences: 'not an object' } })
+			},
+			{
+				scenario: 'connectionReferences is empty object',
+				getClientData: () => JSON.stringify({ properties: { connectionReferences: {} } })
+			}
+		])('should return empty array when $scenario', ({ getClientData }) => {
 			// Arrange
-			const flow = createCloudFlow({ clientData: null });
+			const flow = createCloudFlow({ clientData: getClientData() });
 
 			// Act
 			const names = flow.extractConnectionReferenceNames();
@@ -252,169 +246,62 @@ describe('CloudFlow', () => {
 			expect(names).toEqual([]);
 		});
 
-		it('should return empty array when client data is empty string', () => {
-			// Arrange
-			const flow = createCloudFlow({ clientData: '' });
-
-			// Act
-			const names = flow.extractConnectionReferenceNames();
-
-			// Assert
-			expect(names).toEqual([]);
-		});
-
-		it('should return empty array when properties is missing', () => {
-			// Arrange
-			const clientData = JSON.stringify({ otherField: 'value' });
-			const flow = createCloudFlow({ clientData });
-
-			// Act
-			const names = flow.extractConnectionReferenceNames();
-
-			// Assert
-			expect(names).toEqual([]);
-		});
-
-		it('should return empty array when connectionReferences is missing', () => {
-			// Arrange
-			const clientData = JSON.stringify({
-				properties: {
-					otherField: 'value'
-				}
-			});
-			const flow = createCloudFlow({ clientData });
-
-			// Act
-			const names = flow.extractConnectionReferenceNames();
-
-			// Assert
-			expect(names).toEqual([]);
-		});
-
-		it('should return empty array when connectionReferences is null', () => {
-			// Arrange
-			const clientData = JSON.stringify({
-				properties: {
-					connectionReferences: null
-				}
-			});
-			const flow = createCloudFlow({ clientData });
-
-			// Act
-			const names = flow.extractConnectionReferenceNames();
-
-			// Assert
-			expect(names).toEqual([]);
-		});
-
-		it('should return empty array when connectionReferences is not an object', () => {
-			// Arrange
-			const clientData = JSON.stringify({
-				properties: {
-					connectionReferences: 'not an object'
-				}
-			});
-			const flow = createCloudFlow({ clientData });
-
-			// Act
-			const names = flow.extractConnectionReferenceNames();
-
-			// Assert
-			expect(names).toEqual([]);
-		});
-
-		it('should return empty array when connectionReferences is empty object', () => {
-			// Arrange
-			const clientData = JSON.stringify({
-				properties: {
-					connectionReferences: {}
-				}
-			});
-			const flow = createCloudFlow({ clientData });
-
-			// Act
-			const names = flow.extractConnectionReferenceNames();
-
-			// Assert
-			expect(names).toEqual([]);
-		});
-
-		it('should skip connection reference without connection property', () => {
-			// Arrange
-			const clientData = JSON.stringify({
-				properties: {
-					connectionReferences: {
-						shared_sharepointonline: {
-							otherField: 'value'
-						}
-					}
-				}
-			});
-			const flow = createCloudFlow({ clientData });
-
-			// Act
-			const names = flow.extractConnectionReferenceNames();
-
-			// Assert
-			expect(names).toEqual([]);
-		});
-
-		it('should skip connection reference when connection is null', () => {
-			// Arrange
-			const clientData = JSON.stringify({
-				properties: {
-					connectionReferences: {
-						shared_sharepointonline: {
-							connection: null
-						}
-					}
-				}
-			});
-			const flow = createCloudFlow({ clientData });
-
-			// Act
-			const names = flow.extractConnectionReferenceNames();
-
-			// Assert
-			expect(names).toEqual([]);
-		});
-
-		it('should skip connection reference without connectionReferenceLogicalName', () => {
-			// Arrange
-			const clientData = JSON.stringify({
-				properties: {
-					connectionReferences: {
-						shared_sharepointonline: {
-							connection: {
+		test.each<{ scenario: string; getClientData: () => string }>([
+			{
+				scenario: 'connection reference without connection property',
+				getClientData: () => JSON.stringify({
+					properties: {
+						connectionReferences: {
+							shared_sharepointonline: {
 								otherField: 'value'
 							}
 						}
 					}
-				}
-			});
-			const flow = createCloudFlow({ clientData });
-
-			// Act
-			const names = flow.extractConnectionReferenceNames();
-
-			// Assert
-			expect(names).toEqual([]);
-		});
-
-		it('should skip connection reference when connectionReferenceLogicalName is not a string', () => {
-			// Arrange
-			const clientData = JSON.stringify({
-				properties: {
-					connectionReferences: {
-						shared_sharepointonline: {
-							connection: {
-								connectionReferenceLogicalName: 123
+				})
+			},
+			{
+				scenario: 'connection reference when connection is null',
+				getClientData: () => JSON.stringify({
+					properties: {
+						connectionReferences: {
+							shared_sharepointonline: {
+								connection: null
 							}
 						}
 					}
-				}
-			});
-			const flow = createCloudFlow({ clientData });
+				})
+			},
+			{
+				scenario: 'connection reference without connectionReferenceLogicalName',
+				getClientData: () => JSON.stringify({
+					properties: {
+						connectionReferences: {
+							shared_sharepointonline: {
+								connection: {
+									otherField: 'value'
+								}
+							}
+						}
+					}
+				})
+			},
+			{
+				scenario: 'connection reference when connectionReferenceLogicalName is not a string',
+				getClientData: () => JSON.stringify({
+					properties: {
+						connectionReferences: {
+							shared_sharepointonline: {
+								connection: {
+									connectionReferenceLogicalName: 123
+								}
+							}
+						}
+					}
+				})
+			}
+		])('should skip $scenario', ({ getClientData }) => {
+			// Arrange
+			const flow = createCloudFlow({ clientData: getClientData() });
 
 			// Act
 			const names = flow.extractConnectionReferenceNames();
@@ -480,67 +367,52 @@ describe('CloudFlow', () => {
 	});
 
 	describe('hasConnectionReferences', () => {
-		it('should return true when flow has connection references', () => {
-			// Arrange
-			const clientData = JSON.stringify({
-				properties: {
-					connectionReferences: {
-						shared_sharepointonline: {
-							connection: {
-								connectionReferenceLogicalName: 'cr_sharepoint'
+		test.each<{ scenario: string; getClientData: () => string | null; expected: boolean }>([
+			{
+				scenario: 'flow has connection references',
+				getClientData: () => JSON.stringify({
+					properties: {
+						connectionReferences: {
+							shared_sharepointonline: {
+								connection: {
+									connectionReferenceLogicalName: 'cr_sharepoint'
+								}
 							}
 						}
 					}
-				}
-			});
-			const flow = createCloudFlow({ clientData });
-
-			// Act
-			const result = flow.hasConnectionReferences();
-
-			// Assert
-			expect(result).toBe(true);
-		});
-
-		it('should return false when flow has no connection references', () => {
+				}),
+				expected: true
+			},
+			{
+				scenario: 'flow has no connection references',
+				getClientData: () => JSON.stringify({
+					properties: {
+						connectionReferences: {}
+					}
+				}),
+				expected: false
+			},
+			{
+				scenario: 'client data is null',
+				getClientData: () => null,
+				expected: false
+			},
+			{
+				scenario: 'connectionReferences section is missing',
+				getClientData: () => JSON.stringify({
+					properties: {}
+				}),
+				expected: false
+			}
+		])('should return $expected when $scenario', ({ getClientData, expected }) => {
 			// Arrange
-			const clientData = JSON.stringify({
-				properties: {
-					connectionReferences: {}
-				}
-			});
-			const flow = createCloudFlow({ clientData });
+			const flow = createCloudFlow({ clientData: getClientData() });
 
 			// Act
 			const result = flow.hasConnectionReferences();
 
 			// Assert
-			expect(result).toBe(false);
-		});
-
-		it('should return false when client data is null', () => {
-			// Arrange
-			const flow = createCloudFlow({ clientData: null });
-
-			// Act
-			const result = flow.hasConnectionReferences();
-
-			// Assert
-			expect(result).toBe(false);
-		});
-
-		it('should return false when connectionReferences section is missing', () => {
-			// Arrange
-			const clientData = JSON.stringify({
-				properties: {}
-			});
-			const flow = createCloudFlow({ clientData });
-
-			// Act
-			const result = flow.hasConnectionReferences();
-
-			// Assert
-			expect(result).toBe(false);
+			expect(result).toBe(expected);
 		});
 	});
 });

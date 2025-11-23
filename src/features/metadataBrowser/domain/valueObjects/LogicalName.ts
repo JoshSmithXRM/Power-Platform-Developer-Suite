@@ -29,14 +29,30 @@ export class LogicalName {
         return new LogicalName(value);
     }
 
+    /**
+     * Gets the underlying string value of the logical name.
+     *
+     * @returns Lowercase logical name string
+     */
     public getValue(): string {
         return this.value;
     }
 
+    /**
+     * Checks equality with another LogicalName.
+     *
+     * @param other - LogicalName to compare with
+     * @returns True if values are identical
+     */
     public equals(other: LogicalName): boolean {
         return this.value === other.value;
     }
 
+    /**
+     * Returns string representation of the logical name.
+     *
+     * @returns Lowercase logical name string
+     */
     public toString(): string {
         return this.value;
     }

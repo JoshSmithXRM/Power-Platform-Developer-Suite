@@ -18,7 +18,7 @@ describe('EnvironmentListViewModelMapper', () => {
 	function createEnvironment(
 		id: string,
 		name: string,
-		isActive: boolean = false,
+		isActive = false,
 		lastUsed?: Date
 	): Environment {
 		return new Environment(

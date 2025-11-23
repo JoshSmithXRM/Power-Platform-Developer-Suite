@@ -1,37 +1,25 @@
 import { IWhoAmIService } from '../../domain/interfaces/IWhoAmIService';
-import { IEnvironmentRepository } from '../../domain/interfaces/IEnvironmentRepository';
 import { AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
-import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
+import { createMockEnvironmentRepository, createNullLogger } from '../../../../shared/testing';
 
 import { TestConnectionUseCase, TestConnectionRequest } from './TestConnectionUseCase';
 
 describe('TestConnectionUseCase', () => {
 	let useCase: TestConnectionUseCase;
 	let mockWhoAmIService: jest.Mocked<IWhoAmIService>;
-	let mockRepository: jest.Mocked<IEnvironmentRepository>;
+	let mockRepository: ReturnType<typeof createMockEnvironmentRepository>;
 
 	beforeEach(() => {
 		mockWhoAmIService = {
 			testConnection: jest.fn()
 		};
 
-		mockRepository = {
-			getAll: jest.fn(),
-			getById: jest.fn(),
-			getByName: jest.fn(),
-			getActive: jest.fn(),
-			save: jest.fn(),
-			delete: jest.fn(),
-			isNameUnique: jest.fn(),
-			getClientSecret: jest.fn(),
-			getPassword: jest.fn(),
-			deleteSecrets: jest.fn()
-		};
+		mockRepository = createMockEnvironmentRepository();
 
 		useCase = new TestConnectionUseCase(
 			mockWhoAmIService,
 			mockRepository,
-			new NullLogger()
+			createNullLogger()
 		);
 	});
 
@@ -80,7 +68,7 @@ describe('TestConnectionUseCase', () => {
 
 			expect(result.success).toBe(true);
 			expect(mockWhoAmIService.testConnection).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				'super-secret',
 				undefined
 			);
@@ -106,7 +94,7 @@ describe('TestConnectionUseCase', () => {
 
 			expect(result.success).toBe(true);
 			expect(mockWhoAmIService.testConnection).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				undefined,
 				'secret-password'
 			);
@@ -168,7 +156,7 @@ describe('TestConnectionUseCase', () => {
 			expect(result.success).toBe(true);
 			expect(mockRepository.getClientSecret).toHaveBeenCalledWith('12345678-1234-1234-1234-123456789abc');
 			expect(mockWhoAmIService.testConnection).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				'stored-secret',
 				undefined
 			);
@@ -192,7 +180,7 @@ describe('TestConnectionUseCase', () => {
 			expect(result.success).toBe(true);
 			expect(mockRepository.getPassword).toHaveBeenCalledWith('admin@contoso.com');
 			expect(mockWhoAmIService.testConnection).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				undefined,
 				'stored-password'
 			);
@@ -216,7 +204,7 @@ describe('TestConnectionUseCase', () => {
 			// Should use provided secret, not stored
 			expect(mockRepository.getClientSecret).not.toHaveBeenCalled();
 			expect(mockWhoAmIService.testConnection).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				'new-secret',
 				undefined
 			);
@@ -253,7 +241,7 @@ describe('TestConnectionUseCase', () => {
 			await useCase.execute(request);
 
 			expect(mockWhoAmIService.testConnection).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				undefined,
 				undefined
 			);
@@ -295,7 +283,7 @@ describe('TestConnectionUseCase', () => {
 			const useCaseNoService = new TestConnectionUseCase(
 				null,
 				mockRepository,
-				new NullLogger()
+				createNullLogger()
 			);
 			const request = createValidRequest();
 

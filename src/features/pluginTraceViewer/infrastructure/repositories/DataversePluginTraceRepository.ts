@@ -70,6 +70,24 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 	private static readonly ENTITY_SET = 'plugintracelogs';
 	private static readonly ORGANIZATION_ENTITY = 'organizations';
 
+	/**
+	 * Maximum number of records to delete in a single batch operation.
+	 * Dataverse supports up to 1000, but 100 is safer for reliability and timeout prevention.
+	 */
+	private static readonly BATCH_DELETE_SIZE = 100;
+
+	/**
+	 * HTTP status code indicating successful deletion (No Content).
+	 * Used to count successful operations in batch responses.
+	 */
+	private static readonly HTTP_STATUS_DELETED = 204;
+
+	/**
+	 * Maximum number of results to return in a query.
+	 * Used when fetching all traces for deletion.
+	 */
+	private static readonly DEFAULT_TOP_LIMIT = 1;
+
 	constructor(
 		private readonly apiService: IDataverseApiService,
 		private readonly logger: ILogger
@@ -105,7 +123,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			queryParams.push(`$orderby=${filter.orderBy}`);
 		}
 
-		const odataFilter = filter.toODataFilter();
+		const odataFilter = filter.buildFilterExpression();
 		if (odataFilter) {
 			queryParams.push(`$filter=${odataFilter}`);
 			this.logger.info('Applied OData filter', {
@@ -270,7 +288,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 			{ environmentId, count: traceIds.length }
 		);
 
-		const batchSize = 100;
+		const batchSize = DataversePluginTraceRepository.BATCH_DELETE_SIZE;
 		let totalDeleted = 0;
 
 		for (let i = 0; i < traceIds.length; i += batchSize) {
@@ -397,7 +415,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		});
 
 		try {
-			const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ORGANIZATION_ENTITY}?$select=plugintracelogsetting&$top=1`;
+			const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ORGANIZATION_ENTITY}?$select=plugintracelogsetting&$top=${DataversePluginTraceRepository.DEFAULT_TOP_LIMIT}`;
 
 			const response =
 				await this.apiService.get<{
@@ -439,7 +457,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		});
 
 		try {
-			const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ORGANIZATION_ENTITY}?$select=organizationid&$top=1`;
+			const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ORGANIZATION_ENTITY}?$select=organizationid&$top=${DataversePluginTraceRepository.DEFAULT_TOP_LIMIT}`;
 
 			const response =
 				await this.apiService.get<{

@@ -13,7 +13,7 @@ import { IEnvironmentBehavior } from './IEnvironmentBehavior';
  * Manages solution dropdown, persistence, and filtering for data table panels.
  */
 export class SolutionFilterBehavior implements ISolutionFilterBehavior {
-	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
+	private currentSolutionId = DEFAULT_SOLUTION_ID;
 	private solutionFilterOptions: SolutionOption[] = [];
 
 	constructor(

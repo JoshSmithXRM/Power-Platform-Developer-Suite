@@ -127,7 +127,7 @@ describe('DataTablePanelCoordinator', () => {
 
 		// Cast is safe: MockWebviewPanel implements all WebviewPanel properties used by DataTablePanelCoordinator
 		dependencies = {
-			panel: panelMock as unknown as WebviewPanel,
+			panel: panelMock  as unknown as WebviewPanel,
 			getEnvironmentById: getEnvironmentByIdMock,
 			logger: loggerMock
 		};
@@ -333,7 +333,7 @@ describe('DataTablePanelCoordinator', () => {
 			// Cast is safe: MockWebviewPanel implements all WebviewPanel properties used by DataTablePanelCoordinator
 			const customDependencies = {
 				...dependencies,
-				panel: customPanelMock as unknown as WebviewPanel
+				panel: customPanelMock  as unknown as WebviewPanel
 			};
 
 			// Create coordinator which registers disposal handler

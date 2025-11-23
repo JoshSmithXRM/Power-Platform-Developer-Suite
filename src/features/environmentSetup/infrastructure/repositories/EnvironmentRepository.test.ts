@@ -8,7 +8,7 @@ import { TenantId } from '../../domain/valueObjects/TenantId';
 import { ClientId } from '../../domain/valueObjects/ClientId';
 import { AuthenticationMethod, AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
 import { EnvironmentDomainMapper } from '../mappers/EnvironmentDomainMapper';
-import { EnvironmentConnectionDto, PowerPlatformSettingsDto } from '../dtos/EnvironmentConnectionDto';
+import { EnvironmentConnectionDto, PowerPlatformSettingsDto } from '../../../../shared/application/dtos/EnvironmentConnectionDto';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 
 describe('EnvironmentRepository', () => {
@@ -19,10 +19,10 @@ describe('EnvironmentRepository', () => {
 	let mockLogger: jest.Mocked<ILogger>;
 
 	const createMockEnvironment = (
-		id: string = 'env-1',
-		name: string = 'Test Environment',
+		id = 'env-1',
+		name = 'Test Environment',
 		authMethod: AuthenticationMethodType = AuthenticationMethodType.Interactive,
-		isActive: boolean = false,
+		isActive = false,
 		clientId?: string,
 		username?: string
 	): Environment => {
@@ -42,10 +42,10 @@ describe('EnvironmentRepository', () => {
 	};
 
 	const createMockDto = (
-		id: string = 'env-1',
-		name: string = 'Test Environment',
+		id = 'env-1',
+		name = 'Test Environment',
 		authMethod: 'Interactive' | 'ServicePrincipal' | 'UsernamePassword' | 'DeviceCode' = 'Interactive',
-		isActive: boolean = false,
+		isActive = false,
 		clientId?: string,
 		username?: string
 	): EnvironmentConnectionDto => {

@@ -179,10 +179,10 @@ describe('PluginTraceDetailPanelBehavior', () => {
 				expect.objectContaining({
 					command: 'showDetailPanel',
 					data: expect.objectContaining({
-						trace: expect.any(Object),
-						rawEntity: expect.any(Object),
+						trace: expect.objectContaining({}),
+						rawEntity: expect.objectContaining({}),
 						relatedTraces: expect.any(Array),
-						timeline: expect.any(Object)
+						timeline: expect.objectContaining({})
 					})
 				})
 			);
@@ -314,9 +314,9 @@ describe('PluginTraceDetailPanelBehavior', () => {
 			await behavior.saveDetailPanelWidth(450, TEST_ENVIRONMENT_ID);
 
 			expect(mockPanelStateRepository.save).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				expect.objectContaining({
-					filterCriteria: expect.any(Object),
+					filterCriteria: expect.objectContaining({}),
 					autoRefreshInterval: 30,
 					detailPanelWidth: 450
 				})
@@ -381,7 +381,7 @@ describe('PluginTraceDetailPanelBehavior', () => {
 				expect.objectContaining({
 					command: 'showDetailPanel',
 					data: expect.objectContaining({
-						timeline: expect.any(Object)
+						timeline: expect.objectContaining({})
 					})
 				})
 			);
@@ -433,7 +433,7 @@ describe('PluginTraceDetailPanelBehavior', () => {
 					command: 'showDetailPanel',
 					data: expect.objectContaining({
 						relatedTraces: [],
-						timeline: expect.any(Object)
+						timeline: expect.objectContaining({})
 					})
 				})
 			);

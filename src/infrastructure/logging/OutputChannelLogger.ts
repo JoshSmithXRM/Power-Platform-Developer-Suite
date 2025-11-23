@@ -7,8 +7,22 @@ import { ILogger } from './ILogger';
  * Provides structured logging with automatic timestamps and level formatting
  */
 export class OutputChannelLogger implements ILogger {
+	/**
+	 * Creates an OutputChannelLogger instance.
+	 *
+	 * @param outputChannel - VS Code LogOutputChannel for logging output
+	 */
 	constructor(private readonly outputChannel: vscode.LogOutputChannel) {}
 
+	/**
+	 * Logs trace-level message with optional structured data.
+	 *
+	 * Trace level is for extremely verbose logging like loop iterations,
+	 * raw payloads, or method entry/exit points.
+	 *
+	 * @param message - Log message
+	 * @param args - Optional structured data to log
+	 */
 	public trace(message: string, ...args: unknown[]): void {
 		if (args.length > 0) {
 			const argsStr = args.map(arg => this.stringify(arg)).join('\n');
@@ -18,6 +32,15 @@ export class OutputChannelLogger implements ILogger {
 		}
 	}
 
+	/**
+	 * Logs debug-level message with optional structured data.
+	 *
+	 * Debug level is for technical details, method flow, and API calls
+	 * useful during development and troubleshooting.
+	 *
+	 * @param message - Log message
+	 * @param args - Optional structured data to log
+	 */
 	public debug(message: string, ...args: unknown[]): void {
 		if (args.length > 0) {
 			const argsStr = args.map(arg => this.stringify(arg)).join('\n');
@@ -27,6 +50,15 @@ export class OutputChannelLogger implements ILogger {
 		}
 	}
 
+	/**
+	 * Logs info-level message with optional structured data.
+	 *
+	 * Info level is for business events, use case completion,
+	 * and state changes important to users.
+	 *
+	 * @param message - Log message
+	 * @param args - Optional structured data to log
+	 */
 	public info(message: string, ...args: unknown[]): void {
 		if (args.length > 0) {
 			const argsStr = args.map(arg => this.stringify(arg)).join('\n');
@@ -36,6 +68,15 @@ export class OutputChannelLogger implements ILogger {
 		}
 	}
 
+	/**
+	 * Logs warning-level message with optional structured data.
+	 *
+	 * Warning level is for recoverable issues, fallbacks,
+	 * or missing optional configuration.
+	 *
+	 * @param message - Log message
+	 * @param args - Optional structured data to log
+	 */
 	public warn(message: string, ...args: unknown[]): void {
 		if (args.length > 0) {
 			const argsStr = args.map(arg => this.stringify(arg)).join('\n');
@@ -45,6 +86,15 @@ export class OutputChannelLogger implements ILogger {
 		}
 	}
 
+	/**
+	 * Logs error-level message with optional error object.
+	 *
+	 * Error level is for failures and exceptions. Always pass the error
+	 * object when available to include stack traces for debugging.
+	 *
+	 * @param message - Error message describing what failed
+	 * @param error - Optional error object or additional context
+	 */
 	public error(message: string, error?: unknown): void {
 		if (error instanceof Error) {
 			this.outputChannel.error(`${message}: ${error.message}`);

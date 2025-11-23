@@ -67,7 +67,7 @@ export class PluginTraceFilterService {
 					return `${c.field} ne null`;
 				default: {
 					const exhaustiveCheck: never = c.operator;
-					throw new Error(`Unsupported operator: ${exhaustiveCheck}`);
+					throw new Error(`Invalid FilterOperator: unsupported operator ${exhaustiveCheck}`);
 				}
 			}
 		});

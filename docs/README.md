@@ -24,12 +24,57 @@ Start with CLAUDE.md to understand the project's core principles, then refer to 
   - Dependency inversion and repository pattern
   - Real examples from Environment and Persistence Inspector features
 
+### Pattern Guides (Detailed Implementation)
+- [VALUE_OBJECT_PATTERNS.md](architecture/VALUE_OBJECT_PATTERNS.md) - Value Object implementation patterns
+  - Validation strategies (constructor, static factory, builder)
+  - Immutability and value equality
+  - When to use value objects vs primitives
+  - Production examples: EnvironmentId, EnvironmentName, FilterField
+
+- [DOMAIN_SERVICE_PATTERNS.md](architecture/DOMAIN_SERVICE_PATTERNS.md) - Domain Service patterns
+  - When to use services vs entity methods
+  - Collection services, validation services, query builders
+  - Stateless, pure domain logic
+  - Production examples: FlowConnectionRelationshipBuilder, PluginTraceFilterService
+
+- [MAPPER_PATTERNS.md](architecture/MAPPER_PATTERNS.md) - DTO ↔ Domain mapping patterns
+  - Sorting decision tree (domain service → mapper → ViewModel)
+  - ViewModel mappers, deployment settings mappers, infrastructure mappers
+  - When to delegate sorting vs inline sorting
+  - Production examples: SolutionViewModelMapper, EnvironmentVariableViewModelMapper
+
+- [REPOSITORY_PATTERNS.md](architecture/REPOSITORY_PATTERNS.md) - Repository implementation patterns
+  - DTO → domain mapping (inline vs injected mapper)
+  - Query building (static, dynamic, multi-step)
+  - Caching strategies (5-minute metadata cache)
+  - Batch operations and performance optimization
+  - Production examples: DataverseApiSolutionRepository, DataverseEntityMetadataRepository
+
 ### Infrastructure Documentation
 - [LOGGING_GUIDE.md](architecture/LOGGING_GUIDE.md) - Logging architecture and patterns
   - Layer boundaries for logging (domain has zero logging)
   - OutputChannel vs console.log usage
   - Webview logging with message bridge pattern
   - Dependency injection for ILogger
+
+---
+
+## 🧪 Testing Guides
+
+### Testing Patterns
+- [TESTING_GUIDE.md](testing/TESTING_GUIDE.md) - Comprehensive testing guide
+  - Inverted testing pyramid (heavy domain, light presentation)
+  - Coverage targets by layer (domain 95-100%, app 85-95%)
+  - Test data factories and mock helpers
+  - Shared testing setup utilities (src/shared/testing/setup/)
+  - Test-driven bug fix workflow
+
+- [INTEGRATION_TESTING_GUIDE.md](testing/INTEGRATION_TESTING_GUIDE.md) - Integration testing patterns
+  - Panel integration tests (panel + behaviors + coordinator + use cases)
+  - VS Code mocking patterns (webview, workspace state)
+  - Testing initialization workflows, command handling, state persistence
+  - Error scenario testing and edge case handling
+  - Production examples: ConnectionReferencesPanelComposed, EnvironmentSetupPanelComposed
 
 ---
 
@@ -96,12 +141,19 @@ Start with CLAUDE.md to understand the project's core principles, then refer to 
 
 ```
 docs/
-├── README.md                          (this file - master index)
-├── DOCUMENTATION_STYLE_GUIDE.md       (how to write docs)
-├── technical-debt/                    (categorized debt tracking)
+├── README.md                              (this file - master index)
+├── DOCUMENTATION_STYLE_GUIDE.md           (how to write docs)
+├── technical-debt/                        (categorized debt tracking)
 ├── architecture/
-│   ├── CLEAN_ARCHITECTURE_GUIDE.md    (implementation patterns)
-│   └── LOGGING_GUIDE.md               (logging architecture)
+│   ├── CLEAN_ARCHITECTURE_GUIDE.md        (core architecture patterns)
+│   ├── VALUE_OBJECT_PATTERNS.md           (value object implementation)
+│   ├── DOMAIN_SERVICE_PATTERNS.md         (domain service patterns)
+│   ├── MAPPER_PATTERNS.md                 (DTO ↔ domain mapping)
+│   ├── REPOSITORY_PATTERNS.md             (repository patterns)
+│   └── LOGGING_GUIDE.md                   (logging architecture)
+├── testing/
+│   ├── TESTING_GUIDE.md                   (unit testing patterns)
+│   └── INTEGRATION_TESTING_GUIDE.md       (integration testing patterns)
 └── design/
     ├── data-panel-suite-requirements.md
     └── data-panel-suite-design.md
@@ -118,6 +170,22 @@ docs/
 
 **Learn coding standards and rules**
 → Read [CLAUDE.md](../CLAUDE.md) in the project root
+
+**Implement a value object (immutable, validated)**
+→ Follow [VALUE_OBJECT_PATTERNS.md](architecture/VALUE_OBJECT_PATTERNS.md)
+
+**Create a domain service (collection, validation, query builder)**
+→ Follow [DOMAIN_SERVICE_PATTERNS.md](architecture/DOMAIN_SERVICE_PATTERNS.md)
+
+**Map between domain entities and ViewModels**
+→ Follow [MAPPER_PATTERNS.md](architecture/MAPPER_PATTERNS.md)
+
+**Implement a repository (API calls, DTO mapping)**
+→ Follow [REPOSITORY_PATTERNS.md](architecture/REPOSITORY_PATTERNS.md)
+
+**Write tests for my feature**
+→ Follow [TESTING_GUIDE.md](testing/TESTING_GUIDE.md) for unit tests
+→ Follow [INTEGRATION_TESTING_GUIDE.md](testing/INTEGRATION_TESTING_GUIDE.md) for panel integration tests
 
 **Add logging to my feature**
 → Follow [LOGGING_GUIDE.md](architecture/LOGGING_GUIDE.md)
@@ -138,16 +206,26 @@ docs/
 ### Essential Reading (Start Here)
 1. [CLAUDE.md](../CLAUDE.md) - Core principles (NEVER/ALWAYS rules)
 2. [CLEAN_ARCHITECTURE_GUIDE.md](architecture/CLEAN_ARCHITECTURE_GUIDE.md) - How we structure code
-3. [LOGGING_GUIDE.md](architecture/LOGGING_GUIDE.md) - How we log
+3. [TESTING_GUIDE.md](testing/TESTING_GUIDE.md) - How we test
+4. [LOGGING_GUIDE.md](architecture/LOGGING_GUIDE.md) - How we log
 
 ### For AI Assistants
 - [CLAUDE.md](../CLAUDE.md) - Quick reference with essential rules
-- [CLEAN_ARCHITECTURE_GUIDE.md](architecture/CLEAN_ARCHITECTURE_GUIDE.md) - Detailed architectural patterns
+- [CLEAN_ARCHITECTURE_GUIDE.md](architecture/CLEAN_ARCHITECTURE_GUIDE.md) - Architectural overview
+- **Pattern Guides** (detailed implementation):
+  - [VALUE_OBJECT_PATTERNS.md](architecture/VALUE_OBJECT_PATTERNS.md)
+  - [DOMAIN_SERVICE_PATTERNS.md](architecture/DOMAIN_SERVICE_PATTERNS.md)
+  - [MAPPER_PATTERNS.md](architecture/MAPPER_PATTERNS.md) - **Read this first to avoid sorting mistakes**
+  - [REPOSITORY_PATTERNS.md](architecture/REPOSITORY_PATTERNS.md)
+- **Testing Guides**:
+  - [TESTING_GUIDE.md](testing/TESTING_GUIDE.md) - Unit testing patterns
+  - [INTEGRATION_TESTING_GUIDE.md](testing/INTEGRATION_TESTING_GUIDE.md) - Panel integration tests
 - [DOCUMENTATION_STYLE_GUIDE.md](DOCUMENTATION_STYLE_GUIDE.md) - How to maintain/improve docs
 
 ### For Feature Development
 - [data-panel-suite-requirements.md](design/data-panel-suite-requirements.md) - Current feature requirements
 - [data-panel-suite-design.md](design/data-panel-suite-design.md) - Implementation approach
+- See [.claude/WORKFLOW.md](../.claude/WORKFLOW.md) for development workflows
 
 ---
 

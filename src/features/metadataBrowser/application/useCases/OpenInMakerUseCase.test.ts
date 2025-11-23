@@ -25,7 +25,7 @@ describe('OpenInMakerUseCase', () => {
 
         browserService = {
             openExternal: jest.fn()
-        } as jest.Mocked<IBrowserService>;
+        } as unknown as jest.Mocked<IBrowserService>;
 
         logger = new NullLogger();
         jest.spyOn(logger, 'debug');

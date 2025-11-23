@@ -78,15 +78,15 @@ export class AttributeMetadata {
         isRetrievable?: boolean;
     }): AttributeMetadata {
         if (!props.metadataId || props.metadataId.trim().length === 0) {
-            throw new Error('Attribute metadata ID cannot be empty');
+            throw new Error('Invalid AttributeMetadata: metadataId cannot be empty');
         }
 
         if (!props.displayName || props.displayName.trim().length === 0) {
-            throw new Error('Attribute display name cannot be empty');
+            throw new Error('Invalid AttributeMetadata: displayName cannot be empty');
         }
 
         if (props.maxLength !== undefined && props.maxLength !== null && props.maxLength < 0) {
-            throw new Error('Attribute max length cannot be negative');
+            throw new Error('Invalid AttributeMetadata: maxLength cannot be negative');
         }
 
         return new AttributeMetadata(

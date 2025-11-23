@@ -294,7 +294,7 @@ describe('EnvironmentScopedPanel', () => {
 
 				expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
 					'test.panel',
-					expect.any(String),
+					expect.stringMatching(/.+/),
 					ViewColumn.One,
 					expect.objectContaining({ enableScripts: true })
 				);
@@ -309,7 +309,7 @@ describe('EnvironmentScopedPanel', () => {
 				);
 
 				expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
-					expect.any(String),
+					expect.stringMatching(/.+/),
 					'Test Panel - Environment 1',
 					ViewColumn.One,
 					expect.objectContaining({ enableScripts: true })
@@ -327,7 +327,7 @@ describe('EnvironmentScopedPanel', () => {
 				);
 
 				expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
-					expect.any(String),
+					expect.stringMatching(/.+/),
 					'Test Panel - Unknown',
 					ViewColumn.One,
 					expect.objectContaining({ enableScripts: true })
@@ -343,8 +343,8 @@ describe('EnvironmentScopedPanel', () => {
 				);
 
 				expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
-					expect.any(String),
-					expect.any(String),
+					expect.stringMatching(/.+/),
+					expect.stringMatching(/.+/),
 					ViewColumn.One,
 					{
 						enableScripts: true,
@@ -399,8 +399,8 @@ describe('EnvironmentScopedPanel', () => {
 				);
 
 				expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
-					expect.any(String),
-					expect.any(String),
+					expect.stringMatching(/.+/),
+					expect.stringMatching(/.+/),
 					ViewColumn.One,
 					{
 						enableScripts: true,

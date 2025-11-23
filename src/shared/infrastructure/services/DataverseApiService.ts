@@ -9,6 +9,41 @@ import { normalizeError } from '../../utils/ErrorUtils';
  * Handles authentication token retrieval and request construction.
  */
 export class DataverseApiService implements IDataverseApiService {
+  /**
+   * Maximum number of retry attempts for failed requests.
+   * Retries transient failures (429, 503, 504, network errors).
+   */
+  private static readonly MAX_RETRY_ATTEMPTS = 3;
+
+  /**
+   * Base delay in milliseconds for exponential backoff calculation.
+   * Formula: 2^(attempt-1) * BASE_BACKOFF_MS = 1s, 2s, 4s for attempts 1, 2, 3.
+   */
+  private static readonly BASE_BACKOFF_MS = 1000;
+
+  /**
+   * HTTP status code for rate limiting (Too Many Requests).
+   * Triggers automatic retry with exponential backoff.
+   */
+  private static readonly HTTP_STATUS_RATE_LIMIT = 429;
+
+  /**
+   * HTTP status code for service unavailable.
+   * Triggers automatic retry with exponential backoff.
+   */
+  private static readonly HTTP_STATUS_SERVICE_UNAVAILABLE = 503;
+
+  /**
+   * HTTP status code for gateway timeout.
+   * Triggers automatic retry with exponential backoff.
+   */
+  private static readonly HTTP_STATUS_GATEWAY_TIMEOUT = 504;
+
+  /**
+   * HTTP status code for no content (successful deletion).
+   */
+  private static readonly HTTP_STATUS_NO_CONTENT = 204;
+
   constructor(
     private readonly getAccessToken: (environmentId: string) => Promise<string>,
     private readonly getEnvironmentUrl: (environmentId: string) => Promise<string>,
@@ -186,7 +221,7 @@ export class DataverseApiService implements IDataverseApiService {
     endpoint: string,
     body: unknown | undefined,
     cancellationToken?: ICancellationToken,
-    retries = 3
+    retries = DataverseApiService.MAX_RETRY_ATTEMPTS
   ): Promise<T> {
     if (cancellationToken?.isCancellationRequested) {
       throw new OperationCancelledException();
@@ -227,7 +262,7 @@ export class DataverseApiService implements IDataverseApiService {
       }
     }
 
-    throw new Error('Request failed after all retry attempts');
+    throw new Error('Dataverse API request failed: all retry attempts exhausted');
   }
 
   private async executeRequest<T>(
@@ -289,7 +324,7 @@ export class DataverseApiService implements IDataverseApiService {
       throw error;
     }
 
-    if (method === 'DELETE' || response.status === 204) {
+    if (method === 'DELETE' || response.status === DataverseApiService.HTTP_STATUS_NO_CONTENT) {
       return undefined as T;
     }
 
@@ -297,7 +332,7 @@ export class DataverseApiService implements IDataverseApiService {
 
     if (typeof data !== 'object' || data === null) {
       this.logger.error('Invalid API response: expected object', { data });
-      throw new Error('Invalid API response structure: expected object');
+      throw new Error('Invalid Dataverse API response: expected JSON object');
     }
 
     this.logger.debug('DataverseApiService: Request succeeded', { method, endpoint });
@@ -310,7 +345,9 @@ export class DataverseApiService implements IDataverseApiService {
    * Retryable: 429 (rate limit), 503/504 (service unavailable), network errors.
    */
   private isRetryableError(status: number, error: unknown): boolean {
-    if (status === 429 || status === 503 || status === 504) {
+    if (status === DataverseApiService.HTTP_STATUS_RATE_LIMIT ||
+        status === DataverseApiService.HTTP_STATUS_SERVICE_UNAVAILABLE ||
+        status === DataverseApiService.HTTP_STATUS_GATEWAY_TIMEOUT) {
       return true;
     }
 
@@ -328,7 +365,7 @@ export class DataverseApiService implements IDataverseApiService {
    * Formula: 2^(attempt-1) * 1000ms = 1s, 2s, 4s for attempts 1, 2, 3.
    */
   private calculateBackoff(attempt: number): number {
-    return Math.pow(2, attempt - 1) * 1000;
+    return Math.pow(2, attempt - 1) * DataverseApiService.BASE_BACKOFF_MS;
   }
 
   private async sleep(ms: number): Promise<void> {

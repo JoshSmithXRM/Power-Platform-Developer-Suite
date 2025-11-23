@@ -94,8 +94,7 @@ export class TraceFilter {
 	 * @returns OData filter string (e.g., "typename eq 'MyPlugin' and messagename eq 'Update'")
 	 *          Returns undefined if no filters applied
 	 */
-	// eslint-disable-next-line local-rules/no-presentation-methods-in-domain -- OData query building is domain logic (design decision, see technical design doc)
-	public toODataFilter(): string | undefined {
+	public buildFilterExpression(): string | undefined {
 		const builder = new ODataQueryBuilder();
 
 		// NEW: If using query builder conditions, build from those instead

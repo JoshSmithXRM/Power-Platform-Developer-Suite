@@ -40,7 +40,7 @@ describe('ListEnvironmentVariablesUseCase', () => {
 		displayName: string = schemaName,
 		type: EnvironmentVariableType = EnvironmentVariableType.String,
 		defaultValue: string | null = null,
-		isManaged: boolean = false
+		isManaged = false
 	): EnvironmentVariableDefinitionData {
 		return {
 			environmentvariabledefinitionid: id,
@@ -66,7 +66,7 @@ describe('ListEnvironmentVariablesUseCase', () => {
 		};
 	}
 
-	function createCancellationToken(isCancelled: boolean = false): ICancellationToken {
+	function createCancellationToken(isCancelled = false): ICancellationToken {
 		return {
 			isCancellationRequested: isCancelled,
 			onCancellationRequested: jest.fn()

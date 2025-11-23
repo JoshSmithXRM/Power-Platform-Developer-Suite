@@ -20,8 +20,8 @@ describe('ExecutionMode', () => {
 		});
 
 		test.each([
-			[2, 'Invalid execution mode: 2'],
-			[-1, 'Invalid execution mode: -1']
+			[2, 'Invalid ExecutionMode: unknown numeric value 2'],
+			[-1, 'Invalid ExecutionMode: unknown numeric value -1']
 		])('should throw error for invalid value %i', (value, expectedError) => {
 			expect(() => ExecutionMode.fromNumber(value)).toThrow(expectedError);
 		});

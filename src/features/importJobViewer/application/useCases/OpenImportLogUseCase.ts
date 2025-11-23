@@ -44,13 +44,13 @@ export class OpenImportLogUseCase {
 			);
 
 			if (!importJob.hasLog()) {
-				const error = new Error('Import job has no log data available');
+				const error = new Error('Cannot open import log: no log data available for this import job');
 				this.logger.warn('Import job has no log data', { importJobId });
 				throw error;
 			}
 
 			if (importJob.importLogXml === null) {
-				throw new Error('Unexpected: importLogXml is null after hasLog() check');
+				throw new Error('Internal error: importLogXml is null after hasLog() check');
 			}
 
 			await this.editorService.openXmlInNewTab(importJob.importLogXml);

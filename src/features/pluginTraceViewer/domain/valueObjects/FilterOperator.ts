@@ -46,7 +46,6 @@ export class FilterOperator {
 	/**
 	 * Gets operators applicable to a field type.
 	 */
-	// eslint-disable-next-line local-rules/no-static-entity-methods -- Lookup method for value object collection
 	static forFieldType(fieldType: 'text' | 'enum' | 'date' | 'number' | 'boolean' | 'guid'): FilterOperator[] {
 		return FilterOperator.All.filter(op => op.applicableTypes.includes(fieldType));
 	}
@@ -54,7 +53,6 @@ export class FilterOperator {
 	/**
 	 * Gets operator by display name.
 	 */
-	// eslint-disable-next-line local-rules/no-static-entity-methods -- Lookup method for value object collection
 	static fromDisplayName(displayName: string): FilterOperator | undefined {
 		return FilterOperator.All.find(op => op.displayName === displayName);
 	}
@@ -62,7 +60,6 @@ export class FilterOperator {
 	/**
 	 * Gets operator by OData operator string.
 	 */
-	// eslint-disable-next-line local-rules/no-static-entity-methods -- Lookup method for value object collection
 	static fromODataOperator(odataOperator: string): FilterOperator | undefined {
 		return FilterOperator.All.find(op => op.odataOperator === odataOperator);
 	}

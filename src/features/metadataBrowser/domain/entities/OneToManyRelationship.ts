@@ -39,11 +39,11 @@ export class OneToManyRelationship {
         securityTypes?: string | null;
     }): OneToManyRelationship {
         if (!props.metadataId || props.metadataId.trim().length === 0) {
-            throw new Error('Relationship metadata ID cannot be empty');
+            throw new Error('Invalid OneToManyRelationship: metadataId cannot be empty');
         }
 
         if (!props.schemaName || props.schemaName.trim().length === 0) {
-            throw new Error('Relationship schema name cannot be empty');
+            throw new Error('Invalid OneToManyRelationship: schemaName cannot be empty');
         }
 
         return new OneToManyRelationship(

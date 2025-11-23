@@ -69,7 +69,7 @@ export class VsCodeStorageClearer implements IStorageClearer {
 		const currentValue = this.globalState.get(key);
 
 		if (currentValue === undefined) {
-			throw new Error(`Key not found: ${key}`);
+			throw new Error(`Cannot clear property: global state key "${key}" not found`);
 		}
 
 		const updatedValue = this.deletePropertyAtPath(
@@ -93,7 +93,7 @@ export class VsCodeStorageClearer implements IStorageClearer {
 		const currentValue = this.workspaceState.get(key);
 
 		if (currentValue === undefined) {
-			throw new Error(`Key not found: ${key}`);
+			throw new Error(`Cannot clear property: workspace state key "${key}" not found`);
 		}
 
 		const updatedValue = this.deletePropertyAtPath(
@@ -202,13 +202,13 @@ export class VsCodeStorageClearer implements IStorageClearer {
 		}
 
 		if (typeof obj !== 'object' || obj === null) {
-			throw new Error('Cannot delete property from non-object');
+			throw new Error('Cannot delete property: target is not an object or array');
 		}
 
 		const [first, ...rest] = path;
 
 		if (first === undefined) {
-			throw new Error('Path segment is undefined');
+			throw new Error('Cannot delete property: path segment is undefined');
 		}
 
 		// Create discriminated union for type-safe handling

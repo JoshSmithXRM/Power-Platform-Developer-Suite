@@ -164,10 +164,10 @@ export class DeploymentSettings {
 
 		// Add or preserve existing entries
 		for (const entry of newEntries) {
-			const key: string = keySelector(entry);
+			const key = keySelector(entry);
 			if (existingMap.has(key)) {
 				// Preserve existing value (don't overwrite with environment value)
-				const existingValue: unknown = existingMap.get(key);
+				const existingValue = existingMap.get(key);
 				if (existingValue !== undefined) {
 					synced.push(createPreservedEntry(entry, existingValue));
 					stats.preserved++;
@@ -180,7 +180,7 @@ export class DeploymentSettings {
 		}
 
 		// Calculate removed count
-		const removed: number = existing.length - stats.preserved;
+		const removed = existing.length - stats.preserved;
 
 		// Sort alphabetically
 		synced.sort(comparator);

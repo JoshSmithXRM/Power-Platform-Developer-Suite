@@ -231,7 +231,7 @@ describe('ODataExpressionBuilder', () => {
 				expect(builder.buildExpression(condition)).toBe('exceptiondetails ne null');
 			});
 
-			it('should work with any nullable field', () => {
+			it('should build IsNull expression for any nullable entity field', () => {
 				const condition = new FilterCondition(
 					FilterField.EntityName,
 					FilterOperator.IsNull,

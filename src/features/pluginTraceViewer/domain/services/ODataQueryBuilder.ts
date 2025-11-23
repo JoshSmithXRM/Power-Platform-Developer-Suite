@@ -42,7 +42,7 @@ export class ODataQueryBuilder {
 			return undefined;
 		}
 
-		const firstExpression = firstCondition.toODataExpression();
+		const firstExpression = firstCondition.buildExpression();
 		if (!firstExpression) {
 			return undefined;
 		}
@@ -60,7 +60,7 @@ export class ODataQueryBuilder {
 				continue;
 			}
 
-			const expression = condition.toODataExpression();
+			const expression = condition.buildExpression();
 
 			if (expression) {
 				const operator = condition.logicalOperator === 'or' ? ' or ' : ' and ';

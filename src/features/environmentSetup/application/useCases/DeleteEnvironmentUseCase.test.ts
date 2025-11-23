@@ -2,14 +2,8 @@ import { DeleteEnvironmentUseCase, DeleteEnvironmentRequest } from './DeleteEnvi
 import { IEnvironmentRepository } from '../../domain/interfaces/IEnvironmentRepository';
 import { IDomainEventPublisher } from '../interfaces/IDomainEventPublisher';
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
-import { Environment } from '../../domain/entities/Environment';
-import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
-import { EnvironmentName } from '../../domain/valueObjects/EnvironmentName';
-import { DataverseUrl } from '../../domain/valueObjects/DataverseUrl';
-import { TenantId } from '../../domain/valueObjects/TenantId';
-import { ClientId } from '../../domain/valueObjects/ClientId';
-import { AuthenticationMethod, AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
 import { ApplicationError } from '../errors/ApplicationError';
+import { createTestEnvironment } from '../../../../shared/testing/factories/EnvironmentFactory';
 
 describe('DeleteEnvironmentUseCase', () => {
 	let useCase: DeleteEnvironmentUseCase;
@@ -42,22 +36,6 @@ describe('DeleteEnvironmentUseCase', () => {
 		);
 	});
 
-	function createTestEnvironment(
-		id: string,
-		name: string,
-		isActive: boolean = false
-	): Environment {
-		return new Environment(
-			new EnvironmentId(id),
-			new EnvironmentName(name),
-			new DataverseUrl('https://contoso.crm.dynamics.com'),
-			new TenantId('00000000-0000-0000-0000-000000000000'),
-			new AuthenticationMethod(AuthenticationMethodType.Interactive),
-			new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'),
-			isActive
-		);
-	}
-
 	function createDeleteRequest(environmentId: string): DeleteEnvironmentRequest {
 		return { environmentId };
 	}
@@ -65,7 +43,7 @@ describe('DeleteEnvironmentUseCase', () => {
 	describe('successful deletion flow', () => {
 		it('should call repository.delete with correct environment ID', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Development');
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Development' });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -85,7 +63,7 @@ describe('DeleteEnvironmentUseCase', () => {
 
 		it('should publish EnvironmentDeleted event', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Development');
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Development' });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -106,7 +84,7 @@ describe('DeleteEnvironmentUseCase', () => {
 
 		it('should publish EnvironmentDeleted event with correct wasActive flag', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Production', true);
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Production', isActive: true });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -127,7 +105,7 @@ describe('DeleteEnvironmentUseCase', () => {
 
 		it('should publish AuthenticationCacheInvalidationRequested event', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Development');
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Development' });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -147,7 +125,7 @@ describe('DeleteEnvironmentUseCase', () => {
 
 		it('should publish both events in correct order', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Development');
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Development' });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -167,7 +145,7 @@ describe('DeleteEnvironmentUseCase', () => {
 	describe('secret cleanup', () => {
 		it('should retrieve environment before deletion', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Development');
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Development' });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -187,7 +165,7 @@ describe('DeleteEnvironmentUseCase', () => {
 
 		it('should call repository.delete which handles secret cleanup', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Development');
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Development' });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -237,7 +215,7 @@ describe('DeleteEnvironmentUseCase', () => {
 
 		it('should throw error when repository.delete fails', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Development');
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Development' });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -249,7 +227,7 @@ describe('DeleteEnvironmentUseCase', () => {
 
 		it('should not publish events when repository.delete fails', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Development');
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Development' });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -275,7 +253,7 @@ describe('DeleteEnvironmentUseCase', () => {
 	describe('edge cases', () => {
 		it('should handle environment with no secrets', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Development');
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Development' });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -287,7 +265,7 @@ describe('DeleteEnvironmentUseCase', () => {
 
 		it('should delete inactive environment', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Development', false);
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Development', isActive: false });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -303,7 +281,7 @@ describe('DeleteEnvironmentUseCase', () => {
 
 		it('should delete active environment', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Production', true);
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Production', isActive: true });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -324,7 +302,7 @@ describe('DeleteEnvironmentUseCase', () => {
 		it('should handle environment ID with special characters', async () => {
 			// Arrange
 			const specialId = 'env-123-abc-xyz';
-			const environment = createTestEnvironment(specialId, 'Special Environment');
+			const environment = createTestEnvironment({ id: specialId, name: 'Special Environment' });
 			const request = createDeleteRequest(specialId);
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -343,7 +321,7 @@ describe('DeleteEnvironmentUseCase', () => {
 
 		it('should handle environment with special characters in name', async () => {
 			// Arrange
-			const environment = createTestEnvironment('env-123', 'Dev-Test (2024)');
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Dev-Test (2024)' });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -364,7 +342,7 @@ describe('DeleteEnvironmentUseCase', () => {
 	describe('business logic validation', () => {
 		it('should enforce deletion prevents accidental data loss', async () => {
 			// Arrange - Critical: Deleting active environment
-			const environment = createTestEnvironment('env-123', 'Production', true);
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Production', isActive: true });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);
@@ -384,7 +362,7 @@ describe('DeleteEnvironmentUseCase', () => {
 
 		it('should complete deletion workflow atomically', async () => {
 			// Arrange - Ensures all steps complete or none do
-			const environment = createTestEnvironment('env-123', 'Development');
+			const environment = createTestEnvironment({ id: 'env-123', name: 'Development' });
 			const request = createDeleteRequest('env-123');
 
 			mockRepository.getById.mockResolvedValue(environment);

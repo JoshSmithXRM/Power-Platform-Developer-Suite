@@ -4,6 +4,7 @@ import { OperationCancelledException } from '../../../../shared/domain/errors/Op
 import { ValidationError } from '../../../../shared/domain/errors/ValidationError';
 import { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import { Solution } from '../../domain/entities/Solution';
+import { assertDefined, createMockDataverseApiService, createMockLogger } from '../../../../shared/testing';
 
 import { DataverseApiSolutionRepository } from './DataverseApiSolutionRepository';
 
@@ -13,22 +14,8 @@ describe('DataverseApiSolutionRepository', () => {
 	let mockLogger: jest.Mocked<ILogger>;
 
 	beforeEach(() => {
-		mockApiService = {
-			get: jest.fn(),
-			post: jest.fn(),
-			patch: jest.fn(),
-			delete: jest.fn(),
-			batchDelete: jest.fn()
-		};
-
-		mockLogger = {
-			trace: jest.fn(),
-		debug: jest.fn(),
-			info: jest.fn(),
-			warn: jest.fn(),
-			error: jest.fn()
-		};
-
+		mockApiService = createMockDataverseApiService();
+		mockLogger = createMockLogger();
 		repository = new DataverseApiSolutionRepository(mockApiService, mockLogger);
 	});
 
@@ -62,14 +49,14 @@ describe('DataverseApiSolutionRepository', () => {
 				undefined
 			);
 			expect(result).toHaveLength(1);
-			expect(result[0]).toBeDefined();
+			assertDefined(result[0]);
 			expect(result[0]).toBeInstanceOf(Solution);
-			expect(result[0]!.id).toBe('sol-1');
-			expect(result[0]!.uniqueName).toBe('TestSolution');
-			expect(result[0]!.friendlyName).toBe('Test Solution');
-			expect(result[0]!.version).toBe('1.0.0.0');
-			expect(result[0]!.isManaged).toBe(false);
-			expect(result[0]!.publisherName).toBe('Test Publisher');
+			expect(result[0].id).toBe('sol-1');
+			expect(result[0].uniqueName).toBe('TestSolution');
+			expect(result[0].friendlyName).toBe('Test Solution');
+			expect(result[0].version).toBe('1.0.0.0');
+			expect(result[0].isManaged).toBe(false);
+			expect(result[0].publisherName).toBe('Test Publisher');
 		});
 
 		it('should handle null installedOn date', async () => {
@@ -95,8 +82,8 @@ describe('DataverseApiSolutionRepository', () => {
 
 			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0]).toBeDefined();
-			expect(result[0]!.installedOn).toBeNull();
+			assertDefined(result[0]);
+			expect(result[0].installedOn).toBeNull();
 		});
 
 		it('should handle null description', async () => {
@@ -122,8 +109,8 @@ describe('DataverseApiSolutionRepository', () => {
 
 			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0]).toBeDefined();
-			expect(result[0]!.description).toBe('');
+			assertDefined(result[0]);
+			expect(result[0].description).toBe('');
 		});
 
 		it('should handle missing publisher friendly name', async () => {
@@ -146,8 +133,8 @@ describe('DataverseApiSolutionRepository', () => {
 
 			const result = await repository.findAll('env-123', undefined, undefined);
 
-			expect(result[0]).toBeDefined();
-			expect(result[0]!.publisherName).toBe('Unknown');
+			assertDefined(result[0]);
+			expect(result[0].publisherName).toBe('Unknown');
 		});
 
 		it('should handle multiple solutions', async () => {
@@ -183,10 +170,10 @@ describe('DataverseApiSolutionRepository', () => {
 			const result = await repository.findAll('env-123', undefined, undefined);
 
 			expect(result).toHaveLength(2);
-			expect(result[0]).toBeDefined();
-			expect(result[0]!.uniqueName).toBe('Solution1');
-			expect(result[1]).toBeDefined();
-			expect(result[1]!.uniqueName).toBe('Solution2');
+			assertDefined(result[0]);
+			expect(result[0].uniqueName).toBe('Solution1');
+			assertDefined(result[1]);
+			expect(result[1].uniqueName).toBe('Solution2');
 		});
 
 		it('should handle empty solution list', async () => {

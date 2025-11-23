@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 import { IStorageReader } from '../../domain/interfaces/IStorageReader';
-import { EnvironmentConnectionDto } from '../../../environmentSetup/infrastructure/dtos/EnvironmentConnectionDto';
+import { EnvironmentConnectionDto } from '../../../../shared/application/dtos/EnvironmentConnectionDto';
 
 /**
  * Infrastructure implementation of storage reading using VS Code APIs
@@ -42,10 +42,10 @@ export class VsCodeStorageReader implements IStorageReader {
 	 */
 	public async readAllWorkspaceState(): Promise<Map<string, unknown>> {
 		const entries = new Map<string, unknown>();
-		const keys: readonly string[] = this.workspaceState.keys();
+		const keys = this.workspaceState.keys();
 
 		for (const key of keys) {
-			const value: unknown = this.workspaceState.get(key);
+			const value = this.workspaceState.get(key);
 			entries.set(key, value);
 		}
 

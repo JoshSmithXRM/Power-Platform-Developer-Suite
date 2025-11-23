@@ -58,7 +58,7 @@ export class FileSystemDeploymentSettingsRepository implements IDeploymentSettin
 
 			// Validate structure
 			if (!json || typeof json !== 'object') {
-				throw new Error('Invalid deployment settings file: root must be an object');
+				throw new Error('Cannot read deployment settings: file root must be a JSON object');
 			}
 
 			const jsonObj = json as Record<string, unknown>;
@@ -70,7 +70,7 @@ export class FileSystemDeploymentSettingsRepository implements IDeploymentSettin
 					const entry: unknown = jsonObj['EnvironmentVariables'][i];
 					if (!isEnvironmentVariableEntry(entry)) {
 						throw new Error(
-							`Invalid EnvironmentVariables entry at index ${i}: expected object with SchemaName (string) and Value (string)`
+							`Cannot read deployment settings: invalid EnvironmentVariables entry at index ${i}, expected object with SchemaName and Value properties`
 						);
 					}
 					environmentVariables.push(entry);
@@ -84,7 +84,7 @@ export class FileSystemDeploymentSettingsRepository implements IDeploymentSettin
 					const entry: unknown = jsonObj['ConnectionReferences'][i];
 					if (!isConnectionReferenceEntry(entry)) {
 						throw new Error(
-							`Invalid ConnectionReferences entry at index ${i}: expected object with LogicalName (string), ConnectionId (string), and ConnectorId (string)`
+							`Cannot read deployment settings: invalid ConnectionReferences entry at index ${i}, expected object with LogicalName, ConnectionId, and ConnectorId properties`
 						);
 					}
 					connectionReferences.push(entry);

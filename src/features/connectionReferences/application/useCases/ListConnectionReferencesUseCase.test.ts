@@ -41,7 +41,10 @@ describe('ListConnectionReferencesUseCase', () => {
 			buildRelationshipsForFlow: jest.fn(),
 			createFlowToConnectionReferenceRelationship: jest.fn(),
 			buildManyToManyRelationships: jest.fn(),
-			createConnectionReferenceToFlowsRelationship: jest.fn()
+			createConnectionReferenceToFlowsRelationship: jest.fn(),
+			createOrphanedFlowRelationship: jest.fn(),
+			buildOrphanedConnectionReferenceRelationships: jest.fn(),
+			createOrphanedConnectionReferenceRelationship: jest.fn()
 		} as unknown as jest.Mocked<FlowConnectionRelationshipBuilder>;
 
 		useCase = new ListConnectionReferencesUseCase(
@@ -56,7 +59,7 @@ describe('ListConnectionReferencesUseCase', () => {
 	function createTestCloudFlow(
 		id: string,
 		name: string,
-		isManaged: boolean = false,
+		isManaged = false,
 		clientData: string | null = null
 	): CloudFlow {
 		return new CloudFlow(
@@ -75,7 +78,7 @@ describe('ListConnectionReferencesUseCase', () => {
 		displayName: string,
 		connectorId: string | null = '/providers/Microsoft.PowerApps/apis/shared_sharepointonline',
 		connectionId: string | null = 'conn-123',
-		isManaged: boolean = false
+		isManaged = false
 	): ConnectionReference {
 		return new ConnectionReference(
 			id,
@@ -109,7 +112,7 @@ describe('ListConnectionReferencesUseCase', () => {
 		);
 	}
 
-	function createCancellationToken(isCancelled: boolean = false): ICancellationToken {
+	function createCancellationToken(isCancelled = false): ICancellationToken {
 		return {
 			isCancellationRequested: isCancelled,
 			onCancellationRequested: jest.fn()
@@ -188,7 +191,7 @@ describe('ListConnectionReferencesUseCase', () => {
 			// Assert
 			expect(mockFlowRepository.findAll).toHaveBeenCalledWith(
 				testEnvironmentId,
-				expect.any(Object),
+				expect.objectContaining({}),
 				cancellationToken
 			);
 			expect(mockConnectionRefRepository.findAll).toHaveBeenCalledWith(
@@ -763,6 +766,365 @@ describe('ListConnectionReferencesUseCase', () => {
 			const calls = mockSolutionComponentRepository.findComponentIdsBySolution.mock.calls;
 			expect(calls[0]![2]).toBe('subscription');
 			expect(calls[1]![2]).toBe('connectionreference');
+		});
+	});
+
+	describe('edge cases - network and timeout failures', () => {
+		it('should propagate network timeout from flow repository', async () => {
+			// Arrange
+			const timeoutError = new Error('Network timeout fetching flows');
+			mockFlowRepository.findAll.mockRejectedValue(timeoutError);
+
+			// Act & Assert
+			await expect(useCase.execute(testEnvironmentId))
+				.rejects
+				.toThrow('Network timeout fetching flows');
+		});
+
+		it('should propagate network timeout from connection reference repository', async () => {
+			// Arrange
+			const timeoutError = new Error('Network timeout fetching connection references');
+			mockFlowRepository.findAll.mockResolvedValue([]);
+			mockConnectionRefRepository.findAll.mockRejectedValue(timeoutError);
+
+			// Act & Assert
+			await expect(useCase.execute(testEnvironmentId))
+				.rejects
+				.toThrow('Network timeout fetching connection references');
+		});
+
+		it('should propagate authentication failure from repositories', async () => {
+			// Arrange
+			const authError = new Error('Authentication token expired');
+			mockFlowRepository.findAll.mockRejectedValue(authError);
+
+			// Act & Assert
+			await expect(useCase.execute(testEnvironmentId))
+				.rejects
+				.toThrow('Authentication token expired');
+		});
+
+		it('should handle permission denied errors', async () => {
+			// Arrange
+			const permissionError = new Error('Insufficient privileges to read flows');
+			mockFlowRepository.findAll.mockRejectedValue(permissionError);
+
+			// Act & Assert
+			await expect(useCase.execute(testEnvironmentId))
+				.rejects
+				.toThrow('Insufficient privileges to read flows');
+		});
+
+		it('should handle API rate limiting errors', async () => {
+			// Arrange
+			const rateLimitError = new Error('API rate limit exceeded');
+			mockConnectionRefRepository.findAll.mockResolvedValue([]);
+			mockFlowRepository.findAll.mockRejectedValue(rateLimitError);
+
+			// Act & Assert
+			await expect(useCase.execute(testEnvironmentId))
+				.rejects
+				.toThrow('API rate limit exceeded');
+		});
+
+		it('should handle solution component repository timeout', async () => {
+			// Arrange
+			const timeoutError = new Error('Timeout fetching solution components');
+			mockFlowRepository.findAll.mockResolvedValue([]);
+			mockConnectionRefRepository.findAll.mockResolvedValue([]);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockRejectedValue(timeoutError);
+
+			// Act & Assert
+			await expect(useCase.execute(testEnvironmentId, testSolutionId))
+				.rejects
+				.toThrow('Timeout fetching solution components');
+		});
+	});
+
+	describe('edge cases - relationship builder failures', () => {
+		it('should propagate relationship builder errors', async () => {
+			// Arrange
+			const builderError = new Error('Failed to parse flow client data');
+			mockFlowRepository.findAll.mockResolvedValue([]);
+			mockConnectionRefRepository.findAll.mockResolvedValue([]);
+			mockRelationshipBuilder.buildRelationships.mockImplementation(() => {
+				throw builderError;
+			});
+
+			// Act & Assert
+			await expect(useCase.execute(testEnvironmentId))
+				.rejects
+				.toThrow('Failed to parse flow client data');
+		});
+
+		it('should handle relationship builder throwing for complex data', async () => {
+			// Arrange
+			const flows = [
+				createTestCloudFlow('flow-1', 'Flow 1', false, '{"properties":{}}')
+			];
+			const connectionRefs = [
+				createTestConnectionReference('cr-1', 'cr_sharepoint', 'SharePoint')
+			];
+
+			mockFlowRepository.findAll.mockResolvedValue(flows);
+			mockConnectionRefRepository.findAll.mockResolvedValue(connectionRefs);
+			mockRelationshipBuilder.buildRelationships.mockImplementation(() => {
+				throw new Error('Relationship building failed');
+			});
+
+			// Act & Assert
+			await expect(useCase.execute(testEnvironmentId))
+				.rejects
+				.toThrow('Relationship building failed');
+		});
+	});
+
+	describe('edge cases - concurrent and race conditions', () => {
+		it('should handle simultaneous executions for same environment', async () => {
+			// Arrange
+			mockFlowRepository.findAll.mockResolvedValue([]);
+			mockConnectionRefRepository.findAll.mockResolvedValue([]);
+			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+
+			// Act - Execute concurrently
+			const [result1, result2, result3] = await Promise.all([
+				useCase.execute(testEnvironmentId),
+				useCase.execute(testEnvironmentId),
+				useCase.execute(testEnvironmentId)
+			]);
+
+			// Assert
+			expect(result1.relationships).toHaveLength(0);
+			expect(result2.relationships).toHaveLength(0);
+			expect(result3.relationships).toHaveLength(0);
+			expect(mockFlowRepository.findAll).toHaveBeenCalledTimes(3);
+		});
+
+		it('should handle data changes between parallel fetch operations', async () => {
+			// Arrange - Simulate flows arriving after connection refs fetched
+			let flowCallCount = 0;
+			mockFlowRepository.findAll.mockImplementation(async () => {
+				flowCallCount++;
+				if (flowCallCount === 1) {
+					return [];
+				}
+				return [createTestCloudFlow('flow-1', 'New Flow')];
+			});
+			mockConnectionRefRepository.findAll.mockResolvedValue([]);
+			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+
+			// Act
+			const result = await useCase.execute(testEnvironmentId);
+
+			// Assert - Should work with snapshot at time of fetch
+			expect(result.relationships).toHaveLength(0);
+		});
+
+		it('should handle flows being deleted during fetch', async () => {
+			// Arrange
+			const flows = [createTestCloudFlow('flow-to-be-deleted', 'Flow')];
+			mockFlowRepository.findAll.mockResolvedValue(flows);
+			mockConnectionRefRepository.findAll.mockResolvedValue([]);
+			// Builder might not find the flow anymore
+			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+
+			// Act
+			const result = await useCase.execute(testEnvironmentId);
+
+			// Assert
+			expect(result.relationships).toHaveLength(0);
+		});
+	});
+
+	describe('edge cases - data integrity and validation', () => {
+		it('should handle flows with null clientdata', async () => {
+			// Arrange
+			const flows = [
+				createTestCloudFlow('flow-1', 'Flow with null clientdata', false, null)
+			];
+			const connectionRefs = [
+				createTestConnectionReference('cr-1', 'cr_sharepoint', 'SharePoint')
+			];
+
+			mockFlowRepository.findAll.mockResolvedValue(flows);
+			mockConnectionRefRepository.findAll.mockResolvedValue(connectionRefs);
+			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+
+			// Act
+			const result = await useCase.execute(testEnvironmentId);
+
+			// Assert
+			expect(result.relationships).toHaveLength(0);
+		});
+
+		it('should handle connection references with null connector ID', async () => {
+			// Arrange
+			const flows = [createTestCloudFlow('flow-1', 'Flow 1')];
+			const connectionRefs = [
+				createTestConnectionReference('cr-1', 'cr_null_connector', 'No Connector', null, null)
+			];
+
+			mockFlowRepository.findAll.mockResolvedValue(flows);
+			mockConnectionRefRepository.findAll.mockResolvedValue(connectionRefs);
+			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+
+			// Act
+			const result = await useCase.execute(testEnvironmentId);
+
+			// Assert
+			expect(result.connectionReferences).toHaveLength(1);
+			expect(result.connectionReferences[0]!.connectorId).toBeNull();
+		});
+
+		it('should handle invalid environment ID format', async () => {
+			// Arrange
+			const invalidEnvId = '';
+			const validationError = new Error('Invalid environment ID');
+			mockFlowRepository.findAll.mockRejectedValue(validationError);
+
+			// Act & Assert
+			await expect(useCase.execute(invalidEnvId))
+				.rejects
+				.toThrow('Invalid environment ID');
+		});
+
+		it('should handle invalid solution ID format', async () => {
+			// Arrange
+			const invalidSolutionId = 'not-a-guid';
+			const validationError = new Error('Invalid solution ID format');
+			mockFlowRepository.findAll.mockResolvedValue([]);
+			mockConnectionRefRepository.findAll.mockResolvedValue([]);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockRejectedValue(validationError);
+
+			// Act & Assert
+			await expect(useCase.execute(testEnvironmentId, invalidSolutionId))
+				.rejects
+				.toThrow('Invalid solution ID format');
+		});
+
+		it('should handle extremely large datasets efficiently', async () => {
+			// Arrange - 5000 flows and 2000 connection references
+			const flows = Array.from({ length: 5000 }, (_, i) =>
+				createTestCloudFlow(`flow-${i}`, `Flow ${i}`)
+			);
+			const connectionRefs = Array.from({ length: 2000 }, (_, i) =>
+				createTestConnectionReference(`cr-${i}`, `cr_conn_${i}`, `Connection ${i}`)
+			);
+
+			mockFlowRepository.findAll.mockResolvedValue(flows);
+			mockConnectionRefRepository.findAll.mockResolvedValue(connectionRefs);
+			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+
+			// Act
+			const result = await useCase.execute(testEnvironmentId);
+
+			// Assert
+			expect(mockRelationshipBuilder.buildRelationships).toHaveBeenCalledWith(
+				flows,
+				connectionRefs
+			);
+			expect(result.connectionReferences).toHaveLength(2000);
+		});
+
+		it('should handle special characters in flow and connection reference names', async () => {
+			// Arrange
+			const flows = [
+				createTestCloudFlow('flow-1', 'Flow with special chars !@#$%^&*()')
+			];
+			const connectionRefs = [
+				createTestConnectionReference('cr-1', 'cr_special-!@#', 'CR with émoji 😀')
+			];
+
+			mockFlowRepository.findAll.mockResolvedValue(flows);
+			mockConnectionRefRepository.findAll.mockResolvedValue(connectionRefs);
+			mockRelationshipBuilder.buildRelationships.mockReturnValue([
+				createTestRelationship('flow-1', 'Flow with special chars !@#$%^&*()', 'cr-1', 'cr_special-!@#', 'flow-to-cr')
+			]);
+
+			// Act
+			const result = await useCase.execute(testEnvironmentId);
+
+			// Assert
+			expect(result.relationships).toHaveLength(1);
+			expect(result.relationships[0]!.flowName).toBe('Flow with special chars !@#$%^&*()');
+		});
+	});
+
+	describe('edge cases - filtering edge cases', () => {
+		it('should handle solution filter with no matching flows but matching connection references', async () => {
+			// Arrange
+			const allFlows = [createTestCloudFlow('flow-1', 'Flow 1')];
+			const allConnectionRefs = [
+				createTestConnectionReference('cr-1', 'cr_sharepoint', 'SharePoint')
+			];
+			const flowComponentIds: string[] = [];
+			const crComponentIds = ['cr-1'];
+
+			mockFlowRepository.findAll.mockResolvedValue(allFlows);
+			mockConnectionRefRepository.findAll.mockResolvedValue(allConnectionRefs);
+			mockSolutionComponentRepository.findComponentIdsBySolution
+				.mockResolvedValueOnce(flowComponentIds)
+				.mockResolvedValueOnce(crComponentIds);
+			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+
+			// Act
+			const result = await useCase.execute(testEnvironmentId, testSolutionId);
+
+			// Assert
+			expect(result.connectionReferences).toHaveLength(1);
+			expect(mockRelationshipBuilder.buildRelationships).toHaveBeenCalledWith([], [
+				expect.objectContaining({ id: 'cr-1' })
+			]);
+		});
+
+		it('should handle solution filter with matching flows but no matching connection references', async () => {
+			// Arrange
+			const allFlows = [createTestCloudFlow('flow-1', 'Flow 1')];
+			const allConnectionRefs = [
+				createTestConnectionReference('cr-1', 'cr_sharepoint', 'SharePoint')
+			];
+			const flowComponentIds = ['flow-1'];
+			const crComponentIds: string[] = [];
+
+			mockFlowRepository.findAll.mockResolvedValue(allFlows);
+			mockConnectionRefRepository.findAll.mockResolvedValue(allConnectionRefs);
+			mockSolutionComponentRepository.findComponentIdsBySolution
+				.mockResolvedValueOnce(flowComponentIds)
+				.mockResolvedValueOnce(crComponentIds);
+			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+
+			// Act
+			const result = await useCase.execute(testEnvironmentId, testSolutionId);
+
+			// Assert
+			expect(result.connectionReferences).toHaveLength(0);
+			expect(mockRelationshipBuilder.buildRelationships).toHaveBeenCalledWith([
+				expect.objectContaining({ id: 'flow-1' })
+			], []);
+		});
+
+		it('should handle duplicate component IDs from solution repository', async () => {
+			// Arrange
+			const allFlows = [createTestCloudFlow('flow-1', 'Flow 1')];
+			const allConnectionRefs = [
+				createTestConnectionReference('cr-1', 'cr_sharepoint', 'SharePoint')
+			];
+			// Duplicate IDs in solution components
+			const flowComponentIds = ['flow-1', 'flow-1', 'flow-1'];
+			const crComponentIds = ['cr-1', 'cr-1'];
+
+			mockFlowRepository.findAll.mockResolvedValue(allFlows);
+			mockConnectionRefRepository.findAll.mockResolvedValue(allConnectionRefs);
+			mockSolutionComponentRepository.findComponentIdsBySolution
+				.mockResolvedValueOnce(flowComponentIds)
+				.mockResolvedValueOnce(crComponentIds);
+			mockRelationshipBuilder.buildRelationships.mockReturnValue([]);
+
+			// Act
+			const result = await useCase.execute(testEnvironmentId, testSolutionId);
+
+			// Assert - Set should deduplicate
+			expect(result.connectionReferences).toHaveLength(1);
 		});
 	});
 });

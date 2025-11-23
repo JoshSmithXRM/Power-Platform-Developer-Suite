@@ -86,7 +86,6 @@ export class FilterField {
 	/**
 	 * Gets field by OData name.
 	 */
-	// eslint-disable-next-line local-rules/no-static-entity-methods -- Lookup method for value object collection
 	static fromODataName(odataName: string): FilterField | undefined {
 		return FilterField.All.find(f => f.odataName === odataName);
 	}
@@ -94,7 +93,6 @@ export class FilterField {
 	/**
 	 * Gets field by display name.
 	 */
-	// eslint-disable-next-line local-rules/no-static-entity-methods -- Lookup method for value object collection
 	static fromDisplayName(displayName: string): FilterField | undefined {
 		return FilterField.All.find(f => f.displayName === displayName);
 	}

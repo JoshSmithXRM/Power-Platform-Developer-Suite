@@ -26,12 +26,12 @@ export class ClientId {
 
 	constructor(value: string) {
 		if (!value || value.trim() === '') {
-			throw new DomainError('Client ID cannot be empty');
+			throw new DomainError('Invalid ClientId: cannot be empty');
 		}
 
 		const normalized = value.trim().toLowerCase();
 		if (!ClientId.GUID_PATTERN.test(normalized)) {
-			throw new DomainError('Invalid Client ID format. Expected GUID format');
+			throw new DomainError('Invalid ClientId: expected GUID format');
 		}
 
 		this.value = normalized;

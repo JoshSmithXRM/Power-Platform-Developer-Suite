@@ -1,13 +1,7 @@
 import { IEnvironmentRepository } from '../../domain/interfaces/IEnvironmentRepository';
 import { EnvironmentListViewModelMapper } from '../mappers/EnvironmentListViewModelMapper';
-import { Environment } from '../../domain/entities/Environment';
-import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
-import { EnvironmentName } from '../../domain/valueObjects/EnvironmentName';
-import { DataverseUrl } from '../../domain/valueObjects/DataverseUrl';
-import { TenantId } from '../../domain/valueObjects/TenantId';
-import { ClientId } from '../../domain/valueObjects/ClientId';
-import { AuthenticationMethod, AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
+import { createTestEnvironment } from '../../../../shared/testing/factories/EnvironmentFactory';
 
 import { LoadEnvironmentsUseCase } from './LoadEnvironmentsUseCase';
 
@@ -37,22 +31,6 @@ describe('LoadEnvironmentsUseCase', () => {
 		useCase = new LoadEnvironmentsUseCase(mockRepository, mapper, new NullLogger());
 	});
 
-	function createTestEnvironment(id: string, name: string, isActive: boolean, lastUsed?: Date): Environment {
-		return new Environment(
-			new EnvironmentId(id),
-			new EnvironmentName(name),
-			new DataverseUrl('https://org.crm.dynamics.com'),
-			new TenantId('00000000-0000-0000-0000-000000000000'),
-			new AuthenticationMethod(AuthenticationMethodType.Interactive),
-			new ClientId('51f81489-12ee-4a9e-aaae-a2591f45987d'),
-			isActive,
-			lastUsed ?? undefined,
-			undefined,
-			undefined,
-			undefined
-		);
-	}
-
 	describe('execute', () => {
 		it('should return empty list when no environments exist', async () => {
 			mockRepository.getAll.mockResolvedValue([]);
@@ -66,8 +44,8 @@ describe('LoadEnvironmentsUseCase', () => {
 		});
 
 		it('should return all environments as view models', async () => {
-			const env1 = createTestEnvironment('env-1', 'Development', false);
-			const env2 = createTestEnvironment('env-2', 'Production', false);
+			const env1 = createTestEnvironment({ id: 'env-1', name: 'Development', isActive: false });
+			const env2 = createTestEnvironment({ id: 'env-2', name: 'Production', isActive: false });
 			mockRepository.getAll.mockResolvedValue([env1, env2]);
 
 			const result = await useCase.execute();
@@ -81,8 +59,8 @@ describe('LoadEnvironmentsUseCase', () => {
 		});
 
 		it('should identify active environment', async () => {
-			const env1 = createTestEnvironment('env-1', 'Development', false);
-			const env2 = createTestEnvironment('env-2', 'Production', true); // Active
+			const env1 = createTestEnvironment({ id: 'env-1', name: 'Development', isActive: false });
+			const env2 = createTestEnvironment({ id: 'env-2', name: 'Production', isActive: true }); // Active
 			mockRepository.getAll.mockResolvedValue([env1, env2]);
 
 			const result = await useCase.execute();
@@ -91,8 +69,8 @@ describe('LoadEnvironmentsUseCase', () => {
 		});
 
 		it('should return undefined activeEnvironmentId when no environment is active', async () => {
-			const env1 = createTestEnvironment('env-1', 'Development', false);
-			const env2 = createTestEnvironment('env-2', 'Production', false);
+			const env1 = createTestEnvironment({ id: 'env-1', name: 'Development', isActive: false });
+			const env2 = createTestEnvironment({ id: 'env-2', name: 'Production', isActive: false });
 			mockRepository.getAll.mockResolvedValue([env1, env2]);
 
 			const result = await useCase.execute();
@@ -105,9 +83,9 @@ describe('LoadEnvironmentsUseCase', () => {
 			const yesterday = new Date(now.getTime() - 86400000);
 			const lastWeek = new Date(now.getTime() - 604800000);
 
-			const env1 = createTestEnvironment('env-1', 'Development', false, lastWeek);
-			const env2 = createTestEnvironment('env-2', 'Production', false, now);
-			const env3 = createTestEnvironment('env-3', 'Staging', false, yesterday);
+			const env1 = createTestEnvironment({ id: 'env-1', name: 'Development', isActive: false, lastUsed: lastWeek });
+			const env2 = createTestEnvironment({ id: 'env-2', name: 'Production', isActive: false, lastUsed: now });
+			const env3 = createTestEnvironment({ id: 'env-3', name: 'Staging', isActive: false, lastUsed: yesterday });
 
 			mockRepository.getAll.mockResolvedValue([env1, env2, env3]);
 
@@ -125,9 +103,9 @@ describe('LoadEnvironmentsUseCase', () => {
 		it('should sort environments without lastUsed alphabetically at the end', async () => {
 			const now = new Date();
 
-			const env1 = createTestEnvironment('env-1', 'Zebra', false); // No lastUsed
-			const env2 = createTestEnvironment('env-2', 'Production', false, now); // Has lastUsed
-			const env3 = createTestEnvironment('env-3', 'Alpha', false); // No lastUsed
+			const env1 = createTestEnvironment({ id: 'env-1', name: 'Zebra', isActive: false }); // No lastUsed
+			const env2 = createTestEnvironment({ id: 'env-2', name: 'Production', isActive: false, lastUsed: now }); // Has lastUsed
+			const env3 = createTestEnvironment({ id: 'env-3', name: 'Alpha', isActive: false }); // No lastUsed
 
 			mockRepository.getAll.mockResolvedValue([env1, env2, env3]);
 
@@ -143,7 +121,7 @@ describe('LoadEnvironmentsUseCase', () => {
 		});
 
 		it('should map environment properties correctly', async () => {
-			const env = createTestEnvironment('env-1', 'Development', true);
+			const env = createTestEnvironment({ id: 'env-1', name: 'Development', isActive: true });
 			mockRepository.getAll.mockResolvedValue([env]);
 
 			const result = await useCase.execute();

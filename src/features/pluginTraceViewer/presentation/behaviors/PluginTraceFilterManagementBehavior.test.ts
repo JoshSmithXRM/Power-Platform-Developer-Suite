@@ -6,6 +6,7 @@ import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui
 import { FilterCriteriaMapper } from '../mappers/FilterCriteriaMapper';
 import type { FilterCriteriaViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
+import { assertDefined } from '../../../../shared/testing';
 
 describe('PluginTraceFilterManagementBehavior', () => {
 	let behavior: PluginTraceFilterManagementBehavior;
@@ -96,10 +97,11 @@ describe('PluginTraceFilterManagementBehavior', () => {
 			await behavior.applyFilters(filterData);
 
 			const criteria = behavior.getFilterCriteria();
-			expect(criteria.conditions).toBeDefined();
-			expect(criteria.conditions!.length).toBeGreaterThan(0);
-			expect(criteria.conditions![0]!.field).toBe('Created On');
-			expect(criteria.conditions![0]!.operator).toBe('Greater Than or Equal');
+			assertDefined(criteria.conditions);
+			expect(criteria.conditions.length).toBeGreaterThan(0);
+			assertDefined(criteria.conditions[0]);
+			expect(criteria.conditions[0].field).toBe('Created On');
+			expect(criteria.conditions[0].operator).toBe('Greater Than or Equal');
 		});
 
 		it('should recalculate relative time filters on apply', async () => {
@@ -110,7 +112,9 @@ describe('PluginTraceFilterManagementBehavior', () => {
 			await behavior.applyFilters(filterData);
 
 			const criteria = behavior.getFilterCriteria();
-			const condition = criteria.conditions![0]!;
+			assertDefined(criteria.conditions);
+			assertDefined(criteria.conditions[0]);
+			const condition = criteria.conditions[0];
 
 			// Value should be a recent timestamp (within last 25 hours)
 			const conditionDate = new Date(condition.value);
@@ -140,7 +144,8 @@ describe('PluginTraceFilterManagementBehavior', () => {
 
 			const criteria = behavior.getFilterCriteria();
 			// exceptions quick filter + 1 advanced condition
-			expect(criteria.conditions!.length).toBeGreaterThan(1);
+			assertDefined(criteria.conditions);
+			expect(criteria.conditions.length).toBeGreaterThan(1);
 		});
 
 		it('should normalize datetime values to UTC ISO format', async () => {
@@ -161,7 +166,9 @@ describe('PluginTraceFilterManagementBehavior', () => {
 			await behavior.applyFilters(filterData);
 
 			const criteria = behavior.getFilterCriteria();
-			expect(criteria.conditions![0]!.value).toContain('Z');
+			assertDefined(criteria.conditions);
+			assertDefined(criteria.conditions[0]);
+			expect(criteria.conditions[0].value).toContain('Z');
 		});
 
 		it('should handle errors gracefully', async () => {
@@ -195,7 +202,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 				expect.objectContaining({
 					command: 'updateODataPreview',
 					data: expect.objectContaining({
-						query: expect.any(String)
+						query: expect.stringMatching(/.+/)
 					})
 				})
 			);
@@ -354,8 +361,10 @@ describe('PluginTraceFilterManagementBehavior', () => {
 			// exceptions should be reconstructed as quick filter
 			expect(reconstructedIds).toContain('exceptions');
 			// CustomPlugin condition should remain as advanced filter
-			expect(criteria.conditions!.length).toBe(1);
-			expect(criteria.conditions![0]!.value).toBe('CustomPlugin');
+			assertDefined(criteria.conditions);
+			expect(criteria.conditions.length).toBe(1);
+			assertDefined(criteria.conditions[0]);
+			expect(criteria.conditions[0].value).toBe('CustomPlugin');
 		});
 
 		it('should handle missing storage gracefully', async () => {
@@ -420,7 +429,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 					environmentId: TEST_ENVIRONMENT_ID
 				},
 				expect.objectContaining({
-					filterCriteria: expect.any(Object),
+					filterCriteria: expect.objectContaining({}),
 					autoRefreshInterval: 30
 				})
 			);
@@ -431,7 +440,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 			await behavior.saveFilterCriteria(TEST_ENVIRONMENT_ID, 0);
 
 			expect(mockPanelStateRepository.save).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				expect.objectContaining({
 					filterCriteria: expect.objectContaining({
 						conditions: expect.arrayContaining([
@@ -455,7 +464,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 			await behavior.saveFilterCriteria(TEST_ENVIRONMENT_ID, 10);
 
 			expect(mockPanelStateRepository.save).toHaveBeenCalledWith(
-				expect.any(Object),
+				expect.objectContaining({}),
 				expect.objectContaining({
 					detailPanelWidth: 500,
 					someOtherProperty: 'preserved',
@@ -503,7 +512,8 @@ describe('PluginTraceFilterManagementBehavior', () => {
 			});
 
 			const criteria = behavior.getFilterCriteria();
-			expect(criteria.conditions!.length).toBeGreaterThanOrEqual(2);
+			assertDefined(criteria.conditions);
+			expect(criteria.conditions.length).toBeGreaterThanOrEqual(2);
 		});
 
 		it('should handle datetime conversion failure gracefully', async () => {
@@ -524,7 +534,9 @@ describe('PluginTraceFilterManagementBehavior', () => {
 
 			// Should not throw, should keep original value
 			const criteria = behavior.getFilterCriteria();
-			expect(criteria.conditions![0]!.value).toBe('invalid-date-format');
+			assertDefined(criteria.conditions);
+			assertDefined(criteria.conditions[0]);
+			expect(criteria.conditions[0].value).toBe('invalid-date-format');
 		});
 
 		it('should handle already normalized datetime values', async () => {
@@ -545,7 +557,9 @@ describe('PluginTraceFilterManagementBehavior', () => {
 			await behavior.applyFilters(filterData);
 
 			const criteria = behavior.getFilterCriteria();
-			expect(criteria.conditions![0]!.value).toBe(utcIsoValue);
+			assertDefined(criteria.conditions);
+			assertDefined(criteria.conditions[0]);
+			expect(criteria.conditions[0].value).toBe(utcIsoValue);
 		});
 	});
 });

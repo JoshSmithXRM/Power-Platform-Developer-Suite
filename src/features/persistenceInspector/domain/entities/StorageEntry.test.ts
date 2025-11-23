@@ -46,7 +46,7 @@ describe('StorageEntry', () => {
 		});
 
 		describe('secret value handling', () => {
-			it('should hide secret values with ***', () => {
+			it('should mask secret values with asterisks to prevent exposure', () => {
 				// Arrange & Act
 				const entry = createSecretEntry('secret-key');
 
@@ -55,7 +55,7 @@ describe('StorageEntry', () => {
 				expect(entry.isSecret()).toBe(true);
 			});
 
-			it('should mark secret entry as secret type', () => {
+			it('should correctly identify password secret entries by storage type', () => {
 				// Arrange & Act
 				const entry = createSecretEntry('power-platform-dev-suite-password-user@example.com');
 
@@ -112,7 +112,7 @@ describe('StorageEntry', () => {
 
 	describe('isProtected', () => {
 		describe('protected environments key', () => {
-			it('should return true for power-platform-dev-suite-environments', () => {
+			it('should return true when key exactly matches protected environments configuration key', () => {
 				// Arrange
 				const entry = createGlobalEntry('power-platform-dev-suite-environments', { environments: [] });
 
@@ -120,7 +120,7 @@ describe('StorageEntry', () => {
 				expect(entry.isProtected()).toBe(true);
 			});
 
-			it('should identify protected key regardless of storage type', () => {
+			it('should identify protected environments key across all storage types', () => {
 				// Arrange
 				const globalEntry = createGlobalEntry('power-platform-dev-suite-environments', {});
 				const workspaceEntry = createWorkspaceEntry('power-platform-dev-suite-environments', {});
@@ -132,7 +132,7 @@ describe('StorageEntry', () => {
 		});
 
 		describe('non-protected keys', () => {
-			it('should return false for non-protected keys', () => {
+			it('should return false when key does not match any protected pattern', () => {
 				// Arrange
 				const entry = createGlobalEntry('regular-key', { data: 'value' });
 
@@ -140,7 +140,7 @@ describe('StorageEntry', () => {
 				expect(entry.isProtected()).toBe(false);
 			});
 
-			it('should return false for similar but non-matching keys', () => {
+			it('should return false when key is similar but not exact match to protected key', () => {
 				// Arrange
 				const entry1 = createGlobalEntry('power-platform-dev-suite-environment', { data: 'value' });
 				const entry2 = createGlobalEntry('power-platform-dev-suite-environments-backup', { data: 'value' });
@@ -154,7 +154,7 @@ describe('StorageEntry', () => {
 
 	describe('canBeCleared', () => {
 		describe('protected entries', () => {
-			it('should return false for protected entries', () => {
+			it('should return false when entry is protected to prevent accidental deletion', () => {
 				// Arrange
 				const entry = createGlobalEntry('power-platform-dev-suite-environments', { environments: [] });
 
@@ -164,7 +164,7 @@ describe('StorageEntry', () => {
 		});
 
 		describe('non-protected entries', () => {
-			it('should return true for non-protected entries', () => {
+			it('should return true when entry is not protected allowing safe deletion', () => {
 				// Arrange
 				const entry = createGlobalEntry('clearable-key', { data: 'value' });
 
@@ -172,7 +172,7 @@ describe('StorageEntry', () => {
 				expect(entry.canBeCleared()).toBe(true);
 			});
 
-			it('should return true for all non-protected storage types', () => {
+			it('should return true for non-protected entries across all storage types', () => {
 				// Arrange
 				const globalEntry = createGlobalEntry('global-key', {});
 				const workspaceEntry = createWorkspaceEntry('workspace-key', {});
@@ -462,7 +462,7 @@ describe('StorageEntry', () => {
 	});
 
 	describe('isSecret', () => {
-		it('should return true for secret storage entries', () => {
+		it('should return true when entry belongs to SECRET storage type', () => {
 			// Arrange
 			const entry = createSecretEntry('password-key');
 
@@ -470,7 +470,7 @@ describe('StorageEntry', () => {
 			expect(entry.isSecret()).toBe(true);
 		});
 
-		it('should return false for non-secret storage entries', () => {
+		it('should return false when entry belongs to non-secret storage types', () => {
 			// Arrange
 			const globalEntry = createGlobalEntry('global-key', {});
 			const workspaceEntry = createWorkspaceEntry('workspace-key', {});
@@ -482,7 +482,7 @@ describe('StorageEntry', () => {
 	});
 
 	describe('isWorkspace', () => {
-		it('should return true for workspace storage entries', () => {
+		it('should return true when entry belongs to WORKSPACE storage type', () => {
 			// Arrange
 			const entry = createWorkspaceEntry('panel-state', { expanded: true });
 
@@ -490,7 +490,7 @@ describe('StorageEntry', () => {
 			expect(entry.isWorkspace()).toBe(true);
 		});
 
-		it('should return false for non-workspace storage entries', () => {
+		it('should return false when entry belongs to non-workspace storage types', () => {
 			// Arrange
 			const globalEntry = createGlobalEntry('global-key', {});
 			const secretEntry = createSecretEntry('secret-key');
@@ -502,7 +502,7 @@ describe('StorageEntry', () => {
 	});
 
 	describe('metadata', () => {
-		it('should provide metadata for entry', () => {
+		it('should provide metadata including size in bytes for storage entry', () => {
 			// Arrange
 			const entry = createGlobalEntry('test-key', { data: 'value' });
 
@@ -514,7 +514,7 @@ describe('StorageEntry', () => {
 			expect(metadata.sizeInBytes).toBeGreaterThan(0);
 		});
 
-		it('should have metadata for secret entries', () => {
+		it('should provide metadata with isSecret flag set for secret entries', () => {
 			// Arrange
 			const entry = createSecretEntry('secret-key');
 
@@ -524,6 +524,272 @@ describe('StorageEntry', () => {
 			// Assert
 			expect(metadata).toBeDefined();
 			expect(metadata.isSecret).toBe(true);
+		});
+	});
+
+	describe('edge cases', () => {
+		describe('unicode and special characters', () => {
+			it('should handle unicode characters in key', () => {
+				// Arrange & Act
+				const entry = createGlobalEntry('key-测试-🔑', { data: 'value' });
+
+				// Assert
+				expect(entry.key).toBe('key-测试-🔑');
+			});
+
+			it('should handle special characters in key', () => {
+				// Arrange & Act
+				const entry = createGlobalEntry('key!@#$%^&*()', { data: 'value' });
+
+				// Assert
+				expect(entry.key).toBe('key!@#$%^&*()');
+			});
+
+			it('should handle unicode in stored values', () => {
+				// Arrange
+				const unicodeValue = {
+					name: '用户姓名',
+					description: 'Описание проекта',
+					emoji: '🎉🎊🎈'
+				};
+
+				// Act
+				const entry = createGlobalEntry('unicode-data', unicodeValue);
+
+				// Assert
+				expect(entry.value).toEqual(unicodeValue);
+			});
+
+			it('should handle emoji in object properties', () => {
+				// Arrange
+				const value = {
+					'🔑': 'key-with-emoji',
+					'status': '✅ complete'
+				};
+
+				// Act
+				const entry = createGlobalEntry('emoji-props', value);
+
+				// Assert
+				expect(entry.value).toEqual(value);
+			});
+		});
+
+		describe('very long strings', () => {
+			it('should handle very long key (1000+ chars)', () => {
+				// Arrange
+				const longKey = 'power-platform-dev-suite-' + 'x'.repeat(1000);
+
+				// Act
+				const entry = createGlobalEntry(longKey, { data: 'value' });
+
+				// Assert
+				expect(entry.key).toBe(longKey);
+				expect(entry.key.length).toBeGreaterThan(1000);
+			});
+
+			it('should handle very long string value (10000+ chars)', () => {
+				// Arrange
+				const longValue = 'A'.repeat(10000);
+
+				// Act
+				const entry = createGlobalEntry('long-value-key', longValue);
+
+				// Assert
+				expect(entry.value).toBe(longValue);
+				expect((entry.value as string).length).toBe(10000);
+			});
+
+			it('should handle very large nested object', () => {
+				// Arrange
+				const largeObject = {
+					environments: Array.from({ length: 100 }, (_, i) => ({
+						id: `env-${i}`,
+						name: `Environment ${i}`,
+						url: `https://env${i}.crm.dynamics.com`,
+						description: 'x'.repeat(100)
+					}))
+				};
+
+				// Act
+				const entry = createGlobalEntry('large-object', largeObject);
+
+				// Assert
+				expect(entry.value).toEqual(largeObject);
+				expect((entry.value as Record<string, unknown>)['environments']).toHaveLength(100);
+			});
+
+			it('should handle deeply nested path navigation (10+ levels)', () => {
+				// Arrange
+				const deepObject = {
+					l1: { l2: { l3: { l4: { l5: { l6: { l7: { l8: { l9: { l10: 'deep value' } } } } } } } } }
+				};
+				const entry = createGlobalEntry('deep-data', deepObject);
+
+				// Act
+				const result = entry.getPropertyAtPath(['l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'l7', 'l8', 'l9', 'l10']);
+
+				// Assert
+				expect(result).toBe('deep value');
+			});
+		});
+
+		describe('boundary values', () => {
+			it('should handle single character key', () => {
+				// Arrange & Act
+				const entry = createGlobalEntry('x', { data: 'value' });
+
+				// Assert
+				expect(entry.key).toBe('x');
+				expect(entry.key.length).toBe(1);
+			});
+
+			it('should handle empty object as value', () => {
+				// Arrange & Act
+				const entry = createGlobalEntry('empty-object', {});
+
+				// Assert
+				expect(entry.value).toEqual({});
+			});
+
+			it('should handle empty array as value', () => {
+				// Arrange & Act
+				const entry = createGlobalEntry('empty-array', []);
+
+				// Assert
+				expect(entry.value).toEqual([]);
+			});
+
+			it('should handle zero as value', () => {
+				// Arrange & Act
+				const entry = createGlobalEntry('zero-value', 0);
+
+				// Assert
+				expect(entry.value).toBe(0);
+			});
+
+			it('should handle false as value', () => {
+				// Arrange & Act
+				const entry = createGlobalEntry('false-value', false);
+
+				// Assert
+				expect(entry.value).toBe(false);
+			});
+
+			it('should handle very large arrays', () => {
+				// Arrange
+				const largeArray = Array.from({ length: 1000 }, (_, i) => ({ index: i }));
+
+				// Act
+				const entry = createGlobalEntry('large-array', largeArray);
+
+				// Assert
+				expect((entry.value as unknown[]).length).toBe(1000);
+			});
+		});
+
+		describe('immutability', () => {
+			it('should maintain key immutability', () => {
+				// Arrange
+				const entry = createGlobalEntry('immutable-key', { data: 'value' });
+
+				// Act
+				const key1 = entry.key;
+				const key2 = entry.key;
+
+				// Assert
+				expect(key1).toBe(key2);
+				expect(key1).toBe('immutable-key');
+			});
+
+			it('should maintain storage type immutability', () => {
+				// Arrange
+				const entry = createGlobalEntry('test-key', { data: 'value' });
+
+				// Act
+				const type1 = entry.storageType;
+				const type2 = entry.storageType;
+
+				// Assert
+				expect(type1).toBe(type2);
+				expect(type1).toBe(StorageType.GLOBAL);
+			});
+
+			it('should return consistent value references', () => {
+				// Arrange
+				const value = { data: 'test', nested: { prop: 'value' } };
+				const entry = createGlobalEntry('test-key', value);
+
+				// Act
+				const value1 = entry.value;
+				const value2 = entry.value;
+
+				// Assert
+				expect(value1).toBe(value2);
+			});
+		});
+
+		describe('property path edge cases', () => {
+			it('should handle array index out of bounds', () => {
+				// Arrange
+				const entry = createGlobalEntry('data', { items: [1, 2, 3] });
+
+				// Act
+				const result = entry.getPropertyAtPath(['items', '999']);
+
+				// Assert
+				expect(result).toBeUndefined();
+			});
+
+			it('should handle negative array indices', () => {
+				// Arrange
+				const entry = createGlobalEntry('data', { items: [1, 2, 3] });
+
+				// Act
+				const result = entry.getPropertyAtPath(['items', '-1']);
+
+				// Assert
+				expect(result).toBeUndefined();
+			});
+
+			it('should handle non-existent path in deep structure', () => {
+				// Arrange
+				const entry = createGlobalEntry('data', {
+					a: { b: { c: 'value' } }
+				});
+
+				// Act
+				const result = entry.getPropertyAtPath(['a', 'b', 'x', 'y', 'z']);
+
+				// Assert
+				expect(result).toBeUndefined();
+			});
+
+			it('should handle special characters in property names', () => {
+				// Arrange
+				const entry = createGlobalEntry('data', {
+					'key-with-dash': 'value1',
+					'key.with.dot': 'value2',
+					'key@with@at': 'value3'
+				});
+
+				// Act & Assert
+				expect(entry.getPropertyAtPath(['key-with-dash'])).toBe('value1');
+				expect(entry.getPropertyAtPath(['key.with.dot'])).toBe('value2');
+				expect(entry.getPropertyAtPath(['key@with@at'])).toBe('value3');
+			});
+
+			it('should handle numeric property names', () => {
+				// Arrange
+				const entry = createGlobalEntry('data', {
+					'123': 'numeric-key',
+					'0': 'zero-key'
+				});
+
+				// Act & Assert
+				expect(entry.getPropertyAtPath(['123'])).toBe('numeric-key');
+				expect(entry.getPropertyAtPath(['0'])).toBe('zero-key');
+			});
 		});
 	});
 });

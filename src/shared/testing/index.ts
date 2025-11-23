@@ -6,6 +6,20 @@
 // Assertions
 export { assertDefined } from './assertions/assertDefined';
 
+// Setup utilities (mocks, loggers, tokens)
+export {
+	createMockLogger,
+	createNullLogger,
+	createMockCancellationToken,
+	createDynamicCancellationToken,
+	createMockDataverseApiService,
+	createMockEnvironmentRepository,
+	createMockSolutionRepository,
+	createMockPluginTraceRepository,
+	createMockSolutionComponentRepository,
+	createMockDomainEventPublisher
+} from './setup';
+
 // Factories
 export {
 	createTestEnvironment,

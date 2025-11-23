@@ -1,5 +1,5 @@
 import type { FilterCondition } from '../entities/FilterCondition';
-import { DateTimeFilter } from '../../../../shared/domain/valueObjects/DateTimeFilter';
+import { formatDateForOData } from '../utils/ODataFormatters';
 
 /**
  * Domain Service: OData Expression Builder
@@ -61,9 +61,8 @@ export class ODataExpressionBuilder {
 			return value.toLowerCase();
 		} else if (fieldType === 'date') {
 			// Value is already in UTC ISO format (converted by presentation layer)
-			// Use DateTimeFilter to format for Dataverse OData API
-			const dateFilter = DateTimeFilter.fromUtcIso(value);
-			return dateFilter.getODataFormat();
+			// Format for Dataverse OData API (removes milliseconds)
+			return formatDateForOData(value);
 		}
 
 		return value;

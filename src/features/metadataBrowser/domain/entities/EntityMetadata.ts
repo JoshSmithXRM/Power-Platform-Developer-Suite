@@ -76,15 +76,15 @@ export class EntityMetadata {
         privileges?: readonly SecurityPrivilege[];
     }): EntityMetadata {
         if (!props.metadataId || props.metadataId.trim().length === 0) {
-            throw new Error('Entity metadata ID cannot be empty');
+            throw new Error('Invalid EntityMetadata: metadataId cannot be empty');
         }
 
         if (!props.displayName || props.displayName.trim().length === 0) {
-            throw new Error('Entity display name cannot be empty');
+            throw new Error('Invalid EntityMetadata: displayName cannot be empty');
         }
 
         if (!props.pluralName || props.pluralName.trim().length === 0) {
-            throw new Error('Entity plural name cannot be empty');
+            throw new Error('Invalid EntityMetadata: pluralName cannot be empty');
         }
 
         return new EntityMetadata(

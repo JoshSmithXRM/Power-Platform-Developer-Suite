@@ -110,7 +110,7 @@ describe('PluginTraceFilterService', () => {
 				PluginTraceFilterService.buildODataFilter([
 					{ field: 'typename', operator: invalidOperator, value: 'test' }
 				]);
-			}).toThrow('Unsupported operator:');
+			}).toThrow('Invalid FilterOperator: unsupported operator');
 		});
 	});
 

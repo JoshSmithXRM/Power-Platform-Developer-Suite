@@ -674,6 +674,427 @@ Files changed:
 
 ---
 
+### Bug Fix Examples from Production
+
+#### Example 1: Domain Logic Bug (Value Object Validation)
+
+**Bug**: EnvironmentName accepts empty string after trim
+
+**Test (reproduces bug)**:
+```typescript
+// src/features/environmentSetup/domain/valueObjects/__tests__/EnvironmentName.test.ts
+describe('EnvironmentName validation', () => {
+  it('should reject whitespace-only names', () => {
+    // Bug: This passes but should fail
+    expect(() => new EnvironmentName('   ')).toThrow('Environment name cannot be empty');
+  });
+});
+```
+
+**Before (buggy)**:
+```typescript
+export class EnvironmentName {
+  constructor(value: string) {
+    if (!value) {  // ❌ Doesn't catch whitespace-only strings
+      throw new DomainError('Environment name cannot be empty');
+    }
+    this.value = value.trim();
+  }
+}
+```
+
+**After (fixed)**:
+```typescript
+export class EnvironmentName {
+  constructor(value: string) {
+    if (!value || value.trim() === '') {  // ✅ Checks trimmed value
+      throw new DomainError('Environment name cannot be empty');
+    }
+    this.value = value.trim();
+  }
+}
+```
+
+**Commit**:
+```bash
+git commit -m "fix(domain): reject whitespace-only environment names
+
+- Check trimmed value before accepting
+- Prevents creating environments with invisible names
+- Test: EnvironmentName.test.ts"
+```
+
+---
+
+#### Example 2: Use Case Bug (Sorting Logic)
+
+**Bug**: Connection references sorted incorrectly (mixes managed/unmanaged)
+
+**Test (reproduces bug)**:
+```typescript
+// src/features/connectionReferences/application/useCases/__tests__/ListConnectionReferencesUseCase.test.ts
+describe('ListConnectionReferencesUseCase', () => {
+  it('should sort unmanaged before managed', () => {
+    const managed = createMockRef('cr-1', 'Managed', true);
+    const unmanaged = createMockRef('cr-2', 'Unmanaged', false);
+
+    mockRepository.findAll.mockResolvedValue([managed, unmanaged]);
+
+    const result = await useCase.execute('env-123');
+
+    // Bug: Managed appears first
+    expect(result[0].logicalName).toBe('Unmanaged');  // ✅ Unmanaged should be first
+  });
+});
+```
+
+**Before (buggy)**:
+```typescript
+class ListConnectionReferencesUseCase {
+  async execute(envId: string): Promise<ConnectionReferenceViewModel[]> {
+    const refs = await this.repository.findAll(envId);
+
+    // ❌ Wrong: Sorts by name only (ignores isManaged)
+    return refs
+      .map(ref => this.mapper.toViewModel(ref))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }
+}
+```
+
+**After (fixed)**:
+```typescript
+class ListConnectionReferencesUseCase {
+  async execute(envId: string): Promise<ConnectionReferenceViewModel[]> {
+    const refs = await this.repository.findAll(envId);
+
+    // ✅ Delegate sorting to domain service
+    const sorted = this.collectionService.sort(refs);
+
+    return sorted.map(ref => this.mapper.toViewModel(ref));
+  }
+}
+
+// Domain service handles business rule
+class ConnectionReferenceCollectionService {
+  sort(refs: ConnectionReference[]): ConnectionReference[] {
+    return [...refs].sort((a, b) => {
+      // Unmanaged first
+      if (a.isManaged !== b.isManaged) {
+        return a.isManaged ? 1 : -1;
+      }
+      // Then by name
+      return a.displayName.localeCompare(b.displayName);
+    });
+  }
+}
+```
+
+**Commit**:
+```bash
+git commit -m "fix(app): sort connection references by managed status
+
+- Unmanaged solutions appear first
+- Then sorted alphabetically by name
+- Moved sorting logic to domain service
+- Test: ListConnectionReferencesUseCase.test.ts"
+```
+
+---
+
+#### Example 3: Repository Bug (Query Building)
+
+**Bug**: Plugin trace filter builds invalid OData query for datetime
+
+**Test (reproduces bug)**:
+```typescript
+// src/features/pluginTraceViewer/infrastructure/repositories/__tests__/DataversePluginTraceRepository.test.ts
+describe('DataversePluginTraceRepository', () => {
+  it('should build valid OData filter for datetime', () => {
+    const filter = TraceFilter.create({
+      createdAfter: new Date('2024-01-01T00:00:00Z')
+    });
+
+    mockApiService.get.mockResolvedValue({ value: [] });
+
+    await repository.getTraces('env-123', filter);
+
+    // Bug: Generates invalid OData (missing timezone)
+    expect(mockApiService.get).toHaveBeenCalledWith(
+      'env-123',
+      expect.stringContaining("createdon ge 2024-01-01T00:00:00Z")  // ✅ ISO 8601 format
+    );
+  });
+});
+```
+
+**Before (buggy)**:
+```typescript
+class TraceFilter {
+  buildFilterExpression(): string {
+    const conditions: string[] = [];
+
+    if (this.createdAfter) {
+      // ❌ Wrong: Missing 'Z' timezone suffix
+      conditions.push(`createdon ge ${this.createdAfter.toISOString().slice(0, -5)}`);
+    }
+
+    return conditions.join(' and ');
+  }
+}
+```
+
+**After (fixed)**:
+```typescript
+class TraceFilter {
+  buildFilterExpression(): string {
+    const conditions: string[] = [];
+
+    if (this.createdAfter) {
+      // ✅ Correct: Full ISO 8601 with timezone
+      conditions.push(`createdon ge ${this.createdAfter.toISOString()}`);
+    }
+
+    return conditions.join(' and ');
+  }
+}
+```
+
+**Commit**:
+```bash
+git commit -m "fix(domain): generate valid OData datetime filters
+
+- Use full ISO 8601 format with timezone (Z)
+- Fixes API 400 errors for datetime filters
+- Test: DataversePluginTraceRepository.test.ts"
+```
+
+---
+
+#### Example 4: Panel Bug (Async Initialization Race Condition)
+
+**Bug**: Panel shows "No data" briefly before loading completes
+
+**Test (reproduces bug)**:
+```typescript
+// src/features/metadataBrowser/presentation/panels/__tests__/MetadataBrowserPanel.integration.test.ts
+describe('MetadataBrowserPanel', () => {
+  it('should not show empty state during initialization', async () => {
+    const entities = [createEntityTreeItem('account', 'Account')];
+    mockLoadUseCase.execute.mockResolvedValue({ entities, choices: [] });
+
+    await Panel.createOrShow(/* ... */);
+
+    // Wait for async initialization
+    await flushPromises();
+
+    // Bug: "No data" message flashed during load
+    expect(mockPanel.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'showEmptyState' })
+    );
+  });
+});
+```
+
+**Before (buggy)**:
+```typescript
+class MetadataBrowserPanel {
+  private async initialize(): Promise<void> {
+    // ❌ Shows empty state immediately
+    this.showEmptyState();
+
+    // Then loads data (causing flash)
+    const data = await this.loadMetadataTreeUseCase.execute(this.environmentId);
+    this.updateTreeView(data);
+  }
+}
+```
+
+**After (fixed)**:
+```typescript
+class MetadataBrowserPanel {
+  private async initialize(): Promise<void> {
+    // ✅ Show loading state first
+    this.showLoadingState();
+
+    try {
+      const data = await this.loadMetadataTreeUseCase.execute(this.environmentId);
+
+      if (data.entities.length === 0 && data.choices.length === 0) {
+        this.showEmptyState();  // Only show if truly empty
+      } else {
+        this.updateTreeView(data);
+      }
+    } catch (error) {
+      this.showErrorState(error);
+    }
+  }
+}
+```
+
+**Commit**:
+```bash
+git commit -m "fix(ui): prevent empty state flash during panel initialization
+
+- Show loading state during data fetch
+- Only show empty state when data truly empty
+- Improves perceived performance
+- Test: MetadataBrowserPanel.integration.test.ts"
+```
+
+---
+
+#### Example 5: Performance Bug (N+1 Query)
+
+**Bug**: Loading 100 solution components makes 101 API calls (1 + 100)
+
+**Test (reproduces bug)**:
+```typescript
+// src/shared/infrastructure/repositories/__tests__/DataverseApiSolutionComponentRepository.test.ts
+describe('DataverseApiSolutionComponentRepository performance', () => {
+  it('should fetch components with single query using $expand', async () => {
+    mockApiService.get.mockResolvedValue({
+      value: [
+        { objectid: 'comp-1', componenttype: 1, objecttypecode: 'entity-1' },
+        { objectid: 'comp-2', componenttype: 1, objecttypecode: 'entity-2' }
+      ]
+    });
+
+    await repository.findComponentIdsBySolution('env-123', 'sol-1', 'customentity');
+
+    // ✅ Should make only 2 API calls (ObjectTypeCode + components)
+    expect(mockApiService.get).toHaveBeenCalledTimes(2);
+  });
+});
+```
+
+**Before (buggy - N+1 queries)**:
+```typescript
+class DataverseApiSolutionComponentRepository {
+  async findComponentIdsBySolution(
+    envId: string,
+    solutionId: string,
+    entityLogicalName: string
+  ): Promise<string[]> {
+    // Query 1: Get ObjectTypeCode
+    const objectTypeCode = await this.getObjectTypeCode(envId, entityLogicalName);
+
+    // Query 2: Get component IDs
+    const components = await this.getComponents(envId, solutionId, objectTypeCode);
+
+    // ❌ Bug: Then loops and fetches each component individually (N queries)
+    const fullComponents = [];
+    for (const comp of components) {
+      const full = await this.apiService.get(`solutioncomponents(${comp.objectid})`);
+      fullComponents.push(full);
+    }
+
+    return fullComponents.map(c => c.objectid);
+  }
+}
+```
+
+**After (fixed - 2 queries total)**:
+```typescript
+class DataverseApiSolutionComponentRepository {
+  async findComponentIdsBySolution(
+    envId: string,
+    solutionId: string,
+    entityLogicalName: string
+  ): Promise<string[]> {
+    // Query 1: Get ObjectTypeCode
+    const objectTypeCode = await this.getObjectTypeCode(envId, entityLogicalName);
+
+    if (objectTypeCode === null) {
+      return [];
+    }
+
+    // Query 2: Get all component IDs in single query (no expand needed)
+    const filter = `_solutionid_value eq ${solutionId} and componenttype eq ${objectTypeCode}`;
+    const endpoint = `/api/data/v9.2/solutioncomponents?$select=objectid&$filter=${filter}`;
+
+    const response = await this.apiService.get<ResponseDto>(envId, endpoint);
+
+    // ✅ Fixed: Returns IDs directly (no additional queries)
+    return response.value.map(sc => sc.objectid);
+  }
+}
+```
+
+**Commit**:
+```bash
+git commit -m "fix(perf): eliminate N+1 queries in solution component loading
+
+- Reduced from 101 API calls to 2 calls
+- Fetch all component IDs in single query
+- Improves load time by 95% for large solutions
+- Test: DataverseApiSolutionComponentRepository.test.ts"
+```
+
+---
+
+#### Example 6: Edge Case Bug (Empty Array Handling)
+
+**Bug**: Timeline hierarchy service crashes on empty trace array
+
+**Test (reproduces bug)**:
+```typescript
+// src/features/pluginTraceViewer/domain/services/__tests__/TimelineHierarchyService.test.ts
+describe('TimelineHierarchyService', () => {
+  it('should handle empty trace array gracefully', () => {
+    const service = new TimelineHierarchyService();
+
+    // Bug: Crashes with "Cannot read property 'getTime' of undefined"
+    const result = service.buildHierarchy([]);
+
+    expect(result).toEqual([]);  // ✅ Should return empty array
+  });
+});
+```
+
+**Before (buggy)**:
+```typescript
+class TimelineHierarchyService {
+  buildHierarchy(traces: readonly PluginTrace[]): readonly TimelineNode[] {
+    // ❌ Bug: Doesn't check for empty array
+    const timelineStart = Math.min(...traces.map(t => t.createdOn.getTime()));  // Crashes if empty
+    const timelineEnd = Math.max(...traces.map(t => t.createdOn.getTime() + t.duration.milliseconds));
+    const totalDuration = timelineEnd - timelineStart;
+
+    // ...
+  }
+}
+```
+
+**After (fixed)**:
+```typescript
+class TimelineHierarchyService {
+  buildHierarchy(traces: readonly PluginTrace[]): readonly TimelineNode[] {
+    // ✅ Early return for empty array
+    if (traces.length === 0) {
+      return [];
+    }
+
+    const timelineStart = Math.min(...traces.map(t => t.createdOn.getTime()));
+    const timelineEnd = Math.max(...traces.map(t => t.createdOn.getTime() + t.duration.milliseconds));
+    const totalDuration = timelineEnd - timelineStart;
+
+    // ...
+  }
+}
+```
+
+**Commit**:
+```bash
+git commit -m "fix(domain): handle empty trace array in timeline builder
+
+- Early return prevents Math.min/max on empty array
+- Fixes crash when no traces match filter
+- Test: TimelineHierarchyService.test.ts"
+```
+
+---
+
 ## Refactoring Workflow
 
 **Use for:** Improving code structure without changing behavior

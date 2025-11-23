@@ -66,7 +66,7 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('initialize - when enabled', () => {
 		beforeEach(() => {
-			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
+			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
 				webviewMock as unknown as Webview,
 				'test-panel',
@@ -143,7 +143,7 @@ describe('SolutionFilterBehavior', () => {
 		});
 
 		it('should use default solution ID when no state repository', async () => {
-			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
+			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
 				webviewMock as unknown as Webview,
 				'test-panel',
@@ -176,7 +176,7 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('initialize - when disabled', () => {
 		it('should do nothing when filter is disabled', async () => {
-			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
+			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
 				webviewMock as unknown as Webview,
 				'test-panel',
@@ -198,7 +198,7 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('getCurrentSolutionId', () => {
 		beforeEach(() => {
-			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
+			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
 				webviewMock as unknown as Webview,
 				'test-panel',
@@ -230,7 +230,7 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('setSolutionId', () => {
 		beforeEach(async () => {
-			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
+			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
 				webviewMock as unknown as Webview,
 				'test-panel',
@@ -310,7 +310,7 @@ describe('SolutionFilterBehavior', () => {
 		});
 
 		it('should not persist when no state repository', async () => {
-			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
+			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
 				webviewMock as unknown as Webview,
 				'test-panel',
@@ -339,7 +339,7 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('dispose', () => {
 		it('should not throw when disposing', () => {
-			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
+			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
 				webviewMock as unknown as Webview,
 				'test-panel',
@@ -357,7 +357,7 @@ describe('SolutionFilterBehavior', () => {
 
 	describe('persistence per environment', () => {
 		beforeEach(() => {
-			// Cast is safe: MockWebview implements all Webview methods used by SolutionFilterBehavior
+			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
 				webviewMock as unknown as Webview,
 				'test-panel',
@@ -393,7 +393,7 @@ describe('SolutionFilterBehavior', () => {
 					panelType: 'test-panel',
 					environmentId: 'env-456'
 				},
-				expect.any(Object)
+				expect.objectContaining({})
 			);
 		});
 	});
