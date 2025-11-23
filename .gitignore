@@ -8,6 +8,7 @@ dist/
 *.tsbuildinfo
 out/
 coverage/
+.dev-version
 
 # Extension packaging
 *.vsix
