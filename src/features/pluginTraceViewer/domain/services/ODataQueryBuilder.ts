@@ -4,6 +4,8 @@ import type { OperationType } from '../valueObjects/OperationType';
 import type { TraceStatus } from '../valueObjects/TraceStatus';
 import type { FilterCondition } from '../entities/FilterCondition';
 
+import { ODataExpressionBuilder } from './ODataExpressionBuilder';
+
 /**
  * Domain Service: OData Query Builder
  *
@@ -21,6 +23,7 @@ import type { FilterCondition } from '../entities/FilterCondition';
  * - Single quotes in values are escaped as ''
  */
 export class ODataQueryBuilder {
+	private readonly expressionBuilder = new ODataExpressionBuilder();
 	/**
 	 * Builds OData filter from query builder conditions.
 	 * Each condition has its own logical operator (AND/OR) for chaining.
@@ -42,7 +45,7 @@ export class ODataQueryBuilder {
 			return undefined;
 		}
 
-		const firstExpression = firstCondition.buildExpression();
+		const firstExpression = this.expressionBuilder.buildExpression(firstCondition);
 		if (!firstExpression) {
 			return undefined;
 		}
@@ -60,7 +63,7 @@ export class ODataQueryBuilder {
 				continue;
 			}
 
-			const expression = condition.buildExpression();
+			const expression = this.expressionBuilder.buildExpression(condition);
 
 			if (expression) {
 				const operator = condition.logicalOperator === 'or' ? ' or ' : ' and ';

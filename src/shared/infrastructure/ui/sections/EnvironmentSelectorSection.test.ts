@@ -1,6 +1,6 @@
 import { EnvironmentSelectorSection } from './EnvironmentSelectorSection';
 import { SectionPosition } from '../types/SectionPosition';
-import type { EnvironmentOption } from './EnvironmentSelectorSection';
+import type { EnvironmentOption } from '../types/EnvironmentSelectorTypes';
 
 describe('EnvironmentSelectorSection', () => {
 	describe('constructor', () => {

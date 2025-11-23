@@ -1,20 +1,9 @@
 import type { SectionRenderData } from '../types/SectionRenderData';
 import { SectionPosition } from '../types/SectionPosition';
-import type { DropdownRenderConfig } from '../views/dropdownView';
+import type { DropdownItem, DropdownRenderConfig } from '../types/DropdownTypes';
 import { renderDropdown } from '../views/dropdownView';
 
 import type { ISection } from './ISection';
-
-/**
- * Dropdown item configuration.
- */
-export interface DropdownItem {
-	readonly id: string;
-	readonly label: string;
-	readonly icon?: string;
-	readonly disabled?: boolean;
-	readonly separator?: boolean;
-}
 
 /**
  * Shared infrastructure: Dropdown Section Base

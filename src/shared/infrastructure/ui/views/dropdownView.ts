@@ -1,18 +1,6 @@
-import type { DropdownItem } from '../sections/DropdownSection';
+import type { DropdownRenderConfig } from '../types/DropdownTypes';
 
 import { escapeHtml } from './htmlHelpers';
-
-/**
- * Dropdown render configuration.
- */
-export interface DropdownRenderConfig {
-	readonly id: string;
-	readonly label: string;
-	readonly icon?: string;
-	readonly items: ReadonlyArray<DropdownItem>;
-	readonly currentSelectionId?: string;
-	readonly variant?: 'default' | 'primary' | 'danger';
-}
 
 /**
  * View rendering: Dropdown

@@ -135,6 +135,152 @@ For complex/uncertain problems, trigger extended thinking modes:
 
 ---
 
+## 📦 Version Management & Local Installation
+
+### Critical Rules
+
+1. **`package.json` version is ALWAYS the production version** - Never commit dev suffixes
+2. **Marketplace only accepts numeric versions** - No `-dev.1`, `-beta`, `-rc` tags allowed
+3. **Use F5 for 99% of development** - Only install locally for final production testing
+4. **Dev suffix is automatic** - Scripts handle version manipulation, never manual
+
+### Workflow
+
+**During Feature Development:**
+```bash
+# package.json stays at production version (e.g., "0.1.1")
+# Use F5 (Extension Development Host) for all testing
+npm run watch  # Terminal 1
+# Press F5 to launch Extension Development Host
+```
+
+**When You Need Production Testing:**
+```bash
+# Install local dev build (auto-appends -dev.X suffix)
+npm run local
+# Creates: 0.1.1-dev.3 (increments automatically)
+# Installs in main VS Code with dev version clearly marked
+# package.json REMAINS at 0.1.1 (never modified)
+```
+
+**Revert to Marketplace Version:**
+```bash
+npm run marketplace
+# Uninstalls local version
+# Reinstalls published version from VS Code Marketplace
+```
+
+**Clean Up Extension Folders:**
+```bash
+npm run cleanup-extensions
+# Points to extensions folder for manual cleanup if needed
+# (Windows nul files require manual deletion via File Explorer)
+```
+
+### How It Works
+
+**`npm run local` workflow:**
+1. Reads version from `package.json` (e.g., `0.1.1`)
+2. Increments counter in `.dev-version` file (e.g., `3`)
+3. **Temporarily** modifies `package.json` to `0.1.1-dev.3`
+4. Builds and packages extension with dev version
+5. **Immediately restores** `package.json` to `0.1.1`
+6. Installs `.vsix` with dev version in VS Code
+
+**Result:**
+- ✅ Extensions panel shows: `0.1.1-dev.3` (clearly marked as dev)
+- ✅ `package.json` shows: `0.1.1` (production version, safe to commit)
+- ✅ `.dev-version` shows: `3` (counter for next build)
+- ✅ Git status: Clean (no modifications to package.json)
+
+### Release Process
+
+**When Ready to Publish:**
+
+1. **Finish feature work on feature branch**
+   - All tests passing
+   - Manual testing complete via F5
+   - Code reviewed and approved
+
+2. **Merge to main branch**
+   ```bash
+   git checkout main
+   git merge feature/your-feature
+   ```
+
+3. **Bump version on main**
+   ```bash
+   # Edit package.json manually
+   # "version": "0.1.1" → "0.1.2" (or appropriate semver)
+   git add package.json
+   git commit -m "Bump version to v0.1.2"
+   git push origin main
+   ```
+
+4. **Create GitHub Release**
+   - Go to GitHub → Releases → Create new release
+   - Tag: `v0.1.2`
+   - Title: `v0.1.2`
+   - Description: Release notes
+   - Publish release
+
+5. **GitHub Actions Auto-Publishes**
+   - Workflow triggers on release
+   - Builds from main branch
+   - Publishes `0.1.2` to VS Code Marketplace
+   - Version is numeric (no dev suffix) - ✅ Marketplace accepts it
+
+### Version Requirements
+
+**VS Code Marketplace:**
+- ✅ Accepts: `1.0.0`, `0.1.2`, `2.5.3` (numeric only)
+- ❌ Rejects: `0.1.1-dev.1`, `1.0.0-beta`, `0.5.0-rc.1`
+
+**Local .vsix Installation:**
+- ✅ Accepts: ANY version format including `-dev.X` suffixes
+- ✅ Perfect for development/testing
+
+**Why This Workflow:**
+- `package.json` always shows "real" version (ready to publish anytime)
+- No risk of accidentally publishing dev version (impossible - marketplace rejects it)
+- Clear distinction between dev builds and production
+- Aligns with existing release workflow (bump on main, then publish)
+
+### Troubleshooting
+
+**Extensions won't delete (nul file errors):**
+```bash
+npm run cleanup-extensions
+# Follow instructions to manually delete via File Explorer
+# Navigate to: %USERPROFILE%\.vscode\extensions
+# Delete folders starting with: joshsmithxrm.power-platform-developer-suite-
+# Use Shift+Delete for permanent deletion
+```
+
+**Marketplace install shows wrong version:**
+- Clear VS Code cache (close all windows first):
+  ```bash
+  Remove-Item -Recurse -Force "$env:APPDATA\Code\Cache"
+  code --install-extension JoshSmithXRM.power-platform-developer-suite --force
+  ```
+
+**Want specific dev version:**
+- Dev counter stored in `.dev-version` (gitignored)
+- Edit manually to reset: `echo 1 > .dev-version`
+- Next build will be `-dev.2`
+
+### Node.js Version
+
+**For Packaging (.vsix creation):**
+- Use Node.js 20.x: `nvm use 20`
+- Node.js 22+ has module resolution issues with vsce
+
+**For Development (F5):**
+- Any Node.js version works fine
+- Node.js 22 is OK for regular development
+
+---
+
 ## ⚡ Parallel Execution (Maximize Efficiency)
 
 **ALWAYS use parallel tool calls when operations are independent:**

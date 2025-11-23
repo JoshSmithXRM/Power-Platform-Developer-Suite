@@ -245,16 +245,41 @@ src/shared/infrastructure/ui/views/dropdownView.ts
 
 | Phase | Status | Date Completed | Time Spent | Notes |
 |-------|--------|----------------|------------|-------|
-| Phase 1: npm packages | ⬜ Not Started | - | - | |
-| Phase 2: Data loaders | ⬜ Not Started | - | - | Decision: Delete or Wire? |
-| Phase 3: View functions | ⬜ Not Started | - | - | |
-| Phase 4.1: FilterCondition fix | ⬜ Not Started | - | - | HIGH PRIORITY |
-| Phase 4.2: EnvironmentSelector fix | ⬜ Not Started | - | - | |
-| Phase 4.3: Dropdown fix | ⬜ Not Started | - | - | |
-| Phase 5: Dead code | ⬜ Not Started | - | - | |
-| Validation | ⬜ Not Started | - | - | |
+| Phase 1: npm packages | ✅ Complete | 2025-11-23 | ~5 min | Removed 4 unused packages (15 total with deps) |
+| Phase 2: Data loaders | ✅ Complete | 2025-11-23 | ~5 min | Deleted 4 unused DataLoader files |
+| Phase 3: View functions | ✅ Complete | 2025-11-23 | ~5 min | Deleted 2 unused view files |
+| Phase 4.1: FilterCondition fix | ✅ Complete | 2025-11-23 | ~30 min | Removed buildExpression() method, updated ODataQueryBuilder |
+| Phase 4.2: EnvironmentSelector fix | ✅ Complete | 2025-11-23 | ~15 min | Extracted types to EnvironmentSelectorTypes.ts |
+| Phase 4.3: Dropdown fix | ✅ Complete | 2025-11-23 | ~15 min | Extracted types to DropdownTypes.ts |
+| Phase 5: Dead code | ✅ Complete | 2025-11-23 | ~10 min | Deleted 4 dead code files |
+| Validation | ⬜ Pending | - | - | Will run npm run compile && npm test |
 
 **Legend**: ⬜ Not Started | 🟡 In Progress | ✅ Complete | ❌ Blocked
+
+## Summary (2025-11-23)
+
+**All cleanup tasks completed successfully!**
+
+### What was cleaned up:
+- **4 npm packages** removed (axios, node-fetch, @types/node-fetch, node-persist) = 15 total packages with dependencies
+- **4 DataLoader files** deleted (ConnectionReferences, EnvironmentVariables, ImportJob, Solution)
+- **2 view files** deleted (environmentSetup.ts, pluginTraceTimelineView.ts)
+- **4 dead code items** deleted (FilterSummaryFormatter.ts, PluginTraceToolbarSection.ts + test, TableStriping.ts, BrandedTypes.ts)
+- **3 circular dependencies** fixed:
+  - FilterCondition ↔ ODataExpressionBuilder (HIGH PRIORITY domain layer violation) - Removed entity method that instantiated service
+  - EnvironmentSelectorSection ↔ environmentSelectorView - Extracted shared types
+  - DropdownSection ↔ dropdownView - Extracted shared types
+
+### Architecture improvements:
+- **Clean Architecture compliance**: Entities no longer depend on or instantiate services (FilterCondition fix)
+- **Zero circular dependencies**: All 3 circular dependencies resolved
+- **Cleaner type organization**: Shared types extracted to dedicated type files
+
+### Next steps:
+- Run final validation (`npm run compile && npm test`)
+- Commit changes with proper message
+- Update POST_REFACTOR_CLEANUP.md if needed
+- Delete CLEANUP_CHECKLIST.md after final validation (task complete)
 
 ---
 

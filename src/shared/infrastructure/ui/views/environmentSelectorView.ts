@@ -3,7 +3,7 @@
  * Generates HTML for environment dropdown selector.
  */
 
-import type { EnvironmentOption } from '../sections/EnvironmentSelectorSection';
+import type { EnvironmentOption } from '../types/EnvironmentSelectorTypes';
 
 import { escapeHtml } from './htmlHelpers';
 

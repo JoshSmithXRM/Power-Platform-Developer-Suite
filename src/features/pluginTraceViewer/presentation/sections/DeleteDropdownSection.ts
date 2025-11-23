@@ -1,4 +1,4 @@
-import type { DropdownItem } from '../../../../shared/infrastructure/ui/sections/DropdownSection';
+import type { DropdownItem } from '../../../../shared/infrastructure/ui/types/DropdownTypes';
 import { DropdownSection } from '../../../../shared/infrastructure/ui/sections/DropdownSection';
 
 /**

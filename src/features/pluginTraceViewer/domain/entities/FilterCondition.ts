@@ -1,5 +1,4 @@
 import { ValidationError } from '../../../../shared/domain/errors/ValidationError';
-import { ODataExpressionBuilder } from '../services/ODataExpressionBuilder';
 import { FilterField } from '../valueObjects/FilterField';
 import { FilterOperator } from '../valueObjects/FilterOperator';
 
@@ -48,16 +47,6 @@ export class FilterCondition {
 				`Operator '${this.operator.displayName}' is not applicable to field type '${this.field.fieldType}'`
 			);
 		}
-	}
-
-	/**
-	 * Builds OData filter expression for this condition.
-	 * Delegates to ODataExpressionBuilder domain service.
-	 * Returns undefined if condition is disabled.
-	 */
-	public buildExpression(): string | undefined {
-		const builder = new ODataExpressionBuilder();
-		return builder.buildExpression(this);
 	}
 
 	/**

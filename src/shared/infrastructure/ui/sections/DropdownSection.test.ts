@@ -1,4 +1,5 @@
-import { DropdownSection, type DropdownItem } from './DropdownSection';
+import { DropdownSection } from './DropdownSection';
+import type { DropdownItem } from '../types/DropdownTypes';
 import { SectionPosition } from '../types/SectionPosition';
 
 /**

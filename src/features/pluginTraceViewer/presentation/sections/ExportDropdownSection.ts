@@ -1,4 +1,5 @@
-import { DropdownSection, DropdownItem } from '../../../../shared/infrastructure/ui/sections/DropdownSection';
+import { DropdownSection } from '../../../../shared/infrastructure/ui/sections/DropdownSection';
+import type { DropdownItem } from '../../../../shared/infrastructure/ui/types/DropdownTypes';
 
 /**
  * Section: Export Dropdown
