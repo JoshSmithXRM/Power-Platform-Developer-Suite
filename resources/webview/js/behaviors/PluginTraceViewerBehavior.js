@@ -432,6 +432,12 @@ function switchDetailTab(tab) {
  */
 function setupDetailPanelVisibility() {
 	window.addEventListener('message', event => {
+		// Validate origin first - CRITICAL for security
+		if (!event.origin || !event.origin.startsWith('vscode-webview://')) {
+			console.warn('Rejected message from untrusted origin:', event.origin);
+			return;
+		}
+
 		const message = event.data;
 		const detailSection = document.querySelector('.content-split > .detail-section');
 
@@ -1466,70 +1472,6 @@ function displayRawData() {
 	// Clear container and add pre wrapper
 	container.innerHTML = '';
 	container.appendChild(preWrapper);
-}
-
-/**
- * Displays related traces by correlation ID.
- * Uses the related traces fetched from backend (unfiltered, includes all traces with same correlation ID).
- * @param {Object} currentTrace - The current trace view model
- */
-function displayRelatedTraces(currentTrace) {
-	const container = document.getElementById('relatedTracesContainer');
-	if (!container) {
-		console.warn('[PluginTraceViewer] relatedTracesContainer not found');
-		return;
-	}
-
-	// Check if correlation ID is available
-	const correlationId = currentTrace.correlationId;
-	if (!correlationId || correlationId === 'N/A') {
-		container.innerHTML = '<div class="related-traces-empty">No correlation ID available for this trace</div>';
-		return;
-	}
-
-	// Use related traces fetched from backend (already filtered by correlation ID, unfiltered by table filters)
-	// This ensures we see ALL traces in the execution chain, even if they're filtered out of the main table
-	const relatedTraces = currentRelatedTraces;
-
-	if (relatedTraces.length === 0) {
-		container.innerHTML = '<div class="related-traces-empty">No other traces found with this correlation ID</div>';
-		return;
-	}
-
-	// Render related traces list
-	const relatedHtml = relatedTraces.map(trace => {
-		const statusClass = trace.status.toLowerCase().includes('exception') ? 'exception' : 'success';
-		return `
-			<div class="related-trace-item"
-			     data-command="viewTrace"
-			     data-trace-id="${escapeHtml(trace.id)}"
-			     style="cursor: pointer;">
-				<div class="related-trace-title">
-					<span class="status-indicator ${statusClass}"></span>
-					${escapeHtml(trace.pluginName)}
-				</div>
-				<div class="related-trace-meta">
-					<span>${escapeHtml(trace.messageName)}</span>
-					<span>Depth: ${escapeHtml(trace.depth)}</span>
-					<span>${escapeHtml(trace.duration)}</span>
-				</div>
-			</div>
-		`;
-	}).join('');
-
-	container.innerHTML = relatedHtml;
-
-	// Add click handlers for related trace navigation
-	container.querySelectorAll('.related-trace-item').forEach(item => {
-		item.addEventListener('click', () => {
-			const traceId = item.dataset.traceId;
-			// Send message to extension to select and display this trace
-			vscode.postMessage({
-				command: 'viewTrace',
-				data: { traceId }
-			});
-		});
-	});
 }
 
 /**

@@ -18,7 +18,7 @@
  */
 
 const { execSync } = require('child_process');
-const { readFileSync, writeFileSync, existsSync, copyFileSync, unlinkSync } = require('fs');
+const { readFileSync, writeFileSync, copyFileSync, unlinkSync } = require('fs');
 const { join } = require('path');
 
 const ROOT_DIR = join(__dirname, '..');
@@ -33,9 +33,15 @@ const DEV_VERSION_PATH = join(ROOT_DIR, '.dev-version');
 function getAndIncrementDevVersion() {
 	let devVersion = 1;
 
-	if (existsSync(DEV_VERSION_PATH)) {
+	// Use try-catch instead of existsSync to avoid TOCTOU race condition
+	try {
 		const content = readFileSync(DEV_VERSION_PATH, 'utf8').trim();
 		devVersion = parseInt(content, 10) || 1;
+	} catch (error) {
+		if (error.code !== 'ENOENT') {
+			throw error; // Re-throw unexpected errors
+		}
+		// File doesn't exist, use default devVersion = 1
 	}
 
 	const newDevVersion = devVersion + 1;
@@ -64,9 +70,15 @@ function backupPackageJson() {
  * Restores package.json from backup and deletes the backup file.
  */
 function restorePackageJson() {
-	if (existsSync(PACKAGE_JSON_BACKUP_PATH)) {
+	// Use try-catch instead of existsSync to avoid TOCTOU race condition
+	try {
 		copyFileSync(PACKAGE_JSON_BACKUP_PATH, PACKAGE_JSON_PATH);
 		unlinkSync(PACKAGE_JSON_BACKUP_PATH);
+	} catch (error) {
+		if (error.code !== 'ENOENT') {
+			throw error; // Re-throw unexpected errors
+		}
+		// Backup file doesn't exist, nothing to restore
 	}
 }
 
@@ -137,7 +149,8 @@ async function main() {
 		console.error(`\n❌ Error: ${error.message}`);
 
 		// Always restore package.json on error
-		if (!restored && existsSync(PACKAGE_JSON_BACKUP_PATH)) {
+		// restorePackageJson() handles missing backup file internally
+		if (!restored) {
 			console.log('♻️  Restoring package.json after error...');
 			restorePackageJson();
 			console.log('✅ package.json restored');

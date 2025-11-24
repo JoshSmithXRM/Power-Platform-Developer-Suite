@@ -65,7 +65,9 @@ export class CloudFlow {
 
 			const connectionRefs = data.properties?.connectionReferences;
 
-			if (!connectionRefs || typeof connectionRefs !== 'object' || connectionRefs === null) {
+			// Check for null/undefined first, then check if it's an object
+			// Note: typeof null === 'object' in JavaScript, so !connectionRefs handles that case
+			if (!connectionRefs || typeof connectionRefs !== 'object') {
 				return [];
 			}
 

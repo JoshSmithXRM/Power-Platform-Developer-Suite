@@ -53,6 +53,18 @@ describe('CorrelationId', () => {
 		});
 	});
 
+	describe('getValue', () => {
+		it('should return the correlation ID value', () => {
+			const id = CorrelationId.create('abc-123');
+			expect(id.getValue()).toBe('abc-123');
+		});
+
+		it('should return exact value including whitespace', () => {
+			const id = CorrelationId.create('  abc-123  ');
+			expect(id.getValue()).toBe('  abc-123  ');
+		});
+	});
+
 	describe('toString', () => {
 		it('should return string value when converted to string', () => {
 			const id = CorrelationId.create('abc-123');

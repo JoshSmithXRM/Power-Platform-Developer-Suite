@@ -33,19 +33,6 @@ function attachTimelineEventListeners(container) {
 }
 
 /**
- * Handles trace selection from timeline.
- * @param {string} traceId - Trace ID to select
- */
-function handleTraceSelection(traceId) {
-	// Send message to extension to view this trace
-	vscode.postMessage({
-		command: 'viewTrace',
-		data: { traceId }
-	});
-}
-
-
-/**
  * Highlights a specific trace in the timeline.
  * @param {string} traceId - Trace ID to highlight
  * @param {string} containerId - Container ID

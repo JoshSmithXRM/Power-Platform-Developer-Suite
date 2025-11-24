@@ -496,6 +496,158 @@ describe('EntityMetadata', () => {
             expect(custom.manyToOne).toEqual([]);
             expect(custom.manyToMany).toEqual([]);
         });
+
+        it('should return custom manyToOne relationships', () => {
+            const customManyToOne = OneToManyRelationship.create({
+                metadataId: 'rel-mto-1',
+                schemaName: 'custom_many_to_one',
+                referencedEntity: 'account',
+                referencedAttribute: 'accountid',
+                referencingEntity: 'contact',
+                referencingAttribute: 'custom_accountid',
+                isCustomRelationship: true,
+                isManaged: false,
+                relationshipType: 'OneToManyRelationship',
+                cascadeConfiguration: CascadeConfiguration.create({
+                    assign: 'NoCascade',
+                    delete: 'NoCascade',
+                    merge: 'NoCascade',
+                    reparent: 'NoCascade',
+                    share: 'NoCascade',
+                    unshare: 'NoCascade'
+                })
+            });
+
+            const systemManyToOne = OneToManyRelationship.create({
+                metadataId: 'rel-mto-2',
+                schemaName: 'system_many_to_one',
+                referencedEntity: 'account',
+                referencedAttribute: 'accountid',
+                referencingEntity: 'contact',
+                referencingAttribute: 'parentcustomerid',
+                isCustomRelationship: false,
+                isManaged: true,
+                relationshipType: 'OneToManyRelationship',
+                cascadeConfiguration: CascadeConfiguration.create({
+                    assign: 'NoCascade',
+                    delete: 'NoCascade',
+                    merge: 'NoCascade',
+                    reparent: 'NoCascade',
+                    share: 'NoCascade',
+                    unshare: 'NoCascade'
+                })
+            });
+
+            const entity = createValidEntity({
+                manyToOneRelationships: [customManyToOne, systemManyToOne]
+            });
+
+            const custom = entity.getCustomRelationships();
+            expect(custom.manyToOne).toHaveLength(1);
+            expect(custom.manyToOne[0]).toBe(customManyToOne);
+        });
+
+        it('should return custom manyToMany relationships', () => {
+            const customManyToMany = ManyToManyRelationship.create({
+                metadataId: 'rel-mtm-1',
+                schemaName: 'custom_many_to_many',
+                entity1LogicalName: 'account',
+                entity1IntersectAttribute: 'accountid',
+                entity2LogicalName: 'contact',
+                entity2IntersectAttribute: 'contactid',
+                intersectEntityName: 'custom_account_contact',
+                isCustomRelationship: true,
+                isManaged: false
+            });
+
+            const systemManyToMany = ManyToManyRelationship.create({
+                metadataId: 'rel-mtm-2',
+                schemaName: 'system_many_to_many',
+                entity1LogicalName: 'account',
+                entity1IntersectAttribute: 'accountid',
+                entity2LogicalName: 'contact',
+                entity2IntersectAttribute: 'contactid',
+                intersectEntityName: 'accountcontact',
+                isCustomRelationship: false,
+                isManaged: true
+            });
+
+            const entity = createValidEntity({
+                manyToManyRelationships: [customManyToMany, systemManyToMany]
+            });
+
+            const custom = entity.getCustomRelationships();
+            expect(custom.manyToMany).toHaveLength(1);
+            expect(custom.manyToMany[0]).toBe(customManyToMany);
+        });
+
+        it('should return all custom relationships across all types', () => {
+            const customOneToMany = OneToManyRelationship.create({
+                metadataId: 'rel-1',
+                schemaName: 'custom_one_to_many',
+                referencedEntity: 'account',
+                referencedAttribute: 'accountid',
+                referencingEntity: 'contact',
+                referencingAttribute: 'custom_field',
+                isCustomRelationship: true,
+                isManaged: false,
+                relationshipType: 'OneToManyRelationship',
+                cascadeConfiguration: CascadeConfiguration.create({
+                    assign: 'NoCascade',
+                    delete: 'NoCascade',
+                    merge: 'NoCascade',
+                    reparent: 'NoCascade',
+                    share: 'NoCascade',
+                    unshare: 'NoCascade'
+                })
+            });
+
+            const customManyToOne = OneToManyRelationship.create({
+                metadataId: 'rel-2',
+                schemaName: 'custom_many_to_one',
+                referencedEntity: 'account',
+                referencedAttribute: 'accountid',
+                referencingEntity: 'contact',
+                referencingAttribute: 'custom_accountid',
+                isCustomRelationship: true,
+                isManaged: false,
+                relationshipType: 'OneToManyRelationship',
+                cascadeConfiguration: CascadeConfiguration.create({
+                    assign: 'NoCascade',
+                    delete: 'NoCascade',
+                    merge: 'NoCascade',
+                    reparent: 'NoCascade',
+                    share: 'NoCascade',
+                    unshare: 'NoCascade'
+                })
+            });
+
+            const customManyToMany = ManyToManyRelationship.create({
+                metadataId: 'rel-3',
+                schemaName: 'custom_many_to_many',
+                entity1LogicalName: 'account',
+                entity1IntersectAttribute: 'accountid',
+                entity2LogicalName: 'contact',
+                entity2IntersectAttribute: 'contactid',
+                intersectEntityName: 'custom_account_contact',
+                isCustomRelationship: true,
+                isManaged: false
+            });
+
+            const entity = createValidEntity({
+                oneToManyRelationships: [customOneToMany],
+                manyToOneRelationships: [customManyToOne],
+                manyToManyRelationships: [customManyToMany]
+            });
+
+            const custom = entity.getCustomRelationships();
+            expect(custom.oneToMany).toHaveLength(1);
+            expect(custom.manyToOne).toHaveLength(1);
+            expect(custom.manyToMany).toHaveLength(1);
+            expect(custom.oneToMany[0]).toBe(customOneToMany);
+            expect(custom.manyToOne[0]).toBe(customManyToOne);
+            expect(custom.manyToMany[0]).toBe(customManyToMany);
+        });
     });
 
     describe('getActiveKeys', () => {

@@ -98,7 +98,10 @@ describe('HtmlUtils', () => {
 		});
 
 		it('should handle null and undefined in interpolations', () => {
-			const result = html`<div>${null} ${undefined}</div>`;
+			// Test with variables that may be null/undefined (more realistic than literals)
+			const nullValue: string | null = null;
+			const undefinedValue: string | undefined = undefined;
+			const result = html`<div>${nullValue} ${undefinedValue}</div>`;
 			expect(result.__html).toBe('<div> </div>');
 		});
 

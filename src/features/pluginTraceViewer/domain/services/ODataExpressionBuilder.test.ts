@@ -358,6 +358,63 @@ describe('ODataExpressionBuilder', () => {
 		});
 	});
 
+	describe('boolean field handling', () => {
+		it('should format boolean true as lowercase', () => {
+			const condition = new FilterCondition(
+				FilterField.IsSystemCreated,
+				FilterOperator.Equals,
+				'True',
+				true
+			);
+
+			expect(builder.buildExpression(condition)).toBe('issystemcreated eq true');
+		});
+
+		it('should format boolean false as lowercase', () => {
+			const condition = new FilterCondition(
+				FilterField.IsSystemCreated,
+				FilterOperator.Equals,
+				'False',
+				true
+			);
+
+			expect(builder.buildExpression(condition)).toBe('issystemcreated eq false');
+		});
+
+		it('should format uppercase TRUE as lowercase', () => {
+			const condition = new FilterCondition(
+				FilterField.IsSystemCreated,
+				FilterOperator.Equals,
+				'TRUE',
+				true
+			);
+
+			expect(builder.buildExpression(condition)).toBe('issystemcreated eq true');
+		});
+
+		it('should format mixed case FaLsE as lowercase', () => {
+			const condition = new FilterCondition(
+				FilterField.IsSystemCreated,
+				FilterOperator.Equals,
+				'FaLsE',
+				true
+			);
+
+			expect(builder.buildExpression(condition)).toBe('issystemcreated eq false');
+		});
+
+		it('should support not equals operator on boolean fields', () => {
+			const condition = new FilterCondition(
+				FilterField.IsSystemCreated,
+				FilterOperator.NotEquals,
+				'true',
+				true
+			);
+
+			expect(builder.buildExpression(condition)).toBe('issystemcreated ne true');
+		});
+	});
+
 	describe('GUID field handling', () => {
 		it('should quote GUID field values like text values', () => {
 			const condition = new FilterCondition(

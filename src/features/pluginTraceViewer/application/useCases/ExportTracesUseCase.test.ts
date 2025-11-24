@@ -122,6 +122,63 @@ describe('ExportTracesUseCase', () => {
 				error
 			);
 		});
+
+		it('should log info (not error) when export is cancelled by user', async () => {
+			const traces = [createMockTrace()];
+			const filename = 'traces.csv';
+			const cancellationError = new Error('Export cancelled by user');
+
+			mockExporter.exportToCsv.mockImplementation(() => {
+				throw cancellationError;
+			});
+
+			await expect(
+				useCase.exportToCsv(traces, filename)
+			).rejects.toThrow('Export cancelled by user');
+
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				'ExportTracesUseCase: Export cancelled by user'
+			);
+			expect(mockLogger.error).not.toHaveBeenCalled();
+		});
+
+		it('should log info (not error) when save is cancelled by user', async () => {
+			const traces = [createMockTrace()];
+			const filename = 'traces.csv';
+			const csvContent = 'id,name';
+			const cancellationError = new Error('Save operation cancelled by user');
+
+			mockExporter.exportToCsv.mockReturnValue(csvContent);
+			mockExporter.saveToFile.mockRejectedValue(cancellationError);
+
+			await expect(
+				useCase.exportToCsv(traces, filename)
+			).rejects.toThrow('Save operation cancelled by user');
+
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				'ExportTracesUseCase: Export cancelled by user'
+			);
+			expect(mockLogger.error).not.toHaveBeenCalled();
+		});
+
+		it('should handle non-Error cancellation (string error)', async () => {
+			const traces = [createMockTrace()];
+			const filename = 'traces.csv';
+			const stringError = 'User cancelled by user action';
+
+			mockExporter.exportToCsv.mockImplementation(() => {
+				throw stringError;
+			});
+
+			await expect(
+				useCase.exportToCsv(traces, filename)
+			).rejects.toBe(stringError);
+
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				'ExportTracesUseCase: Export cancelled by user'
+			);
+			expect(mockLogger.error).not.toHaveBeenCalled();
+		});
 	});
 
 	describe('exportToJson', () => {
@@ -202,6 +259,63 @@ describe('ExportTracesUseCase', () => {
 				'ExportTracesUseCase: Failed to export to JSON',
 				error
 			);
+		});
+
+		it('should log info (not error) when export is cancelled by user', async () => {
+			const traces = [createMockTrace()];
+			const filename = 'traces.json';
+			const cancellationError = new Error('Export cancelled by user');
+
+			mockExporter.exportToJson.mockImplementation(() => {
+				throw cancellationError;
+			});
+
+			await expect(
+				useCase.exportToJson(traces, filename)
+			).rejects.toThrow('Export cancelled by user');
+
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				'ExportTracesUseCase: Export cancelled by user'
+			);
+			expect(mockLogger.error).not.toHaveBeenCalled();
+		});
+
+		it('should log info (not error) when save is cancelled by user', async () => {
+			const traces = [createMockTrace()];
+			const filename = 'traces.json';
+			const jsonContent = '[]';
+			const cancellationError = new Error('File dialog cancelled by user');
+
+			mockExporter.exportToJson.mockReturnValue(jsonContent);
+			mockExporter.saveToFile.mockRejectedValue(cancellationError);
+
+			await expect(
+				useCase.exportToJson(traces, filename)
+			).rejects.toThrow('File dialog cancelled by user');
+
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				'ExportTracesUseCase: Export cancelled by user'
+			);
+			expect(mockLogger.error).not.toHaveBeenCalled();
+		});
+
+		it('should handle non-Error cancellation (string error)', async () => {
+			const traces = [createMockTrace()];
+			const filename = 'traces.json';
+			const stringError = 'Operation cancelled by user preference';
+
+			mockExporter.exportToJson.mockImplementation(() => {
+				throw stringError;
+			});
+
+			await expect(
+				useCase.exportToJson(traces, filename)
+			).rejects.toBe(stringError);
+
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				'ExportTracesUseCase: Export cancelled by user'
+			);
+			expect(mockLogger.error).not.toHaveBeenCalled();
 		});
 	});
 });

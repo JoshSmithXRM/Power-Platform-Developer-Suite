@@ -18,6 +18,12 @@
         const vscode = acquireVsCodeApi();
 
         window.addEventListener('message', event => {
+            // Validate origin first - CRITICAL for security
+            if (!event.origin || !event.origin.startsWith('vscode-webview://')) {
+                console.warn('Rejected message from untrusted origin:', event.origin);
+                return;
+            }
+
             const message = event.data;
             const content = document.getElementById('content');
 

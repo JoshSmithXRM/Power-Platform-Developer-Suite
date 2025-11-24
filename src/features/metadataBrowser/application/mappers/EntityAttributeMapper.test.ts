@@ -358,6 +358,19 @@ describe('EntityAttributeMapper', () => {
 			// Assert
 			expect(result.attributeTypeDisplay).toBe('Choice');
 		});
+
+		it('should return unknown attribute type as-is (fallback)', () => {
+			// Arrange - BigIntType is valid but not in mapper's display map
+			const attribute = createAttribute('custom', {
+				attributeType: AttributeType.create('BigIntType')
+			});
+
+			// Act
+			const result = mapper.toViewModel(attribute);
+
+			// Assert
+			expect(result.attributeTypeDisplay).toBe('BigIntType');
+		});
 	});
 
 	describe('required level display mapping', () => {
@@ -411,6 +424,19 @@ describe('EntityAttributeMapper', () => {
 
 			// Assert
 			expect(result.requiredLevelDisplay).toBe('Business Recommended');
+		});
+
+		it('should return unknown required level as-is (fallback)', () => {
+			// Arrange
+			const attribute = createAttribute('custom', {
+				requiredLevel: 'CustomLevel' as unknown as 'None' | 'SystemRequired' | 'ApplicationRequired' | 'Recommended'
+			});
+
+			// Act
+			const result = mapper.toViewModel(attribute);
+
+			// Assert
+			expect(result.requiredLevelDisplay).toBe('CustomLevel');
 		});
 	});
 

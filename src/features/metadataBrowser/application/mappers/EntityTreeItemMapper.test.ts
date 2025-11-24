@@ -120,6 +120,27 @@ describe('EntityTreeItemMapper', () => {
 	});
 
 	describe('edge cases', () => {
+		it('should fallback to logicalName when displayName is falsy', () => {
+			// Arrange - Test defensive programming: mapper handles edge case even though domain prevents it
+			// Create entity with valid displayName first
+			const validEntity = createEntity('account', {
+				displayName: 'Account'
+			});
+
+			// Simulate edge case where displayName might be empty (e.g., from external API)
+			// This tests the || operator's fallback branch
+			const entityWithEmptyDisplay = {
+				...validEntity,
+				displayName: '' // Empty string to test fallback to logicalName
+			};
+
+			// Act
+			const result = mapper.toViewModel(entityWithEmptyDisplay as EntityMetadata);
+
+			// Assert
+			expect(result.displayName).toBe('account');
+		});
+
 		it('should handle special characters in displayName', () => {
 			// Arrange
 			const entity = createEntity('account', {

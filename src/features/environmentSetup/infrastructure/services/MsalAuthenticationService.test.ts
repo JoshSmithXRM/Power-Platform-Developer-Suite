@@ -23,7 +23,6 @@
  * - Main Entry Point: 8 tests (flow routing, custom scopes, validation)
  * - Helper Methods: 8 tests (authority URL generation, client app caching, cancellation)
  */
-/* eslint-disable max-lines */
 
 import * as http from 'http';
 

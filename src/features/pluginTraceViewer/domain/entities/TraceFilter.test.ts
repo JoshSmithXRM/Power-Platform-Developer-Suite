@@ -4,6 +4,8 @@ import { ExecutionMode } from '../valueObjects/ExecutionMode';
 import { TraceStatus } from '../valueObjects/TraceStatus';
 import { FilterField } from '../valueObjects/FilterField';
 import { FilterOperator } from '../valueObjects/FilterOperator';
+import { OperationType } from '../valueObjects/OperationType';
+import { CorrelationId } from '../valueObjects/CorrelationId';
 
 describe('TraceFilter', () => {
 	describe('default', () => {
@@ -170,6 +172,281 @@ describe('TraceFilter', () => {
 		});
 	});
 
+	describe('builder pattern - withEntityName', () => {
+		it('should return new filter with entity name', () => {
+			const original = TraceFilter.default();
+			const updated = original.withEntityName('account');
+			expect(updated.entityNameFilter).toBe('account');
+		});
+
+		it('should preserve top and orderBy', () => {
+			const original = TraceFilter.create({ top: 50, orderBy: 'duration desc' });
+			const updated = original.withEntityName('account');
+			expect(updated.top).toBe(50);
+			expect(updated.orderBy).toBe('duration desc');
+		});
+
+		it('should return new instance (immutability)', () => {
+			const original = TraceFilter.default();
+			const updated = original.withEntityName('account');
+			expect(updated).not.toBe(original);
+			expect(original.entityNameFilter).toBeUndefined();
+		});
+	});
+
+	describe('builder pattern - withMessageName', () => {
+		it('should return new filter with message name', () => {
+			const original = TraceFilter.default();
+			const updated = original.withMessageName('Update');
+			expect(updated.messageNameFilter).toBe('Update');
+		});
+
+		it('should preserve other properties', () => {
+			const original = TraceFilter.create({
+				top: 50,
+				orderBy: 'duration desc',
+				pluginNameFilter: 'MyPlugin'
+			});
+			const updated = original.withMessageName('Update');
+			expect(updated.top).toBe(50);
+			expect(updated.orderBy).toBe('duration desc');
+			expect(updated.pluginNameFilter).toBe('MyPlugin');
+		});
+
+		it('should return new instance (immutability)', () => {
+			const original = TraceFilter.default();
+			const updated = original.withMessageName('Update');
+			expect(updated).not.toBe(original);
+			expect(original.messageNameFilter).toBeUndefined();
+		});
+	});
+
+	describe('builder pattern - withOperationType', () => {
+		it('should return new filter with operation type', () => {
+			const original = TraceFilter.default();
+			const updated = original.withOperationType(OperationType.Plugin);
+			expect(updated.operationTypeFilter).toBe(OperationType.Plugin);
+		});
+
+		it('should preserve other properties', () => {
+			const original = TraceFilter.create({
+				top: 50,
+				orderBy: 'duration desc',
+				pluginNameFilter: 'MyPlugin'
+			});
+			const updated = original.withOperationType(OperationType.Workflow);
+			expect(updated.top).toBe(50);
+			expect(updated.orderBy).toBe('duration desc');
+			expect(updated.pluginNameFilter).toBe('MyPlugin');
+		});
+
+		it('should return new instance (immutability)', () => {
+			const original = TraceFilter.default();
+			const updated = original.withOperationType(OperationType.Plugin);
+			expect(updated).not.toBe(original);
+			expect(original.operationTypeFilter).toBeUndefined();
+		});
+	});
+
+	describe('builder pattern - withMode', () => {
+		it('should return new filter with mode', () => {
+			const original = TraceFilter.default();
+			const updated = original.withMode(ExecutionMode.Synchronous);
+			expect(updated.modeFilter).toBe(ExecutionMode.Synchronous);
+		});
+
+		it('should preserve other properties', () => {
+			const original = TraceFilter.create({
+				top: 50,
+				orderBy: 'duration desc',
+				pluginNameFilter: 'MyPlugin'
+			});
+			const updated = original.withMode(ExecutionMode.Asynchronous);
+			expect(updated.top).toBe(50);
+			expect(updated.orderBy).toBe('duration desc');
+			expect(updated.pluginNameFilter).toBe('MyPlugin');
+		});
+
+		it('should return new instance (immutability)', () => {
+			const original = TraceFilter.default();
+			const updated = original.withMode(ExecutionMode.Synchronous);
+			expect(updated).not.toBe(original);
+			expect(original.modeFilter).toBeUndefined();
+		});
+	});
+
+	describe('builder pattern - withStatus', () => {
+		it('should return new filter with status', () => {
+			const original = TraceFilter.default();
+			const updated = original.withStatus(TraceStatus.Success);
+			expect(updated.statusFilter).toBe(TraceStatus.Success);
+		});
+
+		it('should preserve other properties', () => {
+			const original = TraceFilter.create({
+				top: 50,
+				orderBy: 'duration desc',
+				pluginNameFilter: 'MyPlugin'
+			});
+			const updated = original.withStatus(TraceStatus.Exception);
+			expect(updated.top).toBe(50);
+			expect(updated.orderBy).toBe('duration desc');
+			expect(updated.pluginNameFilter).toBe('MyPlugin');
+		});
+
+		it('should return new instance (immutability)', () => {
+			const original = TraceFilter.default();
+			const updated = original.withStatus(TraceStatus.Success);
+			expect(updated).not.toBe(original);
+			expect(original.statusFilter).toBeUndefined();
+		});
+	});
+
+	describe('builder pattern - withDateRange', () => {
+		it('should return new filter with date range', () => {
+			const from = new Date('2024-01-01');
+			const to = new Date('2024-01-31');
+			const original = TraceFilter.default();
+			const updated = original.withDateRange(from, to);
+			expect(updated.createdOnFrom).toBe(from);
+			expect(updated.createdOnTo).toBe(to);
+		});
+
+		it('should preserve other properties', () => {
+			const from = new Date('2024-01-01');
+			const to = new Date('2024-01-31');
+			const original = TraceFilter.create({
+				top: 50,
+				orderBy: 'duration desc',
+				pluginNameFilter: 'MyPlugin'
+			});
+			const updated = original.withDateRange(from, to);
+			expect(updated.top).toBe(50);
+			expect(updated.orderBy).toBe('duration desc');
+			expect(updated.pluginNameFilter).toBe('MyPlugin');
+		});
+
+		it('should return new instance (immutability)', () => {
+			const from = new Date('2024-01-01');
+			const to = new Date('2024-01-31');
+			const original = TraceFilter.default();
+			const updated = original.withDateRange(from, to);
+			expect(updated).not.toBe(original);
+			expect(original.createdOnFrom).toBeUndefined();
+		});
+
+		it('should accept undefined values', () => {
+			const original = TraceFilter.default();
+			const updated = original.withDateRange(undefined, undefined);
+			expect(updated.createdOnFrom).toBeUndefined();
+			expect(updated.createdOnTo).toBeUndefined();
+		});
+	});
+
+	describe('builder pattern - withDurationRange', () => {
+		it('should return new filter with duration range', () => {
+			const original = TraceFilter.default();
+			const updated = original.withDurationRange(100, 1000);
+			expect(updated.durationMin).toBe(100);
+			expect(updated.durationMax).toBe(1000);
+		});
+
+		it('should preserve other properties', () => {
+			const original = TraceFilter.create({
+				top: 50,
+				orderBy: 'duration desc',
+				pluginNameFilter: 'MyPlugin'
+			});
+			const updated = original.withDurationRange(100, 1000);
+			expect(updated.top).toBe(50);
+			expect(updated.orderBy).toBe('duration desc');
+			expect(updated.pluginNameFilter).toBe('MyPlugin');
+		});
+
+		it('should return new instance (immutability)', () => {
+			const original = TraceFilter.default();
+			const updated = original.withDurationRange(100, 1000);
+			expect(updated).not.toBe(original);
+			expect(original.durationMin).toBeUndefined();
+		});
+
+		it('should accept undefined values', () => {
+			const original = TraceFilter.default();
+			const updated = original.withDurationRange(undefined, undefined);
+			expect(updated.durationMin).toBeUndefined();
+			expect(updated.durationMax).toBeUndefined();
+		});
+	});
+
+	describe('builder pattern - withHasException', () => {
+		it('should return new filter with hasException flag', () => {
+			const original = TraceFilter.default();
+			const updated = original.withHasException(true);
+			expect(updated.hasExceptionFilter).toBe(true);
+		});
+
+		it('should preserve other properties', () => {
+			const original = TraceFilter.create({
+				top: 50,
+				orderBy: 'duration desc',
+				pluginNameFilter: 'MyPlugin'
+			});
+			const updated = original.withHasException(true);
+			expect(updated.top).toBe(50);
+			expect(updated.orderBy).toBe('duration desc');
+			expect(updated.pluginNameFilter).toBe('MyPlugin');
+		});
+
+		it('should return new instance (immutability)', () => {
+			const original = TraceFilter.default();
+			const updated = original.withHasException(true);
+			expect(updated).not.toBe(original);
+			expect(original.hasExceptionFilter).toBeUndefined();
+		});
+
+		it('should accept undefined value', () => {
+			const original = TraceFilter.default();
+			const updated = original.withHasException(undefined);
+			expect(updated.hasExceptionFilter).toBeUndefined();
+		});
+	});
+
+	describe('builder pattern - withCorrelationId', () => {
+		it('should return new filter with correlation ID', () => {
+			const correlationId = CorrelationId.create('123e4567-e89b-12d3-a456-426614174000');
+			const original = TraceFilter.default();
+			const updated = original.withCorrelationId(correlationId);
+			expect(updated.correlationIdFilter).toBe(correlationId);
+		});
+
+		it('should preserve other properties', () => {
+			const correlationId = CorrelationId.create('123e4567-e89b-12d3-a456-426614174000');
+			const original = TraceFilter.create({
+				top: 50,
+				orderBy: 'duration desc',
+				pluginNameFilter: 'MyPlugin'
+			});
+			const updated = original.withCorrelationId(correlationId);
+			expect(updated.top).toBe(50);
+			expect(updated.orderBy).toBe('duration desc');
+			expect(updated.pluginNameFilter).toBe('MyPlugin');
+		});
+
+		it('should return new instance (immutability)', () => {
+			const correlationId = CorrelationId.create('123e4567-e89b-12d3-a456-426614174000');
+			const original = TraceFilter.default();
+			const updated = original.withCorrelationId(correlationId);
+			expect(updated).not.toBe(original);
+			expect(original.correlationIdFilter).toBeUndefined();
+		});
+
+		it('should accept undefined value', () => {
+			const original = TraceFilter.default();
+			const updated = original.withCorrelationId(undefined);
+			expect(updated.correlationIdFilter).toBeUndefined();
+		});
+	});
+
 	describe('builder pattern - clearFilters', () => {
 		it('should clear all filters but preserve top/orderBy', () => {
 			const original = TraceFilter.create({
@@ -216,6 +493,57 @@ describe('TraceFilter', () => {
 			const filter = TraceFilter.create({ modeFilter: ExecutionMode.Synchronous });
 			expect(filter.hasActiveFilters()).toBe(true);
 		});
+
+		it('should return true when correlationIdFilter is set and not empty', () => {
+			const correlationId = CorrelationId.create('123e4567-e89b-12d3-a456-426614174000');
+			const filter = TraceFilter.create({ correlationIdFilter: correlationId });
+			expect(filter.hasActiveFilters()).toBe(true);
+		});
+
+		it('should return true when operationTypeFilter set', () => {
+			const filter = TraceFilter.create({ operationTypeFilter: OperationType.Plugin });
+			expect(filter.hasActiveFilters()).toBe(true);
+		});
+
+		it('should return true when statusFilter set', () => {
+			const filter = TraceFilter.create({ statusFilter: TraceStatus.Success });
+			expect(filter.hasActiveFilters()).toBe(true);
+		});
+
+		it('should return true when createdOnFrom set', () => {
+			const filter = TraceFilter.create({ createdOnFrom: new Date('2024-01-01') });
+			expect(filter.hasActiveFilters()).toBe(true);
+		});
+
+		it('should return true when createdOnTo set', () => {
+			const filter = TraceFilter.create({ createdOnTo: new Date('2024-01-01') });
+			expect(filter.hasActiveFilters()).toBe(true);
+		});
+
+		it('should return true when durationMin set', () => {
+			const filter = TraceFilter.create({ durationMin: 100 });
+			expect(filter.hasActiveFilters()).toBe(true);
+		});
+
+		it('should return true when durationMax set', () => {
+			const filter = TraceFilter.create({ durationMax: 1000 });
+			expect(filter.hasActiveFilters()).toBe(true);
+		});
+
+		it('should return true when hasExceptionFilter set', () => {
+			const filter = TraceFilter.create({ hasExceptionFilter: true });
+			expect(filter.hasActiveFilters()).toBe(true);
+		});
+
+		it('should return true when entityNameFilter set', () => {
+			const filter = TraceFilter.create({ entityNameFilter: 'account' });
+			expect(filter.hasActiveFilters()).toBe(true);
+		});
+
+		it('should return true when messageNameFilter set', () => {
+			const filter = TraceFilter.create({ messageNameFilter: 'Update' });
+			expect(filter.hasActiveFilters()).toBe(true);
+		});
 	});
 
 	describe('getActiveFilterCount', () => {
@@ -236,6 +564,84 @@ describe('TraceFilter', () => {
 				modeFilter: ExecutionMode.Asynchronous
 			});
 			expect(filter.getActiveFilterCount()).toBe(3);
+		});
+
+		it('should count date range as 1 filter when both set', () => {
+			const filter = TraceFilter.create({
+				createdOnFrom: new Date('2024-01-01'),
+				createdOnTo: new Date('2024-01-31')
+			});
+			expect(filter.getActiveFilterCount()).toBe(1);
+		});
+
+		it('should count date range as 1 filter when only from set', () => {
+			const filter = TraceFilter.create({
+				createdOnFrom: new Date('2024-01-01')
+			});
+			expect(filter.getActiveFilterCount()).toBe(1);
+		});
+
+		it('should count date range as 1 filter when only to set', () => {
+			const filter = TraceFilter.create({
+				createdOnTo: new Date('2024-01-31')
+			});
+			expect(filter.getActiveFilterCount()).toBe(1);
+		});
+
+		it('should count duration range as 1 filter when both set', () => {
+			const filter = TraceFilter.create({
+				durationMin: 100,
+				durationMax: 1000
+			});
+			expect(filter.getActiveFilterCount()).toBe(1);
+		});
+
+		it('should count duration range as 1 filter when only min set', () => {
+			const filter = TraceFilter.create({
+				durationMin: 100
+			});
+			expect(filter.getActiveFilterCount()).toBe(1);
+		});
+
+		it('should count duration range as 1 filter when only max set', () => {
+			const filter = TraceFilter.create({
+				durationMax: 1000
+			});
+			expect(filter.getActiveFilterCount()).toBe(1);
+		});
+
+		it('should count hasExceptionFilter', () => {
+			const filter = TraceFilter.create({
+				hasExceptionFilter: true
+			});
+			expect(filter.getActiveFilterCount()).toBe(1);
+		});
+
+		it('should count correlationIdFilter when set and not empty', () => {
+			const correlationId = CorrelationId.create('123e4567-e89b-12d3-a456-426614174000');
+			const filter = TraceFilter.create({
+				correlationIdFilter: correlationId
+			});
+			expect(filter.getActiveFilterCount()).toBe(1);
+		});
+
+		it('should count all filter types correctly', () => {
+			const correlationId = CorrelationId.create('123e4567-e89b-12d3-a456-426614174000');
+			const filter = TraceFilter.create({
+				pluginNameFilter: 'MyPlugin',
+				entityNameFilter: 'account',
+				messageNameFilter: 'Update',
+				operationTypeFilter: OperationType.Plugin,
+				modeFilter: ExecutionMode.Synchronous,
+				statusFilter: TraceStatus.Success,
+				createdOnFrom: new Date('2024-01-01'),
+				createdOnTo: new Date('2024-01-31'),
+				durationMin: 100,
+				durationMax: 1000,
+				hasExceptionFilter: true,
+				correlationIdFilter: correlationId
+			});
+			expect(filter.getActiveFilterCount()).toBe(10);
 		});
 	});
 

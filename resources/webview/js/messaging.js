@@ -42,6 +42,11 @@
 		// Register message handler if provided
 		if (typeof config.handleMessage === 'function') {
 			window.addEventListener('message', event => {
+				// Validate origin first - CRITICAL for security
+				if (!event.origin || !event.origin.startsWith('vscode-webview://')) {
+					console.warn('Rejected message from untrusted origin:', event.origin);
+					return;
+				}
 				config.handleMessage.call(config, event.data);
 			});
 		}
@@ -121,16 +126,6 @@
 	}
 
 	/**
-	 * Wires up search input for client-side filtering.
-	 * NOTE: Search + striping logic moved to DataTableBehavior.js for data tables.
-	 * This function remains for backward compatibility with non-table panels.
-	 */
-	function wireSearch() {
-		// Search is now handled by DataTableBehavior.js for data tables
-		// This stub remains for panels that don't use DataTableBehavior
-	}
-
-	/**
 	 * Wires up environment selector dropdown.
 	 */
 	function wireEnvironmentSelector() {
@@ -174,6 +169,12 @@
 	 * Handles messages from extension to update button states.
 	 */
 	window.addEventListener('message', event => {
+		// Validate origin first - CRITICAL for security
+		if (!event.origin || !event.origin.startsWith('vscode-webview://')) {
+			console.warn('Rejected message from untrusted origin:', event.origin);
+			return;
+		}
+
 		const message = event.data;
 
 		if (message.command === 'setButtonState') {

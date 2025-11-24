@@ -68,6 +68,27 @@ describe('AttributeRowMapper', () => {
 			expect(result.displayName).toBe('Full Name');
 		});
 
+		it('should fallback to logicalName when displayName is empty (defensive coding)', () => {
+			// Arrange
+			// Note: Domain entity prevents empty displayName, but mapper has defensive fallback.
+			// We test the mapper's defensive logic by creating a mock attribute.
+			const baseAttribute = createAttribute('testfield', {
+				displayName: 'Original Name'
+			});
+
+			// Create a mock with empty displayName to test mapper's defensive logic
+			const attributeWithEmptyDisplay = {
+				...baseAttribute,
+				displayName: ''
+			} as AttributeMetadata;
+
+			// Act
+			const result = mapper.toViewModel(attributeWithEmptyDisplay);
+
+			// Assert
+			expect(result.displayName).toBe('testfield');
+		});
+
 		it('should map requiredLevel', () => {
 			// Arrange
 			const attribute = createAttribute('name', {

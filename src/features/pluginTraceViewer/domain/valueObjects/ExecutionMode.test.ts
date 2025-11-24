@@ -27,6 +27,44 @@ describe('ExecutionMode', () => {
 		});
 	});
 
+	describe('fromString', () => {
+		test.each([
+			['Synchronous', ExecutionMode.Synchronous],
+			['Asynchronous', ExecutionMode.Asynchronous]
+		])('should create correct mode from string "%s"', (value, expectedMode) => {
+			const mode = ExecutionMode.fromString(value);
+			expect(mode).toBe(expectedMode);
+		});
+
+		test.each([
+			['synchronous', 'Invalid ExecutionMode: unknown string value "synchronous"'],
+			['Unknown', 'Invalid ExecutionMode: unknown string value "Unknown"'],
+			['', 'Invalid ExecutionMode: unknown string value ""']
+		])('should throw error for invalid string "%s"', (value, expectedError) => {
+			expect(() => ExecutionMode.fromString(value)).toThrow(expectedError);
+		});
+	});
+
+	describe('toNumber', () => {
+		it('should return 0 for Synchronous', () => {
+			expect(ExecutionMode.Synchronous.toNumber()).toBe(0);
+		});
+
+		it('should return 1 for Asynchronous', () => {
+			expect(ExecutionMode.Asynchronous.toNumber()).toBe(1);
+		});
+	});
+
+	describe('toString', () => {
+		it('should return "Synchronous" for Synchronous mode', () => {
+			expect(ExecutionMode.Synchronous.toString()).toBe('Synchronous');
+		});
+
+		it('should return "Asynchronous" for Asynchronous mode', () => {
+			expect(ExecutionMode.Asynchronous.toString()).toBe('Asynchronous');
+		});
+	});
+
 	describe('isSynchronous', () => {
 		test.each([
 			[ExecutionMode.Synchronous, true],

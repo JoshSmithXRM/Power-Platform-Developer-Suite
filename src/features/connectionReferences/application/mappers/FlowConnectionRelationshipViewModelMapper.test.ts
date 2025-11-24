@@ -170,6 +170,18 @@ describe('FlowConnectionRelationshipViewModelMapper', () => {
 			// Assert
 			expect(result.relationshipType).toBe('Valid');
 		});
+
+		it('should map unknown relationship type to "Unknown"', () => {
+			// Arrange
+			// Test the default case by passing an invalid type (defensive programming test)
+			const relationship = createRelationship('Test Flow', 'cr_test', 'invalid-type' as unknown as RelationshipType);
+
+			// Act
+			const result = mapper.toViewModel(relationship);
+
+			// Assert
+			expect(result.relationshipType).toBe('Unknown');
+		});
 	});
 
 	describe('managed flags mapping', () => {

@@ -303,5 +303,25 @@ describe('OpenImportLogUseCase', () => {
 			const [, loggedError] = mockLogger.error.mock.calls[0]!;
 			expect(loggedError).toBeInstanceOf(Error);
 		});
+
+		it('should throw internal error if importLogXml is null after hasLog check', async () => {
+			// Arrange - Test defensive programming check
+			const environmentId = 'env-123';
+			const importJobId = 'job-456';
+			const job = createImportJobWithLog({
+				id: importJobId,
+				importLogXml: null
+			});
+
+			// Mock hasLog() to return true even though importLogXml is null
+			// This simulates an implementation bug that the defensive check protects against
+			jest.spyOn(job, 'hasLog').mockReturnValue(true);
+
+			mockRepository.findByIdWithLog.mockResolvedValue(job);
+
+			// Act & Assert
+			await expect(useCase.execute(environmentId, importJobId))
+				.rejects.toThrow('Internal error: importLogXml is null after hasLog() check');
+		});
 	});
 });

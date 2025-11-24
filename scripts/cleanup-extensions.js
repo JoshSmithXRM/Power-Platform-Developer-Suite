@@ -7,7 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { spawnSync } = require('child_process');
 
 const extensionsDir = path.join(process.env.USERPROFILE, '.vscode', 'extensions');
 const extensionPrefix = 'joshsmithxrm.power-platform-developer-suite-';
@@ -31,12 +31,20 @@ try {
 
 	folders.forEach(folder => {
 		try {
-			// Use Windows rd command which can handle nul files
+			// Use spawnSync with array args to prevent command injection
+			let result;
 			if (process.platform === 'win32') {
-				execSync(`rd /s /q "${folder}"`, { stdio: 'ignore' });
+				// Windows: rd /s /q <path>
+				result = spawnSync('rd', ['/s', '/q', folder], { stdio: 'ignore', shell: true });
 			} else {
-				execSync(`rm -rf "${folder}"`, { stdio: 'ignore' });
+				// Unix: rm -rf <path>
+				result = spawnSync('rm', ['-rf', folder], { stdio: 'ignore' });
 			}
+
+			if (result.error) {
+				throw result.error;
+			}
+
 			console.log(`   ✅ Deleted: ${path.basename(folder)}`);
 		} catch (error) {
 			console.log(`   ❌ Failed to delete: ${path.basename(folder)}`);

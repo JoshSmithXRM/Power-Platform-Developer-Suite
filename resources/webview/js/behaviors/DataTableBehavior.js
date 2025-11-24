@@ -11,9 +11,6 @@
  */
 
 (function() {
-	// Get vscode API from global scope (acquired by messaging.js)
-	const vscode = window.vscode;
-
 	/**
 	 * Applies striping classes to visible table rows.
 	 * Removes existing striping classes first to ensure consistency.

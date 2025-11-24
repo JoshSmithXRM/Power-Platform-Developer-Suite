@@ -108,6 +108,49 @@ describe('FilterCondition', () => {
 				);
 			}).not.toThrow();
 		});
+
+		it('should default logicalOperator to and', () => {
+			const condition = new FilterCondition(
+				FilterField.PluginName,
+				FilterOperator.Contains,
+				'test',
+				true
+			);
+
+			expect(condition.logicalOperator).toBe('and');
+		});
+
+		it('should accept or as logicalOperator', () => {
+			const condition = new FilterCondition(
+				FilterField.PluginName,
+				FilterOperator.Contains,
+				'test',
+				true,
+				'or'
+			);
+
+			expect(condition.logicalOperator).toBe('or');
+		});
+
+		it('should allow empty value for IsNull operator', () => {
+			expect(() => {
+				new FilterCondition(
+					FilterField.ExceptionDetails,
+					FilterOperator.IsNull,
+					'' // Empty is allowed for null operators
+				);
+			}).not.toThrow();
+		});
+
+		it('should allow empty value for IsNotNull operator', () => {
+			expect(() => {
+				new FilterCondition(
+					FilterField.CorrelationId,
+					FilterOperator.IsNotNull,
+					'' // Empty is allowed for null operators
+				);
+			}).not.toThrow();
+		});
 	});
 
 	describe('getDescription', () => {
@@ -245,6 +288,54 @@ describe('FilterCondition', () => {
 		});
 	});
 
+	describe('withLogicalOperator', () => {
+		it('should return new condition with updated logical operator', () => {
+			const condition = new FilterCondition(
+				FilterField.PluginName,
+				FilterOperator.Contains,
+				'test',
+				true,
+				'and'
+			);
+
+			const updated = condition.withLogicalOperator('or');
+
+			expect(updated.logicalOperator).toBe('or');
+			expect(updated.field).toBe(condition.field);
+			expect(updated.operator).toBe(condition.operator);
+			expect(updated.value).toBe(condition.value);
+			expect(updated.enabled).toBe(condition.enabled);
+		});
+
+		it('should not mutate original condition', () => {
+			const condition = new FilterCondition(
+				FilterField.PluginName,
+				FilterOperator.Contains,
+				'test',
+				true,
+				'and'
+			);
+
+			condition.withLogicalOperator('or');
+
+			expect(condition.logicalOperator).toBe('and');
+		});
+
+		it('should allow changing from or to and', () => {
+			const condition = new FilterCondition(
+				FilterField.PluginName,
+				FilterOperator.Contains,
+				'test',
+				true,
+				'or'
+			);
+
+			const updated = condition.withLogicalOperator('and');
+
+			expect(updated.logicalOperator).toBe('and');
+		});
+	});
+
 	describe('createDefault', () => {
 		it('should create default condition with PluginName and Contains', () => {
 			const condition = FilterCondition.createDefault();
@@ -279,6 +370,28 @@ describe('FilterCondition', () => {
 			});
 
 			expect(condition.enabled).toBe(true);
+		});
+
+		it('should default logicalOperator to and when not provided', () => {
+			const condition = FilterCondition.create({
+				field: FilterField.PluginName,
+				operator: FilterOperator.Contains,
+				value: 'test'
+			});
+
+			expect(condition.logicalOperator).toBe('and');
+		});
+
+		it('should accept or as logicalOperator', () => {
+			const condition = FilterCondition.create({
+				field: FilterField.EntityName,
+				operator: FilterOperator.StartsWith,
+				value: 'account',
+				enabled: true,
+				logicalOperator: 'or'
+			});
+
+			expect(condition.logicalOperator).toBe('or');
 		});
 	});
 });

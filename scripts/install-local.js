@@ -6,7 +6,7 @@
  */
 
 const { execSync } = require('child_process');
-const { readdirSync, statSync, existsSync } = require('fs');
+const { readdirSync, statSync } = require('fs');
 const { join } = require('path');
 
 const ROOT_DIR = join(__dirname, '..');

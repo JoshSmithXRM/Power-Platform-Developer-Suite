@@ -295,6 +295,61 @@ describe('DeploymentSettings', () => {
 				expect(updated.connectionReferences).toHaveLength(1);
 			});
 		});
+
+		describe('edge cases', () => {
+			it('should handle entries with empty string values', () => {
+				// Arrange - Test that empty strings are preserved (not treated as undefined)
+				const existing: EnvironmentVariableEntry[] = [
+					{ SchemaName: 'var_WithValue', Value: 'actual-value' },
+					{ SchemaName: 'var_EmptyString', Value: '' }
+				];
+				const newEntries: EnvironmentVariableEntry[] = [
+					createEnvironmentVariable('var_WithValue', 'new-value'),
+					createEnvironmentVariable('var_EmptyString', 'new-value-2')
+				];
+				const settings = new DeploymentSettings(existing, []);
+
+				// Act
+				const { settings: updated, syncResult } = settings.syncEnvironmentVariables(newEntries);
+
+				// Assert - Both entries should be preserved with their original values (including empty string)
+				expect(updated.environmentVariables).toHaveLength(2);
+				expect(syncResult.preserved).toBe(2);
+				const withValue = updated.environmentVariables.find(v => v.SchemaName === 'var_WithValue');
+				const emptyString = updated.environmentVariables.find(v => v.SchemaName === 'var_EmptyString');
+				expect(withValue?.Value).toBe('actual-value');
+				expect(emptyString?.Value).toBe('');
+			});
+
+			it('should skip entries when value extractor returns undefined', () => {
+				// Arrange - This tests the defensive undefined check in syncEntries (line 171)
+				// Create a scenario where an entry exists in the map but the value is undefined
+				// This can theoretically happen if there's a type safety violation or malformed data
+				const existing: EnvironmentVariableEntry[] = [
+					// Using type assertion to create an entry with undefined value for testing
+					{ SchemaName: 'var_Undefined', Value: undefined as unknown as string },
+					{ SchemaName: 'var_Normal', Value: 'normal-value' }
+				];
+				const newEntries: EnvironmentVariableEntry[] = [
+					createEnvironmentVariable('var_Undefined', 'new-value'),
+					createEnvironmentVariable('var_Normal', 'new-value-2')
+				];
+				const settings = new DeploymentSettings(existing, []);
+
+				// Act
+				const { settings: updated, syncResult } = settings.syncEnvironmentVariables(newEntries);
+
+				// Assert - Entry with undefined value should be skipped entirely (defensive check)
+				// Only var_Normal should be in the result (preserved with original value)
+				expect(updated.environmentVariables).toHaveLength(1);
+				expect(syncResult.preserved).toBe(1);
+				expect(syncResult.added).toBe(0);
+				// var_Undefined was skipped because its preserved value was undefined
+				// var_Normal should be preserved
+				const normalVar = updated.environmentVariables.find(v => v.SchemaName === 'var_Normal');
+				expect(normalVar?.Value).toBe('normal-value');
+			});
+		});
 	});
 
 	describe('syncConnectionReferences', () => {

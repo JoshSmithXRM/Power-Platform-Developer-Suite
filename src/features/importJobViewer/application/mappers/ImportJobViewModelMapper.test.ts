@@ -286,6 +286,28 @@ describe('ImportJobViewModelMapper', () => {
 				expect(typeof result.statusClass).toBe('string');
 			});
 		});
+
+		it('should return status-completed class for completed status', () => {
+			// Arrange
+			const job = createImportJob('Test', { statusCode: 1 }); // Code 1 = Completed
+
+			// Act
+			const result = mapper.toViewModel(job);
+
+			// Assert
+			expect(result.statusClass).toBe('status-completed');
+		});
+
+		it('should return status-failed class for cancelled status', () => {
+			// Arrange
+			const job = createImportJob('Test', { statusCode: 4 }); // Code 4 = Cancelled
+
+			// Act
+			const result = mapper.toViewModel(job);
+
+			// Assert
+			expect(result.statusClass).toBe('status-failed');
+		});
 	});
 
 	describe('toViewModels - collection mapping', () => {

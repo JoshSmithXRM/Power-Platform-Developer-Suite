@@ -73,7 +73,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 			expect(mockRepository.exists).toHaveBeenCalledWith(filePath);
 			expect(mockRepository.write).toHaveBeenCalledTimes(1);
 
-			const [, writtenSettings] = mockRepository.write.mock.calls[0]!
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.environmentVariables).toHaveLength(2);
 			expect(writtenSettings.environmentVariables[0]).toEqual({
 				SchemaName: 'cr_apiUrl',
@@ -174,7 +174,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 			await useCase.execute(envVars);
 
 			// Assert
-			const [, writtenSettings] = mockRepository.write.mock.calls[0]!
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.connectionReferences).toHaveLength(1);
 			expect(writtenSettings.connectionReferences[0]!.LogicalName).toBe('cr_sharepoint');
 		});
@@ -218,7 +218,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 			expect(result?.removed).toBe(0);
 			expect(result?.preserved).toBe(0);
 
-			const [, writtenSettings] = mockRepository.write.mock.calls[0]!
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.environmentVariables).toHaveLength(0);
 		});
 
