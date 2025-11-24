@@ -54,14 +54,23 @@ export class PluginTraceFilterManagementBehavior {
 	 * Use this when fetching data to ensure quick filters are applied.
 	 */
 	public getAppliedFilterCriteria(): FilterCriteriaViewModel {
-		const expanded = this.expandQuickFilters({
-			...this.filterCriteria,
+		// Expand quick filters only (without existing conditions to avoid duplication)
+		const expandedQuickFilters = this.expandQuickFilters({
 			quickFilterIds: this.activeQuickFilterIds
 		});
-		return {
+
+		// Merge expanded quick filters with advanced filters from filterCriteria
+		const merged: FilterCriteriaViewModel = {
 			...this.filterCriteria,
-			...expanded
+			conditions: [
+				...(expandedQuickFilters.conditions || []),
+				...(this.filterCriteria.conditions || [])
+			]
 		};
+
+		// Normalize datetime values to UTC ISO format for API compatibility
+		const normalized = this.normalizeFilterDateTimes(merged);
+		return normalized as FilterCriteriaViewModel;
 	}
 
 	/**
@@ -85,23 +94,26 @@ export class PluginTraceFilterManagementBehavior {
 			// Store quick filter IDs separately for recalculation on refresh
 			this.activeQuickFilterIds = filterData.quickFilterIds ?? [];
 
-			// Expand quick filter IDs to conditions (calculates relative time filters)
-			const expandedFilterData = this.expandQuickFilters(filterData);
+			// Extract and normalize advanced filters (NOT expanded quick filters)
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
+			const { quickFilterIds, ...advancedFilterData } = filterData;
+			const normalizedAdvancedFilters = this.normalizeFilterDateTimes(advancedFilterData);
 
-			// Convert local datetime values to UTC ISO before storing/processing
-			const normalizedFilterData = this.normalizeFilterDateTimes(expandedFilterData);
-
-			// Merge partial filter data with current filter criteria
+			// Store ONLY advanced filters in filterCriteria (quick filters stored as IDs)
 			this.filterCriteria = {
 				...this.filterCriteria,
-				...normalizedFilterData
+				...normalizedAdvancedFilters
 			};
+
+			// Expand quick filter IDs to conditions for OData preview and refresh
+			const expandedFilterData = this.expandQuickFilters(filterData);
+			const normalizedExpandedData = this.normalizeFilterDateTimes(expandedFilterData);
 
 			// Persist filter criteria (includes quick filter IDs)
 			await this.onPersistState();
 
-			// Build OData query preview from current filter criteria
-			const domainFilter = this.filterCriteriaMapper.toDomain(this.filterCriteria);
+			// Build OData query preview from expanded filter criteria (includes quick filters)
+			const domainFilter = this.filterCriteriaMapper.toDomain(normalizedExpandedData as FilterCriteriaViewModel);
 			const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
 
 			// Send OData query preview to webview

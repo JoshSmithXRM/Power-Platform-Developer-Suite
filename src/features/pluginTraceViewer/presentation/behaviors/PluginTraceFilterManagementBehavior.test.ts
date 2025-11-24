@@ -96,7 +96,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 
 			await behavior.applyFilters(filterData);
 
-			const criteria = behavior.getFilterCriteria();
+			const criteria = behavior.getAppliedFilterCriteria();
 			assertDefined(criteria.conditions);
 			expect(criteria.conditions.length).toBeGreaterThan(0);
 			assertDefined(criteria.conditions[0]);
@@ -111,7 +111,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 
 			await behavior.applyFilters(filterData);
 
-			const criteria = behavior.getFilterCriteria();
+			const criteria = behavior.getAppliedFilterCriteria();
 			assertDefined(criteria.conditions);
 			assertDefined(criteria.conditions[0]);
 			const condition = criteria.conditions[0];
@@ -142,7 +142,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 
 			await behavior.applyFilters(filterData);
 
-			const criteria = behavior.getFilterCriteria();
+			const criteria = behavior.getAppliedFilterCriteria();
 			// exceptions quick filter + 1 advanced condition
 			assertDefined(criteria.conditions);
 			expect(criteria.conditions.length).toBeGreaterThan(1);
@@ -272,6 +272,93 @@ describe('PluginTraceFilterManagementBehavior', () => {
 
 			expect(showErrorSpy).toHaveBeenCalledWith('Failed to clear filters');
 			showErrorSpy.mockRestore();
+		});
+	});
+
+	describe('getAppliedFilterCriteria', () => {
+		it('should return expanded criteria with quick filters in UTC ISO format', async () => {
+			// Apply a quick filter (lastHour)
+			await behavior.applyFilters({
+				quickFilterIds: ['lastHour']
+			});
+
+			// Get applied filter criteria (this is what handleRefresh uses)
+			const appliedCriteria = behavior.getAppliedFilterCriteria();
+
+			// Should have one condition for the quick filter
+			assertDefined(appliedCriteria.conditions);
+			expect(appliedCriteria.conditions.length).toBe(1);
+			assertDefined(appliedCriteria.conditions[0]);
+
+			const condition = appliedCriteria.conditions[0];
+			expect(condition.field).toBe('Created On');
+			expect(condition.operator).toBe('Greater Than or Equal');
+
+			// CRITICAL: Value should be in UTC ISO format (YYYY-MM-DDTHH:mm:ss.sssZ)
+			// NOT in local datetime format (YYYY-MM-DDTHH:mm)
+			expect(condition.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+
+			// Should NOT be in local datetime format (missing seconds and timezone)
+			expect(condition.value).not.toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+		});
+
+		it('should return normalized datetime values for advanced filters', async () => {
+			// Apply a filter with local datetime format
+			await behavior.applyFilters({
+				conditions: [
+					{
+						id: '1',
+						field: 'Created On',
+						operator: 'Greater Than or Equal',
+						value: '2025-11-23T19:26', // Local datetime format (from datetime-local input)
+						enabled: true,
+						logicalOperator: 'and'
+					}
+				]
+			});
+
+			// Get applied filter criteria
+			const appliedCriteria = behavior.getAppliedFilterCriteria();
+
+			// Value should be normalized to UTC ISO format
+			assertDefined(appliedCriteria.conditions);
+			expect(appliedCriteria.conditions.length).toBe(1);
+			assertDefined(appliedCriteria.conditions[0]);
+			expect(appliedCriteria.conditions[0].value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+		});
+
+		it('should handle mix of quick filters and advanced filters', async () => {
+			// Apply both quick filter and advanced filter
+			await behavior.applyFilters({
+				quickFilterIds: ['exceptions'],
+				conditions: [
+					{
+						id: '1',
+						field: 'Type Name',
+						operator: 'Equals',
+						value: 'CustomPlugin',
+						enabled: true,
+						logicalOperator: 'and'
+					}
+				]
+			});
+
+			const appliedCriteria = behavior.getAppliedFilterCriteria();
+
+			// Should have 2 conditions total
+			assertDefined(appliedCriteria.conditions);
+			expect(appliedCriteria.conditions.length).toBe(2);
+
+			// Quick filter condition (exceptions)
+			const exceptionCondition = appliedCriteria.conditions.find(c => c.field === 'Exception Details');
+			assertDefined(exceptionCondition);
+			expect(exceptionCondition.operator).toBe('Not Equals');
+			expect(exceptionCondition.value).toBe('');
+
+			// Advanced filter condition
+			const typeCondition = appliedCriteria.conditions.find(c => c.field === 'Type Name');
+			assertDefined(typeCondition);
+			expect(typeCondition.value).toBe('CustomPlugin');
 		});
 	});
 
@@ -511,7 +598,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 				quickFilterIds: ['exceptions', 'lastHour']
 			});
 
-			const criteria = behavior.getFilterCriteria();
+			const criteria = behavior.getAppliedFilterCriteria();
 			assertDefined(criteria.conditions);
 			expect(criteria.conditions.length).toBeGreaterThanOrEqual(2);
 		});
