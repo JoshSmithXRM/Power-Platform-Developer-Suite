@@ -531,6 +531,90 @@ export class SolutionCollectionService {
 }
 ```
 
+#### Acceptable Structural Similarity in Collection Services
+
+**Important:** Multiple collection services with similar structure is NOT problematic duplication.
+
+**Why this pattern appears "duplicated" but is actually correct:**
+
+1. **Each service encapsulates feature-specific business logic**
+   - `SolutionCollectionService` sorts by Default priority, then name
+   - `ImportJobCollectionService` sorts by in-progress priority, then date
+   - `EnvironmentVariableCollectionService` sorts alphabetically by schema name
+   - `FlowConnectionRelationshipCollectionService` sorts by flow name, then connection ref name
+   - `ConnectionReferenceCollectionService` sorts by logical name
+   - `CloudFlowCollectionService` sorts by name
+
+2. **Defensive copy is an intentional pattern, not duplication**
+   ```typescript
+   // This appears in all collection services - it's a pattern, not duplication
+   return [...items].sort((a, b) => /* comparison logic */);
+   ```
+
+3. **Comparison logic is NOT identical - each implements different business rules**
+   - 3 services use simple single-field comparison
+   - 3 services use complex multi-criteria comparison with priority logic
+
+4. **Total actual code duplication: ~10 lines across 6 files (trivial)**
+   - Structural similarity ≠ problematic duplication
+   - Each service: 15-25 lines total
+   - Abstraction would ADD complexity, not reduce it
+
+**Why NOT to create a generic `CollectionService<T>`:**
+
+❌ **Bad - Premature abstraction:**
+```typescript
+// ❌ Generic service forces complex callback interfaces
+export class GenericCollectionService<T> {
+    sort(items: T[], compareFn: (a: T, b: T) => number): T[] {
+        return [...items].sort(compareFn);
+    }
+}
+
+// Usage becomes more complex, not simpler
+const service = new GenericCollectionService<Solution>();
+const sorted = service.sort(solutions, (a, b) => {
+    const priorityDiff = a.getSortPriority() - b.getSortPriority();
+    if (priorityDiff !== 0) return priorityDiff;
+    return a.friendlyName.localeCompare(b.friendlyName);
+});
+```
+
+✅ **Good - Feature-specific service:**
+```typescript
+// ✅ Domain service encapsulates business logic clearly
+export class SolutionCollectionService {
+    sort(solutions: Solution[]): Solution[] {
+        return [...solutions].sort((a, b) => {
+            // Business rule explicit and type-safe
+            const priorityDiff = a.getSortPriority() - b.getSortPriority();
+            if (priorityDiff !== 0) return priorityDiff;
+            return a.friendlyName.localeCompare(b.friendlyName);
+        });
+    }
+}
+
+// Usage is clear and simple
+const sorted = collectionService.sort(solutions);
+```
+
+**When this pattern is acceptable:**
+- ✅ Each service encapsulates feature-specific business rules
+- ✅ Services are 15-25 lines (trivial size)
+- ✅ Comparison logic differs between services
+- ✅ Total code saved by abstraction: <20 lines across entire codebase
+- ✅ Services follow Single Responsibility Principle
+
+**When you should abstract:**
+- ❌ Identical comparison logic repeated 3+ times
+- ❌ Services exceed 50 lines with complex shared logic
+- ❌ Abstraction saves >100 lines of duplicated code
+- ❌ Generic solution doesn't compromise type safety or readability
+
+**See also:**
+- CLAUDE.md - Three Strikes Rule exceptions
+- This is an exception to "refactor on 2nd duplication" - structural similarity is not problematic duplication
+
 ---
 
 ### Pattern 2: Relationship Builders
@@ -1085,6 +1169,159 @@ export class TimelineHierarchyService {
     // More private methods...
 }
 ```
+
+---
+
+## Acceptable Structural Similarity in Collection Services
+
+### When Similar-Looking Services Are NOT Duplication
+
+**Key principle:** Structural similarity ≠ code duplication. Collection services may look similar but encapsulate different business logic.
+
+#### Characteristics of Acceptable Collection Service Pattern
+
+✅ **Each service has distinct business rules:**
+- Different sorting criteria (priority vs alphabetical vs chronological)
+- Different comparison logic
+- Different secondary sort keys
+- Feature-specific domain knowledge
+
+✅ **Small, focused services (15-25 lines):**
+- Single responsibility (sorting only)
+- No complex dependencies
+- Pure, testable functions
+
+✅ **Defensive copy pattern `[...items].sort()`:**
+- Intentional pattern to prevent mutation
+- Repeated across services by design
+- Protects domain entities from side effects
+
+#### Production Examples
+
+**Example 1: SolutionCollectionService**
+```typescript
+// Business rule: Default solution first (by priority), then alphabetically by friendly name
+export class SolutionCollectionService {
+    sort(solutions: Solution[]): Solution[] {
+        return [...solutions].sort((a, b) => {
+            const priorityDiff = a.getSortPriority() - b.getSortPriority();
+            if (priorityDiff !== 0) {
+                return priorityDiff;
+            }
+            return a.friendlyName.localeCompare(b.friendlyName);
+        });
+    }
+}
+```
+
+**Example 2: EnvironmentVariableCollectionService**
+```typescript
+// Business rule: Alphabetically by schema name (simple alphabetical)
+export class EnvironmentVariableCollectionService {
+    sort(variables: EnvironmentVariable[]): EnvironmentVariable[] {
+        return [...variables].sort((a, b) => a.schemaName.localeCompare(b.schemaName));
+    }
+}
+```
+
+**Example 3: ImportJobCollectionService**
+```typescript
+// Business rule: In-progress jobs first (by priority), then by most recent creation date
+export class ImportJobCollectionService {
+    sort(jobs: ImportJob[]): ImportJob[] {
+        return [...jobs].sort((a, b) => {
+            const priorityDiff = a.getSortPriority() - b.getSortPriority();
+            if (priorityDiff !== 0) {
+                return priorityDiff;
+            }
+            // Most recent first (reverse chronological)
+            return b.createdOn.getTime() - a.createdOn.getTime();
+        });
+    }
+}
+```
+
+#### Why a Generic CollectionService<T> Would Be Worse
+
+❌ **Generic approach sacrifices clarity and type safety:**
+
+```typescript
+// ❌ Generic approach - obscures business rules
+export class GenericCollectionService<T> {
+    sort(
+        items: T[],
+        compareFn: (a: T, b: T) => number
+    ): T[] {
+        return [...items].sort(compareFn);
+    }
+}
+
+// Usage becomes verbose and unclear:
+const solutionService = new GenericCollectionService<Solution>();
+const sorted = solutionService.sort(solutions, (a, b) => {
+    // Business logic scattered at call site - harder to test, harder to find
+    const priorityDiff = a.getSortPriority() - b.getSortPriority();
+    if (priorityDiff !== 0) return priorityDiff;
+    return a.friendlyName.localeCompare(b.friendlyName);
+});
+```
+
+**Problems with generic approach:**
+1. Business logic scattered at call sites (not centralized)
+2. Harder to test (logic spread across multiple locations)
+3. Harder to discover (no dedicated service to search for)
+4. No type-specific documentation (generic signature doesn't convey intent)
+5. Minimal code savings (~3 lines per service)
+
+✅ **Dedicated services are superior:**
+- Business logic centralized and discoverable
+- Easy to test (one service = one test file)
+- Self-documenting (service name + method name conveys intent)
+- Type-safe (no need for generic constraints)
+- Feature-specific (can add feature-specific methods later)
+
+#### When to Create Separate Collection Services
+
+**Create separate service when:**
+- Different entity types (Solution vs EnvironmentVariable vs ImportJob)
+- Different sorting rules (even if structurally similar)
+- Different business logic (priority, alphabetical, chronological, etc.)
+- Different feature domains (each feature owns its sorting rules)
+
+**Don't create generic abstraction when:**
+- Services are <25 lines each
+- Business logic is feature-specific
+- Type safety would be compromised
+- Abstraction adds complexity without real benefit
+
+#### Testing Collection Services
+
+Each collection service should have dedicated tests:
+
+```typescript
+describe('SolutionCollectionService', () => {
+    it('should sort default solution first, then alphabetically', () => {
+        const service = new SolutionCollectionService();
+        const solutions = [
+            createSolution('C', false),
+            createSolution('A', false),
+            createSolution('B', true)  // Default
+        ];
+
+        const sorted = service.sort(solutions);
+
+        expect(sorted[0].friendlyName).toBe('B'); // Default first
+        expect(sorted[1].friendlyName).toBe('A'); // Then alphabetical
+        expect(sorted[2].friendlyName).toBe('C');
+    });
+});
+```
+
+**Benefits:**
+- Business rules clearly documented in tests
+- Easy to find and understand sorting logic
+- Changes to business rules caught by tests
+- Each service independently testable
 
 ---
 

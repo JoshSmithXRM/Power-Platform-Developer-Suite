@@ -647,6 +647,289 @@ this.logger.debug('Processing value', { value });
 
 ---
 
+## File Size Guidelines
+
+### Target and Maximum Limits
+
+**Target:** <700 lines per file
+**Maximum:** 1000 lines with justification (requires `eslint-disable max-lines` comment)
+
+Large files indicate potential Single Responsibility Principle violations. However, some files legitimately need more lines when splitting would harm cohesion or readability.
+
+---
+
+### When Large Files Are Acceptable
+
+#### 1. **Integration Tests** (800-1500 lines)
+
+**Acceptable when:**
+- ✅ Extensive test cases for complex features
+- ✅ Well-organized with nested `describe` blocks
+- ✅ Each test case clearly named and focused
+- ✅ Comprehensive coverage outweighs file size concern
+- ✅ Splitting would lose important context
+
+**Example:** `MetadataBrowserPanel.integration.test.ts` (1196 lines)
+- Tests entire panel lifecycle with multiple scenarios
+- Extensive setup and teardown for webview testing
+- Clear `describe` structure separates concerns
+
+**Must have:**
+- Logical grouping with `describe` blocks
+- No commented-out code
+- No duplicate test logic
+
+---
+
+#### 2. **Panel Coordinators** (700-900 lines)
+
+**Acceptable when:**
+- ✅ Multiple command handlers (10+) for single panel
+- ✅ All handlers tightly related to panel functionality
+- ✅ Requires `eslint-disable max-lines` with clear justification
+- ✅ Splitting would create artificial boundaries
+
+**Example:** `PluginTraceViewerPanelComposed.ts` (891 lines)
+```typescript
+/* eslint-disable max-lines -- Panel coordinator with 11 simple command handlers */
+```
+
+**Justification required:**
+- Explain why handlers belong together
+- Confirm handlers are simple (not complex business logic)
+- Document alternative considered (e.g., separate coordinator classes)
+
+---
+
+#### 3. **Complex Domain Entities** (700-800 lines)
+
+**Acceptable when:**
+- ✅ Rich behavior with 10+ methods
+- ✅ Clear section comments separating responsibilities
+- ✅ Methods operate on same core state
+- ✅ Splitting would harm entity cohesion
+
+**Example:** `Environment.ts` (832 lines)
+- Multiple authentication methods
+- Validation logic
+- Credential management
+- Configuration management
+
+**Must have:**
+- Clear section comments (e.g., `// === Validation Methods ===`)
+- Related methods grouped together
+- No duplicate logic between methods
+
+---
+
+### When You Must Split Large Files
+
+#### Red Flags (Immediate Refactoring Required)
+
+❌ **Multiple unrelated responsibilities** (SRP violation)
+```typescript
+// ❌ BAD - File does too many things
+export class UserService {
+    // User CRUD
+    createUser() { }
+    deleteUser() { }
+
+    // Email sending (different responsibility!)
+    sendWelcomeEmail() { }
+    sendPasswordReset() { }
+
+    // Reporting (another responsibility!)
+    generateUserReport() { }
+    exportToExcel() { }
+}
+```
+
+❌ **Repetitive code blocks** (need helper extraction)
+```typescript
+// ❌ BAD - Repeated pattern 5+ times
+function processTypeA() {
+    validate();
+    transform();
+    save();
+}
+function processTypeB() {
+    validate();  // Same pattern
+    transform();
+    save();
+}
+// ... 3 more similar functions
+```
+
+❌ **Commented-out code sections** (>50 lines)
+```typescript
+// ❌ BAD - Dead code bloating file
+function activeFunction() { }
+
+// function oldImplementation() {
+//     ... 100 lines of commented code ...
+// }
+```
+
+❌ **God objects** (knows too much about other objects)
+```typescript
+// ❌ BAD - Class coordinates everything
+export class ApplicationCoordinator {
+    // Knows about user management
+    private userService: UserService;
+
+    // Knows about data persistence
+    private database: Database;
+
+    // Knows about UI
+    private panel: vscode.WebviewPanel;
+
+    // Knows about external APIs
+    private apiClient: ApiClient;
+
+    // ... 20 more dependencies
+}
+```
+
+---
+
+### Refactoring Strategies for Large Files
+
+#### Strategy 1: Extract Related Methods to Helper Class
+```typescript
+// Before: 900-line UserService
+export class UserService {
+    createUser() { }
+    deleteUser() { }
+    sendWelcomeEmail() { }  // Email logic
+    sendPasswordReset() { } // Email logic
+}
+
+// After: Split responsibilities
+export class UserService {
+    constructor(private emailService: EmailService) {}
+
+    createUser() {
+        // ...
+        this.emailService.sendWelcomeEmail(user);
+    }
+    deleteUser() { }
+}
+
+export class EmailService {
+    sendWelcomeEmail(user: User) { }
+    sendPasswordReset(email: string) { }
+}
+```
+
+#### Strategy 2: Extract Complex Algorithms to Domain Service
+```typescript
+// Before: 850-line UseCase with complex logic
+export class ProcessDataUseCase {
+    async execute() {
+        const data = await this.repository.getData();
+
+        // 200 lines of complex algorithm
+        const processed = /* complex logic */;
+
+        await this.repository.save(processed);
+    }
+}
+
+// After: Extract algorithm to domain service
+export class ProcessDataUseCase {
+    constructor(
+        private repository: IDataRepository,
+        private processor: DataProcessor  // Domain service
+    ) {}
+
+    async execute() {
+        const data = await this.repository.getData();
+        const processed = this.processor.process(data);
+        await this.repository.save(processed);
+    }
+}
+
+export class DataProcessor {
+    process(data: Data): ProcessedData {
+        // 200 lines of algorithm - testable, reusable
+    }
+}
+```
+
+#### Strategy 3: Split Panel into Sections
+```typescript
+// Before: 1200-line Panel with all handlers inline
+export class MyPanel {
+    handleCommandA() { /* 50 lines */ }
+    handleCommandB() { /* 50 lines */ }
+    // ... 20 more handlers
+}
+
+// After: Extract sections
+export class MyPanel {
+    constructor(
+        private commandHandlers: CommandHandlerSection,
+        private dataSection: DataSection
+    ) {}
+
+    handleCommandA() {
+        this.commandHandlers.handleA();
+    }
+}
+
+export class CommandHandlerSection {
+    handleA() { /* 50 lines */ }
+    handleB() { /* 50 lines */ }
+}
+```
+
+---
+
+### File Size Checklist
+
+Before accepting a large file (>700 lines), verify:
+
+✅ **Organization:**
+- [ ] Clear section comments separating responsibilities
+- [ ] Logical method grouping
+- [ ] No commented-out code
+
+✅ **Cohesion:**
+- [ ] All code relates to single responsibility
+- [ ] Methods operate on shared state
+- [ ] No "utility" methods unrelated to main purpose
+
+✅ **Justification:**
+- [ ] Splitting would harm readability
+- [ ] File has `eslint-disable max-lines` with clear reason
+- [ ] Alternative organizations considered and rejected
+
+✅ **Red Flags (Require Refactoring):**
+- [ ] No multiple unrelated responsibilities
+- [ ] No repetitive code blocks (3+ similar patterns)
+- [ ] No god object pattern (knows too much)
+- [ ] No large sections of dead/commented code
+
+---
+
+### Examples in Codebase
+
+**✅ Acceptable Large Files:**
+
+| File | Lines | Reason Acceptable |
+|------|-------|-------------------|
+| `PluginTraceViewerPanelComposed.ts` | 891 | Panel coordinator with 11 command handlers, justified with `eslint-disable` |
+| `MetadataBrowserPanel.integration.test.ts` | 1196 | Comprehensive integration tests, well-organized `describe` blocks |
+| `Environment.ts` | 832 | Complex domain entity with rich behavior, clear sections |
+
+**❌ Files That Needed Refactoring:**
+
+| File | Lines | Issue | Resolution |
+|------|-------|-------|------------|
+| `extension.ts` | 881 | God object coordinating all features | Extract feature initializers to their features (CQ-1) |
+
+---
+
 ## Decision Tree: Should I Write a Comment?
 
 ```

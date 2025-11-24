@@ -41,6 +41,37 @@
 
 ---
 
+## ⚖️ Acceptable Pattern Exceptions
+
+**Some patterns appear duplicated but are actually valid design decisions:**
+
+### Collection Service Pattern
+- ✅ **Multiple collection services with similar structure** - NOT problematic duplication
+- Each service: 15-25 lines, single `sort()` method, feature-specific business rules
+- Defensive copy `[...items].sort()` is an intentional pattern
+- Example: `SolutionCollectionService`, `ImportJobCollectionService`, `EnvironmentVariableCollectionService`
+- **Why acceptable:** Structural similarity ≠ duplication. Each encapsulates different business logic.
+- **See:** [DOMAIN_SERVICE_PATTERNS.md](docs/architecture/DOMAIN_SERVICE_PATTERNS.md#acceptable-structural-similarity-in-collection-services)
+
+### Large Files (When Justified)
+- ✅ **Integration test files** (800-1500 lines) - Comprehensive test coverage more important than file size
+- ✅ **Panel coordinators** (700-900 lines) - Multiple command handlers for single panel (requires `eslint-disable` justification)
+- ✅ **Complex domain entities** (700-800 lines) - Rich behavior with clear section comments
+- **See:** [CODE_QUALITY_GUIDE.md](docs/architecture/CODE_QUALITY_GUIDE.md#file-size-guidelines) for detailed guidance
+
+### Security Practices (Acceptable Deviations)
+- ✅ **HTTP localhost OAuth redirects** (`http://localhost:3000`) - Industry standard for local development
+- Microsoft MSAL documentation uses HTTP for localhost redirects
+- HTTPS on localhost requires self-signed certificates (poor UX, minimal security benefit)
+- **Why acceptable:** OAuth spec allows HTTP for localhost; redirect URIs are validated by authorization server
+
+### Type Safety in Tests
+- ✅ **Non-null assertions in test files** (`variable!`) - Acceptable in test setup/mocking
+- ✅ **Type assertions for message narrowing** (`as MessageType`) - Common pattern for discriminated unions in tests
+- **Why acceptable:** Test-only code; reduces boilerplate without production risk
+
+---
+
 ## 💬 Comment & Logging Standards
 
 **See detailed guides:**
