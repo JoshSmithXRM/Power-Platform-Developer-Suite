@@ -10,13 +10,11 @@ import { utcToLocalDateTime } from '../../../../shared/presentation/utils/DateTi
 
 /**
  * Filter Panel Section for Plugin Trace Viewer.
- * Renders dynamic query builder with:
- * - Multiple condition rows (Add/Remove)
- * - Enable/Disable checkbox per row
- * - Field dropdown
- * - Operator dropdown
- * - Value input
- * - AND/OR toggle
+ * Renders tabbed filter panel with vertical resizing:
+ * - Tab 1: Quick Filters (predefined filter shortcuts)
+ * - Tab 2: Advanced Filters (custom query builder)
+ * - Tab 3: OData Query (generated query preview)
+ * - Vertical resize handle at bottom (drag up/down to adjust height)
  */
 export class FilterPanelSection implements ISection {
 	public readonly position = SectionPosition.Filters;
@@ -25,75 +23,123 @@ export class FilterPanelSection implements ISection {
 		const filterState = this.extractFilterState(data);
 
 		return `
-			<div class="filter-panel">
+			<div class="filter-panel" id="filterPanel">
+				<!-- Collapsible Header -->
 				<div class="filter-panel-header" id="filterPanelHeader">
 					<span class="filter-panel-title">
 						<span class="codicon codicon-filter"></span>
 						Filters (${filterState.activeCount} / ${filterState.totalCount})
 					</span>
 					<button class="filter-toggle-btn" id="filterToggleBtn" title="Expand/Collapse">
-						<span class="codicon codicon-chevron-up"></span>
+						<span class="codicon codicon-chevron-down"></span>
 					</button>
 				</div>
 
+				<!-- Tab Navigation -->
+				<div class="filter-panel-tab-navigation collapsed" id="filterPanelTabNav">
+					<button class="filter-tab-button active" data-tab="quick" id="quickFiltersTab">
+						Quick Filters
+					</button>
+					<button class="filter-tab-button" data-tab="advanced" id="advancedFiltersTab">
+						Advanced Filters
+					</button>
+					<button class="filter-tab-button" data-tab="odata" id="odataTab">
+						OData Query
+					</button>
+				</div>
+
+				<!-- Tab Content Container -->
 				<div class="filter-panel-body collapsed" id="filterPanelBody">
-					<div class="quick-filters-section">
-						<div class="section-label">Quick Filters</div>
-						<div class="quick-filters">
-							${QUICK_FILTER_DEFINITIONS.map(qf => this.renderQuickFilter(qf)).join('')}
-						</div>
+					<!-- Quick Filters Tab -->
+					<div class="filter-tab-panel active" id="quickFiltersPanel" data-tab="quick">
+						${this.renderQuickFiltersTab()}
 					</div>
 
-					<div class="advanced-filters-section">
-						<div class="section-label">Advanced Filters</div>
-						<div class="filter-conditions" id="filterConditions">
-							${filterState.conditions.map((condition, index) => this.renderConditionRow(condition, index, filterState.conditions.length)).join('')}
-						</div>
+					<!-- Advanced Filters Tab -->
+					<div class="filter-tab-panel" id="advancedFiltersPanel" data-tab="advanced">
+						${this.renderAdvancedFiltersTab(filterState)}
 					</div>
 
-					<div class="filter-actions">
-						<button class="secondary-button" id="addConditionBtn">
-							<span class="codicon codicon-add"></span>
-							Add Condition
-						</button>
-						<button
-							class="primary-button"
-							id="applyFiltersBtn"
-							data-command="applyFilters"
-						>
-							<span class="codicon codicon-check"></span>
-							Apply Filters
-						</button>
-						<button
-							class="secondary-button"
-							id="clearFiltersBtn"
-							data-command="clearFilters"
-						>
-							<span class="codicon codicon-close"></span>
-							Clear All
-						</button>
-					</div>
-
-					<div class="odata-preview-section">
-						<details class="odata-preview-details">
-							<summary class="odata-preview-summary">
-								<span class="codicon codicon-code"></span>
-								Show Generated OData Query
-							</summary>
-							<div class="odata-preview-content">
-								<pre class="odata-query-text" id="odataQueryText">No filters applied</pre>
-								<button
-									class="icon-button copy-query-button"
-									id="copyODataQueryBtn"
-									title="Copy to clipboard"
-								>
-									<span class="codicon codicon-copy"></span>
-									Copy
-								</button>
-							</div>
-						</details>
+					<!-- OData Query Tab -->
+					<div class="filter-tab-panel" id="odataPanel" data-tab="odata">
+						${this.renderODataTab()}
 					</div>
 				</div>
+
+				<!-- Vertical Resize Handle (bottom edge) -->
+				<div
+					class="filter-panel-resize-handle collapsed"
+					id="filterPanelResizeHandle"
+					title="Drag to resize"
+				></div>
+			</div>
+		`;
+	}
+
+	/**
+	 * Renders the Quick Filters tab content.
+	 */
+	private renderQuickFiltersTab(): string {
+		return `
+			<div class="quick-filters-section">
+				<div class="quick-filters">
+					${QUICK_FILTER_DEFINITIONS.map(qf => this.renderQuickFilter(qf)).join('')}
+				</div>
+			</div>
+		`;
+	}
+
+	/**
+	 * Renders the Advanced Filters tab content.
+	 */
+	private renderAdvancedFiltersTab(filterState: { conditions: FilterConditionViewModel[]; activeCount: number; totalCount: number }): string {
+		return `
+			<div class="advanced-filters-section">
+				<div class="filter-conditions" id="filterConditions">
+					${filterState.conditions.map((condition, index) => this.renderConditionRow(condition, index, filterState.conditions.length)).join('')}
+				</div>
+			</div>
+
+			<div class="filter-actions">
+				<button class="secondary-button" id="addConditionBtn">
+					<span class="codicon codicon-add"></span>
+					Add Condition
+				</button>
+				<button
+					class="primary-button"
+					id="applyFiltersBtn"
+					data-command="applyFilters"
+				>
+					<span class="codicon codicon-check"></span>
+					Apply Filters
+				</button>
+				<button
+					class="secondary-button"
+					id="clearFiltersBtn"
+					data-command="clearFilters"
+				>
+					<span class="codicon codicon-close"></span>
+					Clear All
+				</button>
+			</div>
+		`;
+	}
+
+	/**
+	 * Renders the OData Query tab content.
+	 */
+	private renderODataTab(): string {
+		return `
+			<div class="odata-preview-section">
+				<pre class="odata-query-text" id="odataQueryText">No filters applied</pre>
+				<button
+					class="icon-button copy-query-button"
+					id="copyODataQueryBtn"
+					title="Copy to clipboard"
+				>
+					<span class="codicon codicon-copy"></span>
+					Copy
+				</button>
 			</div>
 		`;
 	}

@@ -21,12 +21,12 @@ export class ToolsTreeProvider implements vscode.TreeDataProvider<ToolItem> {
 
 	getChildren(): ToolItem[] {
 		return [
-			new ToolItem('Solutions', 'Browse and manage solutions', 'solutionExplorer', 'power-platform-dev-suite.solutionExplorer'),
-			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewer'),
-			new ToolItem('Connection References', 'View connection references and flows', 'connectionReferences', 'power-platform-dev-suite.connectionReferences'),
-			new ToolItem('Environment Variables', 'View environment variables', 'environmentVariables', 'power-platform-dev-suite.environmentVariables'),
-			new ToolItem('Plugin Traces', 'View and manage plugin trace logs', 'pluginTraceViewer', 'power-platform-dev-suite.pluginTraceViewer'),
-			new ToolItem('Metadata Browser', 'Browse entity metadata and attributes', 'metadataBrowser', 'power-platform-dev-suite.metadataBrowser')
+			new ToolItem('Solutions', 'Browse and manage solutions', 'solutionExplorer', 'power-platform-dev-suite.solutionExplorer', 'package'),
+			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewer', 'cloud-download'),
+			new ToolItem('Connection References', 'View connection references and flows', 'connectionReferences', 'power-platform-dev-suite.connectionReferences', 'plug'),
+			new ToolItem('Environment Variables', 'View environment variables', 'environmentVariables', 'power-platform-dev-suite.environmentVariables', 'symbol-variable'),
+			new ToolItem('Plugin Traces', 'View and manage plugin trace logs', 'pluginTraceViewer', 'power-platform-dev-suite.pluginTraceViewer', 'bug'),
+			new ToolItem('Metadata Browser', 'Browse entity metadata and attributes', 'metadataBrowser', 'power-platform-dev-suite.metadataBrowser', 'database')
 		];
 	}
 }
@@ -75,12 +75,13 @@ class ToolItem extends vscode.TreeItem {
 		public readonly label: string,
 		public readonly tooltip: string,
 		public readonly contextValue: string,
-		commandId: string
+		commandId: string,
+		icon: string = 'tools'
 	) {
 		super(label, vscode.TreeItemCollapsibleState.None);
 		this.tooltip = tooltip;
 		this.contextValue = contextValue;
-		this.iconPath = new vscode.ThemeIcon('tools');
+		this.iconPath = new vscode.ThemeIcon(icon);
 		this.command = {
 			command: commandId,
 			title: label

@@ -370,7 +370,13 @@ tbody tr.selected.row-odd:hover {
     margin-bottom: 0;
     display: flex;
     flex-direction: column;
-    max-height: 250px; /* Constrain entire filter panel */
+    height: var(--filter-panel-height, 250px); /* Default 250px, user adjustable */
+    position: relative; /* For resize handle positioning */
+}
+
+/* When collapsed, only show header height (no reserved space for body) */
+.filter-panel:has(.filter-panel-body.collapsed) {
+    height: auto;
 }
 
 .filter-panel-header {
@@ -420,6 +426,43 @@ tbody tr.selected.row-odd:hover {
     border-radius: 4px;
 }
 
+/* Filter Panel Tab Navigation */
+.filter-panel-tab-navigation {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
+    padding: 0 8px;
+    flex-shrink: 0; /* Don't shrink tab navigation */
+}
+
+.filter-panel-tab-navigation.collapsed {
+    display: none;
+}
+
+.filter-tab-button {
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.filter-tab-button:hover {
+    background: var(--vscode-toolbar-hoverBackground);
+}
+
+.filter-tab-button.active {
+    border-bottom-color: var(--vscode-focusBorder);
+    color: var(--vscode-textLink-activeForeground);
+    font-weight: 600;
+}
+
+/* Filter Panel Body (contains tab panels) */
 .filter-panel-body {
     padding: 16px;
     display: flex;
@@ -433,6 +476,60 @@ tbody tr.selected.row-odd:hover {
 
 .filter-panel-body.collapsed {
     display: none;
+}
+
+/* Filter Tab Panels (individual tab content containers) */
+.filter-tab-panel {
+    display: none; /* Hidden by default */
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto; /* Allow scrolling within tab content */
+    flex: 1; /* Take available space */
+    min-height: 0; /* Allow flex shrinking */
+}
+
+.filter-tab-panel.active {
+    display: flex; /* Show active tab */
+}
+
+/* Vertical Resize Handle (bottom edge of filter panel) */
+.filter-panel-resize-handle {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 8px;
+    cursor: ns-resize; /* North-south resize cursor */
+    z-index: 10;
+    transition: background-color 0.15s ease;
+}
+
+.filter-panel-resize-handle.collapsed {
+    display: none; /* Hide when panel is collapsed */
+}
+
+.filter-panel-resize-handle:hover,
+.filter-panel-resize-handle.resizing {
+    background: var(--vscode-focusBorder);
+}
+
+.filter-panel-resize-handle::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 3px;
+    background: var(--vscode-panel-border);
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.filter-panel-resize-handle:hover::before,
+.filter-panel-resize-handle.resizing::before {
+    opacity: 1;
 }
 
 /* Section Labels */
@@ -598,48 +695,11 @@ tbody tr.selected.row-odd:hover {
     border-color: var(--vscode-focusBorder);
 }
 
-/* OData Preview Section */
+/* OData Preview Section (in OData Query tab) */
 .odata-preview-section {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--vscode-panel-border);
-}
-
-.odata-preview-details {
-    border: 1px solid var(--vscode-input-border);
-    border-radius: 4px;
-    background: var(--vscode-editor-background);
-}
-
-.odata-preview-details[open] {
-    border-color: var(--vscode-focusBorder);
-}
-
-.odata-preview-summary {
-    padding: 10px 12px;
-    cursor: pointer;
     display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--vscode-foreground);
-    list-style: none;
-    user-select: none;
-}
-
-.odata-preview-summary::-webkit-details-marker {
-    display: none;
-}
-
-.odata-preview-summary:hover {
-    background: var(--vscode-list-hoverBackground);
-}
-
-.odata-preview-content {
-    padding: 12px;
-    border-top: 1px solid var(--vscode-panel-border);
-    position: relative;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .odata-query-text {

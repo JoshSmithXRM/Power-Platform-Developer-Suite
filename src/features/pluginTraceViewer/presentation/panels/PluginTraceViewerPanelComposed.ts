@@ -71,7 +71,11 @@ type PluginTraceViewerCommands =
 	| 'saveDetailPanelWidth'
 	| 'showDetailPanel'
 	| 'hideDetailPanel'
-	| 'restoreDetailPanelWidth';
+	| 'restoreDetailPanelWidth'
+	| 'saveFilterPanelHeight'
+	| 'restoreFilterPanelHeight'
+	| 'saveFilterPanelCollapsed'
+	| 'restoreFilterPanelCollapsed';
 
 /**
  * Plugin Trace Viewer panel using new PanelCoordinator architecture.
@@ -238,6 +242,8 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		const environments = await this.getEnvironments();
 
 		// Load persisted state from repository once, then distribute to behaviors
+		let filterPanelHeight: number | null = null;
+		let filterPanelCollapsed: boolean | null = null;
 		if (this.panelStateRepository) {
 			try {
 				const state = await this.panelStateRepository.load({
@@ -255,6 +261,16 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 					if (state.detailPanelWidth && typeof state.detailPanelWidth === 'number') {
 						this.detailPanelBehavior.setDetailPanelWidth(state.detailPanelWidth);
 					}
+
+					// Store filter panel height to restore later
+					if (state['filterPanelHeight'] && typeof state['filterPanelHeight'] === 'number') {
+						filterPanelHeight = state['filterPanelHeight'];
+					}
+
+					// Store filter panel collapsed state to restore later
+					if (state['filterPanelCollapsed'] !== undefined && typeof state['filterPanelCollapsed'] === 'boolean') {
+						filterPanelCollapsed = state['filterPanelCollapsed'];
+					}
 				}
 			} catch (error) {
 				this.logger.warn('Failed to load panel state from storage', { error });
@@ -265,6 +281,16 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		await this.filterManagementBehavior.loadFilterCriteria(
 			this.currentEnvironmentId
 		);
+
+		// Build and send OData query preview for loaded filters
+		const loadedFilterCriteria = this.filterManagementBehavior.getAppliedFilterCriteria();
+		const filterMapper = new FilterCriteriaMapper();
+		const domainFilter = filterMapper.toDomain(loadedFilterCriteria);
+		const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
+		await this.panel.webview.postMessage({
+			command: 'updateODataPreview',
+			data: { query: odataQuery }
+		});
 
 		this.logger.debug('Initializing with auto-refresh interval', {
 			interval: this.autoRefreshBehavior.getInterval()
@@ -327,6 +353,22 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			await this.panel.webview.postMessage({
 				command: 'updateQuickFilterState',
 				data: { quickFilterIds: reconstructedQuickFilterIds }
+			});
+		}
+
+		// Send filter panel collapsed state to webview if it was persisted (before height)
+		if (filterPanelCollapsed !== null) {
+			await this.panel.webview.postMessage({
+				command: 'restoreFilterPanelCollapsed',
+				data: { collapsed: filterPanelCollapsed }
+			});
+		}
+
+		// Send filter panel height to webview if it was persisted (after collapsed state)
+		if (filterPanelHeight !== null) {
+			await this.panel.webview.postMessage({
+				command: 'restoreFilterPanelHeight',
+				data: { height: filterPanelHeight }
 			});
 		}
 	}
@@ -536,6 +578,20 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 				await this.detailPanelBehavior.saveDetailPanelWidth(width, this.currentEnvironmentId);
 			}
 		});
+
+		this.coordinator.registerHandler('saveFilterPanelHeight', async (data) => {
+			const height = (data as { height?: number })?.height;
+			if (height !== undefined) {
+				await this.saveFilterPanelHeight(height);
+			}
+		});
+
+		this.coordinator.registerHandler('saveFilterPanelCollapsed', async (data) => {
+			const collapsed = (data as { collapsed?: boolean })?.collapsed;
+			if (collapsed !== undefined) {
+				await this.saveFilterPanelCollapsed(collapsed);
+			}
+		});
 	}
 
 	private getTableConfig(): DataTableConfig {
@@ -566,8 +622,8 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		this.logger.debug('Refreshing plugin traces');
 
 		try {
-			// Get current filter criteria from behavior
-			const filterCriteria = this.filterManagementBehavior.getFilterCriteria();
+			// Get expanded filter criteria (includes quick filters) from behavior
+			const filterCriteria = this.filterManagementBehavior.getAppliedFilterCriteria();
 
 			// Map filter criteria to domain filter
 			const mapper = new FilterCriteriaMapper();
@@ -735,6 +791,76 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		);
 	}
 
+
+	/**
+	 * Saves filter panel height to persistent storage.
+	 *
+	 * @param height - Filter panel height in pixels
+	 */
+	private async saveFilterPanelHeight(height: number): Promise<void> {
+		if (!this.panelStateRepository) {
+			return;
+		}
+
+		try {
+			// Load existing state to preserve other properties
+			const existingState = await this.panelStateRepository.load({
+				panelType: PluginTraceViewerPanelComposed.viewType,
+				environmentId: this.currentEnvironmentId
+			});
+
+			// Save filter panel height + other preserved state
+			await this.panelStateRepository.save(
+				{
+					panelType: PluginTraceViewerPanelComposed.viewType,
+					environmentId: this.currentEnvironmentId
+				},
+				{
+					...existingState,
+					filterPanelHeight: height
+				}
+			);
+
+			this.logger.debug('Filter panel height saved', { height });
+		} catch (error) {
+			this.logger.error('Failed to save filter panel height', error);
+		}
+	}
+
+	/**
+	 * Saves filter panel collapsed state to persistent storage.
+	 *
+	 * @param collapsed - Whether filter panel is collapsed
+	 */
+	private async saveFilterPanelCollapsed(collapsed: boolean): Promise<void> {
+		if (!this.panelStateRepository) {
+			return;
+		}
+
+		try {
+			// Load existing state to preserve other properties
+			const existingState = await this.panelStateRepository.load({
+				panelType: PluginTraceViewerPanelComposed.viewType,
+				environmentId: this.currentEnvironmentId
+			});
+
+			// Save filter panel collapsed state + other preserved state
+			await this.panelStateRepository.save(
+				{
+					panelType: PluginTraceViewerPanelComposed.viewType,
+					environmentId: this.currentEnvironmentId
+				},
+				{
+					...existingState,
+					filterPanelCollapsed: collapsed
+				}
+			);
+
+			this.logger.debug('Filter panel collapsed state saved', { collapsed });
+		} catch (error) {
+			this.logger.error('Failed to save filter panel collapsed state', error);
+		}
+	}
 
 	/**
 	 * Clears the table by sending empty data to the webview.

@@ -18,11 +18,12 @@ describe('FilterPanelSection', () => {
 	});
 
 	describe('render - filter panel structure', () => {
-		it('should render filter panel container', () => {
+		it('should render filter panel container with ID', () => {
 			const section = new FilterPanelSection();
 
 			const html = section.render({});
 
+			expect(html).toContain('id="filterPanel"');
 			expect(html).toContain('class="filter-panel"');
 		});
 
@@ -44,14 +45,14 @@ describe('FilterPanelSection', () => {
 			expect(html).toContain('class="filter-panel-body collapsed"');
 		});
 
-		it('should render filter toggle button with ID', () => {
+		it('should render filter toggle button with ID and collapsed state', () => {
 			const section = new FilterPanelSection();
 
 			const html = section.render({});
 
 			expect(html).toContain('id="filterToggleBtn"');
 			expect(html).toContain('class="filter-toggle-btn"');
-			expect(html).toContain('codicon-chevron-up');
+			expect(html).toContain('codicon-chevron-down'); // Starts collapsed, so chevron points down
 		});
 
 		it('should render filter title with icon', () => {
@@ -63,16 +64,59 @@ describe('FilterPanelSection', () => {
 			expect(html).toContain('codicon-filter');
 			expect(html).toContain('Filters');
 		});
-	});
 
-	describe('render - quick filters section', () => {
-		it('should render quick filters section label', () => {
+		it('should render tab navigation with collapsed class', () => {
 			const section = new FilterPanelSection();
 
 			const html = section.render({});
 
-			expect(html).toContain('class="section-label"');
-			expect(html).toMatch(/Quick Filters/);
+			expect(html).toContain('id="filterPanelTabNav"');
+			expect(html).toContain('class="filter-panel-tab-navigation collapsed"');
+		});
+
+		it('should render three tab buttons', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			expect(html).toContain('id="quickFiltersTab"');
+			expect(html).toContain('id="advancedFiltersTab"');
+			expect(html).toContain('id="odataTab"');
+			expect(html).toContain('Quick Filters');
+			expect(html).toContain('Advanced Filters');
+			expect(html).toContain('OData Query');
+		});
+
+		it('should render Quick Filters tab as active by default', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			const quickFilterTab = html.match(/<button[^>]*id="quickFiltersTab"[^>]*>/)?.[0] ?? '';
+			expect(quickFilterTab).toContain('class="filter-tab-button active"');
+			expect(quickFilterTab).toContain('data-tab="quick"');
+		});
+
+		it('should render vertical resize handle with collapsed class', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			expect(html).toContain('id="filterPanelResizeHandle"');
+			expect(html).toContain('class="filter-panel-resize-handle collapsed"');
+			expect(html).toContain('title="Drag to resize"');
+		});
+	});
+
+	describe('render - quick filters section', () => {
+		it('should render quick filters tab panel with ID and active class', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			expect(html).toContain('id="quickFiltersPanel"');
+			expect(html).toContain('class="filter-tab-panel active"');
+			expect(html).toContain('data-tab="quick"');
 		});
 
 		it('should render all quick filter definitions', () => {
@@ -126,13 +170,14 @@ describe('FilterPanelSection', () => {
 	});
 
 	describe('render - advanced filters section', () => {
-		it('should render advanced filters section label', () => {
+		it('should render advanced filters tab panel with ID and inactive class', () => {
 			const section = new FilterPanelSection();
 
 			const html = section.render({});
 
-			expect(html).toContain('class="advanced-filters-section"');
-			expect(html).toMatch(/Advanced Filters/);
+			expect(html).toContain('id="advancedFiltersPanel"');
+			expect(html).toContain('class="filter-tab-panel"');
+			expect(html).toContain('data-tab="advanced"');
 		});
 
 		it('should render filter conditions container with ID', () => {
@@ -461,22 +506,22 @@ describe('FilterPanelSection', () => {
 	});
 
 	describe('render - OData preview section', () => {
-		it('should render OData preview details section', () => {
+		it('should render OData tab panel with ID and inactive class', () => {
 			const section = new FilterPanelSection();
 
 			const html = section.render({});
 
-			expect(html).toContain('class="odata-preview-details"');
-			expect(html).toContain('class="odata-preview-summary"');
+			expect(html).toContain('id="odataPanel"');
+			expect(html).toContain('class="filter-tab-panel"');
+			expect(html).toContain('data-tab="odata"');
 		});
 
-		it('should render OData preview summary with icon and label', () => {
+		it('should render OData preview section in OData tab', () => {
 			const section = new FilterPanelSection();
 
 			const html = section.render({});
 
-			expect(html).toContain('codicon-code');
-			expect(html).toContain('Show Generated OData Query');
+			expect(html).toContain('class="odata-preview-section"');
 		});
 
 		it('should render OData query text area with ID', () => {
@@ -499,6 +544,87 @@ describe('FilterPanelSection', () => {
 			expect(html).toContain('title="Copy to clipboard"');
 			expect(html).toContain('codicon-copy');
 			expect(html).toContain('Copy');
+		});
+	});
+
+	describe('render - tabbed layout structure', () => {
+		it('should render all three tab panels', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			expect(html).toContain('id="quickFiltersPanel"');
+			expect(html).toContain('id="advancedFiltersPanel"');
+			expect(html).toContain('id="odataPanel"');
+		});
+
+		it('should mark Quick Filters tab panel as active by default', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			const quickPanel = html.match(/<div[^>]*id="quickFiltersPanel"[^>]*>/)?.[0] ?? '';
+			expect(quickPanel).toContain('class="filter-tab-panel active"');
+		});
+
+		it('should mark Advanced Filters tab panel as inactive by default', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			const advancedPanel = html.match(/<div[^>]*id="advancedFiltersPanel"[^>]*>/)?.[0] ?? '';
+			expect(advancedPanel).toContain('class="filter-tab-panel"');
+			expect(advancedPanel).not.toContain('active');
+		});
+
+		it('should mark OData tab panel as inactive by default', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			const odataPanel = html.match(/<div[^>]*id="odataPanel"[^>]*>/)?.[0] ?? '';
+			expect(odataPanel).toContain('class="filter-tab-panel"');
+			expect(odataPanel).not.toContain('active');
+		});
+
+		it('should have all tab buttons with correct data-tab attributes', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			expect(html).toContain('data-tab="quick"');
+			expect(html).toContain('data-tab="advanced"');
+			expect(html).toContain('data-tab="odata"');
+		});
+
+		it('should render quick filters inside quick filters tab panel', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			const quickPanel = html.substring(html.indexOf('id="quickFiltersPanel"'), html.indexOf('id="advancedFiltersPanel"'));
+			expect(quickPanel).toContain('class="quick-filter-checkbox"');
+		});
+
+		it('should render advanced filter conditions inside advanced filters tab panel', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			const advancedPanel = html.substring(html.indexOf('id="advancedFiltersPanel"'), html.indexOf('id="odataPanel"'));
+			expect(advancedPanel).toContain('id="filterConditions"');
+			expect(advancedPanel).toContain('id="addConditionBtn"');
+			expect(advancedPanel).toContain('id="applyFiltersBtn"');
+		});
+
+		it('should render OData preview inside OData tab panel', () => {
+			const section = new FilterPanelSection();
+
+			const html = section.render({});
+
+			const odataPanel = html.substring(html.indexOf('id="odataPanel"'), html.indexOf('id="filterPanelResizeHandle"'));
+			expect(odataPanel).toContain('id="odataQueryText"');
+			expect(odataPanel).toContain('id="copyODataQueryBtn"');
 		});
 	});
 

@@ -42,6 +42,10 @@ window.createBehavior({
 			updateQuickFilterState(message.data.quickFilterIds);
 		} else if (message.command === 'restoreDetailPanelWidth') {
 			restoreDetailPanelWidth(message.data.width);
+		} else if (message.command === 'restoreFilterPanelHeight') {
+			restoreFilterPanelHeight(message.data.height);
+		} else if (message.command === 'restoreFilterPanelCollapsed') {
+			restoreFilterPanelCollapsed(message.data.collapsed);
 		}
 	}
 });
@@ -94,6 +98,9 @@ function updateTableData(data) {
 		const event = new Event('tableUpdated', { bubbles: true });
 		table.dispatchEvent(event);
 	}
+
+	// Update filter count to reflect current filter state
+	updateFilterCount();
 }
 
 /**
@@ -581,6 +588,178 @@ function restoreDetailPanelWidth(width) {
 }
 
 /**
+ * Restores filter panel height from persisted state.
+ * Called by backend after panel initialization with stored height.
+ *
+ * @param {number} height - Panel height in pixels
+ */
+function restoreFilterPanelHeight(height) {
+	if (!height) {
+		return;
+	}
+
+	const panel = document.getElementById('filterPanel');
+	if (!panel) {
+		return;
+	}
+
+	// Save height to dataset for collapse/expand functionality
+	panel.dataset.savedHeight = height.toString();
+
+	// Update CSS variable
+	panel.style.setProperty('--filter-panel-height', `${height}px`);
+
+	// Only set inline height if panel is NOT collapsed
+	// (Panel starts collapsed, so we shouldn't set height on initial load)
+	const filterBody = document.getElementById('filterPanelBody');
+	const isCollapsed = filterBody?.classList.contains('collapsed');
+
+	if (!isCollapsed) {
+		// Panel is expanded, restore the height
+		panel.style.height = `${height}px`;
+	} else {
+		// Panel is collapsed, let it use auto height (just header)
+		panel.style.height = 'auto';
+	}
+}
+
+/**
+ * Restores filter panel collapsed state from persisted state.
+ * Called by backend after panel initialization with stored collapsed state.
+ *
+ * @param {boolean} collapsed - Whether panel should be collapsed
+ */
+function restoreFilterPanelCollapsed(collapsed) {
+	const filterBody = document.getElementById('filterPanelBody');
+	const filterTabNav = document.getElementById('filterPanelTabNav');
+	const filterResizeHandle = document.getElementById('filterPanelResizeHandle');
+	const filterPanel = document.getElementById('filterPanel');
+	const toggleBtn = document.getElementById('filterToggleBtn');
+
+	if (!filterBody || !filterPanel) {
+		return;
+	}
+
+	// If collapsed is false, expand the panel
+	if (!collapsed) {
+		// Remove collapsed classes
+		filterBody.classList.remove('collapsed');
+		if (filterTabNav) {
+			filterTabNav.classList.remove('collapsed');
+		}
+		if (filterResizeHandle) {
+			filterResizeHandle.classList.remove('collapsed');
+		}
+
+		// Update chevron icon to point up (expanded)
+		const icon = toggleBtn?.querySelector('.codicon');
+		if (icon) {
+			icon.classList.remove('codicon-chevron-down');
+			icon.classList.add('codicon-chevron-up');
+		}
+
+		// Restore height (from dataset or default)
+		const savedHeight = filterPanel.dataset.savedHeight || '250';
+		filterPanel.style.height = `${savedHeight}px`;
+	}
+	// If collapsed is true, leave everything as-is (default state is collapsed)
+}
+
+/**
+ * Switches active filter tab.
+ * Updates tab buttons and panel visibility.
+ *
+ * @param {string} tab - Tab ID ('quick', 'advanced', 'odata')
+ */
+function switchFilterTab(tab) {
+	// Update tab buttons
+	document.querySelectorAll('.filter-tab-button').forEach(btn => {
+		if (btn.dataset.tab === tab) {
+			btn.classList.add('active');
+		} else {
+			btn.classList.remove('active');
+		}
+	});
+
+	// Update tab panels
+	document.querySelectorAll('.filter-tab-panel').forEach(panel => {
+		if (panel.dataset.tab === tab) {
+			panel.classList.add('active');
+		} else {
+			panel.classList.remove('active');
+		}
+	});
+}
+
+/**
+ * Sets up filter panel vertical resize functionality.
+ * Called ONCE during filter panel initialization.
+ *
+ * CRITICAL: Handle must NEVER be destroyed/recreated.
+ * Listeners attached once and persist for panel lifetime.
+ *
+ * @param {HTMLElement} handle - Resize handle element
+ */
+function setupFilterPanelResize(handle) {
+	const panel = document.getElementById('filterPanel');
+	if (!panel) {
+		console.error('[PluginTraceViewer] Cannot setup filter resize - panel not found');
+		return;
+	}
+
+	let isResizing = false;
+	let startY = 0;
+	let startHeight = 0;
+
+	const MIN_HEIGHT = 120; // Enough for header + tabs + minimal content
+	const getMaxHeight = () => window.innerHeight * 0.6; // 60% of viewport
+
+	handle.addEventListener('mousedown', (e) => {
+		isResizing = true;
+		startY = e.clientY;
+		startHeight = panel.offsetHeight;
+		handle.classList.add('resizing');
+		document.body.style.cursor = 'ns-resize'; // North-south cursor
+		document.body.style.userSelect = 'none';
+		e.preventDefault();
+	});
+
+	document.addEventListener('mousemove', (e) => {
+		if (!isResizing) {
+			return;
+		}
+
+		const deltaY = e.clientY - startY; // Positive = drag down (taller), negative = drag up (shorter)
+		const newHeight = Math.max(MIN_HEIGHT, Math.min(getMaxHeight(), startHeight + deltaY));
+
+		// Update height using CSS variable
+		panel.style.setProperty('--filter-panel-height', `${newHeight}px`);
+		panel.style.height = `${newHeight}px`;
+
+		e.preventDefault();
+	});
+
+	document.addEventListener('mouseup', () => {
+		if (!isResizing) {
+			return;
+		}
+
+		isResizing = false;
+		handle.classList.remove('resizing');
+		document.body.style.cursor = '';
+		document.body.style.userSelect = '';
+
+		// Persist height preference via backend and save to dataset
+		const currentHeight = panel.offsetHeight;
+		panel.dataset.savedHeight = currentHeight.toString();
+		vscode.postMessage({
+			command: 'saveFilterPanelHeight',
+			data: { height: currentHeight }
+		});
+	});
+}
+
+/**
  * Sets up filter panel event listeners for query builder.
  */
 function setupFilterPanel() {
@@ -588,19 +767,69 @@ function setupFilterPanel() {
 	const filterHeader = document.getElementById('filterPanelHeader');
 	const toggleBtn = document.getElementById('filterToggleBtn');
 	const filterBody = document.getElementById('filterPanelBody');
+	const filterTabNav = document.getElementById('filterPanelTabNav');
+	const filterResizeHandle = document.getElementById('filterPanelResizeHandle');
 
 	if (filterHeader && toggleBtn && filterBody) {
+		const filterPanel = document.getElementById('filterPanel');
 		const toggleCollapse = () => {
+			const isCurrentlyCollapsed = filterBody.classList.contains('collapsed');
+
+			// Toggle collapsed state
 			filterBody.classList.toggle('collapsed');
+			if (filterTabNav) {
+				filterTabNav.classList.toggle('collapsed');
+			}
+			if (filterResizeHandle) {
+				filterResizeHandle.classList.toggle('collapsed');
+			}
+
+			// Toggle chevron icon
 			const icon = toggleBtn.querySelector('.codicon');
 			if (icon) {
 				icon.classList.toggle('codicon-chevron-down');
 				icon.classList.toggle('codicon-chevron-up');
 			}
+
+			// Handle inline height style for proper collapse/expand
+			if (filterPanel) {
+				if (isCurrentlyCollapsed) {
+					// Expanding: restore saved height or use default
+					const savedHeight = filterPanel.dataset.savedHeight || '250';
+					filterPanel.style.height = `${savedHeight}px`;
+				} else {
+					// Collapsing: save current height and remove inline style
+					const currentHeight = filterPanel.offsetHeight;
+					filterPanel.dataset.savedHeight = currentHeight.toString();
+					filterPanel.style.height = 'auto';
+				}
+			}
+
+			// Persist collapsed state to backend
+			const newCollapsedState = !isCurrentlyCollapsed;
+			vscode.postMessage({
+				command: 'saveFilterPanelCollapsed',
+				data: { collapsed: newCollapsedState }
+			});
 		};
 
 		// Make entire header clickable
 		filterHeader.addEventListener('click', toggleCollapse);
+	}
+
+	// Tab switching for filter panel
+	const filterTabButtons = document.querySelectorAll('.filter-tab-button');
+	filterTabButtons.forEach(button => {
+		button.addEventListener('click', () => {
+			const tab = button.dataset.tab;
+			switchFilterTab(tab);
+		});
+	});
+
+	// Setup vertical resize handle for filter panel (ONCE)
+	if (filterResizeHandle && !window.filterPanelResizeSetup) {
+		setupFilterPanelResize(filterResizeHandle);
+		window.filterPanelResizeSetup = true;
 	}
 
 	// Add condition button
@@ -608,7 +837,7 @@ function setupFilterPanel() {
 	if (addConditionBtn) {
 		addConditionBtn.addEventListener('click', () => {
 			addConditionRow();
-			updateFilterCount();
+			// Don't update count here - only when filters are actually applied
 		});
 	}
 
@@ -669,18 +898,11 @@ function setupFilterPanel() {
 			if (e.target.classList.contains('condition-field')) {
 				updateOperatorsForField(e.target);
 			}
-			// Update count when checkbox or any field changes
-			if (e.target.classList.contains('condition-enabled')) {
-				updateFilterCount();
-			}
+			// Don't update count here - only when filters are actually applied
 		});
 
-		// Update count when value inputs change
-		filterConditions.addEventListener('input', (e) => {
-			if (e.target.classList.contains('condition-value')) {
-				updateFilterCount();
-			}
-		});
+		// Don't update count during editing - only when filters are actually applied
+		// (count will update when table data is refreshed after applying filters)
 
 		// Enter key in value inputs triggers apply
 		filterConditions.addEventListener('keypress', (e) => {
@@ -836,7 +1058,7 @@ function removeConditionRow(row) {
 		}
 	}
 
-	updateFilterCount();
+	// Don't update count here - only when filters are actually applied
 }
 
 /**
@@ -913,41 +1135,37 @@ function updateFilterCount() {
 		return;
 	}
 
-	// Count checked quick filter checkboxes
+	// Count checked quick filter checkboxes (all quick filters are active when checked)
 	const quickFilterCheckboxes = document.querySelectorAll('.quick-filter-checkbox:checked');
-	const quickFilterCount = quickFilterCheckboxes.length;
+	const quickFilterActiveCount = quickFilterCheckboxes.length;
+	const quickFilterTotalCount = quickFilterCheckboxes.length;
 
-	// Count enabled advanced filter rows
+	// Count advanced filter rows (total and active separately)
 	const conditionRows = document.querySelectorAll('.filter-condition-row');
-	let advancedFilterCount = 0;
+	let advancedFilterActiveCount = 0;
+	let advancedFilterTotalCount = 0;
 
 	conditionRows.forEach(row => {
 		const enabled = row.querySelector('.condition-enabled')?.checked || false;
-		if (!enabled) {
-			return;
-		}
-
-		// Check if operator is null/not null (doesn't require value)
 		const operator = row.querySelector('.condition-operator')?.value || '';
 		const isNullOperator = operator === 'Is Null' || operator === 'Is Not Null';
-		// Equals/Not Equals allow empty string as a valid comparison value
 		const allowsEmptyValue = operator === 'Equals' || operator === 'Not Equals';
+		const value = row.querySelector('.condition-value')?.value || '';
+		const hasValue = isNullOperator || allowsEmptyValue || value.trim();
 
-		// For null operators, just check if enabled
-		// For equals/not equals, empty value is valid
-		// For other operators, check if value is non-empty
-		if (isNullOperator || allowsEmptyValue) {
-			advancedFilterCount++;
-		} else {
-			const value = row.querySelector('.condition-value')?.value || '';
-			if (value.trim()) {
-				advancedFilterCount++;
+		// Count toward total if the row has a valid value (regardless of enabled state)
+		if (hasValue) {
+			advancedFilterTotalCount++;
+
+			// Count toward active only if enabled AND has valid value
+			if (enabled) {
+				advancedFilterActiveCount++;
 			}
 		}
 	});
 
-	const totalCount = quickFilterCount + advancedFilterCount;
-	const activeCount = totalCount; // All counted filters are active (enabled)
+	const activeCount = quickFilterActiveCount + advancedFilterActiveCount;
+	const totalCount = quickFilterTotalCount + advancedFilterTotalCount;
 
 	// Update header text
 	filterTitle.innerHTML = `

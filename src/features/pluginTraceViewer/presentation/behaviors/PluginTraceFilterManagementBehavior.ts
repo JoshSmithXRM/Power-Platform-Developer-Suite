@@ -43,10 +43,25 @@ export class PluginTraceFilterManagementBehavior {
 	}
 
 	/**
-	 * Gets the current filter criteria.
+	 * Gets the current filter criteria (advanced filters only, no quick filters).
 	 */
 	public getFilterCriteria(): FilterCriteriaViewModel {
 		return this.filterCriteria;
+	}
+
+	/**
+	 * Gets the fully expanded filter criteria with quick filters merged in.
+	 * Use this when fetching data to ensure quick filters are applied.
+	 */
+	public getAppliedFilterCriteria(): FilterCriteriaViewModel {
+		const expanded = this.expandQuickFilters({
+			...this.filterCriteria,
+			quickFilterIds: this.activeQuickFilterIds
+		});
+		return {
+			...this.filterCriteria,
+			...expanded
+		};
 	}
 
 	/**
@@ -197,6 +212,8 @@ export class PluginTraceFilterManagementBehavior {
 					// Store reconstructed state
 					this.reconstructedQuickFilterIds = reconstructedQuickFilterIds;
 					this.activeQuickFilterIds = reconstructedQuickFilterIds; // Use reconstructed IDs as active
+
+					// Store advanced filters (without quick filter conditions)
 					this.filterCriteria = {
 						...stored,
 						conditions: advancedFilterConditions
@@ -204,7 +221,7 @@ export class PluginTraceFilterManagementBehavior {
 
 					this.logger.info('Filter criteria loaded and reconstructed', {
 						environmentId,
-						totalConditions: conditions.length,
+						totalConditions: this.filterCriteria.conditions?.length || 0,
 						quickFilters: reconstructedQuickFilterIds,
 						advancedFilters: advancedFilterConditions.length
 					});
