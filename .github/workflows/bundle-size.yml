@@ -30,6 +30,9 @@ jobs:
       - name: Build production package
         run: npm run package
 
+      - name: Create VSIX package
+        run: npm run vsce-package
+
       - name: Check VSIX bundle size
         run: |
           VSIX_FILE=$(ls -1 *.vsix | head -n 1)
