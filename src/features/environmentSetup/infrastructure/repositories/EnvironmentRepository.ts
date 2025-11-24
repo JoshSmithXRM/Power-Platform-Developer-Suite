@@ -113,7 +113,7 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 						this.logger.debug('Client secret stored');
 					} else if (!preserveExistingCredentials) {
 						await this.secrets.delete(secretKey);
-						this.logger.debug('Client secret deleted');
+						this.logger.info('Client secret deleted');
 					}
 				}
 			}
@@ -128,7 +128,7 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 						this.logger.debug('Password stored');
 					} else if (!preserveExistingCredentials) {
 						await this.secrets.delete(secretKey);
-						this.logger.debug('Password deleted');
+						this.logger.info('Password deleted');
 					}
 				}
 			}
@@ -164,7 +164,7 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 			if (environment) {
 				const secretKeys = environment.getRequiredSecretKeys();
 				await this.deleteSecrets(secretKeys);
-				this.logger.debug('Deleted secrets', { count: secretKeys.length });
+				this.logger.info('Deleted secrets', { count: secretKeys.length });
 			}
 
 			const filtered = dtos.filter(d => d.id !== id.getValue());

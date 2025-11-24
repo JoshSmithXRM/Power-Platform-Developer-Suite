@@ -255,8 +255,8 @@ export class DataverseApiService implements IDataverseApiService {
 
         const delay = this.calculateBackoff(attempt);
         this.logger.warn(
-          `Retrying request after ${delay}ms (attempt ${attempt}/${retries})`,
-          { method, endpoint, error: String(error), status }
+          'Retrying request after backoff delay',
+          { method, endpoint, error: String(error), status, delayMs: delay, attempt, retries }
         );
         await this.sleep(delay);
       }

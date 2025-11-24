@@ -83,6 +83,7 @@ describe('EnvironmentRepository', () => {
 			get: jest.fn(),
 			store: jest.fn(),
 			delete: jest.fn(),
+			keys: jest.fn(),
 			onDidChange: jest.fn()
 		};
 
@@ -347,7 +348,7 @@ describe('EnvironmentRepository', () => {
 
 			// Assert
 			expect(mockSecrets.delete).toHaveBeenCalledWith('power-platform-dev-suite-secret-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
-			expect(mockLogger.debug).toHaveBeenCalledWith('Client secret deleted');
+			expect(mockLogger.info).toHaveBeenCalledWith('Client secret deleted');
 		});
 
 		it('should preserve client secret when not provided and preserveExistingCredentials is true', async () => {
@@ -403,7 +404,7 @@ describe('EnvironmentRepository', () => {
 
 			// Assert
 			expect(mockSecrets.delete).toHaveBeenCalledWith('power-platform-dev-suite-password-user@test.com');
-			expect(mockLogger.debug).toHaveBeenCalledWith('Password deleted');
+			expect(mockLogger.info).toHaveBeenCalledWith('Password deleted');
 		});
 
 		it('should log and rethrow error when save fails', async () => {
@@ -439,7 +440,7 @@ describe('EnvironmentRepository', () => {
 			// Assert
 			expect(mockSecrets.delete).toHaveBeenCalledWith('power-platform-dev-suite-secret-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
 			expect(mockGlobalState.update).toHaveBeenCalledWith('power-platform-dev-suite-environments', []);
-			expect(mockLogger.debug).toHaveBeenCalledWith('Deleted secrets', { count: 1 });
+			expect(mockLogger.info).toHaveBeenCalledWith('Deleted secrets', { count: 1 });
 			expect(mockLogger.info).toHaveBeenCalledWith('Environment deleted', { id: 'env-1' });
 		});
 

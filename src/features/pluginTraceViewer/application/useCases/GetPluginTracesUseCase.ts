@@ -41,8 +41,8 @@ export class GetPluginTracesUseCase {
 			);
 
 			this.logger.info(
-				`GetPluginTracesUseCase: Retrieved ${traces.length} traces`,
-				{ environmentId }
+				'Retrieved plugin traces',
+				{ environmentId, count: traces.length }
 			);
 
 			return traces;
@@ -66,7 +66,7 @@ export class GetPluginTracesUseCase {
 		environmentId: string,
 		traceId: string
 	): Promise<PluginTrace | null> {
-		this.logger.info('Fetching single plugin trace', { environmentId, traceId });
+		this.logger.debug('Fetching single plugin trace', { environmentId, traceId });
 		return await this.repository.getTraceById(environmentId, traceId);
 	}
 
@@ -86,7 +86,7 @@ export class GetPluginTracesUseCase {
 		correlationId: CorrelationId,
 		top = 1000
 	): Promise<readonly PluginTrace[]> {
-		this.logger.info('Fetching traces by correlationId (unfiltered)', {
+		this.logger.debug('Fetching traces by correlationId (unfiltered)', {
 			environmentId,
 			correlationId: correlationId.value
 		});

@@ -439,6 +439,10 @@ See `.claude/AGENTS.md` for detailed agent guide.
 - `docs/testing/TESTING_GUIDE.md` - Unit testing patterns and test factories
 - `docs/testing/INTEGRATION_TESTING_GUIDE.md` - Panel integration testing patterns
 
+**Project management:**
+- `TECHNICAL_DEBT.md` - Code quality issues requiring remediation
+- `FUTURE_ENHANCEMENTS.md` - Planned features and improvements (deferred work)
+
 ---
 
 **Development:** `npm run compile` (use after EVERY layer)

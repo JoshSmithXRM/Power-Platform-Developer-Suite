@@ -126,18 +126,18 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		const odataFilter = filter.buildFilterExpression();
 		if (odataFilter) {
 			queryParams.push(`$filter=${odataFilter}`);
-			this.logger.info('Applied OData filter', {
+			this.logger.debug('Applied OData filter', {
 				filterExpression: odataFilter,
 				activeConditions: filter.getActiveFilterCount()
 			});
 		} else {
-			this.logger.info('No filter applied - retrieving all traces (up to $top limit)');
+			this.logger.debug('No filter applied - retrieving all traces (up to $top limit)');
 		}
 
 		const queryString = queryParams.join('&');
 		const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ENTITY_SET}?${queryString}`;
 
-		this.logger.info('Fetching plugin traces from Dataverse', {
+		this.logger.debug('Fetching plugin traces from Dataverse', {
 			environmentId,
 			endpoint,
 		});
@@ -204,7 +204,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 
 		const endpoint = `/api/data/v9.2/${DataversePluginTraceRepository.ENTITY_SET}(${traceId})?$select=${selectFields}`;
 
-		this.logger.info('Fetching single plugin trace from Dataverse', {
+		this.logger.debug('Fetching single plugin trace from Dataverse', {
 			environmentId,
 			traceId,
 			endpoint
@@ -265,7 +265,7 @@ export class DataversePluginTraceRepository implements IPluginTraceRepository {
 		try {
 			await this.apiService.delete(environmentId, endpoint);
 
-			this.logger.debug('Deleted plugin trace from Dataverse', {
+			this.logger.info('Deleted plugin trace from Dataverse', {
 				environmentId,
 				traceId,
 			});

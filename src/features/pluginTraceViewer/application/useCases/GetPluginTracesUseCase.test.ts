@@ -49,8 +49,8 @@ describe('GetPluginTracesUseCase', () => {
 				expect.objectContaining({})
 			);
 			expect(mockLogger.info).toHaveBeenCalledWith(
-				`GetPluginTracesUseCase: Retrieved ${mockTraces.length} traces`,
-				{ environmentId }
+				'Retrieved plugin traces',
+				{ environmentId, count: mockTraces.length }
 			);
 		});
 
@@ -97,8 +97,8 @@ describe('GetPluginTracesUseCase', () => {
 
 			expect(result).toEqual([]);
 			expect(mockLogger.info).toHaveBeenCalledWith(
-				'GetPluginTracesUseCase: Retrieved 0 traces',
-				{ environmentId }
+				'Retrieved plugin traces',
+				{ environmentId, count: 0 }
 			);
 		});
 	});

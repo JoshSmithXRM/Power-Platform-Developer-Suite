@@ -25,6 +25,6 @@ export class AuthenticationCacheInvalidationHandler {
 
 		this.authenticationService.clearCacheForEnvironment(event.environmentId);
 
-		this.logger.debug('Authentication cache invalidation completed');
+		this.logger.info('Authentication cache invalidation completed');
 	}
 }

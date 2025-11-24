@@ -102,6 +102,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				undefined
 			);
 		} catch (error) {
+			container.logger.error('Failed to open Environment Setup', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Environment Setup: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -124,6 +125,7 @@ export function activate(context: vscode.ExtensionContext): void {
 					environmentItem.envId
 				);
 			} catch (error) {
+				container.logger.error('Failed to open Environment Setup for edit', error);
 				vscode.window.showErrorMessage(
 					`Failed to open Environment Setup: ${error instanceof Error ? error.message : String(error)}`
 				);
@@ -158,6 +160,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				environmentsProvider.refresh();
 				vscode.window.showInformationMessage(`Environment "${environmentItem.label}" removed successfully!`);
 			} catch (error) {
+				container.logger.error('Failed to remove environment', error);
 				vscode.window.showErrorMessage(
 					`Failed to remove environment: ${error instanceof Error ? error.message : String(error)}`
 				);
@@ -187,6 +190,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				vscode.env.openExternal(vscode.Uri.parse(makerUrl));
 			}
 		} catch (error) {
+			container.logger.error('Failed to open Maker portal', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Maker: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -209,6 +213,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 			vscode.env.openExternal(vscode.Uri.parse(environment.getDataverseUrl().getValue()));
 		} catch (error) {
+			container.logger.error('Failed to open Dynamics', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Dynamics: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -233,6 +238,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		try {
 			void initializeSolutionExplorer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, environmentItem?.envId);
 		} catch (error) {
+			container.logger.error('Failed to open Solution Explorer', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Solution Explorer: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -247,6 +253,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				async (envId) => initializeSolutionExplorer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, envId)
 			);
 		} catch (error) {
+			container.logger.error('Failed to open Solutions with environment picker', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Solutions: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -257,6 +264,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		try {
 			void initializeImportJobViewer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, environmentItem?.envId);
 		} catch (error) {
+			container.logger.error('Failed to open Import Job Viewer', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Import Job Viewer: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -271,6 +279,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				async (envId) => initializeImportJobViewer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, envId)
 			);
 		} catch (error) {
+			container.logger.error('Failed to open Import Jobs with environment picker', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Import Jobs: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -281,6 +290,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		try {
 			void initializeConnectionReferences(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, environmentItem?.envId);
 		} catch (error) {
+			container.logger.error('Failed to open Connection References', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Connection References: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -295,6 +305,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				async (envId) => initializeConnectionReferences(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, envId)
 			);
 		} catch (error) {
+			container.logger.error('Failed to open Connection References with environment picker', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Connection References: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -305,6 +316,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		try {
 			void initializeEnvironmentVariables(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, environmentItem?.envId);
 		} catch (error) {
+			container.logger.error('Failed to open Environment Variables', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Environment Variables: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -319,6 +331,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				async (envId) => initializeEnvironmentVariables(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, envId)
 			);
 		} catch (error) {
+			container.logger.error('Failed to open Environment Variables with environment picker', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Environment Variables: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -329,6 +342,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		try {
 			void initializePluginTraceViewer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, environmentItem?.envId);
 		} catch (error) {
+			container.logger.error('Failed to open Plugin Trace Viewer', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Plugin Trace Viewer: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -343,6 +357,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				async (envId) => initializePluginTraceViewer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, envId)
 			);
 		} catch (error) {
+			container.logger.error('Failed to open Plugin Trace Viewer with environment picker', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Plugin Trace Viewer: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -353,6 +368,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		try {
 			void initializeMetadataBrowser(context, factories.getEnvironments, factories.dataverseApiServiceFactory, container.environmentRepository, container.logger, environmentItem?.envId);
 		} catch (error) {
+			container.logger.error('Failed to open Metadata Browser', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Metadata Browser: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -367,6 +383,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				async (envId) => initializeMetadataBrowser(context, factories.getEnvironments, factories.dataverseApiServiceFactory, container.environmentRepository, container.logger, envId)
 			);
 		} catch (error) {
+			container.logger.error('Failed to open Metadata Browser with environment picker', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Metadata Browser: ${error instanceof Error ? error.message : String(error)}`
 			);

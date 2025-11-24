@@ -62,7 +62,7 @@ export class PluginTraceDetailPanelBehavior {
 	 */
 	public async viewDetail(environmentId: string, traceId: string): Promise<void> {
 		try {
-			this.logger.info('HandleViewDetail called - fetching full trace from Dataverse', { traceId });
+			this.logger.debug('HandleViewDetail called - fetching full trace from Dataverse', { traceId });
 
 			// Fetch the complete trace record from Dataverse to get all fields
 			const trace = await this.getPluginTracesUseCase.getTraceById(environmentId, traceId);
@@ -73,14 +73,14 @@ export class PluginTraceDetailPanelBehavior {
 				return;
 			}
 
-			this.logger.info('Fetched full trace from Dataverse', {
+			this.logger.debug('Fetched full trace from Dataverse', {
 				traceId,
 				hasCorrelationId: !!trace.correlationId
 			});
 
 			// If trace has correlationId, fetch all related traces from Dataverse
 			if (trace.correlationId) {
-				this.logger.info('Fetching related traces by correlationId', {
+				this.logger.debug('Fetching related traces by correlationId', {
 					correlationId: trace.correlationId.value
 				});
 
@@ -90,14 +90,14 @@ export class PluginTraceDetailPanelBehavior {
 					1000
 				);
 
-				this.logger.info('Fetched related traces from Dataverse', {
+				this.logger.debug('Fetched related traces from Dataverse', {
 					count: this.relatedTracesCache.length,
 					correlationId: trace.correlationId.value
 				});
 			} else {
 				// No correlation ID - clear cache
 				this.relatedTracesCache = [];
-				this.logger.info('No correlationId - cleared related traces cache');
+				this.logger.debug('No correlationId - cleared related traces cache');
 			}
 
 			const detailViewModel = this.viewModelMapper.toDetailViewModel(trace);

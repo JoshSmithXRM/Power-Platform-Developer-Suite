@@ -168,7 +168,7 @@ describe('DataversePluginTraceRepository', () => {
 				environmentId,
 				expect.stringContaining(traceId)
 			);
-			expect(mockLogger.debug).toHaveBeenCalledWith(
+			expect(mockLogger.info).toHaveBeenCalledWith(
 				expect.stringContaining('Deleted'),
 				expect.objectContaining({})
 			);
