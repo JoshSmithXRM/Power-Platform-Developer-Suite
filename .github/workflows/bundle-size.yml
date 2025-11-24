@@ -10,6 +10,10 @@ on:
       - 'webpack.config.js'
       - 'tsconfig.json'
 
+permissions:
+  pull-requests: write
+  contents: read
+
 jobs:
   check-size:
     runs-on: ubuntu-latest
