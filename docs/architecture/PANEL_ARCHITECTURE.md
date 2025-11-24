@@ -2,7 +2,6 @@
 
 **Comprehensive guide to the panel composition architecture in Power Platform Developer Suite.**
 
-**Last Updated:** 2025-11-08
 **Status:** Official Architecture Reference
 
 ---

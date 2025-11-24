@@ -1080,7 +1080,7 @@ describe('SolutionExplorerPanel Integration Tests', () => {
 ## References
 
 - [CLAUDE.md](../../CLAUDE.md) - Project coding standards
-- [WORKFLOW_GUIDE.md](../../.claude/WORKFLOW_GUIDE.md) - Development workflow
+- [Development Workflows](../../.claude/WORKFLOW.md) - Development workflow
 - [Jest Documentation](https://jestjs.io/docs/getting-started)
 - [Testing Library](https://testing-library.com/docs/)
 

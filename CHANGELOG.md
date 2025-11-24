@@ -63,16 +63,17 @@ This release represents a **fundamental architectural transformation** - migrati
 
 #### Features Restructured
 
-**9 Features Migrated to Clean Architecture:**
+**8 Features Migrated to Clean Architecture:**
 1. Environment Setup (89 files) - Authentication, validation, MSAL integration
-2. Persistence Inspector (67 files) - Storage inspection, secret revelation
-3. Metadata Browser (74 files) - Entity metadata with 5-minute caching
-4. Plugin Trace Viewer (96 files) - OData query building, CSV export
-5. Solution Explorer (43 files) - Solution management, export
-6. Import Job Viewer (23 files) - Import monitoring, status computation
-7. Environment Variables (25 files) - Variable management, ALM deployment
-8. Connection References (27 files) - Flow-connection relationships
-9. Plugin Registration (partial) - In progress
+2. Metadata Browser (74 files) - Entity metadata with 5-minute caching
+3. Plugin Trace Viewer (96 files) - OData query building, CSV export
+4. Solution Explorer (43 files) - Solution management, export
+5. Import Job Viewer (23 files) - Import monitoring, status computation
+6. Environment Variables (25 files) - Variable management, ALM deployment
+7. Connection References (27 files) - Flow-connection relationships
+8. Plugin Registration (partial) - In progress
+
+**Note:** Persistence Inspector (67 files) migrated but excluded from packaged releases (development/debugging tool only)
 
 #### Breaking Changes
 

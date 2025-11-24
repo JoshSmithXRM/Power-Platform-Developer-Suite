@@ -808,7 +808,7 @@ it('should not throw when activating environment twice', () => {
 // 4. Run test - PASSES ✅
 ```
 
-See [BUG_FIX_WORKFLOW.md](../../.claude/workflows/BUG_FIX_WORKFLOW.md) for complete pattern.
+See [Bug Fix Workflow](../../.claude/WORKFLOW.md#bug-fix-workflow) for complete pattern.
 
 ---
 
@@ -870,9 +870,9 @@ start coverage/index.html # Windows
 
 ## 🔗 See Also
 
-- [NEW_FEATURE_WORKFLOW.md](../../.claude/workflows/NEW_FEATURE_WORKFLOW.md) - Testing in feature workflow
-- [BUG_FIX_WORKFLOW.md](../../.claude/workflows/BUG_FIX_WORKFLOW.md) - Test-driven bug fixes
-- [REFACTORING_WORKFLOW.md](../../.claude/workflows/REFACTORING_WORKFLOW.md) - Testing during refactoring
+- [Feature Development Workflow](../../.claude/WORKFLOW.md#feature-development-workflow) - Testing in feature workflow
+- [Bug Fix Workflow](../../.claude/WORKFLOW.md#bug-fix-workflow) - Test-driven bug fixes
+- [Refactoring Workflow](../../.claude/WORKFLOW.md#refactoring-workflow) - Testing during refactoring
 - [CLAUDE.md](../../CLAUDE.md) - Testing rules and principles
 
 ---

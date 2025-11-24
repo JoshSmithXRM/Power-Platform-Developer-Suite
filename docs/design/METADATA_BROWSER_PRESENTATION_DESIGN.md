@@ -3,7 +3,6 @@
 **Feature:** Metadata Browser MVP (Tab-Based Layout)
 **Design Type:** Presentation Layer Architecture
 **Status:** Design Phase
-**Last Updated:** 2025-11-09
 
 ---
 

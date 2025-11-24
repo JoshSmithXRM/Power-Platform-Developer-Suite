@@ -1,6 +1,5 @@
 # Technical Debt Inventory
 
-**Last Updated:** 2025-11-23
 **Total Items:** 6 (6 items resolved/reclassified earlier today, 1 low-priority item added)
 
 ---
