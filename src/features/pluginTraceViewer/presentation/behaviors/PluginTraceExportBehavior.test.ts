@@ -96,8 +96,8 @@ describe('PluginTraceExportBehavior', () => {
 			await behavior.exportTraces(traces, traceIds, format);
 			const afterExport = new Date();
 
-			const exportCall = mockExportTracesUseCase.exportToCsv.mock.calls[0];
-			const filename = exportCall![1] as string;
+			expect(mockExportTracesUseCase.exportToCsv).toHaveBeenCalledTimes(1);
+			const [, filename] = mockExportTracesUseCase.exportToCsv.mock.calls[0]! as [readonly PluginTrace[], string];
 
 			// Filename format: plugin-traces-YYYY-MM-DDTHH-MM-SS.csv
 			expect(filename).toMatch(/^plugin-traces-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.csv$/);
@@ -173,8 +173,8 @@ describe('PluginTraceExportBehavior', () => {
 
 			await behavior.exportTraces(traces, traceIds, format);
 
-			const exportCall = mockExportTracesUseCase.exportToJson.mock.calls[0];
-			const filename = exportCall![1] as string;
+			expect(mockExportTracesUseCase.exportToJson).toHaveBeenCalledTimes(1);
+			const [, filename] = mockExportTracesUseCase.exportToJson.mock.calls[0]! as [readonly PluginTrace[], string];
 
 			// Filename format: plugin-traces-YYYY-MM-DDTHH-MM-SS.json
 			expect(filename).toMatch(/^plugin-traces-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json$/);
@@ -194,7 +194,7 @@ describe('PluginTraceExportBehavior', () => {
 
 			await behavior.exportTraces(traces, traceIds, format);
 
-			const exportedTraces = mockExportTracesUseCase.exportToCsv.mock.calls[0]![0] as readonly PluginTrace[];
+			const [exportedTraces] = mockExportTracesUseCase.exportToCsv.mock.calls[0]! as [readonly PluginTrace[], string];
 			expect(exportedTraces).toHaveLength(2);
 			assertDefined(exportedTraces[0]);
 			expect(exportedTraces[0].id).toBe('trace-2');
@@ -213,7 +213,7 @@ describe('PluginTraceExportBehavior', () => {
 
 			await behavior.exportTraces(traces, traceIds, format);
 
-			const exportedTraces = mockExportTracesUseCase.exportToJson.mock.calls[0]![0] as readonly PluginTrace[];
+			const [exportedTraces] = mockExportTracesUseCase.exportToJson.mock.calls[0]! as [readonly PluginTrace[], string];
 			expect(exportedTraces).toHaveLength(2);
 			// Should maintain order from original traces array
 			assertDefined(exportedTraces[0]);
@@ -232,7 +232,7 @@ describe('PluginTraceExportBehavior', () => {
 
 			await behavior.exportTraces(traces, traceIds, format);
 
-			const exportedTraces = mockExportTracesUseCase.exportToCsv.mock.calls[0]![0] as readonly PluginTrace[];
+			const [exportedTraces] = mockExportTracesUseCase.exportToCsv.mock.calls[0]! as [readonly PluginTrace[], string];
 			expect(exportedTraces).toHaveLength(2);
 			assertDefined(exportedTraces[0]);
 			expect(exportedTraces[0].id).toBe('trace-1');
@@ -388,7 +388,7 @@ describe('PluginTraceExportBehavior', () => {
 
 			await behavior.exportTraces(traces, traceIds, format);
 
-			const exportedTraces = mockExportTracesUseCase.exportToJson.mock.calls[0]![0] as readonly PluginTrace[];
+			const [exportedTraces] = mockExportTracesUseCase.exportToJson.mock.calls[0]! as [readonly PluginTrace[], string];
 			expect(exportedTraces).toHaveLength(100);
 		});
 	});

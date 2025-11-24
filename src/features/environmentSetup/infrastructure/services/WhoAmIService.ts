@@ -2,6 +2,7 @@ import { Environment } from '../../domain/entities/Environment';
 import { IAuthenticationService } from '../../domain/interfaces/IAuthenticationService';
 import { IWhoAmIService, WhoAmIResponse } from '../../domain/interfaces/IWhoAmIService';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import { ErrorSanitizer } from '../../../../shared/utils/ErrorSanitizer';
 
 /**
  * Internal interface for WhoAmI API response structure
@@ -97,8 +98,18 @@ export class WhoAmIService implements IWhoAmIService {
 				});
 
 				if (!response.ok) {
-					this.logger.error('WhoAmI API failed', { status: response.status, statusText: response.statusText });
-					throw new Error(`WhoAmI API returned ${response.status}: ${response.statusText}`);
+					const errorText = await response.text();
+					// Log full error details for developers
+					this.logger.error('WhoAmI API failed', {
+						status: response.status,
+						statusText: response.statusText,
+						errorText
+					});
+					// Throw sanitized error for users
+					const sanitizedMessage = ErrorSanitizer.sanitize(
+						`WhoAmI API returned ${response.status}: ${response.statusText} - ${errorText}`
+					);
+					throw new Error(sanitizedMessage);
 				}
 
 				const data: unknown = await response.json();

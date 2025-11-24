@@ -34,12 +34,30 @@ export class HtmlRenderingBehavior implements IHtmlRenderingBehavior {
 			vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'datatable.css')
 		);
 
+		// Generate nonce for CSP
+		const nonce = this.generateNonce();
+
+		// Get CSP source for webview URIs
+		const cspSource = this.webview.cspSource;
+
 		return renderDataTable({
 			datatableCssUri: datatableCssUri.toString(),
 			config: this.config,
 			customCss: this.customization.customCss,
 			filterLogic: this.customization.filterLogic,
-			customJavaScript: this.customization.customJavaScript
+			customJavaScript: this.customization.customJavaScript,
+			cspSource,
+			nonce
 		});
+	}
+
+	/**
+	 * Generates a cryptographically secure nonce for Content Security Policy.
+	 * @returns A random nonce string
+	 */
+	private generateNonce(): string {
+		const buffer = new Uint32Array(4);
+		crypto.getRandomValues(buffer);
+		return Array.from(buffer, num => num.toString(36)).join('');
 	}
 }

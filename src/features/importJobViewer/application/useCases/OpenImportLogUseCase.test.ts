@@ -299,8 +299,8 @@ describe('OpenImportLogUseCase', () => {
 			await expect(useCase.execute(environmentId, importJobId))
 				.rejects.toThrow();
 
-			expect(mockLogger.error).toHaveBeenCalled();
-			const loggedError = mockLogger.error.mock.calls[0]![1];
+			expect(mockLogger.error).toHaveBeenCalledTimes(1);
+			const [, loggedError] = mockLogger.error.mock.calls[0]!;
 			expect(loggedError).toBeInstanceOf(Error);
 		});
 	});

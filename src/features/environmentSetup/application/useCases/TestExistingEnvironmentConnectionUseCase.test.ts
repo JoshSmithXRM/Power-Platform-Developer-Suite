@@ -550,10 +550,11 @@ describe('TestExistingEnvironmentConnectionUseCase', () => {
 			await useCase.execute(request);
 
 			// Assert
-			const calledEnv = mockWhoAmIService.testConnection.mock.calls[0]![0];
+			expect(mockWhoAmIService.testConnection).toHaveBeenCalledTimes(1);
+			const [calledEnv] = mockWhoAmIService.testConnection.mock.calls[0]!;
 			expect(calledEnv).toBe(environment);
-			expect(calledEnv!.getName().getValue()).toBe('Development');
-			expect(calledEnv!.getDataverseUrl().getValue()).toBe('https://contoso.crm.dynamics.com');
+			expect(calledEnv.getName().getValue()).toBe('Development');
+			expect(calledEnv.getDataverseUrl().getValue()).toBe('https://contoso.crm.dynamics.com');
 		});
 	});
 });

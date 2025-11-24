@@ -73,7 +73,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 			expect(mockRepository.exists).toHaveBeenCalledWith(filePath);
 			expect(mockRepository.write).toHaveBeenCalledTimes(1);
 
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!
 			expect(writtenSettings.environmentVariables).toHaveLength(2);
 			expect(writtenSettings.environmentVariables[0]).toEqual({
 				SchemaName: 'cr_apiUrl',
@@ -97,7 +97,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 			await useCase.execute([envVar]);
 
 			// Assert
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!
 			expect(writtenSettings.environmentVariables[0]!.Value).toBe('https://api.default.contoso.com');
 		});
 
@@ -113,7 +113,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 			await useCase.execute([envVar]);
 
 			// Assert
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!
 			expect(writtenSettings.environmentVariables[0]!.Value).toBe('');
 		});
 	});
@@ -146,7 +146,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 			expect(result?.removed).toBe(1); // cr_removedVar
 			expect(result?.preserved).toBe(1); // cr_apiUrl (preserved value)
 
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.environmentVariables).toHaveLength(2);
 			// Sync preserves existing values for entries that remain (doesn't overwrite)
 			expect(writtenSettings.environmentVariables.find(e => e.SchemaName === 'cr_apiUrl')?.Value).toBe('https://api.old.contoso.com');
@@ -174,7 +174,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 			await useCase.execute(envVars);
 
 			// Assert
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!
 			expect(writtenSettings.connectionReferences).toHaveLength(1);
 			expect(writtenSettings.connectionReferences[0]!.LogicalName).toBe('cr_sharepoint');
 		});
@@ -218,7 +218,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 			expect(result?.removed).toBe(0);
 			expect(result?.preserved).toBe(0);
 
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!
 			expect(writtenSettings.environmentVariables).toHaveLength(0);
 		});
 
@@ -259,7 +259,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 
 			// Assert
 			expect(result).not.toBeNull();
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.environmentVariables).toHaveLength(6);
 		});
 
@@ -279,7 +279,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 
 			// Assert
 			expect(result).not.toBeNull();
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			// Results are sorted alphabetically by SchemaName
 			expect(writtenSettings.environmentVariables[0]!.Value).toBe('Test données français 日本語');
 			expect(writtenSettings.environmentVariables[1]!.Value).toBe('https://api.contoso.com?key=value&param=123');
@@ -298,7 +298,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 			await useCase.execute([envVar]);
 
 			// Assert
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!
 			expect(writtenSettings.environmentVariables[0]!.Value).toBe(longValue);
 		});
 	});
@@ -388,7 +388,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 			// Assert
 			expect(result).not.toBeNull();
 			expect(result?.added).toBe(100);
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!
 			expect(writtenSettings.environmentVariables).toHaveLength(100);
 		});
 	});
@@ -411,7 +411,7 @@ describe('ExportEnvironmentVariablesToDeploymentSettingsUseCase', () => {
 
 			// Assert - All 3 environment variables should be exported (faithfully represents solution state)
 			expect(result?.added).toBe(3);
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.environmentVariables).toHaveLength(3);
 			// Results are sorted alphabetically by SchemaName
 			expect(writtenSettings.environmentVariables[0]!.Value).toBe('configured');

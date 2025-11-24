@@ -16,11 +16,20 @@ export class RevealSecretUseCase {
 
 	/**
 	 * Reveals the actual value of a secret storage entry
+	 * REQUIRES: User confirmation before execution (confirmed must be true)
 	 * @param key Secret storage key to reveal
+	 * @param confirmed Whether user has confirmed the action via dialog
 	 * @returns The revealed secret value
+	 * @throws Error if confirmation is not provided
 	 */
-	public async execute(key: string): Promise<string> {
-		this.logger.debug('RevealSecretUseCase: Revealing secret', { key });
+	public async execute(key: string, confirmed: boolean): Promise<string> {
+		this.logger.debug('RevealSecretUseCase: Revealing secret', { key, confirmed });
+
+		// Require explicit user confirmation
+		if (!confirmed) {
+			this.logger.warn('Secret revelation attempted without confirmation', { key });
+			throw new Error('Secret revelation requires user confirmation');
+		}
 
 		try {
 			// Orchestrate: call domain service
@@ -34,7 +43,7 @@ export class RevealSecretUseCase {
 			// Orchestrate: raise domain event
 			this.eventPublisher.publish(new SecretRevealed(key));
 
-			this.logger.info('Secret revealed', { key });
+			this.logger.info('Secret revealed', { key }); // Audit trail
 
 			return value;
 		} catch (error) {

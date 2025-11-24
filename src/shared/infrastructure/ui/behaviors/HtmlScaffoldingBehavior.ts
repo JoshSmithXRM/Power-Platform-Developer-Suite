@@ -92,7 +92,7 @@ export class HtmlScaffoldingBehavior implements IPanelBehavior {
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline' https://unpkg.com; script-src 'nonce-${cspNonce}'; font-src ${cspSource} https://unpkg.com;">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline' https://unpkg.com; script-src 'nonce-${cspNonce}'; font-src ${cspSource} https://unpkg.com; img-src ${cspSource} https: data:; connect-src 'none'; frame-src 'none';">
 	<meta id="vscode-csp-nonce" content="${cspNonce}">
 	<title>${escapeHtml(title)}</title>
 	${cssUris.map(uri => `<link rel="stylesheet" href="${uri}">`).join('\n\t')}

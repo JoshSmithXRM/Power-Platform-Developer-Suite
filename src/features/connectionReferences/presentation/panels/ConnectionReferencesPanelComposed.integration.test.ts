@@ -459,7 +459,7 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 			await createPanelAndWait();
 
 			// Simulate solution change to DEFAULT_SOLUTION_ID (reset to default)
-			const messageHandler = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
+			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
 			await messageHandler({
 				command: 'solutionChange',
 				data: {
@@ -498,7 +498,7 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 			await createPanelAndWait();
 
 			// Simulate export command
-			const messageHandler = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
+			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
 			await messageHandler({ command: 'syncDeploymentSettings' });
 
 			expect(mockExportToDeploymentSettingsUseCase.execute).toHaveBeenCalledWith(
@@ -532,7 +532,7 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 			await createPanelAndWait();
 
 			// Simulate export command
-			const messageHandler = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
+			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
 			await messageHandler({ command: 'syncDeploymentSettings' });
 
 			expect(mockExportToDeploymentSettingsUseCase.execute).toHaveBeenCalledWith(
@@ -550,7 +550,7 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 			await createPanelAndWait();
 
 			// Simulate export command
-			const messageHandler = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
+			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
 			await messageHandler({ command: 'syncDeploymentSettings' });
 
 			expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
@@ -573,7 +573,7 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 			await createPanelAndWait();
 
 			// Simulate export command
-			const messageHandler = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
+			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
 			await messageHandler({ command: 'syncDeploymentSettings' });
 
 			expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
@@ -652,7 +652,7 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 
 			await createPanelAndWait();
 
-			const messageHandler = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
+			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
 			await messageHandler({ command: 'openMaker' });
 
 			expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(

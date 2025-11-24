@@ -430,7 +430,7 @@ describe('DataverseEntityMetadataRepository - Option Set Enrichment', () => {
                 expect.stringContaining('$select=MetadataId,LogicalName,SchemaName,DisplayName,IsCustomEntity')
             );
 
-            const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+            const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
             expect(callArg).not.toContain('Attributes');
             expect(callArg).not.toContain('Relationships');
         });
@@ -448,7 +448,7 @@ describe('DataverseEntityMetadataRepository - Option Set Enrichment', () => {
 
             await repository.getAllGlobalChoices('env-123');
 
-            const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+            const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
             expect(callArg).toContain('$select=Name,DisplayName,IsCustomOptionSet');
             expect(callArg).not.toContain('Options');
             expect(callArg).not.toContain('OptionSetType');
@@ -474,7 +474,7 @@ describe('DataverseEntityMetadataRepository - Option Set Enrichment', () => {
 
             await repository.getGlobalChoiceWithOptions('env-123', 'et_accounttype');
 
-            const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+            const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
             expect(callArg).toContain("GlobalOptionSetDefinitions(Name='et_accounttype')");
             expect(callArg).not.toContain('$select');
         });
@@ -630,7 +630,7 @@ describe('DataverseEntityMetadataRepository - Option Set Enrichment', () => {
 
             await repository.getGlobalChoiceWithOptions('env-123', 'et_accounttype');
 
-            const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+            const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
             expect(callArg).toContain("GlobalOptionSetDefinitions(Name='et_accounttype')");
         });
     });
@@ -753,7 +753,7 @@ describe('DataverseEntityMetadataRepository - Option Set Enrichment', () => {
 
             await repository.getGlobalChoiceWithOptions('env-123', 'cr123_accounttype');
 
-            const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+            const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
             expect(callArg).toContain("GlobalOptionSetDefinitions(Name='cr123_accounttype')");
         });
     });

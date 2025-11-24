@@ -393,10 +393,10 @@ describe('LoadEntityMetadataUseCase', () => {
 
             await useCase.execute('env-123', 'cr9a7_customentity');
 
-            const callArgs = repository.getEntityWithAttributes.mock.calls[0];
-            expect(callArgs).toBeDefined();
-            expect(callArgs![1]).toBeInstanceOf(LogicalName);
-            expect(callArgs![1].getValue()).toBe('cr9a7_customentity');
+            expect(repository.getEntityWithAttributes).toHaveBeenCalledTimes(1);
+            const [, logicalNameArg] = repository.getEntityWithAttributes.mock.calls[0]!;
+            expect(logicalNameArg).toBeInstanceOf(LogicalName);
+            expect(logicalNameArg.getValue()).toBe('cr9a7_customentity');
         });
 
         it('should call all mappers with correct data', async () => {

@@ -277,10 +277,10 @@ describe('SolutionFilterBehavior', () => {
 		it('should include lastUpdated timestamp in persisted state', async () => {
 			await behavior.setSolutionId('sol-1');
 
-			const savedState = panelStateRepositoryMock.save.mock.calls[0]?.[1];
-			expect(savedState).toBeDefined();
-			expect(savedState!.lastUpdated).toBeDefined();
-			expect(typeof savedState!.lastUpdated).toBe('string');
+			expect(panelStateRepositoryMock.save).toHaveBeenCalledTimes(1);
+			const [, savedState] = panelStateRepositoryMock.save.mock.calls[0]!;
+			expect(savedState.lastUpdated).toBeDefined();
+			expect(typeof savedState.lastUpdated).toBe('string');
 		});
 
 		it('should call onSolutionChanged callback', async () => {

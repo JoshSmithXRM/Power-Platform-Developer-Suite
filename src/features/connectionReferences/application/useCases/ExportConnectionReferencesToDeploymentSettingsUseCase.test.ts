@@ -69,7 +69,7 @@ describe('ExportConnectionReferencesToDeploymentSettingsUseCase', () => {
 			expect(mockRepository.exists).toHaveBeenCalledWith(filePath);
 			expect(mockRepository.write).toHaveBeenCalledTimes(1);
 
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.connectionReferences).toHaveLength(2);
 			expect(writtenSettings.connectionReferences[0]).toEqual({
 				LogicalName: 'cr_dataverse',
@@ -95,7 +95,7 @@ describe('ExportConnectionReferencesToDeploymentSettingsUseCase', () => {
 			await useCase.execute([connRef]);
 
 			// Assert
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.connectionReferences[0]!.ConnectionId).toBe('');
 		});
 
@@ -111,7 +111,7 @@ describe('ExportConnectionReferencesToDeploymentSettingsUseCase', () => {
 			await useCase.execute([connRef]);
 
 			// Assert
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.connectionReferences[0]!.ConnectorId).toBe('');
 		});
 	});
@@ -144,7 +144,7 @@ describe('ExportConnectionReferencesToDeploymentSettingsUseCase', () => {
 			expect(result?.removed).toBe(1); // cr_removed
 			expect(result?.preserved).toBe(1); // cr_sharepoint (preserved value)
 
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.connectionReferences).toHaveLength(2);
 			// Sync preserves existing values for entries that remain
 			expect(writtenSettings.connectionReferences.find(e => e.LogicalName === 'cr_sharepoint')?.ConnectionId).toBe('conn-sp-old');
@@ -172,7 +172,7 @@ describe('ExportConnectionReferencesToDeploymentSettingsUseCase', () => {
 			await useCase.execute(connRefs);
 
 			// Assert
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.environmentVariables).toHaveLength(1);
 			expect(writtenSettings.environmentVariables[0]!.SchemaName).toBe('cr_apiUrl');
 		});
@@ -216,7 +216,7 @@ describe('ExportConnectionReferencesToDeploymentSettingsUseCase', () => {
 			expect(result?.removed).toBe(0);
 			expect(result?.preserved).toBe(0);
 
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.connectionReferences).toHaveLength(0);
 		});
 
@@ -253,7 +253,7 @@ describe('ExportConnectionReferencesToDeploymentSettingsUseCase', () => {
 
 			// Assert
 			expect(result).not.toBeNull();
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			// Results are sorted alphabetically by LogicalName
 			expect(writtenSettings.connectionReferences[0]!.LogicalName).toBe('cr_special_chars_123');
 			expect(writtenSettings.connectionReferences[1]!.LogicalName).toBe('cr_unicode_日本語');
@@ -272,7 +272,7 @@ describe('ExportConnectionReferencesToDeploymentSettingsUseCase', () => {
 			await useCase.execute([connRef]);
 
 			// Assert
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.connectionReferences[0]!.ConnectorId).toBe(longPath);
 		});
 
@@ -294,7 +294,7 @@ describe('ExportConnectionReferencesToDeploymentSettingsUseCase', () => {
 
 			// Assert
 			expect(result).not.toBeNull();
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.connectionReferences).toHaveLength(4);
 		});
 	});
@@ -384,7 +384,7 @@ describe('ExportConnectionReferencesToDeploymentSettingsUseCase', () => {
 			// Assert
 			expect(result).not.toBeNull();
 			expect(result?.added).toBe(50);
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.connectionReferences).toHaveLength(50);
 		});
 	});
@@ -407,7 +407,7 @@ describe('ExportConnectionReferencesToDeploymentSettingsUseCase', () => {
 
 			// Assert - All 3 connection references should be exported (faithfully represents solution state)
 			expect(result?.added).toBe(3);
-			const writtenSettings = mockRepository.write.mock.calls[0]![1]!;
+			const [, writtenSettings] = mockRepository.write.mock.calls[0]!;
 			expect(writtenSettings.connectionReferences).toHaveLength(3);
 			// Results are sorted alphabetically by LogicalName
 			expect(writtenSettings.connectionReferences[0]!.ConnectionId).toBe('conn-123');

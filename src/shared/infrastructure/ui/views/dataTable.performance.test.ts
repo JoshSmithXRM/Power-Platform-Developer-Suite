@@ -37,6 +37,8 @@ describe('dataTable Performance Tests', () => {
 		customCss: '.custom { color: red; }',
 		filterLogic: 'filtered = allData.filter(item => item.name.includes(query));',
 		customJavaScript: 'console.log("Custom JS");',
+		cspSource: 'vscode-webview://test',
+		nonce: 'test-nonce-123',
 	});
 
 	/**

@@ -348,6 +348,7 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 			const secretKey = 'mySecret';
 			const secretValue = 'super-secret-value';
 
+			showWarningMessageMock.mockResolvedValue('Reveal Secret');
 			mockRevealSecretUseCase.execute.mockResolvedValue(secretValue);
 
 			PersistenceInspectorPanelComposed.createOrShow(
@@ -371,7 +372,7 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 				await messageHandler({ command: 'revealSecret', data: { key: secretKey } });
 			}
 
-			expect(mockRevealSecretUseCase.execute).toHaveBeenCalledWith(secretKey);
+			expect(mockRevealSecretUseCase.execute).toHaveBeenCalledWith(secretKey, true);
 			expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
 				command: 'secretRevealed',
 				key: secretKey,
@@ -381,6 +382,7 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 
 		it('should handle reveal secret errors', async () => {
 			const secretKey = 'nonexistentSecret';
+			showWarningMessageMock.mockResolvedValue('Reveal Secret');
 			mockRevealSecretUseCase.execute.mockRejectedValue(new Error('Secret not found'));
 
 			PersistenceInspectorPanelComposed.createOrShow(
@@ -988,6 +990,7 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 			};
 
 			mockInspectStorageUseCase.execute.mockResolvedValue(mockStorageData);
+			showWarningMessageMock.mockResolvedValue('Reveal Secret');
 			mockRevealSecretUseCase.execute.mockResolvedValue('secret-value');
 
 			PersistenceInspectorPanelComposed.createOrShow(
@@ -1016,7 +1019,7 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 			}
 
 			expect(mockInspectStorageUseCase.execute).toHaveBeenCalled();
-			expect(mockRevealSecretUseCase.execute).toHaveBeenCalledWith('secret1');
+			expect(mockRevealSecretUseCase.execute).toHaveBeenCalledWith('secret1', true);
 		});
 	});
 });

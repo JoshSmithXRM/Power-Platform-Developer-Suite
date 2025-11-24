@@ -138,7 +138,7 @@ describe('ValidateUniqueNameUseCase', () => {
 				})
 			);
 
-			const excludeIdArg = mockRepository.isNameUnique.mock.calls[0]![1] as EnvironmentId;
+			const [, excludeIdArg] = mockRepository.isNameUnique.mock.calls[0]! as [string, EnvironmentId];
 			expect(excludeIdArg.getValue()).toBe('env-123');
 		});
 

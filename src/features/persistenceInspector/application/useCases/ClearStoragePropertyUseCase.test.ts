@@ -77,8 +77,8 @@ describe('ClearStoragePropertyUseCase', () => {
 			await useCase.execute('testKey', 'settings.dataverseUrl');
 
 			expect(mockStorageClearingService.clearProperty).toHaveBeenCalledTimes(1);
-			const call = mockStorageClearingService.clearProperty.mock.calls[0];
-			expect(call?.[1].toString()).toBe('settings.dataverseUrl');
+			const [, pathArg] = mockStorageClearingService.clearProperty.mock.calls[0]!;
+			expect(pathArg.toString()).toBe('settings.dataverseUrl');
 		});
 
 		it('should handle array index paths', async () => {

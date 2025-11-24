@@ -337,7 +337,7 @@ describe('DataversePluginTraceRepository', () => {
 				expect.stringContaining('$select=')
 			);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('plugintracelogid');
 			expect(callArg).toContain('typename');
 			expect(callArg).toContain('exceptiondetails');
@@ -354,7 +354,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraceById(environmentId, traceId);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$select=');
 			expect(callArg).toContain('messageblock');
 			expect(callArg).toContain('configuration');
@@ -373,7 +373,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.deleteAllTraces(environmentId);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$select=plugintracelogid');
 			expect(callArg).not.toContain('typename');
 			expect(callArg).not.toContain('createdon');
@@ -392,7 +392,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$filter=');
 			expect(callArg).toContain('typename');
 		});
@@ -410,7 +410,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$filter=');
 			expect(callArg).toMatch(/typename.*and.*primaryentity.*and.*messagename/i);
 		});
@@ -429,7 +429,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$filter=');
 			expect(callArg).toContain('createdon');
 		});
@@ -446,7 +446,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$filter=');
 			expect(callArg).toContain('performanceexecutionduration');
 		});
@@ -462,7 +462,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$filter=');
 			expect(callArg).toContain('exceptiondetails');
 		});
@@ -484,7 +484,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$filter=');
 			expect(callArg).toContain('correlationid');
 		});
@@ -499,7 +499,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$orderby=createdon desc');
 		});
 
@@ -514,7 +514,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$orderby=typename asc');
 		});
 
@@ -529,7 +529,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$orderby=typename asc,createdon desc');
 		});
 	});
@@ -543,7 +543,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$top=1');
 		});
 
@@ -555,7 +555,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$top=100');
 		});
 
@@ -567,7 +567,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$top=5000');
 		});
 	});
@@ -585,7 +585,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$select=');
 			expect(callArg).toContain('$filter=');
 			expect(callArg).toContain('$orderby=');
@@ -611,7 +611,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$select=');
 			expect(callArg).toContain('$filter=');
 			expect(callArg).toContain('$orderby=');
@@ -631,7 +631,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$filter=');
 		});
 
@@ -646,7 +646,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$filter=');
 		});
 
@@ -661,7 +661,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$filter=');
 		});
 
@@ -676,7 +676,7 @@ describe('DataversePluginTraceRepository', () => {
 
 			await repository.getTraces(environmentId, filter);
 
-			const callArg = mockApiService.get.mock.calls[0]?.[1] as string;
+			const [, callArg] = mockApiService.get.mock.calls[0]! as [string, string];
 			expect(callArg).toContain('$filter=');
 		});
 	});

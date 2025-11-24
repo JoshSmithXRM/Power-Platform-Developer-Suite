@@ -4,6 +4,7 @@ import { IAuthenticationService } from '../../domain/interfaces/IAuthenticationS
 import { ICancellationToken } from '../../domain/interfaces/ICancellationToken';
 import { IPowerPlatformApiService } from '../../domain/interfaces/IPowerPlatformApiService';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import { ErrorSanitizer } from '../../../../shared/utils/ErrorSanitizer';
 
 /**
  * Service for interacting with Power Platform Business Application Platform (BAP) API
@@ -69,8 +70,17 @@ export class PowerPlatformApiService implements IPowerPlatformApiService {
 
 		if (!response.ok) {
 			const errorText = await response.text();
-			this.logger.error('BAP API request failed', { status: response.status, statusText: response.statusText });
-			throw new Error(`BAP API request failed: ${response.status} ${response.statusText} - ${errorText}`);
+			// Log full error details for developers
+			this.logger.error('BAP API request failed', {
+				status: response.status,
+				statusText: response.statusText,
+				errorText
+			});
+			// Throw sanitized error for users
+			const sanitizedMessage = ErrorSanitizer.sanitize(
+				`BAP API request failed: ${response.status} ${response.statusText} - ${errorText}`
+			);
+			throw new Error(sanitizedMessage);
 		}
 
 		const data: unknown = await response.json();

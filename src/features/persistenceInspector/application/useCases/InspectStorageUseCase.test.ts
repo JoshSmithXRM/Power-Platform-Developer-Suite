@@ -70,7 +70,7 @@ describe('InspectStorageUseCase', () => {
 			await useCase.execute();
 
 			expect(mockEventPublisher.publish).toHaveBeenCalledTimes(1);
-			const publishedEvent = mockEventPublisher.publish.mock.calls[0]?.[0];
+			const [publishedEvent] = mockEventPublisher.publish.mock.calls[0]!;
 			expect(publishedEvent).toBeDefined();
 		});
 

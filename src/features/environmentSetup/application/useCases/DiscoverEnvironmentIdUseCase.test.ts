@@ -87,9 +87,9 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 				undefined
 			);
 			// Verify auth method was set correctly
-			const calledEnv = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]?.[0];
-			expect(calledEnv).toBeDefined();
-			expect(calledEnv!.getAuthenticationMethod().getType()).toBe(AuthenticationMethodType.ServicePrincipal);
+			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledTimes(1);
+			const [calledEnv] = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]!;
+			expect(calledEnv.getAuthenticationMethod().getType()).toBe(AuthenticationMethodType.ServicePrincipal);
 		});
 
 		it('should discover environment ID with username/password', async () => {
@@ -111,9 +111,9 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 				undefined
 			);
 			// Verify username was set correctly
-			const calledEnv = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]?.[0];
-			expect(calledEnv).toBeDefined();
-			expect(calledEnv!.getUsername()).toBe('admin@contoso.com');
+			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledTimes(1);
+			const [calledEnv] = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]!;
+			expect(calledEnv.getUsername()).toBe('admin@contoso.com');
 		});
 
 		it('should preserve existing environment ID for token cache', async () => {
@@ -124,9 +124,9 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 
 			await useCase.execute(request, undefined);
 
-			const calledEnv = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]?.[0];
-			expect(calledEnv).toBeDefined();
-			expect(calledEnv!.getId().getValue()).toBe('env-existing-123');
+			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledTimes(1);
+			const [calledEnv] = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]!;
+			expect(calledEnv.getId().getValue()).toBe('env-existing-123');
 		});
 
 		it('should generate temporary ID when no existing ID provided', async () => {
@@ -135,9 +135,9 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 
 			await useCase.execute(request, undefined);
 
-			const calledEnv = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]?.[0];
-			expect(calledEnv).toBeDefined();
-			expect(calledEnv!.getId().getValue()).toMatch(/^env-/);
+			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledTimes(1);
+			const [calledEnv] = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]!;
+			expect(calledEnv.getId().getValue()).toMatch(/^env-/);
 		});
 	});
 
@@ -349,9 +349,9 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 
 			await useCase.execute(request, undefined);
 
-			const calledEnv = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]?.[0];
-			expect(calledEnv).toBeDefined();
-			expect(calledEnv!.getName().getValue()).toBe('Development');
+			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledTimes(1);
+			const [calledEnv] = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]!;
+			expect(calledEnv.getName().getValue()).toBe('Development');
 			expect(calledEnv!.getDataverseUrl().getValue()).toBe('https://contoso.crm.dynamics.com');
 			expect(calledEnv!.getTenantId().getValue()).toBe('00000000-0000-0000-0000-000000000000');
 		});
@@ -362,9 +362,9 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 
 			await useCase.execute(request, undefined);
 
-			const calledEnv = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]?.[0];
-			expect(calledEnv).toBeDefined();
-			expect(calledEnv!.getPowerPlatformEnvironmentId()).toBeUndefined();
+			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledTimes(1);
+			const [calledEnv] = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]!;
+			expect(calledEnv.getPowerPlatformEnvironmentId()).toBeUndefined();
 			expect(calledEnv!.getClientId()).toBeUndefined();
 			expect(calledEnv!.getUsername()).toBeUndefined();
 		});
@@ -375,9 +375,9 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 
 			await useCase.execute(request, undefined);
 
-			const calledEnv = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]?.[0];
-			expect(calledEnv).toBeDefined();
-			expect(calledEnv!.getIsActive()).toBe(false);
+			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledTimes(1);
+			const [calledEnv] = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]!;
+			expect(calledEnv.getIsActive()).toBe(false);
 		});
 	});
 
@@ -390,9 +390,9 @@ describe('DiscoverEnvironmentIdUseCase', () => {
 
 			await useCase.execute(request, undefined);
 
-			const calledEnv = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]?.[0];
-			expect(calledEnv).toBeDefined();
-			expect(calledEnv!.getDataverseUrl().getValue()).toBe('https://myorg.crm4.dynamics.com');
+			expect(mockPowerPlatformApiService.discoverEnvironmentId).toHaveBeenCalledTimes(1);
+			const [calledEnv] = mockPowerPlatformApiService.discoverEnvironmentId.mock.calls[0]!;
+			expect(calledEnv.getDataverseUrl().getValue()).toBe('https://myorg.crm4.dynamics.com');
 		});
 
 		it('should return discovered environment ID exactly as returned by API', async () => {

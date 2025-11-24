@@ -361,16 +361,34 @@ export class PersistenceInspectorPanelComposed {
 	}
 
 	private async handleRevealSecret(key: string): Promise<void> {
-		this.logger.info('User revealed secret', { key });
+		this.logger.info('User initiated reveal secret', { key });
+
+		// Show confirmation dialog
+		const confirmed = await vscode.window.showWarningMessage(
+			`Reveal secret value for "${key}"?`,
+			{
+				modal: true,
+				detail: 'This will expose the masked secret value in the panel. This action will be logged.'
+			},
+			'Reveal Secret'
+		);
+
+		if (confirmed !== 'Reveal Secret') {
+			this.logger.debug('Reveal secret cancelled by user', { key });
+			return;
+		}
 
 		try {
-			const value = await this.revealSecretUseCase.execute(key);
+			// Execute with confirmation
+			const value = await this.revealSecretUseCase.execute(key, true);
 
 			this.panel.webview.postMessage({
 				command: 'secretRevealed',
 				key,
 				value
 			});
+
+			this.logger.info('Secret revealed', { key }); // Additional audit log
 		} catch (error) {
 			this.logger.error('Failed to reveal secret', error);
 			const message = error instanceof Error ? error.message : String(error);

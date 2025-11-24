@@ -25,40 +25,57 @@ describe('RevealSecretUseCase', () => {
 		);
 	});
 
+	describe('confirmation requirement', () => {
+		it('should throw error when confirmation is false', async () => {
+			const secretKey = 'mySecret';
+
+			await expect(useCase.execute(secretKey, false)).rejects.toThrow('Secret revelation requires user confirmation');
+			expect(mockStorageInspectionService.revealSecret).not.toHaveBeenCalled();
+			expect(mockEventPublisher.publish).not.toHaveBeenCalled();
+		});
+
+		it('should not reveal secret when not confirmed', async () => {
+			const secretKey = 'mySecret';
+			mockStorageInspectionService.revealSecret.mockResolvedValue('secret-value');
+
+			await expect(useCase.execute(secretKey, false)).rejects.toThrow();
+			expect(mockStorageInspectionService.revealSecret).not.toHaveBeenCalled();
+		});
+	});
+
 	describe('successful secret reveal', () => {
-		it('should reveal secret value and publish event', async () => {
+		it('should reveal secret value and publish event when confirmed', async () => {
 			const secretKey = 'mySecret';
 			const secretValue = 'super-secret-value';
 
 			mockStorageInspectionService.revealSecret.mockResolvedValue(secretValue);
 
-			const result = await useCase.execute(secretKey);
+			const result = await useCase.execute(secretKey, true);
 
 			expect(result).toBe(secretValue);
-			expect(mockStorageInspectionService.revealSecret).toHaveBeenCalledTimes(1);
 			expect(mockStorageInspectionService.revealSecret).toHaveBeenCalledWith(secretKey);
 			expect(mockEventPublisher.publish).toHaveBeenCalledTimes(1);
 		});
 
-		it('should handle empty secret values', async () => {
+		it('should handle empty secret values when confirmed', async () => {
 			const secretKey = 'emptySecret';
 			const secretValue = '';
 
 			mockStorageInspectionService.revealSecret.mockResolvedValue(secretValue);
 
-			const result = await useCase.execute(secretKey);
+			const result = await useCase.execute(secretKey, true);
 
 			expect(result).toBe('');
 			expect(mockEventPublisher.publish).toHaveBeenCalledTimes(1);
 		});
 
-		it('should handle secrets with special characters', async () => {
+		it('should handle secrets with special characters when confirmed', async () => {
 			const secretKey = 'complexSecret';
 			const secretValue = 'p@$$w0rd!#%&*()';
 
 			mockStorageInspectionService.revealSecret.mockResolvedValue(secretValue);
 
-			const result = await useCase.execute(secretKey);
+			const result = await useCase.execute(secretKey, true);
 
 			expect(result).toBe(secretValue);
 		});
@@ -70,7 +87,7 @@ describe('RevealSecretUseCase', () => {
 
 			mockStorageInspectionService.revealSecret.mockResolvedValue(undefined);
 
-			await expect(useCase.execute(secretKey)).rejects.toThrow('Secret not found: nonexistent');
+			await expect(useCase.execute(secretKey, true)).rejects.toThrow('Secret not found: nonexistent');
 			expect(mockEventPublisher.publish).not.toHaveBeenCalled();
 		});
 
@@ -79,7 +96,7 @@ describe('RevealSecretUseCase', () => {
 
 			mockStorageInspectionService.revealSecret.mockRejectedValue(new Error('Access denied'));
 
-			await expect(useCase.execute(secretKey)).rejects.toThrow('Access denied');
+			await expect(useCase.execute(secretKey, true)).rejects.toThrow('Access denied');
 			expect(mockEventPublisher.publish).not.toHaveBeenCalled();
 		});
 
@@ -89,7 +106,7 @@ describe('RevealSecretUseCase', () => {
 			mockStorageInspectionService.revealSecret.mockRejectedValue(new Error('Storage error'));
 
 			try {
-				await useCase.execute(secretKey);
+				await useCase.execute(secretKey, true);
 			} catch {
 				// Expected error
 			}

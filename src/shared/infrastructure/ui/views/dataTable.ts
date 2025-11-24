@@ -11,6 +11,8 @@ export interface DataTableViewResources {
 	customCss: string;
 	filterLogic: string;
 	customJavaScript: string;
+	cspSource: string;
+	nonce: string;
 }
 
 /**
@@ -19,13 +21,24 @@ export interface DataTableViewResources {
  * @returns Complete HTML document string
  */
 export function renderDataTable(resources: DataTableViewResources): string {
-	const { config, datatableCssUri, customCss, filterLogic, customJavaScript } = resources;
+	const { config, datatableCssUri, customCss, filterLogic, customJavaScript, cspSource, nonce } = resources;
+
+	// Content Security Policy
+	const cspContent = [
+		"default-src 'none'",
+		`script-src 'nonce-${nonce}'`,
+		`style-src ${cspSource} 'unsafe-inline'`,
+		`img-src ${cspSource} https: data:`,
+		`font-src ${cspSource}`,
+		"connect-src 'none'"
+	].join('; ');
 
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="Content-Security-Policy" content="${cspContent}">
 	<title>${config.title}</title>
 	<link rel="stylesheet" href="${datatableCssUri}">
 	<style>
@@ -172,7 +185,7 @@ export function renderDataTable(resources: DataTableViewResources): string {
 		<div id="dataContainer"></div>
 	</div>
 
-	<script>
+	<script nonce="${nonce}">
 		const vscode = acquireVsCodeApi();
 		const config = ${JSON.stringify(config)};
 		let allData = [];

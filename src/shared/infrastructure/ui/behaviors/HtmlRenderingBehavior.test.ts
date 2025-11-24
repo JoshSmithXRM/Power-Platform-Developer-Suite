@@ -161,7 +161,8 @@ describe('HtmlRenderingBehavior', () => {
 
 			behavior.renderHtml();
 
-			const uriCall = (webviewMock.asWebviewUri as jest.Mock).mock.calls[0]?.[0];
+			expect(webviewMock.asWebviewUri).toHaveBeenCalledTimes(1);
+			const [uriCall] = (webviewMock.asWebviewUri as jest.Mock).mock.calls[0]!;
 			expect(uriCall.toString()).toContain('resources');
 			expect(uriCall.toString()).toContain('webview');
 			expect(uriCall.toString()).toContain('css');
@@ -252,12 +253,14 @@ describe('HtmlRenderingBehavior', () => {
 			const behavior2 = new HtmlRenderingBehavior(webviewMock, extensionUri2, config, customization);
 
 			behavior1.renderHtml();
-			const uri1Call = (webviewMock.asWebviewUri as jest.Mock).mock.calls[0]?.[0];
+			expect(webviewMock.asWebviewUri).toHaveBeenCalledTimes(1);
+			const [uri1Call] = (webviewMock.asWebviewUri as jest.Mock).mock.calls[0]!;
 
 			(webviewMock.asWebviewUri as jest.Mock).mockClear();
 
 			behavior2.renderHtml();
-			const uri2Call = (webviewMock.asWebviewUri as jest.Mock).mock.calls[0]?.[0];
+			expect(webviewMock.asWebviewUri).toHaveBeenCalledTimes(1);
+			const [uri2Call] = (webviewMock.asWebviewUri as jest.Mock).mock.calls[0]!;
 
 			expect(uri1Call.toString()).toContain('/path1');
 			expect(uri2Call.toString()).toContain('/path2');

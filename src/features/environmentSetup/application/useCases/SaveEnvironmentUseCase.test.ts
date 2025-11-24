@@ -127,9 +127,8 @@ describe('SaveEnvironmentUseCase', () => {
 			expect(mockRepository.save).toHaveBeenCalledTimes(1);
 
 			// Verify the environment has the Power Platform environment ID
-			const savedEnv = mockRepository.save.mock.calls[0]?.[0];
-			expect(savedEnv).toBeDefined();
-			expect(savedEnv!.getPowerPlatformEnvironmentId()).toBe('00000000-0000-0000-0000-000000000001');
+			const [savedEnv] = mockRepository.save.mock.calls[0]!;
+			expect(savedEnv.getPowerPlatformEnvironmentId()).toBe('00000000-0000-0000-0000-000000000001');
 		});
 	});
 
@@ -199,9 +198,9 @@ describe('SaveEnvironmentUseCase', () => {
 
 			await useCase.execute(request);
 
-			const savedEnv = mockRepository.save.mock.calls[0]?.[0] as Environment;
-			expect(savedEnv).toBeDefined();
-			expect(savedEnv!.getIsActive()).toBe(true);
+			expect(mockRepository.save).toHaveBeenCalledTimes(1);
+			const [savedEnv] = mockRepository.save.mock.calls[0]!;
+			expect(savedEnv.getIsActive()).toBe(true);
 		});
 	});
 

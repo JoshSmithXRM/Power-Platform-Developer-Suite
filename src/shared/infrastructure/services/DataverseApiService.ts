@@ -3,6 +3,7 @@ import { OperationCancelledException } from '../../domain/errors/OperationCancel
 import { ILogger } from '../../../infrastructure/logging/ILogger';
 import { IDataverseApiService } from '../interfaces/IDataverseApiService';
 import { normalizeError } from '../../utils/ErrorUtils';
+import { ErrorSanitizer } from '../../utils/ErrorSanitizer';
 
 /**
  * Service for making authenticated HTTP requests to Dataverse Web API.
@@ -183,14 +184,17 @@ export class DataverseApiService implements IDataverseApiService {
 
       if (!response.ok) {
         const errorText = await response.text();
+        // Log full error details for developers
         this.logger.error('Batch delete failed', {
           status: response.status,
           statusText: response.statusText,
           errorText
         });
-        throw new Error(
+        // Throw sanitized error for users
+        const sanitizedMessage = ErrorSanitizer.sanitize(
           `Batch delete failed: ${response.status} ${response.statusText} - ${errorText}`
         );
+        throw new Error(sanitizedMessage);
       }
 
       const responseText = await response.text();
@@ -307,6 +311,7 @@ export class DataverseApiService implements IDataverseApiService {
 
     if (!response.ok) {
       const errorText = await response.text();
+      // Log full error details for developers
       this.logger.error('Dataverse API request failed', {
         method,
         endpoint,
@@ -317,9 +322,11 @@ export class DataverseApiService implements IDataverseApiService {
         retries
       });
 
-      const error = new Error(
+      // Throw sanitized error for users
+      const sanitizedMessage = ErrorSanitizer.sanitize(
         `Dataverse API request failed: ${response.status} ${response.statusText} - ${errorText}`
       );
+      const error = new Error(sanitizedMessage);
       (error as Error & { status?: number }).status = response.status;
       throw error;
     }

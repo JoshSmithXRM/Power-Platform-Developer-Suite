@@ -8,6 +8,7 @@ import { ICancellationToken, IDisposable } from '../../domain/interfaces/ICancel
 import { AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
 import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import { ErrorSanitizer } from '../../../../shared/utils/ErrorSanitizer';
 
 /**
  * Authentication service using MSAL (Microsoft Authentication Library)
@@ -146,7 +147,11 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	 */
 	private createAuthenticationError(error: unknown, context: string): Error {
 		const err = error instanceof Error ? error : new Error(String(error));
-		return new Error(`${context}: ${err.message}`);
+		// Log full error details for developers
+		this.logger.error(context, err);
+		// Sanitize error message for users (may contain tenant IDs, client IDs, tokens)
+		const sanitizedMessage = ErrorSanitizer.sanitize(`${context}: ${err.message}`);
+		return new Error(sanitizedMessage);
 	}
 
 	/**

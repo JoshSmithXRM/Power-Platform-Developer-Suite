@@ -302,7 +302,7 @@ describe('FileSystemDeploymentSettingsRepository', () => {
 				);
 
 				// Verify JSON format with 4-space indentation
-				const writtenContent = mockWriteFile.mock.calls[0]![1] as string;
+				const [, writtenContent] = mockWriteFile.mock.calls[0]! as [string, string, string];
 				const parsed = JSON.parse(writtenContent);
 				expect(parsed.EnvironmentVariables).toHaveLength(2);
 				expect(parsed.ConnectionReferences).toHaveLength(1);
@@ -318,7 +318,7 @@ describe('FileSystemDeploymentSettingsRepository', () => {
 				await repository.write('/path/to/file.json', settings);
 
 				// Assert
-				const writtenContent = mockWriteFile.mock.calls[0]![1] as string;
+				const [, writtenContent] = mockWriteFile.mock.calls[0]! as [string, string, string];
 				const parsed = JSON.parse(writtenContent);
 				expect(parsed.EnvironmentVariables).toEqual([]);
 				expect(parsed.ConnectionReferences).toEqual([]);
@@ -336,7 +336,7 @@ describe('FileSystemDeploymentSettingsRepository', () => {
 				await repository.write('/path/to/file.json', settings);
 
 				// Assert
-				const writtenContent = mockWriteFile.mock.calls[0]![1] as string;
+				const [, writtenContent] = mockWriteFile.mock.calls[0]! as [string, string, string];
 				const parsed = JSON.parse(writtenContent);
 				expect(parsed.EnvironmentVariables).toHaveLength(1);
 				expect(parsed.ConnectionReferences).toHaveLength(0);

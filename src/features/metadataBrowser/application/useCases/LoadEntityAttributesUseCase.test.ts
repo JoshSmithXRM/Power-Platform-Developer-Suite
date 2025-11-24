@@ -117,10 +117,10 @@ describe('LoadEntityAttributesUseCase', () => {
 
             await useCase.execute('env-123', 'contact');
 
-            const callArgs = repository.getEntityWithAttributes.mock.calls[0];
-            expect(callArgs).toBeDefined();
-            expect(callArgs![1]).toBeInstanceOf(LogicalName);
-            expect(callArgs![1].getValue()).toBe('contact');
+            expect(repository.getEntityWithAttributes).toHaveBeenCalledTimes(1);
+            const [, logicalNameArg] = repository.getEntityWithAttributes.mock.calls[0]!;
+            expect(logicalNameArg).toBeInstanceOf(LogicalName);
+            expect(logicalNameArg.getValue()).toBe('contact');
         });
 
         it('should log start of operation', async () => {
@@ -183,8 +183,8 @@ describe('LoadEntityAttributesUseCase', () => {
 
             await expect(useCase.execute('env-123', 'account')).rejects.toThrow();
 
-            expect(logger.error).toHaveBeenCalled();
-            const loggedError = (logger.error as jest.Mock).mock.calls[0][1];
+            expect(logger.error).toHaveBeenCalledTimes(1);
+            const [, loggedError] = (logger.error as jest.Mock).mock.calls[0]!;
             expect(loggedError).toBeInstanceOf(Error);
         });
 
@@ -245,9 +245,9 @@ describe('LoadEntityAttributesUseCase', () => {
 
             await useCase.execute('env-123', 'cr9a7_customentity');
 
-            const callArgs = repository.getEntityWithAttributes.mock.calls[0];
-            expect(callArgs).toBeDefined();
-            expect(callArgs![1].getValue()).toBe('cr9a7_customentity');
+            expect(repository.getEntityWithAttributes).toHaveBeenCalledTimes(1);
+            const [, logicalNameArg] = repository.getEntityWithAttributes.mock.calls[0]!;
+            expect(logicalNameArg.getValue()).toBe('cr9a7_customentity');
         });
     });
 });
