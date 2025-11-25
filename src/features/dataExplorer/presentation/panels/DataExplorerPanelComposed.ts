@@ -18,12 +18,14 @@ import {
 	EnvironmentScopedPanel,
 	type EnvironmentInfo,
 } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import type { ExecuteSqlQueryUseCase } from '../../application/useCases/ExecuteSqlQueryUseCase';
 import type { QueryResultViewModelMapper } from '../../application/mappers/QueryResultViewModelMapper';
 import { SqlParseErrorViewModelMapper } from '../../application/mappers/SqlParseErrorViewModelMapper';
 import { SqlParseError } from '../../domain/errors/SqlParseError';
 import type { QueryResult } from '../../domain/entities/QueryResult';
 import { QueryEditorSection } from '../sections/QueryEditorSection';
+import { DataverseRecordUrlService } from '../../../../shared/infrastructure/services/DataverseRecordUrlService';
 
 /**
  * Commands supported by Data Explorer panel.
@@ -31,7 +33,9 @@ import { QueryEditorSection } from '../sections/QueryEditorSection';
 type DataExplorerCommands =
 	| 'executeQuery'
 	| 'environmentChange'
-	| 'updateSqlQuery';
+	| 'updateSqlQuery'
+	| 'openRecord'
+	| 'copyRecordUrl';
 
 /**
  * Data Explorer panel using PanelCoordinator architecture.
@@ -45,10 +49,16 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private readonly coordinator: PanelCoordinator<DataExplorerCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
 	private readonly errorMapper: SqlParseErrorViewModelMapper;
+	private readonly recordUrlService: DataverseRecordUrlService;
 	private currentEnvironmentId: string;
 	private currentSqlQuery: string = '';
 	private currentFetchXml: string = '';
 	private currentResult: QueryResult | null = null;
+
+	/** Monotonic counter for query execution to discard stale results. */
+	private querySequence: number = 0;
+	/** AbortController for the current query execution. */
+	private currentAbortController: AbortController | null = null;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -59,12 +69,14 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		) => Promise<EnvironmentInfo | null>,
 		private readonly executeSqlUseCase: ExecuteSqlQueryUseCase,
 		private readonly resultMapper: QueryResultViewModelMapper,
+		private readonly panelStateRepository: IPanelStateRepository,
 		private readonly logger: ILogger,
 		environmentId: string
 	) {
 		super();
 		this.currentEnvironmentId = environmentId;
 		this.errorMapper = new SqlParseErrorViewModelMapper();
+		this.recordUrlService = new DataverseRecordUrlService();
 		logger.debug('DataExplorerPanel: Initialized with new architecture');
 
 		// Configure webview
@@ -92,6 +104,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		executeSqlUseCase: ExecuteSqlQueryUseCase,
 		resultMapper: QueryResultViewModelMapper,
+		panelStateRepository: IPanelStateRepository,
 		logger: ILogger,
 		initialEnvironmentId?: string
 	): Promise<DataExplorerPanelComposed> {
@@ -111,6 +124,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 						getEnvironmentById,
 						executeSqlUseCase,
 						resultMapper,
+						panelStateRepository,
 						logger,
 						envId
 					),
@@ -128,6 +142,24 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private async initializeAndLoadData(): Promise<void> {
 		// Load environments first so they appear on initial render
 		const environments = await this.getEnvironments();
+
+		// Load persisted SQL from state
+		try {
+			const state = await this.panelStateRepository.load({
+				panelType: DataExplorerPanelComposed.viewType,
+				environmentId: this.currentEnvironmentId,
+			});
+			const savedSql = state?.['sqlQuery'];
+			if (savedSql && typeof savedSql === 'string') {
+				this.currentSqlQuery = savedSql;
+				this.logger.debug('Loaded persisted SQL query', {
+					environmentId: this.currentEnvironmentId,
+					sqlLength: this.currentSqlQuery.length,
+				});
+			}
+		} catch (error) {
+			this.logger.warn('Failed to load persisted SQL query', error);
+		}
 
 		// Initialize coordinator with environments
 		await this.scaffoldingBehavior.refresh({
@@ -264,12 +296,58 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				this.currentSqlQuery = sql;
 				this.logger.trace('SQL query updated for preview', { sqlLength: sql.length });
 				await this.updateFetchXmlPreview();
+
+				// Persist SQL to state (already debounced by webview)
+				void this.saveSqlToState();
+			}
+		});
+
+		// Open record in browser
+		this.coordinator.registerHandler('openRecord', async (data) => {
+			const { entityType, recordId } = data as { entityType?: string; recordId?: string };
+			if (entityType && recordId) {
+				await this.handleOpenRecord(entityType, recordId);
+			}
+		});
+
+		// Copy record URL to clipboard
+		this.coordinator.registerHandler('copyRecordUrl', async (data) => {
+			const { entityType, recordId } = data as { entityType?: string; recordId?: string };
+			if (entityType && recordId) {
+				await this.handleCopyRecordUrl(entityType, recordId);
 			}
 		});
 	}
 
 	/**
+	 * Persists current SQL query to panel state.
+	 */
+	private async saveSqlToState(): Promise<void> {
+		try {
+			const existingState = await this.panelStateRepository.load({
+				panelType: DataExplorerPanelComposed.viewType,
+				environmentId: this.currentEnvironmentId,
+			});
+
+			await this.panelStateRepository.save(
+				{
+					panelType: DataExplorerPanelComposed.viewType,
+					environmentId: this.currentEnvironmentId,
+				},
+				{
+					...existingState,
+					sqlQuery: this.currentSqlQuery,
+					lastUpdated: new Date().toISOString(),
+				}
+			);
+		} catch (error) {
+			this.logger.warn('Failed to persist SQL query', error);
+		}
+	}
+
+	/**
 	 * Executes a SQL query.
+	 * Uses query token pattern to prevent stale results from overwriting newer ones.
 	 * @param sql - The SQL query to execute
 	 */
 	private async handleExecuteQuery(sql: string): Promise<void> {
@@ -280,12 +358,46 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			return;
 		}
 
+		// Check for row limit and warn user about potentially large result sets
+		const transpileResult = this.executeSqlUseCase.transpileToFetchXml(trimmedSql);
+		if (transpileResult.success && !transpileResult.hasRowLimit) {
+			const choice = await vscode.window.showWarningMessage(
+				'This query has no row limit and may return up to 5000 records. Large result sets may take longer to load.',
+				{ modal: true },
+				'Add TOP 100',
+				'Continue Anyway'
+			);
+
+			if (choice === 'Add TOP 100') {
+				// Modify SQL to add TOP 100
+				const modifiedSql = this.addTopClause(trimmedSql, 100);
+				return this.handleExecuteQuery(modifiedSql);
+			}
+
+			if (choice !== 'Continue Anyway') {
+				// User cancelled
+				return;
+			}
+		}
+
+		// Abort any in-flight query
+		if (this.currentAbortController) {
+			this.currentAbortController.abort();
+			this.logger.debug('Aborted previous query');
+		}
+
+		// Create new query token
+		const queryId = ++this.querySequence;
+		this.currentAbortController = new AbortController();
+		const signal = this.currentAbortController.signal;
+
 		// Update stored SQL
 		this.currentSqlQuery = trimmedSql;
 
 		this.logger.info('Executing SQL query', {
 			environmentId: this.currentEnvironmentId,
 			sqlLength: trimmedSql.length,
+			queryId,
 		});
 
 		// Show loading state
@@ -299,8 +411,15 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Execute query via use case
 			const result = await this.executeSqlUseCase.execute(
 				this.currentEnvironmentId,
-				trimmedSql
+				trimmedSql,
+				signal
 			);
+
+			// Discard stale results
+			if (queryId !== this.querySequence) {
+				this.logger.debug('Discarding stale query result', { queryId, currentSequence: this.querySequence });
+				return;
+			}
 
 			this.currentResult = result;
 			this.currentFetchXml = result.executedFetchXml;
@@ -311,6 +430,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			this.logger.info('SQL query executed successfully', {
 				rowCount: result.getRowCount(),
 				executionTimeMs: result.executionTimeMs,
+				queryId,
 			});
 
 			// Send results to webview
@@ -329,6 +449,21 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				`Query executed: ${result.getRowCount()} rows in ${result.executionTimeMs}ms`
 			);
 		} catch (error: unknown) {
+			// Ignore aborted queries
+			if (error instanceof Error && error.name === 'AbortError') {
+				this.logger.debug('Query was aborted', { queryId });
+				await this.panel.webview.postMessage({
+					command: 'queryAborted',
+				});
+				return;
+			}
+
+			// Discard stale errors
+			if (queryId !== this.querySequence) {
+				this.logger.debug('Discarding stale query error', { queryId, currentSequence: this.querySequence });
+				return;
+			}
+
 			this.logger.error('SQL query execution failed', error);
 
 			// Map error to ViewModel
@@ -358,12 +493,14 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 			vscode.window.showErrorMessage(`Query failed: ${errorMessage}`);
 		} finally {
-			// Hide loading state
-			this.setButtonLoading('executeQuery', false);
-			await this.panel.webview.postMessage({
-				command: 'setLoadingState',
-				data: { isLoading: false },
-			});
+			// Only reset loading state if this is still the current query
+			if (queryId === this.querySequence) {
+				this.setButtonLoading('executeQuery', false);
+				await this.panel.webview.postMessage({
+					command: 'setLoadingState',
+					data: { isLoading: false },
+				});
+			}
 		}
 	}
 
@@ -439,6 +576,50 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		}
 	}
 
+	/**
+	 * Opens a Dataverse record in the browser.
+	 * @param entityType - The entity logical name (e.g., "contact", "account")
+	 * @param recordId - The record GUID
+	 */
+	private async handleOpenRecord(entityType: string, recordId: string): Promise<void> {
+		this.logger.debug('Opening record in browser', { entityType, recordId });
+
+		try {
+			const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+			if (!environment?.dataverseUrl) {
+				await vscode.window.showWarningMessage('Environment does not have a Dataverse URL configured');
+				return;
+			}
+
+			await this.recordUrlService.openRecord(environment.dataverseUrl, entityType, recordId);
+		} catch (error) {
+			this.logger.error('Failed to open record in browser', error);
+			await vscode.window.showErrorMessage('Failed to open record in browser');
+		}
+	}
+
+	/**
+	 * Copies a Dataverse record URL to the clipboard.
+	 * @param entityType - The entity logical name (e.g., "contact", "account")
+	 * @param recordId - The record GUID
+	 */
+	private async handleCopyRecordUrl(entityType: string, recordId: string): Promise<void> {
+		this.logger.debug('Copying record URL to clipboard', { entityType, recordId });
+
+		try {
+			const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+			if (!environment?.dataverseUrl) {
+				await vscode.window.showWarningMessage('Environment does not have a Dataverse URL configured');
+				return;
+			}
+
+			await this.recordUrlService.copyRecordUrlWithFeedback(environment.dataverseUrl, entityType, recordId);
+		} catch (error) {
+			this.logger.error('Failed to copy record URL', error);
+			await vscode.window.showErrorMessage('Failed to copy record URL');
+		}
+	}
+
 	private setButtonLoading(buttonId: string, isLoading: boolean): void {
 		this.panel.webview.postMessage({
 			command: 'setButtonState',
@@ -446,5 +627,24 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			disabled: isLoading,
 			showSpinner: isLoading,
 		});
+	}
+
+	/**
+	 * Adds a TOP clause to a SQL SELECT statement.
+	 * Inserts "TOP n" after "SELECT" keyword.
+	 */
+	private addTopClause(sql: string, limit: number): string {
+		// Case-insensitive regex to find SELECT and insert TOP after it
+		const selectRegex = /^(\s*SELECT\s+)/i;
+		const match = sql.match(selectRegex);
+		const selectPart = match?.[1];
+
+		if (selectPart) {
+			const afterSelect = sql.substring(selectPart.length);
+			return `${selectPart}TOP ${limit} ${afterSelect}`;
+		}
+
+		// Fallback: just prepend (shouldn't happen with valid SQL)
+		return `SELECT TOP ${limit} ${sql}`;
 	}
 }

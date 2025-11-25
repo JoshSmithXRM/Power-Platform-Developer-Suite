@@ -294,7 +294,9 @@ export class DataverseApiService implements IDataverseApiService {
       'Authorization': `Bearer ${accessToken}`,
       'Accept': 'application/json',
       'OData-MaxVersion': '4.0',
-      'OData-Version': '4.0'
+      'OData-Version': '4.0',
+      // Request all OData annotations (formatted values, lookup entity types, etc.)
+      'Prefer': 'odata.include-annotations="*"'
     };
 
     const fetchOptions: RequestInit = {

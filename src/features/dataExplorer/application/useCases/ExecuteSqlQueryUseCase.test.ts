@@ -50,7 +50,8 @@ describe('ExecuteSqlQueryUseCase', () => {
 			expect(mockRepository.executeQuery).toHaveBeenCalledWith(
 				'env-123',
 				'accounts',
-				expect.stringContaining('<fetch>')
+				expect.stringContaining('<fetch>'),
+				undefined
 			);
 			expect(result.getRowCount()).toBe(2);
 			expect(mockLogger.info).toHaveBeenCalledWith(
@@ -74,7 +75,8 @@ describe('ExecuteSqlQueryUseCase', () => {
 			expect(mockRepository.executeQuery).toHaveBeenCalledWith(
 				'env-123',
 				'accounts',
-				expect.stringContaining('<condition')
+				expect.stringContaining('<condition'),
+				undefined
 			);
 		});
 
@@ -123,6 +125,7 @@ describe('ExecuteSqlQueryUseCase', () => {
 				expect(result.fetchXml).toContain('name="name"');
 				expect(result.fetchXml).toContain('name="revenue"');
 				expect(result.entityName).toBe('account');
+				expect(result.hasRowLimit).toBe(false);
 			}
 		});
 
@@ -160,6 +163,7 @@ describe('ExecuteSqlQueryUseCase', () => {
 			expect(result.success).toBe(true);
 			if (result.success) {
 				expect(result.fetchXml).toContain('top="10"');
+				expect(result.hasRowLimit).toBe(true);
 			}
 		});
 

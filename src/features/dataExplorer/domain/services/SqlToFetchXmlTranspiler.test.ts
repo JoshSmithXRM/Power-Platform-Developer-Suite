@@ -34,10 +34,38 @@ describe('SqlToFetchXmlTranspiler', () => {
 			expect(fetchXml).not.toContain('<all-attributes />');
 		});
 
-		it('should transpile SELECT with column alias', () => {
+		it('should transpile SELECT with column alias using AS', () => {
 			const fetchXml = transpile('SELECT name AS accountname FROM account');
 
 			expect(fetchXml).toContain('<attribute name="name" alias="accountname" />');
+		});
+
+		it('should transpile SELECT with column alias without AS', () => {
+			const fetchXml = transpile('SELECT name accountname FROM account');
+
+			expect(fetchXml).toContain('<attribute name="name" alias="accountname" />');
+		});
+
+		it('should transpile qualified column with alias', () => {
+			const fetchXml = transpile('SELECT a.name AS accountname FROM account a');
+
+			expect(fetchXml).toContain('<attribute name="name" alias="accountname" />');
+		});
+
+		it('should handle mix of aliased and non-aliased columns', () => {
+			const fetchXml = transpile('SELECT name AS accountname, revenue, statecode AS status FROM account');
+
+			expect(fetchXml).toContain('<attribute name="name" alias="accountname" />');
+			expect(fetchXml).toContain('<attribute name="revenue" />');
+			expect(fetchXml).toContain('<attribute name="statecode" alias="status" />');
+		});
+
+		it('should handle unqualified columns with table alias on FROM', () => {
+			// Unqualified columns should still be included when table has alias
+			const fetchXml = transpile('SELECT firstname, lastname FROM contact c');
+
+			expect(fetchXml).toContain('<attribute name="firstname" />');
+			expect(fetchXml).toContain('<attribute name="lastname" />');
 		});
 	});
 
@@ -336,6 +364,307 @@ describe('SqlToFetchXmlTranspiler', () => {
 
 			expect(fetchXml).toContain('name="name"');
 			expect(fetchXml).toContain('alias="AccountName"');
+		});
+	});
+
+	describe('case-insensitive entity names', () => {
+		it('should normalize uppercase entity name to lowercase', () => {
+			const fetchXml = transpile('SELECT * FROM Account');
+
+			expect(fetchXml).toContain('<entity name="account">');
+			expect(fetchXml).not.toContain('name="Account"');
+		});
+
+		it('should normalize mixed-case entity name to lowercase', () => {
+			const fetchXml = transpile('SELECT * FROM SystemUser');
+
+			expect(fetchXml).toContain('<entity name="systemuser">');
+		});
+
+		it('should normalize JOIN entity names to lowercase', () => {
+			const fetchXml = transpile(
+				'SELECT a.name FROM Account a JOIN Contact c ON a.primarycontactid = c.contactid'
+			);
+
+			expect(fetchXml).toContain('<entity name="account">');
+			expect(fetchXml).toContain('<link-entity name="contact"');
+			expect(fetchXml).not.toContain('name="Account"');
+			expect(fetchXml).not.toContain('name="Contact"');
+		});
+
+		it('should normalize LEFT JOIN entity names to lowercase', () => {
+			const fetchXml = transpile(
+				'SELECT a.name FROM Account a LEFT JOIN Contact c ON a.primarycontactid = c.contactid'
+			);
+
+			expect(fetchXml).toContain('<link-entity name="contact"');
+		});
+	});
+
+	describe('JOIN column order detection', () => {
+		it('should correctly set from/to when link-entity column is on left side of ON', () => {
+			// su.systemuserid is from link-entity, c.modifiedby is from parent
+			const fetchXml = transpile(
+				'SELECT c.firstname FROM contact c INNER JOIN systemuser su ON su.systemuserid = c.modifiedby'
+			);
+
+			// from should be systemuserid (from link-entity systemuser)
+			// to should be modifiedby (from parent entity contact)
+			expect(fetchXml).toContain('from="systemuserid"');
+			expect(fetchXml).toContain('to="modifiedby"');
+		});
+
+		it('should correctly set from/to when link-entity column is on right side of ON', () => {
+			// a.primarycontactid is from parent, c.contactid is from link-entity
+			const fetchXml = transpile(
+				'SELECT a.name FROM account a JOIN contact c ON a.primarycontactid = c.contactid'
+			);
+
+			// from should be contactid (from link-entity contact)
+			// to should be primarycontactid (from parent entity account)
+			expect(fetchXml).toContain('from="contactid"');
+			expect(fetchXml).toContain('to="primarycontactid"');
+		});
+
+		it('should handle complex query with JOIN and WHERE', () => {
+			const fetchXml = transpile(`
+				SELECT TOP 100
+				c.firstname, c.lastname, c.createdon, c.modifiedon
+				FROM contact c
+				INNER JOIN systemuser su ON su.systemuserid = c.modifiedby
+				WHERE emailaddress1 = 'test@example.com'
+			`);
+
+			// Verify JOIN column order
+			expect(fetchXml).toContain('from="systemuserid"');
+			expect(fetchXml).toContain('to="modifiedby"');
+			expect(fetchXml).toContain('link-type="inner"');
+			expect(fetchXml).toContain('<link-entity name="systemuser"');
+		});
+	});
+
+	describe('qualified columns from main entity', () => {
+		it('should include qualified columns that match main entity alias', () => {
+			const fetchXml = transpile(
+				'SELECT c.firstname, c.lastname FROM contact c'
+			);
+
+			expect(fetchXml).toContain('<attribute name="firstname" />');
+			expect(fetchXml).toContain('<attribute name="lastname" />');
+		});
+
+		it('should include qualified columns in JOIN query', () => {
+			const fetchXml = transpile(`
+				SELECT c.firstname, c.lastname
+				FROM contact c
+				JOIN systemuser su ON su.systemuserid = c.modifiedby
+			`);
+
+			expect(fetchXml).toContain('<attribute name="firstname" />');
+			expect(fetchXml).toContain('<attribute name="lastname" />');
+		});
+
+		it('should handle table.* wildcard for main entity', () => {
+			const fetchXml = transpile('SELECT c.* FROM contact c');
+
+			expect(fetchXml).toContain('<all-attributes />');
+		});
+	});
+
+	describe('link-entity columns', () => {
+		it('should include link-entity columns inside link-entity element', () => {
+			const fetchXml = transpile(`
+				SELECT c.firstname, su.domainname
+				FROM contact c
+				JOIN systemuser su ON su.systemuserid = c.modifiedby
+			`);
+
+			// Main entity column should be at entity level
+			expect(fetchXml).toMatch(/<entity name="contact">\s*<attribute name="firstname"/);
+
+			// Link-entity column should be inside link-entity
+			expect(fetchXml).toMatch(/<link-entity[^>]*>\s*<attribute name="domainname"/);
+		});
+
+		it('should handle multiple link-entity columns', () => {
+			const fetchXml = transpile(`
+				SELECT c.firstname, su.domainname, su.fullname
+				FROM contact c
+				JOIN systemuser su ON su.systemuserid = c.modifiedby
+			`);
+
+			expect(fetchXml).toContain('<attribute name="domainname" />');
+			expect(fetchXml).toContain('<attribute name="fullname" />');
+		});
+
+		it('should handle link-entity column with alias', () => {
+			const fetchXml = transpile(`
+				SELECT c.firstname, su.domainname AS username
+				FROM contact c
+				JOIN systemuser su ON su.systemuserid = c.modifiedby
+			`);
+
+			expect(fetchXml).toContain('<attribute name="domainname" alias="username" />');
+		});
+
+		it('should handle link-entity wildcard', () => {
+			const fetchXml = transpile(`
+				SELECT c.firstname, su.*
+				FROM contact c
+				JOIN systemuser su ON su.systemuserid = c.modifiedby
+			`);
+
+			// Link-entity should have all-attributes
+			expect(fetchXml).toMatch(/<link-entity[^>]*>\s*<all-attributes/);
+		});
+
+		it('should handle mixed main entity and link-entity columns', () => {
+			const fetchXml = transpile(`
+				SELECT TOP 100
+				c.firstname, lastname, createdon, modifiedon, modifiedby, createdby, su.domainname
+				FROM contact c
+				INNER JOIN systemuser su ON c.modifiedby = su.systemuserid
+				WHERE emailaddress1 = 'test@example.com'
+			`);
+
+			// Main entity columns
+			expect(fetchXml).toContain('<attribute name="firstname" />');
+			expect(fetchXml).toContain('<attribute name="lastname" />');
+			expect(fetchXml).toContain('<attribute name="createdon" />');
+			expect(fetchXml).toContain('<attribute name="modifiedon" />');
+			expect(fetchXml).toContain('<attribute name="modifiedby" />');
+			expect(fetchXml).toContain('<attribute name="createdby" />');
+
+			// Link-entity column inside link-entity
+			expect(fetchXml).toMatch(/<link-entity[^>]*systemuser[^>]*>\s*<attribute name="domainname"/);
+		});
+	});
+
+	describe('table alias behavior', () => {
+		it('should not add alias attribute to main entity (FetchXML does not support it)', () => {
+			const fetchXml = transpile('SELECT * FROM contact c');
+
+			// Main entity should NOT have alias attribute
+			expect(fetchXml).toContain('<entity name="contact">');
+			expect(fetchXml).not.toMatch(/<entity[^>]*alias=/);
+		});
+
+		it('should add alias attribute to link-entity when provided', () => {
+			const fetchXml = transpile(
+				'SELECT c.firstname FROM contact c JOIN systemuser su ON c.modifiedby = su.systemuserid'
+			);
+
+			expect(fetchXml).toMatch(/<link-entity[^>]*alias="su"/);
+		});
+
+		it('should handle link-entity without alias', () => {
+			const fetchXml = transpile(
+				'SELECT c.firstname FROM contact c JOIN systemuser ON c.modifiedby = systemuser.systemuserid'
+			);
+
+			// Link-entity should not have alias attribute when not provided
+			expect(fetchXml).toContain('<link-entity name="systemuser"');
+			expect(fetchXml).not.toMatch(/<link-entity[^>]*alias="systemuser"/);
+		});
+	});
+
+	describe('real-world query scenarios', () => {
+		it('should handle contact with systemuser join query', () => {
+			const fetchXml = transpile(`
+				SELECT TOP 100
+				c.FirstName,
+				LastName,
+				CreatedOn,
+				ModifiedOn,
+				ModifiedBy,
+				CreatedBy,
+				su.DomainName
+				FROM contact c
+				INNER JOIN systemuser su ON c.modifiedby = su.systemuserid
+				WHERE emailaddress1 = 'test@example.com'
+			`);
+
+			// Verify structure
+			expect(fetchXml).toContain('<fetch top="100">');
+			expect(fetchXml).toContain('<entity name="contact">');
+
+			// Main entity columns (all lowercase in FetchXML)
+			expect(fetchXml).toContain('<attribute name="firstname" />');
+			expect(fetchXml).toContain('<attribute name="lastname" />');
+			expect(fetchXml).toContain('<attribute name="createdon" />');
+			expect(fetchXml).toContain('<attribute name="modifiedon" />');
+			expect(fetchXml).toContain('<attribute name="modifiedby" />');
+			expect(fetchXml).toContain('<attribute name="createdby" />');
+
+			// Link-entity with correct from/to
+			expect(fetchXml).toContain('<link-entity name="systemuser"');
+			expect(fetchXml).toContain('from="systemuserid"');
+			expect(fetchXml).toContain('to="modifiedby"');
+			expect(fetchXml).toContain('link-type="inner"');
+			expect(fetchXml).toContain('alias="su"');
+
+			// Link-entity column inside link-entity
+			expect(fetchXml).toMatch(/<link-entity[^>]*>\s*<attribute name="domainname"/);
+
+			// Filter
+			expect(fetchXml).toContain('attribute="emailaddress1"');
+			expect(fetchXml).toContain('operator="eq"');
+		});
+
+		it('should handle account with primary contact join', () => {
+			const fetchXml = transpile(`
+				SELECT a.name, a.revenue, c.fullname, c.emailaddress1
+				FROM account a
+				LEFT JOIN contact c ON a.primarycontactid = c.contactid
+				WHERE a.statecode = 0
+				ORDER BY a.revenue DESC
+			`);
+
+			// Main entity columns
+			expect(fetchXml).toContain('<attribute name="name" />');
+			expect(fetchXml).toContain('<attribute name="revenue" />');
+
+			// Link-entity
+			expect(fetchXml).toContain('<link-entity name="contact"');
+			expect(fetchXml).toContain('from="contactid"');
+			expect(fetchXml).toContain('to="primarycontactid"');
+			expect(fetchXml).toContain('link-type="outer"');
+
+			// Link-entity columns
+			expect(fetchXml).toMatch(/<link-entity[^>]*contact[^>]*>[\s\S]*<attribute name="fullname"/);
+			expect(fetchXml).toMatch(/<link-entity[^>]*contact[^>]*>[\s\S]*<attribute name="emailaddress1"/);
+
+			// Order
+			expect(fetchXml).toContain('<order attribute="revenue" descending="true"');
+		});
+
+		it('should handle query with column aliases for reporting', () => {
+			const fetchXml = transpile(`
+				SELECT
+				name AS AccountName,
+				revenue AS TotalRevenue,
+				statecode AS Status
+				FROM account
+				WHERE revenue > 1000000
+			`);
+
+			expect(fetchXml).toContain('<attribute name="name" alias="AccountName" />');
+			expect(fetchXml).toContain('<attribute name="revenue" alias="TotalRevenue" />');
+			expect(fetchXml).toContain('<attribute name="statecode" alias="Status" />');
+		});
+
+		it('should handle query with multiple conditions', () => {
+			const fetchXml = transpile(`
+				SELECT name, revenue
+				FROM account
+				WHERE statecode = 0 AND revenue > 1000000 AND industrycode IN (1, 2, 3)
+				ORDER BY name ASC
+			`);
+
+			expect(fetchXml).toContain('<filter type="and">');
+			expect(fetchXml).toContain('attribute="statecode"');
+			expect(fetchXml).toContain('attribute="revenue"');
+			expect(fetchXml).toContain('attribute="industrycode"');
 		});
 	});
 });

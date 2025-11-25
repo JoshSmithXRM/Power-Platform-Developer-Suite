@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import { VSCodePanelStateRepository } from '../../../../shared/infrastructure/ui/VSCodePanelStateRepository';
 
 /**
  * Lazy-loads and initializes Data Explorer panel.
@@ -51,6 +52,8 @@ export async function initializeDataExplorer(
 		logger
 	);
 
+	const panelStateRepository = new VSCodePanelStateRepository(context.workspaceState, logger);
+
 	const executeSqlUseCase = new ExecuteSqlQueryUseCase(queryRepository, logger);
 	const resultMapper = new QueryResultViewModelMapper();
 
@@ -60,6 +63,7 @@ export async function initializeDataExplorer(
 		getEnvironmentById,
 		executeSqlUseCase,
 		resultMapper,
+		panelStateRepository,
 		logger,
 		initialEnvironmentId
 	);

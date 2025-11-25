@@ -327,6 +327,26 @@ describe('DataverseApiService', () => {
 			);
 		});
 
+		it('should include Prefer header to request OData annotations for lookup metadata', async () => {
+			const mockResponse = {
+				ok: true,
+				status: 200,
+				json: jest.fn().mockResolvedValue({ value: [] })
+			};
+			(global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+			await service.get('env-123', '/api/data/v9.2/contacts');
+
+			expect(global.fetch).toHaveBeenCalledWith(
+				expect.any(String),
+				expect.objectContaining({
+					headers: expect.objectContaining({
+						'Prefer': 'odata.include-annotations="*"'
+					})
+				})
+			);
+		});
+
 		it('should execute POST request with JSON-serialized body and return created resource', async () => {
 			const mockResponse = {
 				ok: true,

@@ -7,6 +7,9 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
  * Manages SQL editor, FetchXML preview, and query results.
  */
 
+/** Tracks whether a query is currently executing to prevent queueing. */
+let isExecuting = false;
+
 window.createBehavior({
 	initialize() {
 		injectHighlightingStyles();
@@ -17,12 +20,16 @@ window.createBehavior({
 	handleMessage(message) {
 		switch (message.command) {
 			case 'queryResultsUpdated':
+				isExecuting = false;
+				setEditorEnabled(true);
 				updateQueryResults(message.data);
 				break;
 			case 'fetchXmlPreviewUpdated':
 				updateFetchXmlPreview(message.data.fetchXml);
 				break;
 			case 'queryError':
+				isExecuting = false;
+				setEditorEnabled(true);
 				showQueryError(message.data);
 				break;
 			case 'parseErrorPreview':
@@ -36,6 +43,10 @@ window.createBehavior({
 				break;
 			case 'setLoadingState':
 				setLoadingState(message.data.isLoading);
+				break;
+			case 'queryAborted':
+				isExecuting = false;
+				setEditorEnabled(true);
 				break;
 		}
 	}
@@ -101,8 +112,14 @@ function wireExecuteButton() {
 
 /**
  * Executes the current query.
+ * Prevents queueing by checking isExecuting flag.
  */
 function executeQuery() {
+	// Prevent queueing multiple queries
+	if (isExecuting) {
+		return;
+	}
+
 	const sqlEditor = document.getElementById('sql-editor');
 	if (!sqlEditor) {
 		return;
@@ -113,6 +130,10 @@ function executeQuery() {
 		return;
 	}
 
+	// Mark as executing and disable editor
+	isExecuting = true;
+	setEditorEnabled(false);
+
 	// Clear any previous error
 	clearError();
 
@@ -121,6 +142,17 @@ function executeQuery() {
 		command: 'executeQuery',
 		data: { sql: sql }
 	});
+}
+
+/**
+ * Enables or disables the SQL editor during query execution.
+ */
+function setEditorEnabled(enabled) {
+	const sqlEditor = document.getElementById('sql-editor');
+	if (sqlEditor) {
+		sqlEditor.disabled = !enabled;
+		sqlEditor.classList.toggle('editor-disabled', !enabled);
+	}
 }
 
 /**
@@ -134,7 +166,21 @@ function updateQueryResults(data) {
 		return updateQueryResults(data);
 	}
 
-	const { columns, rows, executionTimeMs, totalRecordCount, hasMoreRecords } = data;
+	const { columns, rows, rowLookups, executionTimeMs, totalRecordCount, hasMoreRecords, entityLogicalName } = data;
+
+	// Handle empty results
+	if (!rows || rows.length === 0) {
+		container.innerHTML = `
+			<div class="empty-state">
+				<p>No records found</p>
+			</div>
+		`;
+		updateStatusBar(0, executionTimeMs, totalRecordCount, hasMoreRecords);
+		return;
+	}
+
+	// Determine the primary key column name (entityname + "id")
+	const primaryKeyColumn = entityLogicalName ? `${entityLogicalName}id` : null;
 
 	// Build table HTML
 	let tableHtml = '<table class="data-table">';
@@ -148,11 +194,36 @@ function updateQueryResults(data) {
 
 	// Body
 	tableHtml += '<tbody>';
-	for (const row of rows) {
+	for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+		const row = rows[rowIndex];
+		const lookups = rowLookups?.[rowIndex] || {};
 		tableHtml += '<tr>';
 		for (const col of columns) {
 			const value = row[col.name] || '';
-			tableHtml += `<td>${escapeHtml(value)}</td>`;
+			const lookup = lookups[col.name];
+
+			// Check if this is a lookup field (has entityType and id)
+			if (lookup && lookup.entityType && lookup.id) {
+				// Render as clickable link with copy button
+				tableHtml += `<td><span class="record-cell-content">
+					<a href="#" class="record-link" data-entity="${escapeHtml(lookup.entityType)}" data-id="${escapeHtml(lookup.id)}" title="Open in browser">${escapeHtml(value)}</a>
+					<button class="record-copy-btn" data-entity="${escapeHtml(lookup.entityType)}" data-id="${escapeHtml(lookup.id)}" title="Copy record URL">
+						<span class="codicon codicon-copy"></span>
+					</button>
+				</span></td>`;
+			}
+			// Check if this is the primary key column (e.g., contactid for contact entity)
+			else if (primaryKeyColumn && col.name.toLowerCase() === primaryKeyColumn.toLowerCase() && value && isGuid(value)) {
+				// Render primary key as clickable link to the record itself
+				tableHtml += `<td><span class="record-cell-content">
+					<a href="#" class="record-link" data-entity="${escapeHtml(entityLogicalName)}" data-id="${escapeHtml(value)}" title="Open in browser">${escapeHtml(value)}</a>
+					<button class="record-copy-btn" data-entity="${escapeHtml(entityLogicalName)}" data-id="${escapeHtml(value)}" title="Copy record URL">
+						<span class="codicon codicon-copy"></span>
+					</button>
+				</span></td>`;
+			} else {
+				tableHtml += `<td>${escapeHtml(value)}</td>`;
+			}
 		}
 		tableHtml += '</tr>';
 	}
@@ -171,7 +242,47 @@ function updateQueryResults(data) {
 		applyRowStriping(table);
 		// Wire up sorting for the new table
 		wireSorting(table);
+		// Wire up record link clicks
+		wireRecordLinks(table);
 	}
+}
+
+/**
+ * Wires up click handlers for record links and copy buttons.
+ */
+function wireRecordLinks(table) {
+	// Wire open record links
+	const links = table.querySelectorAll('.record-link');
+	links.forEach(link => {
+		link.addEventListener('click', (event) => {
+			event.preventDefault();
+			const entityType = link.getAttribute('data-entity');
+			const recordId = link.getAttribute('data-id');
+			if (entityType && recordId) {
+				window.vscode.postMessage({
+					command: 'openRecord',
+					data: { entityType, recordId }
+				});
+			}
+		});
+	});
+
+	// Wire copy URL buttons
+	const copyButtons = table.querySelectorAll('.record-copy-btn');
+	copyButtons.forEach(btn => {
+		btn.addEventListener('click', (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			const entityType = btn.getAttribute('data-entity');
+			const recordId = btn.getAttribute('data-id');
+			if (entityType && recordId) {
+				window.vscode.postMessage({
+					command: 'copyRecordUrl',
+					data: { entityType, recordId }
+				});
+			}
+		});
+	});
 }
 
 /**
@@ -576,4 +687,15 @@ function escapeHtml(str) {
 	const div = document.createElement('div');
 	div.textContent = text;
 	return div.innerHTML;
+}
+
+/**
+ * Checks if a string is a valid GUID format.
+ */
+function isGuid(str) {
+	if (typeof str !== 'string') {
+		return false;
+	}
+	const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	return guidPattern.test(str);
 }

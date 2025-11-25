@@ -13,12 +13,14 @@ export interface IDataExplorerQueryRepository {
 	 * @param environmentId - The environment to query
 	 * @param entitySetName - The OData entity set name (e.g., 'accounts')
 	 * @param fetchXml - The FetchXML query string
+	 * @param signal - Optional AbortSignal for cancellation
 	 * @returns Query result with columns, rows, and pagination info
 	 */
 	executeQuery(
 		environmentId: string,
 		entitySetName: string,
-		fetchXml: string
+		fetchXml: string,
+		signal?: AbortSignal
 	): Promise<QueryResult>;
 
 	/**

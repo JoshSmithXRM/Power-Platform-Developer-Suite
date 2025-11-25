@@ -16,6 +16,12 @@ export interface QueryResultViewModel {
 	readonly rows: readonly QueryRowViewModel[];
 
 	/**
+	 * Lookup metadata for each row, enabling clickable record links.
+	 * Index matches the rows array.
+	 */
+	readonly rowLookups: readonly RowLookupsViewModel[];
+
+	/**
 	 * Total number of records (if available from server).
 	 */
 	readonly totalRecordCount: number | null;
@@ -34,6 +40,12 @@ export interface QueryResultViewModel {
 	 * The FetchXML that was executed.
 	 */
 	readonly executedFetchXml: string;
+
+	/**
+	 * The main entity logical name from the query (e.g., "contact", "account").
+	 * Used to create links for primary key columns.
+	 */
+	readonly entityLogicalName: string | null;
 }
 
 /**
@@ -66,4 +78,32 @@ export interface QueryRowViewModel {
 	 * All values are pre-formatted strings ready for display.
 	 */
 	readonly [columnName: string]: string;
+}
+
+/**
+ * Lookup metadata for a row.
+ * Maps column names to lookup info for cells that contain record references.
+ */
+export interface RowLookupsViewModel {
+	/**
+	 * Lookups keyed by column name.
+	 * Only columns with lookup values are included.
+	 */
+	readonly [columnName: string]: LookupViewModel;
+}
+
+/**
+ * Lookup value for a single cell.
+ * Contains the entity type and record ID for opening in browser.
+ */
+export interface LookupViewModel {
+	/**
+	 * The entity logical name (e.g., "contact", "account").
+	 */
+	readonly entityType: string;
+
+	/**
+	 * The record GUID.
+	 */
+	readonly id: string;
 }

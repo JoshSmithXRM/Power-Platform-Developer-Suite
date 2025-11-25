@@ -9,6 +9,8 @@ export interface EnvironmentInfo {
 	id: string;
 	name: string;
 	powerPlatformEnvironmentId: string | undefined;
+	/** Dataverse organization URL (e.g., https://org.crm.dynamics.com) */
+	dataverseUrl?: string;
 }
 
 /**

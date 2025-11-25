@@ -9,7 +9,7 @@ import { SqlToFetchXmlTranspiler } from '../../domain/services/SqlToFetchXmlTran
  * Result of SQL to FetchXML transpilation (for preview).
  */
 export type TranspileResult =
-	| { success: true; fetchXml: string; entityName: string }
+	| { success: true; fetchXml: string; entityName: string; hasRowLimit: boolean }
 	| { success: false; error: SqlParseError };
 
 /**
@@ -37,10 +37,15 @@ export class ExecuteSqlQueryUseCase {
 	 *
 	 * @param environmentId - Target environment
 	 * @param sql - SQL SELECT statement
+	 * @param signal - Optional AbortSignal for cancellation
 	 * @returns Query result with rows, columns, and metadata
 	 * @throws SqlParseError if SQL is invalid
 	 */
-	public async execute(environmentId: string, sql: string): Promise<QueryResult> {
+	public async execute(
+		environmentId: string,
+		sql: string,
+		signal?: AbortSignal
+	): Promise<QueryResult> {
 		this.logger.info('Executing SQL query', {
 			environmentId,
 			sqlLength: sql.length,
@@ -70,7 +75,8 @@ export class ExecuteSqlQueryUseCase {
 			const result = await this.repository.executeQuery(
 				environmentId,
 				entitySetName,
-				fetchXml
+				fetchXml,
+				signal
 			);
 
 			this.logger.info('SQL query executed', {
@@ -96,7 +102,12 @@ export class ExecuteSqlQueryUseCase {
 		try {
 			const statement = this.parser.parse(sql);
 			const fetchXml = this.transpiler.transpile(statement);
-			return { success: true, fetchXml, entityName: statement.getEntityName() };
+			return {
+				success: true,
+				fetchXml,
+				entityName: statement.getEntityName(),
+				hasRowLimit: statement.hasRowLimit(),
+			};
 		} catch (error) {
 			if (error instanceof SqlParseError) {
 				return { success: false, error };

@@ -52,6 +52,22 @@ describe('SqlParser', () => {
 			expect(result.getEntityName()).toBe('account');
 			expect(result.isSelectAll()).toBe(true);
 		});
+
+		it('should tolerate trailing comma in column list', () => {
+			const result = parser.parse('SELECT name, revenue, FROM account');
+
+			expect(result.columns.length).toBe(2);
+			expect(result.columns[0]!.columnName).toBe('name');
+			expect(result.columns[1]!.columnName).toBe('revenue');
+			expect(result.getEntityName()).toBe('account');
+		});
+
+		it('should tolerate trailing comma with WHERE clause', () => {
+			const result = parser.parse("SELECT name, email, FROM contact WHERE statecode = 0");
+
+			expect(result.columns.length).toBe(2);
+			expect(result.where).not.toBeNull();
+		});
 	});
 
 	describe('TOP/LIMIT clauses', () => {

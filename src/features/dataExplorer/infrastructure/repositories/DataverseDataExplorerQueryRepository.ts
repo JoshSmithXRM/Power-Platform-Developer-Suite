@@ -57,7 +57,8 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 	public async executeQuery(
 		environmentId: string,
 		entitySetName: string,
-		fetchXml: string
+		fetchXml: string,
+		_signal?: AbortSignal
 	): Promise<QueryResult> {
 		const startTime = Date.now();
 
@@ -229,24 +230,80 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 	}
 
 	/**
-	 * Extracts attribute names from FetchXML.
+	 * Extracts attribute names from FetchXML, including link-entity attributes with their aliases.
+	 * Link-entity attributes are prefixed with their alias (e.g., "su.domainname").
 	 */
 	private extractAttributesFromFetchXml(fetchXml: string): string[] {
 		const attributes: string[] = [];
 
-		// Match <attribute name="..." /> elements
+		// First, extract main entity attributes (not inside link-entity)
+		// We'll use a simple approach: extract all attributes, then extract link-entity attributes
+		// The difference gives us main entity attributes
+
+		// Extract link-entity aliases and their attributes
+		const linkEntityAttributes = this.extractLinkEntityAttributes(fetchXml);
+
+		// Match all <attribute name="..." /> elements
 		const attributeRegex = /<attribute\s+[^>]*name\s*=\s*["']([^"']+)["'][^>]*\/?>/gi;
 		let match = attributeRegex.exec(fetchXml);
 
 		while (match !== null) {
 			const attrName = match[1];
 			if (attrName !== undefined) {
-				attributes.push(attrName);
+				// Check if this is a link-entity attribute (it will be in linkEntityAttributes with prefix)
+				const prefixedName = linkEntityAttributes.find(le => le.endsWith(`.${attrName}`));
+				if (prefixedName !== undefined) {
+					// This attribute belongs to a link-entity, add with prefix
+					if (!attributes.includes(prefixedName)) {
+						attributes.push(prefixedName);
+					}
+				} else {
+					// Main entity attribute
+					if (!attributes.includes(attrName)) {
+						attributes.push(attrName);
+					}
+				}
 			}
 			match = attributeRegex.exec(fetchXml);
 		}
 
 		return attributes;
+	}
+
+	/**
+	 * Extracts link-entity attributes with their alias prefixes.
+	 * Returns array like ["su.domainname", "su.fullname"]
+	 */
+	private extractLinkEntityAttributes(fetchXml: string): string[] {
+		const results: string[] = [];
+
+		// Match link-entity elements with their alias and nested attributes
+		// This regex captures the alias and the content of each link-entity
+		const linkEntityRegex = /<link-entity[^>]*alias\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/link-entity>/gi;
+		let linkMatch = linkEntityRegex.exec(fetchXml);
+
+		while (linkMatch !== null) {
+			const alias = linkMatch[1];
+			const content = linkMatch[2];
+
+			if (alias !== undefined && content !== undefined) {
+				// Extract attributes within this link-entity
+				const attrRegex = /<attribute\s+[^>]*name\s*=\s*["']([^"']+)["'][^>]*\/?>/gi;
+				let attrMatch = attrRegex.exec(content);
+
+				while (attrMatch !== null) {
+					const attrName = attrMatch[1];
+					if (attrName !== undefined) {
+						results.push(`${alias}.${attrName}`);
+					}
+					attrMatch = attrRegex.exec(content);
+				}
+			}
+
+			linkMatch = linkEntityRegex.exec(fetchXml);
+		}
+
+		return results;
 	}
 
 	/**
@@ -258,13 +315,19 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 
 	/**
 	 * Infers data type for an attribute by scanning all records.
+	 * Handles link-entity columns which may be returned with different key formats.
 	 */
 	private inferDataTypeFromRecords(
 		attrName: string,
 		records: DataverseRecord[]
 	): QueryColumnDataType {
+		// Get possible key names for this attribute (handles link-entity prefixes)
+		const possibleKeys = this.getPossibleRecordKeys(attrName);
+
 		// Check if this is a lookup by looking for _attrname_value pattern
-		const lookupKey = `_${attrName}_value`;
+		const parts = attrName.split('.');
+		const baseName = parts.length > 1 ? parts[parts.length - 1] ?? attrName : attrName;
+		const lookupKey = `_${baseName}_value`;
 		for (const record of records) {
 			if (lookupKey in record) {
 				return 'lookup';
@@ -273,15 +336,33 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 
 		// Find a record that has this attribute with a non-null value
 		for (const record of records) {
-			if (attrName in record) {
-				const value = record[attrName];
-				if (value !== null && value !== undefined) {
-					return this.inferDataType(value, record, attrName);
+			for (const key of possibleKeys) {
+				if (key in record) {
+					const value = record[key];
+					if (value !== null && value !== undefined) {
+						return this.inferDataType(value, record, key);
+					}
 				}
 			}
 		}
 
 		return 'unknown';
+	}
+
+	/**
+	 * Gets possible record key names for an attribute.
+	 * Link-entity attributes may be returned as "alias.attr" or "alias_x002e_attr".
+	 */
+	private getPossibleRecordKeys(attrName: string): string[] {
+		const keys = [attrName];
+
+		// If this is a link-entity attribute (contains dot), add alternate format
+		if (attrName.includes('.')) {
+			// alias.attr -> alias_x002e_attr (OData URL-encoded dot)
+			keys.push(attrName.replace('.', '_x002e_'));
+		}
+
+		return keys;
 	}
 
 	/**
@@ -377,6 +458,7 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 
 	/**
 	 * Maps a Dataverse record to a QueryResultRow.
+	 * Handles link-entity columns which may have different key formats.
 	 */
 	private mapRecordToRow(record: DataverseRecord): QueryResultRow {
 		const cells = new Map<string, QueryCellValue>();
@@ -400,6 +482,9 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 				continue;
 			}
 
+			// Normalize key name (convert _x002e_ back to . for link-entity columns)
+			const normalizedKey = this.normalizeRecordKey(key);
+
 			// Check for formatted value
 			const formattedKey = `${key}@OData.Community.Display.V1.FormattedValue`;
 			if (formattedKey in record) {
@@ -407,13 +492,13 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 					value: value as string | number | boolean | null,
 					formattedValue: String(record[formattedKey]),
 				};
-				cells.set(key, formattedValue);
+				cells.set(normalizedKey, formattedValue);
 			} else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
 				// Parse date strings
-				cells.set(key, new Date(value));
+				cells.set(normalizedKey, new Date(value));
 			} else {
 				// Cast to QueryCellValue - value is one of: string, number, boolean, null
-				cells.set(key, value as QueryCellValue);
+				cells.set(normalizedKey, value as QueryCellValue);
 			}
 		}
 
@@ -421,13 +506,24 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 	}
 
 	/**
+	 * Normalizes a record key by converting OData-encoded characters.
+	 * E.g., "su_x002e_domainname" -> "su.domainname"
+	 */
+	private normalizeRecordKey(key: string): string {
+		// Convert _x002e_ (URL-encoded dot) back to dot
+		return key.replace(/_x002e_/g, '.');
+	}
+
+	/**
 	 * Extracts a lookup value from record.
+	 * Returns a full lookup (with link) if entity type is available,
+	 * or a formatted value (display only) if entity type is missing.
 	 */
 	private extractLookupValue(
 		record: DataverseRecord,
 		idKey: string,
 		_lookupName: string
-	): QueryLookupValue | null {
+	): QueryLookupValue | QueryFormattedValue | null {
 		const id = record[idKey];
 		if (id === null || id === undefined) {
 			return null;
@@ -437,14 +533,31 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 		const formattedKey = `${idKey}@OData.Community.Display.V1.FormattedValue`;
 		const name = record[formattedKey] as string | undefined;
 
-		// Look for entity type
+		// Look for entity type - required for creating valid record links
 		const typeKey = `${idKey}@Microsoft.Dynamics.CRM.lookuplogicalname`;
-		const entityType = (record[typeKey] as string) ?? 'unknown';
+		const entityType = record[typeKey] as string | undefined;
 
+		// If we have entity type, return full lookup (enables clickable link)
+		if (entityType) {
+			return {
+				id: String(id),
+				name,
+				entityType,
+			};
+		}
+
+		// If no entity type but we have a display name, return as formatted value (display only, no link)
+		if (name) {
+			return {
+				value: String(id),
+				formattedValue: name,
+			};
+		}
+
+		// If no entity type and no name, just return the ID as a formatted value
 		return {
-			id: String(id),
-			name,
-			entityType,
+			value: String(id),
+			formattedValue: String(id),
 		};
 	}
 

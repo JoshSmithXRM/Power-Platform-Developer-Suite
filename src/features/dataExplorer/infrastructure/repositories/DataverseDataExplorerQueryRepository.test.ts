@@ -266,4 +266,152 @@ describe('DataverseDataExplorerQueryRepository', () => {
 			expect(Object.keys(viewModel.rows[0] ?? {}).length).toBe(3);
 		});
 	});
+
+	describe('link-entity column handling', () => {
+		it('should extract link-entity columns with alias prefix from FetchXML', async () => {
+			const fetchXml = `<fetch top="100">
+  <entity name="contact">
+    <attribute name="firstname" />
+    <attribute name="lastname" />
+    <link-entity name="systemuser" from="systemuserid" to="modifiedby" link-type="inner" alias="su">
+      <attribute name="domainname" />
+    </link-entity>
+  </entity>
+</fetch>`;
+
+			// Dataverse returns link-entity columns with alias prefix (using _x002e_ encoding)
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#contacts',
+				value: [
+					{
+						firstname: 'John',
+						lastname: 'Doe',
+						'su_x002e_domainname': 'DOMAIN\\johndoe',
+					},
+				],
+			});
+
+			const result = await repository.executeQuery(
+				'env-123',
+				'contacts',
+				fetchXml
+			);
+
+			// Should have 3 columns including the link-entity column
+			expect(result.columns.length).toBe(3);
+			expect(result.columns.map((c) => c.logicalName)).toEqual(
+				expect.arrayContaining(['firstname', 'lastname', 'su.domainname'])
+			);
+
+			// Should be able to get the value using normalized key
+			const row = result.rows[0];
+			expect(row).toBeDefined();
+			expect(row?.getValue('su.domainname')).toBe('DOMAIN\\johndoe');
+		});
+
+		it('should handle link-entity columns with dot notation in response', async () => {
+			const fetchXml = `<fetch>
+  <entity name="contact">
+    <attribute name="firstname" />
+    <link-entity name="systemuser" from="systemuserid" to="modifiedby" alias="su">
+      <attribute name="fullname" />
+    </link-entity>
+  </entity>
+</fetch>`;
+
+			// Some responses might use dot notation directly
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#contacts',
+				value: [
+					{
+						firstname: 'Jane',
+						'su.fullname': 'Jane Smith',
+					},
+				],
+			});
+
+			const result = await repository.executeQuery(
+				'env-123',
+				'contacts',
+				fetchXml
+			);
+
+			expect(result.columns.length).toBe(2);
+			expect(result.columns.map((c) => c.logicalName)).toContain('su.fullname');
+
+			const row = result.rows[0];
+			expect(row?.getValue('su.fullname')).toBe('Jane Smith');
+		});
+
+		it('should handle multiple link-entity attributes', async () => {
+			const fetchXml = `<fetch>
+  <entity name="contact">
+    <attribute name="firstname" />
+    <link-entity name="systemuser" from="systemuserid" to="modifiedby" alias="su">
+      <attribute name="domainname" />
+      <attribute name="fullname" />
+    </link-entity>
+  </entity>
+</fetch>`;
+
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#contacts',
+				value: [
+					{
+						firstname: 'Test',
+						'su_x002e_domainname': 'DOMAIN\\test',
+						'su_x002e_fullname': 'Test User',
+					},
+				],
+			});
+
+			const result = await repository.executeQuery(
+				'env-123',
+				'contacts',
+				fetchXml
+			);
+
+			expect(result.columns.length).toBe(3);
+			expect(result.columns.map((c) => c.logicalName)).toEqual(
+				expect.arrayContaining(['firstname', 'su.domainname', 'su.fullname'])
+			);
+
+			const row = result.rows[0];
+			expect(row?.getValue('su.domainname')).toBe('DOMAIN\\test');
+			expect(row?.getValue('su.fullname')).toBe('Test User');
+		});
+
+		it('should handle link-entity without alias (uses entity name)', async () => {
+			// When no alias is provided, link-entity columns might come back with entity name
+			const fetchXml = `<fetch>
+  <entity name="contact">
+    <attribute name="firstname" />
+    <link-entity name="systemuser" from="systemuserid" to="modifiedby">
+      <attribute name="domainname" />
+    </link-entity>
+  </entity>
+</fetch>`;
+
+			// Without alias, the attribute is in main entity context
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#contacts',
+				value: [
+					{
+						firstname: 'Test',
+						domainname: 'DOMAIN\\test', // No prefix when no alias
+					},
+				],
+			});
+
+			const result = await repository.executeQuery(
+				'env-123',
+				'contacts',
+				fetchXml
+			);
+
+			// Without alias in FetchXML, we expect just the attribute name
+			expect(result.columns.map((c) => c.logicalName)).toContain('firstname');
+			expect(result.columns.map((c) => c.logicalName)).toContain('domainname');
+		});
+	});
 });

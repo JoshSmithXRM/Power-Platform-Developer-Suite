@@ -1,10 +1,11 @@
 import type { QueryResult } from '../../domain/entities/QueryResult';
 import type { QueryResultColumn } from '../../domain/valueObjects/QueryResultColumn';
-import type { QueryResultRow, QueryCellValue } from '../../domain/valueObjects/QueryResultRow';
+import type { QueryResultRow, QueryCellValue, QueryLookupValue } from '../../domain/valueObjects/QueryResultRow';
 import type {
 	QueryResultViewModel,
 	QueryColumnViewModel,
 	QueryRowViewModel,
+	RowLookupsViewModel,
 } from '../viewModels/QueryResultViewModel';
 
 /**
@@ -21,13 +22,17 @@ export class QueryResultViewModelMapper {
 	 * @returns ViewModel ready for presentation layer
 	 */
 	public toViewModel(result: QueryResult): QueryResultViewModel {
+		const entityLogicalName = this.extractEntityNameFromFetchXml(result.executedFetchXml);
+
 		return {
 			columns: result.columns.map((col) => this.mapColumn(col)),
 			rows: result.rows.map((row) => this.mapRow(row, result.columns)),
+			rowLookups: result.rows.map((row) => this.extractLookups(row, result.columns)),
 			totalRecordCount: result.totalRecordCount,
 			hasMoreRecords: result.hasMoreRecords(),
 			executionTimeMs: result.executionTimeMs,
 			executedFetchXml: result.executedFetchXml,
+			entityLogicalName,
 		};
 	}
 
@@ -115,5 +120,56 @@ export class QueryResultViewModelMapper {
 		}
 
 		return String(value);
+	}
+
+	/**
+	 * Extracts lookup metadata from a row.
+	 * Creates a map of column names to lookup info for cells that contain record references.
+	 *
+	 * @param row - Domain row to extract lookups from
+	 * @param columns - Column definitions for the row
+	 * @returns Map of column names to lookup info
+	 */
+	private extractLookups(
+		row: QueryResultRow,
+		columns: readonly QueryResultColumn[]
+	): RowLookupsViewModel {
+		const lookups: Record<string, { entityType: string; id: string }> = {};
+
+		for (const column of columns) {
+			const value = row.getValue(column.logicalName);
+			if (this.isLookupValue(value)) {
+				lookups[column.logicalName] = {
+					entityType: value.entityType,
+					id: value.id,
+				};
+			}
+		}
+
+		return lookups;
+	}
+
+	/**
+	 * Type guard to check if a value is a lookup.
+	 */
+	private isLookupValue(value: QueryCellValue): value is QueryLookupValue {
+		return (
+			value !== null &&
+			typeof value === 'object' &&
+			'id' in value &&
+			'entityType' in value
+		);
+	}
+
+	/**
+	 * Extracts the main entity logical name from FetchXML.
+	 *
+	 * @param fetchXml - The FetchXML string
+	 * @returns The entity logical name or null if not found
+	 */
+	private extractEntityNameFromFetchXml(fetchXml: string): string | null {
+		// Match <entity name="..."> pattern
+		const entityMatch = /<entity\s+[^>]*name\s*=\s*["']([^"']+)["']/i.exec(fetchXml);
+		return entityMatch?.[1] ?? null;
 	}
 }

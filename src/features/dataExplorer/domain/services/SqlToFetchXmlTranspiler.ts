@@ -10,6 +10,7 @@ import {
 	SqlNullCondition,
 	SqlOrderByItem,
 	SqlSelectStatement,
+	SqlTableRef,
 } from '../valueObjects/SqlAst';
 
 /**
@@ -39,14 +40,15 @@ export class SqlToFetchXmlTranspiler {
 		}
 
 		// <entity> element
-		lines.push(`  <entity name="${statement.from.tableName}">`);
+		const entityName = this.normalizeEntityName(statement.from.tableName);
+		lines.push(`  <entity name="${entityName}">`);
 
 		// Attributes (columns)
-		this.transpileColumns(statement.columns, lines);
+		this.transpileColumns(statement.columns, statement.from, lines);
 
 		// Link entities (JOINs)
 		for (const join of statement.joins) {
-			this.transpileJoin(join, lines);
+			this.transpileJoin(join, statement.columns, lines);
 		}
 
 		// Filter (WHERE)
@@ -67,15 +69,23 @@ export class SqlToFetchXmlTranspiler {
 
 	/**
 	 * Transpiles SELECT columns to FetchXML attributes.
+	 * Includes columns that belong to the main entity (unqualified or matching alias).
 	 */
-	private transpileColumns(columns: readonly SqlColumnRef[], lines: string[]): void {
+	private transpileColumns(
+		columns: readonly SqlColumnRef[],
+		mainEntity: SqlTableRef,
+		lines: string[]
+	): void {
 		for (const column of columns) {
 			if (column.isWildcard && column.tableName === null) {
 				// SELECT *
 				lines.push('    <all-attributes />');
+			} else if (column.isWildcard && this.isMainEntityColumn(column.tableName, mainEntity)) {
+				// SELECT c.* where c is main entity alias
+				lines.push('    <all-attributes />');
 			} else if (!column.isWildcard) {
-				// Regular column - only include non-qualified columns in main entity
-				if (column.tableName === null) {
+				// Include column if it belongs to the main entity
+				if (this.isMainEntityColumn(column.tableName, mainEntity)) {
 					const attrName = this.normalizeAttributeName(column.columnName);
 					if (column.alias) {
 						lines.push(`    <attribute name="${attrName}" alias="${column.alias}" />`);
@@ -84,26 +94,97 @@ export class SqlToFetchXmlTranspiler {
 					}
 				}
 			}
-			// table.* and table.column are handled in link-entity
+			// Columns from link-entities would need to be added inside the link-entity element
 		}
 	}
 
 	/**
-	 * Transpiles a JOIN to FetchXML link-entity.
+	 * Checks if a column table reference belongs to the main entity.
+	 * Returns true if tableName is null (unqualified) or matches the main entity's alias/name.
 	 */
-	private transpileJoin(join: SqlJoin, lines: string[]): void {
+	private isMainEntityColumn(tableName: string | null, mainEntity: SqlTableRef): boolean {
+		if (tableName === null) {
+			return true;
+		}
+		// Check against alias first, then table name
+		if (mainEntity.alias && tableName.toLowerCase() === mainEntity.alias.toLowerCase()) {
+			return true;
+		}
+		return tableName.toLowerCase() === mainEntity.tableName.toLowerCase();
+	}
+
+	/**
+	 * Transpiles a JOIN to FetchXML link-entity.
+	 * Intelligently determines from/to based on which column belongs to which table.
+	 * Includes columns that belong to this link-entity.
+	 */
+	private transpileJoin(
+		join: SqlJoin,
+		columns: readonly SqlColumnRef[],
+		lines: string[]
+	): void {
 		const linkType = join.type === 'LEFT' ? 'outer' : 'inner';
 
-		// Determine from/to based on join condition
-		// The "from" attribute is the field in the link-entity (target table)
-		// The "to" attribute is the field in the parent entity
-		const from = this.normalizeAttributeName(join.rightColumn.columnName);
-		const to = this.normalizeAttributeName(join.leftColumn.columnName);
+		// Determine which column is from the link-entity vs parent entity
+		// by checking the table aliases
+		let fromColumn: string;
+		let toColumn: string;
 
+		const leftIsLinkEntity = this.isJoinTableColumn(join.leftColumn.tableName, join.table);
+		const rightIsLinkEntity = this.isJoinTableColumn(join.rightColumn.tableName, join.table);
+
+		if (leftIsLinkEntity && !rightIsLinkEntity) {
+			// LEFT column is from link-entity, RIGHT is from parent
+			fromColumn = join.leftColumn.columnName;
+			toColumn = join.rightColumn.columnName;
+		} else if (rightIsLinkEntity && !leftIsLinkEntity) {
+			// RIGHT column is from link-entity, LEFT is from parent
+			fromColumn = join.rightColumn.columnName;
+			toColumn = join.leftColumn.columnName;
+		} else {
+			// Can't determine - fall back to original behavior (right=from, left=to)
+			fromColumn = join.rightColumn.columnName;
+			toColumn = join.leftColumn.columnName;
+		}
+
+		const from = this.normalizeAttributeName(fromColumn);
+		const to = this.normalizeAttributeName(toColumn);
 		const aliasAttr = join.table.alias ? ` alias="${join.table.alias}"` : '';
+		const linkEntityName = this.normalizeEntityName(join.table.tableName);
 
-		lines.push(`    <link-entity name="${join.table.tableName}" from="${from}" to="${to}" link-type="${linkType}"${aliasAttr}>`);
+		lines.push(`    <link-entity name="${linkEntityName}" from="${from}" to="${to}" link-type="${linkType}"${aliasAttr}>`);
+
+		// Add columns that belong to this link-entity
+		for (const column of columns) {
+			if (this.isJoinTableColumn(column.tableName, join.table)) {
+				if (column.isWildcard) {
+					lines.push('      <all-attributes />');
+				} else {
+					const attrName = this.normalizeAttributeName(column.columnName);
+					if (column.alias) {
+						lines.push(`      <attribute name="${attrName}" alias="${column.alias}" />`);
+					} else {
+						lines.push(`      <attribute name="${attrName}" />`);
+					}
+				}
+			}
+		}
+
 		lines.push('    </link-entity>');
+	}
+
+	/**
+	 * Checks if a column table reference belongs to the join table.
+	 */
+	private isJoinTableColumn(tableName: string | null, joinTable: SqlTableRef): boolean {
+		if (tableName === null) {
+			return false;
+		}
+		// Check against alias first, then table name
+		if (joinTable.alias && tableName.toLowerCase() === joinTable.alias.toLowerCase()) {
+			return true;
+		}
+		return tableName.toLowerCase() === joinTable.tableName.toLowerCase();
 	}
 
 	/**
@@ -361,6 +442,14 @@ export class SqlToFetchXmlTranspiler {
 	 * Dataverse attribute names are always lowercase.
 	 */
 	private normalizeAttributeName(name: string): string {
+		return name.toLowerCase();
+	}
+
+	/**
+	 * Normalizes an entity name for Dataverse.
+	 * Dataverse entity logical names are always lowercase.
+	 */
+	private normalizeEntityName(name: string): string {
 		return name.toLowerCase();
 	}
 }

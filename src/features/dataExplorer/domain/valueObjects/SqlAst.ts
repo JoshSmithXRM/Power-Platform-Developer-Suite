@@ -207,4 +207,12 @@ export class SqlSelectStatement {
 		}
 		return names;
 	}
+
+	/**
+	 * Checks if this query has a row limit (TOP or LIMIT clause).
+	 * Used to warn users about potentially large result sets.
+	 */
+	public hasRowLimit(): boolean {
+		return this.top !== null;
+	}
 }

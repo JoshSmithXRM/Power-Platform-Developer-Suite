@@ -125,15 +125,33 @@ export class SqlParser {
 
 	/**
 	 * Parses SELECT column list.
+	 * Tolerates trailing commas for better UX.
 	 */
 	private parseColumnList(): SqlColumnRef[] {
 		const columns: SqlColumnRef[] = [];
 
 		do {
 			columns.push(this.parseColumnRef());
-		} while (this.match('COMMA'));
+		} while (this.match('COMMA') && !this.isAtClauseKeyword());
 
 		return columns;
+	}
+
+	/**
+	 * Checks if current token is a SQL clause keyword.
+	 * Used to detect trailing commas in column lists.
+	 */
+	private isAtClauseKeyword(): boolean {
+		return (
+			this.check('FROM') ||
+			this.check('WHERE') ||
+			this.check('ORDER') ||
+			this.check('LIMIT') ||
+			this.check('JOIN') ||
+			this.check('LEFT') ||
+			this.check('RIGHT') ||
+			this.check('INNER')
+		);
 	}
 
 	/**
