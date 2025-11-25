@@ -33,3 +33,12 @@ nul
 .review/SUMMARY.md
 .review/CODE_REVIEW_GUIDE.md
 .review/README.md
+
+# E2E test artifacts (screenshots and results are ephemeral)
+e2e/screenshots/*
+!e2e/screenshots/.gitkeep
+e2e/results/*
+!e2e/results/.gitkeep
+
+# VS Code test downloads
+.vscode-test/

@@ -350,18 +350,24 @@
         "call-graph:orphans": "madge --orphans --extensions ts src/",
         "maintenance:weekly": "npm run dead-code:check && npm run comment-audit && npm run call-graph",
         "maintenance:monthly": "npm run maintenance:weekly && npm run dead-code:deps && npm run type-coverage",
-        "maintenance:full": "npm run maintenance:monthly"
+        "maintenance:full": "npm run maintenance:monthly",
+        "e2e:smoke": "npx playwright test --project=smoke",
+        "e2e:headed": "npx playwright test --project=smoke --headed",
+        "e2e:debug": "npx playwright test --project=smoke --debug",
+        "e2e:report": "npx playwright show-report e2e/results/html-report"
     },
     "dependencies": {
         "@azure/msal-node": "^3.8.3"
     },
     "devDependencies": {
         "@eslint/js": "^9.35.0",
+        "@playwright/test": "^1.57.0",
         "@types/jest": "^30.0.0",
         "@types/node": "24.x",
         "@types/vscode": "^1.74.0",
         "@typescript-eslint/eslint-plugin": "^8.48.0",
         "@typescript-eslint/parser": "^8.48.0",
+        "@vscode/test-electron": "^2.5.2",
         "@vscode/vsce": "^3.7.1",
         "eslint-plugin-import": "^2.32.0",
         "eslint-plugin-local-rules": "^3.0.2",
