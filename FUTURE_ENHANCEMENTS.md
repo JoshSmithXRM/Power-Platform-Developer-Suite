@@ -22,7 +22,438 @@ This document tracks features, improvements, and ideas that we want to implement
 
 ## High Priority (Next 6 Months)
 
+### Power Platform Development Tools
+
+#### Plugin Registration Tool
+**Status**: Planned
+**Estimated Effort**: 40+ hours
+**Value**: VSCode-native plugin registration without leaving the IDE
+
+**Description**:
+Port of Microsoft's Plugin Registration Tool (PRT) functionality to VSCode. Register assemblies, steps, and images directly from the extension.
+
+**Core Features**:
+- Browse registered assemblies, plugins, steps, images
+- Register new assemblies (upload DLL)
+- Add/edit/delete plugin steps
+- Add/edit/delete step images
+- Enable/disable steps
+- View plugin type details
+
+**Technical Considerations**:
+- Uses Dataverse Plugin Registration APIs
+- Assembly storage options (database vs sandbox)
+- Step filtering modes
+- Image attribute selection
+
+**Success Criteria**:
+- Can perform all common PRT operations
+- No need to launch external PRT tool
+- Faster iteration for plugin development
+
+---
+
+#### Web Resources Manager
+**Status**: Planned
+**Estimated Effort**: 24-32 hours
+**Value**: Edit web resources with full VSCode capabilities (syntax highlighting, extensions)
+
+**Description**:
+Browse, edit, and sync web resources between Dynamics and local repository.
+
+**Core Features**:
+- Browse/search web resources by solution, type, name
+- Open web resource in VSCode editor (full syntax highlighting)
+- Save changes back to Dynamics
+- Pull latest from Dynamics to local
+- Repo folder mapping for CI/CD sync
+
+**Sync Features**:
+- Map local folder to solution's web resources
+- Push local changes to Dynamics
+- Pull Dynamics changes to local
+- Conflict detection (modified in both places)
+- Batch sync operations
+
+**Technical Considerations**:
+- Web resource content is base64 encoded
+- Need to handle different types (JS, CSS, HTML, images, etc.)
+- Consider file watching for auto-sync
+- Git integration for change tracking
+
+**Success Criteria**:
+- Full VSCode editing experience for web resources
+- Reliable sync between repo and Dynamics
+- CI/CD pipeline integration possible
+
+---
+
+### Data Management
+
+#### Data Explorer (Ad-hoc Advanced Find)
+**Status**: Planned
+**Estimated Effort**: 32-40 hours
+**Value**: Query data without leaving VSCode, save and reuse queries
+
+**Description**:
+Interactive query builder for Dataverse data with live results and saved queries.
+
+**Core Features**:
+- Entity picker with search
+- Column selector (multi-select)
+- Filter builder (conditions, groups, AND/OR)
+- Sort configuration
+- Live data table with results
+- Pagination for large result sets
+
+**Query Persistence**:
+- Save as UserQuery (Personal View) in Dataverse
+- Load existing personal views
+- Portable across devices/users with same permissions
+- Available in Dynamics UI as well
+
+**Advanced Features**:
+- FetchXML view/edit mode
+- Export to CSV/Excel
+- Quick filters on result columns
+- Column resizing/reordering
+
+**Technical Considerations**:
+- UserQuery entity for saved queries (systemuser-owned)
+- FetchXML generation from UI selections
+- Handle large result sets (virtual scrolling?)
+- Respect user's security privileges
+
+**Success Criteria**:
+- Faster than Advanced Find in browser
+- Queries saved and reusable
+- Works with any entity user has access to
+
+---
+
+#### Record Cloning (Cross-Environment)
+**Status**: Planned
+**Estimated Effort**: 16-24 hours
+**Value**: Copy records between environments for testing/data migration
+
+**Description**:
+Query records in source environment and clone to target environment.
+
+**Core Features**:
+- Dual environment connection (source + target)
+- Query builder (reuse Data Explorer)
+- Column mapping (handle different schemas)
+- Preview before clone
+- Batch operations with progress
+
+**Technical Considerations**:
+- Requires two authenticated connections
+- Handle lookup field remapping
+- Skip system fields (createdon, modifiedon, etc.)
+- Handle duplicate detection rules
+- Transaction/rollback for batch failures
+
+**Success Criteria**:
+- Reliable cross-environment data copy
+- Clear handling of lookup remapping
+- Progress visibility for large batches
+
+---
+
+#### Bulk Data Operations
+**Status**: Future
+**Estimated Effort**: 16-24 hours
+**Value**: Safe bulk update/delete with preview
+
+**Description**:
+Bulk update or delete records with preview and confirmation.
+
+**Core Features**:
+- Query records (reuse Data Explorer)
+- Bulk update: set field values across records
+- Bulk delete: remove matching records
+- Preview affected records before execution
+- Progress tracking and cancellation
+
+**Safety Features**:
+- Record count confirmation
+- Preview first N records
+- Dry-run mode
+- Audit trail of operations
+
+**Success Criteria**:
+- Safer than direct API calls
+- Clear preview before destructive operations
+- Handles large batches efficiently
+
+---
+
 ### ALM & DevOps
+
+#### Deployment Settings Promotion
+**Status**: Planned
+**Estimated Effort**: 16-24 hours
+**Value**: Automate environment config promotion (Dev→QA→Prod)
+
+**Description**:
+Promote deployment settings between environments with intelligent mapping for custom connectors.
+
+**Current State**:
+- Can export connection references and environment variables
+- Manual find/replace required for different environments
+
+**Promotion Features**:
+- Source environment settings export
+- Target environment lookup (resolve ConnectionIds, ConnectorIds)
+- Mapping table for custom connectors per environment
+- Diff view showing what will change
+- Apply promotion to target
+
+**Custom Connector Handling**:
+- Standard connectors: same ConnectorId across environments
+- Custom connectors: different ConnectorId per environment
+- Need to query target environment to resolve correct IDs
+- Match by connector name/type, not ID
+
+**Technical Considerations**:
+- Query target environment's connections and connectors
+- Build mapping table: LogicalName → (ConnectionId, ConnectorId)
+- Handle missing connections gracefully
+- Support for connection profiles (saved mappings)
+
+**Success Criteria**:
+- One-click promotion Dev→QA or QA→Prod
+- Custom connectors handled automatically
+- No manual find/replace needed
+
+---
+
+#### Solution Diff/Compare
+**Status**: Future
+**Estimated Effort**: 24-32 hours
+**Value**: Understand differences between environments
+
+**Description**:
+Compare solutions across environments to identify drift and differences.
+
+**Core Features**:
+- Select two environments to compare
+- Select solution(s) to compare
+- Component-level diff (entities, flows, plugins, etc.)
+- Visual diff view (added, removed, modified)
+- Export diff report
+
+**Comparison Types**:
+- Same solution, different environments
+- Different solution versions
+- Component-level deep comparison
+
+**Technical Considerations**:
+- Solution component metadata APIs
+- Handle large solutions efficiently
+- Meaningful diff for complex components
+
+**Success Criteria**:
+- Quick identification of environment drift
+- Clear visualization of differences
+- Actionable diff reports
+
+---
+
+### Administration
+
+#### Connection Manager
+**Status**: Planned
+**Estimated Effort**: 16-24 hours
+**Value**: Manage Power Platform connections from VSCode
+
+**Description**:
+View and manage connections for the environment.
+
+**Core Features**:
+- List all connections
+- Filter by connector type, status, owner
+- View connection details
+- Test connection health
+- Share/unshare connections
+
+**Technical Considerations**:
+- New PowerShell library for connections (investigate API)
+- May need different auth scope
+- Connection sharing permissions
+
+**Success Criteria**:
+- View all environment connections
+- Basic connection management operations
+
+---
+
+#### Async Job Monitor
+**Status**: Planned
+**Estimated Effort**: 16-24 hours
+**Value**: Monitor and manage background jobs
+
+**Description**:
+View and manage async operations, system jobs, and bulk operations.
+
+**Core Features**:
+- List async operations (pending, running, completed, failed)
+- Filter by type, status, date range
+- View job details and errors
+- Cancel pending/running jobs
+- Bulk delete old jobs
+
+**Job Types**:
+- System jobs (workflows, async plugins)
+- Bulk delete jobs
+- Import/export jobs
+- Solution operations
+
+**Cleanup Features**:
+- Delete completed jobs older than X days
+- Delete failed jobs
+- Bulk cleanup with preview
+
+**Success Criteria**:
+- Clear visibility into background operations
+- Easy cleanup of old jobs
+- Quick identification of stuck/failed jobs
+
+---
+
+#### Security Role Viewer
+**Status**: Future
+**Estimated Effort**: 24-32 hours
+**Value**: Understand and compare security roles
+
+**Description**:
+View security role privileges and compare roles.
+
+**Core Features**:
+- List security roles
+- View role privileges (entity permissions matrix)
+- Compare two roles side-by-side
+- Search privileges by entity
+- Export role definition
+
+**Advanced Features**:
+- Effective permissions for user (all roles combined)
+- Role assignment management
+- Privilege gap analysis
+
+**Technical Considerations**:
+- Security role metadata APIs
+- Privilege depth visualization (User, BU, Parent, Org)
+- Large permission matrices
+
+**Success Criteria**:
+- Faster than navigating Dynamics security UI
+- Clear role comparison
+- Understand effective permissions
+
+---
+
+#### Workflow & Flow Manager
+**Status**: Planned
+**Estimated Effort**: 16-24 hours
+**Value**: Manage workflow/flow state without navigating to each one
+
+**Description**:
+View and manage classic workflows and Power Automate flows.
+
+**Core Features**:
+- List all workflows (classic) and flows (modern)
+- Filter by type, status (active/draft), solution
+- Activate/deactivate in bulk
+- View which connections a flow uses
+- View run history summary
+
+**Flow Details**:
+- Connection references used
+- Trigger type
+- Last run status
+- Owner
+
+**Stretch Goals**:
+- View flow definition (read-only)
+- Edit flow definition (complex - may not be feasible)
+
+**Success Criteria**:
+- Quick state management for workflows/flows
+- Understand connection usage per flow
+- Bulk activation/deactivation
+
+---
+
+### Observability
+
+#### Flow Run History
+**Status**: Future
+**Estimated Effort**: 16-24 hours
+**Value**: Debug flow failures without leaving VSCode
+
+**Description**:
+View Power Automate flow run history and errors.
+
+**Core Features**:
+- List flow runs (succeeded, failed, cancelled)
+- Filter by flow, status, date range
+- View run details (trigger, actions, duration)
+- View action inputs/outputs
+- Error message details
+
+**Advanced Features**:
+- Resubmit failed runs
+- Cancel running flows
+- Export run details
+
+**Technical Considerations**:
+- Flow management APIs
+- Run history can be large
+- Action-level detail requires additional API calls
+
+**Success Criteria**:
+- Quick identification of flow failures
+- Clear error context
+- Faster debugging than browser UI
+
+---
+
+#### Entity Dependency Graph
+**Status**: Future
+**Estimated Effort**: 16-24 hours
+**Value**: Understand impact before making changes
+
+**Description**:
+Visual graph of entity dependencies - "what breaks if I delete this?"
+
+**Core Features**:
+- Select entity/component
+- Show dependent components
+- Show dependencies (what this depends on)
+- Visual graph view
+- Impact analysis
+
+**Dependency Types**:
+- Lookup fields
+- Workflows/flows referencing entity
+- Business rules
+- Plugins
+- Forms, views, charts
+
+**Technical Considerations**:
+- Dependency tracking APIs
+- Graph visualization library
+- Can be slow for complex entities
+
+**Success Criteria**:
+- Understand impact before changes
+- Prevent accidental breakage
+- Visual representation of dependencies
+
+---
+
+### ALM & DevOps (Existing Section)
 
 #### Pre-Release Channel Support
 **Status**: Deferred (2025-Q1)
@@ -299,4 +730,4 @@ None yet.
 - Bi-annual review of Medium/Low Priority
 - Annual archive cleanup
 
-**Last Reviewed**: 2025-01-23
+**Last Reviewed**: 2025-11-24
