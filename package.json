@@ -353,7 +353,7 @@
         "maintenance:full": "npm run maintenance:monthly"
     },
     "dependencies": {
-        "@azure/msal-node": "^2.13.0"
+        "@azure/msal-node": "^3.8.3"
     },
     "devDependencies": {
         "@eslint/js": "^9.35.0",
