@@ -1,13 +1,10 @@
 # Panel Development Guide
 
-**Last Updated:** 2025-11-04
-**Status:** Official Guidance
+When and how to implement panels in the Power Platform Developer Suite.
 
 ---
 
 ## Overview
-
-This guide defines **when and how** to implement panels in the Power Platform Developer Suite.
 
 **Default Approach:** Use the **PanelCoordinator framework** for all panels unless you can justify why composition provides no value.
 
@@ -522,4 +519,9 @@ Quick reference for naming initialization methods:
 
 ---
 
-**Questions?** See `.claude/workflows/NEW_FEATURE_WORKFLOW.md` for complete panel implementation workflow.
+## Related Documentation
+
+- **`docs/architecture/WEBVIEW_PATTERNS.md`** - **CRITICAL**: Message contracts, CSS layouts, behavior patterns, and implementation checklist
+- `.claude/templates/PANEL_INITIALIZATION_PATTERN.md` - Two-phase initialization to avoid race conditions
+- `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Layer boundaries and dependencies
+- `.claude/workflows/NEW_FEATURE_WORKFLOW.md` - Complete panel implementation workflow

@@ -273,7 +273,7 @@ These panels follow the pattern correctly:
 
 ---
 
-**Last Updated**: 2025-01-10
 **Related Guides**:
-- `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md`
-- `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md`
+- `docs/architecture/WEBVIEW_PATTERNS.md` - Message contracts, CSS layouts, behavior patterns
+- `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` - Panel architecture decisions
+- `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Layer boundaries
