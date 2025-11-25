@@ -131,6 +131,73 @@ Interactive query builder for Dataverse data with live results and saved queries
 
 ---
 
+#### SQL to FetchXML (SQL4CDS-style)
+**Status**: Planned
+**Estimated Effort**: 24-32 hours
+**Value**: Query Dataverse using familiar SQL syntax
+
+**Description**:
+Write SQL queries, convert to FetchXML, execute against Dataverse. Inspired by XRM Toolbox SQL4CDS.
+
+**Core Features**:
+- SQL query editor with syntax highlighting
+- SQL → FetchXML conversion
+- Execute query and display results
+- View generated FetchXML
+- Query history
+
+**SQL Support**:
+- SELECT with column list or *
+- FROM with table (entity) name
+- WHERE with conditions (=, <>, <, >, LIKE, IN, IS NULL)
+- JOIN for related entities (lookup traversal)
+- ORDER BY
+- TOP / LIMIT for pagination
+- Aggregate functions (COUNT, SUM, AVG, MIN, MAX)
+- GROUP BY
+
+**Example Queries**:
+```sql
+SELECT name, revenue, createdon
+FROM account
+WHERE statecode = 0
+ORDER BY revenue DESC
+
+SELECT a.name, c.fullname
+FROM account a
+JOIN contact c ON a.primarycontactid = c.contactid
+WHERE a.revenue > 1000000
+
+SELECT statecode, COUNT(*) as count
+FROM contact
+GROUP BY statecode
+```
+
+**Integration with Data Explorer**:
+- Switch between SQL mode and visual query builder
+- SQL generates FetchXML, visual builder can read it back
+- Same result display and export capabilities
+
+**Technical Considerations**:
+- SQL parser (could use existing library or build simple one)
+- Map SQL constructs to FetchXML equivalents
+- Handle Dataverse-specific quirks (option sets, lookups, polymorphic lookups)
+- Error messages for unsupported SQL features
+- Consider referencing MarkMpn's SQL4CDS for parsing patterns
+
+**Limitations to Document**:
+- Not full T-SQL - subset that maps to FetchXML
+- No INSERT/UPDATE/DELETE (read-only, or separate feature)
+- Some complex JOINs may not translate
+
+**Success Criteria**:
+- Common queries work as expected
+- Clear error messages for unsupported syntax
+- Faster than writing FetchXML by hand
+- Seamless integration with Data Explorer
+
+---
+
 #### Record Cloning (Cross-Environment)
 **Status**: Planned
 **Estimated Effort**: 16-24 hours
