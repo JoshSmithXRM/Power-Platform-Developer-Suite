@@ -76,10 +76,11 @@ export class SqlToFetchXmlTranspiler {
 			} else if (!column.isWildcard) {
 				// Regular column - only include non-qualified columns in main entity
 				if (column.tableName === null) {
+					const attrName = this.normalizeAttributeName(column.columnName);
 					if (column.alias) {
-						lines.push(`    <attribute name="${column.columnName}" alias="${column.alias}" />`);
+						lines.push(`    <attribute name="${attrName}" alias="${column.alias}" />`);
 					} else {
-						lines.push(`    <attribute name="${column.columnName}" />`);
+						lines.push(`    <attribute name="${attrName}" />`);
 					}
 				}
 			}
@@ -96,8 +97,8 @@ export class SqlToFetchXmlTranspiler {
 		// Determine from/to based on join condition
 		// The "from" attribute is the field in the link-entity (target table)
 		// The "to" attribute is the field in the parent entity
-		const from = join.rightColumn.columnName;
-		const to = join.leftColumn.columnName;
+		const from = this.normalizeAttributeName(join.rightColumn.columnName);
+		const to = this.normalizeAttributeName(join.leftColumn.columnName);
 
 		const aliasAttr = join.table.alias ? ` alias="${join.table.alias}"` : '';
 
@@ -134,7 +135,7 @@ export class SqlToFetchXmlTranspiler {
 	private transpileComparison(condition: SqlComparisonCondition, lines: string[], indent: string): void {
 		const operator = this.mapComparisonOperator(condition.operator);
 		const value = this.formatValue(condition.value);
-		const attr = condition.column.columnName;
+		const attr = this.normalizeAttributeName(condition.column.columnName);
 
 		if (condition.column.tableName) {
 			// Qualified column - would need to be in link-entity filter
@@ -158,7 +159,7 @@ export class SqlToFetchXmlTranspiler {
 	 */
 	private transpileLike(condition: SqlLikeCondition, lines: string[], indent: string): void {
 		const pattern = condition.pattern;
-		const attr = condition.column.columnName;
+		const attr = this.normalizeAttributeName(condition.column.columnName);
 
 		// Determine operator based on pattern
 		let operator: string;
@@ -194,7 +195,7 @@ export class SqlToFetchXmlTranspiler {
 	 */
 	private transpileNull(condition: SqlNullCondition, lines: string[], indent: string): void {
 		const operator = condition.isNegated ? 'not-null' : 'null';
-		const attr = condition.column.columnName;
+		const attr = this.normalizeAttributeName(condition.column.columnName);
 
 		lines.push(
 			`${indent}<filter>`,
@@ -208,7 +209,7 @@ export class SqlToFetchXmlTranspiler {
 	 */
 	private transpileIn(condition: SqlInCondition, lines: string[], indent: string): void {
 		const operator = condition.isNegated ? 'not-in' : 'in';
-		const attr = condition.column.columnName;
+		const attr = this.normalizeAttributeName(condition.column.columnName);
 
 		lines.push(`${indent}<filter>`);
 		lines.push(`${indent}  <condition attribute="${attr}" operator="${operator}">`);
@@ -244,11 +245,13 @@ export class SqlToFetchXmlTranspiler {
 			case 'comparison': {
 				const operator = this.mapComparisonOperator(condition.operator);
 				const value = this.formatValue(condition.value);
-				lines.push(`${indent}<condition attribute="${condition.column.columnName}" operator="${operator}" value="${value}" />`);
+				const attr = this.normalizeAttributeName(condition.column.columnName);
+				lines.push(`${indent}<condition attribute="${attr}" operator="${operator}" value="${value}" />`);
 				break;
 			}
 			case 'like': {
 				const pattern = condition.pattern;
+				const attr = this.normalizeAttributeName(condition.column.columnName);
 				let op: string;
 				let val: string;
 
@@ -265,17 +268,19 @@ export class SqlToFetchXmlTranspiler {
 					op = condition.isNegated ? 'not-like' : 'like';
 					val = pattern;
 				}
-				lines.push(`${indent}<condition attribute="${condition.column.columnName}" operator="${op}" value="${this.escapeXml(val)}" />`);
+				lines.push(`${indent}<condition attribute="${attr}" operator="${op}" value="${this.escapeXml(val)}" />`);
 				break;
 			}
 			case 'null': {
 				const op = condition.isNegated ? 'not-null' : 'null';
-				lines.push(`${indent}<condition attribute="${condition.column.columnName}" operator="${op}" />`);
+				const attr = this.normalizeAttributeName(condition.column.columnName);
+				lines.push(`${indent}<condition attribute="${attr}" operator="${op}" />`);
 				break;
 			}
 			case 'in': {
 				const op = condition.isNegated ? 'not-in' : 'in';
-				lines.push(`${indent}<condition attribute="${condition.column.columnName}" operator="${op}">`);
+				const attr = this.normalizeAttributeName(condition.column.columnName);
+				lines.push(`${indent}<condition attribute="${attr}" operator="${op}">`);
 				for (const v of condition.values) {
 					lines.push(`${indent}  <value>${this.formatValue(v)}</value>`);
 				}
@@ -300,7 +305,8 @@ export class SqlToFetchXmlTranspiler {
 	 */
 	private transpileOrderBy(orderItem: SqlOrderByItem, lines: string[]): void {
 		const descending = orderItem.direction === 'DESC' ? 'true' : 'false';
-		lines.push(`    <order attribute="${orderItem.column.columnName}" descending="${descending}" />`);
+		const attr = this.normalizeAttributeName(orderItem.column.columnName);
+		lines.push(`    <order attribute="${attr}" descending="${descending}" />`);
 	}
 
 	/**
@@ -348,5 +354,13 @@ export class SqlToFetchXmlTranspiler {
 			.replace(/>/g, '&gt;')
 			.replace(/"/g, '&quot;')
 			.replace(/'/g, '&apos;');
+	}
+
+	/**
+	 * Normalizes an attribute name for Dataverse.
+	 * Dataverse attribute names are always lowercase.
+	 */
+	private normalizeAttributeName(name: string): string {
+		return name.toLowerCase();
 	}
 }

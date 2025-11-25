@@ -264,4 +264,78 @@ describe('SqlToFetchXmlTranspiler', () => {
 			expect(fetchXml).toContain('<order');
 		});
 	});
+
+	describe('case-insensitive attribute names', () => {
+		it('should normalize uppercase column names to lowercase', () => {
+			const fetchXml = transpile('SELECT Name, Revenue FROM account');
+
+			expect(fetchXml).toContain('<attribute name="name" />');
+			expect(fetchXml).toContain('<attribute name="revenue" />');
+			expect(fetchXml).not.toContain('Name');
+			expect(fetchXml).not.toContain('Revenue');
+		});
+
+		it('should normalize mixed-case column names to lowercase', () => {
+			const fetchXml = transpile('SELECT AccountName, TotalRevenue FROM account');
+
+			expect(fetchXml).toContain('<attribute name="accountname" />');
+			expect(fetchXml).toContain('<attribute name="totalrevenue" />');
+		});
+
+		it('should normalize WHERE clause attribute names to lowercase', () => {
+			const fetchXml = transpile('SELECT * FROM account WHERE StateCode = 0');
+
+			expect(fetchXml).toContain('attribute="statecode"');
+			expect(fetchXml).not.toContain('StateCode');
+		});
+
+		it('should normalize LIKE condition attribute names to lowercase', () => {
+			const fetchXml = transpile("SELECT * FROM account WHERE Name LIKE '%test%'");
+
+			expect(fetchXml).toContain('attribute="name"');
+		});
+
+		it('should normalize IS NULL attribute names to lowercase', () => {
+			const fetchXml = transpile('SELECT * FROM account WHERE ParentAccountId IS NULL');
+
+			expect(fetchXml).toContain('attribute="parentaccountid"');
+		});
+
+		it('should normalize IN clause attribute names to lowercase', () => {
+			const fetchXml = transpile("SELECT * FROM account WHERE StateCode IN (0, 1)");
+
+			expect(fetchXml).toContain('attribute="statecode"');
+		});
+
+		it('should normalize ORDER BY attribute names to lowercase', () => {
+			const fetchXml = transpile('SELECT * FROM account ORDER BY CreatedOn DESC');
+
+			expect(fetchXml).toContain('attribute="createdon"');
+		});
+
+		it('should normalize JOIN column names to lowercase', () => {
+			const fetchXml = transpile(
+				'SELECT a.name FROM account a JOIN contact c ON a.PrimaryContactId = c.ContactId'
+			);
+
+			expect(fetchXml).toContain('from="contactid"');
+			expect(fetchXml).toContain('to="primarycontactid"');
+		});
+
+		it('should normalize nested condition attribute names to lowercase', () => {
+			const fetchXml = transpile(
+				'SELECT * FROM account WHERE StateCode = 0 AND Revenue > 1000'
+			);
+
+			expect(fetchXml).toContain('attribute="statecode"');
+			expect(fetchXml).toContain('attribute="revenue"');
+		});
+
+		it('should preserve column aliases as-is (case-sensitive)', () => {
+			const fetchXml = transpile('SELECT Name AS AccountName FROM account');
+
+			expect(fetchXml).toContain('name="name"');
+			expect(fetchXml).toContain('alias="AccountName"');
+		});
+	});
 });

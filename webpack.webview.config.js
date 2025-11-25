@@ -20,6 +20,7 @@ module.exports = (env, argv) => {
 			ConnectionReferencesBehavior: './resources/webview/js/behaviors/ConnectionReferencesBehavior.js',
 			ImportJobViewerBehavior: './resources/webview/js/behaviors/ImportJobViewerBehavior.js',
 			EnvironmentVariablesBehavior: './resources/webview/js/behaviors/EnvironmentVariablesBehavior.js',
+			DataExplorerBehavior: './resources/webview/js/behaviors/DataExplorerBehavior.js',
 			TableRenderer: './resources/webview/js/renderers/TableRenderer.js',
 			DetailPanelRenderer: './resources/webview/js/renderers/DetailPanelRenderer.js'
 		},

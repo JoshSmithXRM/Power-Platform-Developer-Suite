@@ -166,12 +166,12 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 			return QueryResult.empty(fetchXml, executionTimeMs);
 		}
 
-		// Extract columns from first record (length > 0 checked above)
+		// Extract columns from FetchXML (authoritative) and response data
 		const firstRecord = records[0];
 		if (firstRecord === undefined) {
 			return QueryResult.empty(fetchXml, executionTimeMs);
 		}
-		const columns = this.extractColumns(firstRecord);
+		const columns = this.extractColumnsFromFetchXmlAndResponse(fetchXml, records);
 
 		// Map records to rows
 		const rows = records.map((record) => this.mapRecordToRow(record));
@@ -188,9 +188,106 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 	}
 
 	/**
-	 * Extracts column metadata from a record.
+	 * Extracts columns from FetchXML and merges with response data.
+	 *
+	 * FetchXML attributes are authoritative (ensures sparse data doesn't hide columns).
+	 * Response data provides type information and additional columns for all-attributes.
 	 */
-	private extractColumns(record: DataverseRecord): QueryResultColumn[] {
+	private extractColumnsFromFetchXmlAndResponse(
+		fetchXml: string,
+		records: DataverseRecord[]
+	): QueryResultColumn[] {
+		const fetchXmlAttributes = this.extractAttributesFromFetchXml(fetchXml);
+		const hasAllAttributes = this.hasAllAttributesElement(fetchXml);
+
+		// If FetchXML uses all-attributes or has no explicit attributes, derive from response
+		if (hasAllAttributes || fetchXmlAttributes.length === 0) {
+			const firstRecord = records[0];
+			if (firstRecord === undefined) {
+				return [];
+			}
+			return this.extractColumnsFromRecord(firstRecord);
+		}
+
+		// Build columns from FetchXML attributes (authoritative list)
+		const columns: QueryResultColumn[] = [];
+		const seenColumns = new Set<string>();
+
+		// First, add all FetchXML-specified attributes
+		for (const attrName of fetchXmlAttributes) {
+			if (seenColumns.has(attrName)) {
+				continue;
+			}
+			seenColumns.add(attrName);
+
+			// Try to infer data type from response data
+			const dataType = this.inferDataTypeFromRecords(attrName, records);
+			columns.push(new QueryResultColumn(attrName, attrName, dataType));
+		}
+
+		return columns;
+	}
+
+	/**
+	 * Extracts attribute names from FetchXML.
+	 */
+	private extractAttributesFromFetchXml(fetchXml: string): string[] {
+		const attributes: string[] = [];
+
+		// Match <attribute name="..." /> elements
+		const attributeRegex = /<attribute\s+[^>]*name\s*=\s*["']([^"']+)["'][^>]*\/?>/gi;
+		let match = attributeRegex.exec(fetchXml);
+
+		while (match !== null) {
+			const attrName = match[1];
+			if (attrName !== undefined) {
+				attributes.push(attrName);
+			}
+			match = attributeRegex.exec(fetchXml);
+		}
+
+		return attributes;
+	}
+
+	/**
+	 * Checks if FetchXML contains all-attributes element.
+	 */
+	private hasAllAttributesElement(fetchXml: string): boolean {
+		return /<all-attributes\s*\/?>/i.test(fetchXml);
+	}
+
+	/**
+	 * Infers data type for an attribute by scanning all records.
+	 */
+	private inferDataTypeFromRecords(
+		attrName: string,
+		records: DataverseRecord[]
+	): QueryColumnDataType {
+		// Check if this is a lookup by looking for _attrname_value pattern
+		const lookupKey = `_${attrName}_value`;
+		for (const record of records) {
+			if (lookupKey in record) {
+				return 'lookup';
+			}
+		}
+
+		// Find a record that has this attribute with a non-null value
+		for (const record of records) {
+			if (attrName in record) {
+				const value = record[attrName];
+				if (value !== null && value !== undefined) {
+					return this.inferDataType(value, record, attrName);
+				}
+			}
+		}
+
+		return 'unknown';
+	}
+
+	/**
+	 * Extracts column metadata from a record (for all-attributes queries).
+	 */
+	private extractColumnsFromRecord(record: DataverseRecord): QueryResultColumn[] {
 		const columns: QueryResultColumn[] = [];
 		const seenColumns = new Set<string>();
 

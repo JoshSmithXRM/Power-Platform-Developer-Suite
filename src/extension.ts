@@ -20,6 +20,7 @@ import { initializeEnvironmentVariables } from './features/environmentVariables/
 import { initializePluginTraceViewer } from './features/pluginTraceViewer/presentation/initialization/initializePluginTraceViewer.js';
 import { initializeMetadataBrowser } from './features/metadataBrowser/presentation/initialization/initializeMetadataBrowser.js';
 import { initializePersistenceInspector } from './features/persistenceInspector/presentation/initialization/initializePersistenceInspector.js';
+import { initializeDataExplorer } from './features/dataExplorer/presentation/initialization/initializeDataExplorer.js';
 
 /**
  * Shows environment picker and executes callback with selected environment ID.
@@ -394,6 +395,32 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	const dataExplorerCommand = vscode.commands.registerCommand('power-platform-dev-suite.dataExplorer', async (environmentItem?: { envId: string }) => {
+		try {
+			void initializeDataExplorer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, environmentItem?.envId);
+		} catch (error) {
+			container.logger.error('Failed to open Data Explorer', error);
+			vscode.window.showErrorMessage(
+				`Failed to open Data Explorer: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	const dataExplorerPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.dataExplorerPickEnvironment', async () => {
+		try {
+			await showEnvironmentPickerAndExecute(
+				container.environmentRepository,
+				'Select an environment to open Data Explorer',
+				async (envId) => initializeDataExplorer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, envId)
+			);
+		} catch (error) {
+			container.logger.error('Failed to open Data Explorer with environment picker', error);
+			vscode.window.showErrorMessage(
+				`Failed to open Data Explorer: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
 	// Register all disposables with VS Code's extension context.
 	// When the extension deactivates, VS Code automatically calls .dispose() on each
 	// registered disposable in reverse order, ensuring proper cleanup of:
@@ -418,6 +445,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		pluginTraceViewerPickEnvironmentCommand,
 		metadataBrowserCommand,
 		metadataBrowserPickEnvironmentCommand,
+		dataExplorerCommand,
+		dataExplorerPickEnvironmentCommand,
 		removeEnvironmentCommand,
 		openMakerCommand,
 		openDynamicsCommand,
