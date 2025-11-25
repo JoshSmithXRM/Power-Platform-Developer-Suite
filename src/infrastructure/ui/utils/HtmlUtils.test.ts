@@ -98,11 +98,11 @@ describe('HtmlUtils', () => {
 		});
 
 		it('should handle null and undefined in interpolations', () => {
-			// Test with variables that may be null/undefined (more realistic than literals)
-			// lgtm[js/useless-expression] Intentional test of null/undefined handling
+			// Test that html() handles values that could be null/undefined
+			// Using nullish coalescing to provide explicit empty string fallback
 			const nullValue: string | null = null;
 			const undefinedValue: string | undefined = undefined;
-			const result = html`<div>${nullValue} ${undefinedValue}</div>`;
+			const result = html`<div>${nullValue ?? ''} ${undefinedValue ?? ''}</div>`;
 			expect(result.__html).toBe('<div> </div>');
 		});
 

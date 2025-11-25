@@ -41,11 +41,11 @@
 
 		// Register message handler if provided
 		if (typeof config.handleMessage === 'function') {
-			// lgtm[js/missing-origin-check] Origin is validated inside handler - VS Code webview security
 			window.addEventListener('message', event => {
-				// Validate origin - VS Code webviews use 'vscode-webview://' scheme
+				// VS Code webview security: messages from extension host have empty origin,
+				// messages from webview context have vscode-webview:// scheme
 				const origin = event.origin || '';
-				if (origin.indexOf('vscode-webview://') !== 0) {
+				if (origin !== '' && !origin.startsWith('vscode-webview://')) {
 					console.warn('Rejected message from untrusted origin:', event.origin);
 					return;
 				}
@@ -170,11 +170,11 @@
 	/**
 	 * Handles messages from extension to update button states.
 	 */
-	// lgtm[js/missing-origin-check] Origin is validated inside handler - VS Code webview security
 	window.addEventListener('message', event => {
-		// Validate origin - VS Code webviews use 'vscode-webview://' scheme
+		// VS Code webview security: messages from extension host have empty origin,
+		// messages from webview context have vscode-webview:// scheme
 		const origin = event.origin || '';
-		if (origin.indexOf('vscode-webview://') !== 0) {
+		if (origin !== '' && !origin.startsWith('vscode-webview://')) {
 			console.warn('Rejected message from untrusted origin:', event.origin);
 			return;
 		}
