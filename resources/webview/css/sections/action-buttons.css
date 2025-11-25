@@ -1,0 +1,22 @@
+/**
+ * Action Buttons Section Styles
+ *
+ * Layout and composition for ActionButtonsSection.
+ */
+
+.action-buttons {
+	display: flex;
+	gap: 8px;
+}
+
+.action-buttons.align-left {
+	justify-content: flex-start;
+}
+
+.action-buttons.align-right {
+	justify-content: flex-end;
+}
+
+.action-buttons.align-center {
+	justify-content: center;
+}

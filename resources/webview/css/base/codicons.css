@@ -1,0 +1,9 @@
+/**
+ * Codicons for VS Code webviews.
+ * Imports the full codicons CSS from unpkg CDN.
+ *
+ * This provides all codicon glyphs used throughout the extension.
+ * @see https://microsoft.github.io/vscode-codicons/dist/codicon.html
+ */
+
+@import url('https://unpkg.com/@vscode/codicons@latest/dist/codicon.css');

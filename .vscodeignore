@@ -20,6 +20,9 @@ webpack.config.js
 
 # Development scripts and tools
 scripts/**
+.dev-version
+package.json.backup
+nul
 
 # Documentation that's not needed in package
 .github/workflows/**

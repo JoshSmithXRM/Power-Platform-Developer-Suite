@@ -18,16 +18,22 @@ const config = {
     },
     resolve: {
         // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
-        extensions: ['.ts', '.js']
+        extensions: ['.ts', '.js'],
+        extensionAlias: {
+            '.js': ['.ts', '.js'] // Allow .js imports to resolve to .ts files (required for TypeScript ESM)
+        }
     },
     module: {
         rules: [
             {
                 test: /\.ts$/,
-                exclude: [/node_modules/, /Old/],
+                exclude: [/node_modules/, /Old/, /\.test\.ts$/, /\.spec\.ts$/],
                 use: [
                     {
-                        loader: 'ts-loader'
+                        loader: 'ts-loader',
+                        options: {
+                            configFile: 'tsconfig.build.json'
+                        }
                     }
                 ]
             }

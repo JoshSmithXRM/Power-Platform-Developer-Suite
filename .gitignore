@@ -7,6 +7,9 @@ dist/
 .DS_Store
 *.tsbuildinfo
 out/
+coverage/
+.dev-version
+package.json.backup
 
 # Extension packaging
 *.vsix
@@ -23,3 +26,10 @@ out/
 # OS
 Thumbs.db
 nul
+
+# Review working files (scratch work, delete after use)
+# Archive summaries to docs/quality/ after review completion
+.review/results/
+.review/SUMMARY.md
+.review/CODE_REVIEW_GUIDE.md
+.review/README.md

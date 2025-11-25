@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metadata Browser</title>
+    <style>
+        body { font-family: var(--vscode-font-family); padding: 20px; }
+        h1 { color: var(--vscode-foreground); }
+        p { color: var(--vscode-descriptionForeground); }
+    </style>
+</head>
+<body>
+    <h1>Metadata Browser</h1>
+    <p>Loading metadata...</p>
+    <div id="content"></div>
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        window.addEventListener('message', event => {
+            // VS Code webview security: messages from extension host have empty origin,
+            // messages from webview context have vscode-webview:// scheme
+            const origin = event.origin || '';
+            if (origin !== '' && !origin.startsWith('vscode-webview://')) {
+                console.warn('Rejected message from untrusted origin:', event.origin);
+                return;
+            }
+
+            const message = event.data;
+            const content = document.getElementById('content');
+
+            if (message.command === 'initialize') {
+                const entitiesHeading = document.createElement('h2');
+                entitiesHeading.textContent = 'Entities: ' + message.data.entities.length;
+                const choicesHeading = document.createElement('h2');
+                choicesHeading.textContent = 'Choices: ' + message.data.choices.length;
+                content.replaceChildren(entitiesHeading, choicesHeading);
+            }
+        });
+    </script>
+</body>
+</html>

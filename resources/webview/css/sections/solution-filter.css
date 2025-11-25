@@ -1,0 +1,35 @@
+/**
+ * Solution Filter Section Styles
+ *
+ * Styles for solution dropdown filter.
+ * Positioned in toolbar, typically after action buttons and before environment selector.
+ */
+
+.solution-filter {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: 8px;
+}
+
+.solution-filter label {
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-foreground);
+}
+
+.solution-filter select {
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	background: var(--vscode-dropdown-background);
+	color: var(--vscode-dropdown-foreground);
+	border: 1px solid var(--vscode-dropdown-border);
+	padding: 4px 8px;
+	border-radius: 2px;
+	cursor: pointer;
+	min-width: 150px;
+}
+
+.solution-filter select:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}

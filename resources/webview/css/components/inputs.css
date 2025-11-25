@@ -1,0 +1,28 @@
+/**
+ * Input Component Styles
+ *
+ * Reusable input primitives for all panels.
+ */
+
+input[type="text"],
+input[type="search"] {
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	padding: 6px 12px;
+	border-radius: 2px;
+	width: 100%;
+}
+
+input[type="text"]:focus,
+input[type="search"]:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+input[type="text"]::placeholder,
+input[type="search"]::placeholder {
+	color: var(--vscode-input-placeholderForeground);
+}

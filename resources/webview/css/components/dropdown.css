@@ -1,0 +1,138 @@
+/**
+ * Dropdown Component
+ *
+ * Reusable dropdown button with menu.
+ * Supports VS Code theming and multiple variants (default, primary, danger).
+ */
+
+/* Dropdown container */
+.dropdown {
+	position: relative;
+	display: inline-block;
+	margin-right: 8px;
+}
+
+/* Dropdown button */
+.dropdown-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	background-color: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+	border: 1px solid var(--vscode-button-border, transparent);
+	border-radius: 2px;
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	cursor: pointer;
+	transition: background-color 0.1s ease;
+}
+
+.dropdown-button:hover {
+	background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.dropdown-button:active {
+	background-color: var(--vscode-button-secondaryBackground);
+}
+
+/* Dropdown button variants */
+.dropdown-button--primary {
+	background-color: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+.dropdown-button--primary:hover {
+	background-color: var(--vscode-button-hoverBackground);
+}
+
+.dropdown-button--danger {
+	background-color: var(--vscode-inputValidation-errorBackground);
+	color: var(--vscode-inputValidation-errorForeground);
+	border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.dropdown-button--danger:hover {
+	opacity: 0.9;
+}
+
+.dropdown-label {
+	flex: 1;
+}
+
+/* Dropdown menu */
+.dropdown-menu {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	margin-top: 4px;
+	min-width: 200px;
+	background-color: var(--vscode-dropdown-background);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 2px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+	z-index: 1000;
+	overflow: hidden;
+	display: none; /* Hidden by default, shown via JS */
+}
+
+/* Dropdown item */
+.dropdown-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	color: var(--vscode-dropdown-foreground);
+	cursor: pointer;
+	user-select: none;
+	transition: background-color 0.1s ease;
+}
+
+.dropdown-item:hover:not(.dropdown-item--disabled) {
+	background-color: var(--vscode-list-hoverBackground);
+}
+
+.dropdown-item:active:not(.dropdown-item--disabled) {
+	background-color: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+/* Selected item (checkmark visible) */
+.dropdown-item--selected {
+	background-color: var(--vscode-list-inactiveSelectionBackground);
+}
+
+/* Disabled item */
+.dropdown-item--disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Checkmark icon */
+.dropdown-item .codicon-check {
+	width: 16px;
+	height: 16px;
+	font-size: 16px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* Checkmark spacer (maintains alignment when no checkmark) */
+.dropdown-item-spacer {
+	width: 16px;
+	height: 16px;
+	display: inline-block;
+}
+
+/* Dropdown item label */
+.dropdown-item-label {
+	flex: 1;
+}
+
+/* Dropdown separator */
+.dropdown-separator {
+	height: 1px;
+	background-color: var(--vscode-dropdown-border);
+	margin: 4px 0;
+}

@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
+import localRules from 'eslint-plugin-local-rules';
 
 export default tseslint.config(
   js.configs.recommended,
@@ -10,7 +11,9 @@ export default tseslint.config(
     ignores: ['dist/**', 'out/**', 'node_modules/**', '*.config.js', 'webpack.config.js']
   },
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    // TypeScript files (Extension Host) - excluding tests
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: 'module',
@@ -21,58 +24,39 @@ export default tseslint.config(
     },
     plugins: {
       '@typescript-eslint': tseslint.plugin,
-      'import': importPlugin
+      'import': importPlugin,
+      'local-rules': localRules
     },
     rules: {
-      
-      // PHASE 1: CRITICAL ARCHITECTURAL RULES
-      
-      // 1. Component Architecture Violations
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='updateWebview']",
-          message: '❌ Use component event bridges instead of updateWebview() for data updates. Only allowed in BasePanel initialization. See: docs/ARCHITECTURE_GUIDE.md#component-update-communication'
-        },
-        {
-          selector: "ArrowFunctionExpression[parent.callee.property.name='map'] ObjectExpression",
-          message: '❌ Move data transformation logic to services. Panels should use service data directly. Pattern: solutions.map(sol => ({ id: sol.solutionId, ... })) should be in service layer.'
-        },
-        {
-          selector: "CallExpression[callee.object.name='console']",
-          message: '❌ Use this.componentLogger instead of console methods in Extension Host context. console.log is only allowed in webview JavaScript files.'
-        }
-      ],
+      // ===========================
+      // TYPE SAFETY (CLAUDE.md: NEVER use `any` without explicit type)
+      // ===========================
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unsafe-return': 'error',
+      '@typescript-eslint/no-unsafe-assignment': 'error',
+      '@typescript-eslint/no-unsafe-member-access': 'error',
+      '@typescript-eslint/no-unsafe-call': 'error',
+      '@typescript-eslint/no-unsafe-argument': 'error',
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+      '@typescript-eslint/prefer-optional-chain': 'warn',
 
-      // 2. Logging Architecture Violations
-      'no-console': 'error',
-
-      // 3. TypeScript Standards  
+      // ===========================
+      // EXPLICIT RETURN TYPES (CLAUDE.md: ALWAYS explicit return types)
+      // ===========================
       '@typescript-eslint/explicit-function-return-type': [
         'error',
         {
-          allowExpressions: true,
+          allowExpressions: false,
           allowTypedFunctionExpressions: true,
-          allowHigherOrderFunctions: true,
+          allowHigherOrderFunctions: false,
           allowDirectConstAssertionInArrowFunctions: true
         }
       ],
 
-      // 4. Import Standards
-      'import/order': [
-        'error',
-        {
-          groups: [
-            'builtin',
-            'external', 
-            'internal',
-            'parent',
-            'sibling',
-            'index'
-          ],
-          'newlines-between': 'always'
-        }
-      ],
+      // ===========================
+      // GENERAL CODE QUALITY
+      // ===========================
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
@@ -81,15 +65,135 @@ export default tseslint.config(
           caughtErrorsIgnorePattern: '^_'
         }
       ],
+      '@typescript-eslint/no-var-requires': 'error',
 
-      // 5. General Code Quality
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-var-requires': 'error'
+      // ===========================
+      // IMPORT ORGANIZATION
+      // ===========================
+      'import/order': [
+        'error',
+        {
+          groups: [
+            'builtin',
+            'external',
+            'internal',
+            'parent',
+            'sibling',
+            'index'
+          ],
+          'newlines-between': 'always'
+        }
+      ],
+
+      // ===========================
+      // LOGGING (No console in Extension Host)
+      // ===========================
+      'no-console': 'error',
+
+      // ===========================
+      // CLEAN ARCHITECTURE BOUNDARIES (CLAUDE.md: Layer separation)
+      // ===========================
+      'local-rules/no-domain-in-presentation': 'error',
+      'local-rules/no-outer-layers-in-domain': 'error',
+      'local-rules/no-presentation-in-application': 'error',
+      'local-rules/no-static-entity-methods': 'error',
+      'local-rules/no-presentation-methods-in-domain': 'error',
+      'local-rules/no-html-in-typescript': 'error',
+      'local-rules/no-static-dependency-instantiation': 'error',
+      'local-rules/no-presentation-logic-in-application-layer': 'error',
+      'local-rules/no-static-mapper-methods': 'warn',
+
+      // ===========================
+      // ASYNC/PROMISE HANDLING
+      // ===========================
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/promise-function-async': 'error',
+
+      // ===========================
+      // CODE COMPLEXITY
+      // ===========================
+      'complexity': ['warn', 15],
+      'max-lines': ['warn', { max: 500, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['warn', { max: 100, skipBlankLines: true, skipComments: true }],
+      'max-depth': ['warn', 4],
+      'max-nested-callbacks': ['warn', 3],
+
+      // ===========================
+      // ERROR HANDLING
+      // ===========================
+      'no-empty': ['error', { allowEmptyCatch: false }],
+
+      // ===========================
+      // TYPE DEFINITIONS
+      // ===========================
+      '@typescript-eslint/consistent-type-definitions': ['error', 'interface']
     }
   },
   {
-    // Override for JavaScript files (webview)
-    files: ['**/*.js'],
+    // Use case files - Stricter complexity limits (CLAUDE.md: Use cases orchestrate only)
+    files: ['src/**/application/useCases/**/*.ts'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+    rules: {
+      'max-lines-per-function': ['error', { max: 50, skipBlankLines: true, skipComments: true }],
+      'complexity': ['error', 10]
+    }
+  },
+  {
+    // Test files - Relax structural complexity rules
+    // These rules measure framework structure (describe → it → expect), not logical complexity
+    // See: Clean Architecture Guardian recommendation (2025-11-02)
+    files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+    rules: {
+      // DISABLED: Framework nesting is structural, not algorithmic complexity
+      'max-nested-callbacks': 'off',
+      'max-lines-per-function': 'off',
+      'max-lines': 'off',
+      'complexity': 'off',
+
+      // KEPT: These catch actual problems even in tests
+      'max-depth': ['warn', 4],  // Deeply nested if/for/while IS bad
+      'max-statements': ['warn', 30],  // Too many statements = unclear test
+
+      // Allow underscore prefix for unused parameters (abstract method implementations)
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_'
+        }
+      ]
+    }
+  },
+  {
+    // Composition root - naturally long due to DI wiring
+    files: ['src/extension.ts'],
+    rules: {
+      'max-lines': 'off',
+      'max-lines-per-function': 'off'
+    }
+  },
+  {
+    // Authentication service - complex auth flows are inherently long
+    files: ['src/features/environmentSetup/infrastructure/services/MsalAuthenticationService.ts'],
+    rules: {
+      'max-lines-per-function': 'off'
+    }
+  },
+  {
+    // HTML rendering - template generation is naturally verbose
+    files: [
+      'src/features/persistenceInspector/presentation/views/persistenceInspector.ts',
+      'src/shared/infrastructure/ui/views/dataTable.ts'
+    ],
+    rules: {
+      'max-lines-per-function': 'off'
+    }
+  },
+  {
+    // JavaScript files (Webview Context)
+    files: ['resources/webview/**/*.js'],
     languageOptions: {
       globals: {
         window: 'readonly',
@@ -103,244 +207,47 @@ export default tseslint.config(
         MutationObserver: 'readonly',
         Node: 'readonly',
         CustomEvent: 'readonly',
-        module: 'writable',
-        ComponentUtils: 'readonly',
-        EnvironmentSelectorUtils: 'readonly'
+        module: 'writable'
       }
     },
     rules: {
+      // Console IS allowed in webview context
       'no-console': 'off',
-      'no-restricted-syntax': 'off',
+
+      // Turn off TypeScript rules for JS files
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       'no-undef': 'off',
       'no-prototype-builtins': 'off',
-      'no-case-declarations': 'off'
+      'no-case-declarations': 'off',
+
+      // Prevent webview JS from importing Extension Host code
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/core/**', '**/features/**', '**/infrastructure/**'],
+              message: '❌ Cannot import Extension Host code in webview context. Use postMessage() to communicate.'
+            }
+          ]
+        }
+      ]
     }
   },
   {
-    // Override for webview JavaScript specifically
-    files: ['resources/webview/js/**/*.js'],
+    // Jest mock files - Need Jest globals
+    files: ['src/__mocks__/**/*.js'],
     languageOptions: {
       globals: {
-        window: 'readonly',
-        document: 'readonly',
-        console: 'readonly',
-        vscode: 'readonly'
+        jest: 'readonly',
+        module: 'writable',
+        require: 'readonly'
       }
     },
     rules: {
-      'no-console': 'off',
-      'no-restricted-syntax': [
-        'error',
-        // Detect camelCase in sendMessage calls (2nd argument is the action/command name)
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='filtersApplied']",
-          message: "❌ Use kebab-case 'filters-applied' not camelCase 'filtersApplied' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='filtersCleared']",
-          message: "❌ Use kebab-case 'filters-cleared' not camelCase 'filtersCleared' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='filterPanelCollapsed']",
-          message: "❌ Use kebab-case 'filter-panel-collapsed' not camelCase 'filterPanelCollapsed' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='loadEnvironments']",
-          message: "❌ Use kebab-case 'load-environments' not camelCase 'loadEnvironments' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='environmentChanged']",
-          message: "❌ Use kebab-case 'environment-changed' not camelCase 'environmentChanged' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='traceSelected']",
-          message: "❌ Use kebab-case 'trace-selected' not camelCase 'traceSelected' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "CallExpression[callee.property.name='sendMessage'] > Literal:nth-child(2)[value='splitRatioChanged']",
-          message: "❌ Use kebab-case 'split-ratio-changed' not camelCase 'splitRatioChanged' in sendMessage(). See: docs/MESSAGE_CONVENTIONS.md"
-        }
-      ]
-    }
-  },
-  {
-    // Services are ALLOWED to do data transformation - that's their job!
-    files: ['src/services/**/*.ts'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='updateWebview']",
-          message: '❌ Use component event bridges instead of updateWebview() for data updates'
-        },
-        {
-          selector: "CallExpression[callee.object.name='console']",
-          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
-        }
-        // Note: Data transformation (map) is ALLOWED in services
-      ]
-    }
-  },
-  {
-    // View classes, config files, and panels are allowed to transform data for UI rendering purposes
-    files: ['src/components/**/*View.ts', 'src/components/**/*Config.ts', 'src/factories/**/*.ts', '!src/factories/PanelComposer.ts', 'src/panels/**/*Panel.ts', '!src/panels/base/**'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='updateWebview']",
-          message: '❌ Use component event bridges instead of updateWebview() for data updates'
-        },
-        {
-          selector: "CallExpression[callee.object.name='console']",
-          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
-        },
-        {
-          selector: "TemplateLiteral TemplateElement[value.raw=/onclick\\s*=/]",
-          message: '❌ No inline onclick handlers in HTML templates. Use postMessage() and handle in message handler. See: docs/MESSAGE_CONVENTIONS.md and docs/EXECUTION_CONTEXTS.md'
-        },
-        {
-          selector: "TemplateLiteral TemplateElement[value.raw=/oninput\\s*=/]",
-          message: '❌ No inline oninput handlers in HTML templates. Use postMessage() and handle in message handler. See: docs/MESSAGE_CONVENTIONS.md and docs/EXECUTION_CONTEXTS.md'
-        },
-        {
-          selector: "TemplateLiteral TemplateElement[value.raw=/<script[^>]*>/]",
-          message: '❌ No inline <script> blocks in HTML templates. Move JavaScript to webview behavior files in resources/webview/js/. See: docs/EXECUTION_CONTEXTS.md'
-        }
-        // Note: Data transformation (map) is ALLOWED in View classes and Factories for UI rendering
-      ]
-    }
-  },
-  {
-    // PHASE 2: MESSAGE CONVENTIONS & ERROR HANDLING
-    // Stricter rules for panels to enforce message naming and error handling standards
-    files: [
-      'src/panels/**/*Panel.ts',
-      '!src/panels/base/**'
-    ],
-    rules: {
-      // Enforce kebab-case in case statement strings (common message patterns)
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='updateWebview']",
-          message: '❌ Use component event bridges instead of updateWebview() for data updates'
-        },
-        {
-          selector: "CallExpression[callee.object.name='console']",
-          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
-        },
-        {
-          // Only enforce on panels that use singleton pattern (have static currentPanel field)
-          // This selector checks: class has currentPanel AND method doesn't call handlePanelCreation
-          selector: "ClassDeclaration:has(PropertyDefinition[static=true][key.name='currentPanel']) MethodDefinition[key.name=/^(createOrShow|createNew)$/][static=true]:not(:has(BlockStatement CallExpression[callee.object.name='BasePanel'][callee.property.name='handlePanelCreation']))",
-          message: '❌ Panel createOrShow() and createNew() methods must use BasePanel.handlePanelCreation() helper to eliminate code duplication. See: CLAUDE.md#refactoring-principles'
-        },
-        {
-          selector: "TemplateLiteral TemplateElement[value.raw=/onclick\\s*=/]",
-          message: '❌ No inline onclick handlers in HTML templates. Use postMessage() and handle in message handler. See: docs/MESSAGE_CONVENTIONS.md'
-        },
-        {
-          selector: "TemplateLiteral TemplateElement[value.raw=/oninput\\s*=/]",
-          message: '❌ No inline oninput handlers in HTML templates. Use postMessage() and handle in message handler. See: docs/MESSAGE_CONVENTIONS.md'
-        },
-        {
-          selector: "TemplateLiteral TemplateElement[value.raw=/<script[^>]*>/]",
-          message: '❌ No inline <script> blocks in HTML templates. Move JavaScript to webview behavior files. See: docs/EXECUTION_CONTEXTS.md'
-        },
-        // Detect common camelCase patterns in case statements
-        {
-          selector: "SwitchCase > Literal[value='loadTraces']",
-          message: "❌ Use kebab-case 'load-traces' not camelCase 'loadTraces'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='loadEnvironments']",
-          message: "❌ Use kebab-case 'load-environments' not camelCase 'loadEnvironments'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='traceLevelChanged']",
-          message: "❌ Use kebab-case 'trace-level-changed' not camelCase 'traceLevelChanged'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='filtersApplied']",
-          message: "❌ Use kebab-case 'filters-applied' not camelCase 'filtersApplied'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='traceSelected']",
-          message: "❌ Use kebab-case 'trace-selected' not camelCase 'traceSelected'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='contextMenuAction']",
-          message: "❌ Use kebab-case 'context-menu-action' not camelCase 'contextMenuAction'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='autoRefreshChanged']",
-          message: "❌ Use kebab-case 'auto-refresh-changed' not camelCase 'autoRefreshChanged'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='splitRatioChanged']",
-          message: "❌ Use kebab-case 'split-ratio-changed' not camelCase 'splitRatioChanged'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='rightPanelOpened']",
-          message: "❌ Use kebab-case 'right-panel-opened' not camelCase 'rightPanelOpened'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='rightPanelClosed']",
-          message: "❌ Use kebab-case 'right-panel-closed' not camelCase 'rightPanelClosed'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='environmentChanged']",
-          message: "❌ Use kebab-case 'environment-changed' not camelCase 'environmentChanged'. Already handled by 'environment-changed' case. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='environment-selected']",
-          message: "❌ Remove 'environment-selected' case - it is never sent. Only 'environment-changed' is emitted by EnvironmentSelectorBehavior. See: resources/webview/js/components/EnvironmentSelectorBehavior.js:162"
-        },
-        {
-          selector: "SwitchCase > Literal[value='filtersCleared']",
-          message: "❌ Use kebab-case 'filters-cleared' not camelCase 'filtersCleared'. See: docs/MESSAGE_CONVENTIONS.md"
-        },
-        {
-          selector: "SwitchCase > Literal[value='filterPanelCollapsed']",
-          message: "❌ Use kebab-case 'filter-panel-collapsed' not camelCase 'filterPanelCollapsed'. See: docs/MESSAGE_CONVENTIONS.md"
-        }
-      ]
-    }
-  },
-  {
-    // FINAL OVERRIDE: BasePanel exemption - must be last to override all previous rules
-    // BasePanel is allowed to use updateWebview() during initialization and for full UI refresh
-    files: ['src/panels/base/BasePanel.ts'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "CallExpression[callee.object.name='console']",
-          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
-        }
-        // Note: updateWebview() IS ALLOWED in BasePanel for initialization
-        // Note: Data transformation (map) IS ALLOWED in BasePanel
-      ]
-    }
-  },
-  {
-    // FINAL OVERRIDE: PanelComposer exemption - bootstrap scripts are necessary infrastructure
-    // Must be last to override all previous script block restrictions
-    files: ['src/factories/PanelComposer.ts'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "CallExpression[callee.object.name='console']",
-          message: '❌ Use this.componentLogger instead of console methods in Extension Host context'
-        }
-        // Note: Inline <script> blocks ARE ALLOWED in PanelComposer (bootstrap code for vscode API)
-        // Note: onclick handlers NOT allowed (use data-action instead)
-        // Note: updateWebview() calls NOT allowed
-      ]
+      // Allow unused vars in mocks (structural setup)
+      '@typescript-eslint/no-unused-vars': 'off'
     }
   }
 );

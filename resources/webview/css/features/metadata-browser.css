@@ -1,0 +1,515 @@
+/**
+ * Metadata Browser Feature Styles
+ * Three-panel layout: Tree (left) | Tables (center) | Detail (right)
+ */
+
+/* Import shared resizable detail panel styles */
+@import url('../shared/resizable-detail-panel.css');
+
+/* ==================================================
+   Container Layout
+   ================================================== */
+
+.metadata-browser-container {
+	display: flex;
+	height: 100%; /* Fill parent height (main-section) */
+	gap: 0;
+	overflow: hidden;
+}
+
+/* ==================================================
+   Left Sidebar - Tree View
+   ================================================== */
+
+.metadata-sidebar {
+	width: 300px;
+	min-width: 200px;
+	max-width: 500px;
+	border-right: 1px solid var(--vscode-panel-border);
+	display: flex;
+	flex-direction: column;
+	background: var(--vscode-sideBar-background);
+	overflow: hidden;
+	min-height: 0; /* Prevent flex overflow - allows tree-container to scroll properly */
+}
+
+.tree-search-container {
+	padding: 8px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-sideBar-background);
+	flex-shrink: 0; /* Don't shrink - maintain fixed height */
+}
+
+.tree-search-input {
+	width: 100%;
+	padding: 6px 8px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 3px;
+	font-size: 13px;
+}
+
+.tree-search-input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.tree-container {
+	flex: 1;
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+/* Tree Sections */
+.tree-section {
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.tree-section-header {
+	display: flex;
+	align-items: center;
+	padding: 8px 12px;
+	cursor: pointer;
+	user-select: none;
+	background: var(--vscode-sideBarSectionHeader-background);
+	color: var(--vscode-sideBarSectionHeader-foreground);
+	font-weight: 600;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.tree-section-header:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.tree-section-icon {
+	margin-right: 6px;
+	font-size: 10px;
+	width: 12px;
+	text-align: center;
+}
+
+.tree-section-title {
+	flex: 1;
+}
+
+.tree-section-count {
+	padding: 2px 6px;
+	background: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	border-radius: 10px;
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.tree-section-content {
+	padding: 4px 0;
+}
+
+/* Tree Items */
+.tree-item {
+	display: flex;
+	align-items: center;
+	padding: 6px 12px 6px 24px;
+	cursor: pointer;
+	user-select: none;
+	color: var(--vscode-foreground);
+}
+
+.tree-item:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.tree-item.selected {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+.tree-item-icon {
+	margin-right: 8px;
+	font-size: 14px;
+}
+
+.tree-item-label {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-width: 0;
+}
+
+.tree-item-name {
+	font-size: 13px;
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tree-item-technical {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	margin-top: 2px;
+}
+
+/* ==================================================
+   Center Panel - Tabbed Content
+   ================================================== */
+
+.metadata-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0; /* Prevent flex overflow */
+	overflow: hidden;
+}
+
+/* ==================================================
+   Selection Header (Breadcrumb)
+   ================================================== */
+
+.selection-header {
+	display: flex;
+	align-items: center;
+	padding: 10px 16px;
+	background: var(--vscode-editor-background);
+	border-bottom: 1px solid var(--vscode-panel-border);
+	gap: 10px;
+	flex-shrink: 0; /* Don't shrink - maintain fixed height */
+}
+
+.selection-icon {
+	font-size: 18px;
+	flex-shrink: 0;
+}
+
+.selection-info {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	flex: 1;
+}
+
+.selection-name {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.selection-technical {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	margin-top: 2px;
+}
+
+/* ==================================================
+   Tab Navigation
+   ================================================== */
+
+/* Tab Navigation */
+.tab-navigation {
+	display: flex;
+	gap: 0;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-editor-background);
+	padding: 0 12px;
+	flex-shrink: 0; /* Don't shrink - maintain fixed height */
+}
+
+.tab-button {
+	padding: 10px 16px;
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 500;
+	transition: all 0.2s;
+}
+
+.tab-button:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.tab-button.active {
+	border-bottom-color: var(--vscode-focusBorder);
+	color: var(--vscode-textLink-activeForeground);
+}
+
+/* Tab Content */
+.tab-content-container {
+	flex: 1;
+	min-height: 0; /* Critical: allows nested flex children to scroll */
+	overflow: hidden;
+	position: relative;
+}
+
+.tab-panel {
+	display: none;
+	height: 100%;
+	overflow: hidden;
+}
+
+.tab-panel.active {
+	display: block;
+}
+
+/* Table Container */
+.table-container {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	min-height: 0; /* Critical: allows table-wrapper to scroll independently */
+}
+
+.table-toolbar {
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-editor-background);
+	flex-shrink: 0; /* Don't shrink - maintain fixed height */
+}
+
+.table-search {
+	width: 300px;
+	padding: 6px 8px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 3px;
+	font-size: 13px;
+}
+
+.table-search:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.table-wrapper {
+	flex: 1;
+	overflow: auto;
+}
+
+.data-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.data-table thead {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+}
+
+.data-table th {
+	padding: 8px 12px;
+	text-align: left;
+	font-weight: 600;
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border-bottom: 2px solid var(--vscode-panel-border);
+	border-right: 1px solid rgba(255, 255, 255, 0.1);
+	white-space: nowrap;
+	cursor: pointer;
+	user-select: none;
+}
+
+.data-table th:last-child {
+	border-right: none;
+}
+
+.data-table th:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+.data-table tbody tr {
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+/* Alternating row colors for better readability */
+.data-table tbody tr.row-even {
+	background: var(--vscode-list-inactiveSelectionBackground);
+}
+
+.data-table tbody tr.row-odd {
+	background: transparent;
+}
+
+.data-table tbody tr:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.data-table td {
+	padding: 8px 12px;
+	color: var(--vscode-foreground);
+	max-width: 400px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.table-link {
+	color: var(--vscode-textLink-foreground);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.table-link:hover {
+	color: var(--vscode-textLink-activeForeground);
+	text-decoration: underline;
+}
+
+.table-empty {
+	padding: 40px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* ==================================================
+   Right Panel - Detail View
+   ================================================== */
+
+/* Feature-specific ID selector (inherits styles from shared CSS via .resizable-detail-panel) */
+#metadataDetailPanel {
+	/* Uses default 500px width from shared CSS */
+}
+
+/* Properties List */
+.properties-list {
+	padding: 8px;
+}
+
+.property-item {
+	padding: 8px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.property-item:last-child {
+	border-bottom: none;
+}
+
+.property-name {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 4px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+.property-value {
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	word-break: break-word;
+	white-space: pre-wrap;
+}
+
+/* Property Section (for tables) */
+.property-section {
+	padding: 12px 8px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.property-section:last-child {
+	border-bottom: none;
+}
+
+.property-section-title {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 8px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+/* Options Table */
+.options-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12px;
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-panel-border);
+}
+
+.options-table th {
+	padding: 6px 8px;
+	text-align: left;
+	font-weight: 600;
+	font-size: 11px;
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border-bottom: 1px solid var(--vscode-panel-border);
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+.options-table td {
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	color: var(--vscode-foreground);
+}
+
+.options-table tbody tr:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.options-table tbody tr:last-child td {
+	border-bottom: none;
+}
+
+/* Color Badge */
+.color-badge {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border-radius: 2px;
+	margin-right: 6px;
+	vertical-align: middle;
+	border: 1px solid var(--vscode-panel-border);
+}
+
+/* Raw Data Display */
+.raw-data-display {
+	padding: 0;
+	margin: 0;
+	font-family: var(--vscode-editor-font-family);
+	font-size: 12px;
+	/* color removed - let JsonHighlighter styles control color */
+	background: var(--vscode-editor-background);
+	overflow-x: auto;
+	white-space: pre;
+	word-wrap: break-word;
+}
+
+
+/* ==================================================
+   Responsive Adjustments
+   ================================================== */
+
+@media (max-width: 1200px) {
+	.metadata-sidebar {
+		width: 250px;
+	}
+}
+
+@media (max-width: 900px) {
+	.metadata-sidebar {
+		width: 200px;
+	}
+
+	.table-search {
+		width: 200px;
+	}
+}

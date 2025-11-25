@@ -1,0 +1,67 @@
+/**
+ * Button Component Styles
+ *
+ * Reusable button primitives for all panels.
+ */
+
+button {
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: none;
+	padding: 6px 14px;
+	cursor: pointer;
+	border-radius: 2px;
+	transition: background 0.2s;
+}
+
+button:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+button:active {
+	background: var(--vscode-button-hoverBackground);
+}
+
+button:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+button.btn-primary {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+button.btn-primary:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+button.btn-danger {
+	background: var(--vscode-errorForeground);
+	color: var(--vscode-button-foreground);
+}
+
+button.btn-danger:hover {
+	background: var(--vscode-errorForeground);
+	opacity: 0.8;
+}
+
+/* Spinner animation for loading states */
+.spinner {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	border: 2px solid currentColor;
+	border-top-color: transparent;
+	border-radius: 50%;
+	animation: spin 0.8s linear infinite;
+	vertical-align: middle;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}

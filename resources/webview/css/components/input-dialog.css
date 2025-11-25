@@ -1,0 +1,87 @@
+/**
+ * Input Dialog Component
+ * Reusable modal dialog for getting text input from users.
+ * Replaces browser prompt() which doesn't work in sandboxed webviews.
+ */
+
+.input-dialog-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 10000;
+}
+
+.input-dialog-container {
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-panel-border);
+	padding: 20px;
+	border-radius: 4px;
+	min-width: 400px;
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.input-dialog-title {
+	margin: 0 0 15px 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+
+.input-dialog-label {
+	display: block;
+	margin-bottom: 8px;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+}
+
+.input-dialog-input {
+	width: 100%;
+	padding: 6px 8px;
+	margin-bottom: 15px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	box-sizing: border-box;
+	font-family: var(--vscode-font-family);
+	font-size: 13px;
+}
+
+.input-dialog-input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.input-dialog-buttons {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+}
+
+.input-dialog-button {
+	padding: 6px 12px;
+	font-size: 12px;
+	cursor: pointer;
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: none;
+	border-radius: 2px;
+}
+
+.input-dialog-button:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+.input-dialog-button.secondary {
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+}
+
+.input-dialog-button.secondary:hover {
+	background: var(--vscode-button-secondaryHoverBackground);
+}

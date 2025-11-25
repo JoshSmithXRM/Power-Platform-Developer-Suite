@@ -35,7 +35,13 @@ jobs:
           
       - name: Install dependencies
         run: npm ci
-        
+
+      - name: Validate before version bump
+        run: |
+          npm run lint
+          npm test
+          npm run compile
+
       - name: Configure Git
         run: |
           git config --local user.email "action@github.com"

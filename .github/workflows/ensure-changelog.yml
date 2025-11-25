@@ -4,19 +4,33 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+
 jobs:
   check-changelog:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history so base and head commits exist
       - name: Determine changed files
         id: changes
         run: |
-          echo "::set-output name=files::$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})"
+          files=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          if [ $? -ne 0 ]; then
+            echo "ERROR: git diff failed. Base or head commit not found."
+            exit 1
+          fi
+          # Use GITHUB_OUTPUT with delimiter for multiline content
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$files" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Fail if code/docs changed without changelog update
         run: |
           files="${{ steps.changes.outputs.files }}"
-          echo "Changed files:\n$files"
+          echo "Changed files:"
+          echo "$files"
           # If only changelog was changed, pass
           if [[ -z "$files" ]]; then
             echo "No changes detected."

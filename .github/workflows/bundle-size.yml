@@ -1,0 +1,96 @@
+name: Bundle Size Check
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'webpack.config.js'
+      - 'tsconfig.json'
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  check-size:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production package
+        run: npm run package
+
+      - name: Create VSIX package
+        run: npm run vsce-package
+
+      - name: Check VSIX bundle size
+        run: |
+          VSIX_FILE=$(ls -1 *.vsix | head -n 1)
+          if [ -z "$VSIX_FILE" ]; then
+            echo "Error: No VSIX file found"
+            exit 1
+          fi
+
+          VSIX_SIZE=$(stat -f%z "$VSIX_FILE" 2>/dev/null || stat -c%s "$VSIX_FILE")
+          VSIX_SIZE_MB=$((VSIX_SIZE / 1024 / 1024))
+          MAX_SIZE=$((10 * 1024 * 1024))  # 10MB limit
+
+          echo "VSIX file: $VSIX_FILE"
+          echo "Size: ${VSIX_SIZE_MB}MB (${VSIX_SIZE} bytes)"
+          echo "Limit: 10MB"
+
+          if [ $VSIX_SIZE -gt $MAX_SIZE ]; then
+            echo "❌ Extension size exceeds 10MB limit!"
+            exit 1
+          else
+            echo "✅ Extension size is within limits"
+          fi
+
+      - name: Comment on PR with size info
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          script: |
+            const fs = require('fs');
+            const vsixFiles = fs.readdirSync('.').filter(f => f.endsWith('.vsix'));
+            if (vsixFiles.length === 0) {
+              console.log('No VSIX file found to report');
+              return;
+            }
+
+            const vsixFile = vsixFiles[0];
+            const stats = fs.statSync(vsixFile);
+            const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
+            const sizeBytes = stats.size.toLocaleString();
+            const maxMB = 10;
+            const status = stats.size > (maxMB * 1024 * 1024) ? '❌' : '✅';
+
+            const body = `## ${status} Bundle Size Report
+
+            **File:** \`${vsixFile}\`
+            **Size:** ${sizeMB}MB (${sizeBytes} bytes)
+            **Limit:** ${maxMB}MB
+
+            ${stats.size > (maxMB * 1024 * 1024) ? '⚠️ **Extension exceeds size limit!**' : '✅ Extension is within size limits'}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

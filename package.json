@@ -65,10 +65,8 @@
         "onCommand:power-platform-dev-suite.removeEnvironment",
         "onCommand:power-platform-dev-suite.solutionExplorer",
         "onCommand:power-platform-dev-suite.importJobViewer",
-        "onCommand:power-platform-dev-suite.openMetadataBrowser",
         "onCommand:power-platform-dev-suite.connectionReferences",
-        "onCommand:power-platform-dev-suite.environmentVariables",
-        "onCommand:power-platform-dev-suite.pluginTraceViewer"
+        "onCommand:power-platform-dev-suite.environmentVariables"
     ],
     "main": "./dist/extension.js",
     "contributes": {
@@ -118,79 +116,70 @@
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.openMetadataBrowser",
-                "title": "Open Metadata Browser",
-                "category": "Power Platform Developer Suite"
-            },
-            {
                 "command": "power-platform-dev-suite.solutionExplorer",
-                "title": "Solution Explorer",
+                "title": "Solutions",
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.solutionExplorerNew",
-                "title": "Open New Solution Explorer",
-                "category": "Power Platform Developer Suite"
-            },
-            {
-                "command": "power-platform-dev-suite.openMetadataBrowserNew",
-                "title": "Open New Metadata Browser",
+                "command": "power-platform-dev-suite.solutionExplorerPickEnvironment",
+                "title": "Solutions: Choose Environment",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.importJobViewer",
-                "title": "Import Job Viewer",
+                "title": "Import Jobs",
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.importJobViewerNew",
-                "title": "Open New Import Job Viewer",
-                "category": "Power Platform Developer Suite"
-            },
-            {
-                "command": "power-platform-dev-suite.dataExplorer",
-                "title": "Data Explorer",
-                "category": "Power Platform Developer Suite"
-            },
-            {
-                "command": "power-platform-dev-suite.dataExplorerNew",
-                "title": "Open New Data Explorer",
+                "command": "power-platform-dev-suite.importJobViewerPickEnvironment",
+                "title": "Import Jobs: Choose Environment",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.connectionReferences",
-                "title": "Connection References Manager",
+                "title": "Connection References",
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.connectionReferencesNew",
-                "title": "Open New Connection References Manager",
+                "command": "power-platform-dev-suite.connectionReferencesPickEnvironment",
+                "title": "Connection References: Choose Environment",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.environmentVariables",
-                "title": "Environment Variables Manager",
+                "title": "Environment Variables",
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.environmentVariablesNew",
-                "title": "Open New Environment Variables Manager",
+                "command": "power-platform-dev-suite.environmentVariablesPickEnvironment",
+                "title": "Environment Variables: Choose Environment",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.pluginTraceViewer",
-                "title": "Plugin Trace Viewer",
+                "title": "Plugin Traces",
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.pluginTraceViewerNew",
-                "title": "Open New Plugin Trace Viewer",
+                "command": "power-platform-dev-suite.pluginTraceViewerPickEnvironment",
+                "title": "Plugin Traces: Choose Environment",
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.testAttributeTypeCasting",
-                "title": "TEST: Attribute Type Casting",
+                "command": "power-platform-dev-suite.metadataBrowser",
+                "title": "Metadata Browser",
                 "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.metadataBrowserPickEnvironment",
+                "title": "Metadata Browser: Choose Environment",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.openPersistenceInspector",
+                "title": "Persistence Inspector (Dev Only)",
+                "category": "Power Platform Developer Suite",
+                "enablement": "powerPlatformDevSuite.isDevelopment"
             }
         ],
         "viewsContainers": {
@@ -258,75 +247,130 @@
                     "group": "3_remove@1"
                 },
                 {
-                    "command": "power-platform-dev-suite.solutionExplorerNew",
+                    "command": "power-platform-dev-suite.solutionExplorerPickEnvironment",
                     "when": "view == power-platform-dev-suite-tools && viewItem == solutionExplorer",
-                    "group": "1_open@1"
+                    "group": "1_environment@1"
                 },
                 {
-                    "command": "power-platform-dev-suite.openMetadataBrowserNew",
-                    "when": "view == power-platform-dev-suite-tools && viewItem == metadataBrowser",
-                    "group": "1_open@1"
-                },
-                {
-                    "command": "power-platform-dev-suite.importJobViewerNew",
+                    "command": "power-platform-dev-suite.importJobViewerPickEnvironment",
                     "when": "view == power-platform-dev-suite-tools && viewItem == importJobViewer",
-                    "group": "1_open@1"
+                    "group": "1_environment@1"
                 },
                 {
-                    "command": "power-platform-dev-suite.dataExplorerNew",
-                    "when": "view == power-platform-dev-suite-tools && viewItem == dataExplorer",
-                    "group": "1_open@1"
-                },
-                {
-                    "command": "power-platform-dev-suite.connectionReferencesNew",
+                    "command": "power-platform-dev-suite.connectionReferencesPickEnvironment",
                     "when": "view == power-platform-dev-suite-tools && viewItem == connectionReferences",
-                    "group": "1_open@1"
+                    "group": "1_environment@1"
                 },
                 {
-                    "command": "power-platform-dev-suite.environmentVariablesNew",
+                    "command": "power-platform-dev-suite.environmentVariablesPickEnvironment",
                     "when": "view == power-platform-dev-suite-tools && viewItem == environmentVariables",
-                    "group": "1_open@1"
+                    "group": "1_environment@1"
                 },
                 {
-                    "command": "power-platform-dev-suite.pluginTraceViewerNew",
+                    "command": "power-platform-dev-suite.pluginTraceViewerPickEnvironment",
                     "when": "view == power-platform-dev-suite-tools && viewItem == pluginTraceViewer",
-                    "group": "1_open@1"
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.metadataBrowserPickEnvironment",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == metadataBrowser",
+                    "group": "1_environment@1"
+                }
+            ],
+            "webview/context": [
+                {
+                    "command": "power-platform-dev-suite.solutionExplorerPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.solutionExplorer'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.importJobViewerPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.importJobViewer'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.connectionReferencesPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.connectionReferences'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.environmentVariablesPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.environmentVariables'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.pluginTraceViewerPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginTraceViewer'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.metadataBrowserPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.metadataBrowser'",
+                    "group": "1_environment@1"
                 }
             ]
         }
     },
     "scripts": {
         "vscode:prepublish": "npm run package",
-        "compile": "npm run lint && webpack",
-        "compile:no-lint": "webpack",
-        "watch": "webpack --watch",
-        "package": "npm run lint && webpack --mode production --devtool hidden-source-map",
-        "package:no-lint": "webpack --mode production --devtool hidden-source-map",
+        "compile": "npm run lint:all && npm test && npm run build:extension && npm run build:webview",
+        "compile:no-lint": "npm test && npm run build:extension && npm run build:webview",
+        "compile:no-test": "npm run lint:all && npm run build:extension && npm run build:webview",
+        "compile:fast": "npm run build:extension && npm run build:webview",
+        "build:extension": "webpack --config webpack.config.js",
+        "build:webview": "webpack --mode development --config webpack.webview.config.js",
+        "watch": "npm run watch:extension & npm run watch:webview",
+        "watch:extension": "webpack --config webpack.config.js --watch",
+        "watch:webview": "webpack --mode development --config webpack.webview.config.js --watch",
+        "package": "npm run lint:all && webpack --config webpack.config.js --mode production --devtool hidden-source-map && webpack --config webpack.webview.config.js --mode production --devtool hidden-source-map",
+        "package:no-lint": "webpack --config webpack.config.js --mode production --devtool hidden-source-map && webpack --config webpack.webview.config.js --mode production --devtool hidden-source-map",
         "lint": "eslint src",
         "lint:fix": "eslint src --fix",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
+        "lint:all": "eslint src resources/webview/js",
+        "lint:webview": "eslint resources/webview/js",
         "lint:architecture": "eslint src",
         "vsce-package": "vsce package",
         "test-release": "npm run package && npm run vsce-package && npm run install-local",
-        "install-local": "code --install-extension power-platform-developer-suite-${npm_package_version}.vsix --force",
+        "install-local": "node scripts/install-local.js",
         "uninstall-local": "code --uninstall-extension JoshSmithXRM.power-platform-developer-suite",
+        "revert-to-marketplace": "npm run uninstall-local && code --install-extension JoshSmithXRM.power-platform-developer-suite && echo Successfully reverted to marketplace version",
+        "local": "node scripts/build-local.js",
+        "marketplace": "npm run revert-to-marketplace",
+        "cleanup-extensions": "node scripts/cleanup-extensions.js",
         "clean-install": "npm run uninstall-local && npm run test-release",
-        "test-fresh": "npm run clean-install && code --new-window"
+        "test-fresh": "npm run clean-install && code --new-window",
+        "dead-code:check": "ts-prune",
+        "dead-code:deps": "depcheck",
+        "type-coverage": "type-coverage --at-least 95 --ignore-files 'src/**/*.spec.ts'",
+        "comment-audit": "grep -rnw . -e 'TODO\\|FIXME\\|XXX\\|HACK' --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git || true",
+        "call-graph": "madge --circular --extensions ts src/",
+        "call-graph:orphans": "madge --orphans --extensions ts src/",
+        "maintenance:weekly": "npm run dead-code:check && npm run comment-audit && npm run call-graph",
+        "maintenance:monthly": "npm run maintenance:weekly && npm run dead-code:deps && npm run type-coverage",
+        "maintenance:full": "npm run maintenance:monthly"
     },
     "dependencies": {
-        "@azure/msal-node": "^2.13.0",
-        "@types/node-fetch": "^2.6.13",
-        "axios": "^1.7.7",
-        "node-fetch": "^3.3.2",
-        "node-persist": "^4.0.2"
+        "@azure/msal-node": "^2.13.0"
     },
     "devDependencies": {
         "@eslint/js": "^9.35.0",
+        "@types/jest": "^30.0.0",
         "@types/node": "16.x",
         "@types/vscode": "^1.74.0",
         "@typescript-eslint/eslint-plugin": "^8.43.0",
         "@typescript-eslint/parser": "^8.43.0",
+        "@vscode/vsce": "^3.2.1",
         "eslint-plugin-import": "^2.32.0",
+        "eslint-plugin-local-rules": "^3.0.2",
+        "jest": "^30.2.0",
+        "madge": "^7.0.0",
+        "ts-jest": "^29.4.5",
         "ts-loader": "^9.5.4",
+        "tslib": "^2.8.1",
+        "type-coverage": "^2.29.7",
         "typescript": "^4.9.4",
         "typescript-eslint": "^8.43.0",
         "webpack": "^5.101.3",

@@ -2,97 +2,24 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Build Extension",
-			"type": "shell",
-			"command": "npm",
-			"args": [
-				"run",
-				"compile"
-			],
+			"type": "npm",
+			"script": "watch",
+			"problemMatcher": "$tsc-watch",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never"
+			},
 			"group": {
 				"kind": "build",
 				"isDefault": true
-			},
-			"presentation": {
-				"echo": true,
-				"reveal": "silent",
-				"focus": false,
-				"panel": "shared"
-			},
-			"problemMatcher": []
-		},
-		{
-			"label": "Watch",
-			"type": "shell",
-			"command": "npm",
-			"args": [
-				"run",
-				"watch"
-			],
-			"group": "build",
-			"isBackground": true,
-			"presentation": {
-				"echo": true,
-				"reveal": "silent",
-				"focus": false,
-				"panel": "shared"
-			},
-			"problemMatcher": []
-		},
-		{
-			"label": "Package Extension",
-			"type": "shell",
-			"command": "npm",
-			"args": [
-				"run",
-				"vsce-package"
-			],
-			"group": "build",
-			"dependsOn": "Build Extension",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared"
 			}
 		},
 		{
-			"label": "Test Release",
-			"type": "shell",
-			"command": "pwsh",
-			"args": [
-				"-File",
-				"scripts/test-release.ps1",
-				"-Clean",
-				"-NewWindow",
-				"-Verbose"
-			],
-			"group": "test",
-			"dependsOn": "Package Extension",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": true,
-				"panel": "dedicated"
-			}
-		},
-		{
-			"label": "Analyze Package",
-			"type": "shell",
-			"command": "pwsh",
-			"args": [
-				"-File",
-				"scripts/analyze-package.ps1",
-				"-Detailed"
-			],
-			"group": "test",
-			"dependsOn": "Package Extension",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": true,
-				"panel": "dedicated"
-			}
+			"type": "npm",
+			"script": "compile:no-lint",
+			"problemMatcher": [],
+			"label": "npm: compile:no-lint",
+			"detail": "webpack"
 		}
 	]
 }

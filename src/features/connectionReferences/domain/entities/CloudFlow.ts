@@ -1,0 +1,110 @@
+import { ValidationError } from '../../../../shared/domain/errors/ValidationError';
+
+/**
+ * CloudFlow entity representing a Power Automate cloud flow.
+ *
+ * Parses clientdata JSON to extract connection reference names and provides flow metadata.
+ */
+export class CloudFlow {
+	/**
+	 * @param clientData - JSON string containing flow definition (null if not loaded)
+	 * @throws {ValidationError} When clientData is present but invalid JSON
+	 */
+	constructor(
+		public readonly id: string,
+		public readonly name: string,
+		public readonly modifiedOn: Date,
+		public readonly isManaged: boolean,
+		public readonly createdBy: string,
+		public readonly clientData: string | null
+	) {
+		if (clientData !== null && clientData.length > 0) {
+			try {
+				JSON.parse(clientData);
+			} catch (_error) {
+				throw new ValidationError(
+					'CloudFlow',
+					'clientData',
+					clientData.substring(0, 100),
+					'Must be valid JSON or null'
+				);
+			}
+		}
+	}
+
+	/**
+	 * Type guard to check if clientData is loaded.
+	 * Narrows the type to ensure clientData is a non-null string.
+	 *
+	 * @returns True if clientData is present and non-empty
+	 */
+	hasClientData(): this is CloudFlow & { clientData: string } {
+		return this.clientData !== null && this.clientData.length > 0;
+	}
+
+	/**
+	 * Extracts connection reference logical names from the flow's clientData.
+	 *
+	 * Parses the connectionReferences section of clientData JSON to identify which
+	 * connection references this flow depends on.
+	 *
+	 * @returns Array of connection reference logical names, or empty array if no data
+	 */
+	extractConnectionReferenceNames(): string[] {
+		// Type guard: ensures clientData is non-null string throughout this method
+		if (!this.hasClientData()) {
+			return [];
+		}
+
+		try {
+			const data: unknown = JSON.parse(this.clientData);
+
+			if (!this.isValidClientData(data)) {
+				return [];
+			}
+
+			const connectionRefs = data.properties?.connectionReferences;
+
+			// Check for null/undefined first, then check if it's an object
+			// Note: typeof null === 'object' in JavaScript, so !connectionRefs handles that case
+			if (!connectionRefs || typeof connectionRefs !== 'object') {
+				return [];
+			}
+
+			const names: string[] = [];
+			Object.values(connectionRefs).forEach((connRef) => {
+				if (connRef && typeof connRef === 'object' && 'connection' in connRef) {
+					const connection = connRef.connection;
+					if (connection && typeof connection === 'object' && 'connectionReferenceLogicalName' in connection) {
+						const logicalName = connection.connectionReferenceLogicalName;
+						if (typeof logicalName === 'string') {
+							names.push(logicalName);
+						}
+					}
+				}
+			});
+
+			return names;
+		} catch (_error) {
+			return [];
+		}
+	}
+
+	private isValidClientData(data: unknown): data is { properties?: { connectionReferences?: Record<string, unknown> } } {
+		return (
+			typeof data === 'object' &&
+			data !== null &&
+			'properties' in data
+		);
+	}
+
+	/**
+	 * Determines if this flow has any connection references.
+	 * Convenience method that checks if extracted connection reference names are present.
+	 *
+	 * @returns True if flow uses at least one connection reference
+	 */
+	hasConnectionReferences(): boolean {
+		return this.extractConnectionReferenceNames().length > 0;
+	}
+}

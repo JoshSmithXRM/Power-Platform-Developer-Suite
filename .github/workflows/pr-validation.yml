@@ -1,0 +1,44 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, 'feature/**', 'fix/**', 'refactor/**']
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Security audit
+        run: npm audit --audit-level=moderate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript compilation
+        run: npm run compile:no-lint
+
+      - name: Run tests with coverage
+        run: npm test -- --coverage
+
+      - name: Type coverage
+        run: npm run type-coverage
+
+      - name: Check for circular dependencies
+        run: npm run call-graph
+
+      - name: Validate architecture rules
+        run: npm run lint:architecture

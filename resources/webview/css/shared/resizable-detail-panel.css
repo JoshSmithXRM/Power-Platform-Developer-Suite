@@ -1,0 +1,185 @@
+/**
+ * Shared styles for resizable detail panels.
+ *
+ * Used by any feature that extends ResizableDetailPanelSection base class.
+ *
+ * Architecture:
+ * - Static HTML structure rendered ONCE by TypeScript
+ * - Resize handle NEVER destroyed
+ * - Tab content updated by JavaScript (targeted updates by ID)
+ *
+ * Pattern: docs/architecture/RESIZABLE_DETAIL_PANEL_PATTERN.md
+ * Base Class: src/shared/infrastructure/ui/sections/ResizableDetailPanelSection.ts
+ *
+ * DO NOT DUPLICATE THESE STYLES IN FEATURE CSS FILES!
+ * Import this file instead: @import url('../shared/resizable-detail-panel.css');
+ */
+
+/* ==================================================
+   Panel Container (applies to any detail panel ID)
+   ================================================== */
+
+.resizable-detail-panel {
+	position: relative;
+	width: 500px;
+	min-width: 300px;
+	max-width: 80vw;
+	border-left: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-sideBar-background);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+/* ==================================================
+   Panel Header
+   ================================================== */
+
+.detail-panel-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-editor-background);
+}
+
+.detail-panel-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.detail-panel-close {
+	background: transparent;
+	border: none;
+	color: var(--vscode-foreground);
+	font-size: 20px;
+	cursor: pointer;
+	padding: 4px 8px;
+	line-height: 1;
+	border-radius: 3px;
+}
+
+.detail-panel-close:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+/* ==================================================
+   Tab Navigation
+   ================================================== */
+
+.detail-tab-navigation {
+	display: flex;
+	gap: 0;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-sideBar-background);
+	padding: 0 8px;
+}
+
+.detail-tab-button {
+	padding: 8px 12px;
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 500;
+	transition: all 0.2s;
+}
+
+.detail-tab-button:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.detail-tab-button.active {
+	border-bottom-color: var(--vscode-focusBorder);
+	color: var(--vscode-textLink-activeForeground);
+}
+
+/* ==================================================
+   Tab Content Container
+   ================================================== */
+
+.detail-content {
+	flex: 1;
+	overflow: hidden;
+	position: relative;
+	min-height: 0;
+}
+
+.detail-tab-panel {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding: 16px;
+	display: none;
+	box-sizing: border-box;
+}
+
+.detail-tab-panel.active {
+	display: block;
+}
+
+/* ==================================================
+   Resize Handle
+   ================================================== */
+
+.detail-panel-resize-handle {
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 8px;
+	cursor: col-resize;
+	z-index: 10;
+	transition: background-color 0.15s ease;
+}
+
+.detail-panel-resize-handle:hover,
+.detail-panel-resize-handle.resizing {
+	background: var(--vscode-focusBorder);
+}
+
+.detail-panel-resize-handle::before {
+	content: '';
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 3px;
+	height: 40px;
+	background: var(--vscode-panel-border);
+	border-radius: 2px;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+.detail-panel-resize-handle:hover::before,
+.detail-panel-resize-handle.resizing::before {
+	opacity: 1;
+}
+
+/* ==================================================
+   Responsive Adjustments
+   ================================================== */
+
+@media (max-width: 1200px) {
+	.resizable-detail-panel {
+		width: 350px;
+	}
+}
+
+@media (max-width: 900px) {
+	.resizable-detail-panel {
+		width: 300px;
+	}
+}

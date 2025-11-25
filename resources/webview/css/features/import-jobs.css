@@ -1,0 +1,13 @@
+/* Import Job Viewer Panel Styles */
+
+.status-completed {
+	color: var(--vscode-terminal-ansiGreen);
+}
+
+.status-failed {
+	color: var(--vscode-terminal-ansiRed);
+}
+
+.status-in-progress {
+	color: var(--vscode-terminal-ansiYellow);
+}

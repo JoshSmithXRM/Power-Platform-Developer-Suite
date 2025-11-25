@@ -1,293 +1,294 @@
 # Power Platform Developer Suite - Documentation
 
-**Version**: 0.0.2
-**Last Updated**: 2025-10-27
-
-Welcome to the Power Platform Developer Suite documentation. This extension helps developers, admins, and power users work with Dynamics 365, Dataverse, and Power Platform solutions directly from VS Code.
+**Master index for all project documentation. Navigate by category to find guides, architecture documentation, and design specifications.**
 
 ---
 
-## 📚 Documentation Index
+## 🚀 Getting Started
 
-### 🚀 Getting Started
+### For Developers
+- [CLAUDE.md](../CLAUDE.md) - Quick reference for AI assistants (essential rules and patterns)
+- [DOCUMENTATION_STYLE_GUIDE.md](DOCUMENTATION_STYLE_GUIDE.md) - How to write and maintain documentation
 
-**New to the project?** Start here:
-
-1. **[CLAUDE.md](../CLAUDE.md)** - Quick reference for AI assistants (also useful for developers)
-   - Critical patterns and conventions
-   - Component architecture overview
-   - Common pitfalls to avoid
-
-2. **[DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md)** - Practical development workflow
-   - Build and run instructions
-   - Development commands
-   - Debugging techniques
-   - Testing workflow
+### For Contributors
+Start with CLAUDE.md to understand the project's core principles, then refer to the Clean Architecture Guide for implementation patterns.
 
 ---
 
-### 🏗️ Core Architecture
+## 📐 Core Architecture
 
-Understanding the system design:
+### Architecture Guides
+- [CLEAN_ARCHITECTURE_GUIDE.md](architecture/CLEAN_ARCHITECTURE_GUIDE.md) - Clean Architecture implementation patterns in this codebase
+  - Rich domain models with behavior (not anemic entities)
+  - Use cases that orchestrate (no business logic)
+  - Dependency inversion and repository pattern
+  - Real examples from Environment and Persistence Inspector features
 
-3. **[ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md)** - High-level architecture
-   - SOLID principles implementation
-   - Component-based architecture
-   - Separation of concerns
-   - Factory patterns
+### Pattern Guides (Detailed Implementation)
+- [VALUE_OBJECT_PATTERNS.md](architecture/VALUE_OBJECT_PATTERNS.md) - Value Object implementation patterns
+  - Validation strategies (constructor, static factory, builder)
+  - Immutability and value equality
+  - When to use value objects vs primitives
+  - Production examples: EnvironmentId, EnvironmentName, FilterField
 
-4. **[EXECUTION_CONTEXTS.md](EXECUTION_CONTEXTS.md)** ⭐ **CRITICAL**
-   - Extension Host vs Webview separation
-   - What code runs where
-   - Common mistakes to avoid
-   - Message passing patterns
+- [DOMAIN_SERVICE_PATTERNS.md](architecture/DOMAIN_SERVICE_PATTERNS.md) - Domain Service patterns
+  - When to use services vs entity methods
+  - Collection services, validation services, query builders
+  - Stateless, pure domain logic
+  - Production examples: FlowConnectionRelationshipBuilder, PluginTraceFilterService
 
-5. **[COMPONENT_PATTERNS.md](COMPONENT_PATTERNS.md)** - Component design
-   - Component lifecycle
-   - Event bridge pattern
-   - Configuration interfaces
-   - Reusable components
+- [MAPPER_PATTERNS.md](architecture/MAPPER_PATTERNS.md) - DTO ↔ Domain mapping patterns
+  - Sorting decision tree (domain service → mapper → ViewModel)
+  - ViewModel mappers, deployment settings mappers, infrastructure mappers
+  - When to delegate sorting vs inline sorting
+  - Production examples: SolutionViewModelMapper, EnvironmentVariableViewModelMapper
 
----
+- [REPOSITORY_PATTERNS.md](architecture/REPOSITORY_PATTERNS.md) - Repository implementation patterns
+  - DTO → domain mapping (inline vs injected mapper)
+  - Query building (static, dynamic, multi-step)
+  - Caching strategies (5-minute metadata cache)
+  - Batch operations and performance optimization
+  - Production examples: DataverseApiSolutionRepository, DataverseEntityMetadataRepository
 
-### 🎨 Implementation Guides
-
-Building panels and features:
-
-6. **[PANEL_LAYOUT_GUIDE.md](PANEL_LAYOUT_GUIDE.md)** ⭐ **MANDATORY**
-   - Standard panel structure
-   - Required HTML layout
-   - Flexbox CSS patterns
-   - Custom layouts (advanced)
-
-7. **[STYLING_PATTERNS.md](STYLING_PATTERNS.md)** - CSS and theming
-   - Semantic CSS tokens
-   - Theme compatibility
-   - Component styling
-   - Layout patterns
-
-8. **[MESSAGE_CONVENTIONS.md](MESSAGE_CONVENTIONS.md)** ⭐ **NEW**
-   - Kebab-case naming standard
-   - Message structure
-   - Component events
-   - Type safety
-
-9. **[ERROR_HANDLING_PATTERNS.md](ERROR_HANDLING_PATTERNS.md)** ⭐ **NEW**
-   - Error handling standards
-   - User notification strategy
-   - Success message patterns
-   - Type-safe error handling
+### Infrastructure Documentation
+- [LOGGING_GUIDE.md](architecture/LOGGING_GUIDE.md) - Logging architecture and patterns
+  - Layer boundaries for logging (domain has zero logging)
+  - OutputChannel vs console.log usage
+  - Webview logging with message bridge pattern
+  - Dependency injection for ILogger
 
 ---
 
-### 🔧 Standards & Quality
+## 🧪 Testing Guides
 
-Code quality and linting:
+### Testing Patterns
+- [TESTING_GUIDE.md](testing/TESTING_GUIDE.md) - Comprehensive testing guide
+  - Inverted testing pyramid (heavy domain, light presentation)
+  - Coverage targets by layer (domain 95-100%, app 85-95%)
+  - Test data factories and mock helpers
+  - Shared testing setup utilities (src/shared/testing/setup/)
+  - Test-driven bug fix workflow
 
-10. **[LINT_RECOMMENDATIONS.md](LINT_RECOMMENDATIONS.md)** - ESLint rules
-    - Code quality violations found
-    - Recommended ESLint rules
-    - Compliance scores
-    - Remediation strategies
-
----
-
-### 📋 Feature Planning
-
-Future features and design documents:
-
-11. **[features/DATA_EXPLORER_DESIGN.md](features/DATA_EXPLORER_DESIGN.md)** - Data Explorer spec
-    - Entity data browsing
-    - CRUD operations
-    - FetchXML queries
-    - Advanced filtering
-
-12. **[features/CONSOLIDATED_LINTING_PLAN.md](features/CONSOLIDATED_LINTING_PLAN.md)** - Linting strategy
-    - Linting implementation plan
-    - Rule priorities
-    - Migration strategy
-
-13. **[features/IMPLEMENTATION_PLAN.md](features/IMPLEMENTATION_PLAN.md)** - Project roadmap
-    - Feature implementation order
-    - Technical dependencies
-    - Timeline estimates
+- [INTEGRATION_TESTING_GUIDE.md](testing/INTEGRATION_TESTING_GUIDE.md) - Integration testing patterns
+  - Panel integration tests (panel + behaviors + coordinator + use cases)
+  - VS Code mocking patterns (webview, workspace state)
+  - Testing initialization workflows, command handling, state persistence
+  - Error scenario testing and edge case handling
+  - Production examples: ConnectionReferencesPanelComposed, EnvironmentSetupPanelComposed
 
 ---
 
-## 🎯 Quick Navigation by Task
+## 🏗️ Design Documents
 
-### "I want to create a new panel"
+### Feature Designs
+- [data-panel-suite-requirements.md](design/data-panel-suite-requirements.md) - Requirements for Data Panel Suite
+  - 4 panels: Solution Explorer, Import Job Viewer, Environment Variables, Connection References
+  - API endpoints, domain models, and business rules
+  - Deployment settings export functionality
 
-Read in this order:
-1. [EXECUTION_CONTEXTS.md](EXECUTION_CONTEXTS.md) - Understand Extension Host vs Webview
-2. [PANEL_LAYOUT_GUIDE.md](PANEL_LAYOUT_GUIDE.md) - Learn mandatory structure
-3. [COMPONENT_PATTERNS.md](COMPONENT_PATTERNS.md) - Use existing components
-4. [MESSAGE_CONVENTIONS.md](MESSAGE_CONVENTIONS.md) - Implement messaging
-5. [ERROR_HANDLING_PATTERNS.md](ERROR_HANDLING_PATTERNS.md) - Handle errors correctly
-
-### "I want to create a new component"
-
-Read in this order:
-1. [COMPONENT_PATTERNS.md](COMPONENT_PATTERNS.md) - Component design patterns
-2. [EXECUTION_CONTEXTS.md](EXECUTION_CONTEXTS.md) - Context separation
-3. [STYLING_PATTERNS.md](STYLING_PATTERNS.md) - Use semantic tokens
-4. [MESSAGE_CONVENTIONS.md](MESSAGE_CONVENTIONS.md) - Event communication
-
-### "I want to understand the error handling"
-
-Read in this order:
-1. [ERROR_HANDLING_PATTERNS.md](ERROR_HANDLING_PATTERNS.md) - Complete error guide
-2. [MESSAGE_CONVENTIONS.md](MESSAGE_CONVENTIONS.md) - Error message format
-3. [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Logging practices
-
-### "I want to fix linting errors"
-
-Read in this order:
-1. [LINT_RECOMMENDATIONS.md](LINT_RECOMMENDATIONS.md) - Current violations
-2. [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md) - Why rules exist
-3. [EXECUTION_CONTEXTS.md](EXECUTION_CONTEXTS.md) - Context violations
-4. [STYLING_PATTERNS.md](STYLING_PATTERNS.md) - CSS semantic tokens
+- [data-panel-suite-design.md](design/data-panel-suite-design.md) - Clean Architecture design for Data Panel Suite
+  - Domain entities with rich behavior (Solution, ImportJob, EnvironmentVariable, etc.)
+  - Use case orchestration patterns
+  - Repository implementations and panel structure
+  - Implementation order and testing strategy
 
 ---
 
-## 📖 Documentation Standards
+## 🔧 Meta Documentation
 
-All documentation in this project follows these standards:
+### Documentation Maintenance
+- [DOCUMENTATION_STYLE_GUIDE.md](DOCUMENTATION_STYLE_GUIDE.md) - Style guide for all documentation
+  - Naming conventions: `{TOPIC}_{TYPE}.md`
+  - No dates in content (use git history)
+  - Quick Reference pattern for docs >400 lines
+  - Examples with ✅/❌ pattern
 
-### Structure
-
-- **Purpose** - What problem does this solve?
-- **Examples** - Show, don't just tell
-- **Anti-patterns** - Show what NOT to do
-- **References** - Link to related docs
-
-### Code Examples
-
-- ✅ Use real code from the project
-- ✅ Include both correct and incorrect examples
-- ✅ Explain why patterns are recommended
-- ✅ Provide context and metadata
-
-### Maintenance
-
-- **Last Updated** - All docs have update date
-- **Status** - Active, Deprecated, Draft, Planned
-- **Cross-References** - Link related documents
-- **Examples** - Update when code changes
+### Technical Debt
+- [technical-debt/](technical-debt/) - Categorized technical debt tracking
+  - See [technical-debt/README.md](technical-debt/README.md) for complete index and current counts
 
 ---
 
-## 🤖 For AI Assistants
+## 📋 Document Categories
 
-If you're an AI assistant helping with this codebase:
+### By Type
 
-**Primary Reference**: [../CLAUDE.md](../CLAUDE.md) - Start here for quick orientation
+**Guides** (`*_GUIDE.md`) - How-to, step-by-step instructions, practical workflows
+- CLEAN_ARCHITECTURE_GUIDE.md
+- LOGGING_GUIDE.md
 
-**Critical Rules**:
-1. NEVER mix Extension Host and Webview contexts ([EXECUTION_CONTEXTS.md](EXECUTION_CONTEXTS.md))
-2. ALWAYS use standard panel structure ([PANEL_LAYOUT_GUIDE.md](PANEL_LAYOUT_GUIDE.md))
-3. ALWAYS use kebab-case for messages ([MESSAGE_CONVENTIONS.md](MESSAGE_CONVENTIONS.md))
-4. ALWAYS follow error handling patterns ([ERROR_HANDLING_PATTERNS.md](ERROR_HANDLING_PATTERNS.md))
+**Requirements** (`*-requirements.md`) - Feature requirements and specifications
+- data-panel-suite-requirements.md
 
-**When Asked About**:
-- Panel creation → [PANEL_LAYOUT_GUIDE.md](PANEL_LAYOUT_GUIDE.md)
-- Component usage → [COMPONENT_PATTERNS.md](COMPONENT_PATTERNS.md)
-- Messaging → [MESSAGE_CONVENTIONS.md](MESSAGE_CONVENTIONS.md)
-- Errors → [ERROR_HANDLING_PATTERNS.md](ERROR_HANDLING_PATTERNS.md)
-- Styling → [STYLING_PATTERNS.md](STYLING_PATTERNS.md)
-- Architecture → [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md)
+**Design** (`*-design.md`) - Architecture and design decisions
+- data-panel-suite-design.md
 
----
+**Reference** (`*_REFERENCE.md`) - Quick lookup, specifications, cheat sheets
+- CLAUDE.md (AI assistant reference)
 
-## 📊 Documentation Coverage
-
-| Topic | Coverage | Quality | Last Updated |
-|-------|----------|---------|--------------|
-| Architecture | ✅ Complete | ⭐⭐⭐⭐⭐ | Recent |
-| Execution Contexts | ✅ Complete | ⭐⭐⭐⭐⭐ | Recent |
-| Panel Layouts | ✅ Complete | ⭐⭐⭐⭐⭐ | Recent |
-| Components | ✅ Complete | ⭐⭐⭐⭐ | Recent |
-| Styling | ✅ Complete | ⭐⭐⭐⭐ | Recent |
-| Development | ✅ Complete | ⭐⭐⭐⭐ | Recent |
-| Messages | ✅ Complete | ⭐⭐⭐⭐⭐ | 2025-10-27 |
-| Error Handling | ✅ Complete | ⭐⭐⭐⭐⭐ | 2025-10-27 |
-| Testing | ⚠️ Partial | ⭐⭐ | TBD |
-| Linting | ✅ Complete | ⭐⭐⭐⭐ | 2025-10-26 |
-| Data Explorer | 🔵 Planned | N/A | Future |
+**Meta** - Documentation about documentation
+- DOCUMENTATION_STYLE_GUIDE.md
+- technical-debt/ (categorized debt tracking)
+- README.md (this file)
 
 ---
 
-## 🔗 External Resources
+## 🗂️ Document Organization
 
-### Power Platform
-- [Power Platform Documentation](https://docs.microsoft.com/power-platform/)
-- [Dataverse Web API Reference](https://docs.microsoft.com/power-apps/developer/data-platform/webapi/overview)
-- [Power Apps Component Framework](https://docs.microsoft.com/power-apps/developer/component-framework/overview)
+```
+docs/
+├── README.md                              (this file - master index)
+├── DOCUMENTATION_STYLE_GUIDE.md           (how to write docs)
+├── technical-debt/                        (categorized debt tracking)
+├── architecture/
+│   ├── CLEAN_ARCHITECTURE_GUIDE.md        (core architecture patterns)
+│   ├── VALUE_OBJECT_PATTERNS.md           (value object implementation)
+│   ├── DOMAIN_SERVICE_PATTERNS.md         (domain service patterns)
+│   ├── MAPPER_PATTERNS.md                 (DTO ↔ domain mapping)
+│   ├── REPOSITORY_PATTERNS.md             (repository patterns)
+│   └── LOGGING_GUIDE.md                   (logging architecture)
+├── testing/
+│   ├── TESTING_GUIDE.md                   (unit testing patterns)
+│   └── INTEGRATION_TESTING_GUIDE.md       (integration testing patterns)
+└── design/
+    ├── data-panel-suite-requirements.md
+    └── data-panel-suite-design.md
+```
 
-### VS Code Extension Development
-- [VS Code Extension API](https://code.visualstudio.com/api)
-- [Webview API](https://code.visualstudio.com/api/extension-guides/webview)
-- [Extension Guides](https://code.visualstudio.com/api/extension-guides/overview)
+---
 
-### TypeScript
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
-- [TypeScript ESLint](https://typescript-eslint.io/)
+## 🔍 Finding What You Need
+
+### I want to...
+
+**Understand the codebase architecture**
+→ Start with [CLEAN_ARCHITECTURE_GUIDE.md](architecture/CLEAN_ARCHITECTURE_GUIDE.md)
+
+**Learn coding standards and rules**
+→ Read [CLAUDE.md](../CLAUDE.md) in the project root
+
+**Implement a value object (immutable, validated)**
+→ Follow [VALUE_OBJECT_PATTERNS.md](architecture/VALUE_OBJECT_PATTERNS.md)
+
+**Create a domain service (collection, validation, query builder)**
+→ Follow [DOMAIN_SERVICE_PATTERNS.md](architecture/DOMAIN_SERVICE_PATTERNS.md)
+
+**Map between domain entities and ViewModels**
+→ Follow [MAPPER_PATTERNS.md](architecture/MAPPER_PATTERNS.md)
+
+**Implement a repository (API calls, DTO mapping)**
+→ Follow [REPOSITORY_PATTERNS.md](architecture/REPOSITORY_PATTERNS.md)
+
+**Write tests for my feature**
+→ Follow [TESTING_GUIDE.md](testing/TESTING_GUIDE.md) for unit tests
+→ Follow [INTEGRATION_TESTING_GUIDE.md](testing/INTEGRATION_TESTING_GUIDE.md) for panel integration tests
+
+**Add logging to my feature**
+→ Follow [LOGGING_GUIDE.md](architecture/LOGGING_GUIDE.md)
+
+**Implement a new data panel**
+→ Reference [data-panel-suite-design.md](design/data-panel-suite-design.md)
+
+**Write new documentation**
+→ Follow [DOCUMENTATION_STYLE_GUIDE.md](DOCUMENTATION_STYLE_GUIDE.md)
+
+**Understand why something was deferred**
+→ Check [technical-debt/README.md](technical-debt/README.md)
+
+---
+
+## 📌 Quick Links
+
+### Essential Reading (Start Here)
+1. [CLAUDE.md](../CLAUDE.md) - Core principles (NEVER/ALWAYS rules)
+2. [CLEAN_ARCHITECTURE_GUIDE.md](architecture/CLEAN_ARCHITECTURE_GUIDE.md) - How we structure code
+3. [TESTING_GUIDE.md](testing/TESTING_GUIDE.md) - How we test
+4. [LOGGING_GUIDE.md](architecture/LOGGING_GUIDE.md) - How we log
+
+### For AI Assistants
+- [CLAUDE.md](../CLAUDE.md) - Quick reference with essential rules
+- [CLEAN_ARCHITECTURE_GUIDE.md](architecture/CLEAN_ARCHITECTURE_GUIDE.md) - Architectural overview
+- **Pattern Guides** (detailed implementation):
+  - [VALUE_OBJECT_PATTERNS.md](architecture/VALUE_OBJECT_PATTERNS.md)
+  - [DOMAIN_SERVICE_PATTERNS.md](architecture/DOMAIN_SERVICE_PATTERNS.md)
+  - [MAPPER_PATTERNS.md](architecture/MAPPER_PATTERNS.md) - **Read this first to avoid sorting mistakes**
+  - [REPOSITORY_PATTERNS.md](architecture/REPOSITORY_PATTERNS.md)
+- **Testing Guides**:
+  - [TESTING_GUIDE.md](testing/TESTING_GUIDE.md) - Unit testing patterns
+  - [INTEGRATION_TESTING_GUIDE.md](testing/INTEGRATION_TESTING_GUIDE.md) - Panel integration tests
+- [DOCUMENTATION_STYLE_GUIDE.md](DOCUMENTATION_STYLE_GUIDE.md) - How to maintain/improve docs
+
+### For Feature Development
+- [data-panel-suite-requirements.md](design/data-panel-suite-requirements.md) - Current feature requirements
+- [data-panel-suite-design.md](design/data-panel-suite-design.md) - Implementation approach
+- See [.claude/WORKFLOW.md](../.claude/WORKFLOW.md) for development workflows
+
+---
+
+## 🔄 Maintenance
+
+### Adding New Documentation
+
+**Before creating a new document:**
+1. Check if content fits into existing document (<800 lines soft limit)
+2. Follow naming convention: `{TOPIC}_{TYPE}.md` (GUIDE, PATTERNS, or REFERENCE)
+3. Include Quick Reference section if >400 lines
+4. Use real code examples from this codebase (not toy examples)
+5. Follow ✅/❌ pattern for good/bad examples
+6. Add entry to this README.md under appropriate category
+
+**Review checklist:** See [DOCUMENTATION_STYLE_GUIDE.md - Review Checklist](DOCUMENTATION_STYLE_GUIDE.md#review-checklist)
+
+### Updating Existing Documentation
+
+**When to update:**
+- Code patterns change (architectural refactoring)
+- New features added that demonstrate patterns
+- Errors or outdated information discovered
+- Examples become stale or deprecated
+
+**When updating:**
+- Don't add dates to content (git history is source of truth)
+- Maintain consistency with style guide
+- Update cross-references if structure changes
+- Keep Quick Reference sections current
+
+---
+
+## 📚 Documentation Principles
+
+### Core Philosophy
+1. **Concise, Example-Driven, Practical** - Show working code from actual codebase
+2. **No Dates** - Use git history for tracking changes
+3. **Progressive Disclosure** - Quick Reference for scanning, detailed content for depth
+4. **Optimized for AI and Humans** - Both audiences benefit from structured information
+
+### Quality Standards
+- Real code examples (from `src/features/`)
+- ✅/❌ pattern showing correct and incorrect approaches
+- "Why" explanations for non-obvious decisions
+- No duplication across documents (link to canonical source)
+- Stand-alone test: each doc understandable independently
 
 ---
 
 ## 🆘 Getting Help
 
-**Found an issue with documentation?**
-- Open an issue on GitHub
-- Include: Which doc, what's wrong, suggested fix
+**Questions about documentation?**
+1. Check [DOCUMENTATION_STYLE_GUIDE.md](DOCUMENTATION_STYLE_GUIDE.md)
+2. Look at exemplar docs (CLEAN_ARCHITECTURE_GUIDE.md, LOGGING_GUIDE.md)
+3. Ask in code review or create an issue
 
-**Need clarification?**
-- Check related docs (see cross-references at bottom of each page)
-- Review code examples in the doc
-- Look at actual implementation in codebase
+**Found inconsistency or error?**
+1. Create issue or PR to fix
+2. Reference style guide in explanation
+3. Update all instances of the inconsistency
 
-**Want to contribute?**
-- Follow documentation standards above
-- Update "Last Updated" date
-- Add cross-references to related docs
-- Include code examples
-
----
-
-## 📝 Changelog
-
-### 2025-10-27
-- ✅ Created documentation index (this file)
-- ✅ Added [MESSAGE_CONVENTIONS.md](MESSAGE_CONVENTIONS.md)
-- ✅ Added [ERROR_HANDLING_PATTERNS.md](ERROR_HANDLING_PATTERNS.md)
-- 🗑️ Removed outdated CURRENT_STATUS.md
-
-### 2025-10-26
-- ✅ Created [LINT_RECOMMENDATIONS.md](LINT_RECOMMENDATIONS.md)
-
-### Earlier
-- ✅ Core documentation created (Architecture, Components, Styling, etc.)
+**Want to propose documentation changes?**
+1. Follow style guide for new content
+2. Update this README.md if adding new documents
+3. Include rationale in PR description
 
 ---
 
-**Need to add new documentation?** Follow this template:
-
-```markdown
-# Title
-
-**Last Updated**: YYYY-MM-DD
-**Status**: ✅ Active / 🔵 Planned / ⚠️ Draft / 🗑️ Deprecated
-
-## Overview
-[What this doc covers]
-
-## [Your Content]
-
-## References
-- [Related Doc 1](link)
-- [Related Doc 2](link)
-```
-
----
-
-**Happy building! 🚀**
+**Last major reorganization:** Check git history for this file
