@@ -159,10 +159,13 @@ For complex/uncertain problems, trigger extended thinking modes:
 
 **Claude Code:**
 - `/clear` - Reset context when switching tasks (important!)
-- `/cleanup-code` - Systematic comment/logging standards enforcement
+- `/design [feature]` - Invoke design-architect for feature design
+- `/new-panel [name]` - Scaffold new VS Code panel with Clean Architecture
+- `/cleanup-code` - Find/fix logging and comment violations
 - `/code-review` - Invoke code-guardian for approval
 - `/review-technical-debt` - Audit technical debt, clean up resolved items
 - `/fix-technical-debt` - Interactively fix technical debt items
+- `/handoff` - Generate session summary for context handoff
 
 **Code Quality & Dead Code Detection:**
 - `npm run type-coverage` - Type coverage check (95% minimum)
@@ -368,5 +371,7 @@ See `.claude/AGENTS.md` for detailed agent guide.
 ---
 
 **Development:** `npm run compile` (use after EVERY layer)
+
+**Git Commits:** No "Generated with Claude Code" footer or Co-Authored-By lines. Keep commit messages clean and conventional.
 
 **Remember:** Rich domain models with behavior. Business logic in domain, not use cases or panels.

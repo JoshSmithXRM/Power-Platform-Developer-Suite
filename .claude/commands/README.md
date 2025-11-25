@@ -1,60 +1,56 @@
 # Claude Code Commands
 
-This directory contains custom slash commands for Claude Code.
+Custom slash commands for this project.
 
 ## Available Commands
 
+### Design & Development
+| Command | Purpose |
+|---------|---------|
+| `/design [feature]` | Invoke design-architect for feature design |
+| `/new-panel [name]` | Scaffold new VS Code panel with Clean Architecture |
+
 ### Code Quality
-- `/cleanup-code` - Systematic code quality cleanup (comments, logging, placeholders)
-- `/code-review` - Invoke code-guardian agent for feature review
-- `/comprehensive-review` - Full 8-agent codebase review (quarterly/pre-production)
+| Command | Purpose |
+|---------|---------|
+| `/cleanup-code [scope]` | Find/fix logging and comment violations |
+| `/code-review [scope]` | Invoke code-guardian for approval |
+| `/comprehensive-review` | 8-agent parallel codebase review (quarterly) |
 
-### Technical Debt Management
-- `/review-technical-debt` - Audit all technical debt items, clean up resolved issues
-- `/fix-technical-debt` - Interactively fix technical debt items (verify → plan → implement → review)
+### Technical Debt
+| Command | Purpose |
+|---------|---------|
+| `/review-technical-debt` | Audit debt items, clean up resolved |
+| `/fix-technical-debt` | Interactive debt item resolution |
 
-## Usage
+### Session Management
+| Command | Purpose |
+|---------|---------|
+| `/handoff` | Generate session summary for context handoff |
 
-Type `/` in Claude Code to see all available commands.
+## Typical Workflows
 
-## Command Descriptions
+**New Feature:**
+1. `/design` - Create technical design
+2. Implement inside-out
+3. `/cleanup-code uncommitted` - Fix violations
+4. `/code-review` - Get approval
 
-### `/cleanup-code`
-**Purpose:** Find and fix code quality violations (console.log, placeholder comments, logging violations)
-**Frequency:** Before code review
-**Duration:** 10-20 minutes
+**New Panel:**
+1. `/new-panel` - Design + scaffold
+2. Implement per design
+3. `/code-review` - Get approval
 
-### `/code-review`
-**Purpose:** Invoke code-guardian agent to review completed feature
-**Frequency:** After each feature complete (all 4 layers + tests)
-**Duration:** 5-15 minutes
+**Sprint Maintenance:**
+1. `/review-technical-debt` - Audit items
+2. `/fix-technical-debt` - Address priority debt
 
-### `/comprehensive-review`
-**Purpose:** Full 8-agent parallel codebase review
-**Frequency:** Quarterly or pre-production only (expensive - 8x token cost)
-**Duration:** ~15 minutes
+**Session End:**
+1. `/handoff` - Capture context
+2. `/clear` - Reset for next task
 
-### `/review-technical-debt`
-**Purpose:** Audit categorized technical debt items, verify issues still exist, clean up resolved items
-**Frequency:** Quarterly or before major releases
-**Duration:** 5-10 minutes
+## Git Hooks
 
-### `/fix-technical-debt`
-**Purpose:** Interactively fix technical debt items - select item → verify → plan → implement → review
-**Frequency:** As needed per sprint planning
-**Duration:** 2-6 hours (depends on item complexity)
-
----
-
-## Best Practices
-
-**Before Feature Complete:**
-1. `/cleanup-code` - Fix code quality issues
-2. `/code-review` - Get code-guardian approval
-
-**Quarterly Maintenance:**
-1. `/review-technical-debt` - Clean up resolved issues
-2. `/comprehensive-review` - Full codebase audit (if needed)
-
-**Sprint Planning:**
-1. `/fix-technical-debt` - Address priority debt items
+Pre-commit hook installed at `.git/hooks/pre-commit`:
+- Runs `npm run compile` before each commit
+- Blocks commit if compilation fails
