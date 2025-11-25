@@ -310,10 +310,6 @@ Read same file (depends on write completing)
    - Manual testing must be complete
    - Get APPROVE before committing
 
-4. **Documentation phase** (optional)
-   - Invoke `docs-generator` when needed
-   - Batch documentation at end of sprint
-
 ### Bug Fixes
 
 1. Write failing test (reproduces bug)
@@ -333,9 +329,8 @@ Read same file (depends on write completing)
 - **YOU** = Implementer (human or builder)
 - **design-architect** = Feature designer (BEFORE implementation, complex features)
 - **code-guardian** = Reviewer + Final Approval Gate (AFTER implementation)
-- **docs-generator** = Documentation creator (OPTIONAL, when needed)
 
-See `.claude/AGENTS.md` for detailed agent guide.
+See `.claude/agents/` for agent definitions.
 
 ---
 
@@ -343,7 +338,7 @@ See `.claude/AGENTS.md` for detailed agent guide.
 
 **For detailed workflows:**
 - `.claude/WORKFLOW.md` - All workflows (features, bugs, refactoring, testing)
-- `.claude/AGENTS.md` - Agent invocation guide
+- `.claude/agents/` - Agent definitions (code-guardian, design-architect)
 - `.claude/TROUBLESHOOTING.md` - Common problems and solutions
 - `.claude/templates/TECHNICAL_DESIGN_TEMPLATE.md` - Design template
 - `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` - Panel patterns

@@ -21,7 +21,6 @@ Quick start for using Claude Code with this project.
 |-------|------|------------|
 | **design-architect** | Before complex features | `/design [feature]` |
 | **code-guardian** | After implementation | `/code-review` |
-| **docs-generator** | When docs needed | Direct invocation |
 
 ### Quick Decision
 
