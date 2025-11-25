@@ -8,6 +8,8 @@
         "templates/**/*",
         "TEMP/**/*",
         "**/*.test.ts",
-        "**/*.spec.ts"
+        "**/*.spec.ts",
+        "e2e/**/*",
+        "playwright.config.ts"
     ]
 }

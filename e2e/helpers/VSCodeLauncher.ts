@@ -1,3 +1,10 @@
+/**
+ * VS Code Launcher for Playwright E2E Tests
+ *
+ * NOTE: console.log statements in this file are intentional for test debugging.
+ * E2E test infrastructure benefits from visible progress output during test runs.
+ * This is test tooling code, not production extension code.
+ */
 import { _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { downloadAndUnzipVSCode } from '@vscode/test-electron';
@@ -32,9 +39,14 @@ export interface VSCodeInstance {
 export class VSCodeLauncher {
   private static cachedVSCodePath: string | null = null;
 
+  /** Time to wait for VS Code extension host to initialize after window opens */
+  private static readonly VSCODE_STABILIZATION_DELAY_MS = 2000;
+
   /**
    * Downloads VS Code if needed and returns the executable path.
-   * Caches the path for subsequent calls.
+   * Caches the path for subsequent calls to avoid re-downloads.
+   *
+   * @returns Path to VS Code executable
    */
   static async getVSCodePath(): Promise<string> {
     if (this.cachedVSCodePath) {
@@ -100,8 +112,8 @@ export class VSCodeLauncher {
     const window = await electronApp.firstWindow();
     console.log('VS Code window opened');
 
-    // Wait for VS Code to stabilize
-    await window.waitForTimeout(2000);
+    // Wait for VS Code extension host to initialize
+    await window.waitForTimeout(this.VSCODE_STABILIZATION_DELAY_MS);
 
     return {
       electronApp,
@@ -114,7 +126,8 @@ export class VSCodeLauncher {
         try {
           fs.rmSync(userDataDir, { recursive: true, force: true });
         } catch {
-          // Ignore cleanup errors
+          // Ignore cleanup errors - temp directories may be locked by VS Code process
+          // or already deleted. Cleanup failure is not critical for test success.
         }
       },
     };
