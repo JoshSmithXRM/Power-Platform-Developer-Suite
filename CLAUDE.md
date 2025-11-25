@@ -119,7 +119,7 @@
 
 ## 💻 Tech Stack
 
-- **TypeScript 4.9.x** (strict mode, explicit return types)
+- **TypeScript 5.x** (strict mode, explicit return types)
 - **Jest 30.x** (testing framework)
 - **VS Code Extension API** (panels, commands, webviews)
 - **Node 18+** (runtime)

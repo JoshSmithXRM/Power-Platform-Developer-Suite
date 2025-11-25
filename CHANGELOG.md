@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Dependencies:** Upgraded TypeScript from 4.9.5 to 5.9.3
+- **Dependencies:** Upgraded @azure/msal-node from 2.x to 3.8.3
+- **Dependencies:** Upgraded madge from 7.0.0 to 8.0.0
+- **Dependencies:** Upgraded @types/node from 16.x to 24.x
+- **Dependencies:** Upgraded @typescript-eslint packages to 8.48.0
+- **Dependencies:** Upgraded @vscode/vsce to 3.7.1
+- **CI:** Updated GitHub Actions (checkout v6, setup-node v6, codeql-action v4, github-script v8)
+
 ## [0.2.0] - 2025-11-24
 
 ### 🏗️ Complete Clean Architecture Refactor (Refactor #3)
