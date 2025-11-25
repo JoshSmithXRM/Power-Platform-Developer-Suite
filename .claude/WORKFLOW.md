@@ -538,7 +538,23 @@ git commit -m "feat(presentation): add Import Job Viewer panel
 
 **After all 4 layers implemented and compiled.**
 
-**Invoke code-guardian:**
+#### Pre-Review Checklist
+
+**Before invoking code-guardian, verify:**
+
+- [ ] `npm run compile` passes
+- [ ] `npm test` passes (relevant tests)
+- [ ] Manual testing complete (F5)
+- [ ] No `any` types in production code
+- [ ] No `console.log` in production code
+- [ ] All public methods have explicit return types
+- [ ] Domain entities have behavior methods (not anemic)
+- [ ] No business logic in use cases or panels
+- [ ] No domain imports from infrastructure/presentation
+
+**If any fail:** Fix locally first - saves token budget and review time.
+
+#### Invoke code-guardian:
 ```
 Review the Import Job Viewer feature for approval.
 

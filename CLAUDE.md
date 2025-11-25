@@ -119,8 +119,8 @@
 
 ## 💻 Tech Stack
 
-- **TypeScript 5.x** (strict mode, explicit return types)
-- **Jest** (testing framework)
+- **TypeScript 4.9.x** (strict mode, explicit return types)
+- **Jest 30.x** (testing framework)
 - **VS Code Extension API** (panels, commands, webviews)
 - **Node 18+** (runtime)
 - **Power Platform API** (Dataverse, environments, solutions)
@@ -165,10 +165,10 @@ For complex/uncertain problems, trigger extended thinking modes:
 - `/fix-technical-debt` - Interactively fix technical debt items
 
 **Code Quality & Dead Code Detection:**
+- `npm run type-coverage` - Type coverage check (95% minimum)
+- `npm run call-graph` - Detect circular dependencies (should always be 0)
 - `npx ts-prune` - Find unused exports (dead code detection)
 - `npx depcheck` - Find unused npm dependencies
-- `npx madge --circular src/ --extensions ts` - Detect circular dependencies (should always be 0)
-- `npx madge --circular src/ --extensions ts > madge-report.txt` - Save circular dependency report
 - `/comprehensive-review` - 8-agent parallel code review (quarterly, pre-production only)
 
 **When to run:**
@@ -341,6 +341,7 @@ See `.claude/AGENTS.md` for detailed agent guide.
 **For detailed workflows:**
 - `.claude/WORKFLOW.md` - All workflows (features, bugs, refactoring, testing)
 - `.claude/AGENTS.md` - Agent invocation guide
+- `.claude/TROUBLESHOOTING.md` - Common problems and solutions
 - `.claude/templates/TECHNICAL_DESIGN_TEMPLATE.md` - Design template
 - `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` - Panel patterns
 - `.claude/templates/PANEL_INITIALIZATION_PATTERN.md` - **CRITICAL** Panel initialization pattern (MUST follow)

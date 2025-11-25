@@ -10,37 +10,38 @@ Quick start guide for using Claude Code with this project.
 
 **Key files:**
 - `CLAUDE.md` (root) - Quick reference rules (read on every response)
-- `.claude/WORKFLOW_GUIDE.md` - How to use agents when building features
-- `.claude/SETUP_GUIDE.md` - Anthropic best practices for maintaining this setup
+- `.claude/WORKFLOW.md` - How to use agents when building features
+- `.claude/AGENTS.md` - Detailed agent invocation guide
+- `.claude/SETUP_GUIDE.md` - Best practices for maintaining this setup
 
 ---
 
 ## 🤖 Available Agents
 
-### 1. architect
-**When to use:** Before implementing new features
+### 1. design-architect
+**When to use:** Before implementing complex features (3+ files, uncertain patterns)
 
 **What it does:** Designs Clean Architecture solution (domain/application/infrastructure/presentation layers)
 
 **Example:**
 ```
 You: "Design the domain layer for the ImportJob feature"
-Claude: "Let me invoke the architect agent to design this..."
+Claude: "Let me invoke design-architect to design this..."
 ```
 
-### 2. code-reviewer
-**When to use:** Automatically after every code change (before commit)
+### 2. code-guardian
+**When to use:** After implementing a feature (before commit)
 
-**What it does:** Catches Clean Architecture violations:
+**What it does:** Reviews code and catches Clean Architecture violations:
 - Anemic domain models
 - Business logic in use cases or panels
 - Wrong dependency direction
 
 **Example:**
 ```
-Claude: [Implements domain layer]
-Claude: "Let me invoke code-reviewer..."
-code-reviewer: "✅ APPROVED - Rich domain entity with behavior"
+Claude: [Implements feature across all layers]
+Claude: "Let me invoke code-guardian for review..."
+code-guardian: "✅ APPROVED - Rich domain entity with behavior"
 ```
 
 ### 3. docs-generator
@@ -91,7 +92,7 @@ Presentation ──→ Application ──→ Domain
 
 ### For New Features:
 ```
-1. architect designs solution (~30 min)
+1. design-architect designs solution (complex features only)
    ↓
 2. Implement layer by layer:
    - Domain first (rich entities, NO dependencies)
@@ -99,23 +100,27 @@ Presentation ──→ Application ──→ Domain
    - Infrastructure third (repositories implement interfaces)
    - Presentation last (panels use use cases)
    ↓
-3. code-reviewer checks each layer (~2 min)
+3. npm run compile + npm test after each layer
    ↓
-4. Commit each layer separately
+4. code-guardian reviews complete feature (once)
    ↓
-5. docs-generator documents pattern (if new)
+5. Commit after approval
+   ↓
+6. docs-generator documents pattern (if new)
 ```
 
 ### For Bug Fixes:
 ```
-1. Implement fix
+1. Write failing test (reproduces bug)
    ↓
-2. code-reviewer checks
+2. Implement fix (test passes)
    ↓
-3. Commit
+3. code-guardian reviews (if significant)
+   ↓
+4. Commit
 ```
 
-**See:** `.claude/WORKFLOW_GUIDE.md` for detailed examples
+**See:** `.claude/WORKFLOW.md` for detailed examples
 
 ---
 
@@ -131,15 +136,17 @@ Presentation ──→ Application ──→ Domain
 ## 📖 Key Documentation
 
 **Architecture:**
-- `docs/ARCHITECTURE_GUIDE.md` - Clean Architecture with C# analogies
-- `docs/LAYER_RESPONSIBILITIES_GUIDE.md` - What goes in each layer
+- `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Core architectural patterns
+- `docs/architecture/CODE_QUALITY_GUIDE.md` - Comment & code quality standards
 
 **Workflow:**
-- `.claude/WORKFLOW_GUIDE.md` - Multi-agent workflow with examples
-- `CLAUDE.md` - Quick reference (84 lines of truth)
+- `.claude/WORKFLOW.md` - Multi-agent workflow with examples
+- `.claude/AGENTS.md` - Detailed agent invocation guide
+- `CLAUDE.md` - Quick reference rules
 
 **Agent maintenance:**
 - `.claude/SETUP_GUIDE.md` - How to update agents and CLAUDE.md
+- `.claude/TROUBLESHOOTING.md` - Common problems and solutions
 
 ---
 
@@ -196,10 +203,11 @@ export class LoadImportJobsUseCase {
 ## 💡 Tips
 
 1. **Implement layer by layer** - Don't implement all layers at once
-2. **Commit each layer** - Makes reviews easier, easier to rollback
-3. **Let code-reviewer catch violations** - It will auto-reject anemic models
+2. **Run compile after each layer** - `npm run compile` catches issues early
+3. **Let code-guardian catch violations** - It will auto-reject anemic models
 4. **Domain first** - Get the domain right, everything else follows
+5. **Use extended thinking** - Say "think hard" for complex decisions
 
 ---
 
-**Need more detail?** See `.claude/WORKFLOW_GUIDE.md` for complete examples.
+**Need more detail?** See `.claude/WORKFLOW.md` for complete examples.
