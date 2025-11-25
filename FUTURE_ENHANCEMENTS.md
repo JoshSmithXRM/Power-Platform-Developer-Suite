@@ -22,6 +22,51 @@ This document tracks features, improvements, and ideas that we want to implement
 
 ## High Priority (Next 6 Months)
 
+### Testing & Automation
+
+#### Playwright E2E Testing for Claude Automation
+**Status**: In Progress
+**Estimated Effort**: 8-16 hours
+**Value**: Claude can run automated UI tests to find issues without manual F5 testing
+
+**Description**:
+Set up Playwright with VS Code's Electron mode to enable automated E2E testing of extension panels. Primary goal is enabling Claude to invoke tests programmatically during development, reducing manual testing burden.
+
+**Core Features**:
+- Launch VS Code with extension via Playwright's Electron support
+- Open panels programmatically (Command Palette automation)
+- Screenshot capture for visual verification
+- Element validation (check expected UI elements exist)
+- JSON output for Claude to parse results
+
+**Technical Approach**:
+- Use `@vscode/test-electron` to download VS Code
+- Launch via `electron.launch()` with extension development path
+- Build thin VS Code navigation helpers (~150 lines)
+- Leverage Playwright's native webview testing (iframes)
+- Playwright trace viewer for debugging failures
+
+**Why Playwright over vscode-extension-tester**:
+- Webviews are the core testing target (Playwright's strength)
+- Faster execution (modern protocol vs Selenium)
+- More reliable (auto-waiting vs implicit waits)
+- Better trace/screenshot capabilities for Claude analysis
+- Active Microsoft development
+
+**Smoke Test MVP**:
+- Open Data Explorer panel
+- Validate key UI elements present
+- Take screenshot
+- Return JSON: `{ passed: bool, screenshot: path, errors: [] }`
+
+**Success Criteria**:
+- `npm run e2e:smoke` runnable from CLI
+- Claude can invoke and interpret results
+- Catches obvious UI regressions automatically
+- < 30 second execution time for smoke tests
+
+---
+
 ### Power Platform Development Tools
 
 #### Plugin Registration Tool
