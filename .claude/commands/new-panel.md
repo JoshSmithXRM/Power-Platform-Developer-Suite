@@ -1,6 +1,6 @@
 # New Panel
 
-Scaffold a new VS Code panel feature with proper Clean Architecture structure.
+Design and scaffold a new VS Code panel feature with Clean Architecture.
 
 ## Usage
 
@@ -10,72 +10,56 @@ If `$ARGUMENTS` not provided, ask: "What panel should I create? (name and purpos
 
 ## Process
 
-1. **Read Templates** (parallel)
-   - `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md`
-   - `.claude/templates/PANEL_INITIALIZATION_PATTERN.md`
-   - Example panel structure from existing feature (e.g., `src/features/pluginTraceViewer/`)
+1. **Gather Context** (parallel)
+   - Read CLAUDE.md for project rules
+   - Read `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` for panel patterns
+   - Read `.claude/templates/PANEL_INITIALIZATION_PATTERN.md` (CRITICAL)
+   - Read example panel: `src/features/pluginTraceViewer/` or `src/features/solutionExplorer/`
 
 2. **Invoke design-architect**
 
-   Use Task tool with `subagent_type: design-architect`:
+   Use Task tool with `subagent_type: design-architect` and this prompt:
    ```
-   Design a new VS Code panel: [name and purpose]
+   PROJECT CONTEXT:
+   - Read CLAUDE.md for coding rules
+   - Read .claude/templates/PANEL_DEVELOPMENT_GUIDE.md
+   - Read .claude/templates/PANEL_INITIALIZATION_PATTERN.md (CRITICAL - singleton pattern)
 
-   CRITICAL: Follow PANEL_INITIALIZATION_PATTERN.md exactly:
-   - Singleton pattern with static currentPanel
-   - createOrShow() factory method
-   - Proper dispose() cleanup
+   DESIGN REQUEST:
+   New VS Code panel: [name and purpose from $ARGUMENTS]
 
-   Structure (under src/features/[featureName]/):
-   - domain/ - Entities with behavior, repository interfaces, domain services
-   - application/ - Use cases, ViewModels (DTOs), mappers
-   - infrastructure/ - Repository implementations, external APIs
-   - presentation/ - Panel class, views/, message handlers
+   PANEL REQUIREMENTS:
+   - Singleton pattern: private static currentPanel + createOrShow() factory
+   - HTML in presentation/views/, NOT in panel TypeScript
+   - Typed message handling (discriminated unions)
+   - All dependencies via constructor injection
 
-   Include:
-   - Panel mockup (webview HTML structure)
-   - Message types (panel ↔ extension communication)
-   - ViewModels for each data display
-   - Use cases for each user action
-   - Domain entities with rich behavior
-   ```
+   STRUCTURE (under src/features/[featureName]/):
+   - domain/ - Entities with behavior, repository interfaces
+   - application/ - Use cases, ViewModels, mappers
+   - infrastructure/ - Repository implementations
+   - presentation/ - Panel, views/, message handlers
 
-3. **Create Directory Structure**
-
-   After design approval, create:
-   ```
-   src/features/[featureName]/
-   ├── domain/
-   │   ├── entities/
-   │   ├── repositories/
-   │   └── services/
-   ├── application/
-   │   ├── useCases/
-   │   ├── viewModels/
-   │   └── mappers/
-   ├── infrastructure/
-   │   └── repositories/
-   └── presentation/
-       ├── panels/
-       └── views/
+   OUTPUT:
+   - Save design to: docs/design/[FEATURE]_PANEL_DESIGN.md
+   - Include: Panel mockup, message types, ViewModels, use cases, domain entities
+   - Break into slices (MVP first)
    ```
 
-4. **Implement Inside-Out**
-
-   Domain → Application → Infrastructure → Presentation
-
-   Run `npm run compile` after each layer.
+3. **After Design Approval**
+   - Create directory structure
+   - Implement inside-out: Domain → App → Infra → Presentation
+   - `npm run compile` after each layer
 
 ## Key Patterns
 
-- **Singleton panel**: `private static currentPanel: Panel | undefined`
-- **Factory method**: `public static createOrShow(context, ...deps)`
-- **HTML in views/**: Never inline HTML in panel TypeScript
-- **Message handling**: Typed message discriminated unions
-- **Dependency injection**: All dependencies via constructor
+- **Singleton**: `private static currentPanel: Panel | undefined`
+- **Factory**: `public static createOrShow(context, ...deps)`
+- **HTML separation**: All HTML in `presentation/views/`
+- **Dependency injection**: Constructor injection, testable
 
-## Reference
+## Reference Panels
 
-See existing panels for patterns:
 - `src/features/pluginTraceViewer/` - Complex panel with filtering
+- `src/features/solutionExplorer/` - Panel with tree view
 - `src/features/environmentSetup/` - Simpler panel with forms
