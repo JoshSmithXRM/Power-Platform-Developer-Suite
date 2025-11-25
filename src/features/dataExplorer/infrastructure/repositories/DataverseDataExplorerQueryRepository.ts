@@ -35,6 +35,19 @@ interface EntityDefinitionResponse {
 }
 
 /**
+ * Represents an attribute extracted from FetchXML.
+ * When alias is present, Dataverse returns data keyed by the alias.
+ */
+interface FetchXmlAttribute {
+	/** The attribute logical name */
+	name: string;
+	/** The alias (if specified in FetchXML) - this becomes the response key */
+	alias: string | null;
+	/** The key to use when looking up values in the response */
+	responseKey: string;
+}
+
+/**
  * Infrastructure implementation of IDataExplorerQueryRepository.
  * Executes FetchXML queries via Dataverse OData API.
  *
@@ -193,6 +206,9 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 	 *
 	 * FetchXML attributes are authoritative (ensures sparse data doesn't hide columns).
 	 * Response data provides type information and additional columns for all-attributes.
+	 *
+	 * IMPORTANT: When FetchXML uses aliases, Dataverse returns data keyed by the alias,
+	 * not the attribute name. We must use the alias as the column key.
 	 */
 	private extractColumnsFromFetchXmlAndResponse(
 		fetchXml: string,
@@ -215,86 +231,145 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 		const seenColumns = new Set<string>();
 
 		// First, add all FetchXML-specified attributes
-		for (const attrName of fetchXmlAttributes) {
-			if (seenColumns.has(attrName)) {
+		// Use the responseKey (alias if present, otherwise attribute name) as the column name
+		for (const attr of fetchXmlAttributes) {
+			if (seenColumns.has(attr.responseKey)) {
 				continue;
 			}
-			seenColumns.add(attrName);
+			seenColumns.add(attr.responseKey);
 
-			// Try to infer data type from response data
-			const dataType = this.inferDataTypeFromRecords(attrName, records);
-			columns.push(new QueryResultColumn(attrName, attrName, dataType));
+			// Try to infer data type from response data using the response key
+			const dataType = this.inferDataTypeFromRecords(attr.responseKey, records);
+			// Use responseKey as both name and displayName (alias provides better display name)
+			columns.push(new QueryResultColumn(attr.responseKey, attr.responseKey, dataType));
 		}
 
 		return columns;
 	}
 
 	/**
-	 * Extracts attribute names from FetchXML, including link-entity attributes with their aliases.
-	 * Link-entity attributes are prefixed with their alias (e.g., "su.domainname").
+	 * Extracts attributes from FetchXML, including their aliases.
+	 *
+	 * IMPORTANT: When FetchXML specifies an alias for an attribute, Dataverse returns
+	 * the data keyed by that alias, not the attribute name. For example:
+	 *   <attribute name="et_opportunitynumber" alias="OpportunityNumber" />
+	 * Returns: { "OpportunityNumber": "OPTY00001286" }
+	 *
+	 * This method extracts both the attribute name and alias so we can correctly
+	 * match response data to columns.
 	 */
-	private extractAttributesFromFetchXml(fetchXml: string): string[] {
-		const attributes: string[] = [];
+	private extractAttributesFromFetchXml(fetchXml: string): FetchXmlAttribute[] {
+		const attributes: FetchXmlAttribute[] = [];
+		const seenResponseKeys = new Set<string>();
 
-		// First, extract main entity attributes (not inside link-entity)
-		// We'll use a simple approach: extract all attributes, then extract link-entity attributes
-		// The difference gives us main entity attributes
-
-		// Extract link-entity aliases and their attributes
-		const linkEntityAttributes = this.extractLinkEntityAttributes(fetchXml);
-
-		// Match all <attribute name="..." /> elements
-		const attributeRegex = /<attribute\s+[^>]*name\s*=\s*["']([^"']+)["'][^>]*\/?>/gi;
-		let match = attributeRegex.exec(fetchXml);
-
-		while (match !== null) {
-			const attrName = match[1];
-			if (attrName !== undefined) {
-				// Check if this is a link-entity attribute (it will be in linkEntityAttributes with prefix)
-				const prefixedName = linkEntityAttributes.find(le => le.endsWith(`.${attrName}`));
-				if (prefixedName !== undefined) {
-					// This attribute belongs to a link-entity, add with prefix
-					if (!attributes.includes(prefixedName)) {
-						attributes.push(prefixedName);
-					}
-				} else {
-					// Main entity attribute
-					if (!attributes.includes(attrName)) {
-						attributes.push(attrName);
-					}
-				}
+		// Extract link-entity attributes first (they have their own aliases)
+		const linkEntityAttrs = this.extractLinkEntityAttributesWithAliases(fetchXml);
+		for (const attr of linkEntityAttrs) {
+			if (!seenResponseKeys.has(attr.responseKey)) {
+				seenResponseKeys.add(attr.responseKey);
+				attributes.push(attr);
 			}
-			match = attributeRegex.exec(fetchXml);
+		}
+
+		// Extract main entity attributes (not inside link-entity)
+		// We need to find attributes that are direct children of <entity>, not inside <link-entity>
+		const mainEntityAttrs = this.extractMainEntityAttributesWithAliases(fetchXml);
+		for (const attr of mainEntityAttrs) {
+			if (!seenResponseKeys.has(attr.responseKey)) {
+				seenResponseKeys.add(attr.responseKey);
+				attributes.push(attr);
+			}
 		}
 
 		return attributes;
 	}
 
 	/**
-	 * Extracts link-entity attributes with their alias prefixes.
-	 * Returns array like ["su.domainname", "su.fullname"]
+	 * Extracts main entity attributes with their aliases.
+	 * Only extracts attributes that are direct children of the entity element.
 	 */
-	private extractLinkEntityAttributes(fetchXml: string): string[] {
-		const results: string[] = [];
+	private extractMainEntityAttributesWithAliases(fetchXml: string): FetchXmlAttribute[] {
+		const results: FetchXmlAttribute[] = [];
 
-		// Match link-entity elements with their alias and nested attributes
-		// This regex captures the alias and the content of each link-entity
-		const linkEntityRegex = /<link-entity[^>]*alias\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/link-entity>/gi;
+		// Remove link-entity content to only match main entity attributes
+		const withoutLinkEntities = fetchXml.replace(/<link-entity[\s\S]*?<\/link-entity>/gi, '');
+
+		// Match attributes with optional alias
+		const attrRegex = /<attribute\s+[^>]*name\s*=\s*["']([^"']+)["'](?:[^>]*alias\s*=\s*["']([^"']+)["'])?[^>]*\/?>/gi;
+		let match = attrRegex.exec(withoutLinkEntities);
+
+		while (match !== null) {
+			const name = match[1];
+			const alias = match[2] ?? null;
+
+			if (name !== undefined) {
+				// When alias is present, Dataverse returns data keyed by the alias
+				const responseKey = alias ?? name;
+				results.push({ name, alias, responseKey });
+			}
+			match = attrRegex.exec(withoutLinkEntities);
+		}
+
+		return results;
+	}
+
+	/**
+	 * Extracts link-entity attributes with their aliases.
+	 *
+	 * For link-entity WITH alias and attribute WITH alias:
+	 *   <link-entity alias="op"><attribute name="domainname" alias="UserDomain" /></link-entity>
+	 * Dataverse returns: { "UserDomain": "contoso" }
+	 *
+	 * For link-entity WITH alias and attribute WITHOUT alias:
+	 *   <link-entity alias="op"><attribute name="domainname" /></link-entity>
+	 * Dataverse returns: { "op.domainname": "contoso" }
+	 *
+	 * For link-entity WITHOUT alias:
+	 *   <link-entity name="systemuser"><attribute name="domainname" /></link-entity>
+	 * Dataverse returns: { "domainname": "contoso" } (no prefix)
+	 */
+	private extractLinkEntityAttributesWithAliases(fetchXml: string): FetchXmlAttribute[] {
+		const results: FetchXmlAttribute[] = [];
+
+		// Match all link-entity elements (with or without alias)
+		// Captures: [1] = entity name, [2] = alias (optional), [3] = content
+		const linkEntityRegex = /<link-entity[^>]*name\s*=\s*["']([^"']+)["'](?:[^>]*alias\s*=\s*["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/link-entity>/gi;
 		let linkMatch = linkEntityRegex.exec(fetchXml);
 
 		while (linkMatch !== null) {
-			const alias = linkMatch[1];
-			const content = linkMatch[2];
+			const linkEntityName = linkMatch[1];
+			const linkAlias = linkMatch[2] ?? null; // May be undefined if no alias
+			const content = linkMatch[3];
 
-			if (alias !== undefined && content !== undefined) {
-				// Extract attributes within this link-entity
-				const attrRegex = /<attribute\s+[^>]*name\s*=\s*["']([^"']+)["'][^>]*\/?>/gi;
+			if (linkEntityName !== undefined && content !== undefined) {
+				// Extract attributes within this link-entity, including their aliases
+				const attrRegex = /<attribute\s+[^>]*name\s*=\s*["']([^"']+)["'](?:[^>]*alias\s*=\s*["']([^"']+)["'])?[^>]*\/?>/gi;
 				let attrMatch = attrRegex.exec(content);
 
 				while (attrMatch !== null) {
 					const attrName = attrMatch[1];
+					const attrAlias = attrMatch[2] ?? null;
+
 					if (attrName !== undefined) {
-						results.push(`${alias}.${attrName}`);
+						// Determine the response key based on aliases
+						let responseKey: string;
+						if (attrAlias) {
+							// Attribute has alias - Dataverse uses attribute alias as key
+							responseKey = attrAlias;
+						} else if (linkAlias) {
+							// Link-entity has alias but attribute doesn't - prefix with link alias
+							responseKey = `${linkAlias}.${attrName}`;
+						} else {
+							// No aliases at all - Dataverse returns just the attribute name
+							responseKey = attrName;
+						}
+
+						const fullName = linkAlias ? `${linkAlias}.${attrName}` : attrName;
+						results.push({
+							name: fullName,
+							alias: attrAlias,
+							responseKey,
+						});
 					}
 					attrMatch = attrRegex.exec(content);
 				}

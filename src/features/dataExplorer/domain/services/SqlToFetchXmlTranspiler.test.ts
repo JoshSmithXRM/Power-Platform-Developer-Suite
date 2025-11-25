@@ -667,4 +667,37 @@ describe('SqlToFetchXmlTranspiler', () => {
 			expect(fetchXml).toContain('attribute="industrycode"');
 		});
 	});
+
+	describe('LEFT JOIN with multiple aliased columns', () => {
+		it('should include all main entity columns when using table alias', () => {
+			const sql = `SELECT
+				o.et_opportunitynumber AS OpportunityNumber,
+				o.et_issalesforceoutboundenabled AS SFOutboundEnabled,
+				o.et_autoresetfieldcode AS OptyAutoResetCode,
+				o.ModifiedOn AS OptyModifiedOn,
+				op.et_opportunityproductnumber AS ProductNumber,
+				op.et_productid AS ProductLookupId,
+				op.et_autoresetfieldcode AS ProductAutoResetCode,
+				op.CreatedOn AS ProductCreatedOn,
+				op.ModifiedOn AS ProductModifiedOn
+			FROM et_salesopportunity o
+			LEFT JOIN et_salesopportunityproducts op ON op.et_salesopportunityid = o.et_salesopportunityid
+			WHERE o.et_opportunitynumber = 'OPTY00001286'`;
+
+			const fetchXml = transpile(sql);
+
+			// Main entity columns
+			expect(fetchXml).toContain('<attribute name="et_opportunitynumber" alias="OpportunityNumber" />');
+			expect(fetchXml).toContain('<attribute name="et_issalesforceoutboundenabled" alias="SFOutboundEnabled" />');
+			expect(fetchXml).toContain('<attribute name="et_autoresetfieldcode" alias="OptyAutoResetCode" />');
+			expect(fetchXml).toContain('<attribute name="modifiedon" alias="OptyModifiedOn" />');
+
+			// Link entity columns
+			expect(fetchXml).toContain('<attribute name="et_opportunityproductnumber" alias="ProductNumber" />');
+			expect(fetchXml).toContain('<attribute name="et_productid" alias="ProductLookupId" />');
+			expect(fetchXml).toContain('<attribute name="et_autoresetfieldcode" alias="ProductAutoResetCode" />');
+			expect(fetchXml).toContain('<attribute name="createdon" alias="ProductCreatedOn" />');
+			expect(fetchXml).toContain('<attribute name="modifiedon" alias="ProductModifiedOn" />');
+		});
+	});
 });
