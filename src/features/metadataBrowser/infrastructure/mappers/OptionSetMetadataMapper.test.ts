@@ -227,6 +227,22 @@ describe('OptionSetMetadataMapper', () => {
 				expect(result!.options).toHaveLength(0);
 				expect(result!.displayName).toBeNull();
 			});
+
+			it('should handle optionSetDto with no Name and no Options as fallback', () => {
+				// Arrange
+				const optionSetDto: OptionSetMetadataDto = {
+					IsGlobal: false
+				};
+
+				// Act
+				const result = mapper.mapOptionSetDtoToValueObject(optionSetDto, undefined);
+
+				// Assert
+				expect(result).not.toBeNull();
+				expect(result!.name).toBeNull();
+				expect(result!.isGlobal).toBe(false);
+				expect(result!.options).toEqual([]);
+			});
 		});
 	});
 

@@ -452,5 +452,20 @@ describe('FileSystemDeploymentSettingsRepository', () => {
 			expect(vscode.window.showSaveDialog).toHaveBeenCalled();
 			expect(vscode.Uri.file).toHaveBeenCalledWith('/custom/path');
 		});
+
+		it('should use suggested filename when no workspace is open', async () => {
+			// Arrange
+			const mockUri = { fsPath: '/home/user/solution.deploymentsettings.json' };
+			(vscode.window.showSaveDialog as jest.Mock).mockResolvedValue(mockUri);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(vscode.workspace as any).workspaceFolders = undefined; // No workspace open
+
+			// Act
+			await repository.promptForFilePath('solution.deploymentsettings.json');
+
+			// Assert
+			expect(vscode.window.showSaveDialog).toHaveBeenCalled();
+			expect(vscode.Uri.file).toHaveBeenCalledWith('solution.deploymentsettings.json');
+		});
 	});
 });

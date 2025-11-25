@@ -20,23 +20,7 @@ export class OptionSetMetadataMapper {
 		optionSetDto: OptionSetMetadataDto | undefined,
 		globalOptionSetDto: { Name: string } | undefined
 	): OptionSetMetadata | null {
-		if (!optionSetDto && !globalOptionSetDto) {
-			return null;
-		}
-
-		// If optionSetDto exists with options, use it (even if globalOptionSetDto also exists)
-		if (optionSetDto?.Options && optionSetDto.Options.length > 0) {
-			const options = optionSetDto.Options.map(optDto => this.mapOptionMetadataDtoToValueObject(optDto));
-			return OptionSetMetadata.create({
-				name: optionSetDto.Name ?? null,
-				displayName: null,
-				isGlobal: optionSetDto.IsGlobal ?? false,
-				isCustom: false,
-				options: options
-			});
-		}
-
-		// If optionSetDto exists but has no options, still use it for metadata
+		// Prioritize optionSetDto when it exists (regardless of options)
 		if (optionSetDto) {
 			const options = optionSetDto.Options?.map(optDto => this.mapOptionMetadataDtoToValueObject(optDto)) || [];
 			return OptionSetMetadata.create({
@@ -48,7 +32,7 @@ export class OptionSetMetadataMapper {
 			});
 		}
 
-		// Only use globalOptionSetDto as a fallback when optionSetDto doesn't exist
+		// Use globalOptionSetDto as fallback when optionSetDto doesn't exist
 		if (globalOptionSetDto) {
 			// Global option set reference (no inline options, no display name at attribute level)
 			return OptionSetMetadata.create({
@@ -60,6 +44,7 @@ export class OptionSetMetadataMapper {
 			});
 		}
 
+		// Neither dto provided
 		return null;
 	}
 

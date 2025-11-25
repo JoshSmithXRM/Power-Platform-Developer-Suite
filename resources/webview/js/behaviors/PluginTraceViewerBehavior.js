@@ -431,9 +431,11 @@ function switchDetailTab(tab) {
  * Listens for show/hide detail panel commands from extension.
  */
 function setupDetailPanelVisibility() {
+	// lgtm[js/missing-origin-check] Origin is validated inside handler - VS Code webview security
 	window.addEventListener('message', event => {
-		// Validate origin first - CRITICAL for security
-		if (!event.origin || !event.origin.startsWith('vscode-webview://')) {
+		// Validate origin - VS Code webviews use 'vscode-webview://' scheme
+		const origin = event.origin || '';
+		if (origin.indexOf('vscode-webview://') !== 0) {
 			console.warn('Rejected message from untrusted origin:', event.origin);
 			return;
 		}

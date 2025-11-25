@@ -167,6 +167,10 @@ export class FileSystemDeploymentSettingsRepository implements IDeploymentSettin
 			} else {
 				options.defaultUri = baseUri;
 			}
+		} else if (suggestedName !== undefined) {
+			// No workspace open - use suggested filename without path
+			// VS Code will default to a reasonable location (e.g., user's home or last used)
+			options.defaultUri = vscode.Uri.file(suggestedName);
 		}
 
 		const uri = await vscode.window.showSaveDialog(options);

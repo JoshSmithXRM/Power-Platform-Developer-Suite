@@ -99,6 +99,7 @@ describe('HtmlUtils', () => {
 
 		it('should handle null and undefined in interpolations', () => {
 			// Test with variables that may be null/undefined (more realistic than literals)
+			// lgtm[js/useless-expression] Intentional test of null/undefined handling
 			const nullValue: string | null = null;
 			const undefinedValue: string | undefined = undefined;
 			const result = html`<div>${nullValue} ${undefinedValue}</div>`;
