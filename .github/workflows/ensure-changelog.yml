@@ -22,11 +22,15 @@ jobs:
             echo "ERROR: git diff failed. Base or head commit not found."
             exit 1
           fi
-          echo "::set-output name=files::$files"
+          # Use GITHUB_OUTPUT with delimiter for multiline content
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$files" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Fail if code/docs changed without changelog update
         run: |
           files="${{ steps.changes.outputs.files }}"
-          echo "Changed files:\n$files"
+          echo "Changed files:"
+          echo "$files"
           # If only changelog was changed, pass
           if [[ -z "$files" ]]; then
             echo "No changes detected."
