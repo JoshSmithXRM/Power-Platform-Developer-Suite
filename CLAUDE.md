@@ -370,6 +370,18 @@ See `.claude/AGENTS.md` for detailed agent guide.
 
 ---
 
+## 🔄 Session Habits
+
+| When | Action |
+|------|--------|
+| Complex feature (3+ files) | `/design` first |
+| Before commit | `/code-review` |
+| End session | `/handoff` |
+| Context full/switching tasks | `/clear` |
+| Uncertain architecture | "think harder" before designing |
+
+---
+
 **Development:** `npm run compile` (use after EVERY layer)
 
 **Git Commits:** No "Generated with Claude Code" footer or Co-Authored-By lines. Keep commit messages clean and conventional.
