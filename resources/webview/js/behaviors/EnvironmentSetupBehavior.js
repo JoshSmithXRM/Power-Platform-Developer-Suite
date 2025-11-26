@@ -33,58 +33,54 @@ window.createBehavior({
 			lastSavedAuthMethod = authMethodSelect.value;
 		}
 
-		// Register event listeners in capture phase to prevent generic messaging.js handlers
+		// Register click handlers for form buttons
+		// Note: These explicit handlers take precedence; messaging.js generic handlers are not used here
 		if (saveButton) {
-			saveButton.addEventListener('click', (e) => {
-				e.stopPropagation();
+			saveButton.addEventListener('click', () => {
 				if (form && form.checkValidity()) {
 					saveEnvironment();
 				} else if (form) {
 					form.reportValidity();
 				}
-			}, true);
+			});
 		}
 
 		if (saveAndCloseButton) {
-			saveAndCloseButton.addEventListener('click', (e) => {
-				e.stopPropagation();
+			saveAndCloseButton.addEventListener('click', () => {
 				if (form && form.checkValidity()) {
 					saveAndCloseEnvironment();
 				} else if (form) {
 					form.reportValidity();
 				}
-			}, true);
+			});
 		}
 
 		if (testButton) {
-			testButton.addEventListener('click', (e) => {
-				e.stopPropagation();
+			testButton.addEventListener('click', () => {
 				if (form && form.checkValidity()) {
 					testConnection();
 				} else if (form) {
 					form.reportValidity();
 				}
-			}, true);
+			});
 		}
 
 		if (discoverButton) {
-			discoverButton.addEventListener('click', (e) => {
-				e.stopPropagation();
+			discoverButton.addEventListener('click', () => {
 				if (form && form.checkValidity()) {
 					discoverEnvironmentId();
 				} else if (form) {
 					form.reportValidity();
 				}
-			}, true);
+			});
 		}
 
 		if (deleteButton) {
-			deleteButton.addEventListener('click', (e) => {
-				e.stopPropagation();
+			deleteButton.addEventListener('click', () => {
 				window.vscode.postMessage({
 					command: 'deleteEnvironment'
 				});
-			}, true);
+			});
 		}
 
 		if (authMethodSelect) {

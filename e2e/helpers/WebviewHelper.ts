@@ -32,21 +32,22 @@ export class WebviewHelper {
   /**
    * Waits for a webview panel to appear in VS Code.
    *
-   * @param viewType - The viewType of the webview panel (e.g., 'environmentSetup', 'powerPlatformDevSuite.solutionExplorer')
+   * @param _viewType - Unused. Kept for API compatibility. VS Code webview URLs use random UUIDs, not viewType.
    * @param timeout - Maximum wait time in milliseconds
    * @throws Error if panel doesn't appear within timeout
    */
-  async waitForPanel(viewType?: string, timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<void> {
-    const selector = viewType ? `iframe.webview[src*="${viewType}"]` : 'iframe.webview';
-    console.log(`Waiting for panel${viewType ? ` with viewType: ${viewType}` : ''}...`);
+  async waitForPanel(_viewType?: string, timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<void> {
+    // VS Code webviews use vscode-webview:// URLs with random UUIDs, not viewType in src
+    const selector = 'iframe[class*="webview"]';
+    console.log('Waiting for panel...');
 
-    // Wait for the webview iframe to appear using its viewType in the src attribute
+    // Wait for any webview iframe to appear
     await this.page.waitForSelector(selector, {
       state: 'attached',
       timeout,
     });
 
-    console.log(`Panel appeared${viewType ? `: ${viewType}` : ''}`);
+    console.log('Panel appeared');
   }
 
   /**
@@ -55,7 +56,7 @@ export class WebviewHelper {
    * CRITICAL: You must use this frame to interact with webview content.
    * Direct page.click() calls won't work on elements inside webviews.
    *
-   * @param viewType - Optional viewType to target specific webview (recommended for reliability)
+   * @param _viewType - Unused. Kept for API compatibility. VS Code webview URLs use random UUIDs, not viewType.
    * @param timeout - Maximum wait time for iframe to be available
    * @returns Playwright Frame for the webview content
    * @throws Error if webview iframe not found or frame unavailable
@@ -66,11 +67,13 @@ export class WebviewHelper {
    * await frame.click('#my-button'); // Click button inside webview
    * ```
    */
-  async getWebviewFrame(viewType?: string, timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<Frame> {
-    const selector = viewType ? `iframe.webview[src*="${viewType}"]` : 'iframe.webview';
-    console.log(`Getting webview frame${viewType ? ` for viewType: ${viewType}` : ''}...`);
+  async getWebviewFrame(_viewType?: string, timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<Frame> {
+    // VS Code webviews use vscode-webview:// URLs with random UUIDs, not viewType in src
+    // So we just look for any iframe with class containing "webview"
+    const selector = 'iframe[class*="webview"]';
+    console.log('Getting webview frame...');
 
-    // Find the webview iframe (optionally by viewType in src attribute)
+    // Find the webview iframe
     const iframeElement = await this.page.waitForSelector(selector, {
       state: 'attached',
       timeout,

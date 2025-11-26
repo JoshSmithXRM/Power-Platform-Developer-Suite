@@ -11,6 +11,12 @@ export interface ButtonConfig {
 	readonly icon?: string;
 	readonly variant?: 'default' | 'primary' | 'danger';
 	readonly disabled?: boolean;
+	/**
+	 * When true, the button will NOT receive a generic click handler from messaging.js.
+	 * Use this when the behavior script attaches its own click handler that needs to
+	 * collect additional data (e.g., form inputs) before sending the message.
+	 */
+	readonly customHandler?: boolean;
 }
 
 /**

@@ -159,10 +159,13 @@ For complex/uncertain problems, trigger extended thinking modes:
 
 **Claude Code:**
 - `/clear` - Reset context when switching tasks (important!)
-- `/cleanup-code` - Systematic comment/logging standards enforcement
+- `/design [feature]` - Invoke design-architect for feature design
+- `/new-panel [name]` - Scaffold new VS Code panel with Clean Architecture
+- `/cleanup-code` - Find/fix logging and comment violations
 - `/code-review` - Invoke code-guardian for approval
 - `/review-technical-debt` - Audit technical debt, clean up resolved items
 - `/fix-technical-debt` - Interactively fix technical debt items
+- `/handoff` - Generate session summary for context handoff
 
 **Code Quality & Dead Code Detection:**
 - `npm run type-coverage` - Type coverage check (95% minimum)
@@ -337,10 +340,6 @@ Read same file (depends on write completing)
    - Manual testing must be complete
    - Get APPROVE before committing
 
-4. **Documentation phase** (optional)
-   - Invoke `docs-generator` when needed
-   - Batch documentation at end of sprint
-
 ### Bug Fixes
 
 1. Write failing test (reproduces bug)
@@ -360,9 +359,8 @@ Read same file (depends on write completing)
 - **YOU** = Implementer (human or builder)
 - **design-architect** = Feature designer (BEFORE implementation, complex features)
 - **code-guardian** = Reviewer + Final Approval Gate (AFTER implementation)
-- **docs-generator** = Documentation creator (OPTIONAL, when needed)
 
-See `.claude/AGENTS.md` for detailed agent guide.
+See `.claude/agents/` for agent definitions.
 
 ---
 
@@ -370,7 +368,7 @@ See `.claude/AGENTS.md` for detailed agent guide.
 
 **For detailed workflows:**
 - `.claude/WORKFLOW.md` - All workflows (features, bugs, refactoring, testing)
-- `.claude/AGENTS.md` - Agent invocation guide
+- `.claude/agents/` - Agent definitions (code-guardian, design-architect)
 - `.claude/TROUBLESHOOTING.md` - Common problems and solutions
 - `.claude/templates/TECHNICAL_DESIGN_TEMPLATE.md` - Design template
 - `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` - Panel patterns
@@ -398,6 +396,20 @@ See `.claude/AGENTS.md` for detailed agent guide.
 
 ---
 
+## 🔄 Session Habits
+
+| When | Action |
+|------|--------|
+| Complex feature (3+ files) | `/design` first |
+| Before commit | `/code-review` |
+| End session | `/handoff` |
+| Context full/switching tasks | `/clear` |
+| Uncertain architecture | "think harder" before designing |
+
+---
+
 **Development:** `npm run compile` (use after EVERY layer)
+
+**Git Commits:** No "Generated with Claude Code" footer or Co-authored-by lines. Keep commit messages clean and conventional.
 
 **Remember:** Rich domain models with behavior. Business logic in domain, not use cases or panels.

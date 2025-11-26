@@ -8,7 +8,7 @@ import { Environment } from '../../features/environmentSetup/domain/entities/Env
  */
 export class SharedFactories {
 	public readonly getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>;
-	public readonly getEnvironmentById: (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId: string | undefined } | null>;
+	public readonly getEnvironmentById: (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId: string | undefined; dataverseUrl: string } | null>;
 	public readonly dataverseApiServiceFactory: {
 		getAccessToken: (envId: string) => Promise<string>;
 		getDataverseUrl: (envId: string) => Promise<string>;
@@ -42,7 +42,7 @@ export class SharedFactories {
 	 * Creates a factory function for getting environment details by ID.
 	 * Shared across Solution Explorer and Import Job Viewer panels.
 	 */
-	private createGetEnvironmentById(): (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId: string | undefined } | null> {
+	private createGetEnvironmentById(): (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId: string | undefined; dataverseUrl: string } | null> {
 		return async (envId: string) => {
 			const environments = await this.environmentRepository.getAll();
 			const environment = environments.find(env => env.getId().getValue() === envId);
@@ -52,7 +52,8 @@ export class SharedFactories {
 			return {
 				id: envId,
 				name: environment.getName().getValue(),
-				powerPlatformEnvironmentId: environment.getPowerPlatformEnvironmentId()
+				powerPlatformEnvironmentId: environment.getPowerPlatformEnvironmentId(),
+				dataverseUrl: environment.getDataverseUrl().getValue()
 			};
 		};
 	}

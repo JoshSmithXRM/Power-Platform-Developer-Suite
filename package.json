@@ -2,7 +2,7 @@
     "name": "power-platform-developer-suite",
     "displayName": "Power Platform Developer Suite",
     "description": "A comprehensive VSCode extension for Power Platform development and administration - your complete toolkit for Dynamics 365, Dataverse, and Power Platform solutions",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "icon": "images/icon.png",
     "publisher": "JoshSmithXRM",
     "repository": {
@@ -180,6 +180,16 @@
                 "title": "Persistence Inspector (Dev Only)",
                 "category": "Power Platform Developer Suite",
                 "enablement": "powerPlatformDevSuite.isDevelopment"
+            },
+            {
+                "command": "power-platform-dev-suite.dataExplorer",
+                "title": "Data Explorer",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.dataExplorerPickEnvironment",
+                "title": "Data Explorer: Choose Environment",
+                "category": "Power Platform Developer Suite"
             }
         ],
         "viewsContainers": {
@@ -275,6 +285,11 @@
                     "command": "power-platform-dev-suite.metadataBrowserPickEnvironment",
                     "when": "view == power-platform-dev-suite-tools && viewItem == metadataBrowser",
                     "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.dataExplorerPickEnvironment",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == dataExplorer",
+                    "group": "1_environment@1"
                 }
             ],
             "webview/context": [
@@ -306,6 +321,11 @@
                 {
                     "command": "power-platform-dev-suite.metadataBrowserPickEnvironment",
                     "when": "webviewId == 'powerPlatformDevSuite.metadataBrowser'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.dataExplorerPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.dataExplorer'",
                     "group": "1_environment@1"
                 }
             ]

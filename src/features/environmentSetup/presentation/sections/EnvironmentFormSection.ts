@@ -51,7 +51,7 @@ export class EnvironmentFormSection implements ISection {
 					<label for="environmentId">Environment ID (Optional)</label>
 					<div style="display: flex; gap: 8px;">
 						<input type="text" id="environmentId" name="powerPlatformEnvironmentId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value="${environmentId}" style="flex: 1;">
-						<button type="button" id="discoverEnvironmentId" style="white-space: nowrap;">Discover ID</button>
+						<button type="button" id="discoverEnvironmentId" data-custom-handler style="white-space: nowrap;">Discover ID</button>
 					</div>
 					<div class="help-text">Optional: The unique GUID for this environment (for Power Apps Maker portal). Click "Discover ID" to auto-populate from BAP API.</div>
 				</div>
