@@ -178,41 +178,41 @@ function loadEnvironmentData(data) {
 }
 
 /**
- * Saves the environment configuration without closing the panel.
- * Collects form data and sends to extension host. Shows "Saved!" feedback on success.
+ * Collects form data and sends a command to the extension host.
+ * Optionally updates button state during the operation.
+ * @param {string} command - The command to send to the extension host
+ * @param {HTMLButtonElement|null} button - Optional button to update state
+ * @param {string} loadingText - Text to show while operation is in progress
  */
-function saveEnvironment() {
+function sendFormCommand(command, button, loadingText) {
 	const formData = new FormData(form);
 	const data = Object.fromEntries(formData.entries());
 
-	if (saveButton) {
-		saveButton.disabled = true;
-		saveButton.textContent = 'Saving...';
+	if (button) {
+		button.disabled = true;
+		button.textContent = loadingText;
 	}
 
 	window.vscode.postMessage({
-		command: 'saveEnvironment',
+		command: command,
 		data: data
 	});
 }
 
 /**
+ * Saves the environment configuration without closing the panel.
+ * Shows "Saved!" feedback on success.
+ */
+function saveEnvironment() {
+	sendFormCommand('saveEnvironment', saveButton, 'Saving...');
+}
+
+/**
  * Saves the environment configuration and closes the panel.
- * Collects form data and sends to extension host. Panel closes automatically on success.
+ * Panel closes automatically on success.
  */
 function saveAndCloseEnvironment() {
-	const formData = new FormData(form);
-	const data = Object.fromEntries(formData.entries());
-
-	if (saveAndCloseButton) {
-		saveAndCloseButton.disabled = true;
-		saveAndCloseButton.textContent = 'Saving...';
-	}
-
-	window.vscode.postMessage({
-		command: 'saveAndCloseEnvironment',
-		data: data
-	});
+	sendFormCommand('saveAndCloseEnvironment', saveAndCloseButton, 'Saving...');
 }
 
 /**
@@ -220,18 +220,7 @@ function saveAndCloseEnvironment() {
  * Shows success/error feedback via VS Code notifications.
  */
 function testConnection() {
-	const formData = new FormData(form);
-	const data = Object.fromEntries(formData.entries());
-
-	if (testButton) {
-		testButton.disabled = true;
-		testButton.textContent = 'Testing...';
-	}
-
-	window.vscode.postMessage({
-		command: 'testConnection',
-		data: data
-	});
+	sendFormCommand('testConnection', testButton, 'Testing...');
 }
 
 /**
@@ -239,18 +228,7 @@ function testConnection() {
  * Queries the BAP API and populates the environmentId field on success.
  */
 function discoverEnvironmentId() {
-	const formData = new FormData(form);
-	const data = Object.fromEntries(formData.entries());
-
-	if (discoverButton) {
-		discoverButton.disabled = true;
-		discoverButton.textContent = 'Discovering...';
-	}
-
-	window.vscode.postMessage({
-		command: 'discoverEnvironmentId',
-		data: data
-	});
+	sendFormCommand('discoverEnvironmentId', discoverButton, 'Discovering...');
 }
 
 function validateName() {

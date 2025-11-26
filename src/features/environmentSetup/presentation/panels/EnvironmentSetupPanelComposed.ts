@@ -254,7 +254,8 @@ export class EnvironmentSetupPanelComposed {
 			await this.handleSaveEnvironment(data, true);
 		}, { disableOnExecute: true });
 
-		// Note: disableOnExecute: false because behavior manages button state via handleTestResult
+		// Note: disableOnExecute: false because button state is managed by the webview's
+		// handleTestResult function in EnvironmentSetupBehavior.js
 		this.coordinator.registerHandler('testConnection', async (data?: unknown) => {
 			if (!isTestConnectionData(data)) {
 				this.logger.warn('Invalid test connection data');
@@ -267,7 +268,8 @@ export class EnvironmentSetupPanelComposed {
 			await this.handleDeleteEnvironment();
 		}, { disableOnExecute: true });
 
-		// Note: disableOnExecute: false because behavior manages button state via handleDiscoverResult
+		// Note: disableOnExecute: false because button state is managed by the webview's
+		// handleDiscoverResult function in EnvironmentSetupBehavior.js
 		this.coordinator.registerHandler('discoverEnvironmentId', async (data?: unknown) => {
 			if (!isDiscoverEnvironmentIdData(data)) {
 				this.logger.warn('Invalid discover environment ID data');
