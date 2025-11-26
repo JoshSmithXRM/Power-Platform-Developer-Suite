@@ -129,8 +129,8 @@ Before accepting ANY change, it must pass these gates:
 
 - [x] **Work order approved by user** (2025-01-26)
 - [x] **Review framework approved by user** (2025-01-26)
-- [ ] Phase 1: Inventory started
-- [ ] Phase 1: Inventory complete
+- [x] Phase 1: Inventory started (2025-01-26)
+- [x] Phase 1: Inventory complete (2025-01-26)
 - [ ] Phase 2: Gap Analysis complete
 - [ ] Phase 3: Proposals documented
 - [ ] Phase 4: Proposals evaluated
@@ -140,27 +140,175 @@ Before accepting ANY change, it must pass these gates:
 
 ## Inventory
 
-*To be populated in Phase 1*
+### .claude/ Directory (29 files)
 
-### .claude/ Directory
+#### Core Files
 | File | Purpose | Notes |
 |------|---------|-------|
-| | | |
+| `README.md` | Quick start guide for Claude Code setup | Links to other files, architecture reference |
+| `WORKFLOW.md` | Feature dev, bug fix, refactor workflows | Defines when to design vs just implement |
+| `TROUBLESHOOTING.md` | Common problems and solutions | Agent issues, build issues, context issues |
+| `settings.local.json` | Local Claude settings | Git-ignored |
+| `settings.local.example.json` | Template for local settings | Checked in |
 
-### docs/ Directory
+#### Agents (2 active, 3 archived)
 | File | Purpose | Notes |
 |------|---------|-------|
-| | | |
+| `agents/code-guardian.md` | Code review & final approval gate | ~1000 lines, comprehensive checklist |
+| `agents/design-architect.md` | Outside-in feature design | ~925 lines, panel architecture focus |
+| `archive/agents/code-guardian.md` | Old version | Archived |
+| `archive/agents/design-architect.md` | Old version | Archived |
+| `archive/agents/docs-generator.md` | Deprecated agent | Archived |
+| `archive/AGENTS.md` | Old agent documentation | Archived |
+| `archive/SETUP_GUIDE.md` | Old setup guide | Archived |
 
-### GitHub Actions
-| Workflow | Purpose | Notes |
-|----------|---------|-------|
-| | | |
+#### Slash Commands (10 commands)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `commands/README.md` | Command index and workflows | Lists all commands with usage |
+| `commands/design.md` | `/design` - Invoke design-architect | Scope guidelines by complexity |
+| `commands/code-review.md` | `/code-review` - Invoke code-guardian | Prerequisites checklist |
+| `commands/new-panel.md` | `/new-panel` - Scaffold panel | References templates |
+| `commands/cleanup-code.md` | `/cleanup-code` - Fix violations | Parallel grep searches |
+| `commands/comprehensive-review.md` | `/comprehensive-review` - 8-agent review | Quarterly, 15 min, expensive |
+| `commands/review-technical-debt.md` | `/review-technical-debt` - Audit debt | Verify, classify, cleanup |
+| `commands/fix-technical-debt.md` | `/fix-technical-debt` - Fix debt items | Interactive selection |
+| `commands/prepare-release.md` | `/prepare-release` - Release prep | Version bump, changelog, notes |
+| `commands/handoff.md` | `/handoff` - Session summary | Context for next session |
+
+#### Templates (3 templates)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `templates/TECHNICAL_DESIGN_TEMPLATE.md` | Design document format | ~700 lines, comprehensive |
+| `templates/PANEL_DEVELOPMENT_GUIDE.md` | Panel architecture decisions | Framework vs direct, sections |
+| `templates/PANEL_INITIALIZATION_PATTERN.md` | Two-phase init pattern | CRITICAL for race conditions |
+
+#### Skills (2 skills)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `skills/code-cleanup/SKILL.md` | Auto-detected code quality issues | Invokes cleanup-code command |
+| `skills/code-review-gateway/SKILL.md` | Auto-detect ready for review | Invokes code-guardian |
+
+#### Requirements (1 file)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `requirements/METADATA_BROWSER_REQUIREMENTS.md` | Feature requirements doc | User stories, technical reqs |
+
+#### Examples (1 file)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `examples/ExampleBehavior.js` | Example webview behavior | Reference implementation |
+
+---
+
+### docs/ Directory (53 files)
+
+#### Root docs/
+| File | Purpose | Notes |
+|------|---------|-------|
+| `README.md` | Documentation index | Links to all doc sections |
+| `GETTING_STARTED.md` | User getting started guide | Setup, authentication |
+| `RELEASE_GUIDE.md` | Release process documentation | Detailed release workflow |
+| `DOCUMENTATION_STYLE_GUIDE.md` | Doc writing standards | Formatting rules |
+| `DATA_EXPLORER_TODO.md` | Data Explorer feature tracking | Active work |
+| `ALM_DOCUMENTATION_REVIEW_TODO.md` | This document | Active work |
+
+#### Architecture (17 files)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `architecture/CLEAN_ARCHITECTURE_GUIDE.md` | Core architecture patterns | Main reference |
+| `architecture/CLEAN_ARCHITECTURE_EXAMPLES.md` | Code examples | Supports guide |
+| `architecture/CLEAN_ARCHITECTURE_PATTERNS.md` | Pattern catalog | Supports guide |
+| `architecture/CODE_QUALITY_GUIDE.md` | Comment & code standards | CLAUDE.md references |
+| `architecture/LOGGING_GUIDE.md` | Logging by layer | CLAUDE.md references |
+| `architecture/DOMAIN_SERVICE_PATTERNS.md` | Domain service patterns | Collection services |
+| `architecture/MAPPER_PATTERNS.md` | Mapper implementation | Sorting rules |
+| `architecture/REPOSITORY_PATTERNS.md` | Repository patterns | Interface in domain |
+| `architecture/VALUE_OBJECT_PATTERNS.md` | Value object patterns | Immutability |
+| `architecture/ODATA_DOMAIN_PATTERN.md` | OData query pattern | Infrastructure concern |
+| `architecture/PANEL_ARCHITECTURE.md` | Panel composition | PanelCoordinator, sections |
+| `architecture/WEBVIEW_PATTERNS.md` | Webview message contracts | CSS, behaviors |
+| `architecture/STATIC_FACTORY_PATTERN.md` | Static factory pattern | createOrShow |
+| `architecture/RENDERING_PATTERN_DECISION.md` | HTML vs data-driven | Decision doc |
+| `architecture/RESIZABLE_DETAIL_PANEL_*.md` | Detail panel pattern (3 files) | Pattern documentation |
+
+#### Design (9 files)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `design/DATA_EXPLORER_DESIGN.md` | Data Explorer design | Active feature |
+| `design/DATA_EXPLORER_INTELLISENSE_*.md` | IntelliSense designs (2) | Enhancement |
+| `design/DATETIME_FILTER_ARCHITECTURE.md` | Filter architecture | Component design |
+| `design/FILTER_PANEL_IMPROVEMENTS_DESIGN.md` | Filter improvements | Enhancement |
+| `design/METADATA_BROWSER_*.md` | Metadata browser (2) | Feature design |
+| `design/WEBVIEW_TYPESCRIPT_MIGRATION_DESIGN.md` | TS migration | Future work |
+| `design/CLEANUP_GUIDE.md` | Design doc cleanup | Process doc |
+| `design/reviews/README.md` | Review folder readme | Empty placeholder |
+
+#### Designs (1 file - note: separate from design/)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `designs/PLAYWRIGHT_E2E_DESIGN.md` | E2E testing design | Infrastructure |
+
+#### Testing (3 files)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `testing/TESTING_GUIDE.md` | Unit testing patterns | Test factories |
+| `testing/INTEGRATION_TESTING_GUIDE.md` | Panel integration tests | Webview testing |
+| `testing/SOLUTION_PANEL_INTEGRATION_TESTS.md` | Specific panel tests | Example tests |
+
+#### Releases (5 files)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `releases/README.md` | Release folder readme | Format guide |
+| `releases/RELEASE_NOTES_GUIDE.md` | Release notes format | Writing guide |
+| `releases/v0.2.0.md` | v0.2.0 release notes | Historical |
+| `releases/v0.2.1.md` | v0.2.1 release notes | Historical |
+| `releases/v0.2.2.md` | v0.2.2 release notes | Current |
+
+#### Technical Debt (7 files)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `technical-debt/README.md` | Debt tracking index | Categories, counts |
+| `technical-debt/TEMPLATE.md` | New debt item template | Standardized format |
+| `technical-debt/accepted-tradeoffs/*.md` | Accepted tradeoffs (4) | Documented decisions |
+| `technical-debt/low-priority/*.md` | Low priority items (1) | notification-service |
+| `technical-debt/will-not-implement/*.md` | Won't fix (1) | xml-formatter |
+
+#### Quality (2 files)
+| File | Purpose | Notes |
+|------|---------|-------|
+| `quality/README.md` | Quality folder readme | Review process |
+| `quality/2025-11-review.md` | November 2025 review | Historical |
+
+---
+
+### GitHub Actions (7 workflows)
+
+| Workflow | Trigger | Purpose | Notes |
+|----------|---------|---------|-------|
+| `pr-validation.yml` | PR to main/feature/* | Lint, compile, test, type-coverage, circular deps, architecture | Full validation |
+| `publish.yml` | Release published | Build & publish to marketplace | Requires ADO_MARKETPLACE_PAT |
+| `codeql.yml` | Push to main, PR to main, weekly | Security scanning | CodeQL analysis |
+| `ensure-changelog.yml` | PR events | Require CHANGELOG update | Blocks PR if missing |
+| `bundle-size.yml` | PR to main (src changes) | Check VSIX size < 10MB | Comments on PR |
+| `version-bump.yml` | Manual dispatch | Bump version, tag, release | Requires WORKFLOW_PAT |
+| `dependabot.yml` | Weekly/Monthly | Dependency updates | NPM + GH Actions |
+
+---
 
 ### Root Config Files
+
 | File | Purpose | Notes |
 |------|---------|-------|
-| | | |
+| `CLAUDE.md` | Project rules for Claude | ~17KB, auto-loaded |
+| `README.md` | Project readme | User-facing |
+| `CHANGELOG.md` | Version history | ~29KB, detailed |
+| `CONTRIBUTING.md` | Contribution guide | PR process |
+| `SECURITY.md` | Security policy | Vulnerability reporting |
+| `FUTURE_ENHANCEMENTS.md` | Planned features | ~24KB, deferred work |
+| `package.json` | NPM config | Dependencies, scripts |
+| `tsconfig.json` | TypeScript config | Strict mode |
+| `tsconfig.build.json` | Build-specific TS config | Production settings |
 
 ---
 
