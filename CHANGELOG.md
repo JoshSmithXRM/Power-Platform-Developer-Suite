@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **E2E Testing Infrastructure:** Playwright-based E2E testing for VS Code extension
+  - `npm run e2e:smoke` - Automated smoke tests (~30s) for VS Code launch and command execution
+  - `VSCodeLauncher` - Launch VS Code via Playwright Electron with extension loaded
+  - `CommandPaletteHelper` - Automate Command Palette interactions
+  - `WebviewHelper` - Access webview iframe content
+  - `ScreenshotHelper` - Capture and annotate screenshots
+  - `ClaudeJsonReporter` - AI-optimized JSON output with suggestions
+  - Console log capture (`vscode.getLogs()`) - Renderer and webview debug messages
+  - Extension Output channel capture (`vscode.getExtensionLogs()`) - Extension logger output
+  - Design doc: `docs/designs/PLAYWRIGHT_E2E_DESIGN.md`
+
 ### Changed
 
 - **Dependencies:** Upgraded TypeScript from 4.9.5 to 5.9.3
