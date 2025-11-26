@@ -174,6 +174,25 @@ For complex/uncertain problems, trigger extended thinking modes:
 - `npx depcheck` - Find unused npm dependencies
 - `/comprehensive-review` - 8-agent parallel code review (quarterly, pre-production only)
 
+**E2E Testing (Playwright):**
+- `npm run e2e:smoke` - Run smoke tests (~30s) - VS Code launch, command execution, screenshots
+- `npm run e2e:headed` - Run with visible VS Code window (debugging)
+- `npm run e2e:debug` - Step-by-step debugging with Playwright Inspector
+
+**When to run E2E tests:**
+- ✅ After UI/panel changes to verify they still work
+- ✅ When debugging panel initialization issues
+- ✅ To capture screenshots of current state
+- ✅ To verify extension activation and command registration
+- ❌ NOT for every code change (unit tests are faster)
+- ❌ NOT as replacement for manual F5 testing (E2E is supplementary)
+
+**What E2E tests capture:**
+- `vscode.getLogs()` - VS Code console logs (renderer, webview debug messages)
+- `vscode.getExtensionLogs()` - Extension Output channel logs (your logger.info/debug/error)
+- Screenshots saved to `e2e/screenshots/`
+- Structured JSON results in `e2e/results/claude-results.json`
+
 **When to run:**
 - **Monthly**: Quick `ts-prune` check for unused exports
 - **Before cleanup sprints**: Generate all 3 reports (ts-prune, depcheck, madge)
@@ -369,6 +388,7 @@ See `.claude/agents/` for agent definitions.
 **Testing guides:**
 - `docs/testing/TESTING_GUIDE.md` - Unit testing patterns and test factories
 - `docs/testing/INTEGRATION_TESTING_GUIDE.md` - Panel integration testing patterns
+- `docs/designs/PLAYWRIGHT_E2E_DESIGN.md` - E2E testing infrastructure (Playwright + VS Code)
 
 **Project management:**
 - `TECHNICAL_DEBT.md` - Code quality issues requiring remediation
