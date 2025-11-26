@@ -13,6 +13,7 @@
 	gap: 16px;
 	padding: 16px;
 	border-bottom: 1px solid var(--vscode-panel-border);
+	flex-shrink: 0; /* Don't shrink - let results section fill remaining space */
 }
 
 .editor-container {
@@ -109,6 +110,16 @@
 	overflow-y: auto;
 }
 
+/* Reset code element styling inside FetchXML preview */
+.fetchxml-content code {
+	background: transparent;
+	padding: 0;
+	border: none;
+	border-radius: 0;
+	font-family: inherit;
+	font-size: inherit;
+}
+
 /* ============================================
    ERROR BANNER
    ============================================ */
@@ -139,25 +150,27 @@
    RESULTS SECTION
    ============================================ */
 
-/* Main section needs flex layout for Data Explorer */
+/* Data Explorer layout adjustments */
+
+/* Main section needs to be a flex container for results to expand */
 .main-section {
 	display: flex;
 	flex-direction: column;
 }
 
+/* Results section fills remaining space in main-section */
 .query-results-section {
 	display: flex;
 	flex-direction: column;
 	flex: 1;
 	min-height: 0;
-	overflow: hidden;
 }
 
+/* Table container scrolls independently */
 #results-table-container {
 	flex: 1;
 	overflow: auto;
-	min-height: 200px;
-	max-height: calc(100vh - 450px); /* Leave room for query editor + toolbar */
+	min-height: 100px; /* Minimum visible area */
 }
 
 /* Ensure table scrolls properly - use min-width for horizontal scroll */
@@ -192,7 +205,7 @@
 	font-style: italic;
 }
 
-/* Status Bar */
+/* Status Bar - fixed at bottom of results section */
 .results-status-bar {
 	display: flex;
 	align-items: center;
@@ -202,6 +215,7 @@
 	border-top: 1px solid var(--vscode-panel-border);
 	font-size: 12px;
 	color: var(--vscode-descriptionForeground);
+	flex-shrink: 0; /* Don't shrink - always visible */
 }
 
 /* ============================================

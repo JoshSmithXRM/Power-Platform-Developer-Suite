@@ -36,17 +36,18 @@ export class WebviewHelper {
    * @param timeout - Maximum wait time in milliseconds
    * @throws Error if panel doesn't appear within timeout
    */
-  async waitForPanel(viewType?: string, timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<void> {
-    const selector = viewType ? `iframe.webview[src*="${viewType}"]` : 'iframe.webview';
-    console.log(`Waiting for panel${viewType ? ` with viewType: ${viewType}` : ''}...`);
+  async waitForPanel(_viewType?: string, timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<void> {
+    // VS Code webviews use vscode-webview:// URLs with random UUIDs, not viewType in src
+    const selector = 'iframe[class*="webview"]';
+    console.log('Waiting for panel...');
 
-    // Wait for the webview iframe to appear using its viewType in the src attribute
+    // Wait for any webview iframe to appear
     await this.page.waitForSelector(selector, {
       state: 'attached',
       timeout,
     });
 
-    console.log(`Panel appeared${viewType ? `: ${viewType}` : ''}`);
+    console.log('Panel appeared');
   }
 
   /**
@@ -66,11 +67,13 @@ export class WebviewHelper {
    * await frame.click('#my-button'); // Click button inside webview
    * ```
    */
-  async getWebviewFrame(viewType?: string, timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<Frame> {
-    const selector = viewType ? `iframe.webview[src*="${viewType}"]` : 'iframe.webview';
-    console.log(`Getting webview frame${viewType ? ` for viewType: ${viewType}` : ''}...`);
+  async getWebviewFrame(_viewType?: string, timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<Frame> {
+    // VS Code webviews use vscode-webview:// URLs with random UUIDs, not viewType in src
+    // So we just look for any iframe with class containing "webview"
+    const selector = 'iframe[class*="webview"]';
+    console.log('Getting webview frame...');
 
-    // Find the webview iframe (optionally by viewType in src attribute)
+    // Find the webview iframe
     const iframeElement = await this.page.waitForSelector(selector, {
       state: 'attached',
       timeout,

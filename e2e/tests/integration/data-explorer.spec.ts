@@ -170,8 +170,8 @@ test.describe('Data Explorer Integration Tests', () => {
     // Take screenshot of initial state
     await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-initial');
 
-    // Verify SQL editor is present (textarea or code editor element)
-    const sqlEditor = await frame.$('#sqlEditor, .sql-editor, textarea[name="sql"]');
+    // Verify SQL editor is present
+    const sqlEditor = await frame.$('#sql-editor');
     expect(sqlEditor).toBeTruthy();
 
     // Verify Execute Query button is present
@@ -187,7 +187,7 @@ test.describe('Data Explorer Integration Tests', () => {
     const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.dataExplorer');
 
     // Find and fill SQL editor
-    const sqlEditor = await frame.$('#sqlEditor, .sql-editor, textarea');
+    const sqlEditor = await frame.$('#sql-editor');
     expect(sqlEditor).toBeTruthy();
 
     if (sqlEditor) {
@@ -233,7 +233,8 @@ test.describe('Data Explorer Integration Tests', () => {
     // Check logs for query execution
     const logs = vscode.getExtensionLogs();
 
-    // Count query executions - should be exactly 1
+    // Count query executions - should be 2 per execution (panel + use case both log)
+    // If duplicate execution occurred, we'd see 4+ logs
     const queryExecutions = logs.filter(l => l.includes('Executing SQL query'));
     console.log(`Query executions logged: ${queryExecutions.length}`);
     for (const log of queryExecutions) {
@@ -241,7 +242,8 @@ test.describe('Data Explorer Integration Tests', () => {
     }
 
     // CRITICAL: Verify no duplicate execution (our bug fix)
-    expect(queryExecutions.length).toBeLessThanOrEqual(1);
+    // 2 logs = 1 execution (panel + use case), 4 logs = duplicate execution
+    expect(queryExecutions.length).toBeLessThanOrEqual(2);
 
     // Check for successful completion
     const completionLogs = logs.filter(l =>
@@ -348,8 +350,9 @@ test.describe('Data Explorer Integration Tests', () => {
 
     const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.dataExplorer');
 
-    // Enter filtered query
-    const sqlEditor = await frame.$('#sqlEditor, .sql-editor, textarea');
+    // Wait for editor to be enabled and enter filtered query
+    await frame.waitForSelector('#sql-editor:not([disabled])', { timeout: 15000, state: 'attached' });
+    const sqlEditor = await frame.$('#sql-editor');
     if (sqlEditor) {
       await sqlEditor.fill('');
       await sqlEditor.fill(testQueries.filteredSelect);
@@ -378,8 +381,9 @@ test.describe('Data Explorer Integration Tests', () => {
 
     const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.dataExplorer');
 
-    // Enter query that returns no results
-    const sqlEditor = await frame.$('#sqlEditor, .sql-editor, textarea');
+    // Wait for editor to be enabled and enter query that returns no results
+    await frame.waitForSelector('#sql-editor:not([disabled])', { timeout: 15000, state: 'attached' });
+    const sqlEditor = await frame.$('#sql-editor');
     if (sqlEditor) {
       await sqlEditor.fill('');
       await sqlEditor.fill(testQueries.emptyResult);
@@ -400,6 +404,9 @@ test.describe('Data Explorer Integration Tests', () => {
 
     console.log(`No results message found: ${noResultsMessage !== null}`);
     console.log(`Empty table found: ${emptyTable !== null}`);
+
+    // Wait for editor to be re-enabled before next test
+    await frame.waitForSelector('#sql-editor:not([disabled])', { timeout: 10000, state: 'attached' });
   });
 
   test('Invalid SQL shows error message', async () => {
@@ -407,8 +414,12 @@ test.describe('Data Explorer Integration Tests', () => {
 
     const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.dataExplorer');
 
+    // Wait for editor to be enabled (may be disabled from previous query)
+    // Use state: 'attached' since element exists but may not be "visible" to Playwright
+    await frame.waitForSelector('#sql-editor:not([disabled])', { timeout: 15000, state: 'attached' });
+
     // Enter invalid SQL
-    const sqlEditor = await frame.$('#sqlEditor, .sql-editor, textarea');
+    const sqlEditor = await frame.$('#sql-editor');
     if (sqlEditor) {
       await sqlEditor.fill('');
       await sqlEditor.fill(testQueries.invalidSql);
@@ -444,8 +455,11 @@ test.describe('Data Explorer Integration Tests', () => {
 
     const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.dataExplorer');
 
+    // Wait for editor to be enabled (may be disabled from previous query)
+    await frame.waitForSelector('#sql-editor:not([disabled])', { timeout: 15000, state: 'attached' });
+
     // Enter valid query
-    const sqlEditor = await frame.$('#sqlEditor, .sql-editor, textarea');
+    const sqlEditor = await frame.$('#sql-editor');
     if (sqlEditor) {
       await sqlEditor.fill('');
       await sqlEditor.fill(testQueries.simpleSelect);
@@ -457,8 +471,8 @@ test.describe('Data Explorer Integration Tests', () => {
     // Clear logs
     vscode.clearLogs();
 
-    // Press Ctrl+Enter
-    await frame.keyboard.press('Control+Enter');
+    // Press Ctrl+Enter (keyboard is on page, not frame)
+    await vscode.window.keyboard.press('Control+Enter');
     await vscode.window.waitForTimeout(8000);
 
     await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-ctrl-enter');
@@ -479,15 +493,20 @@ test.describe('Data Explorer Integration Tests', () => {
 
     const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.dataExplorer');
 
+    // Wait for editor to be enabled (may be disabled from previous query)
+    await frame.waitForSelector('#sql-editor:not([disabled])', { timeout: 15000, state: 'attached' });
+
     // Enter query
-    const sqlEditor = await frame.$('#sqlEditor, .sql-editor, textarea');
+    const sqlEditor = await frame.$('#sql-editor');
     if (sqlEditor) {
       await sqlEditor.fill('');
       await sqlEditor.fill(testQueries.simpleSelect);
     }
 
-    // Clear logs COMPLETELY before this test
-    vscode.clearLogs();
+    // Get baseline log count BEFORE executing (logs persist across tests)
+    const logsBefore = vscode.getExtensionLogs();
+    const executingLogsBefore = logsBefore.filter(l => l.includes('Executing SQL query')).length;
+    const staleLogsBefore = logsBefore.filter(l => l.includes('stale') || l.includes('Discarding')).length;
 
     // Single click on Execute
     const executeButton = await frame.$('#executeQuery, button:has-text("Execute")');
@@ -497,34 +516,27 @@ test.describe('Data Explorer Integration Tests', () => {
       await vscode.window.waitForTimeout(10000);
     }
 
-    // Get all logs
-    const logs = vscode.getExtensionLogs();
+    // Get all logs after execution
+    const logsAfter = vscode.getExtensionLogs();
 
-    // Count DISTINCT query executions by queryId
-    const executingLogs = logs.filter(l => l.includes('Executing SQL query'));
-    const queryIds = executingLogs
-      .map(l => {
-        const match = l.match(/queryId[:\s]+(\d+)/i);
-        return match ? match[1] : null;
-      })
-      .filter(id => id !== null);
+    // Count NEW executions (difference from before)
+    const executingLogsAfter = logsAfter.filter(l => l.includes('Executing SQL query')).length;
+    const newExecutions = executingLogsAfter - executingLogsBefore;
+
+    // Count NEW stale/discarded queries
+    const staleLogsAfter = logsAfter.filter(l => l.includes('stale') || l.includes('Discarding')).length;
+    const newStaleLogs = staleLogsAfter - staleLogsBefore;
 
     console.log(`\n📊 Query execution analysis:`);
-    console.log(`   Total "Executing SQL query" logs: ${executingLogs.length}`);
-    console.log(`   Query IDs found: ${queryIds.join(', ') || 'none'}`);
-
-    // Check for stale/discarded queries (indicates duplicate execution)
-    const staleLogs = logs.filter(l => l.includes('stale') || l.includes('Discarding'));
-    console.log(`   Stale/discarded query logs: ${staleLogs.length}`);
-    for (const log of staleLogs) {
-      console.log(`   ⚠️ ${log}`);
-    }
+    console.log(`   Logs before: ${executingLogsBefore}, after: ${executingLogsAfter}`);
+    console.log(`   New "Executing SQL query" logs: ${newExecutions}`);
+    console.log(`   New stale/discarded logs: ${newStaleLogs}`);
 
     // CRITICAL ASSERTION: No duplicate executions
-    // If our fix works, there should be exactly 1 query execution
-    // and 0 stale/discarded queries
-    expect(staleLogs.length).toBe(0);
-    expect(executingLogs.length).toBeLessThanOrEqual(1);
+    // If our fix works, there should be exactly 2 NEW logs per execution (panel + use case)
+    // 4+ logs would indicate duplicate execution, 0 stale/discarded queries expected
+    expect(newStaleLogs).toBe(0);
+    expect(newExecutions).toBeLessThanOrEqual(2);
 
     await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-no-duplicates');
   });

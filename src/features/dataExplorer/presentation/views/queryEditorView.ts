@@ -45,6 +45,17 @@ export function renderQueryEditorSection(data: QueryEditorRenderData): string {
 				</div>
 			</div>
 		</div>
+		<div class="query-results-section">
+			<div id="results-table-container">
+				<div class="empty-state">
+					<p>Run a query to see results</p>
+				</div>
+			</div>
+			<div class="results-status-bar">
+				<span id="results-count">0 rows</span>
+				<span id="execution-time">0ms</span>
+			</div>
+		</div>
 	`;
 }
 
