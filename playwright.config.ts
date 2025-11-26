@@ -1,10 +1,16 @@
 import { defineConfig } from '@playwright/test';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load environment variables from .env.e2e.local for integration tests
+dotenv.config({ path: path.resolve(__dirname, '.env.e2e.local') });
 
 /**
  * Playwright configuration for VS Code extension E2E testing.
  *
  * Usage:
  * - npm run e2e:smoke - Quick smoke tests (< 30s)
+ * - npm run e2e:integration - Integration tests (requires credentials in .env.e2e.local)
  * - npm run e2e:headed - Debug with visible VS Code window
  * - npm run e2e:debug - Step-by-step debugging
  */

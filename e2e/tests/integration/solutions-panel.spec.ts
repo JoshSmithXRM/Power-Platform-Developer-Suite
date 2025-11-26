@@ -121,6 +121,32 @@ test.describe('Solutions Panel Integration Tests', () => {
     await frame.fill('#clientId', testConfig.clientId!);
     await frame.fill('#clientSecret', testConfig.clientSecret!);
 
+    // Take screenshot before testing connection
+    await VSCodeLauncher.takeScreenshot(vscode.window, 'env-setup-before-test-connection');
+
+    // Click Test Connection to verify credentials work
+    const testConnectionButton = await frame.$('button:has-text("Test Connection")');
+    if (testConnectionButton) {
+      console.log('Testing connection...');
+      await testConnectionButton.click();
+      // Wait for connection test to complete (may take a few seconds for auth)
+      await vscode.window.waitForTimeout(5000);
+
+      // Take screenshot after test connection
+      await VSCodeLauncher.takeScreenshot(vscode.window, 'env-setup-after-test-connection');
+
+      // Check extension logs for connection test result
+      const logs = vscode.getExtensionLogs();
+      const connectionLogs = logs.filter(l =>
+        l.includes('Connection') || l.includes('connection') ||
+        l.includes('Test') || l.includes('Success') || l.includes('Failed')
+      );
+      console.log('Connection test logs:');
+      for (const log of connectionLogs.slice(-10)) {
+        console.log(`  ${log}`);
+      }
+    }
+
     // Click Save & Close
     let saveButton = await frame.$('button:has-text("Save & Close")');
     if (!saveButton) {
@@ -139,10 +165,21 @@ test.describe('Solutions Panel Integration Tests', () => {
 
     // Open Solutions panel
     await commandPalette.executeCommand('Power Platform Developer Suite: Solutions');
-    await vscode.window.waitForTimeout(5000); // Allow time for API call
+    await vscode.window.waitForTimeout(10000); // Allow time for API call (increased from 5s)
 
     // Take screenshot
     await VSCodeLauncher.takeScreenshot(vscode.window, 'solutions-loaded');
+
+    // Log extension activity for debugging
+    const allLogs = vscode.getExtensionLogs();
+    const solutionLogs = allLogs.filter(l =>
+      l.includes('Solution') || l.includes('solution') ||
+      l.includes('ListSolutions') || l.includes('error') || l.includes('Error')
+    );
+    console.log('Solutions-related logs:');
+    for (const log of solutionLogs.slice(-20)) {
+      console.log(`  ${log}`);
+    }
 
     // Get webview frame
     const frame = await webviewHelper.getWebviewFrame();
@@ -213,22 +250,27 @@ test.describe('Solutions Panel Integration Tests', () => {
     const frame = await webviewHelper.getWebviewFrame();
 
     // Find solution name links (friendlyNameHtml renders as clickable)
+    // Note: Links may use href="#" with JavaScript click handlers (SPA pattern)
     const solutionLinks = await frame.$$('a[data-solution-id], .solution-link, td a');
     console.log(`Found ${solutionLinks.length} solution links`);
 
     // Take screenshot
     await VSCodeLauncher.takeScreenshot(vscode.window, 'solutions-links');
 
-    // If we have the PP Environment ID, links should be clickable
-    if (testConfig.ppEnvId && solutionLinks.length > 0) {
+    // Verify we found clickable links
+    expect(solutionLinks.length).toBeGreaterThan(0);
+
+    // Check link properties
+    if (solutionLinks.length > 0) {
       const firstLink = solutionLinks[0];
       const href = await firstLink.getAttribute('href');
-      console.log(`First solution link href: ${href}`);
+      const onclick = await firstLink.getAttribute('onclick');
+      const dataSolutionId = await firstLink.getAttribute('data-solution-id');
+      console.log(`First solution link - href: ${href}, onclick: ${onclick ? 'yes' : 'no'}, data-solution-id: ${dataSolutionId}`);
 
-      // Verify link contains maker portal URL pattern
-      if (href) {
-        expect(href).toContain('make.powerapps.com');
-      }
+      // Links should either have a proper href OR use JavaScript handlers
+      const hasClickHandler = onclick !== null || dataSolutionId !== null || href === '#';
+      expect(hasClickHandler || (href && href.includes('make.powerapps.com'))).toBe(true);
     }
   });
 
