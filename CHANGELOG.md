@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2025-11-26
+
 ### Added
+
+- **Data Explorer Panel (MVP):** SQL query execution against Dataverse
+  - SQL to FetchXML transpilation with live preview
+  - Query results displayed in sortable table
+  - Clickable record links - lookup fields and primary keys open records in browser
+  - Copy record URL button on hover
+  - Syntax highlighting for SQL editor and FetchXML preview
+  - Query execution status bar with row count and timing
+  - Keyboard shortcut (Ctrl+Enter) for query execution
 
 - **E2E Testing Infrastructure:** Playwright-based E2E testing for VS Code extension
   - `npm run e2e:smoke` - Automated smoke tests (~30s) for VS Code launch and command execution
@@ -19,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ClaudeJsonReporter` - AI-optimized JSON output with suggestions
   - Console log capture (`vscode.getLogs()`) - Renderer and webview debug messages
   - Extension Output channel capture (`vscode.getExtensionLogs()`) - Extension logger output
+  - Data Explorer integration tests - Query execution, results display, record links
   - Environment Setup integration tests - Form field validation, Service Principal auth
   - Solutions Panel integration tests - Real API calls, 1000+ solutions loading verified
   - Auto-loading credentials via `dotenv` from `.env.e2e.local`
