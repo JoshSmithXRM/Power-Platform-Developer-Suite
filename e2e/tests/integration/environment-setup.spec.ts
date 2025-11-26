@@ -65,8 +65,8 @@ test.describe('Environment Setup Integration Tests', () => {
     // Take screenshot of form
     await VSCodeLauncher.takeScreenshot(vscode.window, 'env-setup-new-form');
 
-    // Get webview frame
-    const frame = await webviewHelper.getWebviewFrame();
+    // Get webview frame (use viewType for reliability)
+    const frame = await webviewHelper.getWebviewFrame('environmentSetup');
 
     // Verify required form fields are present
     // Note: field IDs match EnvironmentFormSection.ts
@@ -85,7 +85,7 @@ test.describe('Environment Setup Integration Tests', () => {
 
   test('Form fields accept input correctly', async () => {
     // Form should already be open from previous test
-    const frame = await webviewHelper.getWebviewFrame();
+    const frame = await webviewHelper.getWebviewFrame('environmentSetup');
 
     // Fill in the form fields (IDs from EnvironmentFormSection.ts)
     await frame.fill('#name', testEnvironment.name);
@@ -106,15 +106,13 @@ test.describe('Environment Setup Integration Tests', () => {
   });
 
   test('Service Principal auth method shows conditional fields', async () => {
-    const frame = await webviewHelper.getWebviewFrame();
+    const frame = await webviewHelper.getWebviewFrame('environmentSetup');
 
     // Select authentication method (Service Principal)
     // Uses #authenticationMethod and value "ServicePrincipal" per EnvironmentFormSection.ts
     const authSelect = await frame.$('#authenticationMethod');
     if (authSelect) {
       await authSelect.selectOption('ServicePrincipal');
-      // Wait for conditional fields to become visible
-      await vscode.window.waitForTimeout(1000);
     }
 
     // Wait for clientId field to be visible (shown for ServicePrincipal)
@@ -142,7 +140,7 @@ test.describe('Environment Setup Integration Tests', () => {
   });
 
   test('Save button triggers save operation', async () => {
-    const frame = await webviewHelper.getWebviewFrame();
+    const frame = await webviewHelper.getWebviewFrame('environmentSetup');
 
     // Clear logs to track save operation
     vscode.clearLogs();

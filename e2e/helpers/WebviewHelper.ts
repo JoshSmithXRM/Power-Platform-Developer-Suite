@@ -32,21 +32,21 @@ export class WebviewHelper {
   /**
    * Waits for a webview panel to appear in VS Code.
    *
-   * @param panelTitleOrViewType - Panel title text or viewType to wait for
+   * @param viewType - The viewType of the webview panel (e.g., 'environmentSetup', 'powerPlatformDevSuite.solutionExplorer')
    * @param timeout - Maximum wait time in milliseconds
    * @throws Error if panel doesn't appear within timeout
    */
-  async waitForPanel(panelTitleOrViewType: string, timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<void> {
-    console.log(`Waiting for panel: ${panelTitleOrViewType}`);
+  async waitForPanel(viewType?: string, timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<void> {
+    const selector = viewType ? `iframe.webview[src*="${viewType}"]` : 'iframe.webview';
+    console.log(`Waiting for panel${viewType ? ` with viewType: ${viewType}` : ''}...`);
 
-    // Wait for the webview iframe to appear
-    // VS Code webview iframes have a specific structure
-    await this.page.waitForSelector('iframe.webview', {
+    // Wait for the webview iframe to appear using its viewType in the src attribute
+    await this.page.waitForSelector(selector, {
       state: 'attached',
       timeout,
     });
 
-    console.log(`Panel appeared: ${panelTitleOrViewType}`);
+    console.log(`Panel appeared${viewType ? `: ${viewType}` : ''}`);
   }
 
   /**
@@ -55,21 +55,23 @@ export class WebviewHelper {
    * CRITICAL: You must use this frame to interact with webview content.
    * Direct page.click() calls won't work on elements inside webviews.
    *
+   * @param viewType - Optional viewType to target specific webview (recommended for reliability)
    * @param timeout - Maximum wait time for iframe to be available
    * @returns Playwright Frame for the webview content
    * @throws Error if webview iframe not found or frame unavailable
    *
    * @example
    * ```typescript
-   * const frame = await webviewHelper.getWebviewFrame();
+   * const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.solutionExplorer');
    * await frame.click('#my-button'); // Click button inside webview
    * ```
    */
-  async getWebviewFrame(timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<Frame> {
-    console.log('Getting webview frame...');
+  async getWebviewFrame(viewType?: string, timeout: number = WebviewHelper.PANEL_WAIT_TIMEOUT_MS): Promise<Frame> {
+    const selector = viewType ? `iframe.webview[src*="${viewType}"]` : 'iframe.webview';
+    console.log(`Getting webview frame${viewType ? ` for viewType: ${viewType}` : ''}...`);
 
-    // Find the webview iframe
-    const iframeElement = await this.page.waitForSelector('iframe.webview', {
+    // Find the webview iframe (optionally by viewType in src attribute)
+    const iframeElement = await this.page.waitForSelector(selector, {
       state: 'attached',
       timeout,
     });
@@ -77,7 +79,7 @@ export class WebviewHelper {
     // Get the frame handle
     const frame = await iframeElement.contentFrame();
     if (frame === null) {
-      throw new Error('Failed to get webview frame - contentFrame() returned null');
+      throw new Error(`Failed to get webview frame${viewType ? ` for viewType "${viewType}"` : ''} - contentFrame() returned null`);
     }
 
     // VS Code webviews have a nested iframe structure

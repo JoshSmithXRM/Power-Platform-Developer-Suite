@@ -252,9 +252,9 @@ export class VSCodeLauncher {
       return [];
     }
 
-    // Find extension folder
+    // Find extension folder (includes publisher ID for robustness)
     const extFolders = fs.readdirSync(extHostPath)
-      .filter(f => f.includes('power-platform-developer-suite'));
+      .filter(f => f.toLowerCase().includes('joshsmithxrm.power-platform-developer-suite'));
 
     for (const extFolder of extFolders) {
       const extLogDir = path.join(extHostPath, extFolder);

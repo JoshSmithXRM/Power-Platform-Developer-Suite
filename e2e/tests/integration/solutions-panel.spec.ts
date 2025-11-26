@@ -94,7 +94,7 @@ test.describe('Solutions Panel Integration Tests', () => {
     await commandPalette.executeCommand('Power Platform Developer Suite: Add Environment');
     await vscode.window.waitForTimeout(2000);
 
-    const frame = await webviewHelper.getWebviewFrame();
+    const frame = await webviewHelper.getWebviewFrame('environmentSetup');
 
     // Fill in the form with real credentials (IDs from EnvironmentFormSection.ts)
     await frame.fill('#name', testConfig.envName);
@@ -113,7 +113,6 @@ test.describe('Solutions Panel Integration Tests', () => {
     const authSelect = await frame.$('#authenticationMethod');
     if (authSelect) {
       await authSelect.selectOption('ServicePrincipal');
-      await vscode.window.waitForTimeout(1000);
     }
 
     // Fill credentials (wait for conditional fields to be visible)
@@ -121,8 +120,14 @@ test.describe('Solutions Panel Integration Tests', () => {
     await frame.fill('#clientId', testConfig.clientId!);
     await frame.fill('#clientSecret', testConfig.clientSecret!);
 
-    // Take screenshot before testing connection
+    // Clear sensitive fields before taking screenshot (security: avoid capturing credentials)
+    await frame.fill('#clientSecret', '');
+
+    // Take screenshot before testing connection (credentials cleared for security)
     await VSCodeLauncher.takeScreenshot(vscode.window, 'env-setup-before-test-connection');
+
+    // Re-fill client secret for actual test
+    await frame.fill('#clientSecret', testConfig.clientSecret!);
 
     // Click Test Connection to verify credentials work
     const testConnectionButton = await frame.$('button:has-text("Test Connection")');
@@ -165,7 +170,15 @@ test.describe('Solutions Panel Integration Tests', () => {
 
     // Open Solutions panel
     await commandPalette.executeCommand('Power Platform Developer Suite: Solutions');
-    await vscode.window.waitForTimeout(10000); // Allow time for API call (increased from 5s)
+
+    // Get webview frame (use viewType for reliability with multiple panels)
+    const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.solutionExplorer');
+
+    // Wait for solutions to load by checking for table rows (more reliable than fixed timeout)
+    await frame.waitForSelector('table tbody tr, .data-table-row, [data-row]', {
+      state: 'visible',
+      timeout: 15000, // Allow time for API call
+    });
 
     // Take screenshot
     await VSCodeLauncher.takeScreenshot(vscode.window, 'solutions-loaded');
@@ -180,9 +193,6 @@ test.describe('Solutions Panel Integration Tests', () => {
     for (const log of solutionLogs.slice(-20)) {
       console.log(`  ${log}`);
     }
-
-    // Get webview frame
-    const frame = await webviewHelper.getWebviewFrame();
 
     // Check for data table with solutions
     const tableRows = await frame.$$('table tbody tr, .data-table-row, [data-row]');
@@ -200,7 +210,7 @@ test.describe('Solutions Panel Integration Tests', () => {
   test('Refresh button reloads solutions', async () => {
     test.skip(!hasCredentials, 'Credentials not configured');
 
-    const frame = await webviewHelper.getWebviewFrame();
+    const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.solutionExplorer');
 
     // Clear extension logs to track refresh
     vscode.clearLogs();
@@ -227,7 +237,7 @@ test.describe('Solutions Panel Integration Tests', () => {
     test.skip(!hasCredentials, 'Credentials not configured');
     test.skip(!testConfig.ppEnvId, 'Power Platform Environment ID not configured');
 
-    const frame = await webviewHelper.getWebviewFrame();
+    const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.solutionExplorer');
 
     // Find "Open in Maker" button
     const openMakerButton = await frame.$('button:has-text("Open in Maker"), #openMaker, [data-action="openMaker"]');
@@ -247,7 +257,7 @@ test.describe('Solutions Panel Integration Tests', () => {
   test('Solution rows have clickable links', async () => {
     test.skip(!hasCredentials, 'Credentials not configured');
 
-    const frame = await webviewHelper.getWebviewFrame();
+    const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.solutionExplorer');
 
     // Find solution name links (friendlyNameHtml renders as clickable)
     // Note: Links may use href="#" with JavaScript click handlers (SPA pattern)
