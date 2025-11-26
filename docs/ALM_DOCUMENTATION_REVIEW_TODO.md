@@ -314,17 +314,172 @@ Before accepting ANY change, it must pass these gates:
 
 ## Gap Analysis
 
-*To be populated in Phase 2*
+### What's Working Well (Don't Change)
+
+| Element | Why It Works | Evidence |
+|---------|--------------|----------|
+| NEVER/ALWAYS rules | Clear, unambiguous boundaries | Consistent enforcement of `any`, layer violations |
+| Agents (code-guardian, design-architect) | Specialized deep work | Comprehensive reviews, structured designs |
+| Slash commands | Explicit invocation points | `/design`, `/code-review` are clear triggers |
+| Inside-out implementation | Prevents architecture drift | Domain-first catches issues early |
+| References to external docs | Keeps CLAUDE.md lean | Doesn't duplicate pattern guides |
+| PR validation pipeline | Automated safety net | Catches compile/test/lint failures |
+| Technical debt tracking | Documented tradeoffs | Prevents re-litigation of decisions |
+
+### Critical Gaps Identified
+
+| Gap | Type | Location | Impact | Root Cause |
+|-----|------|----------|--------|------------|
+| **No discovery step** | Structural | WORKFLOW.md, CLAUDE.md | HIGH | Workflow goes straight from request to design/implement without exploring existing patterns |
+| **No work persistence rule** | Structural | CLAUDE.md | HIGH | Claude does work but doesn't document/commit incrementally |
+| **Defensive commit rules** | Guidance | CLAUDE.md | MEDIUM | "Only commit when requested" causes unnecessary friction |
+| **design-architect doesn't explore first** | Agent behavior | agents/design-architect.md | MEDIUM | Focuses on creating new designs, not discovering existing patterns |
+| **No session context awareness** | Behavioral | CLAUDE.md | LOW | Rules are absolute, not situational |
+| **design/ vs designs/ folders** | Organizational | docs/ | LOW | Minor naming inconsistency |
+
+### Gap-to-Goal Mapping
+
+| Goal | Status | Gaps Affecting It |
+|------|--------|-------------------|
+| **Pattern Discovery** | CRITICAL GAP | No discovery step, design-architect doesn't explore first |
+| **Doc Discoverability** | Minor gaps | design/ vs designs/ confusion |
+| **Minimal Effective Guidance** | Minor gaps | Potential CLAUDE.md/WORKFLOW.md overlap |
+| **Pipeline Reliability** | Good | None identified |
+
+### Root Cause Analysis
+
+The core problem - "Claude overlooks existing patterns" - traces to:
+
+1. **No explicit discovery step** - Workflows go straight from "understand request" to "design" or "implement"
+2. **design-architect focuses on creation** - It designs new things, doesn't first check what exists
+3. **Review happens too late** - code-guardian catches violations after implementation
+4. **Work isn't persisted** - Progress isn't documented in files or committed incrementally
+
+### Recommendation: Iterate, Don't Rewrite
+
+**Why iterate:**
+- Most of the workflow IS working (agents, commands, pipeline)
+- Rewrite risks breaking what works
+- Pain points are specific: discovery + persistence + context-awareness
+- Anthropic best practice: focused changes outperform exhaustive rewrites
+
+**Core fixes needed:**
+1. Add "Explore Before Create" phase to workflow
+2. Add "Persist Work Incrementally" rule
+3. Adjust context-aware guidance for situational decisions
 
 ---
 
 ## Proposals
 
-*To be populated in Phase 3*
+### Proposal 1: Add "Explore Before Create" Workflow Step
 
-| # | Problem | Proposal | Goal Served | Gates Passed | Status |
-|---|---------|----------|-------------|--------------|--------|
-| | | | | | |
+**Problem:** Claude implements new code without checking if similar patterns exist, leading to wasted tokens and reverts.
+
+**Concrete Example:** Web resource editing feature - rebuilt a pattern that already existed in the codebase, had to revert and use existing approach.
+
+**Proposal:** Add explicit discovery step to CLAUDE.md and WORKFLOW.md:
+- Before implementing ANY new feature, explore existing codebase for similar patterns
+- Check: similar entities, similar panels, similar use cases
+- Document what was found before proceeding
+
+**Goal Served:** Pattern Discovery
+
+**Expected Outcome:** Claude asks "what exists?" before "what should I build?"
+
+**How to Measure:** Observe next 3-5 feature implementations - does Claude explore first?
+
+**Gates Evaluation:**
+- Gate 1 (Problem Evidence): ✅ Concrete example provided (web resource editing)
+- Gate 2 (Root Cause): ✅ Addresses missing workflow step
+- Gate 3 (Claude Behavior): ✅ "Before X, ALWAYS Y" aligns with Anthropic best practices
+- Gate 4 (Maintenance): ✅ Simple rule, doesn't go stale
+- Gate 5 (Testability): ✅ Observable in next implementations
+
+**Status:** Pending user approval
+
+---
+
+### Proposal 2: Add "Persist Work Incrementally" Rule
+
+**Problem:** Claude does work (analysis, planning, implementation) but doesn't document it in files or commit at logical checkpoints.
+
+**Concrete Example:** Gap analysis was done but not written to the TODO file until user pointed it out.
+
+**Proposal:** Add to CLAUDE.md:
+- When working on multi-phase tasks, create/update a tracking file
+- Document progress in the file as work proceeds
+- Commit after each completed phase/slice
+- For code: commit per layer, get review before final commit
+- For documentation/planning: commit at logical checkpoints without asking
+
+**Goal Served:** Pattern Discovery (documentation), Minimal Effective Guidance (context-aware commits)
+
+**Expected Outcome:** Work is persisted incrementally, no lost progress, clear audit trail
+
+**How to Measure:** Observe if Claude updates files and commits without prompting
+
+**Gates Evaluation:**
+- Gate 1 (Problem Evidence): ✅ This session - gap analysis not documented until prompted
+- Gate 2 (Root Cause): ✅ Addresses missing persistence rule
+- Gate 3 (Claude Behavior): ✅ Explicit triggers work well with Claude
+- Gate 4 (Maintenance): ✅ Simple behavioral rule
+- Gate 5 (Testability): ✅ Observable immediately
+
+**Status:** Pending user approval
+
+---
+
+### Proposal 3: Context-Aware Commit Guidance
+
+**Problem:** Current rule "Only commit when requested" is too defensive for documentation/planning work.
+
+**Concrete Example:** Asked "should I commit?" during documentation phase when the answer was obviously yes.
+
+**Proposal:** Replace blanket commit rule with context-aware guidance:
+- **Code changes:** Follow user preference established in session, or ask if unclear
+- **Documentation/planning:** Commit at logical checkpoints without asking
+- **If session pattern established:** Follow it (e.g., user said "commit and proceed" once = do it going forward)
+
+**Goal Served:** Minimal Effective Guidance
+
+**Expected Outcome:** Less friction, fewer unnecessary questions
+
+**How to Measure:** Reduction in "should I commit?" questions during appropriate contexts
+
+**Gates Evaluation:**
+- Gate 1 (Problem Evidence): ✅ This session - unnecessary question
+- Gate 2 (Root Cause): ✅ Addresses overly defensive rule
+- Gate 3 (Claude Behavior): ✅ Context-awareness aligns with natural language understanding
+- Gate 4 (Maintenance): ✅ Replaces rigid rule with judgment
+- Gate 5 (Testability): ✅ Observable in sessions
+
+**Status:** Pending user approval
+
+---
+
+### Proposal 4: Consolidate design/ and designs/ Folders
+
+**Problem:** Two similarly named folders create confusion.
+
+**Concrete Example:** `docs/design/` has 9 files, `docs/designs/` has 1 file (PLAYWRIGHT_E2E_DESIGN.md)
+
+**Proposal:** Move `docs/designs/PLAYWRIGHT_E2E_DESIGN.md` to `docs/design/` and delete empty `designs/` folder.
+
+**Goal Served:** Doc Discoverability
+
+**Expected Outcome:** Single location for design documents
+
+**How to Measure:** No confusion about where designs go
+
+**Gates Evaluation:**
+- Gate 1 (Problem Evidence): ✅ Two folders exist with overlapping purpose
+- Gate 2 (Root Cause): ✅ Directly fixes organizational issue
+- Gate 3 (Claude Behavior): N/A - not a Claude behavior change
+- Gate 4 (Maintenance): ✅ One-time cleanup
+- Gate 5 (Testability): ✅ Verifiable - one folder exists after
+
+**Status:** Pending user approval
 
 ---
 
@@ -340,4 +495,9 @@ Before accepting ANY change, it must pass these gates:
 
 ## Notes
 
-*Add notes and observations here as work progresses.*
+### Session Observations (2025-01-26)
+
+1. **Gap analysis done but not documented** - Illustrates Proposal 2 (persist work)
+2. **Asked about committing** - Illustrates Proposal 3 (context-aware commits)
+3. **Web resource editing revert** - Illustrates Proposal 1 (explore before create)
+4. **Workflow mostly solid** - Iteration recommended over rewrite
