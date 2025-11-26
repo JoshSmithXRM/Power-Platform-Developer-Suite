@@ -1,20 +1,24 @@
-import * as fs from 'fs/promises';
-
-import * as vscode from 'vscode';
-
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IPluginTraceExporter } from '../../domain/repositories/IPluginTraceExporter';
 import type { PluginTrace } from '../../domain/entities/PluginTrace';
-import { normalizeError } from '../../../../shared/utils/ErrorUtils';
+import { CsvExportService } from '../../../../shared/infrastructure/services/CsvExportService';
 
 /**
- * Infrastructure implementation of IPluginTraceExporter using VS Code file APIs
+ * Infrastructure implementation of IPluginTraceExporter using VS Code file APIs.
+ * Uses the shared CsvExportService for file operations and CSV escaping.
  */
 export class FileSystemPluginTraceExporter implements IPluginTraceExporter {
-	constructor(private readonly logger: ILogger) {}
+	private readonly csvExportService: CsvExportService;
+
+	constructor(private readonly logger: ILogger) {
+		this.csvExportService = new CsvExportService(logger);
+	}
 
 	exportToCsv(traces: readonly PluginTrace[]): string {
 		this.logger.debug('Exporting traces to CSV', { count: traces.length });
+
+		const escape = (value: string): string =>
+			this.csvExportService.escapeCsvField(value);
 
 		const headers = [
 			'ID',
@@ -42,29 +46,25 @@ export class FileSystemPluginTraceExporter implements IPluginTraceExporter {
 
 		for (const trace of traces) {
 			const row = [
-				this.escapeCsvField(trace.id),
-				this.escapeCsvField(trace.createdOn.toISOString()),
-				this.escapeCsvField(trace.pluginName),
-				this.escapeCsvField(trace.entityName ?? ''),
-				this.escapeCsvField(trace.messageName),
-				this.escapeCsvField(trace.operationType.value.toString()),
-				this.escapeCsvField(trace.mode.value.toString()),
-				this.escapeCsvField(trace.depth.toString()),
-				this.escapeCsvField(trace.duration.milliseconds.toString()),
-				this.escapeCsvField(
-					trace.constructorDuration.milliseconds.toString()
-				),
-				this.escapeCsvField(
-					trace.hasException() ? 'Exception' : 'Success'
-				),
-				this.escapeCsvField(trace.exceptionDetails ?? ''),
-				this.escapeCsvField(trace.messageBlock ?? ''),
-				this.escapeCsvField(trace.configuration ?? ''),
-				this.escapeCsvField(trace.secureConfiguration ?? ''),
-				this.escapeCsvField(trace.correlationId?.value ?? ''),
-				this.escapeCsvField(trace.requestId ?? ''),
-				this.escapeCsvField(trace.pluginStepId ?? ''),
-				this.escapeCsvField(trace.persistenceKey ?? ''),
+				escape(trace.id),
+				escape(trace.createdOn.toISOString()),
+				escape(trace.pluginName),
+				escape(trace.entityName ?? ''),
+				escape(trace.messageName),
+				escape(trace.operationType.value.toString()),
+				escape(trace.mode.value.toString()),
+				escape(trace.depth.toString()),
+				escape(trace.duration.milliseconds.toString()),
+				escape(trace.constructorDuration.milliseconds.toString()),
+				escape(trace.hasException() ? 'Exception' : 'Success'),
+				escape(trace.exceptionDetails ?? ''),
+				escape(trace.messageBlock ?? ''),
+				escape(trace.configuration ?? ''),
+				escape(trace.secureConfiguration ?? ''),
+				escape(trace.correlationId?.value ?? ''),
+				escape(trace.requestId ?? ''),
+				escape(trace.pluginStepId ?? ''),
+				escape(trace.persistenceKey ?? ''),
 			];
 
 			rows.push(row.join(','));
@@ -105,70 +105,6 @@ export class FileSystemPluginTraceExporter implements IPluginTraceExporter {
 		content: string,
 		suggestedFilename: string
 	): Promise<string> {
-		this.logger.debug('Showing save dialog', { suggestedFilename });
-
-		try {
-			const uri = await vscode.window.showSaveDialog({
-				defaultUri: vscode.Uri.file(suggestedFilename),
-				filters: this.getFileFilters(suggestedFilename),
-			});
-
-			if (!uri) {
-				throw new Error('Save dialog cancelled by user');
-			}
-
-			await fs.writeFile(uri.fsPath, content, 'utf-8');
-
-			this.logger.info('Saved file successfully', {
-				path: uri.fsPath,
-			});
-
-			return uri.fsPath;
-		} catch (error) {
-			const normalizedError = normalizeError(error);
-			const errorMessage = normalizedError.message || String(normalizedError);
-
-			// User cancellation is expected - don't log as error
-			if (errorMessage.includes('cancelled by user')) {
-				this.logger.debug('Save dialog cancelled by user');
-				throw normalizedError;
-			}
-
-			this.logger.error('Failed to save file', normalizedError);
-			throw normalizedError;
-		}
-	}
-
-	private escapeCsvField(value: string): string {
-		if (
-			value.includes(',') ||
-			value.includes('"') ||
-			value.includes('\n')
-		) {
-			return `"${value.replace(/"/g, '""')}"`;
-		}
-		return value;
-	}
-
-	private getFileFilters(
-		suggestedFilename: string
-	): Record<string, string[]> {
-		const extension = suggestedFilename.split('.').pop()?.toLowerCase();
-
-		if (extension === 'csv') {
-			return {
-				CSV: ['csv'],
-				'All Files': ['*'],
-			};
-		} else if (extension === 'json') {
-			return {
-				JSON: ['json'],
-				'All Files': ['*'],
-			};
-		}
-
-		return {
-			'All Files': ['*'],
-		};
+		return this.csvExportService.saveToFile(content, suggestedFilename);
 	}
 }

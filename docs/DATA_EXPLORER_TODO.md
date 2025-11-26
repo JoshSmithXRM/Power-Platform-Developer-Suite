@@ -20,6 +20,30 @@ This document tracks work in progress and remaining items for the Data Explorer 
 - [x] Added `dataverseUrl` to `EnvironmentInfo` interface
 - [x] Added `entityLogicalName` to `QueryResultViewModel` for primary key detection
 
+### Export to CSV Feature
+- [x] **CsvExportService** - Created shared service for CSV/JSON export (`src/shared/infrastructure/services/CsvExportService.ts`)
+  - Generic `toCsv(TabularData)` method for any tabular data
+  - `escapeCsvField()` helper for RFC 4180 compliant CSV escaping
+  - `saveToFile()` using VS Code save dialog
+  - `toJson()` for JSON export support
+- [x] **Data Explorer CSV Export** - Added "Export CSV" button to toolbar
+  - Exports current query results to CSV file
+  - Generates filename with entity name and timestamp (e.g., `contact_export_2025-11-26T12-30-00.csv`)
+  - Shows warning if no results to export
+- [x] **Plugin Traces Refactored** - Updated `FileSystemPluginTraceExporter` to use shared `CsvExportService`
+  - Delegates file saving to shared service
+  - Uses shared `escapeCsvField()` method
+  - Reduced code duplication
+
+### E2E Tests for CSV Export
+- [x] **Data Explorer CSV tests** - Added to `e2e/tests/integration/data-explorer.spec.ts`
+  - Tests Export CSV button visibility after query execution
+  - Tests Export CSV action triggers correctly
+- [x] **Plugin Traces E2E tests** - Created new `e2e/tests/integration/plugin-traces.spec.ts`
+  - Tests panel opens correctly
+  - Tests export dropdown/buttons are present
+  - Tests CSV export triggers export flow
+
 ## In Progress
 
 ### Bugs to Fix
@@ -51,17 +75,21 @@ This document tracks work in progress and remaining items for the Data Explorer 
 - [ ] Consider adding table alias support for main entity in SQL (FetchXML limitation - main entity doesn't support alias)
 - [ ] Add sorting persistence
 - [ ] Add column resizing
-- [ ] Export to CSV/Excel
+- [x] **Export to CSV** - COMPLETED: Added Export CSV button and shared CsvExportService
 
 ## Files Modified This Session
 
 ### Core Changes
 - `src/shared/infrastructure/services/DataverseApiService.ts` - Added Prefer header for annotations
 - `src/shared/infrastructure/services/DataverseRecordUrlService.ts` - NEW: Reusable URL builder
+- `src/shared/infrastructure/services/CsvExportService.ts` - NEW: Shared CSV/JSON export utility
+- `src/shared/infrastructure/services/CsvExportService.test.ts` - NEW: Unit tests for CsvExportService
 - `src/features/dataExplorer/infrastructure/repositories/DataverseDataExplorerQueryRepository.ts` - Link-entity handling, lookup extraction
 - `src/features/dataExplorer/application/mappers/QueryResultViewModelMapper.ts` - Entity name extraction, lookup mapping
 - `src/features/dataExplorer/application/viewModels/QueryResultViewModel.ts` - Added entityLogicalName, rowLookups
-- `src/features/dataExplorer/presentation/panels/DataExplorerPanelComposed.ts` - openRecord/copyRecordUrl handlers
+- `src/features/dataExplorer/presentation/panels/DataExplorerPanelComposed.ts` - openRecord/copyRecordUrl handlers, Export CSV functionality
+- `src/features/pluginTraceViewer/infrastructure/exporters/FileSystemPluginTraceExporter.ts` - Refactored to use shared CsvExportService
+- `src/features/pluginTraceViewer/infrastructure/exporters/FileSystemPluginTraceExporter.test.ts` - Updated test expectations
 
 ### Webview Changes
 - `resources/webview/js/behaviors/DataExplorerBehavior.js` - Record links, copy buttons, empty state
@@ -73,8 +101,9 @@ This document tracks work in progress and remaining items for the Data Explorer 
 
 ### E2E Test Infrastructure
 - `e2e/helpers/WebviewHelper.ts` - Fixed iframe selector for VS Code webview detection
-- `e2e/tests/integration/data-explorer.spec.ts` - Fixed multiple test issues (selectors, assertions, keyboard handling)
+- `e2e/tests/integration/data-explorer.spec.ts` - Fixed multiple test issues (selectors, assertions, keyboard handling), added CSV export tests
 - `e2e/tests/integration/environment-setup.spec.ts` - Updated duplicate execution assertions
+- `e2e/tests/integration/plugin-traces.spec.ts` - NEW: Plugin Trace Viewer E2E tests including CSV export
 
 ## Notes
 

@@ -16,6 +16,7 @@ window.createBehavior({
 		setupSqlEditorHighlighting();
 		wireSqlEditor();
 		wireExecuteButton();
+		wireWarningModal();
 	},
 	handleMessage(message) {
 		switch (message.command) {
@@ -47,6 +48,15 @@ window.createBehavior({
 			case 'queryAborted':
 				isExecuting = false;
 				setEditorEnabled(true);
+				break;
+			case 'showWarningModal':
+				showWarningModal(message.data);
+				break;
+			case 'hideWarningModal':
+				hideWarningModal();
+				break;
+			case 'updateSqlEditor':
+				updateSqlEditor(message.data.sql);
 				break;
 		}
 	}
@@ -698,4 +708,147 @@ function isGuid(str) {
 	}
 	const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 	return guidPattern.test(str);
+}
+
+// ============================================
+// WARNING MODAL FUNCTIONS
+// ============================================
+
+/**
+ * Wires up the warning modal button handlers.
+ * Uses data-action attributes on buttons to avoid storing state.
+ */
+function wireWarningModal() {
+	const modal = document.getElementById('warning-modal');
+	if (!modal) {
+		return;
+	}
+
+	const cancelBtn = document.getElementById('modal-btn-cancel');
+	const secondaryBtn = document.getElementById('modal-btn-secondary');
+	const primaryBtn = document.getElementById('modal-btn-primary');
+
+	// Cancel button always closes modal with 'cancel' action
+	if (cancelBtn) {
+		cancelBtn.addEventListener('click', () => {
+			sendModalResponse('cancel');
+		});
+	}
+
+	// Secondary button reads action from data attribute
+	if (secondaryBtn) {
+		secondaryBtn.addEventListener('click', () => {
+			const action = secondaryBtn.dataset.action;
+			if (action) {
+				sendModalResponse(action);
+			}
+		});
+	}
+
+	// Primary button reads action from data attribute
+	if (primaryBtn) {
+		primaryBtn.addEventListener('click', () => {
+			const action = primaryBtn.dataset.action;
+			if (action) {
+				sendModalResponse(action);
+			}
+		});
+	}
+
+	// Close on Escape key
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape' && modal.classList.contains('visible')) {
+			sendModalResponse('cancel');
+		}
+	});
+
+	// Close on overlay click (outside dialog)
+	modal.addEventListener('click', (event) => {
+		if (event.target === modal) {
+			sendModalResponse('cancel');
+		}
+	});
+}
+
+/**
+ * Shows the warning modal with the given configuration.
+ * Sets data-action attributes on buttons for stateless response handling.
+ * @param {Object} config - Modal configuration
+ * @param {string} config.message - The warning message to display
+ * @param {string} config.primaryLabel - Label for primary button
+ * @param {string} config.primaryAction - Action identifier for primary button
+ * @param {string} config.secondaryLabel - Label for secondary button
+ * @param {string} config.secondaryAction - Action identifier for secondary button
+ */
+function showWarningModal(config) {
+	const modal = document.getElementById('warning-modal');
+	const messageEl = document.getElementById('modal-message');
+	const primaryBtn = document.getElementById('modal-btn-primary');
+	const secondaryBtn = document.getElementById('modal-btn-secondary');
+
+	if (!modal || !messageEl) {
+		// Modal not found, send cancel response
+		sendModalResponse('cancel');
+		return;
+	}
+
+	// Set message
+	messageEl.textContent = config.message;
+
+	// Set button labels and data-action attributes (stateless approach)
+	if (primaryBtn) {
+		primaryBtn.textContent = config.primaryLabel || 'OK';
+		primaryBtn.dataset.action = config.primaryAction || '';
+		primaryBtn.style.display = config.primaryLabel ? 'block' : 'none';
+	}
+
+	if (secondaryBtn) {
+		secondaryBtn.textContent = config.secondaryLabel || '';
+		secondaryBtn.dataset.action = config.secondaryAction || '';
+		secondaryBtn.style.display = config.secondaryLabel ? 'block' : 'none';
+	}
+
+	// Show modal
+	modal.classList.add('visible');
+
+	// Focus primary button for keyboard accessibility
+	if (primaryBtn && config.primaryLabel) {
+		primaryBtn.focus();
+	}
+}
+
+/**
+ * Hides the warning modal.
+ */
+function hideWarningModal() {
+	const modal = document.getElementById('warning-modal');
+	if (modal) {
+		modal.classList.remove('visible');
+	}
+}
+
+/**
+ * Sends the modal response back to the extension.
+ * @param {string} action - The action taken (cancel, primary action, or secondary action)
+ */
+function sendModalResponse(action) {
+	hideWarningModal();
+
+	window.vscode.postMessage({
+		command: 'warningModalResponse',
+		data: { action }
+	});
+}
+
+/**
+ * Updates the SQL editor content (e.g., after adding TOP clause).
+ * @param {string} sql - The new SQL content
+ */
+function updateSqlEditor(sql) {
+	const sqlEditor = document.getElementById('sql-editor');
+	if (sqlEditor) {
+		sqlEditor.value = sql;
+		// Trigger input event to update highlighting
+		sqlEditor.dispatchEvent(new Event('input'));
+	}
 }

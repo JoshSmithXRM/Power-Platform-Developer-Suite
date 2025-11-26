@@ -266,7 +266,7 @@ describe('FileSystemPluginTraceExporter', () => {
 				'utf-8'
 			);
 			expect(mockLogger.info).toHaveBeenCalledWith(
-				'Saved file successfully',
+				'File saved successfully',
 				{
 					path: '/test/path/file.csv',
 				}

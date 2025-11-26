@@ -315,6 +315,124 @@
 }
 
 /* ============================================
+   WARNING MODAL DIALOG
+   In-webview modal for row limit warnings
+   ============================================ */
+
+.modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
+.modal-overlay.visible {
+	opacity: 1;
+	visibility: visible;
+}
+
+.modal-dialog {
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+	border-radius: 6px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+	max-width: 450px;
+	width: 90%;
+	transform: scale(0.95);
+	transition: transform 0.15s ease;
+}
+
+.modal-overlay.visible .modal-dialog {
+	transform: scale(1);
+}
+
+.modal-header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 16px 20px 12px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.modal-icon {
+	font-size: 20px;
+	color: var(--vscode-editorWarning-foreground);
+}
+
+.modal-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	margin: 0;
+}
+
+.modal-body {
+	padding: 16px 20px;
+}
+
+.modal-message {
+	font-size: 13px;
+	line-height: 1.5;
+	color: var(--vscode-foreground);
+	margin: 0;
+}
+
+.modal-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	padding: 12px 20px 16px;
+}
+
+.modal-btn {
+	padding: 6px 14px;
+	font-size: 13px;
+	font-family: var(--vscode-font-family);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: background 0.1s ease;
+}
+
+.modal-btn-primary {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: none;
+}
+
+.modal-btn-primary:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+.modal-btn-secondary {
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+	border: none;
+}
+
+.modal-btn-secondary:hover {
+	background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.modal-btn-cancel {
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: 1px solid var(--vscode-button-border, var(--vscode-panel-border));
+}
+
+.modal-btn-cancel:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+/* ============================================
    RESPONSIVE
    ============================================ */
 

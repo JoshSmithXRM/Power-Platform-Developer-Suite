@@ -56,6 +56,7 @@ export function renderQueryEditorSection(data: QueryEditorRenderData): string {
 				<span id="execution-time">0ms</span>
 			</div>
 		</div>
+		${renderWarningModal()}
 	`;
 }
 
@@ -74,6 +75,31 @@ function renderErrorBanner(
 		<div class="error-banner" role="alert">
 			<span class="error-icon">⚠️</span>
 			<span class="error-text">${escapeHtml(message)}${positionText}</span>
+		</div>
+	`;
+}
+
+/**
+ * Renders the warning modal overlay.
+ * Hidden by default, shown via JavaScript when needed.
+ */
+function renderWarningModal(): string {
+	return `
+		<div id="warning-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+			<div class="modal-dialog">
+				<div class="modal-header">
+					<span class="modal-icon codicon codicon-warning"></span>
+					<h2 id="modal-title" class="modal-title">Query Warning</h2>
+				</div>
+				<div class="modal-body">
+					<p id="modal-message" class="modal-message"></p>
+				</div>
+				<div class="modal-footer">
+					<button id="modal-btn-cancel" class="modal-btn modal-btn-cancel" type="button">Cancel</button>
+					<button id="modal-btn-secondary" class="modal-btn modal-btn-secondary" type="button"></button>
+					<button id="modal-btn-primary" class="modal-btn modal-btn-primary" type="button"></button>
+				</div>
+			</div>
 		</div>
 	`;
 }

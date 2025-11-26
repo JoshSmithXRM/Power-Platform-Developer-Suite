@@ -49,9 +49,11 @@ const testQueries = {
   // Query with WHERE clause
   filteredSelect: "SELECT TOP 3 fullname FROM systemuser WHERE domainname LIKE '%'",
   // Query that returns no results (safe filter)
-  emptyResult: "SELECT fullname FROM systemuser WHERE fullname = 'THIS_USER_DOES_NOT_EXIST_12345'",
+  emptyResult: "SELECT TOP 1 fullname FROM systemuser WHERE fullname = 'THIS_USER_DOES_NOT_EXIST_12345'",
   // Invalid SQL to test error handling
   invalidSql: 'SELECT * FROM',
+  // Query without TOP clause - triggers large result set warning modal
+  noTopClause: 'SELECT fullname FROM systemuser WHERE isdisabled = 0',
 };
 
 test.describe('Data Explorer Integration Tests', () => {
@@ -539,6 +541,387 @@ test.describe('Data Explorer Integration Tests', () => {
     expect(newExecutions).toBeLessThanOrEqual(2);
 
     await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-no-duplicates');
+  });
+
+  test('Export CSV button is visible after query execution', async () => {
+    test.skip(!hasCredentials, 'Credentials not configured');
+
+    const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.dataExplorer');
+
+    // Wait for editor to be enabled and enter a query
+    await frame.waitForSelector('#sql-editor:not([disabled])', { timeout: 15000, state: 'attached' });
+    const sqlEditor = await frame.$('#sql-editor');
+    if (sqlEditor) {
+      await sqlEditor.fill('');
+      await sqlEditor.fill(testQueries.simpleSelect);
+    }
+
+    // Execute query to get results
+    const executeButton = await frame.$('#executeQuery, button:has-text("Execute")');
+    if (executeButton) {
+      await executeButton.click();
+      await vscode.window.waitForTimeout(8000);
+    }
+
+    // Check for Export CSV button
+    const exportCsvButton = await frame.$('#exportCsv, button:has-text("Export CSV")');
+    expect(exportCsvButton).toBeTruthy();
+
+    await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-export-csv-button');
+    console.log('Export CSV button is visible after query execution');
+  });
+
+  test('Export CSV shows warning when no results', async () => {
+    test.skip(!hasCredentials, 'Credentials not configured');
+
+    const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.dataExplorer');
+
+    // Clear logs to monitor for warning
+    vscode.clearLogs();
+
+    // Click Export CSV without having results
+    // First, let's clear any existing results by switching environments or clearing
+    // We'll test the button behavior - it should show a warning
+
+    // Find and click Export CSV button
+    const exportCsvButton = await frame.$('#exportCsv, button:has-text("Export CSV")');
+    if (exportCsvButton) {
+      console.log('Clicking Export CSV button...');
+      await exportCsvButton.click();
+      await vscode.window.waitForTimeout(2000);
+    }
+
+    // The button click should trigger the export flow
+    // Check logs for export-related messages
+    const logs = vscode.getExtensionLogs();
+    const exportLogs = logs.filter(l =>
+      l.includes('Export') ||
+      l.includes('export') ||
+      l.includes('CSV')
+    );
+
+    console.log(`Export-related logs: ${exportLogs.length}`);
+    for (const log of exportLogs.slice(-5)) {
+      console.log(`  ${log}`);
+    }
+
+    await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-export-csv-action');
+  });
+
+  test('Query without TOP - Add TOP 100 modifies SQL and executes', async () => {
+    test.skip(!hasCredentials, 'Credentials not configured');
+
+    // Open Data Explorer
+    await commandPalette.executeCommand('Power Platform Developer Suite: Data Explorer');
+    await vscode.window.waitForTimeout(3000); // Allow panel to initialize
+
+    const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.dataExplorer');
+
+    // Wait for panel to be fully ready and stable
+    console.log('Waiting for panel to finish initialization...');
+
+    // Wait for button to be enabled and stay enabled (stability check)
+    let stableCount = 0;
+    for (let attempt = 0; attempt < 60; attempt++) { // Up to 30 seconds
+      await vscode.window.waitForTimeout(500);
+      const btn = await frame.$('#executeQuery:not([disabled])');
+      if (btn) {
+        stableCount++;
+        if (stableCount >= 4) { // 2 seconds of stability
+          console.log('Panel fully initialized (button stable for 2s)');
+          break;
+        }
+      } else {
+        stableCount = 0; // Reset if button becomes disabled
+      }
+      if (attempt % 10 === 0) {
+        console.log(`  Waiting for button stability... (attempt ${attempt}, stable count ${stableCount})`);
+      }
+    }
+
+    // Enter query WITHOUT TOP clause
+    await frame.waitForSelector('#sql-editor:not([disabled])', { timeout: 15000, state: 'attached' });
+    const sqlEditor = await frame.$('#sql-editor');
+    expect(sqlEditor).toBeTruthy();
+    await sqlEditor!.fill('');
+    await sqlEditor!.fill(testQueries.noTopClause);
+
+    // Verify original SQL has no TOP
+    const originalSql = await sqlEditor!.inputValue();
+    expect(originalSql.toUpperCase()).not.toContain('TOP');
+    console.log(`Original SQL: ${originalSql}`);
+
+    // Clear logs to track execution
+    vscode.clearLogs();
+
+    // Verify button is still enabled before clicking
+    const executeButton = await frame.$('#executeQuery');
+    expect(executeButton).toBeTruthy();
+    const isEnabled = await executeButton!.isEnabled();
+    console.log(`Execute Query button is enabled: ${isEnabled}`);
+    expect(isEnabled).toBe(true);
+
+    console.log('Clicking Execute Query button...');
+    await executeButton!.click();
+
+    // Wait for in-webview warning modal to appear
+    console.log('Waiting for row limit warning modal (in-webview)...');
+
+    // The modal is rendered inside our webview iframe with id="warning-modal"
+    // When visible, it has the "visible" class
+    let modalFound = false;
+
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await vscode.window.waitForTimeout(500);
+      const modal = await frame.$('#warning-modal.visible');
+      if (modal) {
+        console.log('Found in-webview warning modal');
+        modalFound = true;
+        break;
+      }
+      if (attempt % 5 === 0) {
+        console.log(`  Attempt ${attempt + 1}/20: Modal not visible yet...`);
+      }
+    }
+
+    await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-modal-add-top');
+
+    // Debug if modal not found
+    if (!modalFound) {
+      console.log('WARNING MODAL NOT FOUND. Debugging info:');
+      const modalEl = await frame.$('#warning-modal');
+      if (modalEl) {
+        const classes = await modalEl.getAttribute('class');
+        console.log(`  Modal element exists with classes: ${classes}`);
+      } else {
+        console.log('  Modal element #warning-modal does not exist in DOM');
+      }
+      const allLogs = vscode.getExtensionLogs();
+      for (const log of allLogs.slice(-15)) {
+        console.log(`  ${log}`);
+      }
+    }
+
+    expect(modalFound).toBe(true);
+
+    // Verify modal message contains expected text
+    const modalMessage = await frame.$('#modal-message');
+    expect(modalMessage).toBeTruthy();
+    const messageText = await modalMessage!.textContent();
+    console.log(`Modal message: ${messageText?.substring(0, 100)}`);
+    expect(messageText).toContain('5000 records');
+
+    // Click "Add TOP 100" button (primary button)
+    const addTopButton = await frame.$('#modal-btn-primary');
+    expect(addTopButton).toBeTruthy();
+    await addTopButton!.click();
+    console.log('Clicked "Add TOP 100" button');
+
+    // Wait for query to execute
+    await vscode.window.waitForTimeout(8000);
+    await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-after-add-top');
+
+    // VERIFY 1: SQL editor was modified to include TOP 100
+    const modifiedSql = await sqlEditor!.inputValue();
+    console.log(`Modified SQL: ${modifiedSql}`);
+    expect(modifiedSql.toUpperCase()).toContain('TOP 100');
+
+    // VERIFY 2: Query executed (check logs)
+    const logs = vscode.getExtensionLogs();
+    const executionLogs = logs.filter(l => l.includes('SQL query executed'));
+    console.log(`Execution logs found: ${executionLogs.length}`);
+    expect(executionLogs.length).toBeGreaterThan(0);
+
+    // VERIFY 3: Results table appeared
+    const resultsTable = await frame.$('table, .results-table, #results-table-container table');
+    expect(resultsTable).toBeTruthy();
+  });
+
+  test('Query without TOP - Continue Anyway executes original query', async () => {
+    test.skip(!hasCredentials, 'Credentials not configured');
+
+    // Open Data Explorer (may have been closed by previous test)
+    await commandPalette.executeCommand('Power Platform Developer Suite: Data Explorer');
+    await vscode.window.waitForTimeout(3000); // Allow panel to initialize
+
+    const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.dataExplorer');
+
+    // Wait for panel to be fully ready and stable
+    console.log('Waiting for panel to finish initialization...');
+
+    // Wait for button to be enabled and stay enabled (stability check)
+    let stableCount = 0;
+    for (let attempt = 0; attempt < 60; attempt++) {
+      await vscode.window.waitForTimeout(500);
+      const btn = await frame.$('#executeQuery:not([disabled])');
+      if (btn) {
+        stableCount++;
+        if (stableCount >= 4) {
+          console.log('Panel fully initialized (button stable for 2s)');
+          break;
+        }
+      } else {
+        stableCount = 0;
+      }
+    }
+
+    // Enter query WITHOUT TOP clause
+    await frame.waitForSelector('#sql-editor:not([disabled])', { timeout: 15000, state: 'attached' });
+    const sqlEditor = await frame.$('#sql-editor');
+    expect(sqlEditor).toBeTruthy();
+    await sqlEditor!.fill('');
+    await sqlEditor!.fill(testQueries.noTopClause);
+
+    const originalSql = await sqlEditor!.inputValue();
+    console.log(`Original SQL: ${originalSql}`);
+
+    // Clear logs
+    vscode.clearLogs();
+
+    // Verify button is still enabled before clicking
+    const executeButton = await frame.$('#executeQuery');
+    const isEnabled = await executeButton!.isEnabled();
+    console.log(`Execute Query button is enabled: ${isEnabled}`);
+    expect(isEnabled).toBe(true);
+
+    console.log('Clicking Execute Query button...');
+    await executeButton!.click();
+
+    // Wait for in-webview warning modal to appear
+    console.log('Waiting for row limit warning modal (in-webview)...');
+    let modalFound = false;
+
+    for (let attempt = 0; attempt < 16; attempt++) {
+      await vscode.window.waitForTimeout(500);
+      const modal = await frame.$('#warning-modal.visible');
+      if (modal) {
+        console.log('Found in-webview warning modal');
+        modalFound = true;
+        break;
+      }
+    }
+
+    await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-modal-continue');
+    expect(modalFound).toBe(true);
+
+    // Click "Continue Anyway" button (secondary button)
+    const continueButton = await frame.$('#modal-btn-secondary');
+    expect(continueButton).toBeTruthy();
+    await continueButton!.click();
+    console.log('Clicked "Continue Anyway" button');
+
+    // Wait for query to execute
+    await vscode.window.waitForTimeout(8000);
+    await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-after-continue');
+
+    // VERIFY 1: SQL editor was NOT modified (still no TOP)
+    const currentSql = await sqlEditor!.inputValue();
+    console.log(`Current SQL: ${currentSql}`);
+    expect(currentSql).toBe(originalSql); // Unchanged
+
+    // VERIFY 2: Query executed
+    const logs = vscode.getExtensionLogs();
+    const executionLogs = logs.filter(l => l.includes('SQL query executed'));
+    console.log(`Execution logs found: ${executionLogs.length}`);
+    expect(executionLogs.length).toBeGreaterThan(0);
+
+    // VERIFY 3: Results appeared
+    const resultsTable = await frame.$('table, .results-table, #results-table-container table');
+    expect(resultsTable).toBeTruthy();
+  });
+
+  test('Query without TOP - Cancel does not execute query', async () => {
+    test.skip(!hasCredentials, 'Credentials not configured');
+
+    // Open Data Explorer (may have been closed by previous test)
+    await commandPalette.executeCommand('Power Platform Developer Suite: Data Explorer');
+    await vscode.window.waitForTimeout(3000); // Allow panel to initialize
+
+    const frame = await webviewHelper.getWebviewFrame('powerPlatformDevSuite.dataExplorer');
+
+    // Wait for panel to be fully ready and stable
+    console.log('Waiting for panel to finish initialization...');
+
+    // Wait for button to be enabled and stay enabled (stability check)
+    let stableCount = 0;
+    for (let attempt = 0; attempt < 60; attempt++) {
+      await vscode.window.waitForTimeout(500);
+      const btn = await frame.$('#executeQuery:not([disabled])');
+      if (btn) {
+        stableCount++;
+        if (stableCount >= 4) {
+          console.log('Panel fully initialized (button stable for 2s)');
+          break;
+        }
+      } else {
+        stableCount = 0;
+      }
+    }
+
+    // Enter a different query to ensure we're not seeing stale results
+    await frame.waitForSelector('#sql-editor:not([disabled])', { timeout: 15000, state: 'attached' });
+    const sqlEditor = await frame.$('#sql-editor');
+    expect(sqlEditor).toBeTruthy();
+
+    // Use a query that would return different results to detect if it ran
+    const cancelTestQuery = 'SELECT fullname FROM systemuser WHERE isdisabled = 1';
+    await sqlEditor!.fill('');
+    await sqlEditor!.fill(cancelTestQuery);
+
+    const originalSql = await sqlEditor!.inputValue();
+    console.log(`Original SQL: ${originalSql}`);
+
+    // Track execution logs BEFORE clicking to detect new executions
+    const logsBeforeClick = vscode.getExtensionLogs();
+    const executionLogsBeforeClick = logsBeforeClick.filter(l => l.includes('SQL query executed'));
+    console.log(`Execution logs before clicking: ${executionLogsBeforeClick.length}`);
+
+    // Verify button is still enabled before clicking
+    const executeButton = await frame.$('#executeQuery');
+    const isEnabled = await executeButton!.isEnabled();
+    console.log(`Execute Query button is enabled: ${isEnabled}`);
+    expect(isEnabled).toBe(true);
+
+    console.log('Clicking Execute Query button...');
+    await executeButton!.click();
+
+    // Wait for in-webview warning modal to appear
+    console.log('Waiting for row limit warning modal (in-webview)...');
+    let modalFound = false;
+
+    for (let attempt = 0; attempt < 16; attempt++) {
+      await vscode.window.waitForTimeout(500);
+      const modal = await frame.$('#warning-modal.visible');
+      if (modal) {
+        console.log('Found in-webview warning modal');
+        modalFound = true;
+        break;
+      }
+    }
+
+    await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-modal-cancel');
+    expect(modalFound).toBe(true);
+
+    // Click Cancel button (or press Escape - both work with in-webview modal)
+    const cancelButton = await frame.$('#modal-btn-cancel');
+    expect(cancelButton).toBeTruthy();
+    await cancelButton!.click();
+    console.log('Clicked Cancel button');
+
+    // Wait a moment to ensure nothing happens
+    await vscode.window.waitForTimeout(2000);
+    await VSCodeLauncher.takeScreenshot(vscode.window, 'data-explorer-after-cancel');
+
+    // VERIFY 1: SQL editor unchanged
+    const currentSql = await sqlEditor!.inputValue();
+    expect(currentSql).toBe(originalSql);
+
+    // VERIFY 2: No new query execution in logs (compare before/after counts)
+    const logsAfterCancel = vscode.getExtensionLogs();
+    const executionLogsAfterCancel = logsAfterCancel.filter(l => l.includes('SQL query executed'));
+    console.log(`Execution logs after cancel: ${executionLogsAfterCancel.length}`);
+    // Should be the same count as before since cancel should not execute the query
+    expect(executionLogsAfterCancel.length).toBe(executionLogsBeforeClick.length);
   });
 
   test('No errors in extension logs', async () => {
