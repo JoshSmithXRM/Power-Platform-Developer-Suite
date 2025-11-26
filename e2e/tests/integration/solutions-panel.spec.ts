@@ -270,7 +270,15 @@ test.describe('Solutions Panel Integration Tests', () => {
 
       // Links should either have a proper href OR use JavaScript handlers
       const hasClickHandler = onclick !== null || dataSolutionId !== null || href === '#';
-      expect(hasClickHandler || (href && href.includes('make.powerapps.com'))).toBe(true);
+      const isValidMakerUrl = (url: string): boolean => {
+        try {
+          const parsed = new URL(url);
+          return parsed.hostname === 'make.powerapps.com' || parsed.hostname.endsWith('.make.powerapps.com');
+        } catch {
+          return false;
+        }
+      };
+      expect(hasClickHandler || (href && isValidMakerUrl(href))).toBe(true);
     }
   });
 

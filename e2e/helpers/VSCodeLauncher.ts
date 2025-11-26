@@ -169,12 +169,21 @@ export class VSCodeLauncher {
         console.log('Closing VS Code...');
         await electronApp.close();
 
-        // Clean up user data directory
-        try {
-          fs.rmSync(userDataDir, { recursive: true, force: true });
-        } catch {
-          // Ignore cleanup errors - temp directories may be locked by VS Code process
-          // or already deleted. Cleanup failure is not critical for test success.
+        // Wait for VS Code processes to release file locks
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Clean up user data directory with retry logic
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            fs.rmSync(userDataDir, { recursive: true, force: true });
+            break;
+          } catch (err) {
+            if (attempt === 2) {
+              console.warn(`Failed to clean up ${userDataDir}: ${err}`);
+            } else {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
         }
       },
       getLogs: (): CapturedLog[] => [...capturedLogs],
