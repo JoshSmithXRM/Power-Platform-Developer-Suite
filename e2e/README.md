@@ -14,7 +14,7 @@ This directory contains Playwright E2E tests for the Power Platform Developer Su
 - **May require credentials** for full functionality
 - Tests real panel interactions with data
 - Run with: `npm run e2e:integration`
-- Duration: ~2 minutes
+- Duration: ~60 seconds (with credentials)
 
 ## Running Tests
 
@@ -36,9 +36,9 @@ npm run e2e:debug
 
 Some integration tests (like Solutions panel) require credentials to connect to a real Dataverse environment.
 
-### Option 1: Environment Variables
+### Creating the Credentials File
 
-Create a `.env.e2e.local` file (gitignored):
+Create a `.env.e2e.local` file in the project root (automatically gitignored):
 
 ```bash
 # .env.e2e.local
@@ -50,13 +50,25 @@ PPDS_TEST_CLIENT_SECRET=your-client-secret
 PPDS_TEST_PP_ENV_ID=your-power-platform-environment-id
 ```
 
-### Option 2: Skip Authenticated Tests
+**Note:** Credentials are automatically loaded via `dotenv` in `playwright.config.ts`. No manual environment variable setup needed.
 
-Tests that require credentials will skip gracefully if credentials are not provided:
+### Service Principal Requirements
+
+The Service Principal (App Registration) needs:
+1. **API Permissions**: Dynamics CRM > `user_impersonation` (Delegated) or Application permissions
+2. **Application User**: Must be added as an Application User in the target Dataverse environment
+3. **Security Role**: Appropriate security role assigned (e.g., System Administrator for full access)
+
+### Running Without Credentials
+
+Tests that require credentials will skip gracefully:
 
 ```
-⏭️  Skipping test: PPDS_TEST_DATAVERSE_URL not configured
+⏭️  Skipping Solutions integration tests: credentials not configured
+   Set PPDS_TEST_DATAVERSE_URL, PPDS_TEST_TENANT_ID, PPDS_TEST_CLIENT_ID, PPDS_TEST_CLIENT_SECRET
 ```
+
+Environment Setup tests run without credentials (they test form UI interactions only).
 
 ## Test Structure
 
@@ -141,3 +153,25 @@ test('My integration test', async () => {
 3. **Run in headed mode**: `npm run e2e:headed`
 4. **Use debug mode**: `npm run e2e:debug`
 5. **Check extension logs**: Look for `🔌 Extension Output logs` in test output
+
+## Tips & Lessons Learned
+
+### API Timing
+- Solutions API can take **6+ seconds** to respond - tests use 10s wait
+- Always use `waitForTimeout()` after API-dependent operations
+- Consider `waitForSelector()` for specific elements instead of fixed waits
+
+### Test Connection Validation
+- Integration tests click "Test Connection" before saving environments
+- This validates credentials work before attempting API calls
+- Look for `Connection test successful` in logs
+
+### Webview Selectors
+- Form fields use simple IDs: `#name`, `#dataverseUrl`, `#tenantId`, `#authenticationMethod`
+- Solution links use SPA pattern: `href="#"` with `data-solution-id` attributes
+- Always reference `EnvironmentFormSection.ts` for correct field IDs
+
+### Test Isolation
+- Each `test.describe` block shares one VS Code instance via `beforeAll`/`afterAll`
+- Tests within a describe block share state (panel stays open between tests)
+- Different describe blocks get fresh VS Code instances
