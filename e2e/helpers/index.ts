@@ -8,7 +8,7 @@
  */
 
 export { VSCodeLauncher } from './VSCodeLauncher';
-export type { VSCodeLaunchOptions, VSCodeInstance } from './VSCodeLauncher';
+export type { VSCodeLaunchOptions, VSCodeInstance, CapturedLog } from './VSCodeLauncher';
 
 export { CommandPaletteHelper } from './CommandPaletteHelper';
 

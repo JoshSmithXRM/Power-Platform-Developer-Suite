@@ -65,6 +65,26 @@ test.describe('VS Code Launch Smoke Tests', () => {
       'vscode-extension-loaded'
     );
 
+    // Check captured console logs for errors
+    const logs = vscode.getLogs();
+    const errorLogs = logs.filter(log => log.level === 'error');
+
+    console.log(`\n📋 Captured ${logs.length} console logs:`);
+    for (const log of logs.slice(0, 10)) { // Show first 10
+      console.log(`  [${log.level}] ${log.message.substring(0, 100)}`);
+    }
+    if (logs.length > 10) {
+      console.log(`  ... and ${logs.length - 10} more`);
+    }
+
+    // Log errors separately for visibility
+    if (errorLogs.length > 0) {
+      console.log(`\n⚠️ ${errorLogs.length} error logs captured:`);
+      for (const log of errorLogs) {
+        console.log(`  ${log.message}`);
+      }
+    }
+
     // If we got here without errors, extension loaded
     expect(true).toBe(true);
   });

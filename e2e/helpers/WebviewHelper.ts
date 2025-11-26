@@ -15,6 +15,10 @@ import type { Page, Frame } from '@playwright/test';
  * CRITICAL: Webviews are rendered inside iframes. You cannot interact
  * with webview content directly from the main page - you must first
  * get the iframe's Frame handle using getWebviewFrame().
+ *
+ * NOTE: Console logs from webviews are captured via VSCodeInstance.getLogs()
+ * since Playwright's Frame API doesn't expose console events. Webview console
+ * messages bubble up to the main page's console event listener.
  */
 export class WebviewHelper {
   /** Default timeout for waiting for panels to appear */

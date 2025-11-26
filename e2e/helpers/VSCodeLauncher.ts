@@ -21,6 +21,18 @@ export interface VSCodeLaunchOptions {
   timeout?: number;
 }
 
+/** Captured console log entry */
+export interface CapturedLog {
+  /** Log level (log, warn, error, info, debug) */
+  level: string;
+  /** Log message text */
+  message: string;
+  /** Source of the log (main, webview, extension-host) */
+  source: 'main' | 'webview' | 'extension-host';
+  /** Timestamp when log was captured */
+  timestamp: string;
+}
+
 export interface VSCodeInstance {
   /** Playwright Electron application handle */
   electronApp: ElectronApplication;
@@ -28,6 +40,10 @@ export interface VSCodeInstance {
   window: Page;
   /** Clean up and close VS Code */
   close: () => Promise<void>;
+  /** Get all captured console logs */
+  getLogs: () => CapturedLog[];
+  /** Clear captured logs */
+  clearLogs: () => void;
 }
 
 /**
@@ -112,6 +128,29 @@ export class VSCodeLauncher {
     const window = await electronApp.firstWindow();
     console.log('VS Code window opened');
 
+    // Set up console log capture
+    const capturedLogs: CapturedLog[] = [];
+
+    // Capture main window console logs
+    window.on('console', (msg) => {
+      capturedLogs.push({
+        level: msg.type(),
+        message: msg.text(),
+        source: 'main',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    // Capture page errors (uncaught exceptions)
+    window.on('pageerror', (error) => {
+      capturedLogs.push({
+        level: 'error',
+        message: `Uncaught: ${error.message}`,
+        source: 'main',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
     // Wait for VS Code extension host to initialize
     await window.waitForTimeout(this.VSCODE_STABILIZATION_DELAY_MS);
 
@@ -129,6 +168,10 @@ export class VSCodeLauncher {
           // Ignore cleanup errors - temp directories may be locked by VS Code process
           // or already deleted. Cleanup failure is not critical for test success.
         }
+      },
+      getLogs: (): CapturedLog[] => [...capturedLogs],
+      clearLogs: (): void => {
+        capturedLogs.length = 0;
       },
     };
   }
