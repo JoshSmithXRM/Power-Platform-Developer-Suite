@@ -30,7 +30,11 @@ export default defineConfig({
   // Reporter configuration
   reporter: [
     ['list'], // Console output for developers
-    ['json', { outputFile: 'e2e/results/test-results.json' }], // JSON for Claude
+    ['json', { outputFile: 'e2e/results/test-results.json' }], // Standard JSON
+    ['./e2e/reporters/ClaudeJsonReporter.ts', {
+      outputFile: 'e2e/results/claude-results.json',
+      outputToConsole: true,
+    }], // Claude-optimized JSON with suggestions
   ],
 
   // Screenshot configuration
