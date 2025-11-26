@@ -68,12 +68,18 @@
 	 * Wires up all buttons to send messages when clicked.
 	 * Buttons with id="commandName" will send {command: 'commandName'} messages.
 	 * Skips dropdown buttons (handled by DropdownComponent.js).
+	 * Skips buttons with data-custom-handler (handled by behavior scripts).
 	 */
 	function wireButtons() {
 		const buttons = document.querySelectorAll('button[id]');
 		buttons.forEach(button => {
 			// Skip dropdown triggers - they're handled by DropdownComponent
 			if (button.hasAttribute('data-dropdown-trigger')) {
+				return;
+			}
+
+			// Skip buttons with custom handlers - they're handled by behavior scripts
+			if (button.hasAttribute('data-custom-handler')) {
 				return;
 			}
 

@@ -36,12 +36,13 @@ export function renderActionButtons(
 function renderButton(button: ButtonConfig): string {
 	const variantClass = button.variant ? `btn-${button.variant}` : 'btn-default';
 	const disabledAttr = button.disabled ? ' disabled' : '';
+	const customHandlerAttr = button.customHandler ? ' data-custom-handler' : '';
 	const icon = button.icon ? `<span class="btn-icon">${escapeHtml(button.icon)}</span>` : '';
 
 	return `
 		<button
 			id="${escapeHtml(button.id)}"
-			class="btn ${variantClass}"${disabledAttr}
+			class="btn ${variantClass}"${disabledAttr}${customHandlerAttr}
 		>
 			${icon}
 			<span class="btn-label">${escapeHtml(button.label)}</span>

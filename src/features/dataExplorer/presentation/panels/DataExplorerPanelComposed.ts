@@ -180,9 +180,11 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		const queryEditorSection = new QueryEditorSection();
 
 		// Note: Button IDs must match command names registered in registerCommandHandlers()
+		// customHandler: true prevents messaging.js from attaching a generic click handler,
+		// since DataExplorerBehavior.js attaches its own handler that sends SQL data
 		const actionButtons = new ActionButtonsSection(
 			{
-				buttons: [{ id: 'executeQuery', label: 'Execute Query' }],
+				buttons: [{ id: 'executeQuery', label: 'Execute Query', customHandler: true }],
 			},
 			SectionPosition.Toolbar
 		);
