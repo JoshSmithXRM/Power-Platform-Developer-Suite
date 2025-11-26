@@ -77,6 +77,17 @@ test.describe('VS Code Launch Smoke Tests', () => {
       console.log(`  ... and ${logs.length - 10} more`);
     }
 
+    // Check extension-specific logs from Output channel
+    const extensionLogs = vscode.getExtensionLogs();
+    console.log(`\n🔌 Extension Output logs (${extensionLogs.length} lines):`);
+    for (const line of extensionLogs) {
+      console.log(`  ${line}`);
+    }
+
+    // Verify extension activated successfully
+    const hasActivationLog = extensionLogs.some(l => l.includes('Extension activating'));
+    expect(hasActivationLog).toBe(true);
+
     // Log errors separately for visibility
     if (errorLogs.length > 0) {
       console.log(`\n⚠️ ${errorLogs.length} error logs captured:`);
@@ -84,8 +95,5 @@ test.describe('VS Code Launch Smoke Tests', () => {
         console.log(`  ${log.message}`);
       }
     }
-
-    // If we got here without errors, extension loaded
-    expect(true).toBe(true);
   });
 });

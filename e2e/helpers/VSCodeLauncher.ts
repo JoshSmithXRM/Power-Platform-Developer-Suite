@@ -44,6 +44,10 @@ export interface VSCodeInstance {
   getLogs: () => CapturedLog[];
   /** Clear captured logs */
   clearLogs: () => void;
+  /** Get extension-specific logs from Output channel (reads from disk) */
+  getExtensionLogs: () => string[];
+  /** Path to user data directory (for advanced log access) */
+  userDataDir: string;
 }
 
 /**
@@ -120,6 +124,9 @@ export class VSCodeLauncher {
         '--disable-telemetry',
         // Disable crash reporter
         '--disable-crash-reporter',
+        // Enable verbose logging to capture extension logs
+        '--log=trace',
+        '--verbose',
       ],
       timeout,
     });
@@ -157,6 +164,7 @@ export class VSCodeLauncher {
     return {
       electronApp,
       window,
+      userDataDir,
       close: async (): Promise<void> => {
         console.log('Closing VS Code...');
         await electronApp.close();
@@ -172,6 +180,9 @@ export class VSCodeLauncher {
       getLogs: (): CapturedLog[] => [...capturedLogs],
       clearLogs: (): void => {
         capturedLogs.length = 0;
+      },
+      getExtensionLogs: (): string[] => {
+        return VSCodeLauncher.readExtensionLogs(userDataDir);
       },
     };
   }
@@ -200,4 +211,55 @@ export class VSCodeLauncher {
 
     return screenshotPath;
   }
+
+  /**
+   * Reads extension logs from the VS Code logs directory.
+   * Looks for logs from "Power Platform Developer Suite" extension.
+   *
+   * @param userDataDir - Path to VS Code user data directory
+   * @returns Array of log lines from the extension
+   */
+  static readExtensionLogs(userDataDir: string): string[] {
+    const logsDir = path.join(userDataDir, 'logs');
+    if (!fs.existsSync(logsDir)) {
+      return [];
+    }
+
+    const logs: string[] = [];
+
+    // Find the most recent date folder
+    const dateFolders = fs.readdirSync(logsDir)
+      .filter(f => fs.statSync(path.join(logsDir, f)).isDirectory())
+      .sort()
+      .reverse();
+
+    if (dateFolders.length === 0) {
+      return [];
+    }
+
+    // Look for extension log in window1/exthost/<extension-id>/
+    const extHostPath = path.join(logsDir, dateFolders[0], 'window1', 'exthost');
+    if (!fs.existsSync(extHostPath)) {
+      return [];
+    }
+
+    // Find extension folder
+    const extFolders = fs.readdirSync(extHostPath)
+      .filter(f => f.includes('power-platform-developer-suite'));
+
+    for (const extFolder of extFolders) {
+      const extLogDir = path.join(extHostPath, extFolder);
+      if (fs.statSync(extLogDir).isDirectory()) {
+        const logFiles = fs.readdirSync(extLogDir).filter(f => f.endsWith('.log'));
+        for (const logFile of logFiles) {
+          const logPath = path.join(extLogDir, logFile);
+          const content = fs.readFileSync(logPath, 'utf-8');
+          logs.push(...content.split('\n').filter(l => l.trim().length > 0));
+        }
+      }
+    }
+
+    return logs;
+  }
+
 }
