@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **E2E Testing Infrastructure:** Playwright-based E2E testing for VS Code extension
   - `npm run e2e:smoke` - Automated smoke tests (~30s) for VS Code launch and command execution
+  - `npm run e2e:integration` - Integration tests (~60s) with real Dataverse connections
   - `VSCodeLauncher` - Launch VS Code via Playwright Electron with extension loaded
   - `CommandPaletteHelper` - Automate Command Palette interactions
   - `WebviewHelper` - Access webview iframe content
@@ -18,10 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ClaudeJsonReporter` - AI-optimized JSON output with suggestions
   - Console log capture (`vscode.getLogs()`) - Renderer and webview debug messages
   - Extension Output channel capture (`vscode.getExtensionLogs()`) - Extension logger output
+  - Environment Setup integration tests - Form field validation, Service Principal auth
+  - Solutions Panel integration tests - Real API calls, 1000+ solutions loading verified
+  - Auto-loading credentials via `dotenv` from `.env.e2e.local`
   - Design doc: `docs/designs/PLAYWRIGHT_E2E_DESIGN.md`
 
 ### Changed
 
+- **Dependencies:** Added `dotenv` for automatic credential loading in E2E tests
 - **Dependencies:** Upgraded TypeScript from 4.9.5 to 5.9.3
 - **Dependencies:** Upgraded @azure/msal-node from 2.x to 3.8.3
 - **Dependencies:** Upgraded madge from 7.0.0 to 8.0.0
