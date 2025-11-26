@@ -32,6 +32,7 @@ import {
  */
 type EnvironmentSetupCommands =
 	| 'saveEnvironment'
+	| 'saveAndCloseEnvironment'
 	| 'testConnection'
 	| 'deleteEnvironment'
 	| 'discoverEnvironmentId'
@@ -177,7 +178,8 @@ export class EnvironmentSetupPanelComposed {
 		const formSection = new EnvironmentFormSection();
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
-				{ id: 'saveEnvironment', label: 'Save Environment' },
+				{ id: 'saveEnvironment', label: 'Save' },
+				{ id: 'saveAndCloseEnvironment', label: 'Save & Close' },
 				{ id: 'testConnection', label: 'Test Connection' },
 				{ id: 'deleteEnvironment', label: 'Delete Environment' }
 			],
@@ -241,28 +243,40 @@ export class EnvironmentSetupPanelComposed {
 				this.logger.warn('Invalid save environment data');
 				return;
 			}
-			await this.handleSaveEnvironment(data);
+			await this.handleSaveEnvironment(data, false);
 		}, { disableOnExecute: true });
 
+		this.coordinator.registerHandler('saveAndCloseEnvironment', async (data?: unknown) => {
+			if (!isSaveEnvironmentData(data)) {
+				this.logger.warn('Invalid save environment data');
+				return;
+			}
+			await this.handleSaveEnvironment(data, true);
+		}, { disableOnExecute: true });
+
+		// Note: disableOnExecute: false because button state is managed by the webview's
+		// handleTestResult function in EnvironmentSetupBehavior.js
 		this.coordinator.registerHandler('testConnection', async (data?: unknown) => {
 			if (!isTestConnectionData(data)) {
 				this.logger.warn('Invalid test connection data');
 				return;
 			}
 			await this.handleTestConnection(data);
-		}, { disableOnExecute: true });
+		}, { disableOnExecute: false });
 
 		this.coordinator.registerHandler('deleteEnvironment', async () => {
 			await this.handleDeleteEnvironment();
 		}, { disableOnExecute: true });
 
+		// Note: disableOnExecute: false because button state is managed by the webview's
+		// handleDiscoverResult function in EnvironmentSetupBehavior.js
 		this.coordinator.registerHandler('discoverEnvironmentId', async (data?: unknown) => {
 			if (!isDiscoverEnvironmentIdData(data)) {
 				this.logger.warn('Invalid discover environment ID data');
 				return;
 			}
 			await this.handleDiscoverEnvironmentId(data);
-		}, { disableOnExecute: true });
+		}, { disableOnExecute: false });
 
 		this.coordinator.registerHandler('validateName', async (data?: unknown) => {
 			if (!isValidateNameData(data)) {
@@ -297,15 +311,18 @@ export class EnvironmentSetupPanelComposed {
 
 	/**
 	 * Handles save environment command.
+	 * @param data - The save environment request data
+	 * @param closeAfterSave - Whether to close the panel after successful save
 	 */
-	private async handleSaveEnvironment(data: SaveEnvironmentRequest): Promise<void> {
+	private async handleSaveEnvironment(data: SaveEnvironmentRequest, closeAfterSave: boolean): Promise<void> {
 		const currentEnvironmentId = this.currentEnvironmentId;
 		const wasNew = !currentEnvironmentId;
 
 		this.logger.info('User initiated save for environment', {
 			name: data.name,
 			authMethod: data.authenticationMethod,
-			isEdit: !wasNew
+			isEdit: !wasNew,
+			closeAfterSave
 		});
 
 		const request: SaveEnvironmentRequest = {
@@ -365,15 +382,18 @@ export class EnvironmentSetupPanelComposed {
 			data: {
 				success: true,
 				environmentId: result.environmentId,
-				isNewEnvironment: wasNew
+				isNewEnvironment: wasNew,
+				closeAfterSave
 			}
 		});
 
 		void vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
 
-		setTimeout(() => {
-			this.panel.dispose();
-		}, 500);
+		if (closeAfterSave) {
+			setTimeout(() => {
+				this.panel.dispose();
+			}, 500);
+		}
 	}
 
 	/**
@@ -421,6 +441,17 @@ export class EnvironmentSetupPanelComposed {
 	}
 
 	/**
+	 * Sends discover environment ID result to webview.
+	 * Helper to ensure button state is always reset.
+	 */
+	private sendDiscoverResult(data: { success: boolean; environmentId?: string; cancelled?: boolean }): void {
+		this.panel.webview.postMessage({
+			command: 'discover-environment-id-result',
+			data
+		});
+	}
+
+	/**
 	 * Handles discover environment ID command.
 	 */
 	private async handleDiscoverEnvironmentId(data: DiscoverEnvironmentIdRequest): Promise<void> {
@@ -430,6 +461,8 @@ export class EnvironmentSetupPanelComposed {
 			name: data.name,
 			authMethod: data.authenticationMethod
 		});
+
+		let resultSent = false;
 
 		try {
 			const result = await vscode.window.withProgress({
@@ -455,49 +488,54 @@ export class EnvironmentSetupPanelComposed {
 					environmentId: result.environmentId
 				});
 				vscode.window.showInformationMessage(`Environment ID discovered: ${result.environmentId}`);
-				this.panel.webview.postMessage({
-					command: 'discover-environment-id-result',
-					data: result
-				});
+				this.sendDiscoverResult(result);
+				resultSent = true;
 			} else if (result.requiresInteractiveAuth) {
 				this.logger.warn('Discovery requires interactive auth', {
 					name: data.name
 				});
 				const retry = await vscode.window.showWarningMessage(
 					`Discovery failed: Service Principals typically don't have Power Platform API permissions.\n\nWould you like to use Interactive authentication just for discovery?`,
-					'Use Interactive Auth',
-					'Cancel'
+					{ modal: true },
+					'Use Interactive Auth'
 				);
 
 				if (retry === 'Use Interactive Auth') {
 					await this.handleDiscoverEnvironmentIdWithInteractive(data);
+					resultSent = true; // Interactive handler sends its own result
 				} else {
 					vscode.window.showInformationMessage('You can manually enter the Environment ID from the Power Platform Admin Center.');
-					this.panel.webview.postMessage({
-						command: 'discover-environment-id-result',
-						data: result
-					});
+					this.sendDiscoverResult({ success: false, cancelled: true });
+					resultSent = true;
 				}
 			} else {
 				this.logger.error('Failed to discover environment ID', {
 					errorMessage: result.errorMessage
 				});
 				vscode.window.showErrorMessage(`Failed to discover environment ID: ${result.errorMessage}`);
-				this.panel.webview.postMessage({
-					command: 'discover-environment-id-result',
-					data: result
-				});
+				this.sendDiscoverResult(result);
+				resultSent = true;
 			}
 		} catch (error) {
-			if (error instanceof Error && (error.message.includes('cancelled') || error.message.includes('Authentication cancelled'))) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			const isCancellation = errorMessage.includes('cancelled') || errorMessage.includes('Cancelled');
+
+			if (isCancellation) {
 				this.logger.info('Environment ID discovery cancelled by user');
 				vscode.window.showInformationMessage('Environment ID discovery cancelled');
-				this.panel.webview.postMessage({
-					command: 'discover-environment-id-result',
-					data: { success: false, errorMessage: 'Cancelled by user' }
-				});
+				this.sendDiscoverResult({ success: false, cancelled: true });
+				resultSent = true;
 			} else {
+				this.logger.error('Unexpected error during discovery', { error: errorMessage });
+				this.sendDiscoverResult({ success: false });
+				resultSent = true;
 				throw error;
+			}
+		} finally {
+			// Guarantee button reset even if something unexpected happens
+			if (!resultSent) {
+				this.logger.warn('Discovery completed without sending result - sending fallback');
+				this.sendDiscoverResult({ success: false, cancelled: true });
 			}
 		}
 	}
@@ -506,6 +544,8 @@ export class EnvironmentSetupPanelComposed {
 	 * Handles discover environment ID with interactive auth fallback.
 	 */
 	private async handleDiscoverEnvironmentIdWithInteractive(data: DiscoverEnvironmentIdRequest): Promise<void> {
+		let resultSent = false;
+
 		try {
 			await vscode.window.withProgress({
 				location: vscode.ProgressLocation.Notification,
@@ -530,20 +570,26 @@ export class EnvironmentSetupPanelComposed {
 					vscode.window.showErrorMessage(`Failed to discover environment ID: ${result.errorMessage}`);
 				}
 
-				this.panel.webview.postMessage({
-					command: 'discover-environment-id-result',
-					data: result
-				});
+				this.sendDiscoverResult(result);
+				resultSent = true;
 			});
 		} catch (error) {
-			if (error instanceof Error && (error.message.includes('cancelled') || error.message.includes('Authentication cancelled'))) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			const isCancellation = errorMessage.includes('cancelled') || errorMessage.includes('Cancelled');
+
+			if (isCancellation) {
 				vscode.window.showInformationMessage('Environment ID discovery cancelled');
-				this.panel.webview.postMessage({
-					command: 'discover-environment-id-result',
-					data: { success: false, errorMessage: 'Cancelled by user' }
-				});
+				this.sendDiscoverResult({ success: false, cancelled: true });
+				resultSent = true;
 			} else {
+				this.sendDiscoverResult({ success: false });
+				resultSent = true;
 				throw error;
+			}
+		} finally {
+			// Guarantee button reset even if something unexpected happens
+			if (!resultSent) {
+				this.sendDiscoverResult({ success: false, cancelled: true });
 			}
 		}
 	}

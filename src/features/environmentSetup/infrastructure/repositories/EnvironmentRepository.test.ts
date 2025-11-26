@@ -470,6 +470,64 @@ describe('EnvironmentRepository', () => {
 			await expect(repository.delete(new EnvironmentId('env-1'))).rejects.toThrow('Delete failed');
 			expect(mockLogger.error).toHaveBeenCalledWith('EnvironmentRepository: Failed to delete environment', error);
 		});
+
+		it('should NOT delete shared password when another environment uses the same username', async () => {
+			// Arrange: Two environments share the same username (and thus password key)
+			const sharedUsername = 'shared-user@contoso.com';
+			const env1 = createMockEnvironment('env-1', 'Environment 1', AuthenticationMethodType.UsernamePassword, false, undefined, sharedUsername);
+			const dto1 = createMockDto('env-1', 'Environment 1', 'UsernamePassword', false, undefined, sharedUsername);
+			const dto2 = createMockDto('env-2', 'Environment 2', 'UsernamePassword', false, undefined, sharedUsername);
+
+			mockGlobalState.get.mockReturnValue([dto1, dto2]);
+			mockMapper.toDomain.mockReturnValue(env1);
+			mockSecrets.delete.mockResolvedValue();
+			mockGlobalState.update.mockResolvedValue();
+
+			// Act: Delete env-1 while env-2 still uses the same username
+			await repository.delete(new EnvironmentId('env-1'));
+
+			// Assert: Shared password should NOT be deleted (env-2 still needs it)
+			expect(mockSecrets.delete).not.toHaveBeenCalled();
+		});
+
+		it('should NOT delete shared client secret when another environment uses the same clientId', async () => {
+			// Arrange: Two environments share the same clientId (and thus client secret key)
+			const sharedClientId = '11111111-2222-3333-4444-555555555555';
+			const env1 = createMockEnvironment('env-1', 'Environment 1', AuthenticationMethodType.ServicePrincipal, false, sharedClientId);
+			const dto1 = createMockDto('env-1', 'Environment 1', 'ServicePrincipal', false, sharedClientId);
+			const dto2 = createMockDto('env-2', 'Environment 2', 'ServicePrincipal', false, sharedClientId);
+
+			mockGlobalState.get.mockReturnValue([dto1, dto2]);
+			mockMapper.toDomain.mockReturnValue(env1);
+			mockSecrets.delete.mockResolvedValue();
+			mockGlobalState.update.mockResolvedValue();
+
+			// Act: Delete env-1 while env-2 still uses the same clientId
+			await repository.delete(new EnvironmentId('env-1'));
+
+			// Assert: Shared client secret should NOT be deleted (env-2 still needs it)
+			expect(mockSecrets.delete).not.toHaveBeenCalled();
+		});
+
+		it('should delete unshared credentials when environment is deleted', async () => {
+			// Arrange: Environment with unique credentials (not shared)
+			const uniqueUsername = 'unique-user@contoso.com';
+			const env1 = createMockEnvironment('env-1', 'Environment 1', AuthenticationMethodType.UsernamePassword, false, undefined, uniqueUsername);
+			const dto1 = createMockDto('env-1', 'Environment 1', 'UsernamePassword', false, undefined, uniqueUsername);
+			// env-2 uses a different username
+			const dto2 = createMockDto('env-2', 'Environment 2', 'UsernamePassword', false, undefined, 'different-user@contoso.com');
+
+			mockGlobalState.get.mockReturnValue([dto1, dto2]);
+			mockMapper.toDomain.mockReturnValue(env1);
+			mockSecrets.delete.mockResolvedValue();
+			mockGlobalState.update.mockResolvedValue();
+
+			// Act: Delete env-1 (which has a unique username)
+			await repository.delete(new EnvironmentId('env-1'));
+
+			// Assert: Unshared password SHOULD be deleted
+			expect(mockSecrets.delete).toHaveBeenCalledWith(`power-platform-dev-suite-password-${uniqueUsername}`);
+		});
 	});
 
 	describe('isNameUnique', () => {

@@ -12,19 +12,21 @@ export class PersistenceInspectorSection implements ISection {
 
 	render(_data: SectionRenderData): string {
 		return `
-			<div id="globalStateSection" class="section">
-				<div class="section-title">Global State</div>
-				<div id="globalStateEntries"></div>
-			</div>
+			<div class="persistence-inspector-content">
+				<div id="globalStateSection" class="section">
+					<div class="section-title">Global State</div>
+					<div id="globalStateEntries"></div>
+				</div>
 
-			<div id="workspaceStateSection" class="section">
-				<div class="section-title">Workspace State</div>
-				<div id="workspaceStateEntries"></div>
-			</div>
+				<div id="workspaceStateSection" class="section">
+					<div class="section-title">Workspace State</div>
+					<div id="workspaceStateEntries"></div>
+				</div>
 
-			<div id="secretsSection" class="section">
-				<div class="section-title">Secrets</div>
-				<div id="secretEntries"></div>
+				<div id="secretsSection" class="section">
+					<div class="section-title">Secrets</div>
+					<div id="secretEntries"></div>
+				</div>
 			</div>
 		`;
 	}
