@@ -24,16 +24,12 @@ This document tracks work in progress and remaining items for the Data Explorer 
 
 ### Bugs to Fix
 - [x] **Stacked columns bug** - Fixed by using `<span class="record-cell-content">` wrapper instead of `display: flex` on `<td>`
-- [ ] **Duplicate query execution** - Single click triggers multiple queries (see logs with queryId 7, 8, etc.) - PARKING LOT for next commit
+- [x] **Duplicate query execution** - Fixed by adding `customHandler` property to `ButtonConfig`. Root cause: both messaging.js and DataExplorerBehavior.js were attaching click handlers to the same button.
 
 ## Parking Lot (Future Sessions)
 
 ### Known Issues
-- [ ] **Duplicate query execution** - Queries are being executed multiple times on single click. Likely causes:
-  - Multiple event listeners being attached
-  - Webview sending duplicate messages
-  - Panel coordination issue
-  - Needs investigation across all panels
+(None currently)
 
 ### Potential Enhancements
 - [ ] Consider adding table alias support for main entity in SQL (FetchXML limitation - main entity doesn't support alias)
