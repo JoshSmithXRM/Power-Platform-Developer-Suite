@@ -82,7 +82,7 @@ describe('EnvironmentFormSection', () => {
 			it('should render Environment ID with discover button', () => {
 				const html = section.render({});
 
-				expect(html).toContain('<button type="button" id="discoverEnvironmentId"');
+				expect(html).toContain('<button type="button" id="discoverEnvironmentId" data-custom-handler');
 				expect(html).toContain('>Discover ID</button>');
 			});
 

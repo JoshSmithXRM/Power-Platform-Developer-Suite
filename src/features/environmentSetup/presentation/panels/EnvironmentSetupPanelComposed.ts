@@ -176,12 +176,14 @@ export class EnvironmentSetupPanelComposed {
 
 	private createCoordinator(): { coordinator: PanelCoordinator<EnvironmentSetupCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
 		const formSection = new EnvironmentFormSection();
+		// customHandler: true prevents messaging.js from attaching generic click handlers,
+		// since EnvironmentSetupBehavior.js attaches its own handlers that validate and collect form data
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
-				{ id: 'saveEnvironment', label: 'Save' },
-				{ id: 'saveAndCloseEnvironment', label: 'Save & Close' },
-				{ id: 'testConnection', label: 'Test Connection' },
-				{ id: 'deleteEnvironment', label: 'Delete Environment' }
+				{ id: 'saveEnvironment', label: 'Save', customHandler: true },
+				{ id: 'saveAndCloseEnvironment', label: 'Save & Close', customHandler: true },
+				{ id: 'testConnection', label: 'Test Connection', customHandler: true },
+				{ id: 'deleteEnvironment', label: 'Delete Environment', customHandler: true }
 			],
 			position: 'right'
 		}, SectionPosition.Toolbar);
