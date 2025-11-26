@@ -13,6 +13,9 @@ This directory contains custom slash commands for Claude Code.
 - `/review-technical-debt` - Audit all technical debt items, clean up resolved issues
 - `/fix-technical-debt` - Interactively fix technical debt items (verify → plan → implement → review)
 
+### Release Management
+- `/prepare-release` - Prepare version release (bump version, create release notes, update changelog)
+
 ## Usage
 
 Type `/` in Claude Code to see all available commands.
@@ -44,6 +47,11 @@ Type `/` in Claude Code to see all available commands.
 **Frequency:** As needed per sprint planning
 **Duration:** 2-6 hours (depends on item complexity)
 
+### `/prepare-release`
+**Purpose:** Prepare all release artifacts (version bump, changelog date, release notes)
+**Frequency:** Before each version release
+**Duration:** 2-5 minutes
+
 ---
 
 ## Best Practices
@@ -58,3 +66,8 @@ Type `/` in Claude Code to see all available commands.
 
 **Sprint Planning:**
 1. `/fix-technical-debt` - Address priority debt items
+
+**Before Release:**
+1. `/prepare-release X.Y.Z` - Bump version, create release notes
+2. Push and merge PR to main
+3. Create GitHub Release with tag
