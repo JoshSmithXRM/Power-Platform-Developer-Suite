@@ -1,5 +1,19 @@
 /* Persistence Inspector Panel Styles */
 
+/* Make main-section a flex container so children can use flex: 1 */
+.main-section:has(.persistence-inspector-content) {
+	display: flex;
+	flex-direction: column;
+}
+
+/* Scrollable content wrapper - fills parent and enables scrolling */
+.persistence-inspector-content {
+	flex: 1;
+	min-height: 0; /* Critical: allows flex child to shrink below content size */
+	overflow-y: auto;
+	padding: 16px;
+}
+
 .section {
 	margin-bottom: 30px;
 }

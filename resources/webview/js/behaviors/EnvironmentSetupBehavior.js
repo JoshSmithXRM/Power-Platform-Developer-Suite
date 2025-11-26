@@ -10,6 +10,7 @@ let form;
 let nameInput;
 let authMethodSelect;
 let saveButton;
+let saveAndCloseButton;
 let testButton;
 let discoverButton;
 let deleteButton;
@@ -23,6 +24,7 @@ window.createBehavior({
 		nameInput = document.getElementById('name');
 		authMethodSelect = document.getElementById('authenticationMethod');
 		saveButton = document.getElementById('saveEnvironment');
+		saveAndCloseButton = document.getElementById('saveAndCloseEnvironment');
 		testButton = document.getElementById('testConnection');
 		discoverButton = document.getElementById('discoverEnvironmentId');
 		deleteButton = document.getElementById('deleteEnvironment');
@@ -37,6 +39,17 @@ window.createBehavior({
 				e.stopPropagation();
 				if (form && form.checkValidity()) {
 					saveEnvironment();
+				} else if (form) {
+					form.reportValidity();
+				}
+			}, true);
+		}
+
+		if (saveAndCloseButton) {
+			saveAndCloseButton.addEventListener('click', (e) => {
+				e.stopPropagation();
+				if (form && form.checkValidity()) {
+					saveAndCloseEnvironment();
 				} else if (form) {
 					form.reportValidity();
 				}
@@ -110,16 +123,11 @@ window.createBehavior({
 				break;
 
 			case 'test-connection-result':
-				// VS Code shows notification, no UI update needed
+				handleTestResult(message.data);
 				break;
 
 			case 'discover-environment-id-result':
-				if (message.data.success) {
-					const envIdInput = document.getElementById('environmentId');
-					if (envIdInput && message.data.environmentId) {
-						envIdInput.value = message.data.environmentId;
-					}
-				}
+				handleDiscoverResult(message.data);
 				break;
 
 			case 'name-validation-result':
@@ -169,44 +177,58 @@ function loadEnvironmentData(data) {
 	}
 }
 
+/**
+ * Collects form data and sends a command to the extension host.
+ * Optionally updates button state during the operation.
+ * @param {string} command - The command to send to the extension host
+ * @param {HTMLButtonElement|null} button - Optional button to update state
+ * @param {string} loadingText - Text to show while operation is in progress
+ */
+function sendFormCommand(command, button, loadingText) {
+	const formData = new FormData(form);
+	const data = Object.fromEntries(formData.entries());
+
+	if (button) {
+		button.disabled = true;
+		button.textContent = loadingText;
+	}
+
+	window.vscode.postMessage({
+		command: command,
+		data: data
+	});
+}
+
+/**
+ * Saves the environment configuration without closing the panel.
+ * Shows "Saved!" feedback on success.
+ */
 function saveEnvironment() {
-	const formData = new FormData(form);
-	const data = Object.fromEntries(formData.entries());
-
-	window.vscode.postMessage({
-		command: 'saveEnvironment',
-		data: data
-	});
+	sendFormCommand('saveEnvironment', saveButton, 'Saving...');
 }
 
+/**
+ * Saves the environment configuration and closes the panel.
+ * Panel closes automatically on success.
+ */
+function saveAndCloseEnvironment() {
+	sendFormCommand('saveAndCloseEnvironment', saveAndCloseButton, 'Saving...');
+}
+
+/**
+ * Tests the connection to the environment using current form credentials.
+ * Shows success/error feedback via VS Code notifications.
+ */
 function testConnection() {
-	const formData = new FormData(form);
-	const data = Object.fromEntries(formData.entries());
-
-	if (testButton) {
-		testButton.disabled = true;
-		testButton.textContent = 'Testing...';
-	}
-
-	window.vscode.postMessage({
-		command: 'testConnection',
-		data: data
-	});
+	sendFormCommand('testConnection', testButton, 'Testing...');
 }
 
+/**
+ * Discovers the Power Platform Environment ID using current form credentials.
+ * Queries the BAP API and populates the environmentId field on success.
+ */
 function discoverEnvironmentId() {
-	const formData = new FormData(form);
-	const data = Object.fromEntries(formData.entries());
-
-	if (discoverButton) {
-		discoverButton.disabled = true;
-		discoverButton.textContent = 'Discovering...';
-	}
-
-	window.vscode.postMessage({
-		command: 'discoverEnvironmentId',
-		data: data
-	});
+	sendFormCommand('discoverEnvironmentId', discoverButton, 'Discovering...');
 }
 
 function validateName() {
@@ -262,6 +284,16 @@ function updateConditionalFields() {
 }
 
 function handleSaveComplete(data) {
+	// Reset both save buttons
+	if (saveButton) {
+		saveButton.disabled = false;
+		saveButton.textContent = 'Save';
+	}
+	if (saveAndCloseButton) {
+		saveAndCloseButton.disabled = false;
+		saveAndCloseButton.textContent = 'Save & Close';
+	}
+
 	if (data.success) {
 		// Clear any existing validation errors
 		clearAllValidationErrors();
@@ -275,11 +307,14 @@ function handleSaveComplete(data) {
 			}
 		}
 
-		if (saveButton) {
-			saveButton.textContent = 'Saved!';
-			setTimeout(() => {
-				saveButton.textContent = 'Save Environment';
-			}, 2000);
+		// Show brief "Saved!" feedback if not closing
+		if (!data.closeAfterSave) {
+			if (saveButton) {
+				saveButton.textContent = 'Saved!';
+				setTimeout(() => {
+					saveButton.textContent = 'Save';
+				}, 2000);
+			}
 		}
 
 		// Show delete button if newly created
@@ -391,6 +426,11 @@ function clearAllValidationErrors() {
 	});
 }
 
+/**
+ * Handles the test connection result from the extension host.
+ * Updates button state with success/error styling feedback.
+ * @param {Object} data - Result object with success field
+ */
 function handleTestResult(data) {
 	if (testButton) {
 		testButton.disabled = false;
@@ -410,6 +450,11 @@ function handleTestResult(data) {
 	}
 }
 
+/**
+ * Handles the discover environment ID result from the extension host.
+ * Updates button state and populates the environment ID field on success.
+ * @param {Object} data - Result object with success, cancelled, and environmentId fields
+ */
 function handleDiscoverResult(data) {
 	if (discoverButton) {
 		discoverButton.disabled = false;
@@ -425,7 +470,8 @@ function handleDiscoverResult(data) {
 			setTimeout(() => {
 				discoverButton.classList.remove('success');
 			}, 3000);
-		} else {
+		} else if (!data.cancelled) {
+			// Presentation logic: skip error styling for user-initiated cancellations
 			discoverButton.classList.add('error');
 			setTimeout(() => {
 				discoverButton.classList.remove('error');
