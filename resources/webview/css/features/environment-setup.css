@@ -1,5 +1,16 @@
 /* Environment Setup Panel Styles */
 
+/* Toolbar buttons should match form width and align right */
+.toolbar-section {
+	justify-content: center;
+}
+
+.toolbar-section .action-buttons {
+	width: 100%;
+	max-width: 800px;
+	justify-content: flex-end;
+}
+
 .form-container {
 	max-width: 800px;
 	margin: 0 auto;

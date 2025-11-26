@@ -32,6 +32,7 @@ import {
  */
 type EnvironmentSetupCommands =
 	| 'saveEnvironment'
+	| 'saveAndCloseEnvironment'
 	| 'testConnection'
 	| 'deleteEnvironment'
 	| 'discoverEnvironmentId'
@@ -177,7 +178,8 @@ export class EnvironmentSetupPanelComposed {
 		const formSection = new EnvironmentFormSection();
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
-				{ id: 'saveEnvironment', label: 'Save Environment' },
+				{ id: 'saveEnvironment', label: 'Save' },
+				{ id: 'saveAndCloseEnvironment', label: 'Save & Close' },
 				{ id: 'testConnection', label: 'Test Connection' },
 				{ id: 'deleteEnvironment', label: 'Delete Environment' }
 			],
@@ -241,7 +243,15 @@ export class EnvironmentSetupPanelComposed {
 				this.logger.warn('Invalid save environment data');
 				return;
 			}
-			await this.handleSaveEnvironment(data);
+			await this.handleSaveEnvironment(data, false);
+		}, { disableOnExecute: true });
+
+		this.coordinator.registerHandler('saveAndCloseEnvironment', async (data?: unknown) => {
+			if (!isSaveEnvironmentData(data)) {
+				this.logger.warn('Invalid save environment data');
+				return;
+			}
+			await this.handleSaveEnvironment(data, true);
 		}, { disableOnExecute: true });
 
 		this.coordinator.registerHandler('testConnection', async (data?: unknown) => {
@@ -297,15 +307,18 @@ export class EnvironmentSetupPanelComposed {
 
 	/**
 	 * Handles save environment command.
+	 * @param data - The save environment request data
+	 * @param closeAfterSave - Whether to close the panel after successful save
 	 */
-	private async handleSaveEnvironment(data: SaveEnvironmentRequest): Promise<void> {
+	private async handleSaveEnvironment(data: SaveEnvironmentRequest, closeAfterSave: boolean): Promise<void> {
 		const currentEnvironmentId = this.currentEnvironmentId;
 		const wasNew = !currentEnvironmentId;
 
 		this.logger.info('User initiated save for environment', {
 			name: data.name,
 			authMethod: data.authenticationMethod,
-			isEdit: !wasNew
+			isEdit: !wasNew,
+			closeAfterSave
 		});
 
 		const request: SaveEnvironmentRequest = {
@@ -365,15 +378,18 @@ export class EnvironmentSetupPanelComposed {
 			data: {
 				success: true,
 				environmentId: result.environmentId,
-				isNewEnvironment: wasNew
+				isNewEnvironment: wasNew,
+				closeAfterSave
 			}
 		});
 
 		void vscode.commands.executeCommand('power-platform-dev-suite.refreshEnvironments');
 
-		setTimeout(() => {
-			this.panel.dispose();
-		}, 500);
+		if (closeAfterSave) {
+			setTimeout(() => {
+				this.panel.dispose();
+			}, 500);
+		}
 	}
 
 	/**
@@ -465,6 +481,7 @@ export class EnvironmentSetupPanelComposed {
 				});
 				const retry = await vscode.window.showWarningMessage(
 					`Discovery failed: Service Principals typically don't have Power Platform API permissions.\n\nWould you like to use Interactive authentication just for discovery?`,
+					{ modal: true },
 					'Use Interactive Auth',
 					'Cancel'
 				);
@@ -475,7 +492,7 @@ export class EnvironmentSetupPanelComposed {
 					vscode.window.showInformationMessage('You can manually enter the Environment ID from the Power Platform Admin Center.');
 					this.panel.webview.postMessage({
 						command: 'discover-environment-id-result',
-						data: result
+						data: { success: false, cancelled: true }
 					});
 				}
 			} else {
@@ -494,7 +511,7 @@ export class EnvironmentSetupPanelComposed {
 				vscode.window.showInformationMessage('Environment ID discovery cancelled');
 				this.panel.webview.postMessage({
 					command: 'discover-environment-id-result',
-					data: { success: false, errorMessage: 'Cancelled by user' }
+					data: { success: false, cancelled: true }
 				});
 			} else {
 				throw error;
@@ -540,7 +557,7 @@ export class EnvironmentSetupPanelComposed {
 				vscode.window.showInformationMessage('Environment ID discovery cancelled');
 				this.panel.webview.postMessage({
 					command: 'discover-environment-id-result',
-					data: { success: false, errorMessage: 'Cancelled by user' }
+					data: { success: false, cancelled: true }
 				});
 			} else {
 				throw error;
