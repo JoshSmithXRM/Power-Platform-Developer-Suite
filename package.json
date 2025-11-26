@@ -352,8 +352,10 @@
         "maintenance:monthly": "npm run maintenance:weekly && npm run dead-code:deps && npm run type-coverage",
         "maintenance:full": "npm run maintenance:monthly",
         "e2e:smoke": "npx playwright test --project=smoke",
-        "e2e:headed": "npx playwright test --project=smoke --headed",
-        "e2e:debug": "npx playwright test --project=smoke --debug",
+        "e2e:integration": "npx playwright test --project=integration",
+        "e2e:all": "npx playwright test",
+        "e2e:headed": "npx playwright test --headed",
+        "e2e:debug": "npx playwright test --debug",
         "e2e:report": "npx playwright show-report e2e/results/html-report"
     },
     "dependencies": {
