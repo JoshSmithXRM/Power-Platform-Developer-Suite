@@ -184,5 +184,37 @@ describe('ExecuteSqlQueryUseCase', () => {
 				expect(opportunityResult.entityName).toBe('opportunity');
 			}
 		});
+
+		it('should return error result for whitespace-only SQL', () => {
+			const result = useCase.transpileToFetchXml('   \t\n   ');
+
+			expect(result.success).toBe(false);
+			if (!result.success) {
+				expect(result.error).toBeInstanceOf(SqlParseError);
+			}
+		});
+	});
+
+	describe('execute with AbortSignal', () => {
+		it('should pass AbortSignal to repository', async () => {
+			const queryResult = createTestQueryResult({ rowCount: 1 });
+			const abortController = new AbortController();
+
+			mockRepository.getEntitySetName.mockResolvedValue('accounts');
+			mockRepository.executeQuery.mockResolvedValue(queryResult);
+
+			await useCase.execute(
+				'env-123',
+				'SELECT name FROM account',
+				abortController.signal
+			);
+
+			expect(mockRepository.executeQuery).toHaveBeenCalledWith(
+				'env-123',
+				'accounts',
+				expect.any(String),
+				abortController.signal
+			);
+		});
 	});
 });

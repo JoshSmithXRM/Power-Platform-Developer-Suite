@@ -311,4 +311,52 @@ describe('SqlParser', () => {
 			expect(result.orderBy.length).toBe(2);
 		});
 	});
+
+	describe('RIGHT JOIN', () => {
+		it('should parse RIGHT JOIN', () => {
+			const result = parser.parse(
+				'SELECT a.name, c.fullname FROM account a RIGHT JOIN contact c ON a.primarycontactid = c.contactid'
+			);
+
+			expect(result.joins[0]!.type).toBe('RIGHT');
+		});
+
+		it('should parse RIGHT OUTER JOIN', () => {
+			const result = parser.parse(
+				'SELECT a.name FROM account a RIGHT OUTER JOIN contact c ON a.contactid = c.contactid'
+			);
+
+			expect(result.joins[0]!.type).toBe('RIGHT');
+		});
+	});
+
+	describe('NULL literal in WHERE clause', () => {
+		it('should parse IS NULL condition', () => {
+			const result = parser.parse('SELECT * FROM account WHERE deleteddate IS NULL');
+
+			expect(result.where).not.toBeNull();
+			expect(result.where!.kind).toBe('null');
+		});
+
+		it('should parse IS NOT NULL condition', () => {
+			const result = parser.parse('SELECT * FROM account WHERE email IS NOT NULL');
+
+			expect(result.where).not.toBeNull();
+		});
+	});
+
+	describe('additional error cases', () => {
+		it('should throw error for extra tokens after valid SQL', () => {
+			// Valid SQL followed by garbage - should fail
+			expect(() => parser.parse('SELECT * FROM account WHERE x = 1 GARBAGE')).toThrow(SqlParseError);
+		});
+
+		it('should throw error for missing comparison operator', () => {
+			expect(() => parser.parse('SELECT * FROM account WHERE name "test"')).toThrow(SqlParseError);
+		});
+
+		it('should throw error for missing literal value', () => {
+			expect(() => parser.parse('SELECT * FROM account WHERE name =')).toThrow(SqlParseError);
+		});
+	});
 });

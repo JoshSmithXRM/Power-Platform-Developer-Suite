@@ -109,6 +109,7 @@ export class ExecuteSqlQueryUseCase {
 				hasRowLimit: statement.hasRowLimit(),
 			};
 		} catch (error) {
+			// istanbul ignore else - SqlParser only throws SqlParseError
 			if (error instanceof SqlParseError) {
 				return { success: false, error };
 			}

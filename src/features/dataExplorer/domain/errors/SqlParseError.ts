@@ -35,6 +35,7 @@ export class SqlParseError extends DomainError {
 		const beforePosition = sql.substring(0, position);
 		const lines = beforePosition.split('\n');
 		const line = lines.length;
+		// istanbul ignore next - String.split() always returns at least one element
 		const lastLine = lines[lines.length - 1] ?? '';
 		const column = lastLine.length + 1;
 		return { line, column };

@@ -700,4 +700,172 @@ describe('SqlToFetchXmlTranspiler', () => {
 			expect(fetchXml).toContain('<attribute name="modifiedon" alias="ProductModifiedOn" />');
 		});
 	});
+
+	describe('LIKE patterns without wildcards', () => {
+		it('should transpile LIKE without wildcards to like operator', () => {
+			const fetchXml = transpile("SELECT * FROM account WHERE name LIKE 'Contoso'");
+
+			expect(fetchXml).toContain('operator="like"');
+			expect(fetchXml).toContain('value="Contoso"');
+		});
+
+		it('should transpile NOT LIKE without wildcards to not-like operator', () => {
+			const fetchXml = transpile("SELECT * FROM account WHERE name NOT LIKE 'Test'");
+
+			expect(fetchXml).toContain('operator="not-like"');
+			expect(fetchXml).toContain('value="Test"');
+		});
+	});
+
+	describe('nested conditions - LIKE in logical operators', () => {
+		it('should transpile LIKE condition within AND clause', () => {
+			const fetchXml = transpile(
+				"SELECT * FROM account WHERE statecode = 0 AND name LIKE 'Contoso%'"
+			);
+
+			expect(fetchXml).toContain('<filter type="and">');
+			expect(fetchXml).toContain('operator="eq"');
+			expect(fetchXml).toContain('operator="begins-with"');
+		});
+
+		it('should transpile NOT LIKE condition within OR clause', () => {
+			const fetchXml = transpile(
+				"SELECT * FROM account WHERE statecode = 0 OR name NOT LIKE '%test%'"
+			);
+
+			expect(fetchXml).toContain('<filter type="or">');
+			expect(fetchXml).toContain('operator="not-like"');
+		});
+
+		it('should transpile LIKE with ends-with pattern in nested condition', () => {
+			const fetchXml = transpile(
+				"SELECT * FROM account WHERE statecode = 0 AND name LIKE '%Inc'"
+			);
+
+			expect(fetchXml).toContain('operator="ends-with"');
+		});
+
+		it('should transpile NOT LIKE with begins-with pattern in nested condition', () => {
+			const fetchXml = transpile(
+				"SELECT * FROM account WHERE statecode = 0 AND name NOT LIKE 'Test%'"
+			);
+
+			expect(fetchXml).toContain('operator="not-begin-with"');
+		});
+
+		it('should transpile NOT LIKE with ends-with pattern in nested condition', () => {
+			const fetchXml = transpile(
+				"SELECT * FROM account WHERE statecode = 0 AND name NOT LIKE '%Inc'"
+			);
+
+			expect(fetchXml).toContain('operator="not-end-with"');
+		});
+
+		it('should transpile LIKE without wildcards in nested condition', () => {
+			const fetchXml = transpile(
+				"SELECT * FROM account WHERE statecode = 0 AND name LIKE 'ExactMatch'"
+			);
+
+			expect(fetchXml).toContain('operator="like"');
+			expect(fetchXml).toContain('value="ExactMatch"');
+		});
+
+		it('should transpile NOT LIKE without wildcards in nested condition', () => {
+			const fetchXml = transpile(
+				"SELECT * FROM account WHERE statecode = 0 AND name NOT LIKE 'ExactMatch'"
+			);
+
+			expect(fetchXml).toContain('operator="not-like"');
+		});
+	});
+
+	describe('nested conditions - IS NULL in logical operators', () => {
+		it('should transpile IS NULL condition within AND clause', () => {
+			const fetchXml = transpile(
+				'SELECT * FROM account WHERE statecode = 0 AND deleteddate IS NULL'
+			);
+
+			expect(fetchXml).toContain('<filter type="and">');
+			expect(fetchXml).toContain('operator="null"');
+		});
+
+		it('should transpile IS NOT NULL condition within OR clause', () => {
+			const fetchXml = transpile(
+				'SELECT * FROM account WHERE statecode = 0 OR email IS NOT NULL'
+			);
+
+			expect(fetchXml).toContain('<filter type="or">');
+			expect(fetchXml).toContain('operator="not-null"');
+		});
+	});
+
+	describe('nested conditions - IN in logical operators', () => {
+		it('should transpile IN condition within AND clause', () => {
+			const fetchXml = transpile(
+				'SELECT * FROM account WHERE name IS NOT NULL AND statecode IN (0, 1, 2)'
+			);
+
+			expect(fetchXml).toContain('<filter type="and">');
+			expect(fetchXml).toContain('operator="in"');
+		});
+
+		it('should transpile NOT IN condition within OR clause', () => {
+			const fetchXml = transpile(
+				'SELECT * FROM account WHERE statecode = 0 OR industry NOT IN (1, 2)'
+			);
+
+			expect(fetchXml).toContain('operator="not-in"');
+		});
+	});
+
+	describe('deeply nested logical conditions', () => {
+		it('should transpile nested logical conditions', () => {
+			const fetchXml = transpile(
+				'SELECT * FROM account WHERE (statecode = 0 OR statecode = 1) AND (revenue > 1000 OR industrycode = 1)'
+			);
+
+			// Should have nested filters
+			expect(fetchXml).toContain('<filter type="and">');
+			expect(fetchXml).toContain('<filter type="or">');
+		});
+	});
+
+	describe('qualified columns in WHERE clause', () => {
+		it('should handle qualified column in comparison condition', () => {
+			const fetchXml = transpile(
+				'SELECT a.name FROM account a WHERE a.statecode = 0'
+			);
+
+			expect(fetchXml).toContain('attribute="statecode"');
+			expect(fetchXml).toContain('operator="eq"');
+		});
+	});
+
+	describe('JOIN with ambiguous column references', () => {
+		it('should fall back to default column order when neither column matches link-entity', () => {
+			// This tests the edge case where neither column can be matched to the join table
+			// Using unqualified columns creates this scenario
+			const fetchXml = transpile(
+				'SELECT name FROM account a JOIN contact ON primarycontactid = contactid'
+			);
+
+			// Should still produce valid FetchXML with default column ordering
+			expect(fetchXml).toContain('<link-entity name="contact"');
+			expect(fetchXml).toContain('from=');
+			expect(fetchXml).toContain('to=');
+		});
+	});
+
+	describe('RIGHT JOIN', () => {
+		it('should transpile RIGHT JOIN as inner link-type', () => {
+			// Note: Dataverse doesn't support RIGHT JOIN, but the transpiler maps it
+			const fetchXml = transpile(
+				'SELECT a.name FROM account a RIGHT JOIN contact c ON a.primarycontactid = c.contactid'
+			);
+
+			// RIGHT JOIN maps to inner (same as INNER JOIN) in FetchXML
+			expect(fetchXml).toContain('<link-entity name="contact"');
+			expect(fetchXml).toContain('link-type="inner"');
+		});
+	});
 });

@@ -355,7 +355,7 @@ function updateFetchXmlPreview(fetchXml) {
  * Shows a query error in the UI.
  */
 function showQueryError(errorData) {
-	const { message, errorType, position, context } = errorData;
+	const { message, position } = errorData;
 
 	// Create or find error banner
 	let errorBanner = document.querySelector('.error-banner');
