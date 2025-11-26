@@ -32,7 +32,7 @@ export class WebviewHelper {
   /**
    * Waits for a webview panel to appear in VS Code.
    *
-   * @param viewType - The viewType of the webview panel (e.g., 'environmentSetup', 'powerPlatformDevSuite.solutionExplorer')
+   * @param _viewType - Unused. Kept for API compatibility. VS Code webview URLs use random UUIDs, not viewType.
    * @param timeout - Maximum wait time in milliseconds
    * @throws Error if panel doesn't appear within timeout
    */
@@ -56,7 +56,7 @@ export class WebviewHelper {
    * CRITICAL: You must use this frame to interact with webview content.
    * Direct page.click() calls won't work on elements inside webviews.
    *
-   * @param viewType - Optional viewType to target specific webview (recommended for reliability)
+   * @param _viewType - Unused. Kept for API compatibility. VS Code webview URLs use random UUIDs, not viewType.
    * @param timeout - Maximum wait time for iframe to be available
    * @returns Playwright Frame for the webview content
    * @throws Error if webview iframe not found or frame unavailable

@@ -34,7 +34,7 @@ window.createBehavior({
 		}
 
 		// Register click handlers for form buttons
-		// Note: data-custom-handler attribute on buttons prevents messaging.js generic handlers
+		// Note: These explicit handlers take precedence; messaging.js generic handlers are not used here
 		if (saveButton) {
 			saveButton.addEventListener('click', () => {
 				if (form && form.checkValidity()) {

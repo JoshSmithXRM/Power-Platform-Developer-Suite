@@ -410,6 +410,6 @@ See `.claude/agents/` for agent definitions.
 
 **Development:** `npm run compile` (use after EVERY layer)
 
-**Git Commits:** No "Generated with Claude Code" footer or Co-Authored-By lines. Keep commit messages clean and conventional.
+**Git Commits:** No "Generated with Claude Code" footer or Co-authored-by lines. Keep commit messages clean and conventional.
 
 **Remember:** Rich domain models with behavior. Business logic in domain, not use cases or panels.
