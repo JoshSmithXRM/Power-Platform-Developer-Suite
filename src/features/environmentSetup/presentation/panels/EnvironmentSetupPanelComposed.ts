@@ -482,8 +482,7 @@ export class EnvironmentSetupPanelComposed {
 				const retry = await vscode.window.showWarningMessage(
 					`Discovery failed: Service Principals typically don't have Power Platform API permissions.\n\nWould you like to use Interactive authentication just for discovery?`,
 					{ modal: true },
-					'Use Interactive Auth',
-					'Cancel'
+					'Use Interactive Auth'
 				);
 
 				if (retry === 'Use Interactive Auth') {
@@ -514,6 +513,11 @@ export class EnvironmentSetupPanelComposed {
 					data: { success: false, cancelled: true }
 				});
 			} else {
+				// Unexpected error - still reset button state before re-throwing
+				this.panel.webview.postMessage({
+					command: 'discover-environment-id-result',
+					data: { success: false }
+				});
 				throw error;
 			}
 		}
@@ -560,6 +564,11 @@ export class EnvironmentSetupPanelComposed {
 					data: { success: false, cancelled: true }
 				});
 			} else {
+				// Unexpected error - still reset button state before re-throwing
+				this.panel.webview.postMessage({
+					command: 'discover-environment-id-result',
+					data: { success: false }
+				});
 				throw error;
 			}
 		}
