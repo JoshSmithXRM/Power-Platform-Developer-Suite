@@ -344,10 +344,14 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			}
 		});
 
-		// Export results to CSV
-		this.coordinator.registerHandler('exportCsv', async () => {
-			await this.handleExportCsv();
-		});
+		// Export results to CSV - disable automatic loading state since we manage it manually
+		this.coordinator.registerHandler(
+			'exportCsv',
+			async () => {
+				await this.handleExportCsv();
+			},
+			{ disableOnExecute: false }
+		);
 
 		// Handle warning modal response from webview
 		this.coordinator.registerHandler('warningModalResponse', async (data) => {
@@ -690,6 +694,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		}
 
 		this.logger.info('Exporting query results to CSV', { rowCount });
+		this.setButtonLoading('exportCsv', true);
 
 		try {
 			// Map QueryResult to TabularData
@@ -726,6 +731,8 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 			this.logger.error('Failed to export CSV', error);
 			await vscode.window.showErrorMessage(`Failed to export CSV: ${errorMessage}`);
+		} finally {
+			this.setButtonLoading('exportCsv', false);
 		}
 	}
 
