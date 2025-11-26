@@ -1,0 +1,193 @@
+import * as vscode from 'vscode';
+
+import type { GetWebResourceContentUseCase } from '../../application/useCases/GetWebResourceContentUseCase';
+import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+
+/**
+ * URI scheme for web resources.
+ * Format: ppds-webresource://environmentId/webResourceId/filename.ext
+ */
+export const WEB_RESOURCE_SCHEME = 'ppds-webresource';
+
+/**
+ * Parses a web resource URI into its components.
+ *
+ * @param uri - VS Code URI with ppds-webresource scheme
+ * @returns Parsed components or null if invalid
+ */
+export function parseWebResourceUri(uri: vscode.Uri): { environmentId: string; webResourceId: string; filename: string } | null {
+	if (uri.scheme !== WEB_RESOURCE_SCHEME) {
+		return null;
+	}
+
+	// authority = environmentId
+	// path = /webResourceId/filename.ext
+	const environmentId = uri.authority;
+	const pathParts = uri.path.split('/').filter(p => p.length > 0);
+
+	if (pathParts.length < 2) {
+		return null;
+	}
+
+	// pathParts[0] is guaranteed to exist since we checked length >= 2 above
+	const webResourceId = pathParts[0] as string;
+	const filename = pathParts.slice(1).join('/');
+
+	return { environmentId, webResourceId, filename };
+}
+
+/**
+ * Creates a web resource URI.
+ *
+ * @param environmentId - Environment GUID
+ * @param webResourceId - Web resource GUID
+ * @param filename - Display filename with extension
+ * @returns VS Code URI for the web resource
+ */
+export function createWebResourceUri(
+	environmentId: string,
+	webResourceId: string,
+	filename: string
+): vscode.Uri {
+	return vscode.Uri.parse(`${WEB_RESOURCE_SCHEME}://${environmentId}/${webResourceId}/${filename}`);
+}
+
+/**
+ * Read-only FileSystemProvider for web resources.
+ *
+ * Enables opening web resources directly in VS Code editor without
+ * downloading files to disk. Content is fetched on-demand from Dataverse.
+ *
+ * URI format: ppds-webresource://environmentId/webResourceId/filename.ext
+ */
+export class WebResourceFileSystemProvider implements vscode.FileSystemProvider {
+	private readonly _onDidChangeFile = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
+	readonly onDidChangeFile = this._onDidChangeFile.event;
+
+	/** Cache for web resource content to avoid repeated API calls */
+	private readonly contentCache = new Map<string, { content: Uint8Array; timestamp: number }>();
+	private readonly CACHE_TTL_MS = 60000; // 1 minute cache
+
+	constructor(
+		private readonly getWebResourceContentUseCase: GetWebResourceContentUseCase,
+		private readonly logger: ILogger
+	) {}
+
+	watch(): vscode.Disposable {
+		// Read-only: no file watching needed
+		return new vscode.Disposable(() => {});
+	}
+
+	async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
+		const parsed = parseWebResourceUri(uri);
+		if (parsed === null) {
+			throw vscode.FileSystemError.FileNotFound(uri);
+		}
+
+		this.logger.debug('WebResourceFileSystemProvider stat', {
+			uri: uri.toString(),
+			environmentId: parsed.environmentId,
+			webResourceId: parsed.webResourceId
+		});
+
+		// Try to get content to determine size
+		try {
+			const content = await this.readFile(uri);
+			return {
+				type: vscode.FileType.File,
+				ctime: Date.now(),
+				mtime: Date.now(),
+				size: content.length
+			};
+		} catch {
+			throw vscode.FileSystemError.FileNotFound(uri);
+		}
+	}
+
+	readDirectory(): [string, vscode.FileType][] {
+		// Read-only: not a real filesystem, no directory listing
+		return [];
+	}
+
+	createDirectory(): void {
+		throw vscode.FileSystemError.NoPermissions('Web resources are read-only');
+	}
+
+	async readFile(uri: vscode.Uri): Promise<Uint8Array> {
+		const parsed = parseWebResourceUri(uri);
+		if (parsed === null) {
+			throw vscode.FileSystemError.FileNotFound(uri);
+		}
+
+		const cacheKey = `${parsed.environmentId}:${parsed.webResourceId}`;
+
+		// Check cache
+		const cached = this.contentCache.get(cacheKey);
+		if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+			this.logger.debug('WebResourceFileSystemProvider readFile (cached)', {
+				webResourceId: parsed.webResourceId,
+				size: cached.content.length
+			});
+			return cached.content;
+		}
+
+		this.logger.debug('WebResourceFileSystemProvider readFile', {
+			uri: uri.toString(),
+			environmentId: parsed.environmentId,
+			webResourceId: parsed.webResourceId
+		});
+
+		try {
+			const result = await this.getWebResourceContentUseCase.execute(
+				parsed.environmentId,
+				parsed.webResourceId
+			);
+
+			// Cache the content
+			this.contentCache.set(cacheKey, {
+				content: result.content,
+				timestamp: Date.now()
+			});
+
+			this.logger.info('Web resource content loaded', {
+				webResourceId: parsed.webResourceId,
+				size: result.content.length
+			});
+
+			return result.content;
+		} catch (error) {
+			this.logger.error('Failed to read web resource', error);
+			throw vscode.FileSystemError.FileNotFound(uri);
+		}
+	}
+
+	writeFile(): void {
+		throw vscode.FileSystemError.NoPermissions('Web resources are read-only');
+	}
+
+	delete(): void {
+		throw vscode.FileSystemError.NoPermissions('Web resources are read-only');
+	}
+
+	rename(): void {
+		throw vscode.FileSystemError.NoPermissions('Web resources are read-only');
+	}
+
+	/**
+	 * Invalidates cached content for a specific web resource.
+	 * Call this when a web resource is modified to ensure fresh content on next read.
+	 */
+	invalidateCache(environmentId: string, webResourceId: string): void {
+		const cacheKey = `${environmentId}:${webResourceId}`;
+		this.contentCache.delete(cacheKey);
+		this.logger.debug('WebResourceFileSystemProvider cache invalidated', { environmentId, webResourceId });
+	}
+
+	/**
+	 * Clears all cached content.
+	 */
+	clearCache(): void {
+		this.contentCache.clear();
+		this.logger.debug('WebResourceFileSystemProvider cache cleared');
+	}
+}

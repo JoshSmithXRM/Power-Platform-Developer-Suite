@@ -1,0 +1,492 @@
+import * as vscode from 'vscode';
+
+import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
+import type { DataTableConfig, EnvironmentOption } from '../../../../shared/infrastructure/ui/DataTablePanel';
+import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
+import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
+import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
+import { DataTableSection } from '../../../../shared/infrastructure/ui/sections/DataTableSection';
+import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
+import { EnvironmentSelectorSection } from '../../../../shared/infrastructure/ui/sections/EnvironmentSelectorSection';
+import { SolutionFilterSection } from '../../../../shared/infrastructure/ui/sections/SolutionFilterSection';
+import { PanelLayout } from '../../../../shared/infrastructure/ui/types/PanelLayout';
+import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
+import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
+import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
+import type { ListWebResourcesUseCase } from '../../application/useCases/ListWebResourcesUseCase';
+import type { WebResourceViewModelMapper } from '../mappers/WebResourceViewModelMapper';
+import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
+import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/solutionFilterView';
+import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
+import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
+import { createWebResourceUri } from '../../infrastructure/providers/WebResourceFileSystemProvider';
+
+/**
+ * Commands supported by Web Resources panel.
+ */
+type WebResourcesCommands = 'refresh' | 'openMaker' | 'environmentChange' | 'solutionChange' | 'openWebResource';
+
+/**
+ * Web Resources panel using PanelCoordinator architecture.
+ * Displays list of web resources for a specific environment with optional solution filtering.
+ * Extends EnvironmentScopedPanel for singleton pattern management.
+ */
+export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourcesPanelComposed> {
+	public static readonly viewType = 'powerPlatformDevSuite.webResources';
+	private static panels = new Map<string, WebResourcesPanelComposed>();
+
+	private readonly coordinator: PanelCoordinator<WebResourcesCommands>;
+	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private currentEnvironmentId: string;
+	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
+	private solutionOptions: SolutionOption[] = [];
+
+	private constructor(
+		private readonly panel: vscode.WebviewPanel,
+		private readonly extensionUri: vscode.Uri,
+		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
+		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
+		private readonly listWebResourcesUseCase: ListWebResourcesUseCase,
+		private readonly solutionRepository: ISolutionRepository,
+		private readonly urlBuilder: IMakerUrlBuilder,
+		private readonly viewModelMapper: WebResourceViewModelMapper,
+		private readonly logger: ILogger,
+		environmentId: string,
+		private readonly panelStateRepository: IPanelStateRepository | undefined
+	) {
+		super();
+		this.currentEnvironmentId = environmentId;
+		logger.debug('WebResourcesPanel: Initialized with new architecture');
+
+		// Configure webview
+		panel.webview.options = {
+			enableScripts: true,
+			localResourceRoots: [extensionUri]
+		};
+
+		const result = this.createCoordinator();
+		this.coordinator = result.coordinator;
+		this.scaffoldingBehavior = result.scaffoldingBehavior;
+
+		this.registerCommandHandlers();
+
+		void this.initializeAndLoadData();
+	}
+
+	protected reveal(column: vscode.ViewColumn): void {
+		this.panel.reveal(column);
+	}
+
+	public static async createOrShow(
+		extensionUri: vscode.Uri,
+		getEnvironments: () => Promise<EnvironmentOption[]>,
+		getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
+		listWebResourcesUseCase: ListWebResourcesUseCase,
+		solutionRepository: ISolutionRepository,
+		urlBuilder: IMakerUrlBuilder,
+		viewModelMapper: WebResourceViewModelMapper,
+		logger: ILogger,
+		initialEnvironmentId?: string,
+		panelStateRepository?: IPanelStateRepository
+	): Promise<WebResourcesPanelComposed> {
+		return EnvironmentScopedPanel.createOrShowPanel({
+			viewType: WebResourcesPanelComposed.viewType,
+			titlePrefix: 'Web Resources',
+			extensionUri,
+			getEnvironments,
+			getEnvironmentById,
+			initialEnvironmentId,
+			panelFactory: (panel, envId) => new WebResourcesPanelComposed(
+				panel,
+				extensionUri,
+				getEnvironments,
+				getEnvironmentById,
+				listWebResourcesUseCase,
+				solutionRepository,
+				urlBuilder,
+				viewModelMapper,
+				logger,
+				envId,
+				panelStateRepository
+			),
+			webviewOptions: {
+				enableScripts: true,
+				localResourceRoots: [extensionUri],
+				retainContextWhenHidden: true,
+				enableFindWidget: true
+			}
+		}, WebResourcesPanelComposed.panels);
+	}
+
+	private async initializeAndLoadData(): Promise<void> {
+		// Load persisted solution ID immediately (optimistic - no validation yet)
+		if (this.panelStateRepository) {
+			const savedState = await this.panelStateRepository.load({
+				panelType: 'webResources',
+				environmentId: this.currentEnvironmentId
+			});
+			if (savedState?.selectedSolutionId) {
+				this.currentSolutionId = savedState.selectedSolutionId;
+			}
+		}
+
+		// Show initial loading state with known solution ID
+		const environments = await this.getEnvironments();
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			solutions: [],
+			currentSolutionId: this.currentSolutionId,
+			tableData: [],
+			isLoading: true
+		});
+
+		// PARALLEL LOADING - Don't wait for solutions to load data!
+		const [solutions, webResources] = await Promise.all([
+			this.loadSolutions(),
+			this.listWebResourcesUseCase.execute(
+				this.currentEnvironmentId,
+				this.currentSolutionId
+			)
+		]);
+
+		// Post-load validation: Check if persisted solution still exists
+		let finalSolutionId = this.currentSolutionId;
+		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+			if (!solutions.some(s => s.id === this.currentSolutionId)) {
+				this.logger.warn('Persisted solution no longer exists, falling back to default', {
+					invalidSolutionId: this.currentSolutionId
+				});
+				finalSolutionId = DEFAULT_SOLUTION_ID;
+				this.currentSolutionId = DEFAULT_SOLUTION_ID;
+
+				// Save corrected state
+				if (this.panelStateRepository) {
+					await this.panelStateRepository.save(
+						{ panelType: 'webResources', environmentId: this.currentEnvironmentId },
+						{ selectedSolutionId: DEFAULT_SOLUTION_ID, lastUpdated: new Date().toISOString() }
+					);
+				}
+			}
+		}
+
+		const viewModels = this.viewModelMapper.toViewModels(webResources);
+
+		// Final render with both solutions and data
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			solutions,
+			currentSolutionId: finalSolutionId,
+			tableData: viewModels
+		});
+	}
+
+	private createCoordinator(): { coordinator: PanelCoordinator<WebResourcesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
+		const config = this.getTableConfig();
+
+		const environmentSelector = new EnvironmentSelectorSection();
+		const solutionFilter = new SolutionFilterSection();
+		const tableSection = new DataTableSection(config);
+		// Note: Button IDs must match command names registered in registerCommandHandlers()
+		const actionButtons = new ActionButtonsSection({
+			buttons: [
+				{ id: 'openMaker', label: 'Open in Maker' },
+				{ id: 'refresh', label: 'Refresh' }
+			]
+		}, SectionPosition.Toolbar);
+
+		// Order: action buttons, solution filter, environment selector (far right), then table
+		const compositionBehavior = new SectionCompositionBehavior(
+			[actionButtons, solutionFilter, environmentSelector, tableSection],
+			PanelLayout.SingleColumn
+		);
+
+		const cssUris = resolveCssModules(
+			{
+				base: true,
+				components: ['buttons', 'inputs'],
+				sections: ['environment-selector', 'solution-filter', 'action-buttons', 'datatable']
+			},
+			this.extensionUri,
+			this.panel.webview
+		);
+
+		const scaffoldingConfig: HtmlScaffoldingConfig = {
+			cssUris,
+			jsUris: [
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
+				).toString()
+			],
+			cspNonce: getNonce(),
+			title: 'Web Resources'
+		};
+
+		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
+			this.panel.webview,
+			compositionBehavior,
+			scaffoldingConfig
+		);
+
+		const coordinator = new PanelCoordinator<WebResourcesCommands>({
+			panel: this.panel,
+			extensionUri: this.extensionUri,
+			behaviors: [scaffoldingBehavior],
+			logger: this.logger
+		});
+
+		return { coordinator, scaffoldingBehavior };
+	}
+
+	private registerCommandHandlers(): void {
+		// Refresh web resources
+		this.coordinator.registerHandler('refresh', async () => {
+			await this.handleRefresh();
+		});
+
+		// Open web resources in Maker
+		this.coordinator.registerHandler('openMaker', async () => {
+			await this.handleOpenMaker();
+		});
+
+		// Environment change
+		this.coordinator.registerHandler('environmentChange', async (data) => {
+			const environmentId = (data as { environmentId?: string })?.environmentId;
+			if (environmentId) {
+				await this.handleEnvironmentChange(environmentId);
+			}
+		});
+
+		// Solution change
+		this.coordinator.registerHandler('solutionChange', async (data) => {
+			const solutionId = (data as { solutionId?: string })?.solutionId;
+			if (solutionId) {
+				await this.handleSolutionChange(solutionId);
+			}
+		});
+
+		// Open web resource in editor
+		this.coordinator.registerHandler('openWebResource', async (data) => {
+			const payload = data as { id?: string; name?: string; typeCode?: string } | undefined;
+			if (payload?.id && payload?.name && payload?.typeCode) {
+				await this.handleOpenWebResource(payload.id, payload.name, parseInt(payload.typeCode, 10));
+			}
+		});
+	}
+
+	private getTableConfig(): DataTableConfig {
+		return {
+			viewType: WebResourcesPanelComposed.viewType,
+			title: 'Web Resources',
+			dataCommand: 'webResourcesData',
+			defaultSortColumn: 'name',
+			defaultSortDirection: 'asc',
+			columns: [
+				{ key: 'name', label: 'Name' },
+				{ key: 'displayName', label: 'Display Name' },
+				{ key: 'type', label: 'Type' },
+				{ key: 'size', label: 'Size' },
+				{ key: 'modifiedOn', label: 'Modified On' }
+			],
+			searchPlaceholder: '🔍 Search web resources...',
+			noDataMessage: 'No web resources found.',
+			toolbarButtons: []
+		};
+	}
+
+	private async loadSolutions(): Promise<SolutionOption[]> {
+		try {
+			this.solutionOptions = await this.solutionRepository.findAllForDropdown(this.currentEnvironmentId);
+			return this.solutionOptions;
+		} catch (error) {
+			this.logger.error('Failed to load solutions', error);
+			return [];
+		}
+	}
+
+	private async handleRefresh(): Promise<void> {
+		this.logger.debug('Refreshing web resources');
+
+		try {
+			const webResources = await this.listWebResourcesUseCase.execute(
+				this.currentEnvironmentId,
+				this.currentSolutionId
+			);
+
+			// Map to view models (mapper handles sorting)
+			const viewModels = this.viewModelMapper.toViewModels(webResources);
+
+			this.logger.info('Web resources loaded successfully', { count: viewModels.length });
+
+			// Data-driven update: Send ViewModels to frontend
+			await this.panel.webview.postMessage({
+				command: 'updateTableData',
+				data: {
+					viewModels,
+					columns: this.getTableConfig().columns
+				}
+			});
+		} catch (error: unknown) {
+			this.logger.error('Error refreshing web resources', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			vscode.window.showErrorMessage(`Failed to refresh web resources: ${errorMessage}`);
+		}
+	}
+
+	private async handleOpenMaker(): Promise<void> {
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+		if (!environment?.powerPlatformEnvironmentId) {
+			this.logger.warn('Cannot open Maker Portal: Environment ID not configured');
+			vscode.window.showErrorMessage('Cannot open in Maker Portal: Environment ID not configured. Edit environment to add one.');
+			return;
+		}
+
+		const url = this.urlBuilder.buildWebResourcesUrl(
+			environment.powerPlatformEnvironmentId,
+			this.currentSolutionId
+		);
+		await vscode.env.openExternal(vscode.Uri.parse(url));
+		this.logger.info('Opened web resources in Maker Portal');
+	}
+
+	private async handleEnvironmentChange(environmentId: string): Promise<void> {
+		this.logger.debug('Environment changed', { environmentId });
+
+		this.setButtonLoading('refresh', true);
+		this.clearTable();
+
+		try {
+			const oldEnvironmentId = this.currentEnvironmentId;
+			this.currentEnvironmentId = environmentId;
+			this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
+
+			// Re-register panel in map for new environment
+			this.reregisterPanel(WebResourcesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
+
+			const environment = await this.getEnvironmentById(environmentId);
+			if (environment) {
+				this.panel.title = `Web Resources - ${environment.name}`;
+			}
+
+			this.solutionOptions = await this.loadSolutions();
+
+			await this.handleRefresh();
+		} finally {
+			this.setButtonLoading('refresh', false);
+		}
+	}
+
+	private async handleSolutionChange(solutionId: string): Promise<void> {
+		this.logger.debug('Solution filter changed', { solutionId });
+
+		this.setButtonLoading('refresh', true);
+		this.clearTable();
+
+		try {
+			this.currentSolutionId = solutionId;
+
+			// Persist solution selection
+			if (this.panelStateRepository) {
+				await this.panelStateRepository.save(
+					{
+						panelType: 'webResources',
+						environmentId: this.currentEnvironmentId
+					},
+					{
+						selectedSolutionId: solutionId,
+						lastUpdated: new Date().toISOString()
+					}
+				);
+			}
+
+			await this.handleRefresh();
+		} finally {
+			this.setButtonLoading('refresh', false);
+		}
+	}
+
+	/**
+	 * Clears the table by sending empty data to the webview.
+	 * Provides immediate visual feedback during environment switches.
+	 */
+	private clearTable(): void {
+		this.panel.webview.postMessage({
+			command: 'updateTableData',
+			data: {
+				viewModels: [],
+				columns: this.getTableConfig().columns
+			}
+		});
+	}
+
+	private setButtonLoading(buttonId: string, isLoading: boolean): void {
+		this.panel.webview.postMessage({
+			command: 'setButtonState',
+			buttonId,
+			disabled: isLoading,
+			showSpinner: isLoading,
+		});
+	}
+
+	/**
+	 * Opens a web resource in VS Code editor.
+	 *
+	 * @param webResourceId - Web resource GUID
+	 * @param name - Web resource name (used for filename)
+	 * @param typeCode - Web resource type code (determines file extension)
+	 */
+	private async handleOpenWebResource(webResourceId: string, name: string, typeCode: number): Promise<void> {
+		this.logger.debug('Opening web resource in editor', { webResourceId, name, typeCode });
+
+		try {
+			const fileExtension = this.getFileExtensionFromTypeCode(typeCode);
+			const filename = `${name}${fileExtension}`;
+
+			const uri = createWebResourceUri(
+				this.currentEnvironmentId,
+				webResourceId,
+				filename
+			);
+
+			const document = await vscode.workspace.openTextDocument(uri);
+			await vscode.window.showTextDocument(document, { preview: true });
+
+			this.logger.info('Opened web resource in editor', { webResourceId, filename });
+		} catch (error) {
+			this.logger.error('Failed to open web resource', error);
+			const message = error instanceof Error ? error.message : 'Unknown error';
+			vscode.window.showErrorMessage(`Failed to open web resource: ${message}`);
+		}
+	}
+
+	/**
+	 * Maps Dataverse type code to file extension.
+	 * Duplicates logic from WebResourceType value object to avoid domain import.
+	 */
+	private getFileExtensionFromTypeCode(typeCode: number): string {
+		const extensionMap: Record<number, string> = {
+			1: '.html',
+			2: '.css',
+			3: '.js',
+			4: '.xml',
+			5: '.png',
+			6: '.jpg',
+			7: '.gif',
+			8: '.xap',
+			9: '.xsl',
+			10: '.ico',
+			11: '.svg',
+			12: '.resx'
+		};
+		return extensionMap[typeCode] ?? '.txt';
+	}
+}

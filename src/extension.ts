@@ -21,6 +21,7 @@ import { initializePluginTraceViewer } from './features/pluginTraceViewer/presen
 import { initializeMetadataBrowser } from './features/metadataBrowser/presentation/initialization/initializeMetadataBrowser.js';
 import { initializePersistenceInspector } from './features/persistenceInspector/presentation/initialization/initializePersistenceInspector.js';
 import { initializeDataExplorer } from './features/dataExplorer/presentation/initialization/initializeDataExplorer.js';
+import { initializeWebResources } from './features/webResources/presentation/initialization/initializeWebResources.js';
 
 /**
  * Shows environment picker and executes callback with selected environment ID.
@@ -425,6 +426,32 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	const webResourcesCommand = vscode.commands.registerCommand('power-platform-dev-suite.webResources', async (environmentItem?: { envId: string }) => {
+		try {
+			void initializeWebResources(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, environmentItem?.envId);
+		} catch (error) {
+			container.logger.error('Failed to open Web Resources', error);
+			vscode.window.showErrorMessage(
+				`Failed to open Web Resources: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	const webResourcesPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.webResourcesPickEnvironment', async () => {
+		try {
+			await showEnvironmentPickerAndExecute(
+				container.environmentRepository,
+				'Select an environment to browse web resources',
+				async (envId) => initializeWebResources(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, envId)
+			);
+		} catch (error) {
+			container.logger.error('Failed to open Web Resources with environment picker', error);
+			vscode.window.showErrorMessage(
+				`Failed to open Web Resources: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
 	// Register all disposables with VS Code's extension context.
 	// When the extension deactivates, VS Code automatically calls .dispose() on each
 	// registered disposable in reverse order, ensuring proper cleanup of:
@@ -451,6 +478,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		metadataBrowserPickEnvironmentCommand,
 		dataExplorerCommand,
 		dataExplorerPickEnvironmentCommand,
+		webResourcesCommand,
+		webResourcesPickEnvironmentCommand,
 		removeEnvironmentCommand,
 		openMakerCommand,
 		openDynamicsCommand,

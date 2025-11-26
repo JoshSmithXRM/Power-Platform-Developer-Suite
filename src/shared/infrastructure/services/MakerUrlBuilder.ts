@@ -128,4 +128,23 @@ export class MakerUrlBuilder implements IMakerUrlBuilder {
   buildFlowUrl(environmentId: string, solutionId: string, flowId: string): string {
     return `${this.baseUrl}/environments/${environmentId}/solutions/${solutionId}/objects/cloudflows/${flowId}/edit`;
   }
+
+  /**
+   * Builds Maker Portal URL for web resources.
+   *
+   * Two patterns based on context:
+   * - With solution: /environments/{envId}/solutions/{solutionId}/objects/webresources
+   * - Without solution: /environments/{envId}/webresources (not available, redirects to solutions)
+   *
+   * @param environmentId - Power Platform environment GUID
+   * @param solutionId - Optional solution GUID for solution-scoped view
+   * @returns Maker Portal web resources URL
+   */
+  buildWebResourcesUrl(environmentId: string, solutionId?: string): string {
+    if (solutionId) {
+      return `${this.baseUrl}/environments/${environmentId}/solutions/${solutionId}/objects/webresources`;
+    }
+    // Without solution, link to solutions list (no direct web resources list outside solutions)
+    return `${this.baseUrl}/environments/${environmentId}/solutions`;
+  }
 }

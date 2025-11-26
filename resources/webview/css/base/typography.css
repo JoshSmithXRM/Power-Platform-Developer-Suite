@@ -23,3 +23,8 @@ a {
 a:hover {
 	text-decoration: underline;
 }
+
+/* Clickable links in tables - cursor pointer for clear affordance */
+.clickable-link {
+	cursor: pointer;
+}
