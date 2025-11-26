@@ -193,6 +193,18 @@ For complex/uncertain problems, trigger extended thinking modes:
 3. **Use `npm run local` for production testing** - Auto-appends `-dev.X` suffix, safe to commit
 4. **Node.js 20.x for packaging** - Node 22+ has vsce module resolution issues
 
+### Release Checklist (MANDATORY)
+
+**Before merging ANY PR to main:**
+- [ ] Update `CHANGELOG.md` with changes under correct version section
+
+**For version releases (use `/prepare-release` command):**
+- [ ] Bump version in `package.json`
+- [ ] Update `CHANGELOG.md` date to release date
+- [ ] Create release notes file: `docs/releases/vX.X.X.md`
+- [ ] All tests pass (`npm test`)
+- [ ] Compilation succeeds (`npm run compile`)
+
 ### Commands
 
 **Primary Development:**
@@ -208,11 +220,10 @@ npm run marketplace  # Revert to marketplace version
 ```
 
 **Release Process:**
-1. Merge to `main`
-2. Bump version in `package.json`
-3. Commit and push
-4. Create GitHub Release (tag `v0.X.X`)
-5. GitHub Actions auto-publishes to marketplace
+1. Run `/prepare-release` command (creates release notes, updates version)
+2. Merge to `main`
+3. Create GitHub Release (tag `v0.X.X`)
+4. GitHub Actions auto-publishes to marketplace
 
 See [Release Guide](docs/RELEASE_GUIDE.md) for detailed steps and troubleshooting.
 

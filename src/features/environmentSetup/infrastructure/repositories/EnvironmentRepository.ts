@@ -151,7 +151,8 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 	}
 
 	/**
-	 * Deletes an environment and all associated secrets.
+	 * Deletes an environment and its secrets (unless shared with other environments).
+	 * Only deletes secrets that are not used by any remaining environment.
 	 * @param id Environment ID to delete
 	 */
 	public async delete(id: EnvironmentId): Promise<void> {
@@ -163,8 +164,19 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 
 			if (environment) {
 				const secretKeys = environment.getRequiredSecretKeys();
-				await this.deleteSecrets(secretKeys);
-				this.logger.info('Deleted secrets', { count: secretKeys.length });
+				const remainingDtos = dtos.filter(d => d.id !== id.getValue());
+				const keysStillInUse = this.getSecretKeysInUse(remainingDtos);
+				const keysToDelete = secretKeys.filter(key => !keysStillInUse.has(key));
+
+				if (keysToDelete.length > 0) {
+					await this.deleteSecrets(keysToDelete);
+					this.logger.info('Deleted secrets', { count: keysToDelete.length });
+				}
+
+				if (keysToDelete.length < secretKeys.length) {
+					const sharedCount = secretKeys.length - keysToDelete.length;
+					this.logger.debug('Preserved shared secrets', { count: sharedCount });
+				}
 			}
 
 			const filtered = dtos.filter(d => d.id !== id.getValue());
@@ -175,6 +187,28 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 			this.logger.error('EnvironmentRepository: Failed to delete environment', error);
 			throw error;
 		}
+	}
+
+	/**
+	 * Collects all secret keys that are in use by a set of environment DTOs.
+	 * Used to prevent deletion of shared credentials.
+	 */
+	private getSecretKeysInUse(dtos: EnvironmentConnectionDto[]): Set<string> {
+		const keysInUse = new Set<string>();
+
+		for (const dto of dtos) {
+			const authMethod = dto.settings.authenticationMethod;
+
+			if (authMethod === 'ServicePrincipal' && dto.settings.clientId) {
+				keysInUse.add(`${EnvironmentRepository.SECRET_PREFIX_CLIENT}${dto.settings.clientId}`);
+			}
+
+			if (authMethod === 'UsernamePassword' && dto.settings.username) {
+				keysInUse.add(`${EnvironmentRepository.SECRET_PREFIX_PASSWORD}${dto.settings.username}`);
+			}
+		}
+
+		return keysInUse;
 	}
 
 	/**

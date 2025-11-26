@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2025-11-25
+
+### Fixed
+
+- **Environment Setup:** Button alignment - toolbar buttons now centered and right-aligned to match form content width
+- **Environment Setup:** Interactive auth warning now displays as modal dialog instead of corner notification
+- **Environment Setup:** Discover/Test buttons now properly reset text when user cancels operation
+- **Environment Setup:** Added separate "Save" and "Save & Close" buttons - users can now save without closing panel
+- **Environment Setup:** Deleting an environment no longer deletes credentials shared with other environments (e.g., two environments using the same username/password)
+- **Persistence Inspector:** Panel content now scrolls properly when content exceeds viewport height
+
 ### Changed
 
 - **Dependencies:** Upgraded TypeScript from 4.9.5 to 5.9.3
