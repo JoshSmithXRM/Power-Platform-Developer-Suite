@@ -102,6 +102,7 @@ e2e/
 - Data tables populate correctly
 - Refresh functionality works
 - "Open in Maker" links are correct
+- **Data Explorer**: SQL query execution, results display, record links, no duplicate execution
 
 ## Log Capture
 

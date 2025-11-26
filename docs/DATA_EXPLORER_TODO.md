@@ -29,7 +29,7 @@ This document tracks work in progress and remaining items for the Data Explorer 
 ## Parking Lot (Future Sessions)
 
 ### Known Issues
-(None currently)
+- [ ] **E2E Playwright tests not finding webview iframe** - Tests timeout on `iframe.webview[src*="environmentSetup"]` selector. Screenshot shows panel IS rendering correctly (form visible, buttons working). Same infrastructure code worked on feature/e2e-playwright branch 5 minutes prior. Need to debug why iframe detection fails. Test file created: `e2e/tests/integration/data-explorer.spec.ts`
 
 ### Potential Enhancements
 - [ ] Consider adding table alias support for main entity in SQL (FetchXML limitation - main entity doesn't support alias)
