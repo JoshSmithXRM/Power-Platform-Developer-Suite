@@ -26,16 +26,24 @@ import { SqlParseError } from '../../domain/errors/SqlParseError';
 import type { QueryResult } from '../../domain/entities/QueryResult';
 import { QueryEditorSection } from '../sections/QueryEditorSection';
 import { DataverseRecordUrlService } from '../../../../shared/infrastructure/services/DataverseRecordUrlService';
+import { CsvExportService, type TabularData } from '../../../../shared/infrastructure/services/CsvExportService';
 
 /**
  * Commands supported by Data Explorer panel.
  */
 type DataExplorerCommands =
 	| 'executeQuery'
+	| 'exportCsv'
 	| 'environmentChange'
 	| 'updateSqlQuery'
 	| 'openRecord'
-	| 'copyRecordUrl';
+	| 'copyRecordUrl'
+	| 'warningModalResponse';
+
+/**
+ * Type-safe actions for the row limit warning modal.
+ */
+type WarningModalAction = 'addTop100' | 'continueAnyway' | 'cancel';
 
 /**
  * Data Explorer panel using PanelCoordinator architecture.
@@ -50,6 +58,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
 	private readonly errorMapper: SqlParseErrorViewModelMapper;
 	private readonly recordUrlService: DataverseRecordUrlService;
+	private readonly csvExportService: CsvExportService;
 	private currentEnvironmentId: string;
 	private currentSqlQuery: string = '';
 	private currentFetchXml: string = '';
@@ -59,6 +68,9 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private querySequence: number = 0;
 	/** AbortController for the current query execution. */
 	private currentAbortController: AbortController | null = null;
+	/** Resolver for pending warning modal response. */
+	private pendingModalResolver: ((action: WarningModalAction) => void) | null =
+		null;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -77,6 +89,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		this.currentEnvironmentId = environmentId;
 		this.errorMapper = new SqlParseErrorViewModelMapper();
 		this.recordUrlService = new DataverseRecordUrlService();
+		this.csvExportService = new CsvExportService(logger);
 		logger.debug('DataExplorerPanel: Initialized with new architecture');
 
 		// Configure webview
@@ -90,6 +103,14 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
 
 		this.registerCommandHandlers();
+
+		// Cleanup pending modal resolver on panel dispose to avoid memory leaks
+		panel.onDidDispose(() => {
+			if (this.pendingModalResolver) {
+				this.pendingModalResolver('cancel');
+				this.pendingModalResolver = null;
+			}
+		});
 
 		void this.initializeAndLoadData();
 	}
@@ -184,7 +205,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// since DataExplorerBehavior.js attaches its own handler that sends SQL data
 		const actionButtons = new ActionButtonsSection(
 			{
-				buttons: [{ id: 'executeQuery', label: 'Execute Query', customHandler: true }],
+				buttons: [
+					{ id: 'executeQuery', label: 'Execute Query', customHandler: true },
+					{ id: 'exportCsv', label: 'Export CSV' },
+				],
 			},
 			SectionPosition.Toolbar
 		);
@@ -319,6 +343,26 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				await this.handleCopyRecordUrl(entityType, recordId);
 			}
 		});
+
+		// Export results to CSV
+		this.coordinator.registerHandler('exportCsv', async () => {
+			await this.handleExportCsv();
+		});
+
+		// Handle warning modal response from webview
+		this.coordinator.registerHandler('warningModalResponse', async (data) => {
+			const rawAction = (data as { action?: string })?.action;
+			// Validate action is one of the expected values, default to cancel
+			const action: WarningModalAction =
+				rawAction === 'addTop100' || rawAction === 'continueAnyway'
+					? rawAction
+					: 'cancel';
+			this.logger.debug('Warning modal response received', { action });
+			if (this.pendingModalResolver) {
+				this.pendingModalResolver(action);
+				this.pendingModalResolver = null;
+			}
+		});
 	}
 
 	/**
@@ -363,23 +407,31 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Check for row limit and warn user about potentially large result sets
 		const transpileResult = this.executeSqlUseCase.transpileToFetchXml(trimmedSql);
 		if (transpileResult.success && !transpileResult.hasRowLimit) {
-			const choice = await vscode.window.showWarningMessage(
-				'This query has no row limit and may return up to 5000 records. Large result sets may take longer to load.',
-				{ modal: true },
-				'Add TOP 100',
-				'Continue Anyway'
-			);
+			// Show warning modal in webview (testable, accessible)
+			const choice = await this.showRowLimitWarningModal();
 
-			if (choice === 'Add TOP 100') {
+			if (choice === 'addTop100') {
 				// Modify SQL to add TOP 100
 				const modifiedSql = this.addTopClause(trimmedSql, 100);
+				// Update the SQL editor in the webview with the modified query
+				// Check panel is still alive before posting (could be disposed during modal)
+				try {
+					await this.panel.webview.postMessage({
+						command: 'updateSqlEditor',
+						data: { sql: modifiedSql },
+					});
+				} catch {
+					// Panel was disposed during modal interaction
+					return;
+				}
 				return this.handleExecuteQuery(modifiedSql);
 			}
 
-			if (choice !== 'Continue Anyway') {
+			if (choice === 'cancel') {
 				// User cancelled
 				return;
 			}
+			// choice === 'continueAnyway' - proceed with original query
 		}
 
 		// Abort any in-flight query
@@ -620,6 +672,89 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			this.logger.error('Failed to copy record URL', error);
 			await vscode.window.showErrorMessage('Failed to copy record URL');
 		}
+	}
+
+	/**
+	 * Exports current query results to CSV file.
+	 */
+	private async handleExportCsv(): Promise<void> {
+		if (!this.currentResult) {
+			await vscode.window.showWarningMessage('No query results to export. Please execute a query first.');
+			return;
+		}
+
+		const rowCount = this.currentResult.getRowCount();
+		if (rowCount === 0) {
+			await vscode.window.showWarningMessage('No data to export. Query returned 0 rows.');
+			return;
+		}
+
+		this.logger.info('Exporting query results to CSV', { rowCount });
+
+		try {
+			// Map QueryResult to TabularData
+			const viewModel = this.resultMapper.toViewModel(this.currentResult);
+			const tabularData: TabularData = {
+				headers: viewModel.columns.map((col) => col.header),
+				rows: viewModel.rows.map((row) =>
+					viewModel.columns.map((col) => row[col.name] ?? '')
+				),
+			};
+
+			// Generate CSV content
+			const csvContent = this.csvExportService.toCsv(tabularData);
+
+			// Generate suggested filename
+			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+			const entityName = viewModel.entityLogicalName ?? 'query';
+			const suggestedFilename = `${entityName}_export_${timestamp}.csv`;
+
+			// Save to file
+			const savedPath = await this.csvExportService.saveToFile(csvContent, suggestedFilename);
+
+			await vscode.window.showInformationMessage(
+				`Exported ${rowCount} rows to ${savedPath}`
+			);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+
+			// User cancellation is expected - don't show error
+			if (errorMessage.includes('cancelled by user')) {
+				this.logger.debug('CSV export cancelled by user');
+				return;
+			}
+
+			this.logger.error('Failed to export CSV', error);
+			await vscode.window.showErrorMessage(`Failed to export CSV: ${errorMessage}`);
+		}
+	}
+
+	/**
+	 * Shows an in-webview warning modal for queries without row limits.
+	 * Waits for user response: 'addTop100', 'continueAnyway', or 'cancel'.
+	 *
+	 * Modal is rendered in webview (not VS Code native) for E2E testability.
+	 *
+	 * @returns User's choice action
+	 */
+	private async showRowLimitWarningModal(): Promise<WarningModalAction> {
+		return new Promise((resolve) => {
+			// Store resolver to be called when webview responds
+			this.pendingModalResolver = resolve;
+
+			// Send modal configuration to webview
+			this.panel.webview.postMessage({
+				command: 'showWarningModal',
+				data: {
+					message:
+						'This query has no row limit and may return up to 5000 records. Large result sets may take longer to load.',
+					primaryLabel: 'Add TOP 100',
+					primaryAction: 'addTop100',
+					secondaryLabel: 'Continue Anyway',
+					secondaryAction: 'continueAnyway',
+				},
+			});
+		});
 	}
 
 	private setButtonLoading(buttonId: string, isLoading: boolean): void {
