@@ -30,6 +30,8 @@
         "dist",
         "Old/**/*",
         "templates/**/*",
-        "TEMP/**/*"
+        "TEMP/**/*",
+        "e2e/**/*",
+        "playwright.config.ts"
     ]
 }

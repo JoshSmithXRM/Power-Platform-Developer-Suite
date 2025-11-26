@@ -22,6 +22,37 @@ This document tracks features, improvements, and ideas that we want to implement
 
 ## High Priority (Next 6 Months)
 
+### Testing & Automation
+
+#### Playwright E2E Testing for Claude Automation
+**Status**: ✅ Implemented (Slice 1-4 complete)
+**Branch**: `feature/playwright-e2e`
+**Value**: Claude can run automated UI tests to find issues without manual F5 testing
+
+**What's Implemented**:
+- ✅ VS Code launch via Playwright Electron (`VSCodeLauncher.launch()`)
+- ✅ Command Palette automation (`CommandPaletteHelper`)
+- ✅ Webview iframe access (`WebviewHelper`)
+- ✅ Screenshot capture (`ScreenshotHelper`, `VSCodeLauncher.takeScreenshot()`)
+- ✅ Console log capture (`vscode.getLogs()` - renderer + webview debug)
+- ✅ Extension Output channel logs (`vscode.getExtensionLogs()` - your logger output)
+- ✅ Claude-optimized JSON reporter with suggestions (`ClaudeJsonReporter`)
+- ✅ Smoke tests: VS Code launch, command execution, extension activation verification
+
+**Commands**:
+- `npm run e2e:smoke` - Run smoke tests (~30s)
+- `npm run e2e:headed` - Visible VS Code window
+- `npm run e2e:debug` - Playwright Inspector
+
+**Design Doc**: `docs/designs/PLAYWRIGHT_E2E_DESIGN.md`
+
+**Future Enhancements** (not yet implemented):
+- Webview content interaction tests (click buttons, fill forms inside panels)
+- Panel-specific integration tests (Data Explorer query execution, etc.)
+- Visual regression testing (screenshot comparison)
+
+---
+
 ### Power Platform Development Tools
 
 #### Plugin Registration Tool

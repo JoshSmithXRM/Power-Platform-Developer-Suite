@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **E2E Testing Infrastructure:** Playwright-based E2E testing for VS Code extension
+  - `npm run e2e:smoke` - Automated smoke tests (~30s) for VS Code launch and command execution
+  - `npm run e2e:integration` - Integration tests (~60s) with real Dataverse connections
+  - `VSCodeLauncher` - Launch VS Code via Playwright Electron with extension loaded
+  - `CommandPaletteHelper` - Automate Command Palette interactions
+  - `WebviewHelper` - Access webview iframe content
+  - `ScreenshotHelper` - Capture and annotate screenshots
+  - `ClaudeJsonReporter` - AI-optimized JSON output with suggestions
+  - Console log capture (`vscode.getLogs()`) - Renderer and webview debug messages
+  - Extension Output channel capture (`vscode.getExtensionLogs()`) - Extension logger output
+  - Environment Setup integration tests - Form field validation, Service Principal auth
+  - Solutions Panel integration tests - Real API calls, 1000+ solutions loading verified
+  - Auto-loading credentials via `dotenv` from `.env.e2e.local`
+  - Design doc: `docs/designs/PLAYWRIGHT_E2E_DESIGN.md`
+
+### Changed
+
+- **Dependencies:** Added `dotenv` for automatic credential loading in E2E tests
+- **Dependencies:** Upgraded TypeScript from 4.9.5 to 5.9.3
+- **Dependencies:** Upgraded @azure/msal-node from 2.x to 3.8.3
+- **Dependencies:** Upgraded madge from 7.0.0 to 8.0.0
+- **Dependencies:** Upgraded @types/node from 16.x to 24.x
+- **Dependencies:** Upgraded @typescript-eslint packages to 8.48.0
+- **Dependencies:** Upgraded @vscode/vsce to 3.7.1
+- **CI:** Updated GitHub Actions (checkout v6, setup-node v6, codeql-action v4, github-script v8)
+
 ## [0.2.1] - 2025-11-25
 
 ### Fixed
@@ -17,16 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Environment Setup:** Added separate "Save" and "Save & Close" buttons - users can now save without closing panel
 - **Environment Setup:** Deleting an environment no longer deletes credentials shared with other environments (e.g., two environments using the same username/password)
 - **Persistence Inspector:** Panel content now scrolls properly when content exceeds viewport height
-
-### Changed
-
-- **Dependencies:** Upgraded TypeScript from 4.9.5 to 5.9.3
-- **Dependencies:** Upgraded @azure/msal-node from 2.x to 3.8.3
-- **Dependencies:** Upgraded madge from 7.0.0 to 8.0.0
-- **Dependencies:** Upgraded @types/node from 16.x to 24.x
-- **Dependencies:** Upgraded @typescript-eslint packages to 8.48.0
-- **Dependencies:** Upgraded @vscode/vsce to 3.7.1
-- **CI:** Updated GitHub Actions (checkout v6, setup-node v6, codeql-action v4, github-script v8)
 
 ## [0.2.0] - 2025-11-24
 
