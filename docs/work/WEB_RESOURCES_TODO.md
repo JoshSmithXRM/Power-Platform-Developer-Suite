@@ -2,7 +2,7 @@
 
 **Branch:** `feature/web-resources`
 **Created:** 2025-11-26
-**Status:** Implementation (Slice 2 - Virtual Table & Pagination)
+**Status:** Blocked (waiting on `feature/virtual-table`)
 
 ---
 
@@ -16,21 +16,33 @@
 - Found: Plugin Trace limit hardcoded to 100 in `TraceFilter.ts:178`
 - Found: No VS Code configuration infrastructure exists
 - Will reuse: Existing panel patterns, scaffolding behavior, FileSystemProvider pattern
-- Need to create: Virtual data table component, configuration system, server-side pagination
+- Need to create: ~~Virtual data table component~~ (moved to `feature/virtual-table`)
 
 **Key Constraint:** User environment has **70,000 web resources** - current fetch-all approach is unusable
 
 ---
 
+## Dependencies
+
+```
+feature/configuration-settings (in progress - parallel branch)
+    ↓
+feature/virtual-table (in progress - parallel branch)
+    ↓
+feature/web-resources (this branch - adopts virtual table for Slice 2)
+```
+
+---
+
 ## Slice Status
 
-| Slice | Description | Status |
-|-------|-------------|--------|
-| 1 | Browse & View (read-only) | ✅ Complete |
-| 2 | Virtual Table & Pagination | 🔄 In Progress |
-| 3 | Edit & Save | ⏳ Planned |
-| 4 | Publish | ⏳ Planned |
-| 5 | Enhanced UX | ⏳ Planned |
+| Slice | Description | Status | Notes |
+|-------|-------------|--------|-------|
+| 1 | Browse & View (read-only) | ✅ Complete | Works but unusable at 70k scale |
+| 2 | Adopt Virtual Table | ⏳ Blocked | Waiting on `feature/virtual-table` |
+| 3 | Edit & Save | ⏳ Planned | Design after Slice 2 |
+| 4 | Publish | ⏳ Planned | |
+| 5 | Enhanced UX | ⏳ Planned | |
 
 ---
 
@@ -48,77 +60,74 @@
 
 ---
 
-## Slice 2: Virtual Table & Pagination 🔄 IN PROGRESS
+## Slice 2: Adopt Virtual Table ⏳ BLOCKED
 
-### Requirements
+**Blocked by:** `feature/virtual-table` branch
 
-- [ ] Support 70k+ web resources without browser/memory issues
-- [ ] Fast initial load (< 2 seconds for first page)
-- [ ] Instant client-side search within cached records
-- [ ] Configurable page sizes and cache limits
-- [ ] Apply to Web Resources panel first, then migrate others
-
-### Architecture Decisions (PENDING USER INPUT)
-
-| Decision | Options | Recommendation | User Choice |
-|----------|---------|----------------|-------------|
-| Branch strategy | A) New `feature/configuration-settings` first, B) Build in current branch | A - Config is foundational | **TBD** |
-| Initial page size | 50, 100, 250 | 100 | **TBD** |
-| Max cache size | 1000, 5000, 10000 | 5000 | **TBD** |
-| Beyond-cache search | Prompt user, Auto-search server, Show "not found" | Auto-search server | **TBD** |
-| Other panels scope | Web Resources only vs include Solutions/Import Jobs | Include (user says they're slow) | **TBD** |
-
-### Implementation Checklist
-
-#### Configuration System (if Option A - separate branch first)
-- [ ] Create `feature/configuration-settings` branch
-- [ ] Add VS Code configuration contribution to `package.json`
-- [ ] Create `IConfigurationService` in shared domain
-- [ ] Implement `VSCodeConfigurationService` in infrastructure
-- [ ] Settings: `defaultPageSize`, `maxCachedRecords`, `pluginTraceLimit`
-- [ ] Unit tests
-- [ ] Merge to main, pull into web-resources branch
-
-#### Domain Layer
-- [ ] `PaginatedResult<T>` value object (items, totalCount, hasMore, cursor)
-- [ ] `TableConfiguration` value object (pageSize, maxCache, etc.)
-- [ ] Update repository interfaces for pagination support
-- [ ] Domain tests
-- [ ] `npm run compile` passes
+Once virtual table merges to main:
+- [ ] Pull virtual table into this branch
+- [ ] Update `WebResourcesPanelComposed` to use `VirtualDataTableSection`
+- [ ] Update `ListWebResourcesUseCase` for paginated repository
+- [ ] Test with 70k environment
 - [ ] Committed
 
-#### Application Layer
-- [ ] Update `ListWebResourcesUseCase` for paginated fetching
-- [ ] Add `SearchWebResourcesUseCase` for server-side search (beyond cache)
-- [ ] ViewModel updates for pagination state
-- [ ] Mapper updates
-- [ ] Application tests (90% target)
-- [ ] `npm run compile` passes
+---
+
+## Slice 3: Edit & Save ⏳ PLANNED
+
+**Prerequisites:** Slice 2 complete (users need to find files before editing)
+
+- [ ] Design document created
+- [ ] Update `WebResourceFileSystemProvider.writeFile()` (currently throws read-only)
+- [ ] Create `UpdateWebResourceUseCase`
+- [ ] Add save-to-Dynamics functionality
+- [ ] Dirty indicator in editor
+- [ ] Error handling for save failures
+- [ ] Tests
 - [ ] Committed
 
-#### Infrastructure Layer
-- [ ] Update `DataverseWebResourceRepository` with `$top`, `$skip` support
-- [ ] Add server-side `$filter` for search
-- [ ] Background caching service
-- [ ] `npm run compile` passes
+---
+
+## Slice 4: Publish ⏳ PLANNED
+
+- [ ] Create `PublishWebResourceUseCase`
+- [ ] Call Dataverse `PublishXml` action
+- [ ] UI for publish button/command
+- [ ] Batch publish support
+- [ ] Tests
 - [ ] Committed
 
-#### Presentation Layer
-- [ ] `VirtualDataTableSection` component (renders only visible rows)
-- [ ] Virtual scrolling behavior (swap DOM elements on scroll)
-- [ ] "Loading more..." indicator
-- [ ] "X of Y loaded" status
-- [ ] Search behavior (cache first, server fallback)
-- [ ] `npm run compile` passes
+---
+
+## Slice 5: Enhanced UX ⏳ PLANNED
+
+- [ ] Conflict detection (modified by another user)
+- [ ] Auto-refresh on external changes
+- [ ] Diff view (local vs server)
+- [ ] Keyboard shortcuts
+- [ ] Tests
 - [ ] Committed
+
+---
+
+## Current Work (While Blocked)
+
+### Immediate Tasks
+- [x] Clean up design doc (extract patterns, trim future ideas)
+- [ ] Move future slice ideas to `docs/future/DEVELOPMENT_TOOLS.md`
+
+### Design Doc Cleanup
+The existing `WEB_RESOURCES_PANEL_DESIGN.md` (1934 lines) needs:
+- [ ] Extract reusable patterns to `docs/architecture/`
+- [ ] Trim to current/next slice only
+- [ ] Move Slices 3-5 details to future enhancements
 
 ---
 
 ## Testing
 
 - [ ] Unit tests pass: `npm test`
-- [ ] Integration tests for virtual table
-- [ ] Performance tests: 1k, 5k, 10k records render times
+- [ ] Integration tests for panel
 - [ ] E2E tests: `npm run e2e:smoke`
 - [ ] Manual testing (F5) with 70k environment
 
@@ -156,11 +165,8 @@
 - User confirmed: Solutions and Import Jobs are also slow
 - User preference: Client-side filtering of cached data (not server round-trips)
 - Merged latest from main (documentation audit release)
-- Created this tracking document
-- **BLOCKED:** Awaiting user decisions on architecture questions
-
-### Next Session
-- Get user decisions on architecture questions
-- If Option A: Create configuration branch first
-- If Option B: Proceed with implementation in current branch
-- Design virtual table component (may need `/design` for this)
+- Created tracking document
+- **Decision:** Split pagination/virtual table to separate branch (`feature/virtual-table`)
+- **Decision:** Split configuration to separate branch (`feature/configuration-settings`)
+- Updated this tracking doc to reflect new dependency chain
+- **Current status:** Blocked on dependencies, working on design doc cleanup
