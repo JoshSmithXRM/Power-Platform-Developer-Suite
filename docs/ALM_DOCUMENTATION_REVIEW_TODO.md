@@ -1,7 +1,7 @@
 # ALM & Documentation Review TODO
 
 **Branch:** `docs/alm-documentation-review`
-**Created:** 2025-01-26
+**Created:** 2025-11-26
 **Status:** Planning
 
 ---
@@ -127,13 +127,12 @@ Before accepting ANY change, it must pass these gates:
 
 ## Approval Status
 
-- [x] **Work order approved by user** (2025-01-26)
-- [x] **Review framework approved by user** (2025-01-26)
-- [x] Phase 1: Inventory started (2025-01-26)
-- [x] Phase 1: Inventory complete (2025-01-26)
-- [ ] Phase 2: Gap Analysis complete
-- [ ] Phase 3: Proposals documented
-- [ ] Phase 4: Proposals evaluated
+- [x] **Work order approved by user** (2025-11-26)
+- [x] **Review framework approved by user** (2025-11-26)
+- [x] Phase 1: Inventory complete (2025-11-26)
+- [x] Phase 2: Gap Analysis complete (2025-11-26)
+- [x] Phase 3: Proposals documented (2025-11-26)
+- [x] Phase 4: Proposals evaluated & approved (2025-11-26)
 - [ ] Phase 5: Implementation complete
 
 ---
@@ -485,19 +484,92 @@ The core problem - "Claude overlooks existing patterns" - traces to:
 
 ## Decision Log
 
-*Document approval/rejection decisions with rationale*
-
 | Date | Proposal | Decision | Rationale |
 |------|----------|----------|-----------|
-| | | | |
+| 2025-11-26 | Proposal 1: Explore Before Create | ✅ APPROVED | Core pain point, concrete evidence |
+| 2025-11-26 | Proposal 2: Persist Work Incrementally | ✅ APPROVED | Demonstrated in this session |
+| 2025-11-26 | Proposal 3: Context-Aware Commits | ✅ APPROVED | Reduces friction |
+| 2025-11-26 | Proposal 4: Consolidate design/ folders | ✅ APPROVED | Simple cleanup |
+| 2025-11-26 | Comprehensive 9-Phase Workflow | ✅ APPROVED | Replaces individual proposals with unified approach |
+
+---
+
+## Final Approved Changes
+
+### 1. Comprehensive 9-Phase Development Workflow
+
+Rewrite `.claude/WORKFLOW.md` with complete flow:
+
+1. **Discovery** - Explore existing patterns before implementation
+2. **Requirements** - Define success criteria (checklist or separate doc)
+3. **Design** - Architecture decisions (if 3+ files)
+4. **Task Tracking** - Create `docs/work/[FEATURE]_TODO.md`
+5. **Implementation** - Inside-out, commit per layer
+6. **Testing** - Unit tests always, E2E for UI/workflow bugs
+7. **Code Review** - `/code-review` before PR (mandatory)
+8. **Final Commit & PR** - Via `gh` CLI
+9. **Cleanup** - Delete tracking doc, extract patterns from design doc
+
+### 2. Documentation Organization
+
+| Location | Purpose |
+|----------|---------|
+| `.claude/` | Claude-specific guidance (workflows, agents, commands, templates) |
+| `docs/` | Project documentation (architecture, testing, guides) |
+| `docs/work/` | Active work tracking (transient, deleted after merge) |
+| Root | High-level project files (CLAUDE.md, README, CHANGELOG) |
+
+### 3. Hotfix Fast Path
+
+Streamlined 5-step process for urgent bugs:
+1. Discovery (what's broken?)
+2. Create test to prove bug
+3. Fix bug
+4. Quick review
+5. Commit + PR
+
+### 4. E2E Test Guidance
+
+Add to workflow/CLAUDE.md:
+- Unit tests: Always for bugs
+- E2E tests: Only for UI/workflow/timing bugs (not every bug)
+
+### 5. Bug Tracking During Manual Testing
+
+Bugs found during F5 testing tracked in TODO doc, fixed before commit.
+
+### 6. Folder Consolidation
+
+Move `docs/designs/PLAYWRIGHT_E2E_DESIGN.md` → `docs/design/`, delete `designs/` folder.
+
+### 7. Parallel Work Documentation
+
+Document git worktrees + symlinks pattern for parallel feature work.
+
+---
+
+## Implementation Checklist
+
+- [ ] Create `docs/work/` directory
+- [ ] Rewrite `.claude/WORKFLOW.md` with 9-phase workflow
+- [ ] Create `.claude/templates/TASK_TRACKING_TEMPLATE.md`
+- [ ] Update `CLAUDE.md` with E2E test guidance
+- [ ] Update `CLAUDE.md` with context-aware commit rules
+- [ ] Move `docs/designs/PLAYWRIGHT_E2E_DESIGN.md` to `docs/design/`
+- [ ] Delete `docs/designs/` folder
+- [ ] Update references to moved file
+- [ ] Create `docs/BRANCH_STRATEGY.md` (next task after this)
 
 ---
 
 ## Notes
 
-### Session Observations (2025-01-26)
+### Session Observations (2025-11-26)
 
-1. **Gap analysis done but not documented** - Illustrates Proposal 2 (persist work)
-2. **Asked about committing** - Illustrates Proposal 3 (context-aware commits)
-3. **Web resource editing revert** - Illustrates Proposal 1 (explore before create)
+1. **Gap analysis done but not documented** - Illustrates need for persistence rule
+2. **Asked about committing** - Illustrates need for context-aware commits
+3. **Web resource editing revert** - Illustrates need for discovery step
 4. **Workflow mostly solid** - Iteration recommended over rewrite
+5. **Unclear .claude/ vs docs/ purpose** - Now documented
+6. **Need hotfix fast path** - Added for urgent bugs
+7. **E2E tests not for every bug** - Only UI/workflow/timing bugs
