@@ -2,7 +2,7 @@
 
 **Branch:** `docs/alm-documentation-review`
 **Created:** 2025-11-26
-**Status:** Planning
+**Status:** Complete - Ready for PR
 
 ---
 
@@ -133,7 +133,7 @@ Before accepting ANY change, it must pass these gates:
 - [x] Phase 2: Gap Analysis complete (2025-11-26)
 - [x] Phase 3: Proposals documented (2025-11-26)
 - [x] Phase 4: Proposals evaluated & approved (2025-11-26)
-- [ ] Phase 5: Implementation complete
+- [x] Phase 5: Implementation complete (2025-11-26)
 
 ---
 
@@ -550,6 +550,7 @@ Document git worktrees + symlinks pattern for parallel feature work.
 
 ## Implementation Checklist
 
+### Phase 5a: Documentation & Workflow
 - [x] Create `docs/work/` directory
 - [x] Rewrite `.claude/WORKFLOW.md` with 9-phase workflow
 - [x] Create `.claude/templates/TASK_TRACKING_TEMPLATE.md`
@@ -558,7 +559,16 @@ Document git worktrees + symlinks pattern for parallel feature work.
 - [x] Move `docs/designs/PLAYWRIGHT_E2E_DESIGN.md` to `docs/design/`
 - [x] Delete `docs/designs/` folder
 - [x] Update references to moved file (CHANGELOG.md, FUTURE_ENHANCEMENTS.md, CLAUDE.md)
-- [ ] Create `docs/BRANCH_STRATEGY.md` (next task after this)
+
+### Phase 5b: Branch Strategy & GitHub Configuration
+- [x] Create `docs/BRANCH_STRATEGY.md`
+- [x] Configure GitHub repo merge settings (enable merge commits, auto-delete branches)
+- [x] Update main branch protection ruleset:
+  - [x] Remove `required_linear_history` (allows merge commits)
+  - [x] Add `merge` to allowed merge methods (alongside squash)
+  - [x] Add `validate` status check requirement
+- [x] Add gh CLI permissions to `.claude/settings.local.example.json`
+- [x] Add E2E smoke tests to `.github/workflows/pr-validation.yml`
 
 ---
 
