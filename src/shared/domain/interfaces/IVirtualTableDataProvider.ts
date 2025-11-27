@@ -1,6 +1,7 @@
+import type { PaginatedResult } from '../valueObjects/PaginatedResult';
+
 import type { ICancellationToken } from './ICancellationToken';
 import type { QueryOptions } from './QueryOptions';
-import type { PaginatedResult } from '../valueObjects/PaginatedResult';
 
 /**
  * Domain interface for paginated data access.
