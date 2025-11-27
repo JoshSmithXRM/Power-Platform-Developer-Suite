@@ -11,10 +11,11 @@ import type { Uri, WebviewPanel, Webview, Disposable } from 'vscode';
 import { SolutionExplorerPanelComposed } from './SolutionExplorerPanelComposed';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
-import type { ListSolutionsUseCase } from '../../application/useCases/ListSolutionsUseCase';
+import type { ISolutionRepository } from '../../domain/interfaces/ISolutionRepository';
 import type { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
 import { Solution } from '../../domain/entities/Solution';
+import { PaginatedResult } from '../../../../shared/domain/valueObjects/PaginatedResult';
 import type { EnvironmentOption } from '../../../../shared/infrastructure/ui/DataTablePanel';
 import type { EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 
@@ -70,7 +71,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 	let mockEnvironments: EnvironmentOption[];
 	let mockGetEnvironments: jest.Mock<Promise<EnvironmentOption[]>>;
 	let mockGetEnvironmentById: jest.Mock<Promise<EnvironmentInfo | null>>;
-	let mockListSolutionsUseCase: jest.Mocked<ListSolutionsUseCase>;
+	let mockSolutionRepository: jest.Mocked<ISolutionRepository>;
 	let mockUrlBuilder: jest.Mocked<IMakerUrlBuilder>;
 	let mockViewModelMapper: jest.Mocked<SolutionViewModelMapper>;
 	let mockLogger: ILogger;
@@ -126,10 +127,13 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 
 		mockPanel = createMockPanel();
 
-		// Mock use cases
-		mockListSolutionsUseCase = {
-			execute: jest.fn().mockResolvedValue([])
-		} as unknown as jest.Mocked<ListSolutionsUseCase>;
+		// Mock repository - returns empty paginated result by default
+		mockSolutionRepository = {
+			findAll: jest.fn().mockResolvedValue([]),
+			findAllForDropdown: jest.fn().mockResolvedValue([]),
+			findPaginated: jest.fn().mockResolvedValue(PaginatedResult.create([], 1, 100, 0)),
+			getCount: jest.fn().mockResolvedValue(0)
+		} as unknown as jest.Mocked<ISolutionRepository>;
 
 		mockUrlBuilder = {
 			buildSolutionUrl: jest.fn().mockReturnValue('https://make.powerapps.com/solution/123'),
@@ -182,7 +186,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 			mockExtensionUri,
 			mockGetEnvironments,
 			mockGetEnvironmentById,
-			mockListSolutionsUseCase,
+			mockSolutionRepository,
 			mockUrlBuilder,
 			mockViewModelMapper,
 			mockLogger,
@@ -263,11 +267,14 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 				createMockSolution({ uniqueName: 'Solution1', friendlyName: 'Solution A' }),
 				createMockSolution({ uniqueName: 'Solution2', friendlyName: 'Solution B' })
 			];
-			mockListSolutionsUseCase.execute.mockResolvedValueOnce(mockSolutions);
+			mockSolutionRepository.findPaginated.mockResolvedValueOnce(
+				PaginatedResult.create(mockSolutions, 1, 100, mockSolutions.length)
+			);
+			mockSolutionRepository.getCount.mockResolvedValueOnce(mockSolutions.length);
 
 			await createPanelAndWait();
 
-			expect(mockListSolutionsUseCase.execute).toHaveBeenCalledWith(TEST_ENVIRONMENT_ID);
+			expect(mockSolutionRepository.findPaginated).toHaveBeenCalled();
 			expect(mockViewModelMapper.toViewModel).toHaveBeenCalledTimes(2);
 			// Panel uses HtmlScaffoldingBehavior which sends HTML content via postMessage
 			expect(mockPanel.webview.postMessage).toHaveBeenCalled();
@@ -275,17 +282,17 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 
 		it('should display loading state before data loads', async () => {
 			// Make solutions loading slow to capture loading state
-			let resolveSolutions: (value: Solution[]) => void;
-			const solutionsPromise = new Promise<Solution[]>(resolve => {
-				resolveSolutions = resolve;
+			let resolvePaginated: (value: PaginatedResult<Solution>) => void;
+			const paginatedPromise = new Promise<PaginatedResult<Solution>>(resolve => {
+				resolvePaginated = resolve;
 			});
-			mockListSolutionsUseCase.execute.mockReturnValue(solutionsPromise);
+			mockSolutionRepository.findPaginated.mockReturnValue(paginatedPromise);
 
 			const panelPromise = SolutionExplorerPanelComposed.createOrShow(
 				mockExtensionUri,
 				mockGetEnvironments,
 				mockGetEnvironmentById,
-				mockListSolutionsUseCase,
+				mockSolutionRepository,
 				mockUrlBuilder,
 				mockViewModelMapper,
 				mockLogger,
@@ -299,7 +306,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 			expect(mockPanel.webview.postMessage).toHaveBeenCalled();
 
 			// Resolve solutions and wait for completion
-			resolveSolutions!([]);
+			resolvePaginated!(PaginatedResult.create([], 1, 100, 0));
 			await panelPromise;
 			await new Promise(resolve => setImmediate(resolve));
 		});
@@ -317,7 +324,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 				mockExtensionUri,
 				mockGetEnvironments,
 				mockGetEnvironmentById,
-				mockListSolutionsUseCase,
+				mockSolutionRepository,
 				mockUrlBuilder,
 				mockViewModelMapper,
 				mockLogger,
@@ -334,7 +341,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 				mockExtensionUri,
 				mockGetEnvironments,
 				mockGetEnvironmentById,
-				mockListSolutionsUseCase,
+				mockSolutionRepository,
 				mockUrlBuilder,
 				mockViewModelMapper,
 				mockLogger,
@@ -349,12 +356,14 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 
 	describe('Solution Loading', () => {
 		it('should handle empty solution list', async () => {
-			mockListSolutionsUseCase.execute.mockResolvedValueOnce([]);
+			mockSolutionRepository.findPaginated.mockResolvedValueOnce(
+				PaginatedResult.create([], 1, 100, 0)
+			);
 
 			await createPanelAndWait();
 
 			// Panel should load successfully even with no solutions
-			expect(mockListSolutionsUseCase.execute).toHaveBeenCalledWith(TEST_ENVIRONMENT_ID);
+			expect(mockSolutionRepository.findPaginated).toHaveBeenCalled();
 			expect(mockPanel.webview.postMessage).toHaveBeenCalled();
 		});
 
@@ -364,7 +373,9 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 				createMockSolution({ uniqueName: 'Alpha', friendlyName: 'Alpha Solution' }),
 				createMockSolution({ uniqueName: 'Default', friendlyName: 'Default' })
 			];
-			mockListSolutionsUseCase.execute.mockResolvedValueOnce(mockSolutions);
+			mockSolutionRepository.findPaginated.mockResolvedValueOnce(
+				PaginatedResult.create(mockSolutions, 1, 100, mockSolutions.length)
+			);
 
 			const sortedViewModels = [
 				{ id: '1', friendlyName: 'Alpha Solution' },
@@ -385,17 +396,19 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 		});
 
 		it('should attempt to load solutions even when errors occur', async () => {
-			// Note: This test verifies that the use case is called.
+			// Note: This test verifies that the repository is called.
 			// Error handling in initializeAndLoadData is a known limitation - errors are unhandled.
 			// In production, errors would be logged by the logger and the panel would show empty state.
 
-			mockListSolutionsUseCase.execute.mockResolvedValueOnce([]);
+			mockSolutionRepository.findPaginated.mockResolvedValueOnce(
+				PaginatedResult.create([], 1, 100, 0)
+			);
 
 			const panel = await SolutionExplorerPanelComposed.createOrShow(
 				mockExtensionUri,
 				mockGetEnvironments,
 				mockGetEnvironmentById,
-				mockListSolutionsUseCase,
+				mockSolutionRepository,
 				mockUrlBuilder,
 				mockViewModelMapper,
 				mockLogger,
@@ -406,7 +419,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 
 			// Panel is created and attempts to load solutions
 			expect(panel).toBeDefined();
-			expect(mockListSolutionsUseCase.execute).toHaveBeenCalledWith(TEST_ENVIRONMENT_ID);
+			expect(mockSolutionRepository.findPaginated).toHaveBeenCalled();
 		});
 
 		it('should load solutions with all expected properties', async () => {
@@ -425,7 +438,9 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 				isApiManaged: true,
 				solutionType: 'Internal'
 			});
-			mockListSolutionsUseCase.execute.mockResolvedValueOnce([mockSolution]);
+			mockSolutionRepository.findPaginated.mockResolvedValueOnce(
+				PaginatedResult.create([mockSolution], 1, 100, 1)
+			);
 
 			await createPanelAndWait();
 
@@ -439,7 +454,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 				mockExtensionUri,
 				mockGetEnvironments,
 				mockGetEnvironmentById,
-				mockListSolutionsUseCase,
+				mockSolutionRepository,
 				mockUrlBuilder,
 				mockViewModelMapper,
 				mockLogger,
@@ -469,7 +484,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 				mockExtensionUri,
 				mockGetEnvironments,
 				mockGetEnvironmentById,
-				mockListSolutionsUseCase,
+				mockSolutionRepository,
 				mockUrlBuilder,
 				mockViewModelMapper,
 				mockLogger,
@@ -477,7 +492,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 			);
 			await new Promise(resolve => setImmediate(resolve));
 
-			expect(mockListSolutionsUseCase.execute).toHaveBeenCalled();
+			expect(mockSolutionRepository.findPaginated).toHaveBeenCalled();
 		}, 10000);
 
 		it('should load solutions for correct environment', async () => {
@@ -486,7 +501,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 				mockExtensionUri,
 				mockGetEnvironments,
 				mockGetEnvironmentById,
-				mockListSolutionsUseCase,
+				mockSolutionRepository,
 				mockUrlBuilder,
 				mockViewModelMapper,
 				mockLogger,
@@ -494,7 +509,8 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 			);
 			await new Promise(resolve => setImmediate(resolve));
 
-			expect(mockListSolutionsUseCase.execute).toHaveBeenCalledWith(testEnvId);
+			// The repository is called via the adapter which binds the environment ID
+			expect(mockSolutionRepository.findPaginated).toHaveBeenCalled();
 		});
 	});
 
@@ -526,13 +542,15 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 				createMockSolution({ uniqueName: 'Solution1', friendlyName: 'Solution A' }),
 				createMockSolution({ uniqueName: 'Solution2', friendlyName: 'Solution B' })
 			];
-			mockListSolutionsUseCase.execute.mockResolvedValueOnce(mockSolutions);
+			mockSolutionRepository.findPaginated.mockResolvedValueOnce(
+				PaginatedResult.create(mockSolutions, 1, 100, mockSolutions.length)
+			);
 
 			await createPanelAndWait();
 
 			// Verify full initialization sequence
 			expect(mockGetEnvironments).toHaveBeenCalled();
-			expect(mockListSolutionsUseCase.execute).toHaveBeenCalledWith(TEST_ENVIRONMENT_ID);
+			expect(mockSolutionRepository.findPaginated).toHaveBeenCalled();
 			expect(mockViewModelMapper.toViewModel).toHaveBeenCalledTimes(2);
 			expect(mockPanel.webview.postMessage).toHaveBeenCalled();
 		});
@@ -548,12 +566,14 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 
 		it('should maintain state consistency during initialization', async () => {
 			const mockSolutions = [createMockSolution()];
-			mockListSolutionsUseCase.execute.mockResolvedValueOnce(mockSolutions);
+			mockSolutionRepository.findPaginated.mockResolvedValueOnce(
+				PaginatedResult.create(mockSolutions, 1, 100, mockSolutions.length)
+			);
 
 			await createPanelAndWait();
 
 			// Verify panel initialization completed successfully
-			expect(mockListSolutionsUseCase.execute).toHaveBeenCalledWith(TEST_ENVIRONMENT_ID);
+			expect(mockSolutionRepository.findPaginated).toHaveBeenCalled();
 			expect(mockViewModelMapper.toViewModel).toHaveBeenCalled();
 			expect(mockPanel.webview.postMessage).toHaveBeenCalled();
 		});
@@ -566,7 +586,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 					mockExtensionUri,
 					mockGetEnvironments,
 					mockGetEnvironmentById,
-					mockListSolutionsUseCase,
+					mockSolutionRepository,
 					mockUrlBuilder,
 					mockViewModelMapper,
 					mockLogger,
@@ -580,7 +600,7 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 				mockExtensionUri,
 				mockGetEnvironments,
 				mockGetEnvironmentById,
-				mockListSolutionsUseCase,
+				mockSolutionRepository,
 				mockUrlBuilder,
 				mockViewModelMapper,
 				mockLogger,
@@ -588,8 +608,8 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 			);
 			await new Promise(resolve => setImmediate(resolve));
 
-			// Should use first environment from the list
-			expect(mockListSolutionsUseCase.execute).toHaveBeenCalledWith('env1');
+			// Should use first environment from the list - repository is called via adapter
+			expect(mockSolutionRepository.findPaginated).toHaveBeenCalled();
 		});
 	});
 

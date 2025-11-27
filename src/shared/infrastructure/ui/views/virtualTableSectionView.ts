@@ -100,28 +100,35 @@ function renderVirtualTable(
 	const visibleRows = Math.min(data.length, 20); // Show roughly 20 rows max initially
 	const containerHeight = visibleRows * estimatedRowHeight;
 
+	// Scroll wrapper handles both horizontal and vertical scrolling
+	// Table uses natural layout - no display:block hacks
+	// Sticky thead stays visible during scroll
 	return `
 		<div class="table-container virtual-table-container">
-			<table class="virtual-table">
-				<thead>
-					<tr>
-						${config.columns.map(col => renderTableHeader(col, sortColumn, sortDirection)).join('')}
-					</tr>
-				</thead>
-				<tbody
-					id="virtualTableBody"
-					class="virtual-scroll-container"
-					data-rows="${escapeHtml(rowDataJson)}"
-					data-columns="${escapeHtml(JSON.stringify(config.columns))}"
-					data-row-height="${estimatedRowHeight}"
-					style="height: ${containerHeight}px; display: block; overflow-y: auto;"
-				>
-					${data.length === 0
-						? renderNoDataRow(config.columns.length, config.noDataMessage, searchQuery)
-						: renderInitialRows(data, config.columns, estimatedRowHeight)
-					}
-				</tbody>
-			</table>
+			<div
+				id="virtualScrollWrapper"
+				class="virtual-scroll-wrapper"
+				style="height: ${containerHeight}px; overflow: auto;"
+			>
+				<table class="virtual-table">
+					<thead>
+						<tr>
+							${config.columns.map(col => renderTableHeader(col, sortColumn, sortDirection)).join('')}
+						</tr>
+					</thead>
+					<tbody
+						id="virtualTableBody"
+						data-rows="${escapeHtml(rowDataJson)}"
+						data-columns="${escapeHtml(JSON.stringify(config.columns))}"
+						data-row-height="${estimatedRowHeight}"
+					>
+						${data.length === 0
+							? renderNoDataRow(config.columns.length, config.noDataMessage, searchQuery)
+							: renderInitialRows(data, config.columns, estimatedRowHeight)
+						}
+					</tbody>
+				</table>
+			</div>
 		</div>
 	`;
 }
@@ -177,7 +184,7 @@ function renderTableRow(
 		return `<td class="${cellClass}">${cellHtml}</td>`;
 	}).join('');
 
-	return `<tr data-index="${index}" style="height: ${rowHeight}px; display: table-row;">${cells}</tr>`;
+	return `<tr data-index="${index}" style="height: ${rowHeight}px;">${cells}</tr>`;
 }
 
 /**
@@ -195,9 +202,12 @@ function renderNoDataRow(columnCount: number, noDataMessage: string, searchQuery
 }
 
 /**
- * Renders table footer with pagination status.
+ * Renders table footer with record count.
  *
- * Shows cache progress for virtual tables (e.g., "100 of 5000 cached").
+ * Matches regular DataTableSection format for consistency:
+ * - No filter: "1,246 records"
+ * - Filter applied: "28 of 1,246 records"
+ * - Loading: shows spinner indicator
  */
 function renderVirtualFooter(
 	visibleCount: number,
@@ -205,37 +215,34 @@ function renderVirtualFooter(
 	isLoading?: boolean
 ): string {
 	if (!pagination) {
-		// Fallback to simple count
+		// Fallback to simple count (matches regular DataTable)
 		const recordText = visibleCount === 1 ? 'record' : 'records';
-		return `<div class="table-footer">${visibleCount} ${recordText}</div>`;
+		return `<div class="table-footer">${visibleCount.toLocaleString()} ${recordText}</div>`;
 	}
 
 	const { cachedCount, totalCount, isLoading: isBackgroundLoading, isFullyCached } = pagination;
 
-	// Build status message
-	let statusMessage: string;
-	if (isLoading) {
-		statusMessage = 'Loading...';
-	} else if (isFullyCached) {
-		statusMessage = `${totalCount.toLocaleString()} records`;
-	} else if (isBackgroundLoading) {
-		const percentage = totalCount > 0 ? Math.round((cachedCount / totalCount) * 100) : 0;
-		statusMessage = `${cachedCount.toLocaleString()} of ${totalCount.toLocaleString()} cached (${percentage}%)`;
-	} else {
-		statusMessage = `${cachedCount.toLocaleString()} of ${totalCount.toLocaleString()} cached`;
-	}
-
-	// Add loading indicator if background loading
+	// Loading indicator (only when background loading)
 	const loadingIndicator = isBackgroundLoading
-		? '<span class="background-loading-indicator" title="Loading more records...">⟳</span>'
+		? ' <span class="background-loading-indicator" title="Loading more records...">⟳</span>'
 		: '';
 
-	return `
-		<div class="table-footer virtual-table-footer">
-			<span class="record-count">${visibleCount.toLocaleString()} visible</span>
-			<span class="cache-status">${statusMessage} ${loadingIndicator}</span>
-		</div>
-	`;
+	// Initial loading state
+	if (isLoading) {
+		return `<div class="table-footer">Loading...${loadingIndicator}</div>`;
+	}
+
+	// Use cached count as "available" records when not fully cached
+	const availableCount = isFullyCached ? totalCount : cachedCount;
+	const recordText = availableCount === 1 ? 'record' : 'records';
+
+	// Filter applied (visible < available) - show "X of Y records" format
+	if (visibleCount < availableCount) {
+		return `<div class="table-footer">${visibleCount.toLocaleString()} of ${availableCount.toLocaleString()} ${recordText}${loadingIndicator}</div>`;
+	}
+
+	// No filter - show simple "X records" format (matches regular DataTable)
+	return `<div class="table-footer">${availableCount.toLocaleString()} ${recordText}${loadingIndicator}</div>`;
 }
 
 /**

@@ -34,6 +34,7 @@
 	 */
 	function initialize() {
 		const tbody = document.getElementById('virtualTableBody');
+		const scrollWrapper = document.getElementById('virtualScrollWrapper');
 		if (!tbody) {
 			return; // Not a virtual table
 		}
@@ -64,8 +65,9 @@
 			rowHeight = parseInt(heightAttr, 10) || DEFAULT_ROW_HEIGHT;
 		}
 
-		// Set up scroll handling
-		setupScrollHandler(tbody);
+		// Set up scroll handling on wrapper (handles both H and V scroll)
+		const scrollContainer = scrollWrapper || tbody;
+		setupScrollHandler(scrollContainer, tbody);
 
 		// Set up search handling
 		setupSearchHandler();
@@ -74,24 +76,25 @@
 		renderVisibleRows(tbody);
 
 		// Update container height for scrollbar
-		updateContainerHeight(tbody);
+		updateContainerHeight(scrollContainer);
 	}
 
 	/**
 	 * Sets up scroll event handler with debouncing.
 	 *
+	 * @param {HTMLElement} scrollContainer - The element that handles scrolling (wrapper or tbody)
 	 * @param {HTMLElement} tbody - The virtual table body element
 	 */
-	function setupScrollHandler(tbody) {
-		tbody.addEventListener('scroll', () => {
+	function setupScrollHandler(scrollContainer, tbody) {
+		scrollContainer.addEventListener('scroll', () => {
 			// Debounce scroll events
 			if (scrollDebounceTimer) {
 				cancelAnimationFrame(scrollDebounceTimer);
 			}
 
 			scrollDebounceTimer = requestAnimationFrame(() => {
-				const scrollTop = tbody.scrollTop;
-				const containerHeight = tbody.clientHeight;
+				const scrollTop = scrollContainer.scrollTop;
+				const containerHeight = scrollContainer.clientHeight;
 
 				// Calculate visible range
 				const newStart = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN_COUNT);
@@ -146,11 +149,14 @@
 
 		// Reset scroll position and render
 		const tbody = document.getElementById('virtualTableBody');
+		const scrollWrapper = document.getElementById('virtualScrollWrapper');
+		const scrollContainer = scrollWrapper || tbody;
+
 		if (tbody) {
 			visibleStart = 0;
 			visibleEnd = Math.min(filteredRows.length, 50);
-			tbody.scrollTop = 0;
-			updateContainerHeight(tbody);
+			scrollContainer.scrollTop = 0;
+			updateContainerHeight(scrollContainer);
 			renderVisibleRows(tbody);
 			updateFooter();
 		}
@@ -159,14 +165,14 @@
 	/**
 	 * Updates container height based on total filtered rows.
 	 *
-	 * @param {HTMLElement} tbody - The virtual table body element
+	 * @param {HTMLElement} scrollContainer - The scroll container element (wrapper or tbody)
 	 */
-	function updateContainerHeight(tbody) {
+	function updateContainerHeight(scrollContainer) {
 		const totalHeight = filteredRows.length * rowHeight;
 		const minHeight = Math.min(400, totalHeight); // Min 400px or total height
 		const maxHeight = Math.min(600, totalHeight); // Max 600px
 
-		tbody.style.height = `${Math.max(minHeight, maxHeight)}px`;
+		scrollContainer.style.height = `${Math.max(minHeight, maxHeight)}px`;
 	}
 
 	/**
@@ -261,11 +267,28 @@
 
 	/**
 	 * Updates the footer with current counts.
+	 * Format matches regular DataTable: "X records" or "X of Y records" when filtered.
 	 */
 	function updateFooter() {
-		const recordCount = document.querySelector('.record-count');
-		if (recordCount) {
-			recordCount.textContent = `${filteredRows.length.toLocaleString()} visible`;
+		const footer = document.querySelector('.table-footer');
+		if (!footer) {
+			return;
+		}
+
+		const totalCount = allRows.length;
+		const visibleCount = filteredRows.length;
+		const recordText = totalCount === 1 ? 'record' : 'records';
+
+		// Preserve any loading indicator
+		const loadingIndicator = footer.querySelector('.background-loading-indicator');
+		const loadingHtml = loadingIndicator ? ` ${loadingIndicator.outerHTML}` : '';
+
+		if (visibleCount < totalCount) {
+			// Filter applied - show "X of Y records"
+			footer.innerHTML = `${visibleCount.toLocaleString()} of ${totalCount.toLocaleString()} ${recordText}${loadingHtml}`;
+		} else {
+			// No filter - show "X records"
+			footer.innerHTML = `${totalCount.toLocaleString()} ${recordText}${loadingHtml}`;
 		}
 	}
 
@@ -320,32 +343,35 @@
 
 	/**
 	 * Updates pagination status in footer.
+	 * Called when backend sends updated pagination state during background loading.
 	 *
 	 * @param {Object} pagination - Pagination state
 	 */
 	function updatePaginationStatus(pagination) {
-		const cacheStatus = document.querySelector('.cache-status');
-		if (!cacheStatus) {
+		const footer = document.querySelector('.table-footer');
+		if (!footer) {
 			return;
 		}
 
 		const { cachedCount, totalCount, isLoading, isFullyCached } = pagination;
 
-		let statusMessage;
-		if (isFullyCached) {
-			statusMessage = `${totalCount.toLocaleString()} records`;
-		} else if (isLoading) {
-			const percentage = totalCount > 0 ? Math.round((cachedCount / totalCount) * 100) : 0;
-			statusMessage = `${cachedCount.toLocaleString()} of ${totalCount.toLocaleString()} cached (${percentage}%)`;
-		} else {
-			statusMessage = `${cachedCount.toLocaleString()} of ${totalCount.toLocaleString()} cached`;
-		}
+		// Use available count (cached if loading, total if fully cached)
+		const availableCount = isFullyCached ? totalCount : cachedCount;
+		const visibleCount = filteredRows.length;
+		const recordText = availableCount === 1 ? 'record' : 'records';
 
-		const loadingIndicator = isLoading
-			? '<span class="background-loading-indicator" title="Loading more records...">⟳</span>'
+		// Loading indicator
+		const loadingHtml = isLoading
+			? ' <span class="background-loading-indicator" title="Loading more records...">⟳</span>'
 			: '';
 
-		cacheStatus.innerHTML = `${statusMessage} ${loadingIndicator}`;
+		if (visibleCount < availableCount) {
+			// Filter applied - show "X of Y records"
+			footer.innerHTML = `${visibleCount.toLocaleString()} of ${availableCount.toLocaleString()} ${recordText}${loadingHtml}`;
+		} else {
+			// No filter - show "X records"
+			footer.innerHTML = `${availableCount.toLocaleString()} ${recordText}${loadingHtml}`;
+		}
 	}
 
 	// Expose update function globally for message handling
