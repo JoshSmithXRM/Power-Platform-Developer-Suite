@@ -6,9 +6,10 @@
  *
  * Key features:
  * - Virtual scrolling (renders only visible rows)
- * - Client-side search filtering
+ * - Client-side search filtering with server fallback
  * - Row striping for visible rows
  * - Scroll position tracking
+ * - Server search indicator for large datasets
  *
  * Works with VirtualDataTableSection TypeScript component.
  */
@@ -26,6 +27,13 @@
 	let visibleStart = 0;
 	let visibleEnd = 50;
 	let scrollDebounceTimer = null;
+
+	// Pagination state for server search fallback
+	let paginationState = {
+		isFullyCached: true, // Assume fully cached until told otherwise
+		isServerSearching: false,
+		lastSearchQuery: ''
+	};
 
 	/**
 	 * Initializes the virtual table renderer.
@@ -127,12 +135,16 @@
 
 	/**
 	 * Filters rows based on search query.
+	 * If no results found and cache not fully loaded, triggers server search.
 	 *
 	 * @param {string} query - Search query (lowercase)
 	 */
 	function filterRows(query) {
+		paginationState.lastSearchQuery = query;
+
 		if (!query) {
 			filteredRows = [...allRows];
+			paginationState.isServerSearching = false;
 		} else {
 			filteredRows = allRows.filter(row => {
 				// Search all column values
@@ -144,6 +156,12 @@
 					return String(value).toLowerCase().includes(query);
 				});
 			});
+
+			// Server search fallback: 0 results AND cache not fully loaded
+			if (filteredRows.length === 0 && !paginationState.isFullyCached && !paginationState.isServerSearching) {
+				triggerServerSearch(query);
+				return; // Don't render yet - wait for server response
+			}
 		}
 
 		// Reset scroll position and render
@@ -158,6 +176,117 @@
 			renderVisibleRows(tbody);              // Render FIRST
 			updateContainerHeight(scrollContainer); // THEN measure actual height
 			updateFooter();
+		}
+	}
+
+	/**
+	 * Triggers server-side search when client cache has no matches.
+	 * Sends message to VS Code extension to perform server search.
+	 *
+	 * @param {string} query - Search query
+	 */
+	function triggerServerSearch(query) {
+		paginationState.isServerSearching = true;
+
+		// Show searching indicator
+		showServerSearchIndicator();
+
+		// Send message to backend
+		if (typeof vscode !== 'undefined') {
+			vscode.postMessage({
+				command: 'searchServer',
+				data: { query: query }
+			});
+		}
+	}
+
+	/**
+	 * Shows "Searching server..." indicator in the table.
+	 */
+	function showServerSearchIndicator() {
+		const tbody = document.getElementById('virtualTableBody');
+		if (!tbody) {
+			return;
+		}
+
+		// Clear existing content
+		while (tbody.firstChild) {
+			tbody.removeChild(tbody.firstChild);
+		}
+
+		// Create searching indicator row
+		const tr = document.createElement('tr');
+		const td = document.createElement('td');
+		td.colSpan = columns.length;
+		td.style.textAlign = 'center';
+		td.style.padding = '24px';
+		td.style.color = 'var(--vscode-descriptionForeground)';
+		td.innerHTML = '<span class="spinner" style="margin-right: 8px;"></span>Searching server...';
+		tr.appendChild(td);
+		tbody.appendChild(tr);
+
+		// Update footer to show searching state
+		const footer = document.querySelector('.table-footer');
+		if (footer) {
+			footer.textContent = 'Searching server...';
+		}
+	}
+
+	/**
+	 * Handles server search results from backend.
+	 *
+	 * @param {Object} data - Server search response { results, source }
+	 */
+	function handleServerSearchResults(data) {
+		paginationState.isServerSearching = false;
+
+		if (!data || !data.results) {
+			// No results - show empty state
+			filteredRows = [];
+		} else {
+			// Use server results
+			filteredRows = data.results;
+		}
+
+		// Render results
+		const tbody = document.getElementById('virtualTableBody');
+		const scrollWrapper = document.getElementById('virtualScrollWrapper');
+		const scrollContainer = scrollWrapper || tbody;
+
+		if (tbody) {
+			visibleStart = 0;
+			visibleEnd = Math.min(filteredRows.length, 50);
+			scrollContainer.scrollTop = 0;
+			renderVisibleRows(tbody);
+			updateContainerHeight(scrollContainer);
+			updateFooterWithSource(data?.source || 'server');
+		}
+	}
+
+	/**
+	 * Updates footer with search source indicator.
+	 *
+	 * @param {string} source - 'cache' or 'server'
+	 */
+	function updateFooterWithSource(source) {
+		const footer = document.querySelector('.table-footer');
+		if (!footer) {
+			return;
+		}
+
+		const totalCount = allRows.length;
+		const visibleCount = filteredRows.length;
+		const recordText = visibleCount === 1 ? 'record' : 'records';
+
+		// Show source indicator for server results
+		const sourceIndicator = source === 'server'
+			? ' <span class="server-search-indicator" title="Results from server search">(from server)</span>'
+			: '';
+
+		if (visibleCount < totalCount) {
+			footer.innerHTML = `${visibleCount.toLocaleString()} of ${totalCount.toLocaleString()} ${recordText}${sourceIndicator}`;
+		} else {
+			footer.innerHTML = `${visibleCount.toLocaleString()} ${recordText}${sourceIndicator}`;
 		}
 	}
 
@@ -404,6 +533,14 @@
 			columns = data.columns;
 		}
 
+		// Update pagination state for server search fallback
+		if (data.pagination) {
+			paginationState.isFullyCached = data.pagination.isFullyCached || false;
+		}
+
+		// Reset server search state on new data
+		paginationState.isServerSearching = false;
+
 		// Reset and re-render
 		const tbody = document.getElementById('virtualTableBody');
 		if (tbody) {
@@ -420,6 +557,12 @@
 		if (data.pagination) {
 			updatePaginationStatus(data.pagination);
 		}
+
+		// Re-apply search filter if there was an active search query
+		const searchInput = document.getElementById('searchInput');
+		if (searchInput && searchInput.value.trim()) {
+			filterRows(searchInput.value.toLowerCase().trim());
+		}
 	}
 
 	/**
@@ -435,6 +578,9 @@
 		}
 
 		const { cachedCount, totalCount, isLoading, isFullyCached } = pagination;
+
+		// Track cache state for server search fallback decision
+		paginationState.isFullyCached = isFullyCached;
 
 		// Use available count (cached if loading, total if fully cached)
 		const availableCount = isFullyCached ? totalCount : cachedCount;
@@ -463,7 +609,8 @@
 			if (tbody) {
 				renderVisibleRows(tbody);
 			}
-		}
+		},
+		handleServerSearchResults: handleServerSearchResults
 	};
 
 	// Listen for table update messages from VS Code webview API
@@ -481,8 +628,15 @@
 		}
 
 		const message = event.data;
-		if (message && message.command === 'updateVirtualTable') {
-			updateVirtualTable(message.data);
+		if (message) {
+			switch (message.command) {
+				case 'updateVirtualTable':
+					updateVirtualTable(message.data);
+					break;
+				case 'serverSearchResults':
+					handleServerSearchResults(message.data);
+					break;
+			}
 		}
 	});
 

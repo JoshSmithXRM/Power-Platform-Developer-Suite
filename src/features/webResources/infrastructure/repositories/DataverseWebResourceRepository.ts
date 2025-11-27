@@ -1,6 +1,7 @@
 import { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 import { QueryOptions } from '../../../../shared/domain/interfaces/QueryOptions';
+import { PaginatedResult } from '../../../../shared/domain/valueObjects/PaginatedResult';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../../../../shared/infrastructure/utils/ODataQueryBuilder';
 import { CancellationHelper } from '../../../../shared/infrastructure/utils/CancellationHelper';
@@ -17,6 +18,8 @@ interface DataverseWebResourcesResponse {
 	value: DataverseWebResourceDto[];
 	/** OData nextLink for pagination - present when more records exist */
 	'@odata.nextLink'?: string;
+	/** OData count - present when $count=true query param is used */
+	'@odata.count'?: number;
 }
 
 /**
@@ -254,6 +257,124 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 		} catch (error) {
 			const normalizedError = normalizeError(error);
 			this.logger.error('Failed to update web resource content', normalizedError);
+			throw normalizedError;
+		}
+	}
+
+	/**
+	 * Retrieves a paginated subset of web resources using OData $skip and $top.
+	 * Supports true server-side pagination (unlike Solutions which don't support $skip).
+	 */
+	async findPaginated(
+		environmentId: string,
+		page: number,
+		pageSize: number,
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
+	): Promise<PaginatedResult<WebResource>> {
+		const skip = (page - 1) * pageSize;
+
+		// Build query with pagination and count
+		const queryParts: string[] = [
+			'$select=webresourceid,name,displayname,webresourcetype,ismanaged,modifiedon',
+			'$count=true',
+			`$top=${pageSize}`,
+			`$skip=${skip}`,
+			'$orderby=name'
+		];
+
+		// Add filter if provided
+		if (options?.filter) {
+			queryParts.push(`$filter=${encodeURIComponent(options.filter)}`);
+		}
+
+		// Override orderBy if provided
+		if (options?.orderBy) {
+			// Replace the default orderby
+			const orderByIndex = queryParts.findIndex(p => p.startsWith('$orderby='));
+			if (orderByIndex >= 0) {
+				queryParts[orderByIndex] = `$orderby=${encodeURIComponent(options.orderBy)}`;
+			}
+		}
+
+		const endpoint = `/api/data/v9.2/webresourceset?${queryParts.join('&')}`;
+
+		this.logger.debug('Fetching paginated web resources from Dataverse', {
+			environmentId,
+			page,
+			pageSize,
+			skip
+		});
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			const response = await this.apiService.get<DataverseWebResourcesResponse>(
+				environmentId,
+				endpoint,
+				cancellationToken
+			);
+
+			CancellationHelper.throwIfCancelled(cancellationToken);
+
+			const webResources = response.value.map((dto) => this.mapToEntity(dto));
+			const totalCount = response['@odata.count'] ?? webResources.length;
+
+			this.logger.debug('Fetched paginated web resources', {
+				page,
+				pageSize,
+				returnedCount: webResources.length,
+				totalCount
+			});
+
+			return PaginatedResult.create(webResources, page, pageSize, totalCount);
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to fetch paginated web resources', normalizedError);
+			throw normalizedError;
+		}
+	}
+
+	/**
+	 * Gets the total count of web resources using OData $count query parameter.
+	 * Uses $top=1 for efficiency (Dataverse doesn't allow $top=0).
+	 */
+	async getCount(
+		environmentId: string,
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
+	): Promise<number> {
+		const queryParts: string[] = [
+			'$count=true',
+			'$top=1',
+			'$select=webresourceid'
+		];
+
+		if (options?.filter) {
+			queryParts.push(`$filter=${encodeURIComponent(options.filter)}`);
+		}
+
+		const endpoint = `/api/data/v9.2/webresourceset?${queryParts.join('&')}`;
+
+		this.logger.debug('Fetching web resource count from Dataverse', { environmentId });
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			const response = await this.apiService.get<DataverseWebResourcesResponse>(
+				environmentId,
+				endpoint,
+				cancellationToken
+			);
+
+			const count = response['@odata.count'] ?? 0;
+
+			this.logger.debug('Fetched web resource count', { environmentId, count });
+
+			return count;
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to fetch web resource count', normalizedError);
 			throw normalizedError;
 		}
 	}

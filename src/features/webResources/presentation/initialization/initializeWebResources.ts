@@ -81,6 +81,7 @@ export async function initializeWebResources(
 		getEnvironments,
 		getEnvironmentById,
 		listWebResourcesUseCase,
+		webResourceRepository,
 		solutionRepository,
 		urlBuilder,
 		viewModelMapper,

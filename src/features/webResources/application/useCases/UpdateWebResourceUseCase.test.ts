@@ -20,7 +20,9 @@ describe('UpdateWebResourceUseCase', () => {
 			findAll: jest.fn(),
 			findById: jest.fn(),
 			getContent: jest.fn(),
-			updateContent: jest.fn()
+			updateContent: jest.fn(),
+			findPaginated: jest.fn(),
+			getCount: jest.fn()
 		};
 
 		useCase = new UpdateWebResourceUseCase(

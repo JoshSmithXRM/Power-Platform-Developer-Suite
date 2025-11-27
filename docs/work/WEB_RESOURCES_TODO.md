@@ -2,7 +2,7 @@
 
 **Branch:** `feature/web-resources`
 **Created:** 2025-11-26
-**Status:** Blocked (waiting on `feature/virtual-table`)
+**Status:** Implementation Complete - Ready for Manual Testing & Review
 
 ---
 
@@ -10,26 +10,23 @@
 
 **Goal:** Provide web resource browsing, editing, and sync capabilities within VS Code
 
-**Discovery Findings:**
-- Found: Existing `DataTableSection` shared by all panels - no pagination
-- Found: All repositories use fetch-all-then-filter pattern (OData `@odata.nextLink` loop)
-- Found: Plugin Trace limit hardcoded to 100 in `TraceFilter.ts:178`
-- Found: No VS Code configuration infrastructure exists
-- Will reuse: Existing panel patterns, scaffolding behavior, FileSystemProvider pattern
-- Need to create: ~~Virtual data table component~~ (moved to `feature/virtual-table`)
+**Key Constraint:** User environment has **65,000+ web resources** in a single solution - requires virtual table with server-side search fallback
 
-**Key Constraint:** User environment has **70,000 web resources** - current fetch-all approach is unusable
+**What's Included in This PR:**
+- Web Resources panel (browse, edit, save)
+- Virtual table infrastructure with 5k cache + server search fallback
+- All virtual table work from merged `feature/virtual-table` branch
 
 ---
 
 ## Dependencies
 
 ```
-feature/configuration-settings (in progress - parallel branch)
+feature/configuration-settings ✅ MERGED
     ↓
-feature/virtual-table (in progress - parallel branch)
+feature/virtual-table ✅ MERGED
     ↓
-feature/web-resources (this branch - adopts virtual table for Slice 2)
+feature/web-resources (this branch - completes virtual table + web resources)
 ```
 
 ---
@@ -39,7 +36,7 @@ feature/web-resources (this branch - adopts virtual table for Slice 2)
 | Slice | Description | Status | Notes |
 |-------|-------------|--------|-------|
 | 1 | Browse & View (read-only) | ✅ Complete | Works but unusable at 70k scale |
-| 2 | Adopt Virtual Table | ⏳ Blocked | Waiting on `feature/virtual-table` |
+| 2 | Adopt Virtual Table | ✅ Complete | 5k cache + server search fallback |
 | 3 | Edit & Save | ✅ Complete | Ctrl+S saves to Dataverse |
 | 4 | Publish | ⏳ Planned | |
 | 5 | Enhanced UX | ⏳ Planned | |
@@ -60,15 +57,34 @@ feature/web-resources (this branch - adopts virtual table for Slice 2)
 
 ---
 
-## Slice 2: Adopt Virtual Table ⏳ BLOCKED
+## Slice 2: Adopt Virtual Table ✅ COMPLETE
 
-**Blocked by:** `feature/virtual-table` branch
+**Status:** Virtual table with server-side search fallback fully implemented
 
-Once virtual table merges to main:
-- [ ] Pull virtual table into this branch
-- [ ] Update `WebResourcesPanelComposed` to use `VirtualDataTableSection`
-- [ ] Update `ListWebResourcesUseCase` for paginated repository
-- [ ] Test with 70k environment
+### Infrastructure (Virtual Table Slice 4)
+- [x] Pull virtual table from main (merged)
+- [x] `SearchVirtualTableUseCase` - client-cache + server fallback orchestration
+- [x] Add `findPaginated()` and `getCount()` to `IWebResourceRepository`
+- [x] Implement paginated queries in `DataverseWebResourceRepository`
+- [x] Create `WebResourceDataProviderAdapter`
+- [x] Unit tests for SearchVirtualTableUseCase (26 tests)
+
+### UI Integration
+- [x] Update `VirtualTableRenderer.js` for server search flow:
+  - [x] Notify backend when search yields 0 results and cache not full
+  - [x] Show "Searching server..." indicator
+  - [x] Handle server search results
+- [x] Update `WebResourcesPanelComposed`:
+  - [x] Change from `DataTableSection` to `VirtualDataTableSection`
+  - [x] Create `VirtualTableCacheManager` with adapter
+  - [x] Create `SearchVirtualTableUseCase` instance
+  - [x] Handle `searchServer` messages from webview
+  - [x] Wire up OData filter builder for web resources
+  - [x] Background cache loading with state updates
+- [x] All tests pass (6,800 total)
+
+### Remaining
+- [ ] Manual test with 65k+ web resources environment (F5)
 - [ ] Committed
 
 ---
@@ -133,10 +149,11 @@ Once virtual table merges to main:
 
 ## Testing
 
-- [ ] Unit tests pass: `npm test`
-- [ ] Integration tests for panel
+- [x] Unit tests pass: `npm test` (6,800 tests)
+- [x] Lint passes: `npm run lint:all`
+- [x] Build passes: `npm run compile`
+- [ ] Manual testing (F5) with 65k+ web resources environment
 - [ ] E2E tests: `npm run e2e:smoke`
-- [ ] Manual testing (F5) with 70k environment
 
 ### Bugs Found During Manual Testing
 
@@ -146,9 +163,24 @@ Once virtual table merges to main:
 
 ---
 
+## Future Work (Not in This PR)
+
+These items were identified during virtual table development but are deferred:
+
+### Panel Migrations to Virtual Table
+- [ ] **Plugin Trace Viewer** - Remove 100 record hardcoded limit (`TraceFilter.ts:178`)
+- [ ] **Import Jobs** - Reported slow with large datasets
+
+### Performance Benchmarks
+- [ ] Create formal performance test suite (1k, 5k, 10k, 70k records)
+- [ ] Document actual load times and memory usage
+
+---
+
 ## Review & Merge
 
-- [ ] All implementation checkboxes complete
+- [x] All implementation checkboxes complete
+- [ ] Manual testing complete (F5)
 - [ ] All bugs from manual testing fixed
 - [ ] `/code-review` - APPROVED
 - [ ] CHANGELOG.md updated
@@ -205,3 +237,31 @@ Once virtual table merges to main:
 - Removed `isReadonly: true` from FileSystemProvider registration
 - Added 33 new tests (288 total for web resources feature)
 - **Current status:** Slice 3 complete. Ready for manual testing (F5)
+
+### Session 4 (2025-11-27)
+- Merged configuration settings and virtual table changes from main
+- User reported 65k web resources in a SINGLE solution - 5k cache insufficient
+- Decision: Implement Virtual Table Slice 4 (server-side search fallback) on this branch
+- Implemented shared infrastructure for server-side search:
+  - Created `SearchVirtualTableUseCase` in `src/shared/application/useCases/`
+  - Added `findPaginated()` and `getCount()` to `IWebResourceRepository`
+  - Implemented paginated queries in `DataverseWebResourceRepository` (supports OData $skip)
+  - Created `WebResourceDataProviderAdapter` for VirtualTableCacheManager binding
+  - Added 26 tests for SearchVirtualTableUseCase
+- All tests pass (6,826 total)
+- **Current status:** Server search infrastructure complete. Panel integration pending.
+
+### Session 5 (2025-11-27)
+- Completed Slice 2 panel integration:
+  - Updated `VirtualTableRenderer.js` with server search flow (triggerServerSearch, showServerSearchIndicator, handleServerSearchResults)
+  - Updated `WebResourcesPanelComposed` to use virtual table architecture:
+    - Changed from `DataTableSection` to `VirtualDataTableSection`
+    - Added `VirtualTableCacheManager<WebResource>` and `SearchVirtualTableUseCase<WebResource>`
+    - Implemented `initializeVirtualTable()` for environment-specific setup
+    - Added `searchServer` command handler for server-side search
+    - Added `updateVirtualTableData()` for background cache loading updates
+    - OData filter builder: `contains(name,'...') or contains(displayname,'...')`
+  - Updated `initializeWebResources.ts` to pass `webResourceRepository` to panel
+  - Fixed type issues: `PaginatedResult.getItems()`, `SearchResult.results`, `VirtualTableCacheState` getters
+- All tests pass (6,800 total)
+- **Current status:** Slice 2 complete. Ready for manual testing (F5) with 65k environment.

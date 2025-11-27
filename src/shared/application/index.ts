@@ -9,6 +9,10 @@
 export { VirtualTableCacheManager } from './services/VirtualTableCacheManager';
 export type { CacheStateChangeCallback } from './services/VirtualTableCacheManager';
 
+// Use Cases
+export { SearchVirtualTableUseCase } from './useCases/SearchVirtualTableUseCase';
+export type { SearchResult, ODataFilterBuilder } from './useCases/SearchVirtualTableUseCase';
+
 // ViewModels
 export type {
 	VirtualTableViewModel,

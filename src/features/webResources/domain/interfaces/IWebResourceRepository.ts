@@ -1,5 +1,6 @@
 import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 import { QueryOptions } from '../../../../shared/domain/interfaces/QueryOptions';
+import { PaginatedResult } from '../../../../shared/domain/valueObjects/PaginatedResult';
 import { WebResource } from '../entities/WebResource';
 
 /**
@@ -63,4 +64,38 @@ export interface IWebResourceRepository {
 		base64Content: string,
 		cancellationToken?: ICancellationToken
 	): Promise<void>;
+
+	/**
+	 * Retrieves a paginated subset of web resources.
+	 * Used for virtual scrolling with large datasets (65k+ records).
+	 *
+	 * @param environmentId - Environment ID
+	 * @param page - Page number (1-based)
+	 * @param pageSize - Number of records per page
+	 * @param options - Optional query options for filtering, selection, ordering
+	 * @param cancellationToken - Optional token to cancel the operation
+	 * @returns PaginatedResult containing WebResource entities
+	 */
+	findPaginated(
+		environmentId: string,
+		page: number,
+		pageSize: number,
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
+	): Promise<PaginatedResult<WebResource>>;
+
+	/**
+	 * Gets the total count of web resources in the specified environment.
+	 * Used for pagination calculations and UI display.
+	 *
+	 * @param environmentId - Environment ID
+	 * @param options - Optional query options for filtering
+	 * @param cancellationToken - Optional token to cancel the operation
+	 * @returns Total count of web resources
+	 */
+	getCount(
+		environmentId: string,
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
+	): Promise<number>;
 }

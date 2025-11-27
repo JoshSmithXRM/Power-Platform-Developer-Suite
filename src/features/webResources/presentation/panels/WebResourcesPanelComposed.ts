@@ -6,7 +6,7 @@ import type { DataTableConfig, EnvironmentOption } from '../../../../shared/infr
 import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
 import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
 import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
-import { DataTableSection } from '../../../../shared/infrastructure/ui/sections/DataTableSection';
+import { VirtualDataTableSection } from '../../../../shared/infrastructure/ui/sections/VirtualDataTableSection';
 import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
 import { EnvironmentSelectorSection } from '../../../../shared/infrastructure/ui/sections/EnvironmentSelectorSection';
 import { SolutionFilterSection } from '../../../../shared/infrastructure/ui/sections/SolutionFilterSection';
@@ -14,8 +14,17 @@ import { PanelLayout } from '../../../../shared/infrastructure/ui/types/PanelLay
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
 import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
 import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
+import {
+	VirtualTableCacheManager,
+	VirtualTableConfig,
+	SearchVirtualTableUseCase,
+	VirtualTableCacheState
+} from '../../../../shared/application';
 import type { ListWebResourcesUseCase } from '../../application/useCases/ListWebResourcesUseCase';
 import type { WebResourceViewModelMapper } from '../mappers/WebResourceViewModelMapper';
+import type { IWebResourceRepository } from '../../domain/interfaces/IWebResourceRepository';
+import type { WebResource } from '../../domain/entities/WebResource';
+import { WebResourceDataProviderAdapter } from '../../infrastructure/adapters/WebResourceDataProviderAdapter';
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/solutionFilterView';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
@@ -26,11 +35,12 @@ import { createWebResourceUri } from '../../infrastructure/providers/WebResource
 /**
  * Commands supported by Web Resources panel.
  */
-type WebResourcesCommands = 'refresh' | 'openMaker' | 'environmentChange' | 'solutionChange' | 'openWebResource';
+type WebResourcesCommands = 'refresh' | 'openMaker' | 'environmentChange' | 'solutionChange' | 'openWebResource' | 'searchServer';
 
 /**
- * Web Resources panel using PanelCoordinator architecture.
+ * Web Resources panel using PanelCoordinator architecture with virtual table.
  * Displays list of web resources for a specific environment with optional solution filtering.
+ * Uses VirtualTableCacheManager for large datasets (65k+ records).
  * Extends EnvironmentScopedPanel for singleton pattern management.
  */
 export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourcesPanelComposed> {
@@ -39,9 +49,14 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 	private readonly coordinator: PanelCoordinator<WebResourcesCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private readonly virtualTableConfig: VirtualTableConfig;
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
 	private solutionOptions: SolutionOption[] = [];
+
+	// Virtual table infrastructure
+	private cacheManager: VirtualTableCacheManager<WebResource> | null = null;
+	private searchUseCase: SearchVirtualTableUseCase<WebResource> | null = null;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -49,6 +64,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		private readonly listWebResourcesUseCase: ListWebResourcesUseCase,
+		private readonly webResourceRepository: IWebResourceRepository,
 		private readonly solutionRepository: ISolutionRepository,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		private readonly viewModelMapper: WebResourceViewModelMapper,
@@ -58,7 +74,13 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	) {
 		super();
 		this.currentEnvironmentId = environmentId;
-		logger.debug('WebResourcesPanel: Initialized with new architecture');
+		logger.debug('WebResourcesPanel: Initialized with virtual table architecture');
+
+		// Configure virtual table: 100 initial, up to 5000 cached, background loading enabled
+		this.virtualTableConfig = VirtualTableConfig.create(100, 5000, 500, true);
+
+		// Initialize virtual table infrastructure for "All Web Resources"
+		this.initializeVirtualTable(environmentId);
 
 		// Configure webview
 		panel.webview.options = {
@@ -75,6 +97,39 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		void this.initializeAndLoadData();
 	}
 
+	/**
+	 * Initializes virtual table cache manager and search use case for a given environment.
+	 */
+	private initializeVirtualTable(environmentId: string): void {
+		const provider = new WebResourceDataProviderAdapter(this.webResourceRepository, environmentId);
+		this.cacheManager = new VirtualTableCacheManager<WebResource>(provider, this.virtualTableConfig, this.logger);
+
+		// Client-side filter function for web resources
+		const clientFilterFn = (record: WebResource, query: string): boolean => {
+			return record.name.getValue().toLowerCase().includes(query) ||
+				record.displayName.toLowerCase().includes(query);
+		};
+
+		// OData filter builder for server-side search
+		const odataFilterBuilder = (query: string): string => {
+			const escaped = query.replace(/'/g, "''");
+			return `contains(name,'${escaped}') or contains(displayname,'${escaped}')`;
+		};
+
+		this.searchUseCase = new SearchVirtualTableUseCase<WebResource>(
+			this.cacheManager,
+			provider,
+			clientFilterFn,
+			odataFilterBuilder,
+			this.logger
+		);
+
+		// Register for cache state changes to update UI
+		this.cacheManager.onStateChange((state, records) => {
+			void this.updateVirtualTableData(records, state);
+		});
+	}
+
 	protected reveal(column: vscode.ViewColumn): void {
 		this.panel.reveal(column);
 	}
@@ -84,6 +139,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		getEnvironments: () => Promise<EnvironmentOption[]>,
 		getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		listWebResourcesUseCase: ListWebResourcesUseCase,
+		webResourceRepository: IWebResourceRepository,
 		solutionRepository: ISolutionRepository,
 		urlBuilder: IMakerUrlBuilder,
 		viewModelMapper: WebResourceViewModelMapper,
@@ -104,6 +160,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				getEnvironments,
 				getEnvironmentById,
 				listWebResourcesUseCase,
+				webResourceRepository,
 				solutionRepository,
 				urlBuilder,
 				viewModelMapper,
@@ -143,16 +200,11 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			isLoading: true
 		});
 
-		// PARALLEL LOADING - Don't wait for solutions to load data!
-		const [solutions, webResources] = await Promise.all([
-			this.loadSolutions(),
-			this.listWebResourcesUseCase.execute(
-				this.currentEnvironmentId,
-				this.currentSolutionId
-			)
-		]);
+		// Load solutions in parallel with initial data
+		const solutionsPromise = this.loadSolutions();
 
 		// Post-load validation: Check if persisted solution still exists
+		const solutions = await solutionsPromise;
 		let finalSolutionId = this.currentSolutionId;
 		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
 			if (!solutions.some(s => s.id === this.currentSolutionId)) {
@@ -172,16 +224,47 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			}
 		}
 
-		const viewModels = this.viewModelMapper.toViewModels(webResources);
+		// Use virtual table for "All Web Resources", use case for solution-filtered
+		if (finalSolutionId === DEFAULT_SOLUTION_ID && this.cacheManager) {
+			// Virtual table mode: load initial page, background loading will continue
+			this.logger.debug('Using virtual table for All Web Resources');
+			const initialData = await this.cacheManager.loadInitialPage();
+			const viewModels = this.viewModelMapper.toViewModels(initialData.getItems());
+			const cacheState = this.cacheManager.getCacheState();
 
-		// Final render with both solutions and data
-		await this.scaffoldingBehavior.refresh({
-			environments,
-			currentEnvironmentId: this.currentEnvironmentId,
-			solutions,
-			currentSolutionId: finalSolutionId,
-			tableData: viewModels
-		});
+			// Final render with solutions and initial page
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				solutions,
+				currentSolutionId: finalSolutionId,
+				tableData: viewModels,
+				pagination: {
+					cachedCount: cacheState.getCachedRecordCount(),
+					totalCount: cacheState.getTotalRecordCount(),
+					isLoading: cacheState.getIsLoading(),
+					currentPage: cacheState.getCurrentPage(),
+					isFullyCached: cacheState.isFullyCached()
+				}
+			});
+		} else {
+			// Solution-filtered: use traditional use case (solution filtering not supported by virtual table yet)
+			this.logger.debug('Using list use case for solution-filtered query', { solutionId: finalSolutionId });
+			const webResources = await this.listWebResourcesUseCase.execute(
+				this.currentEnvironmentId,
+				finalSolutionId
+			);
+			const viewModels = this.viewModelMapper.toViewModels(webResources);
+
+			// Final render with both solutions and data
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				solutions,
+				currentSolutionId: finalSolutionId,
+				tableData: viewModels
+			});
+		}
 	}
 
 	private createCoordinator(): { coordinator: PanelCoordinator<WebResourcesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
@@ -189,7 +272,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		const environmentSelector = new EnvironmentSelectorSection();
 		const solutionFilter = new SolutionFilterSection();
-		const tableSection = new DataTableSection(config);
+		const tableSection = new VirtualDataTableSection(config);
 		// Note: Button IDs must match command names registered in registerCommandHandlers()
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
@@ -224,7 +307,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'renderers', 'VirtualTableRenderer.js')
 				).toString()
 			],
 			cspNonce: getNonce(),
@@ -281,6 +364,14 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				await this.handleOpenWebResource(payload.id, payload.name, parseInt(payload.typeCode, 10));
 			}
 		});
+
+		// Server-side search (triggered when client cache has no matches)
+		this.coordinator.registerHandler('searchServer', async (data) => {
+			const payload = data as { query?: string } | undefined;
+			if (payload?.query && this.searchUseCase) {
+				await this.handleServerSearch(payload.query);
+			}
+		});
 	}
 
 	private getTableConfig(): DataTableConfig {
@@ -314,27 +405,54 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	}
 
 	private async handleRefresh(): Promise<void> {
-		this.logger.debug('Refreshing web resources');
+		this.logger.debug('Refreshing web resources', { solutionId: this.currentSolutionId });
 
 		try {
-			const webResources = await this.listWebResourcesUseCase.execute(
-				this.currentEnvironmentId,
-				this.currentSolutionId
-			);
+			if (this.currentSolutionId === DEFAULT_SOLUTION_ID && this.cacheManager) {
+				// Virtual table mode: reset and reload cache
+				this.cacheManager.clearCache();
+				const initialData = await this.cacheManager.loadInitialPage();
+				const viewModels = this.viewModelMapper.toViewModels(initialData.getItems());
+				const cacheState = this.cacheManager.getCacheState();
 
-			// Map to view models (mapper handles sorting)
-			const viewModels = this.viewModelMapper.toViewModels(webResources);
+				this.logger.info('Web resources refreshed via virtual table', {
+					count: viewModels.length,
+					totalCount: cacheState.getTotalRecordCount()
+				});
 
-			this.logger.info('Web resources loaded successfully', { count: viewModels.length });
+				await this.panel.webview.postMessage({
+					command: 'updateTableData',
+					data: {
+						viewModels,
+						columns: this.getTableConfig().columns,
+						pagination: {
+							cachedCount: cacheState.getCachedRecordCount(),
+							totalCount: cacheState.getTotalRecordCount(),
+							isLoading: cacheState.getIsLoading(),
+							currentPage: cacheState.getCurrentPage(),
+							isFullyCached: cacheState.isFullyCached()
+						}
+					}
+				});
+			} else {
+				// Solution-filtered: use traditional use case
+				const webResources = await this.listWebResourcesUseCase.execute(
+					this.currentEnvironmentId,
+					this.currentSolutionId
+				);
 
-			// Data-driven update: Send ViewModels to frontend
-			await this.panel.webview.postMessage({
-				command: 'updateTableData',
-				data: {
-					viewModels,
-					columns: this.getTableConfig().columns
-				}
-			});
+				const viewModels = this.viewModelMapper.toViewModels(webResources);
+
+				this.logger.info('Web resources loaded successfully', { count: viewModels.length });
+
+				await this.panel.webview.postMessage({
+					command: 'updateTableData',
+					data: {
+						viewModels,
+						columns: this.getTableConfig().columns
+					}
+				});
+			}
 		} catch (error: unknown) {
 			this.logger.error('Error refreshing web resources', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -371,6 +489,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 			// Re-register panel in map for new environment
 			this.reregisterPanel(WebResourcesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
+
+			// Reinitialize virtual table for new environment
+			this.initializeVirtualTable(environmentId);
 
 			const environment = await this.getEnvironmentById(environmentId);
 			if (environment) {
@@ -488,5 +609,86 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			12: '.resx'
 		};
 		return extensionMap[typeCode] ?? '.txt';
+	}
+
+	/**
+	 * Handles server-side search when client cache has no matching results.
+	 * Uses SearchVirtualTableUseCase to query server with OData $filter.
+	 */
+	private async handleServerSearch(query: string): Promise<void> {
+		if (!this.searchUseCase) {
+			this.logger.warn('Server search requested but searchUseCase not initialized');
+			return;
+		}
+
+		this.logger.debug('Executing server-side search', { query });
+
+		try {
+			const result = await this.searchUseCase.execute(query);
+			const viewModels = this.viewModelMapper.toViewModels(result.results);
+
+			// Send results back to webview
+			await this.panel.webview.postMessage({
+				command: 'serverSearchResults',
+				data: {
+					viewModels,
+					source: result.source,
+					query,
+					isFullyCached: result.source === 'cache'
+				}
+			});
+
+			this.logger.debug('Server search completed', {
+				query,
+				resultCount: viewModels.length,
+				source: result.source
+			});
+		} catch (error) {
+			this.logger.error('Server search failed', error);
+			// Send error back to webview so it can show appropriate message
+			await this.panel.webview.postMessage({
+				command: 'serverSearchResults',
+				data: {
+					viewModels: [],
+					source: 'error',
+					query,
+					error: error instanceof Error ? error.message : 'Search failed'
+				}
+			});
+		}
+	}
+
+	/**
+	 * Updates the virtual table display when cache state changes.
+	 * Called by VirtualTableCacheManager.onStateChange callback.
+	 */
+	private async updateVirtualTableData(records: readonly WebResource[], state: VirtualTableCacheState): Promise<void> {
+		// Only update if we're in "All Web Resources" mode
+		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+			return;
+		}
+
+		const viewModels = this.viewModelMapper.toViewModels(records);
+
+		await this.panel.webview.postMessage({
+			command: 'updateTableData',
+			data: {
+				viewModels,
+				columns: this.getTableConfig().columns,
+				pagination: {
+					cachedCount: state.getCachedRecordCount(),
+					totalCount: state.getTotalRecordCount(),
+					isLoading: state.getIsLoading(),
+					currentPage: state.getCurrentPage(),
+					isFullyCached: state.isFullyCached()
+				}
+			}
+		});
+
+		this.logger.debug('Virtual table data updated', {
+			recordCount: viewModels.length,
+			isFullyLoaded: state.isFullyCached(),
+			totalCount: state.getTotalRecordCount()
+		});
 	}
 }
