@@ -34,6 +34,9 @@ describe('SolutionViewModelMapper', () => {
 			solutionType?: string | null;
 		} = {}
 	): Solution {
+		// Use explicit undefined check for installedOn to distinguish "not provided" from "explicitly null"
+		const installedOn = options.installedOn !== undefined ? options.installedOn : new Date('2024-01-01T00:00:00Z');
+
 		return new Solution(
 			options.id ?? `sol-${uniqueName}`,
 			uniqueName,
@@ -42,7 +45,7 @@ describe('SolutionViewModelMapper', () => {
 			options.isManaged ?? false,
 			options.publisherId ?? '00000000-0000-0000-0000-000000000000',
 			options.publisherName ?? 'Default Publisher',
-			options.installedOn ?? new Date('2024-01-01T00:00:00Z'),
+			installedOn,
 			options.description ?? '',
 			options.modifiedOn ?? new Date('2024-01-15T10:00:00Z'),
 			options.isVisible ?? true,
@@ -184,6 +187,29 @@ describe('SolutionViewModelMapper', () => {
 			// Assert
 			expect(result.installedOn).toBeDefined();
 			expect(typeof result.installedOn).toBe('string');
+		});
+
+		it('should set installedOnSortValue to timestamp when date exists', () => {
+			// Arrange
+			const installedOn = new Date('2024-01-15T10:30:00Z');
+			const solution = createSolution('test', { installedOn });
+
+			// Act
+			const result = mapper.toViewModel(solution);
+
+			// Assert
+			expect(result.installedOnSortValue).toBe(installedOn.getTime());
+		});
+
+		it('should set installedOnSortValue to 0 when date is null', () => {
+			// Arrange
+			const solution = createSolution('test', { installedOn: null });
+
+			// Act
+			const result = mapper.toViewModel(solution);
+
+			// Assert
+			expect(result.installedOnSortValue).toBe(0);
 		});
 
 		it('should map description', () => {
