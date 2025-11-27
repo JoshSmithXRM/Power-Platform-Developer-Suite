@@ -136,8 +136,7 @@ Planned features organized by area - see [docs/future/README.md](future/README.m
 
 | Document | Purpose |
 |----------|---------|
-| [TECHNICAL_DEBT.md](../TECHNICAL_DEBT.md) | Code quality issues |
-| [technical-debt/README.md](technical-debt/README.md) | Categorized debt tracking |
+| [technical-debt/README.md](technical-debt/README.md) | Technical debt tracking (categorized) |
 | [CHANGELOG.md](../CHANGELOG.md) | Version history |
 | [RELEASE_GUIDE.md](RELEASE_GUIDE.md) | Release process |
 | [BRANCH_STRATEGY.md](BRANCH_STRATEGY.md) | Git branching and merging |

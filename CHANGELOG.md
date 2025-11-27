@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Data Explorer - Export CSV:** Export query results to CSV file
+  - "Export CSV" button in toolbar after query execution
+  - Generates filename with entity name and timestamp (e.g., `contact_export_2025-11-27T12-30-00.csv`)
+  - RFC 4180 compliant CSV formatting (proper escaping of quotes, commas, newlines)
+
+- **Shared CsvExportService:** Reusable CSV/JSON export utility for all features
+  - Generic `toCsv(TabularData)` method for any tabular data
+  - `escapeCsvField()` helper for RFC 4180 compliant CSV escaping
+  - `saveToFile()` using VS Code save dialog
+
+- **Plugin Trace Viewer E2E Tests:** Playwright integration tests
+  - Panel open/close tests
+  - Export dropdown visibility tests
+  - CSV export flow tests
+
+### Changed
+
+- **Plugin Trace Viewer:** Refactored `FileSystemPluginTraceExporter` to use shared `CsvExportService`
+  - Reduced code duplication
+  - Consistent CSV formatting across features
+
+### Fixed
+
+- **Data Explorer:** Export CSV button no longer gets stuck in loading state after export completes
+
 ## [0.2.2] - 2025-11-26
 
 ### Added
