@@ -20,11 +20,14 @@ import {
 } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import type { ExecuteSqlQueryUseCase } from '../../application/useCases/ExecuteSqlQueryUseCase';
+import type { ExecuteFetchXmlQueryUseCase } from '../../application/useCases/ExecuteFetchXmlQueryUseCase';
 import type { QueryResultViewModelMapper } from '../../application/mappers/QueryResultViewModelMapper';
 import { SqlParseErrorViewModelMapper } from '../../application/mappers/SqlParseErrorViewModelMapper';
 import { SqlParseError } from '../../domain/errors/SqlParseError';
+import { FetchXmlValidationError } from '../../domain/errors/FetchXmlValidationError';
 import type { QueryResult } from '../../domain/entities/QueryResult';
 import { QueryEditorSection } from '../sections/QueryEditorSection';
+import type { QueryMode, TranspilationWarning } from '../views/queryEditorView';
 import { DataverseRecordUrlService } from '../../../../shared/infrastructure/services/DataverseRecordUrlService';
 import { CsvExportService, type TabularData } from '../../../../shared/infrastructure/services/CsvExportService';
 
@@ -36,6 +39,8 @@ type DataExplorerCommands =
 	| 'exportCsv'
 	| 'environmentChange'
 	| 'updateSqlQuery'
+	| 'updateFetchXmlQuery'
+	| 'switchQueryMode'
 	| 'openRecord'
 	| 'copyRecordUrl'
 	| 'warningModalResponse';
@@ -47,7 +52,7 @@ type WarningModalAction = 'addTop100' | 'continueAnyway' | 'cancel';
 
 /**
  * Data Explorer panel using PanelCoordinator architecture.
- * Allows SQL query execution against Dataverse with FetchXML preview.
+ * Allows SQL/FetchXML query execution against Dataverse with bidirectional preview.
  * Extends EnvironmentScopedPanel for singleton pattern management.
  */
 export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplorerPanelComposed> {
@@ -62,6 +67,8 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private currentEnvironmentId: string;
 	private currentSqlQuery: string = '';
 	private currentFetchXml: string = '';
+	private currentQueryMode: QueryMode = 'sql';
+	private currentTranspilationWarnings: readonly TranspilationWarning[] = [];
 	private currentResult: QueryResult | null = null;
 
 	/** Monotonic counter for query execution to discard stale results. */
@@ -80,6 +87,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			envId: string
 		) => Promise<EnvironmentInfo | null>,
 		private readonly executeSqlUseCase: ExecuteSqlQueryUseCase,
+		private readonly executeFetchXmlUseCase: ExecuteFetchXmlQueryUseCase,
 		private readonly resultMapper: QueryResultViewModelMapper,
 		private readonly panelStateRepository: IPanelStateRepository,
 		private readonly logger: ILogger,
@@ -124,6 +132,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		getEnvironments: () => Promise<EnvironmentOption[]>,
 		getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		executeSqlUseCase: ExecuteSqlQueryUseCase,
+		executeFetchXmlUseCase: ExecuteFetchXmlQueryUseCase,
 		resultMapper: QueryResultViewModelMapper,
 		panelStateRepository: IPanelStateRepository,
 		logger: ILogger,
@@ -144,6 +153,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 						getEnvironments,
 						getEnvironmentById,
 						executeSqlUseCase,
+						executeFetchXmlUseCase,
 						resultMapper,
 						panelStateRepository,
 						logger,
@@ -164,7 +174,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Load environments first so they appear on initial render
 		const environments = await this.getEnvironments();
 
-		// Load persisted SQL from state
+		// Load persisted state (SQL query and mode)
 		try {
 			const state = await this.panelStateRepository.load({
 				panelType: DataExplorerPanelComposed.viewType,
@@ -178,8 +188,16 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 					sqlLength: this.currentSqlQuery.length,
 				});
 			}
+			const savedFetchXml = state?.['fetchXmlQuery'];
+			if (savedFetchXml && typeof savedFetchXml === 'string') {
+				this.currentFetchXml = savedFetchXml;
+			}
+			const savedMode = state?.['queryMode'];
+			if (savedMode === 'sql' || savedMode === 'fetchxml') {
+				this.currentQueryMode = savedMode;
+			}
 		} catch (error) {
-			this.logger.warn('Failed to load persisted SQL query', error);
+			this.logger.warn('Failed to load persisted query state', error);
 		}
 
 		// Initialize coordinator with environments
@@ -189,6 +207,8 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			customData: {
 				sql: this.currentSqlQuery,
 				fetchXml: this.currentFetchXml,
+				queryMode: this.currentQueryMode,
+				transpilationWarnings: this.currentTranspilationWarnings,
 			},
 		});
 	}
@@ -300,11 +320,18 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private registerCommandHandlers(): void {
 		this.logger.debug('Registering Data Explorer command handlers');
 
-		// Execute SQL query
+		// Execute query (handles both SQL and FetchXML modes)
 		this.coordinator.registerHandler('executeQuery', async (data) => {
-			// SQL can be sent directly with the command or use the stored value
-			const sql = (data as { sql?: string })?.sql ?? this.currentSqlQuery;
-			await this.handleExecuteQuery(sql);
+			if (this.currentQueryMode === 'fetchxml') {
+				// In FetchXML mode, execute FetchXML directly
+				const fetchXml =
+					(data as { fetchXml?: string })?.fetchXml ?? this.currentFetchXml;
+				await this.handleExecuteFetchXmlQuery(fetchXml);
+			} else {
+				// In SQL mode, transpile and execute
+				const sql = (data as { sql?: string })?.sql ?? this.currentSqlQuery;
+				await this.handleExecuteSqlQuery(sql);
+			}
 		});
 
 		// Environment change
@@ -324,7 +351,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				await this.updateFetchXmlPreview();
 
 				// Persist SQL to state (already debounced by webview)
-				void this.saveSqlToState();
+				void this.saveQueryStateToStorage();
 			}
 		});
 
@@ -367,12 +394,35 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				this.pendingModalResolver = null;
 			}
 		});
+
+		// Switch query mode (SQL ↔ FetchXML)
+		this.coordinator.registerHandler('switchQueryMode', async (data) => {
+			const mode = (data as { mode?: QueryMode })?.mode;
+			if (mode === 'sql' || mode === 'fetchxml') {
+				await this.handleSwitchQueryMode(mode);
+			}
+		});
+
+		// Update FetchXML query (for SQL preview in FetchXML mode)
+		this.coordinator.registerHandler('updateFetchXmlQuery', async (data) => {
+			const fetchXml = (data as { fetchXml?: string })?.fetchXml;
+			if (fetchXml !== undefined) {
+				this.currentFetchXml = fetchXml;
+				this.logger.trace('FetchXML query updated for preview', {
+					fetchXmlLength: fetchXml.length,
+				});
+				await this.updateSqlPreview();
+
+				// Persist FetchXML to state (already debounced by webview)
+				void this.saveQueryStateToStorage();
+			}
+		});
 	}
 
 	/**
-	 * Persists current SQL query to panel state.
+	 * Persists current query state (SQL, FetchXML, mode) to panel state.
 	 */
-	private async saveSqlToState(): Promise<void> {
+	private async saveQueryStateToStorage(): Promise<void> {
 		try {
 			const existingState = await this.panelStateRepository.load({
 				panelType: DataExplorerPanelComposed.viewType,
@@ -387,20 +437,22 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				{
 					...existingState,
 					sqlQuery: this.currentSqlQuery,
+					fetchXmlQuery: this.currentFetchXml,
+					queryMode: this.currentQueryMode,
 					lastUpdated: new Date().toISOString(),
 				}
 			);
 		} catch (error) {
-			this.logger.warn('Failed to persist SQL query', error);
+			this.logger.warn('Failed to persist query state', error);
 		}
 	}
 
 	/**
-	 * Executes a SQL query.
+	 * Executes a SQL query (SQL mode).
 	 * Uses query token pattern to prevent stale results from overwriting newer ones.
 	 * @param sql - The SQL query to execute
 	 */
-	private async handleExecuteQuery(sql: string): Promise<void> {
+	private async handleExecuteSqlQuery(sql: string): Promise<void> {
 		const trimmedSql = sql.trim();
 		if (trimmedSql === '') {
 			this.logger.warn('Execute query called with empty SQL');
@@ -428,7 +480,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 					// Panel was disposed during modal interaction
 					return;
 				}
-				return this.handleExecuteQuery(modifiedSql);
+				return this.handleExecuteSqlQuery(modifiedSql);
 			}
 
 			if (choice === 'cancel') {
@@ -631,6 +683,213 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			});
 		} finally {
 			this.setButtonLoading('executeQuery', false);
+		}
+	}
+
+	/**
+	 * Handles switching between SQL and FetchXML query modes.
+	 * Refreshes the panel to render the appropriate editor.
+	 */
+	private async handleSwitchQueryMode(mode: QueryMode): Promise<void> {
+		if (this.currentQueryMode === mode) {
+			return;
+		}
+
+		this.logger.debug('Switching query mode', { from: this.currentQueryMode, to: mode });
+		this.currentQueryMode = mode;
+
+		// Clear any previous errors
+		await this.panel.webview.postMessage({ command: 'clearError' });
+
+		// Send mode change to webview to update UI
+		await this.panel.webview.postMessage({
+			command: 'queryModeChanged',
+			data: {
+				mode,
+				sql: this.currentSqlQuery,
+				fetchXml: this.currentFetchXml,
+				transpilationWarnings: this.currentTranspilationWarnings,
+			},
+		});
+
+		// Persist mode to state
+		void this.saveQueryStateToStorage();
+	}
+
+	/**
+	 * Executes a FetchXML query directly (FetchXML mode).
+	 * @param fetchXml - The FetchXML query to execute
+	 */
+	private async handleExecuteFetchXmlQuery(fetchXml: string): Promise<void> {
+		const trimmedFetchXml = fetchXml.trim();
+		if (trimmedFetchXml === '') {
+			this.logger.warn('Execute query called with empty FetchXML');
+			vscode.window.showWarningMessage('Please enter a FetchXML query');
+			return;
+		}
+
+		// Abort any in-flight query
+		if (this.currentAbortController) {
+			this.currentAbortController.abort();
+			this.logger.debug('Aborted previous query');
+		}
+
+		// Create new query token
+		const queryId = ++this.querySequence;
+		this.currentAbortController = new AbortController();
+		const signal = this.currentAbortController.signal;
+
+		// Update stored FetchXML
+		this.currentFetchXml = trimmedFetchXml;
+
+		this.logger.info('Executing FetchXML query', {
+			environmentId: this.currentEnvironmentId,
+			fetchXmlLength: trimmedFetchXml.length,
+			queryId,
+		});
+
+		// Show loading state
+		this.setButtonLoading('executeQuery', true);
+		await this.panel.webview.postMessage({
+			command: 'setLoadingState',
+			data: { isLoading: true },
+		});
+
+		try {
+			// Execute query via use case (validates and executes)
+			const result = await this.executeFetchXmlUseCase.execute(
+				this.currentEnvironmentId,
+				trimmedFetchXml,
+				signal
+			);
+
+			// Discard stale results
+			if (queryId !== this.querySequence) {
+				this.logger.debug('Discarding stale query result', {
+					queryId,
+					currentSequence: this.querySequence,
+				});
+				return;
+			}
+
+			this.currentResult = result;
+
+			// Map to ViewModel
+			const viewModel = this.resultMapper.toViewModel(result);
+
+			this.logger.info('FetchXML query executed successfully', {
+				rowCount: result.getRowCount(),
+				executionTimeMs: result.executionTimeMs,
+				queryId,
+			});
+
+			// Send results to webview
+			await this.panel.webview.postMessage({
+				command: 'queryResultsUpdated',
+				data: viewModel,
+			});
+
+			vscode.window.showInformationMessage(
+				`Query executed: ${result.getRowCount()} rows in ${result.executionTimeMs}ms`
+			);
+		} catch (error: unknown) {
+			// Ignore aborted queries
+			if (error instanceof Error && error.name === 'AbortError') {
+				this.logger.debug('Query was aborted', { queryId });
+				await this.panel.webview.postMessage({
+					command: 'queryAborted',
+				});
+				return;
+			}
+
+			// Discard stale errors
+			if (queryId !== this.querySequence) {
+				this.logger.debug('Discarding stale query error', {
+					queryId,
+					currentSequence: this.querySequence,
+				});
+				return;
+			}
+
+			this.logger.error('FetchXML query execution failed', error);
+
+			// Map error to ViewModel
+			let errorMessage: string;
+			if (error instanceof FetchXmlValidationError) {
+				errorMessage = error.message;
+				await this.panel.webview.postMessage({
+					command: 'queryError',
+					data: {
+						message: error.getFormattedErrors(),
+						position: error.errors[0]?.line
+							? { line: error.errors[0].line, column: 1 }
+							: undefined,
+					},
+				});
+			} else {
+				errorMessage =
+					error instanceof Error ? error.message : 'Unknown error';
+				const errorViewModel =
+					this.errorMapper.genericErrorToViewModel(
+						error instanceof Error ? error : new Error(errorMessage)
+					);
+
+				await this.panel.webview.postMessage({
+					command: 'queryError',
+					data: errorViewModel,
+				});
+			}
+
+			vscode.window.showErrorMessage(`Query failed: ${errorMessage}`);
+		} finally {
+			// Only reset loading state if this is still the current query
+			if (queryId === this.querySequence) {
+				this.setButtonLoading('executeQuery', false);
+				await this.panel.webview.postMessage({
+					command: 'setLoadingState',
+					data: { isLoading: false },
+				});
+			}
+		}
+	}
+
+	/**
+	 * Updates SQL preview when FetchXML query changes (FetchXML mode).
+	 */
+	private async updateSqlPreview(): Promise<void> {
+		if (this.currentFetchXml.trim() === '') {
+			this.currentSqlQuery = '';
+			this.currentTranspilationWarnings = [];
+			await this.panel.webview.postMessage({
+				command: 'sqlPreviewUpdated',
+				data: { sql: '', warnings: [] },
+			});
+			return;
+		}
+
+		// Use FetchXML use case method for transpilation
+		const result = this.executeFetchXmlUseCase.transpileToSql(this.currentFetchXml);
+
+		if (result.success) {
+			this.currentSqlQuery = result.sql;
+			this.currentTranspilationWarnings = result.warnings;
+
+			// Send to webview
+			await this.panel.webview.postMessage({
+				command: 'sqlPreviewUpdated',
+				data: { sql: result.sql, warnings: result.warnings },
+			});
+
+			// Clear any previous error
+			await this.panel.webview.postMessage({
+				command: 'clearError',
+			});
+		} else {
+			// Show validation error in preview mode
+			await this.panel.webview.postMessage({
+				command: 'parseErrorPreview',
+				data: { message: result.error },
+			});
 		}
 	}
 

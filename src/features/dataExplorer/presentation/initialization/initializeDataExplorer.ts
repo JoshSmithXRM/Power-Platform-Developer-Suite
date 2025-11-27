@@ -33,6 +33,9 @@ export async function initializeDataExplorer(
 	const { ExecuteSqlQueryUseCase } = await import(
 		'../../application/useCases/ExecuteSqlQueryUseCase.js'
 	);
+	const { ExecuteFetchXmlQueryUseCase } = await import(
+		'../../application/useCases/ExecuteFetchXmlQueryUseCase.js'
+	);
 	const { QueryResultViewModelMapper } = await import(
 		'../../application/mappers/QueryResultViewModelMapper.js'
 	);
@@ -55,6 +58,7 @@ export async function initializeDataExplorer(
 	const panelStateRepository = new VSCodePanelStateRepository(context.workspaceState, logger);
 
 	const executeSqlUseCase = new ExecuteSqlQueryUseCase(queryRepository, logger);
+	const executeFetchXmlUseCase = new ExecuteFetchXmlQueryUseCase(queryRepository, logger);
 	const resultMapper = new QueryResultViewModelMapper();
 
 	await DataExplorerPanelComposed.createOrShow(
@@ -62,6 +66,7 @@ export async function initializeDataExplorer(
 		getEnvironments,
 		getEnvironmentById,
 		executeSqlUseCase,
+		executeFetchXmlUseCase,
 		resultMapper,
 		panelStateRepository,
 		logger,

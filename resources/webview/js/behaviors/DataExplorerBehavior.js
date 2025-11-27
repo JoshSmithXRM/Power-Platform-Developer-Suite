@@ -4,18 +4,25 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 /**
  * Data Explorer Behavior
  * Handles client-side interactions for the Data Explorer panel.
- * Manages SQL editor, FetchXML preview, and query results.
+ * Manages SQL/FetchXML editors, previews, and query results.
  */
 
 /** Tracks whether a query is currently executing to prevent queueing. */
 let isExecuting = false;
 
+/** Current query mode (sql or fetchxml). */
+let currentMode = 'sql';
+
 window.createBehavior({
 	initialize() {
 		injectHighlightingStyles();
+		detectInitialMode();
 		setupSqlEditorHighlighting();
+		setupFetchXmlEditorHighlighting();
 		wireSqlEditor();
+		wireFetchXmlEditor();
 		wireExecuteButton();
+		wireModeToggle();
 		wireWarningModal();
 	},
 	handleMessage(message) {
@@ -27,6 +34,12 @@ window.createBehavior({
 				break;
 			case 'fetchXmlPreviewUpdated':
 				updateFetchXmlPreview(message.data.fetchXml);
+				break;
+			case 'sqlPreviewUpdated':
+				updateSqlPreview(message.data.sql, message.data.warnings);
+				break;
+			case 'queryModeChanged':
+				handleModeChange(message.data);
 				break;
 			case 'queryError':
 				isExecuting = false;
@@ -57,6 +70,9 @@ window.createBehavior({
 				break;
 			case 'updateSqlEditor':
 				updateSqlEditor(message.data.sql);
+				break;
+			case 'updateFetchXmlEditor':
+				updateFetchXmlEditor(message.data.fetchXml);
 				break;
 		}
 	}
@@ -851,4 +867,308 @@ function updateSqlEditor(sql) {
 		// Trigger input event to update highlighting
 		sqlEditor.dispatchEvent(new Event('input'));
 	}
+}
+
+// ============================================
+// MODE TOGGLE FUNCTIONS
+// ============================================
+
+/**
+ * Detects the initial mode from the DOM.
+ */
+function detectInitialMode() {
+	const sqlTab = document.getElementById('mode-sql');
+	const fetchXmlTab = document.getElementById('mode-fetchxml');
+
+	if (fetchXmlTab && fetchXmlTab.classList.contains('active')) {
+		currentMode = 'fetchxml';
+	} else if (sqlTab && sqlTab.classList.contains('active')) {
+		currentMode = 'sql';
+	}
+}
+
+/**
+ * Wires up the mode toggle buttons.
+ */
+function wireModeToggle() {
+	const sqlTab = document.getElementById('mode-sql');
+	const fetchXmlTab = document.getElementById('mode-fetchxml');
+
+	if (sqlTab) {
+		sqlTab.addEventListener('click', () => {
+			if (currentMode !== 'sql') {
+				switchMode('sql');
+			}
+		});
+	}
+
+	if (fetchXmlTab) {
+		fetchXmlTab.addEventListener('click', () => {
+			if (currentMode !== 'fetchxml') {
+				switchMode('fetchxml');
+			}
+		});
+	}
+}
+
+/**
+ * Switches to a new mode and notifies the extension.
+ * @param {string} mode - The mode to switch to ('sql' or 'fetchxml')
+ */
+function switchMode(mode) {
+	currentMode = mode;
+
+	// Update tab active state
+	const sqlTab = document.getElementById('mode-sql');
+	const fetchXmlTab = document.getElementById('mode-fetchxml');
+
+	if (sqlTab) {
+		sqlTab.classList.toggle('active', mode === 'sql');
+		sqlTab.setAttribute('aria-selected', mode === 'sql');
+	}
+	if (fetchXmlTab) {
+		fetchXmlTab.classList.toggle('active', mode === 'fetchxml');
+		fetchXmlTab.setAttribute('aria-selected', mode === 'fetchxml');
+	}
+
+	// Notify extension about mode change
+	window.vscode.postMessage({
+		command: 'switchQueryMode',
+		data: { mode }
+	});
+}
+
+/**
+ * Handles mode change from extension (e.g., when restoring state).
+ * @param {Object} data - Mode change data
+ * @param {string} data.mode - The new mode
+ * @param {string} data.sql - SQL content
+ * @param {string} data.fetchXml - FetchXML content
+ * @param {Array} data.transpilationWarnings - Warnings from FetchXML to SQL transpilation
+ */
+function handleModeChange(data) {
+	currentMode = data.mode;
+
+	// Update tab active state
+	const sqlTab = document.getElementById('mode-sql');
+	const fetchXmlTab = document.getElementById('mode-fetchxml');
+	const sqlPanel = document.getElementById('sql-editor-panel');
+	const fetchXmlPanel = document.getElementById('fetchxml-editor-panel');
+
+	if (sqlTab) {
+		sqlTab.classList.toggle('active', data.mode === 'sql');
+		sqlTab.setAttribute('aria-selected', data.mode === 'sql');
+	}
+	if (fetchXmlTab) {
+		fetchXmlTab.classList.toggle('active', data.mode === 'fetchxml');
+		fetchXmlTab.setAttribute('aria-selected', data.mode === 'fetchxml');
+	}
+
+	// Show/hide panels
+	if (sqlPanel) {
+		sqlPanel.hidden = data.mode !== 'sql';
+	}
+	if (fetchXmlPanel) {
+		fetchXmlPanel.hidden = data.mode !== 'fetchxml';
+	}
+
+	// Update editor content based on mode
+	if (data.mode === 'sql') {
+		updateSqlEditor(data.sql || '');
+		updateFetchXmlPreview(data.fetchXml || '');
+	} else {
+		updateFetchXmlEditor(data.fetchXml || '');
+		updateSqlPreview(data.sql || '', data.transpilationWarnings || []);
+	}
+
+	// Re-setup highlighting for new elements
+	setupSqlEditorHighlighting();
+	setupFetchXmlEditorHighlighting();
+}
+
+// ============================================
+// FETCHXML EDITOR FUNCTIONS
+// ============================================
+
+/**
+ * Wires up the FetchXML editor for live SQL preview.
+ */
+function wireFetchXmlEditor() {
+	const fetchXmlEditor = document.getElementById('fetchxml-editor');
+	if (!fetchXmlEditor) {
+		return;
+	}
+
+	// Debounced update to avoid excessive messaging
+	const debouncedUpdate = debounce((fetchXml) => {
+		window.vscode.postMessage({
+			command: 'updateFetchXmlQuery',
+			data: { fetchXml }
+		});
+	}, 300);
+
+	fetchXmlEditor.addEventListener('input', (event) => {
+		const fetchXml = event.target.value;
+		debouncedUpdate(fetchXml);
+	});
+
+	// Handle Ctrl+Enter to execute query
+	fetchXmlEditor.addEventListener('keydown', (event) => {
+		if (event.ctrlKey && event.key === 'Enter') {
+			event.preventDefault();
+			executeQuery();
+		}
+	});
+}
+
+/**
+ * Sets up FetchXML editor with syntax highlighting overlay.
+ */
+function setupFetchXmlEditorHighlighting() {
+	const fetchXmlEditor = document.getElementById('fetchxml-editor');
+	if (!fetchXmlEditor) {
+		return;
+	}
+
+	// Check if already set up
+	if (fetchXmlEditor.parentElement.classList.contains('fetchxml-editor-container')) {
+		return;
+	}
+
+	// Wrap the textarea in a container
+	const container = document.createElement('div');
+	container.className = 'fetchxml-editor-container';
+
+	// Create the highlight overlay
+	const highlightLayer = document.createElement('pre');
+	highlightLayer.className = 'fetchxml-editor-highlight';
+	highlightLayer.setAttribute('aria-hidden', 'true');
+
+	// Insert container and move textarea into it
+	fetchXmlEditor.parentNode.insertBefore(container, fetchXmlEditor);
+	container.appendChild(highlightLayer);
+	container.appendChild(fetchXmlEditor);
+
+	// Initial highlight
+	updateFetchXmlHighlighting(fetchXmlEditor.value);
+
+	// Update highlighting on input
+	fetchXmlEditor.addEventListener('input', () => {
+		updateFetchXmlHighlighting(fetchXmlEditor.value);
+	});
+
+	// Sync scroll position
+	fetchXmlEditor.addEventListener('scroll', () => {
+		highlightLayer.scrollTop = fetchXmlEditor.scrollTop;
+		highlightLayer.scrollLeft = fetchXmlEditor.scrollLeft;
+	});
+}
+
+/**
+ * Updates the FetchXML highlighting layer.
+ * @param {string} fetchXml - The FetchXML content to highlight
+ */
+function updateFetchXmlHighlighting(fetchXml) {
+	const highlightLayer = document.querySelector('.fetchxml-editor-highlight');
+	if (!highlightLayer) {
+		return;
+	}
+
+	if (fetchXml) {
+		// Add a space at the end to ensure the highlight layer matches textarea height
+		highlightLayer.innerHTML = XmlHighlighter.highlight(fetchXml) + '\n';
+	} else {
+		highlightLayer.innerHTML = '';
+	}
+}
+
+/**
+ * Updates the FetchXML editor content.
+ * @param {string} fetchXml - The new FetchXML content
+ */
+function updateFetchXmlEditor(fetchXml) {
+	const fetchXmlEditor = document.getElementById('fetchxml-editor');
+	if (fetchXmlEditor) {
+		fetchXmlEditor.value = fetchXml;
+		// Trigger input event to update highlighting
+		fetchXmlEditor.dispatchEvent(new Event('input'));
+	}
+}
+
+/**
+ * Updates the SQL preview panel (in FetchXML mode) with syntax highlighting.
+ * @param {string} sql - The SQL content
+ * @param {Array} warnings - Transpilation warnings
+ */
+function updateSqlPreview(sql, warnings) {
+	const previewContent = document.getElementById('sql-preview-content');
+	if (previewContent) {
+		if (sql) {
+			previewContent.innerHTML = SqlHighlighter.highlight(sql);
+		} else {
+			previewContent.textContent = '';
+		}
+	}
+
+	// Update warnings banner
+	updateWarningsBanner(warnings);
+}
+
+/**
+ * Updates the transpilation warnings banner.
+ * @param {Array} warnings - Array of warning objects with message and feature properties
+ */
+function updateWarningsBanner(warnings) {
+	const warningsContainer = document.getElementById('transpilation-warnings');
+
+	if (!warningsContainer) {
+		// Create warnings container if it doesn't exist and we have warnings
+		if (warnings && warnings.length > 0) {
+			createWarningsBanner(warnings);
+		}
+		return;
+	}
+
+	if (!warnings || warnings.length === 0) {
+		warningsContainer.style.display = 'none';
+		return;
+	}
+
+	// Update warnings content
+	const listElement = warningsContainer.querySelector('.warnings-list');
+	if (listElement) {
+		listElement.innerHTML = warnings.map(w =>
+			`<li><strong>${escapeHtml(w.feature)}:</strong> ${escapeHtml(w.message)}</li>`
+		).join('');
+	}
+	warningsContainer.style.display = 'block';
+}
+
+/**
+ * Creates a new warnings banner and inserts it into the DOM.
+ * @param {Array} warnings - Array of warning objects
+ */
+function createWarningsBanner(warnings) {
+	const fetchXmlPanel = document.getElementById('fetchxml-editor-panel');
+	const sqlPreviewWrapper = fetchXmlPanel?.querySelector('.sql-preview-wrapper');
+
+	if (!sqlPreviewWrapper) {
+		return;
+	}
+
+	const banner = document.createElement('div');
+	banner.className = 'warnings-banner';
+	banner.id = 'transpilation-warnings';
+	banner.setAttribute('role', 'status');
+	banner.innerHTML = `
+		<div class="warnings-header">
+			<span class="warning-icon">⚠️</span>
+			<span class="warning-title">Transpilation Warnings</span>
+		</div>
+		<ul class="warnings-list">
+			${warnings.map(w => `<li><strong>${escapeHtml(w.feature)}:</strong> ${escapeHtml(w.message)}</li>`).join('')}
+		</ul>
+	`;
+
+	sqlPreviewWrapper.parentNode.insertBefore(banner, sqlPreviewWrapper);
 }
