@@ -400,7 +400,7 @@ See `.claude/agents/` for agent definitions.
 
 **Project management:**
 - `TECHNICAL_DEBT.md` - Code quality issues requiring remediation
-- `FUTURE_ENHANCEMENTS.md` - Planned features and improvements (deferred work)
+- `docs/future/` - Planned features and improvements (per-feature files)
 
 ---
 

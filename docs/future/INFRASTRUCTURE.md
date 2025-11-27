@@ -1,0 +1,142 @@
+# Infrastructure Enhancements
+
+Testing infrastructure, tooling, and user experience improvements.
+
+---
+
+## Implemented
+
+### Playwright E2E Testing
+**Status**: ✅ Implemented (Slice 1-4 complete)
+**Priority**: High
+**Value**: Claude can run automated UI tests to find issues without manual F5 testing
+
+**What's Implemented**:
+- ✅ VS Code launch via Playwright Electron (`VSCodeLauncher.launch()`)
+- ✅ Command Palette automation (`CommandPaletteHelper`)
+- ✅ Webview iframe access (`WebviewHelper`)
+- ✅ Screenshot capture (`ScreenshotHelper`, `VSCodeLauncher.takeScreenshot()`)
+- ✅ Console log capture (`vscode.getLogs()` - renderer + webview debug)
+- ✅ Extension Output channel logs (`vscode.getExtensionLogs()` - your logger output)
+- ✅ Claude-optimized JSON reporter with suggestions (`ClaudeJsonReporter`)
+- ✅ Smoke tests: VS Code launch, command execution, extension activation verification
+
+**Commands**:
+- `npm run e2e:smoke` - Run smoke tests (~30s)
+- `npm run e2e:headed` - Visible VS Code window
+- `npm run e2e:debug` - Playwright Inspector
+
+**Design Doc**: `docs/design/PLAYWRIGHT_E2E_DESIGN.md`
+
+**Remaining Enhancements** (not yet implemented):
+- Webview content interaction tests (click buttons, fill forms inside panels)
+- Panel-specific integration tests (Data Explorer query execution, etc.)
+- Visual regression testing (screenshot comparison)
+
+---
+
+## Low Priority
+
+### Integration Testing Framework
+**Status**: Future
+**Priority**: Low
+**Estimated Effort**: 16-24 hours
+**Value**: Catch integration bugs before production
+
+**Description**:
+Add VS Code extension integration tests using `@vscode/test-electron`.
+
+**Scope**:
+- Extension activation tests
+- Command registration tests
+- Webview integration tests
+- End-to-end user workflow tests
+
+**Challenges**:
+- Requires headless VS Code setup (xvfb on Linux)
+- Longer CI build times
+- More complex test fixtures
+- Maintenance overhead
+
+**Success Criteria**:
+- Core workflows covered by integration tests
+- Tests run in CI
+- No flaky tests
+- Clear test organization
+
+---
+
+### E2E Testing with Real Power Platform
+**Status**: Exploratory
+**Priority**: Low
+**Estimated Effort**: 24-40 hours
+**Value**: Catch API integration issues
+
+**Description**:
+End-to-end tests against real Power Platform environments.
+
+**Challenges**:
+- Requires test environment credentials
+- Power Platform API rate limits
+- Long test execution times
+- Environment setup/teardown complexity
+- Cost considerations
+
+**Considerations**:
+- May need dedicated test environment
+- Secret management for credentials
+- Selective execution (not every PR)
+- Clear test data cleanup
+
+---
+
+### Multi-Environment Support
+**Status**: Exploratory
+**Priority**: Low
+**Estimated Effort**: 40+ hours
+**Value**: Streamline multi-environment workflows
+
+**Description**:
+Enhanced support for working with multiple Power Platform environments simultaneously.
+
+**Potential Features**:
+- Environment comparison views
+- Bulk operations across environments
+- Environment-specific settings
+- Connection profiles
+
+**Depends On**:
+- User feedback on current environment handling
+- Clear use cases from real users
+
+---
+
+### In-App Feedback Mechanism
+**Status**: Future (2025-Q3)
+**Priority**: Low
+**Estimated Effort**: 6-8 hours
+**Value**: Easier bug reporting and feature requests
+
+**Description**:
+Add command to report issues directly from VS Code.
+
+**Requirements**:
+- "Report Issue" command in command palette
+- Pre-populate GitHub issue template with diagnostic info
+- Include extension version, VS Code version, OS
+- Option to include error logs
+
+**Features**:
+- Auto-fill issue template
+- Privacy controls (what data to include)
+- Direct link to GitHub issues
+- Optional screenshot attachment
+
+**Success Criteria**:
+- Reduces incomplete bug reports
+- Faster triage time
+- Positive user feedback
+
+---
+
+**Last Updated**: 2025-11-26

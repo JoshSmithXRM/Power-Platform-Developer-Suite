@@ -2,7 +2,7 @@
 
 **Branch:** `docs/alm-documentation-review`
 **Created:** 2025-11-26
-**Status:** Complete - Ready for PR
+**Status:** In Progress - Phase 5c Documentation Cleanup
 
 ---
 
@@ -569,6 +569,51 @@ Document git worktrees + symlinks pattern for parallel feature work.
   - [x] Add `validate` status check requirement
 - [x] Add gh CLI permissions to `.claude/settings.local.example.json`
 - [x] Add E2E smoke tests to `.github/workflows/pr-validation.yml`
+
+### Phase 5c: Documentation Cleanup & Organization
+
+#### Structural Changes
+- [x] Delete `.claude/archive/` folder (git history is archive)
+- [x] Create `docs/requirements/` folder
+- [x] Move `.claude/requirements/METADATA_BROWSER_REQUIREMENTS.md` → `docs/requirements/`
+- [x] Create `docs/future/` folder structure
+- [x] Create `docs/future/README.md` (index + lifecycle rules)
+- [x] Migrate `FUTURE_ENHANCEMENTS.md` into per-feature files in `docs/future/`
+- [x] Delete root `FUTURE_ENHANCEMENTS.md`
+- [x] Update references to FUTURE_ENHANCEMENTS.md in CLAUDE.md, RELEASE_GUIDE.md, DATA_EXPLORER_DESIGN.md
+
+#### Workflow Updates
+- [ ] Update `.claude/WORKFLOW.md` with design doc lifecycle:
+  - Design docs scope MVP only
+  - Extract patterns to `docs/architecture/` during implementation
+  - Migrate future enhancements to `docs/future/[FEATURE].md` before deletion
+  - Delete design doc before PR
+
+#### Documentation Audit
+- [ ] Audit `docs/architecture/` (17 files) - staleness, duplication, consolidation opportunities
+- [ ] Audit `docs/design/` (9 files) - identify completed features, apply lifecycle
+- [ ] Audit `docs/testing/` (3 files) - verify accuracy
+- [ ] Verify all CLAUDE.md references point to valid files
+- [ ] Check cross-references between docs
+- [ ] Remove any unhelpful or confusing content
+
+#### Formalize Standards
+- [ ] Document naming convention (SCREAMING_SNAKE_CASE.md) in docs/README.md
+- [ ] Update docs/README.md with clear navigation/index
+- [ ] Document `.claude/` vs `docs/` purpose distinction
+
+---
+
+## Documentation Decisions (2025-11-26)
+
+| Decision | Rule |
+|----------|------|
+| **Archive policy** | No archive folders - git history is the archive |
+| **Naming convention** | SCREAMING_SNAKE_CASE.md for all documentation files |
+| **Design doc lifecycle** | Delete before PR; extract patterns during implementation; migrate future items to `docs/future/` |
+| **Requirements location** | `docs/requirements/` (near design docs, not in .claude/) |
+| **Future enhancements** | `docs/future/` folder with per-feature files for scalability |
+| **Claude vs docs** | `.claude/` = Claude-only guidance; `docs/` = project docs (human + AI readable) |
 
 ---
 
