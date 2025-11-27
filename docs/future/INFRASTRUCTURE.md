@@ -35,6 +35,88 @@ Testing infrastructure, tooling, and user experience improvements.
 
 ---
 
+## High Priority
+
+### User Configuration System
+**Status**: In Progress (feature/web-resources branch)
+**Priority**: High
+**Estimated Effort**: 8-12 hours
+**Value**: User-configurable settings for record limits, page sizes, and panel behavior
+
+**Description**:
+Add VS Code configuration contribution point to allow users to customize extension behavior. Currently all limits are hardcoded (e.g., plugin trace 100 limit in `TraceFilter.ts:178`).
+
+**Core Features**:
+- VS Code Settings UI integration (`contributes.configuration` in package.json)
+- `IConfigurationService` domain interface
+- `VSCodeConfigurationService` infrastructure implementation
+- Settings exposed via VS Code Settings editor
+
+**Planned Settings**:
+```json
+{
+  "ppds.table.defaultPageSize": 100,
+  "ppds.table.maxCachedRecords": 5000,
+  "ppds.pluginTrace.defaultLimit": 100
+}
+```
+
+**Technical Considerations**:
+- Domain layer defines interface (no VS Code dependency)
+- Infrastructure implements using `vscode.workspace.getConfiguration()`
+- Inject via constructor (testable with mock)
+- Settings should have sensible defaults
+
+**Success Criteria**:
+- Users can adjust record limits without code changes
+- Settings appear in VS Code Settings UI under "Power Platform Developer Suite"
+- All panels respect configured values
+
+**Dependencies**:
+- Required for Virtual Data Table (large dataset support)
+
+---
+
+### Virtual Data Table
+**Status**: In Progress (feature/web-resources branch)
+**Priority**: High
+**Estimated Effort**: 16-24 hours
+**Value**: Support large datasets (70k+ records) without browser/memory issues
+
+**Description**:
+New data table component with virtual scrolling and server-side pagination. Current `DataTableSection` renders ALL rows to DOM, causing performance issues with large datasets.
+
+**Core Features**:
+- Virtual scrolling (only render visible rows + buffer)
+- Server-side pagination (`$top`, `$skip` OData parameters)
+- Background caching up to configurable limit
+- Client-side search within cache (instant)
+- Server-side search fallback (for records beyond cache)
+- "X of Y loaded" status indicator
+
+**Technical Approach**:
+1. Fetch first page immediately (fast initial load)
+2. Background-fetch additional pages up to `maxCachedRecords`
+3. Virtual scroll renders ~50-100 rows in DOM at a time
+4. Search filters cached data; falls back to server if not found
+
+**Panels to Update**:
+- Web Resources (70k+ records - critical)
+- Plugin Trace Viewer (remove hardcoded 100 limit)
+- Solutions (user reports slow)
+- Import Jobs (user reports slow)
+
+**Success Criteria**:
+- 70k records: Initial load < 2 seconds
+- Smooth scrolling through large datasets
+- Instant search within cached records
+- No browser memory issues
+
+**Dependencies**:
+- User Configuration System (for page size settings)
+
+---
+
 ## Low Priority
 
 ### Integration Testing Framework
@@ -139,4 +221,4 @@ Add command to report issues directly from VS Code.
 
 ---
 
-**Last Updated**: 2025-11-26
+**Last Updated**: 2025-11-27
