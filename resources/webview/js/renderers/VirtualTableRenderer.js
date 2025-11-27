@@ -17,7 +17,6 @@
 	// Configuration
 	const OVERSCAN_COUNT = 5; // Extra rows to render above/below viewport
 	const DEFAULT_ROW_HEIGHT = 32;
-	const SCROLL_DEBOUNCE_MS = 16; // ~60fps
 
 	// State
 	let allRows = [];
@@ -190,14 +189,35 @@
 	}
 
 	/**
-	 * Renders only visible rows to the DOM.
+	 * Creates a spacer row element for virtual scrolling.
+	 *
+	 * @param {string} className - CSS class for the spacer
+	 * @param {number} height - Height in pixels
+	 * @returns {HTMLTableRowElement} Spacer row element
+	 */
+	function createSpacerRow(className, height) {
+		const tr = document.createElement('tr');
+		tr.className = className;
+		tr.style.height = `${height}px`;
+		const td = document.createElement('td');
+		td.colSpan = columns.length;
+		tr.appendChild(td);
+		return tr;
+	}
+
+	/**
+	 * Renders only visible rows to the DOM using safe DOM manipulation.
 	 *
 	 * @param {HTMLElement} tbody - The virtual table body element
 	 */
 	function renderVisibleRows(tbody) {
+		// Clear existing content safely
+		while (tbody.firstChild) {
+			tbody.removeChild(tbody.firstChild);
+		}
+
 		if (filteredRows.length === 0) {
-			// Show empty message
-			tbody.innerHTML = renderEmptyRow();
+			tbody.appendChild(createEmptyRow());
 			return;
 		}
 
@@ -205,68 +225,88 @@
 		const topSpacerHeight = visibleStart * rowHeight;
 		const bottomSpacerHeight = Math.max(0, (filteredRows.length - visibleEnd) * rowHeight);
 
-		// Build visible rows HTML
-		const rowsHtml = [];
-
 		// Top spacer (invisible, for scroll position)
 		if (topSpacerHeight > 0) {
-			rowsHtml.push(`<tr class="virtual-spacer-top" style="height: ${topSpacerHeight}px;"><td colspan="${columns.length}"></td></tr>`);
+			tbody.appendChild(createSpacerRow('virtual-spacer-top', topSpacerHeight));
 		}
 
 		// Visible rows
 		for (let i = visibleStart; i < visibleEnd && i < filteredRows.length; i++) {
 			const row = filteredRows[i];
-			rowsHtml.push(renderRow(row, i));
+			tbody.appendChild(createRowElement(row, i));
 		}
 
 		// Bottom spacer (invisible, for scroll position)
 		if (bottomSpacerHeight > 0) {
-			rowsHtml.push(`<tr class="virtual-spacer-bottom" style="height: ${bottomSpacerHeight}px;"><td colspan="${columns.length}"></td></tr>`);
+			tbody.appendChild(createSpacerRow('virtual-spacer-bottom', bottomSpacerHeight));
 		}
 
-		tbody.innerHTML = rowsHtml.join('');
 		applyRowStriping(tbody);
 	}
 
 	/**
-	 * Renders a single row.
+	 * Creates a single row element using safe DOM manipulation.
 	 *
 	 * @param {Object} row - Row data object
 	 * @param {number} index - Row index
-	 * @returns {string} HTML string for the row
+	 * @returns {HTMLTableRowElement} Row element
 	 */
-	function renderRow(row, index) {
-		const cells = columns.map(col => {
+	function createRowElement(row, index) {
+		const tr = document.createElement('tr');
+		tr.setAttribute('data-index', String(index));
+		tr.style.height = `${rowHeight}px`;
+
+		columns.forEach(col => {
+			const td = document.createElement('td');
 			const value = row[col.key];
 			const cellClass = row[col.key + 'Class'] || '';
-			const cellHtml = row[col.key + 'Html'] || escapeHtml(String(value || ''));
-			// Add title attribute for tooltip on truncated content
-			const plainText = String(value || '');
-			const titleAttr = plainText ? ` title="${escapeHtml(plainText)}"` : '';
-			return `<td class="${cellClass}"${titleAttr}>${cellHtml}</td>`;
-		}).join('');
 
-		return `<tr data-index="${index}" style="height: ${rowHeight}px;">${cells}</tr>`;
+			if (cellClass) {
+				td.className = cellClass;
+			}
+
+			// Add title attribute for tooltip on truncated content
+			const plainText = String(value !== null && value !== undefined ? value : '');
+			if (plainText) {
+				td.title = plainText;
+			}
+
+			// Check for pre-rendered HTML content (from trusted backend)
+			const cellHtml = row[col.key + 'Html'];
+			if (cellHtml) {
+				// Pre-rendered HTML from backend - use sanitized insertion
+				td.innerHTML = sanitizeHtml(cellHtml);
+			} else {
+				// Plain text - use textContent for automatic escaping
+				td.textContent = plainText;
+			}
+
+			tr.appendChild(td);
+		});
+
+		return tr;
 	}
 
 	/**
-	 * Renders empty state row.
+	 * Creates empty state row element.
 	 *
-	 * @returns {string} HTML string for empty row
+	 * @returns {HTMLTableRowElement} Empty row element
 	 */
-	function renderEmptyRow() {
+	function createEmptyRow() {
 		const searchInput = document.getElementById('searchInput');
 		const message = searchInput && searchInput.value
 			? 'No matching records found'
 			: 'No data available';
 
-		return `
-			<tr>
-				<td colspan="${columns.length}" style="text-align: center; padding: 24px; color: var(--vscode-descriptionForeground);">
-					${escapeHtml(message)}
-				</td>
-			</tr>
-		`;
+		const tr = document.createElement('tr');
+		const td = document.createElement('td');
+		td.colSpan = columns.length;
+		td.style.textAlign = 'center';
+		td.style.padding = '24px';
+		td.style.color = 'var(--vscode-descriptionForeground)';
+		td.textContent = message;
+		tr.appendChild(td);
+		return tr;
 	}
 
 	/**
@@ -310,15 +350,53 @@
 	}
 
 	/**
-	 * Escapes HTML special characters.
+	 * Sanitizes HTML content by allowing only safe tags and attributes.
+	 * Used for pre-rendered HTML from trusted backend.
 	 *
-	 * @param {string} str - String to escape
-	 * @returns {string} Escaped string
+	 * @param {string} html - HTML string to sanitize
+	 * @returns {string} Sanitized HTML string
 	 */
-	function escapeHtml(str) {
-		const div = document.createElement('div');
-		div.textContent = str;
-		return div.innerHTML;
+	function sanitizeHtml(html) {
+		// Allowed tags for cell content (badges, icons, links)
+		const allowedTags = ['span', 'a', 'strong', 'em', 'i', 'b', 'code', 'br'];
+		// Allowed attributes
+		const allowedAttributes = ['class', 'title', 'href', 'target', 'rel'];
+
+		const template = document.createElement('template');
+		template.innerHTML = html;
+
+		const sanitize = (element) => {
+			const children = Array.from(element.childNodes);
+			children.forEach(child => {
+				if (child.nodeType === Node.ELEMENT_NODE) {
+					const tagName = child.tagName.toLowerCase();
+					if (!allowedTags.includes(tagName)) {
+						// Replace disallowed tags with text content
+						const text = document.createTextNode(child.textContent || '');
+						element.replaceChild(text, child);
+					} else {
+						// Remove disallowed attributes
+						Array.from(child.attributes).forEach(attr => {
+							if (!allowedAttributes.includes(attr.name.toLowerCase())) {
+								child.removeAttribute(attr.name);
+							}
+							// Sanitize href to prevent javascript: URLs
+							if (attr.name.toLowerCase() === 'href') {
+								const href = attr.value.toLowerCase().trim();
+								if (href.startsWith('javascript:') || href.startsWith('data:')) {
+									child.removeAttribute('href');
+								}
+							}
+						});
+						// Recursively sanitize children
+						sanitize(child);
+					}
+				}
+			});
+		};
+
+		sanitize(template.content);
+		return template.innerHTML;
 	}
 
 	/**
@@ -402,10 +480,22 @@
 		}
 	};
 
-	// Listen for table update messages
+	// Listen for table update messages from VS Code webview API
 	window.addEventListener('message', event => {
+		// Verify origin - VS Code webviews use vscode-webview:// protocol
+		// or the message comes from the same origin (self-posted)
+		const origin = event.origin;
+		const isVSCodeWebview = origin.startsWith('vscode-webview://');
+		const isSameOrigin = origin === window.location.origin;
+		const isNullOrigin = origin === 'null'; // VS Code webviews may report null origin
+
+		if (!isVSCodeWebview && !isSameOrigin && !isNullOrigin) {
+			// Reject messages from untrusted origins
+			return;
+		}
+
 		const message = event.data;
-		if (message.command === 'updateVirtualTable') {
+		if (message && message.command === 'updateVirtualTable') {
 			updateVirtualTable(message.data);
 		}
 	});

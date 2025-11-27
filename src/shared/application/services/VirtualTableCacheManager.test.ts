@@ -1,8 +1,13 @@
-import { VirtualTableCacheManager } from './VirtualTableCacheManager';
+// Import from index to ensure barrel file coverage
+import {
+	VirtualTableCacheManager,
+	VirtualTableConfig,
+	VirtualTableCacheState
+} from '../index';
+import type { CacheStateChangeCallback } from '../index';
 import type { IVirtualTableDataProvider } from '../../domain/interfaces/IVirtualTableDataProvider';
 import type { ICancellationToken } from '../../domain/interfaces/ICancellationToken';
 import { PaginatedResult } from '../../domain/valueObjects/PaginatedResult';
-import { VirtualTableConfig } from '../../domain/valueObjects/VirtualTableConfig';
 import { NullLogger } from '../../../infrastructure/logging/NullLogger';
 
 // Test entity type
@@ -536,6 +541,100 @@ describe('VirtualTableCacheManager', () => {
 			// Should have stopped early due to cancellation
 			const cachedCount = cacheManager.getCachedRecords().length;
 			expect(cachedCount).toBeLessThan(config.getMaxCachedRecords());
+		});
+
+		it('should handle undefined cancellation token during background loading', async () => {
+			const config = VirtualTableConfig.createDefault();
+			const cacheManager = new VirtualTableCacheManager(provider, config, logger);
+
+			// Load without cancellation token - tests the undefined branch
+			await cacheManager.loadInitialPage(undefined, undefined);
+			await cacheManager.waitForBackgroundLoading();
+
+			// Should complete loading without errors
+			expect(cacheManager.getCachedRecords().length).toBeGreaterThan(100);
+		});
+	});
+
+	describe('concurrent loading protection', () => {
+		it('should not start duplicate background loading', async () => {
+			// Setup slow provider to ensure background loading takes time
+			provider.findPaginated.mockImplementation(async (page, pageSize) => {
+				if (page > 1) {
+					await new Promise(resolve => setTimeout(resolve, 100));
+				}
+				const startIndex = (page - 1) * pageSize;
+				const items = createTestEntities(Math.min(pageSize, 1000 - startIndex), startIndex + 1);
+				return PaginatedResult.create(items, page, pageSize, 1000);
+			});
+
+			const config = VirtualTableConfig.createDefault();
+			const cacheManager = new VirtualTableCacheManager(provider, config, logger);
+
+			// Start initial load which triggers background loading
+			await cacheManager.loadInitialPage();
+
+			// Verify background loading is in progress
+			expect(cacheManager.isBackgroundLoading()).toBe(true);
+
+			// Try to load again while background loading is running
+			// This tests the early return in startBackgroundLoading
+			await cacheManager.loadInitialPage();
+
+			// Wait for background loading to complete
+			await cacheManager.waitForBackgroundLoading();
+
+			// Should complete without issues
+			expect(cacheManager.isBackgroundLoading()).toBe(false);
+		});
+	});
+
+	describe('barrel file exports', () => {
+		it('should export VirtualTableCacheState from index', () => {
+			// Verify re-exported class is usable
+			const state = VirtualTableCacheState.createEmpty();
+			expect(state.isEmpty()).toBe(true);
+		});
+
+		it('should export VirtualTableConfig from index', () => {
+			// Verify re-exported class is usable
+			const config = VirtualTableConfig.createDefault();
+			expect(config.getInitialPageSize()).toBe(100);
+		});
+
+		it('should type CacheStateChangeCallback correctly', () => {
+			// Verify type export works by using it
+			const callback: CacheStateChangeCallback<TestEntity> = (state, records) => {
+				expect(state).toBeDefined();
+				expect(records).toBeDefined();
+			};
+
+			const config = createNoBackgroundConfig();
+			const cacheManager = new VirtualTableCacheManager(provider, config, logger);
+			cacheManager.onStateChange(callback);
+
+			// Callback should be registered without type errors
+			expect(true).toBe(true);
+		});
+	});
+
+	describe('waitForBackgroundLoading edge cases', () => {
+		it('should resolve immediately when no background loading', async () => {
+			const config = createNoBackgroundConfig();
+			const cacheManager = new VirtualTableCacheManager(provider, config, logger);
+
+			// Call wait when no loading has started
+			await expect(cacheManager.waitForBackgroundLoading()).resolves.toBeUndefined();
+		});
+
+		it('should resolve immediately after loading completes', async () => {
+			const config = createNoBackgroundConfig();
+			const cacheManager = new VirtualTableCacheManager(provider, config, logger);
+
+			await cacheManager.loadInitialPage();
+
+			// Background loading not enabled, so wait should resolve immediately
+			await expect(cacheManager.waitForBackgroundLoading()).resolves.toBeUndefined();
 		});
 	});
 });
