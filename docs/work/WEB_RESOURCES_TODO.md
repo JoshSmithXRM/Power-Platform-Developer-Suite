@@ -115,7 +115,9 @@ Once virtual table merges to main:
 ### Immediate Tasks
 - [x] Clean up design doc (extract patterns, trim future ideas)
 - [x] Move future slice ideas to `docs/future/DEVELOPMENT_TOOLS.md`
-- [ ] Run technical debt check on Slice 1 implementation
+- [x] Run technical debt check on Slice 1 implementation
+- [x] Add WebResourceTypeFormatter tests (14 tests)
+- [x] Add DataverseWebResourceRepository tests (17 tests)
 
 ### Design Doc Cleanup ✅ COMPLETE
 - [x] Trimmed `WEB_RESOURCES_PANEL_DESIGN.md` from 1934 → 148 lines
