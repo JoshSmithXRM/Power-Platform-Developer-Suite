@@ -44,7 +44,7 @@ This document tracks features, improvements, and ideas that we want to implement
 - `npm run e2e:headed` - Visible VS Code window
 - `npm run e2e:debug` - Playwright Inspector
 
-**Design Doc**: `docs/designs/PLAYWRIGHT_E2E_DESIGN.md`
+**Design Doc**: `docs/design/PLAYWRIGHT_E2E_DESIGN.md`
 
 **Future Enhancements** (not yet implemented):
 - Webview content interaction tests (click buttons, fill forms inside panels)

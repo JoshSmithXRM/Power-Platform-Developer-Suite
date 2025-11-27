@@ -550,14 +550,14 @@ Document git worktrees + symlinks pattern for parallel feature work.
 
 ## Implementation Checklist
 
-- [ ] Create `docs/work/` directory
-- [ ] Rewrite `.claude/WORKFLOW.md` with 9-phase workflow
-- [ ] Create `.claude/templates/TASK_TRACKING_TEMPLATE.md`
-- [ ] Update `CLAUDE.md` with E2E test guidance
-- [ ] Update `CLAUDE.md` with context-aware commit rules
-- [ ] Move `docs/designs/PLAYWRIGHT_E2E_DESIGN.md` to `docs/design/`
-- [ ] Delete `docs/designs/` folder
-- [ ] Update references to moved file
+- [x] Create `docs/work/` directory
+- [x] Rewrite `.claude/WORKFLOW.md` with 9-phase workflow
+- [x] Create `.claude/templates/TASK_TRACKING_TEMPLATE.md`
+- [x] Update `CLAUDE.md` with E2E test guidance
+- [x] Update `CLAUDE.md` with context-aware commit rules
+- [x] Move `docs/designs/PLAYWRIGHT_E2E_DESIGN.md` to `docs/design/`
+- [x] Delete `docs/designs/` folder
+- [x] Update references to moved file (CHANGELOG.md, FUTURE_ENHANCEMENTS.md, CLAUDE.md)
 - [ ] Create `docs/BRANCH_STRATEGY.md` (next task after this)
 
 ---

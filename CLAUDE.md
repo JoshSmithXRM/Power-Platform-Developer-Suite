@@ -346,6 +346,14 @@ Read same file (depends on write completing)
 2. Fix bug (test passes)
 3. Commit with test (prevents regression)
 
+**E2E tests for bugs:** Only write E2E tests for UI/workflow/timing bugs - not every bug.
+| Bug Type | Unit Test | E2E Test |
+|----------|-----------|----------|
+| Domain/use case logic | ✅ Always | ❌ No |
+| Panel rendering | ✅ If possible | ✅ Yes |
+| User workflow broken | ❌ Hard | ✅ Yes |
+| Race condition/timing | ❌ Hard | ✅ Yes |
+
 ### Refactoring
 
 1. Tests pass BEFORE refactoring (baseline)
@@ -388,7 +396,7 @@ See `.claude/agents/` for agent definitions.
 **Testing guides:**
 - `docs/testing/TESTING_GUIDE.md` - Unit testing patterns and test factories
 - `docs/testing/INTEGRATION_TESTING_GUIDE.md` - Panel integration testing patterns
-- `docs/designs/PLAYWRIGHT_E2E_DESIGN.md` - E2E testing infrastructure (Playwright + VS Code)
+- `docs/design/PLAYWRIGHT_E2E_DESIGN.md` - E2E testing infrastructure (Playwright + VS Code)
 
 **Project management:**
 - `TECHNICAL_DEBT.md` - Code quality issues requiring remediation
@@ -401,10 +409,44 @@ See `.claude/agents/` for agent definitions.
 | When | Action |
 |------|--------|
 | Complex feature (3+ files) | `/design` first |
-| Before commit | `/code-review` |
+| Before PR | `/code-review` (mandatory) |
 | End session | `/handoff` |
 | Context full/switching tasks | `/clear` |
 | Uncertain architecture | "think harder" before designing |
+
+---
+
+## 📝 Commit Guidance
+
+**Context-aware approach** - not one-size-fits-all:
+
+**Code changes:**
+- Commit per layer during implementation
+- Follow session pattern if established (user said "commit and proceed" = do it going forward)
+- Ask if unclear on significant code changes
+
+**Documentation/planning:**
+- Commit at logical checkpoints WITHOUT asking
+- After each completed phase
+- When tracking doc updated significantly
+
+**Never commit:**
+- Failing tests
+- Compilation errors
+- Incomplete implementations (unless WIP branch)
+
+---
+
+## 📂 Work Tracking
+
+**For multi-phase work, create tracking doc:** `docs/work/[FEATURE]_TODO.md`
+
+- Use template: `.claude/templates/TASK_TRACKING_TEMPLATE.md`
+- Update as work progresses (check boxes)
+- Track bugs found during manual testing
+- Delete after PR merge (git history preserves it)
+
+**Keep in sync:** TodoWrite (in-session) + tracking doc (persistent)
 
 ---
 
