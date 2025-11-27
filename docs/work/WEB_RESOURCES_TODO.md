@@ -172,4 +172,16 @@ Once virtual table merges to main:
 - **Decision:** Split pagination/virtual table to separate branch (`feature/virtual-table`)
 - **Decision:** Split configuration to separate branch (`feature/configuration-settings`)
 - Updated this tracking doc to reflect new dependency chain
-- **Current status:** Blocked on dependencies, working on design doc cleanup
+- Created worktrees for parallel development:
+  - `C:\VS\Power-Platform-Developer-Suite-configuration` → `feature/configuration-settings`
+  - `C:\VS\Power-Platform-Developer-Suite-virtual-table` → `feature/virtual-table`
+- Design doc cleanup:
+  - Trimmed `WEB_RESOURCES_PANEL_DESIGN.md` from 1934 → 148 lines
+  - Moved Slices 3-5 details to `docs/future/DEVELOPMENT_TOOLS.md`
+  - Committed: `81467ac`
+- Technical debt resolution:
+  - Added WebResourceTypeFormatter tests (14 tests)
+  - Added DataverseWebResourceRepository tests (17 tests)
+  - Total web resources tests now: 255
+  - Committed: `bcd6af8`
+- **Current status:** All cleanup complete. Branch blocked on `feature/virtual-table`
