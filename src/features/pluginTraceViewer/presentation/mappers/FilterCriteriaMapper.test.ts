@@ -436,16 +436,30 @@ describe('FilterCriteriaMapper', () => {
 	});
 
 	describe('empty', () => {
-		it('should create empty FilterCriteriaViewModel', () => {
-			const result = FilterCriteriaMapper.empty();
+		it('should create empty FilterCriteriaViewModel with default top', () => {
+			const mapper = new FilterCriteriaMapper();
+			const result = mapper.empty();
 
 			expect(result.conditions).toEqual([]);
 			expect(result.top).toBe(100);
 		});
 
+		it('should use configured default limit when config service provided', () => {
+			const mockConfigService = {
+				get: jest.fn().mockReturnValue(250)
+			};
+			const mapper = new FilterCriteriaMapper(mockConfigService);
+			const result = mapper.empty();
+
+			expect(result.conditions).toEqual([]);
+			expect(result.top).toBe(250);
+			expect(mockConfigService.get).toHaveBeenCalledWith('pluginTrace.defaultLimit', 100);
+		});
+
 		it('should return new instance each time', () => {
-			const result1 = FilterCriteriaMapper.empty();
-			const result2 = FilterCriteriaMapper.empty();
+			const mapper = new FilterCriteriaMapper();
+			const result1 = mapper.empty();
+			const result2 = mapper.empty();
 
 			expect(result1).not.toBe(result2);
 			expect(result1.conditions).not.toBe(result2.conditions);

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
 import type { IPanelStateRepository, PanelState } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { FilterCriteriaMapper } from '../mappers/FilterCriteriaMapper';
 import type { FilterCriteriaViewModel, FilterConditionViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
@@ -36,10 +37,11 @@ export class PluginTraceFilterManagementBehavior {
 		private readonly panelStateRepository: IPanelStateRepository | null,
 		private readonly viewType: string,
 		private readonly onRefreshNeeded: () => Promise<void>,
-		private readonly onPersistState: () => Promise<void>
+		private readonly onPersistState: () => Promise<void>,
+		configService?: IConfigurationService
 	) {
-		this.filterCriteriaMapper = new FilterCriteriaMapper();
-		this.filterCriteria = FilterCriteriaMapper.empty();
+		this.filterCriteriaMapper = new FilterCriteriaMapper(configService);
+		this.filterCriteria = this.filterCriteriaMapper.empty();
 	}
 
 	/**
@@ -143,7 +145,7 @@ export class PluginTraceFilterManagementBehavior {
 			this.logger.debug('Clearing filters');
 
 			// Reset to empty filter criteria and clear active quick filters
-			this.filterCriteria = FilterCriteriaMapper.empty();
+			this.filterCriteria = this.filterCriteriaMapper.empty();
 			this.activeQuickFilterIds = [];
 
 			// Persist empty filter criteria

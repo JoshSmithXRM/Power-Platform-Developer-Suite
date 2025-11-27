@@ -72,6 +72,12 @@
     "contributes": {
         "commands": [
             {
+                "command": "power-platform-dev-suite.openSettings",
+                "title": "Open Settings",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(gear)"
+            },
+            {
                 "command": "power-platform-dev-suite.addEnvironment",
                 "title": "Add Environment",
                 "category": "Power Platform Developer Suite",
@@ -329,6 +335,18 @@
                     "group": "1_environment@1"
                 }
             ]
+        },
+        "configuration": {
+            "title": "Power Platform Developer Suite",
+            "properties": {
+                "powerPlatformDevSuite.pluginTrace.defaultLimit": {
+                    "type": "number",
+                    "default": 100,
+                    "minimum": 1,
+                    "maximum": 5000,
+                    "description": "Default number of plugin traces to fetch (1-5000). Increase for powerful environments, decrease for slower connections."
+                }
+            }
         }
     },
     "scripts": {
