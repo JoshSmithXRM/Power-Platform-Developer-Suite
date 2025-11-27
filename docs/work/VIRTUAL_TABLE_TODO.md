@@ -2,7 +2,7 @@
 
 **Branch:** `feature/virtual-table`
 **Created:** 2025-11-27
-**Status:** Discovery | Requirements | Design Complete | **Implementation (Solutions Panel)** | Testing | Review | Complete
+**Status:** Discovery | Requirements | Design Complete | **Implementation (Data Table Consistency)** | Testing | Review | Complete
 **Design Docs:** `docs/design/VIRTUAL_DATA_TABLE_*.md` (4 files created)
 
 ---
@@ -127,6 +127,21 @@
 - [ ] Web Resources panel (critical - 70k records) - needs $skip support or fetchxml paging
 - [ ] Plugin Trace Viewer (remove 100 limit)
 - [ ] Import Jobs (reported slow)
+
+### Data Table Consistency Pattern (NEW)
+- [ ] `ColumnTypes.ts` - Type definitions and bounds
+- [ ] `ColumnWidthCalculator.ts` - Width calculation utility
+- [ ] `tables/index.ts` - Re-exports
+- [ ] CSS updates - `table-layout: fixed`, `white-space: nowrap`
+- [ ] `VirtualDataTableSection` - Use calculator
+- [ ] `virtualTableSectionView.ts` - Apply widths, add title attributes
+- [ ] `DataTableSection` - Use calculator
+- [ ] `dataTableSectionView.ts` - Apply widths, add title attributes
+- [ ] Solutions panel - Add column types
+- [ ] Import Jobs panel - Add column types
+- [ ] Environment Variables panel - Add column types
+- [ ] Plugin Trace Viewer panel - Add column types
+- [ ] Test all panels for consistency
 
 ### Deferred Work (Slice 3)
 - [ ] Server-side search fallback - Query server when search term not in cache
