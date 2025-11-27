@@ -26,7 +26,7 @@ Testing infrastructure, tooling, and user experience improvements.
 - `npm run e2e:headed` - Visible VS Code window
 - `npm run e2e:debug` - Playwright Inspector
 
-**Design Doc**: `docs/design/PLAYWRIGHT_E2E_DESIGN.md`
+**Implementation**: `e2e/` folder with Playwright tests and helpers
 
 **Remaining Enhancements** (not yet implemented):
 - Webview content interaction tests (click buttons, fill forms inside panels)

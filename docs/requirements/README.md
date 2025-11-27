@@ -37,3 +37,4 @@ Requirements (WHAT) → Design (HOW) → Implementation
 | File | Feature | Status |
 |------|---------|--------|
 | [METADATA_BROWSER_REQUIREMENTS.md](METADATA_BROWSER_REQUIREMENTS.md) | Metadata Browser | In Development |
+| [METADATA_BROWSER_PRESENTATION_REQUIREMENTS.md](METADATA_BROWSER_PRESENTATION_REQUIREMENTS.md) | Metadata Browser Presentation | In Development |

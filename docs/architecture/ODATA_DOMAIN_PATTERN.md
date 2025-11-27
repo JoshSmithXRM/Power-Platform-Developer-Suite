@@ -353,11 +353,11 @@ toODataFilter(): string {
 
 ## Design Documents
 
-This decision is documented in multiple design docs:
+This decision is documented in:
 
-1. **DATETIME_FILTER_ARCHITECTURE.md**:
-   - Explains OData format conversion in DateTimeFilter
-   - Documents layer responsibilities for datetime handling
+1. **DateTimeFilter implementation** (`src/shared/domain/valueObjects/DateTimeFilter.ts`):
+   - Demonstrates OData format conversion in value object
+   - Layer responsibilities for datetime handling
 
 2. **FILTER_PANEL_IMPROVEMENTS_DESIGN.md**:
    - Describes filter panel architecture
@@ -410,13 +410,13 @@ This decision is documented in multiple design docs:
 
 ## References
 
-**Design Documents**:
-- `docs/design/DATETIME_FILTER_ARCHITECTURE.md` - DateTime filtering architecture
+**Documentation**:
 - `docs/design/FILTER_PANEL_IMPROVEMENTS_DESIGN.md` - Filter panel design
 - `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Domain layer responsibilities
 
 **Code Locations**:
-- `src/features/pluginTraceViewer/domain/services/ODataExpressionBuilder.ts`
+- `src/shared/domain/valueObjects/DateTimeFilter.ts` - DateTime filtering value object
+- `src/features/pluginTraceViewer/domain/services/ODataExpressionBuilder.ts` - OData query building
 - `src/features/pluginTraceViewer/domain/services/ODataExpressionBuilder.test.ts` (48 tests)
 - `src/features/pluginTraceViewer/domain/entities/FilterCondition.ts:59`
 - `src/features/pluginTraceViewer/domain/entities/TraceFilter.ts:98`

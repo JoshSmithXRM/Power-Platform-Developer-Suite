@@ -396,7 +396,7 @@ See `.claude/agents/` for agent definitions.
 **Testing guides:**
 - `docs/testing/TESTING_GUIDE.md` - Unit testing patterns and test factories
 - `docs/testing/INTEGRATION_TESTING_GUIDE.md` - Panel integration testing patterns
-- `docs/design/PLAYWRIGHT_E2E_DESIGN.md` - E2E testing infrastructure (Playwright + VS Code)
+- `e2e/README.md` - E2E testing infrastructure (Playwright + VS Code)
 
 **Project management:**
 - `TECHNICAL_DEBT.md` - Code quality issues requiring remediation

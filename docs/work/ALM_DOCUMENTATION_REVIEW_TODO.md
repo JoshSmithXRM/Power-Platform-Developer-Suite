@@ -590,12 +590,16 @@ Document git worktrees + symlinks pattern for parallel feature work.
   - Delete design doc before PR
 
 #### Documentation Audit
-- [ ] Audit `docs/architecture/` (17 files) - staleness, duplication, consolidation opportunities
-- [ ] Audit `docs/design/` (9 files) - identify completed features, apply lifecycle
-- [ ] Audit `docs/testing/` (3 files) - verify accuracy
-- [ ] Verify all CLAUDE.md references point to valid files
-- [ ] Check cross-references between docs
-- [ ] Remove any unhelpful or confusing content
+- [x] Audit `docs/architecture/` (17 files) - no consolidation needed, all files serve purpose
+- [x] Audit `docs/design/` - cleanup completed:
+  - Deleted DATA_EXPLORER_INTELLISENSE_DESIGN.md (superseded by V2)
+  - Deleted DATETIME_FILTER_ARCHITECTURE.md (implemented)
+  - Deleted PLAYWRIGHT_E2E_DESIGN.md (implemented)
+  - Moved METADATA_BROWSER_PRESENTATION_REQUIREMENTS.md to docs/requirements/
+  - Moved CLEANUP_GUIDE.md to .claude/templates/DESIGN_CLEANUP_GUIDE.md
+- [x] Verify all CLAUDE.md references point to valid files
+- [x] Check cross-references between docs (fixed ODATA_DOMAIN_PATTERN.md, INFRASTRUCTURE.md)
+- [x] Remove any unhelpful or confusing content
 
 #### Formalize Standards
 - [ ] Document naming convention (SCREAMING_SNAKE_CASE.md) in docs/README.md
