@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Virtual Table Infrastructure** - High-performance table rendering for large datasets
+  - Virtual scrolling renders only visible rows to DOM (50-100 rows vs all rows)
+  - Background data loading with cache management (up to 5,000 records)
+  - Solutions panel migrated to virtual table (tested with 1,246 solutions)
+  - Domain layer: `IVirtualTableDataProvider`, `PaginatedResult`, `VirtualTableConfig`, `VirtualTableCacheState`
+  - Application layer: `VirtualTableCacheManager` with background loading
+  - Infrastructure layer: `VirtualDataTableSection`, `VirtualTableRenderer.js`
+
+- **Data Table Consistency Pattern** - Unified table appearance across all panels
+  - Column width calculator with semantic type bounds (name, identifier, status, boolean, datetime, etc.)
+  - Fixed column widths prevent resize during scroll
+  - Truncated content shows full text on hover (title tooltips)
+  - Consistent 36px row heights with `table-layout: fixed`
+
 - **User Configuration System** - Customizable extension settings via VS Code Settings UI
   - `powerPlatformDevSuite.pluginTrace.defaultLimit` - Configure default number of plugin traces to fetch (1-5000, default: 100)
   - Settings accessible via Command Palette: "Power Platform Developer Suite: Open Settings"
