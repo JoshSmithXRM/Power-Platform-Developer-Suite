@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Data Explorer - FetchXML Direct Editing:** SQL/FetchXML mode toggle for bidirectional query editing
+  - Mode toggle tabs (SQL / FetchXML) above editor
+  - **SQL Mode:** SQL editor (editable) + FetchXML preview (read-only) - existing behavior
+  - **FetchXML Mode:** FetchXML editor (editable) + SQL preview (read-only)
+  - Live FetchXML → SQL transpilation with syntax highlighting
+  - Warnings banner for unsupported FetchXML features (aggregates, distinct, paging, groupby)
+  - Direct FetchXML execution without SQL transpilation step
+  - Ctrl+Enter keyboard shortcut works in both modes
+  - Query mode persisted per environment (SQL, FetchXML, and mode state all saved)
+
 - **Data Explorer - Export CSV:** Export query results to CSV file
   - "Export CSV" button in toolbar after query execution
   - Generates filename with entity name and timestamp (e.g., `contact_export_2025-11-27T12-30-00.csv`)

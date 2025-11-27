@@ -11,7 +11,7 @@
 |-------|------|--------|
 | Slice 1 (MVP) | Execute simple SQL query | ✅ Complete |
 | Slice 2 | Export results to CSV | ✅ Complete |
-| **Slice 3** | Edit FetchXML directly | 🔄 In Progress |
+| Slice 3 | Edit FetchXML directly | ✅ Complete (pending manual test) |
 | Slice 4 | Pagination (paging cookies) | ⏳ Post-MVP |
 
 ---
@@ -20,32 +20,34 @@
 
 **Goal:** User can edit FetchXML directly and execute, with bidirectional SQL ↔ FetchXML translation.
 
-### Domain Layer
-- [ ] `FetchXmlValidator` domain service - validates FetchXML syntax
-- [ ] `FetchXmlToSqlTranspiler` domain service - reverse transpilation with warnings
-- [ ] Unit tests for FetchXmlValidator (target: 100%)
-- [ ] Unit tests for FetchXmlToSqlTranspiler (target: 100%)
-- [ ] `npm run compile` passes
-- [ ] Committed
+### Domain Layer ✅
+- [x] `FetchXmlValidator` domain service - validates FetchXML syntax (32 tests)
+- [x] `FetchXmlToSqlTranspiler` domain service - reverse transpilation with warnings (33 tests)
+- [x] Unit tests for FetchXmlValidator (100% coverage)
+- [x] Unit tests for FetchXmlToSqlTranspiler (100% coverage)
+- [x] `npm run compile` passes
+- [x] Committed: `301186a`
 
-### Application Layer
-- [ ] `ExecuteFetchXmlQueryUseCase` - executes raw FetchXML queries
-- [ ] Update `ExecuteSqlQueryUseCase` with `transpileToFetchXml()` method (if not already)
-- [ ] Unit tests (target: 90%)
-- [ ] `npm run compile` passes
-- [ ] Committed
+### Application Layer ✅
+- [x] `FetchXmlValidationError` domain error
+- [x] `ExecuteFetchXmlQueryUseCase` - validates and executes raw FetchXML queries
+- [x] `transpileToSql()` and `validate()` methods for live preview
+- [x] Unit tests (20 tests for use case, 12 for error)
+- [x] `npm run compile` passes
+- [x] Committed: `78f8384`
 
-### Presentation Layer
-- [ ] Mode toggle UI: SQL ↔ FetchXML tabs
-- [ ] FetchXML editor (editable when in FetchXML mode)
-- [ ] SQL preview (read-only when in FetchXML mode)
-- [ ] Warning banner for unsupported FetchXML features during reverse transpilation
-- [ ] `npm run compile` passes
-- [ ] Committed
+### Presentation Layer ✅
+- [x] Mode toggle UI: SQL ↔ FetchXML tabs
+- [x] FetchXML editor (editable when in FetchXML mode) with syntax highlighting
+- [x] SQL preview (read-only when in FetchXML mode)
+- [x] Warning banner for unsupported FetchXML features
+- [x] Query mode persistence (SQL, FetchXML, mode all saved per environment)
+- [x] `npm run compile` passes
+- [x] Committed: `b3b2afc`
 
 ### Testing
-- [ ] Unit tests pass: `npm test`
-- [ ] E2E tests: Mode switching, FetchXML execution
+- [x] Unit tests pass: `npm test` (6,394 tests, 97 new this session)
+- [ ] E2E tests: Mode switching, FetchXML execution (optional)
 - [ ] Manual testing (F5): Full workflow test
 
 ### Bugs Found During Manual Testing
@@ -113,7 +115,32 @@
 
 ## Session Notes
 
-### Session: 2025-11-27
+### Session: 2025-11-27 (continued)
+**Slice 3 Implementation Complete**
+
+Domain Layer:
+- `FetchXmlValidator` - string-based XML validation (32 tests)
+- `FetchXmlToSqlTranspiler` - reverse transpilation with warnings (33 tests)
+
+Application Layer:
+- `FetchXmlValidationError` - domain error with formatted output
+- `ExecuteFetchXmlQueryUseCase` - validate + execute (20 tests)
+
+Presentation Layer:
+- Mode toggle tabs (SQL / FetchXML)
+- FetchXML editor with syntax highlighting
+- SQL preview panel
+- Warnings banner for unsupported features
+- State persistence per environment
+
+Commits:
+- `301186a` - Domain services
+- `78f8384` - Application use case
+- `b3b2afc` - Presentation layer
+
+**Next:** Manual testing with F5
+
+### Session: 2025-11-27 (earlier)
 - Completed documentation audit
 - Fixed docs/README.md broken TECHNICAL_DEBT.md reference
 - Updated CHANGELOG.md [Unreleased] with Phase 2 changes
