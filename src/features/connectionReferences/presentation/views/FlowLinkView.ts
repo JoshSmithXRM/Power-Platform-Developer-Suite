@@ -14,7 +14,7 @@ export interface FlowConnectionRelationshipViewModelWithHtml extends FlowConnect
 export function renderFlowLink(flowId: string, flowName: string): string {
 	const escapedId = escapeHtml(flowId);
 	const escapedName = escapeHtml(flowName);
-	return `<a href="#" class="flow-link" data-command="openFlow" data-flow-id="${escapedId}">${escapedName}</a>`;
+	return `<a href="#" class="flow-link" data-command="openFlow" data-flow-id="${escapedId}" title="${escapedName}">${escapedName}</a>`;
 }
 
 /**

@@ -128,20 +128,22 @@
 - [ ] Plugin Trace Viewer (remove 100 limit)
 - [ ] Import Jobs (reported slow)
 
-### Data Table Consistency Pattern (NEW)
-- [ ] `ColumnTypes.ts` - Type definitions and bounds
-- [ ] `ColumnWidthCalculator.ts` - Width calculation utility
-- [ ] `tables/index.ts` - Re-exports
-- [ ] CSS updates - `table-layout: fixed`, `white-space: nowrap`
-- [ ] `VirtualDataTableSection` - Use calculator
-- [ ] `virtualTableSectionView.ts` - Apply widths, add title attributes
-- [ ] `DataTableSection` - Use calculator
-- [ ] `dataTableSectionView.ts` - Apply widths, add title attributes
-- [ ] Solutions panel - Add column types
-- [ ] Import Jobs panel - Add column types
-- [ ] Environment Variables panel - Add column types
-- [ ] Plugin Trace Viewer panel - Add column types
-- [ ] Test all panels for consistency
+### Data Table Consistency Pattern (COMPLETE)
+- [x] `ColumnTypes.ts` - Type definitions and bounds
+- [x] `ColumnWidthCalculator.ts` - Width calculation utility
+- [x] `tables/index.ts` - Re-exports
+- [x] CSS updates - `table-layout: fixed`, `white-space: nowrap`
+- [x] `VirtualDataTableSection` - Use calculator
+- [x] `virtualTableSectionView.ts` - Apply widths, add title attributes
+- [x] `DataTableSection` - Use calculator
+- [x] `dataTableSectionView.ts` - Apply widths, add title attributes
+- [x] Solutions panel - Add column types
+- [x] Import Jobs panel - Add column types
+- [x] Environment Variables panel - Add column types
+- [x] Plugin Trace Viewer panel - Add column types
+- [x] Connection References panel - Add column types
+- [x] `npm run compile` passes (all tests pass)
+- [ ] Manual F5 testing across all panels
 
 ### Deferred Work (Slice 3)
 - [ ] Server-side search fallback - Query server when search term not in cache
@@ -326,12 +328,72 @@
 - **Scope:** ALL panels (mandatory pattern, not optional)
 - **Status:** Design complete, ready for implementation
 
+### Session 8 (2025-11-27) - Data Table Consistency Pattern Implementation
+- **Implemented Column Width Calculator Utility:**
+  - Created `src/shared/infrastructure/ui/tables/ColumnTypes.ts` with:
+    - `ColumnType` union (11 types: name, identifier, status, boolean, version, date, datetime, user, description, progress, numeric)
+    - `ColumnBounds` interface with min/max/avgCharWidth
+    - `COLUMN_TYPE_BOUNDS` constant with bounds for each type
+    - `TypedColumnConfig` and `CalculatedColumn` interfaces
+  - Created `src/shared/infrastructure/ui/tables/ColumnWidthCalculator.ts` with:
+    - `calculateColumnWidths()` for fully typed columns
+    - `calculateColumnWidthsWithOptionalTypes()` for backwards compatibility
+    - `hasTypedColumns()` helper
+    - `formatForMeasurement()` for type-specific width estimation
+  - Created `src/shared/infrastructure/ui/tables/index.ts` re-exports
+- **Updated CSS for Consistency:**
+  - Added `table-layout: fixed` for both `data-table` and `virtual-table`
+  - Added `white-space: nowrap`, `overflow: hidden`, `text-overflow: ellipsis` on cells
+  - Fixed row height at 36px
+  - Added tooltip cursor for `td[title]`
+  - Removed `width: max-content` from virtual table (was causing resize issues)
+- **Updated View Renderers:**
+  - `virtualTableSectionView.ts` - Calculates widths, applies to headers, adds title attributes
+  - `dataTableSectionView.ts` - Same pattern for regular tables
+  - Added `data-table` class to regular tables for CSS targeting
+- **Added Column Types to All Panels:**
+  - Solutions panel (9 columns: name, identifier, version, status, boolean, datetime)
+  - Import Jobs panel (7 columns: name, status, progress, user, datetime, identifier)
+  - Environment Variables panel (7 columns: identifier, name, status, description, boolean, datetime)
+  - Plugin Trace Viewer panel (9 columns: status, datetime, identifier, name, numeric)
+  - Connection References panel (8 columns: name, identifier, status, boolean, datetime)
+- **Extended `DataTableColumn` interface** to include optional `type?: ColumnType`
+- **All tests pass:** `npm run compile` successful
+- **Status:** Data Table Consistency Pattern implementation COMPLETE
+- **Remaining:** Manual F5 testing across all panels
+
+### Session 9 (2025-11-27) - Tooltip Fixes
+- **Fixed VirtualTableRenderer.js** - Added title attributes to `renderRow()` for virtual table tooltips
+- **Fixed TableRenderer.js** - Added title attributes to `renderTableRow()` for Metadata Browser and other panels
+- **Fixed Link Tooltips** - Added `title` attribute to all link-generating code:
+  - `ImportJobViewModelMapper.ts` - Solution name links
+  - `SolutionViewModelMapper.ts` - Solution name links
+  - `PluginTraceViewModelMapper.ts` - Plugin name links
+  - `FlowLinkView.ts` - Flow name links
+  - `clickableLinks.ts` - Generic data table links
+- **Verified Working:**
+  - Solutions panel - Tooltips working ✓
+  - Import Jobs panel - Tooltips working ✓
+  - Plugin Trace Viewer - Tooltips working ✓
+  - Connection References - Tooltips working ✓
+- **Issues Found During Testing:**
+  1. Boolean display inconsistency - Env Vars & Connection Refs show "Managed/Unmanaged" instead of "Yes/No"
+  2. Date/time sorting - Sorting as text, not as dates
+  3. Column ordering needs adjustment on 3 panels
+  4. Metadata Browser tooltips - Still not working (different rendering path)
+  5. Solutions scrollbar - Shows scrollbar when filtered to few items
+
+### Issues to Fix (Session 10)
+- [ ] Boolean consistency: Change "Managed/Unmanaged" to "Yes/No" on Env Vars & Connection Refs
+- [ ] Date/time sorting: Implement proper date comparison
+- [ ] Column reordering:
+  - Connection References: Flow Name, CR Display Name, Connection Reference, Status, Flow Managed, Flow Modified, CR Managed, CR Modified On
+  - Environment Variables: Schema Name, Display Name, Type, Default Value, Current Value, Managed, Modified On
+  - Plugin Traces: Status, Started, Duration, Operation, Plugin Name, Entity, Message, Depth, Mode
+- [ ] Metadata Browser tooltips: Investigate different rendering path
+- [ ] Solutions scrollbar: Fix container height calculation when filtered
+
 ### Next Steps
-1. Commit design documents
-2. Implement ColumnWidthCalculator utility
-3. Update CSS for table consistency
-4. Update Solutions panel with column types
-5. Update Import Jobs panel with column types
-6. Update remaining panels
-7. Test across all panels
-8. Code review and merge
+1. Commit current tooltip fixes
+2. Fix remaining issues identified above
+3. Code review and merge

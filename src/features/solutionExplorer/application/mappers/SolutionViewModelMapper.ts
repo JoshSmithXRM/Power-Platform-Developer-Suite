@@ -23,7 +23,7 @@ export class SolutionViewModelMapper {
       id: solution.id,
       uniqueName: solution.uniqueName,
       friendlyName: solution.friendlyName,
-      friendlyNameHtml: `<a href="#" class="solution-link" data-command="openInMaker" data-solution-id="${escapedId}">${escapedName}</a>`,
+      friendlyNameHtml: `<a href="#" class="solution-link" data-command="openInMaker" data-solution-id="${escapedId}" title="${escapedName}">${escapedName}</a>`,
       version: solution.version,
       isManaged: solution.isManaged ? 'Managed' : 'Unmanaged',
       publisherName: solution.publisherName,

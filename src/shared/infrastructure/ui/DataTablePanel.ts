@@ -8,6 +8,8 @@
  * - View renderers (dataTable.ts)
  */
 
+import type { ColumnType } from './tables';
+
 /**
  * Represents an environment option in the environment selector dropdown.
  */
@@ -19,11 +21,17 @@ export interface EnvironmentOption {
 
 /**
  * Represents a column definition in the data table.
+ *
+ * When `type` is specified, column widths are calculated automatically
+ * based on data content using the ColumnWidthCalculator.
  */
 export interface DataTableColumn {
 	readonly key: string;
 	readonly label: string;
-	readonly width?: string; // CSS width value (e.g., '20%', '150px', 'auto')
+	/** CSS width value (e.g., '20%', '150px', 'auto'). Overridden by calculated width if type is set. */
+	readonly width?: string;
+	/** Column type for automatic width calculation */
+	readonly type?: ColumnType;
 }
 
 /**

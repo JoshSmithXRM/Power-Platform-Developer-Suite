@@ -31,7 +31,7 @@ export class PluginTraceViewModelMapper {
 			id: trace.id,
 			createdOn: trace.createdOn.toLocaleString(),
 			pluginName: trace.pluginName,
-			pluginNameHtml: `<a href="#" class="plugin-link" data-command="viewDetail" data-trace-id="${escapedId}">${escapedName}</a>`,
+			pluginNameHtml: `<a href="#" class="plugin-link" data-command="viewDetail" data-trace-id="${escapedId}" title="${escapedName}">${escapedName}</a>`,
 			entityName: trace.entityName ?? 'N/A',
 			messageName: trace.messageName,
 			operationType: OperationTypeFormatter.getDisplayName(

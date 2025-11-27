@@ -156,10 +156,9 @@ tbody tr:hover {
 	overflow: auto;
 }
 
-/* Virtual table uses natural layout - columns size to content */
+/* Virtual table - fixed layout with calculated widths */
 .virtual-table {
-	width: max-content;
-	min-width: 100%;
+	width: 100%;
 	border-collapse: collapse;
 }
 
@@ -192,4 +191,32 @@ tbody tr:hover {
 @keyframes spin {
 	from { transform: rotate(0deg); }
 	to { transform: rotate(360deg); }
+}
+
+/* ===========================================
+   Data Table Consistency Pattern
+   Ensures columns don't resize during scroll
+   and text doesn't wrap within cells
+   =========================================== */
+
+/* Fixed layout enforces calculated column widths */
+table.data-table,
+table.virtual-table {
+	table-layout: fixed;
+}
+
+/* Consistent cell rendering - no wrapping */
+table.data-table td,
+table.virtual-table td {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 36px;
+	max-height: 36px;
+	vertical-align: middle;
+}
+
+/* Tooltip cursor for truncated content */
+td[title] {
+	cursor: default;
 }

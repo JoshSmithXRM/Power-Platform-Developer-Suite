@@ -25,7 +25,7 @@ export class ImportJobViewModelMapper {
 			id: job.id,
 			name: job.name,
 			solutionName: job.solutionName,
-			solutionNameHtml: `<a href="#" class="job-link" data-command="viewImportJob" data-import-job-id="${escapedId}">${escapedName}</a>`,
+			solutionNameHtml: `<a href="#" class="job-link" data-command="viewImportJob" data-import-job-id="${escapedId}" title="${escapedName}">${escapedName}</a>`,
 			createdBy: job.createdBy,
 			createdOn: DateFormatter.formatDate(job.createdOn),
 			completedOn: DateFormatter.formatDate(job.completedOn),

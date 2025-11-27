@@ -226,7 +226,10 @@
 			const value = row[col.key];
 			const cellClass = row[col.key + 'Class'] || '';
 			const cellHtml = row[col.key + 'Html'] || escapeHtml(String(value || ''));
-			return `<td class="${cellClass}">${cellHtml}</td>`;
+			// Add title attribute for tooltip on truncated content
+			const plainText = String(value || '');
+			const titleAttr = plainText ? ` title="${escapeHtml(plainText)}"` : '';
+			return `<td class="${cellClass}"${titleAttr}>${cellHtml}</td>`;
 		}).join('');
 
 		return `<tr data-index="${index}" style="height: ${rowHeight}px;">${cells}</tr>`;

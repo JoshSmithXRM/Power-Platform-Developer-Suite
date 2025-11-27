@@ -12,6 +12,11 @@ import type {
 	VirtualTableFilterState,
 	VirtualTableVirtualizationState
 } from '../../../application/viewModels/VirtualTableViewModel';
+import {
+	calculateColumnWidthsWithOptionalTypes,
+	hasTypedColumns,
+	type ColumnWithCalculatedWidth
+} from '../tables';
 
 import { escapeHtml } from './htmlHelpers';
 
@@ -35,6 +40,7 @@ export interface VirtualTableViewData {
  * - Renders only container + header
  * - Stores row data in a data attribute for JS to read
  * - Includes virtual scroll container for TanStack Virtual
+ * - Calculates column widths from data when types are defined
  */
 export function renderVirtualTableSection(viewData: VirtualTableViewData): string {
 	const { data, config, isLoading, errorMessage, searchQuery, pagination } = viewData;
@@ -50,15 +56,20 @@ export function renderVirtualTableSection(viewData: VirtualTableViewData): strin
 	const sortColumn = viewData.sortColumn || config.defaultSortColumn;
 	const sortDirection = viewData.sortDirection || config.defaultSortDirection;
 
+	// Calculate column widths if any columns have types defined
+	const calculatedColumns = hasTypedColumns(config.columns)
+		? calculateColumnWidthsWithOptionalTypes(data, config.columns)
+		: config.columns as ReadonlyArray<ColumnWithCalculatedWidth>;
+
 	// Serialize row data for JS to read
 	const rowDataJson = JSON.stringify(data);
-	const estimatedRowHeight = viewData.virtualization?.estimatedItemHeight || 32;
+	const estimatedRowHeight = viewData.virtualization?.estimatedItemHeight || 36;
 
 	return `
 		<div class="table-wrapper virtual-table-wrapper">
 			${config.enableSearch !== false ? renderSearchBox(config.searchPlaceholder, searchQuery) : ''}
 			<div class="table-content">
-				${renderVirtualTable(data, config, sortColumn, sortDirection, searchQuery, rowDataJson, estimatedRowHeight)}
+				${renderVirtualTable(data, calculatedColumns, config, sortColumn, sortDirection, searchQuery, rowDataJson, estimatedRowHeight)}
 			</div>
 			${renderVirtualFooter(data.length, pagination, isLoading)}
 		</div>
@@ -89,6 +100,7 @@ function renderSearchBox(placeholder: string, searchQuery?: string): string {
  */
 function renderVirtualTable(
 	data: ReadonlyArray<Record<string, unknown>>,
+	columns: ReadonlyArray<ColumnWithCalculatedWidth>,
 	config: DataTableConfig,
 	sortColumn: string,
 	sortDirection: 'asc' | 'desc',
@@ -113,18 +125,18 @@ function renderVirtualTable(
 				<table class="virtual-table">
 					<thead>
 						<tr>
-							${config.columns.map(col => renderTableHeader(col, sortColumn, sortDirection)).join('')}
+							${columns.map(col => renderTableHeader(col, sortColumn, sortDirection)).join('')}
 						</tr>
 					</thead>
 					<tbody
 						id="virtualTableBody"
 						data-rows="${escapeHtml(rowDataJson)}"
-						data-columns="${escapeHtml(JSON.stringify(config.columns))}"
+						data-columns="${escapeHtml(JSON.stringify(columns))}"
 						data-row-height="${estimatedRowHeight}"
 					>
 						${data.length === 0
-							? renderNoDataRow(config.columns.length, config.noDataMessage, searchQuery)
-							: renderInitialRows(data, config.columns, estimatedRowHeight)
+							? renderNoDataRow(columns.length, config.noDataMessage, searchQuery)
+							: renderInitialRows(data, columns, estimatedRowHeight)
 						}
 					</tbody>
 				</table>
@@ -135,16 +147,19 @@ function renderVirtualTable(
 
 /**
  * Renders table header cell with sort indicator.
+ * Uses calculated width if available, otherwise falls back to manual width.
  */
 function renderTableHeader(
-	column: { key: string; label: string; width?: string },
+	column: ColumnWithCalculatedWidth,
 	sortColumn: string,
 	sortDirection: 'asc' | 'desc'
 ): string {
 	const sortIndicator = sortColumn === column.key
 		? (sortDirection === 'asc' ? ' ▲' : ' ▼')
 		: '';
-	const widthAttr = column.width ? ` style="width: ${column.width}"` : '';
+	// Prefer calculated width, fall back to manual width
+	const width = column.calculatedWidth ?? column.width;
+	const widthAttr = width ? ` style="width: ${width}"` : '';
 
 	return `<th data-sort="${column.key}"${widthAttr}>${escapeHtml(column.label)}${sortIndicator}</th>`;
 }
@@ -156,7 +171,7 @@ function renderTableHeader(
  */
 function renderInitialRows(
 	data: ReadonlyArray<Record<string, unknown>>,
-	columns: ReadonlyArray<{ key: string; label: string; width?: string }>,
+	columns: ReadonlyArray<ColumnWithCalculatedWidth>,
 	rowHeight: number
 ): string {
 	// Render first 50 rows for initial paint (or all if fewer)
@@ -170,18 +185,22 @@ function renderInitialRows(
  * Renders a single table row.
  *
  * Each row has a data-index for virtual scrolling positioning.
+ * Cells include title attribute for tooltip on truncated content.
  */
 function renderTableRow(
 	row: Record<string, unknown>,
-	columns: ReadonlyArray<{ key: string; label: string; width?: string }>,
+	columns: ReadonlyArray<ColumnWithCalculatedWidth>,
 	index: number,
 	rowHeight: number
 ): string {
 	const cells = columns.map(col => {
 		const value = row[col.key];
 		const cellClass = row[col.key + 'Class'] || '';
-		const cellHtml = row[col.key + 'Html'] || escapeHtml(String(value || ''));
-		return `<td class="${cellClass}">${cellHtml}</td>`;
+		const cellHtml = row[col.key + 'Html'] || escapeHtml(String(value ?? ''));
+		// Plain text value for tooltip (strip HTML)
+		const plainText = String(value ?? '');
+		const titleAttr = plainText ? ` title="${escapeHtml(plainText)}"` : '';
+		return `<td class="${cellClass}"${titleAttr}>${cellHtml}</td>`;
 	}).join('');
 
 	return `<tr data-index="${index}" style="height: ${rowHeight}px;">${cells}</tr>`;
