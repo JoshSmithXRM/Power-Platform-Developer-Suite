@@ -119,19 +119,27 @@ describe('dataTableSectionView', () => {
 			expect(html).toContain('Value 2');
 		});
 
-		it('should render custom cell HTML', () => {
+		it('should render cell links from structured CellLink data', () => {
 			const html = renderDataTableSection({
 				data: [
 					{
 						name: 'Test',
 						value: 'Value',
-						nameHtml: '<strong>Test</strong>',
+						nameLink: {
+							command: 'testCommand',
+							commandData: { 'item-id': '123' },
+							className: 'test-link',
+						},
 					},
 				],
 				config: mockConfig,
 			});
 
-			expect(html).toContain('<strong>Test</strong>');
+			expect(html).toContain('<a href="#"');
+			expect(html).toContain('class="test-link"');
+			expect(html).toContain('data-command="testCommand"');
+			expect(html).toContain('data-item-id="123"');
+			expect(html).toContain('>Test</a>');
 		});
 
 		it('should render cell classes', () => {

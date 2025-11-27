@@ -140,3 +140,83 @@ tbody tr:hover {
 	width: 24px;
 	height: 24px;
 }
+
+/* ===========================================
+   Virtual Table Styles
+   Scroll wrapper approach - natural table layout
+   =========================================== */
+
+/* Disable double scrollbar - table-content normally scrolls, but not for virtual tables */
+.table-content:has(.virtual-scroll-wrapper) {
+	overflow: visible;
+}
+
+/* Scroll wrapper handles both horizontal and vertical scrolling */
+.virtual-scroll-wrapper {
+	overflow: auto;
+}
+
+/* Virtual table - fixed layout with calculated widths */
+.virtual-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+/* Sticky header stays visible during vertical scroll */
+.virtual-table thead {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+}
+
+/* Spacer rows for virtual scrolling positioning */
+.virtual-table .virtual-spacer-top,
+.virtual-table .virtual-spacer-bottom {
+	visibility: hidden;
+}
+
+.virtual-table .virtual-spacer-top td,
+.virtual-table .virtual-spacer-bottom td {
+	padding: 0;
+	border: none;
+}
+
+/* Background loading indicator */
+.background-loading-indicator {
+	display: inline-block;
+	animation: spin 1s linear infinite;
+	margin-left: 8px;
+}
+
+@keyframes spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+/* ===========================================
+   Data Table Consistency Pattern
+   Ensures columns don't resize during scroll
+   and text doesn't wrap within cells
+   =========================================== */
+
+/* Fixed layout enforces calculated column widths */
+table.data-table,
+table.virtual-table {
+	table-layout: fixed;
+}
+
+/* Consistent cell rendering - no wrapping */
+table.data-table td,
+table.virtual-table td {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 36px;
+	max-height: 36px;
+	vertical-align: middle;
+}
+
+/* Tooltip cursor for truncated content */
+td[title] {
+	cursor: default;
+}

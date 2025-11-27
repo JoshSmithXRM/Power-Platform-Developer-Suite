@@ -6,14 +6,17 @@ import type { DataTableConfig, EnvironmentOption } from '../../../../shared/infr
 import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
 import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
 import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
-import { DataTableSection } from '../../../../shared/infrastructure/ui/sections/DataTableSection';
+import { VirtualDataTableSection } from '../../../../shared/infrastructure/ui/sections/VirtualDataTableSection';
 import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
 import { EnvironmentSelectorSection } from '../../../../shared/infrastructure/ui/sections/EnvironmentSelectorSection';
 import { PanelLayout } from '../../../../shared/infrastructure/ui/types/PanelLayout';
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
 import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
 import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
-import type { ListSolutionsUseCase } from '../../application/useCases/ListSolutionsUseCase';
+import { VirtualTableCacheManager, VirtualTableConfig } from '../../../../shared/application';
+import type { ISolutionRepository } from '../../domain/interfaces/ISolutionRepository';
+import type { Solution } from '../../domain/entities/Solution';
+import { SolutionDataProviderAdapter } from '../../infrastructure/adapters/SolutionDataProviderAdapter';
 import type { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 
@@ -33,14 +36,16 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 
 	private readonly coordinator: PanelCoordinator<SolutionExplorerCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private readonly virtualTableConfig: VirtualTableConfig;
 	private currentEnvironmentId: string;
+	private cacheManager: VirtualTableCacheManager<Solution>;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
-		private readonly listSolutionsUseCase: ListSolutionsUseCase,
+		private readonly solutionRepository: ISolutionRepository,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		private readonly viewModelMapper: SolutionViewModelMapper,
 		private readonly logger: ILogger,
@@ -48,7 +53,14 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 	) {
 		super();
 		this.currentEnvironmentId = environmentId;
-		logger.debug('SolutionExplorerPanel: Initialized with new architecture');
+		logger.debug('SolutionExplorerPanel: Initialized with virtual table architecture');
+
+		// Configure virtual table: 100 initial, up to 5000 cached (plenty for ~1200 solutions)
+		this.virtualTableConfig = VirtualTableConfig.create(100, 5000, 500, true);
+
+		// Create cache manager with adapter binding environment
+		const provider = new SolutionDataProviderAdapter(solutionRepository, environmentId);
+		this.cacheManager = new VirtualTableCacheManager(provider, this.virtualTableConfig, logger);
 
 		// Configure webview
 		panel.webview.options = {
@@ -73,7 +85,7 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 		extensionUri: vscode.Uri,
 		getEnvironments: () => Promise<EnvironmentOption[]>,
 		getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
-		listSolutionsUseCase: ListSolutionsUseCase,
+		solutionRepository: ISolutionRepository,
 		urlBuilder: IMakerUrlBuilder,
 		viewModelMapper: SolutionViewModelMapper,
 		logger: ILogger,
@@ -91,7 +103,7 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 				extensionUri,
 				getEnvironments,
 				getEnvironmentById,
-				listSolutionsUseCase,
+				solutionRepository,
 				urlBuilder,
 				viewModelMapper,
 				logger,
@@ -118,17 +130,57 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 			isLoading: true
 		});
 
-		// Load solutions data
-		const solutions = await this.listSolutionsUseCase.execute(this.currentEnvironmentId);
-		const viewModels = solutions
+		// Load initial page of solutions using cache manager
+		const result = await this.cacheManager.loadInitialPage();
+		const cacheState = this.cacheManager.getCacheState();
+
+		// Map to ViewModels and sort
+		const viewModels = result.getItems()
 			.map(s => this.viewModelMapper.toViewModel(s))
 			.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName));
 
-		// Re-render with actual data
+		this.logger.info('Solutions loaded with virtual table', {
+			initialCount: viewModels.length,
+			totalCount: cacheState.getTotalRecordCount()
+		});
+
+		// Re-render with actual data and pagination state
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
-			tableData: viewModels
+			tableData: viewModels,
+			pagination: {
+				cachedCount: cacheState.getCachedRecordCount(),
+				totalCount: cacheState.getTotalRecordCount(),
+				isLoading: cacheState.getIsLoading(),
+				currentPage: cacheState.getCurrentPage(),
+				isFullyCached: cacheState.isFullyCached()
+			}
+		});
+
+		// Set up callback to update UI during background loading
+		this.cacheManager.onStateChange((state, cachedRecords) => {
+			const updatedViewModels = cachedRecords
+				.map(s => this.viewModelMapper.toViewModel(s))
+				.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName));
+
+			// Send updated data to webview (fire-and-forget, errors logged)
+			this.panel.webview.postMessage({
+				command: 'updateVirtualTable',
+				data: {
+					rows: updatedViewModels,
+					pagination: {
+						cachedCount: state.getCachedRecordCount(),
+						totalCount: state.getTotalRecordCount(),
+						isLoading: state.getIsLoading(),
+						currentPage: state.getCurrentPage(),
+						isFullyCached: state.isFullyCached()
+					}
+				}
+			}).then(
+				() => { /* success */ },
+				(error) => this.logger.error('Failed to send virtual table update', error)
+			);
 		});
 	}
 
@@ -136,7 +188,8 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 		const config = this.getTableConfig();
 
 		const environmentSelector = new EnvironmentSelectorSection();
-		const tableSection = new DataTableSection(config);
+		// Use VirtualDataTableSection for virtual scrolling support
+		const tableSection = new VirtualDataTableSection(config);
 		// Note: Button IDs must match command names registered in registerCommandHandlers()
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
@@ -174,8 +227,9 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
 				).toString(),
+				// Use VirtualTableRenderer instead of DataTableBehavior for virtual scrolling
 				this.panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
+					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'VirtualTableRenderer.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'SolutionExplorerBehavior.js')
@@ -237,15 +291,15 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 			defaultSortColumn: 'friendlyName',
 			defaultSortDirection: 'asc',
 			columns: [
-				{ key: 'friendlyName', label: 'Solution Name' },
-				{ key: 'uniqueName', label: 'Unique Name' },
-				{ key: 'version', label: 'Version' },
-				{ key: 'isManaged', label: 'Type' },
-				{ key: 'publisherName', label: 'Publisher' },
-				{ key: 'isVisible', label: 'Visible' },
-				{ key: 'isApiManaged', label: 'API Managed' },
-				{ key: 'installedOn', label: 'Installed On' },
-				{ key: 'modifiedOn', label: 'Modified On' }
+				{ key: 'friendlyName', label: 'Solution Name', type: 'name' },
+				{ key: 'uniqueName', label: 'Unique Name', type: 'identifier' },
+				{ key: 'version', label: 'Version', type: 'version' },
+				{ key: 'isManaged', label: 'Type', type: 'status' },
+				{ key: 'publisherName', label: 'Publisher', type: 'name' },
+				{ key: 'isVisible', label: 'Visible', type: 'boolean' },
+				{ key: 'isApiManaged', label: 'API Managed', type: 'boolean' },
+				{ key: 'installedOn', label: 'Installed On', type: 'datetime' },
+				{ key: 'modifiedOn', label: 'Modified On', type: 'datetime' }
 			],
 			searchPlaceholder: '🔍 Search...',
 			noDataMessage: 'No solutions found.',
@@ -254,26 +308,40 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 	}
 
 	private async handleRefresh(): Promise<void> {
-		this.logger.debug('Refreshing solutions');
+		this.logger.debug('Refreshing solutions with virtual table');
 
 		try {
-			const solutions = await this.listSolutionsUseCase.execute(this.currentEnvironmentId);
+			// Clear existing cache and reload
+			this.cacheManager.clearCache();
+
+			// Load initial page
+			const result = await this.cacheManager.loadInitialPage();
+			const cacheState = this.cacheManager.getCacheState();
 
 			// Sort view models alphabetically by friendlyName for initial render
-			// Client-side sorting (DataTableBehavior.js) handles user interactions
-			const viewModels = solutions
+			// Client-side sorting (VirtualTableRenderer.js) handles user interactions
+			const viewModels = result.getItems()
 				.map(s => this.viewModelMapper.toViewModel(s))
 				.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName));
 
-			this.logger.info('Solutions loaded successfully', { count: viewModels.length });
+			this.logger.info('Solutions refreshed successfully', {
+				initialCount: viewModels.length,
+				totalCount: cacheState.getTotalRecordCount()
+			});
 
-			// Data-driven update: Send ViewModels to frontend
+			// Send data to frontend with pagination state
 			await this.panel.webview.postMessage({
-				command: 'updateTableData',
+				command: 'updateVirtualTable',
 				data: {
-					viewModels,
+					rows: viewModels,
 					columns: this.getTableConfig().columns,
-					isLoading: false
+					pagination: {
+						cachedCount: cacheState.getCachedRecordCount(),
+						totalCount: cacheState.getTotalRecordCount(),
+						isLoading: cacheState.getIsLoading(),
+						currentPage: cacheState.getCurrentPage(),
+						isFullyCached: cacheState.isFullyCached()
+					}
 				}
 			});
 		} catch (error: unknown) {
@@ -318,6 +386,11 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 		try {
 			const oldEnvironmentId = this.currentEnvironmentId;
 			this.currentEnvironmentId = environmentId;
+
+			// Clear old cache and create new cache manager for new environment
+			this.cacheManager.clearCache();
+			const newProvider = new SolutionDataProviderAdapter(this.solutionRepository, environmentId);
+			this.cacheManager = new VirtualTableCacheManager(newProvider, this.virtualTableConfig, this.logger);
 
 			// Re-register panel in map for new environment
 			this.reregisterPanel(SolutionExplorerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);

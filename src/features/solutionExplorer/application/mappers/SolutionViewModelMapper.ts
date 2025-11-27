@@ -1,7 +1,6 @@
 import { Solution } from '../../domain/entities/Solution';
 import { SolutionViewModel } from '../viewModels/SolutionViewModel';
 import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
-import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
 import type { SolutionCollectionService } from '../../domain/services/SolutionCollectionService';
 
 /**
@@ -16,20 +15,23 @@ export class SolutionViewModelMapper {
    * @returns SolutionViewModel presentation object
    */
   toViewModel(solution: Solution): SolutionViewModel {
-    const escapedName = escapeHtml(solution.friendlyName);
-    const escapedId = escapeHtml(solution.id);
-
     return {
       id: solution.id,
       uniqueName: solution.uniqueName,
       friendlyName: solution.friendlyName,
-      friendlyNameHtml: `<a href="#" class="solution-link" data-command="openInMaker" data-solution-id="${escapedId}">${escapedName}</a>`,
+      friendlyNameLink: {
+        command: 'openInMaker',
+        commandData: { 'solution-id': solution.id },
+        className: 'solution-link',
+      },
       version: solution.version,
       isManaged: solution.isManaged ? 'Managed' : 'Unmanaged',
       publisherName: solution.publisherName,
       installedOn: DateFormatter.formatDate(solution.installedOn),
+      installedOnSortValue: solution.installedOn?.getTime() ?? 0,
       description: solution.description,
       modifiedOn: DateFormatter.formatDate(solution.modifiedOn),
+      modifiedOnSortValue: solution.modifiedOn?.getTime() ?? 0,
       isVisible: solution.isVisible ? 'Yes' : 'No',
       isApiManaged: solution.isApiManaged ? 'Yes' : 'No',
     };

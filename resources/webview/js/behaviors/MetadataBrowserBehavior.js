@@ -324,13 +324,13 @@ window.createBehavior({
 
 		tbody.innerHTML = relationships.map((rel, index) => `
 			<tr data-index="${index}" class="${index % 2 === 0 ? 'row-even' : 'row-odd'}">
-				<td>
+				<td title="${escapeHtml(rel.name)}">
 					<a href="#" class="table-link" data-action="openDetail" data-tab="oneToMany" data-index="${index}">
 						${escapeHtml(rel.name)}
 					</a>
 				</td>
-				<td>${this.renderRelatedEntity(rel)}</td>
-				<td>${escapeHtml(rel.referencingAttribute)}</td>
+				<td title="${escapeHtml(rel.relatedEntity)}">${this.renderRelatedEntity(rel)}</td>
+				<td title="${escapeHtml(rel.referencingAttribute)}">${escapeHtml(rel.referencingAttribute)}</td>
 			</tr>
 		`).join('');
 
@@ -357,13 +357,13 @@ window.createBehavior({
 
 		tbody.innerHTML = relationships.map((rel, index) => `
 			<tr data-index="${index}" class="${index % 2 === 0 ? 'row-even' : 'row-odd'}">
-				<td>
+				<td title="${escapeHtml(rel.name)}">
 					<a href="#" class="table-link" data-action="openDetail" data-tab="manyToOne" data-index="${index}">
 						${escapeHtml(rel.name)}
 					</a>
 				</td>
-				<td>${this.renderRelatedEntity(rel)}</td>
-				<td>${escapeHtml(rel.referencingAttribute)}</td>
+				<td title="${escapeHtml(rel.relatedEntity)}">${this.renderRelatedEntity(rel)}</td>
+				<td title="${escapeHtml(rel.referencingAttribute)}">${escapeHtml(rel.referencingAttribute)}</td>
 			</tr>
 		`).join('');
 
@@ -390,13 +390,13 @@ window.createBehavior({
 
 		tbody.innerHTML = relationships.map((rel, index) => `
 			<tr data-index="${index}" class="${index % 2 === 0 ? 'row-even' : 'row-odd'}">
-				<td>
+				<td title="${escapeHtml(rel.name)}">
 					<a href="#" class="table-link" data-action="openDetail" data-tab="manyToMany" data-index="${index}">
 						${escapeHtml(rel.name)}
 					</a>
 				</td>
-				<td>${this.renderRelatedEntity(rel)}</td>
-				<td>${escapeHtml(rel.referencingAttribute)}</td>
+				<td title="${escapeHtml(rel.relatedEntity)}">${this.renderRelatedEntity(rel)}</td>
+				<td title="${escapeHtml(rel.referencingAttribute)}">${escapeHtml(rel.referencingAttribute)}</td>
 			</tr>
 		`).join('');
 
@@ -408,14 +408,15 @@ window.createBehavior({
 	 * Renders related entity with navigation link
 	 */
 	renderRelatedEntity(rel) {
+		const escapedEntity = escapeHtml(rel.relatedEntity);
 		if (rel.navigationType === 'entity') {
 			const target = Array.isArray(rel.navigationTarget) ? rel.navigationTarget[0] : rel.navigationTarget;
-			return `<a href="#" class="table-link" data-action="navigate" data-target="${escapeAttr(target)}">${escapeHtml(rel.relatedEntity)}</a>`;
+			return `<a href="#" class="table-link" data-action="navigate" data-target="${escapeAttr(target)}" title="${escapedEntity}">${escapedEntity}</a>`;
 		} else if (rel.navigationType === 'quickPick') {
 			const targets = Array.isArray(rel.navigationTarget) ? rel.navigationTarget : [rel.navigationTarget];
-			return `<a href="#" class="table-link" data-action="navigateQuickPick" data-targets="${escapeAttr(JSON.stringify(targets))}">${escapeHtml(rel.relatedEntity)}</a>`;
+			return `<a href="#" class="table-link" data-action="navigateQuickPick" data-targets="${escapeAttr(JSON.stringify(targets))}" title="${escapedEntity}">${escapedEntity}</a>`;
 		}
-		return escapeHtml(rel.relatedEntity);
+		return escapedEntity;
 	},
 
 	/**
@@ -464,10 +465,12 @@ window.createBehavior({
 			<tr data-index="${index}" class="${index % 2 === 0 ? 'row-even' : 'row-odd'}">
 				${columns.map(col => {
 					const value = row[col.key];
+					const escapedValue = escapeHtml(value);
+					const titleAttr = value ? ` title="${escapedValue}"` : '';
 					if (col.isLinkable && row.isLinkable) {
-						return `<td><a href="#" class="table-link" data-action="openDetail" data-tab="${tab}" data-index="${index}">${escapeHtml(value)}</a></td>`;
+						return `<td${titleAttr}><a href="#" class="table-link" data-action="openDetail" data-tab="${tab}" data-index="${index}">${escapedValue}</a></td>`;
 					}
-					return `<td>${escapeHtml(value)}</td>`;
+					return `<td${titleAttr}>${escapedValue}</td>`;
 				}).join('')}
 			</tr>
 		`).join('');
@@ -1015,13 +1018,18 @@ window.createBehavior({
 	 * Renders option set values as a formatted table
 	 */
 	renderOptionsTable(options) {
-		const rows = options.map(opt => `
+		const rows = options.map(opt => {
+			const escapedLabel = escapeHtml(opt.label);
+			const escapedValue = escapeHtml(String(opt.value));
+			const escapedColor = escapeHtml(opt.color || '#0000ff');
+			return `
 			<tr>
-				<td>${escapeHtml(opt.label)}</td>
-				<td>${escapeHtml(String(opt.value))}</td>
-				<td><span class="color-badge" style="background-color: ${escapeHtml(opt.color || '#0000ff')}"></span> ${escapeHtml(opt.color || '#0000ff')}</td>
+				<td title="${escapedLabel}">${escapedLabel}</td>
+				<td title="${escapedValue}">${escapedValue}</td>
+				<td title="${escapedColor}"><span class="color-badge" style="background-color: ${escapedColor}"></span> ${escapedColor}</td>
 			</tr>
-		`).join('');
+		`;
+		}).join('');
 
 		return `
 			<table class="options-table">

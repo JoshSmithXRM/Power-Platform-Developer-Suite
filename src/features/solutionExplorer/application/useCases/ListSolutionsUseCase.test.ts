@@ -14,7 +14,9 @@ describe('ListSolutionsUseCase', () => {
 	beforeEach(() => {
 		mockRepository = {
 			findAll: jest.fn(),
-			findAllForDropdown: jest.fn()
+			findAllForDropdown: jest.fn(),
+			findPaginated: jest.fn(),
+			getCount: jest.fn()
 		};
 
 		mockLogger = {

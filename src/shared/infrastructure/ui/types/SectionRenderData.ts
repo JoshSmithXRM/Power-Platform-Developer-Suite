@@ -86,4 +86,16 @@ export interface SectionRenderData {
 	 * Custom state object that sections can use to track UI state.
 	 */
 	readonly state?: Record<string, unknown>;
+
+	/**
+	 * Pagination state (for VirtualDataTableSection).
+	 * Contains information about cached records, total count, and loading state.
+	 */
+	readonly pagination?: {
+		readonly cachedCount: number;
+		readonly totalCount: number;
+		readonly isLoading: boolean;
+		readonly currentPage: number;
+		readonly isFullyCached: boolean;
+	};
 }

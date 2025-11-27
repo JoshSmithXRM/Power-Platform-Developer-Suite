@@ -17,7 +17,6 @@ export async function initializeSolutionExplorer(
 	const { DataverseApiService } = await import('../../../../shared/infrastructure/services/DataverseApiService.js');
 	const { MakerUrlBuilder } = await import('../../../../shared/infrastructure/services/MakerUrlBuilder.js');
 	const { DataverseApiSolutionRepository } = await import('../../infrastructure/repositories/DataverseApiSolutionRepository.js');
-	const { ListSolutionsUseCase } = await import('../../application/useCases/ListSolutionsUseCase.js');
 	const { SolutionExplorerPanelComposed } = await import('../panels/SolutionExplorerPanelComposed.js');
 	const { SolutionViewModelMapper } = await import('../../application/mappers/SolutionViewModelMapper.js');
 	const { SolutionCollectionService } = await import('../../domain/services/SolutionCollectionService.js');
@@ -28,16 +27,15 @@ export async function initializeSolutionExplorer(
 	const urlBuilder = new MakerUrlBuilder();
 	const solutionRepository = new DataverseApiSolutionRepository(dataverseApiService, logger);
 
-	const listSolutionsUseCase = new ListSolutionsUseCase(solutionRepository, logger);
-
 	const collectionService = new SolutionCollectionService();
 	const viewModelMapper = new SolutionViewModelMapper(collectionService);
 
+	// Pass repository directly - panel uses VirtualTableCacheManager internally
 	await SolutionExplorerPanelComposed.createOrShow(
 		context.extensionUri,
 		getEnvironments,
 		getEnvironmentById,
-		listSolutionsUseCase,
+		solutionRepository,
 		urlBuilder,
 		viewModelMapper,
 		logger,

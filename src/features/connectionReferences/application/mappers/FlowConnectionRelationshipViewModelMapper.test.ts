@@ -195,10 +195,10 @@ describe('FlowConnectionRelationshipViewModelMapper', () => {
 			const result = mapper.toViewModel(relationship);
 
 			// Assert
-			expect(result.flowIsManaged).toBe('Managed');
+			expect(result.flowIsManaged).toBe('Yes');
 		});
 
-		it('should map flowIsManaged to "Unmanaged" when false', () => {
+		it('should map flowIsManaged to "No" when false', () => {
 			// Arrange
 			const relationship = createRelationship('Test Flow', 'cr_test', 'flow-to-cr', {
 				flowIsManaged: false
@@ -208,7 +208,7 @@ describe('FlowConnectionRelationshipViewModelMapper', () => {
 			const result = mapper.toViewModel(relationship);
 
 			// Assert
-			expect(result.flowIsManaged).toBe('Unmanaged');
+			expect(result.flowIsManaged).toBe('No');
 		});
 
 		it('should map flowIsManaged to empty string when null', () => {
@@ -224,7 +224,7 @@ describe('FlowConnectionRelationshipViewModelMapper', () => {
 			expect(result.flowIsManaged).toBe('');
 		});
 
-		it('should map connectionReferenceIsManaged to "Managed" when true', () => {
+		it('should map connectionReferenceIsManaged to "Yes" when true', () => {
 			// Arrange
 			const relationship = createRelationship('Test Flow', 'cr_test', 'flow-to-cr', {
 				crIsManaged: true
@@ -234,10 +234,10 @@ describe('FlowConnectionRelationshipViewModelMapper', () => {
 			const result = mapper.toViewModel(relationship);
 
 			// Assert
-			expect(result.connectionReferenceIsManaged).toBe('Managed');
+			expect(result.connectionReferenceIsManaged).toBe('Yes');
 		});
 
-		it('should map connectionReferenceIsManaged to "Unmanaged" when false', () => {
+		it('should map connectionReferenceIsManaged to "No" when false', () => {
 			// Arrange
 			const relationship = createRelationship('Test Flow', 'cr_test', 'flow-to-cr', {
 				crIsManaged: false
@@ -247,7 +247,7 @@ describe('FlowConnectionRelationshipViewModelMapper', () => {
 			const result = mapper.toViewModel(relationship);
 
 			// Assert
-			expect(result.connectionReferenceIsManaged).toBe('Unmanaged');
+			expect(result.connectionReferenceIsManaged).toBe('No');
 		});
 
 		it('should map connectionReferenceIsManaged to empty string when null', () => {
@@ -410,10 +410,10 @@ describe('FlowConnectionRelationshipViewModelMapper', () => {
 			const result = mapper.toViewModels(relationships);
 
 			// Assert
-			expect(result[0]?.flowIsManaged).toBe('Managed');
-			expect(result[0]?.connectionReferenceIsManaged).toBe('Managed');
-			expect(result[1]?.flowIsManaged).toBe('Unmanaged');
-			expect(result[1]?.connectionReferenceIsManaged).toBe('Unmanaged');
+			expect(result[0]?.flowIsManaged).toBe('Yes');
+			expect(result[0]?.connectionReferenceIsManaged).toBe('Yes');
+			expect(result[1]?.flowIsManaged).toBe('No');
+			expect(result[1]?.connectionReferenceIsManaged).toBe('No');
 			expect(result[2]?.flowIsManaged).toBe('');
 			expect(result[2]?.connectionReferenceIsManaged).toBe('');
 		});

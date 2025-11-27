@@ -22,7 +22,8 @@ module.exports = (env, argv) => {
 			EnvironmentVariablesBehavior: './resources/webview/js/behaviors/EnvironmentVariablesBehavior.js',
 			DataExplorerBehavior: './resources/webview/js/behaviors/DataExplorerBehavior.js',
 			TableRenderer: './resources/webview/js/renderers/TableRenderer.js',
-			DetailPanelRenderer: './resources/webview/js/renderers/DetailPanelRenderer.js'
+			DetailPanelRenderer: './resources/webview/js/renderers/DetailPanelRenderer.js',
+			VirtualTableRenderer: './resources/webview/js/renderers/VirtualTableRenderer.js'
 		},
 
 		output: {

@@ -4,6 +4,12 @@
  */
 
 import type { DataTableConfig } from '../DataTablePanel';
+import {
+	calculateColumnWidthsWithOptionalTypes,
+	hasTypedColumns,
+	type ColumnWithCalculatedWidth
+} from '../tables';
+import { isCellLink, type CellLink } from '../types/CellLink';
 
 import { escapeHtml } from './htmlHelpers';
 
@@ -19,6 +25,7 @@ export interface DataTableViewData {
 
 /**
  * Renders complete data table with search, headers, and rows.
+ * Calculates column widths from data when types are defined.
  */
 export function renderDataTableSection(viewData: DataTableViewData): string {
 	const { data, config, isLoading, errorMessage, searchQuery } = viewData;
@@ -34,11 +41,16 @@ export function renderDataTableSection(viewData: DataTableViewData): string {
 	const sortColumn = viewData.sortColumn || config.defaultSortColumn;
 	const sortDirection = viewData.sortDirection || config.defaultSortDirection;
 
+	// Calculate column widths if any columns have types defined
+	const calculatedColumns = hasTypedColumns(config.columns)
+		? calculateColumnWidthsWithOptionalTypes(data, config.columns)
+		: config.columns as ReadonlyArray<ColumnWithCalculatedWidth>;
+
 	return `
 		<div class="table-wrapper">
 			${config.enableSearch !== false ? renderSearchBox(config.searchPlaceholder, viewData.searchQuery) : ''}
 			<div class="table-content">
-				${renderTable(data, config, sortColumn, sortDirection, searchQuery)}
+				${renderTable(data, calculatedColumns, config, sortColumn, sortDirection, searchQuery)}
 			</div>
 			${renderFooter(data.length)}
 		</div>
@@ -63,9 +75,11 @@ function renderSearchBox(placeholder: string, searchQuery?: string): string {
 
 /**
  * Renders table with headers and data rows.
+ * Uses data-table class for CSS consistency pattern styling.
  */
 function renderTable(
 	data: ReadonlyArray<Record<string, unknown>>,
+	columns: ReadonlyArray<ColumnWithCalculatedWidth>,
 	config: DataTableConfig,
 	sortColumn: string,
 	sortDirection: 'asc' | 'desc',
@@ -73,16 +87,16 @@ function renderTable(
 ): string {
 	return `
 		<div class="table-container">
-			<table>
+			<table class="data-table">
 				<thead>
 					<tr>
-						${config.columns.map(col => renderTableHeader(col, sortColumn, sortDirection)).join('')}
+						${columns.map(col => renderTableHeader(col, sortColumn, sortDirection)).join('')}
 					</tr>
 				</thead>
 				<tbody>
 					${data.length === 0
-						? renderNoDataRow(config.columns.length, config.noDataMessage, searchQuery)
-						: data.map(row => renderTableRow(row, config.columns)).join('')
+						? renderNoDataRow(columns.length, config.noDataMessage, searchQuery)
+						: data.map(row => renderTableRow(row, columns)).join('')
 					}
 				</tbody>
 			</table>
@@ -92,33 +106,74 @@ function renderTable(
 
 /**
  * Renders table header cell with sort indicator.
+ * Uses calculated width if available, otherwise falls back to manual width.
+ * Includes data-type for proper sorting (e.g., datetime columns).
  */
 function renderTableHeader(
-	column: { key: string; label: string; width?: string },
+	column: ColumnWithCalculatedWidth,
 	sortColumn: string,
 	sortDirection: 'asc' | 'desc'
 ): string {
 	const sortIndicator = sortColumn === column.key
 		? (sortDirection === 'asc' ? ' ▲' : ' ▼')
 		: '';
-	const widthAttr = column.width ? ` style="width: ${column.width}"` : '';
+	// Prefer calculated width, fall back to manual width
+	const width = column.calculatedWidth ?? column.width;
+	const widthAttr = width ? ` style="width: ${width}"` : '';
+	// Include type for proper sorting (datetime, numeric)
+	const typeAttr = column.type ? ` data-type="${column.type}"` : '';
 
-	return `<th data-sort="${column.key}"${widthAttr}>${escapeHtml(column.label)}${sortIndicator}</th>`;
+	return `<th data-sort="${column.key}"${typeAttr}${widthAttr}>${escapeHtml(column.label)}${sortIndicator}</th>`;
+}
+
+/**
+ * Renders a link element from structured CellLink data.
+ * All values are escaped to prevent XSS.
+ */
+function renderCellLink(text: string, linkData: CellLink): string {
+	const escapedText = escapeHtml(text);
+	const escapedClass = escapeHtml(linkData.className);
+	const escapedCommand = escapeHtml(linkData.command);
+	const escapedTitle = escapeHtml(linkData.title ?? text);
+
+	// Build data attributes from commandData
+	const dataAttrs = Object.entries(linkData.commandData)
+		.map(([key, value]) => `data-${escapeHtml(key)}="${escapeHtml(value)}"`)
+		.join(' ');
+
+	return `<a href="#" class="${escapedClass}" data-command="${escapedCommand}" ${dataAttrs} title="${escapedTitle}">${escapedText}</a>`;
 }
 
 /**
  * Renders table data row.
- * Supports custom HTML via {columnKey}Html properties (caller must sanitize).
+ * Includes title attribute for tooltip on truncated content.
+ * Supports {columnKey}Link for structured link data (no raw HTML parsing).
+ * Supports {columnKey}SortValue for reliable date/numeric sorting.
  */
 function renderTableRow(
 	row: Record<string, unknown>,
-	columns: ReadonlyArray<{ key: string; label: string; width?: string }>
+	columns: ReadonlyArray<ColumnWithCalculatedWidth>
 ): string {
 	const cells = columns.map(col => {
 		const value = row[col.key];
 		const cellClass = row[col.key + 'Class'] || '';
-		const cellHtml = row[col.key + 'Html'] || escapeHtml(String(value || ''));
-		return `<td class="${cellClass}">${cellHtml}</td>`;
+		const plainText = String(value ?? '');
+		const titleAttr = plainText ? ` title="${escapeHtml(plainText)}"` : '';
+
+		// Sort value for reliable date/numeric sorting (timestamps, ISO strings)
+		const sortValue = row[col.key + 'SortValue'];
+		const sortAttr = sortValue !== undefined ? ` data-sort-value="${escapeHtml(String(sortValue))}"` : '';
+
+		// Check for structured link data (preferred - no HTML parsing)
+		const cellLink = row[col.key + 'Link'];
+		let cellContent: string;
+		if (isCellLink(cellLink)) {
+			cellContent = renderCellLink(plainText, cellLink);
+		} else {
+			cellContent = escapeHtml(plainText);
+		}
+
+		return `<td class="${cellClass}"${titleAttr}${sortAttr}>${cellContent}</td>`;
 	}).join('');
 
 	return `<tr>${cells}</tr>`;
