@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Web Resources Panel** - Browse, edit, and save web resources directly in VS Code
+  - Browse web resources with solution filtering
+  - Open web resources in VS Code editor with syntax highlighting
+  - Edit and save changes directly to Dataverse (Ctrl+S)
+  - Business rules: managed resources read-only, binary types (PNG, JPG, etc.) not editable
+  - Custom URI scheme: `ppds-webresource://` for VS Code file system integration
+  - 60-second content cache for performance
+  - Virtual table integration for 65k+ web resources
+
+- **Server-Side Search Fallback** - Search large datasets beyond local cache
+  - `SearchVirtualTableUseCase` orchestrates client-cache + server search
+  - When local cache (5k records) has no matches, automatically queries server
+  - OData `$filter` with `contains()` for name/display name search
+  - "Searching server..." indicator during remote queries
+  - Web Resources: `findPaginated()` and `getCount()` with OData `$skip` support
+
 - **Virtual Table Infrastructure** - High-performance table rendering for large datasets
   - Virtual scrolling renders only visible rows to DOM (50-100 rows vs all rows)
   - Background data loading with cache management (up to 5,000 records)
