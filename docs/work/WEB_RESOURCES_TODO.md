@@ -114,13 +114,14 @@ Once virtual table merges to main:
 
 ### Immediate Tasks
 - [x] Clean up design doc (extract patterns, trim future ideas)
-- [ ] Move future slice ideas to `docs/future/DEVELOPMENT_TOOLS.md`
+- [x] Move future slice ideas to `docs/future/DEVELOPMENT_TOOLS.md`
+- [ ] Run technical debt check on Slice 1 implementation
 
-### Design Doc Cleanup
-The existing `WEB_RESOURCES_PANEL_DESIGN.md` (1934 lines) needs:
-- [ ] Extract reusable patterns to `docs/architecture/`
-- [ ] Trim to current/next slice only
-- [ ] Move Slices 3-5 details to future enhancements
+### Design Doc Cleanup ✅ COMPLETE
+- [x] Trimmed `WEB_RESOURCES_PANEL_DESIGN.md` from 1934 → 148 lines
+- [x] Moved Slices 3-5 details to `docs/future/DEVELOPMENT_TOOLS.md`
+- [x] Kept key architectural decisions (FileSystemProvider, URI scheme, caching)
+- [x] Updated status to reflect current blocked state
 
 ---
 
