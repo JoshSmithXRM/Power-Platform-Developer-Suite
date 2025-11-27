@@ -2432,7 +2432,7 @@ function createMockExecuteSqlUseCase(): ExecuteSqlQueryUseCase {
 - `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md`
 
 **Feature Specification:**
-- `FUTURE_ENHANCEMENTS.md` (lines 93-191) - Original feature description
+- `docs/future/DATA_MANAGEMENT.md` - Data Explorer feature enhancements
 
 ---
 
