@@ -524,4 +524,4 @@ Quick reference for naming initialization methods:
 - **`docs/architecture/WEBVIEW_PATTERNS.md`** - **CRITICAL**: Message contracts, CSS layouts, behavior patterns, and implementation checklist
 - `.claude/templates/PANEL_INITIALIZATION_PATTERN.md` - Two-phase initialization to avoid race conditions
 - `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Layer boundaries and dependencies
-- `.claude/workflows/NEW_FEATURE_WORKFLOW.md` - Complete panel implementation workflow
+- `.claude/WORKFLOW.md` - Complete development workflow (9 phases)

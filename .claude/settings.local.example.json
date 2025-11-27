@@ -54,7 +54,17 @@
       "Bash(Get-Content:*)",
       "Bash(Measure-Object:*)",
       "Bash(Get-ChildItem:*)",
-      "Bash(Test-Path:*)"
+      "Bash(Test-Path:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr status:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue status:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh auth status:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",
@@ -92,7 +102,17 @@
       "Bash(git am:*)",
       "Bash(git branch -D:*)",
       "Bash(git branch -d:*)",
-      "Bash(git tag -d:*)"
+      "Bash(git tag -d:*)",
+      "Bash(gh api:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr close:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(gh issue create:*)",
+      "Bash(gh issue close:*)",
+      "Bash(gh issue edit:*)",
+      "Bash(gh release create:*)",
+      "Bash(gh repo create:*)"
     ]
   }
 }

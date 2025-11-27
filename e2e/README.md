@@ -38,19 +38,14 @@ Some integration tests (like Solutions panel) require credentials to connect to 
 
 ### Creating the Credentials File
 
-Create a `.env.e2e.local` file in the project root (automatically gitignored):
+Copy the example file and fill in your credentials:
 
 ```bash
-# .env.e2e.local
-PPDS_TEST_ENV_NAME=Test Environment
-PPDS_TEST_DATAVERSE_URL=https://yourorg.crm.dynamics.com
-PPDS_TEST_TENANT_ID=your-tenant-guid
-PPDS_TEST_CLIENT_ID=your-app-registration-client-id
-PPDS_TEST_CLIENT_SECRET=your-client-secret
-PPDS_TEST_PP_ENV_ID=your-power-platform-environment-id
+cp .env.e2e.example .env.e2e.local
+# Edit .env.e2e.local with your Dataverse credentials
 ```
 
-**Note:** Credentials are automatically loaded via `dotenv` in `playwright.config.ts`. No manual environment variable setup needed.
+The `.env.e2e.local` file is automatically gitignored. Credentials are loaded via `dotenv` in `playwright.config.ts`.
 
 ### Service Principal Requirements
 
