@@ -14,7 +14,8 @@ import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
  * @returns HTML anchor element as string
  */
 export function renderDataTableLink(cssClass: string, entityId: string, displayText: string): string {
-	return `<a href="#" class="${cssClass}" data-id="${entityId}">${escapeHtml(displayText)}</a>`;
+	const escapedText = escapeHtml(displayText);
+	return `<a href="#" class="${cssClass}" data-id="${entityId}" title="${escapedText}">${escapedText}</a>`;
 }
 
 /**

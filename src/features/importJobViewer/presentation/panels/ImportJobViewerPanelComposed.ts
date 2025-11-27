@@ -239,13 +239,13 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 			defaultSortColumn: 'createdOn',
 			defaultSortDirection: 'desc',
 			columns: [
-				{ key: 'solutionName', label: 'Solution' },
-				{ key: 'status', label: 'Status' },
-				{ key: 'progress', label: 'Progress' },
-				{ key: 'createdBy', label: 'Created By' },
-				{ key: 'createdOn', label: 'Created On' },
-				{ key: 'duration', label: 'Duration' },
-				{ key: 'operationContext', label: 'Operation Context' }
+				{ key: 'solutionName', label: 'Solution', type: 'name' },
+				{ key: 'status', label: 'Status', type: 'status' },
+				{ key: 'progress', label: 'Progress', type: 'progress' },
+				{ key: 'createdBy', label: 'Created By', type: 'user' },
+				{ key: 'createdOn', label: 'Created On', type: 'datetime' },
+				{ key: 'duration', label: 'Duration', type: 'status' },
+				{ key: 'operationContext', label: 'Operation Context', type: 'identifier' }
 			],
 			searchPlaceholder: '🔍 Search...',
 			noDataMessage: 'No import jobs found.',

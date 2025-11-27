@@ -158,7 +158,7 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 				type: 'String',
 				currentValue: 'current-value',
 				defaultValue: 'default-value',
-				isManaged: 'Unmanaged',
+				isManaged: 'No',
 				description: 'Test description',
 				modifiedOn: '2024-01-15 10:30:45'
 			}),

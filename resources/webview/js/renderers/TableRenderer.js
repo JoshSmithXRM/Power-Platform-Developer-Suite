@@ -50,7 +50,10 @@ function renderTableRow(row, columns, index) {
 		const value = row[col.key];
 		const cellClass = row[col.key + 'Class'] || '';
 		const cellHtml = row[col.key + 'Html'] || escapeHtml(value || '');
-		return `<td class="${cellClass}">${cellHtml}</td>`;
+		// Add title attribute for tooltip on truncated content
+		const plainText = String(value || '');
+		const titleAttr = plainText ? ` title="${escapeHtml(plainText)}"` : '';
+		return `<td class="${cellClass}"${titleAttr}>${cellHtml}</td>`;
 	}).join('');
 
 	// Apply striping class if index provided

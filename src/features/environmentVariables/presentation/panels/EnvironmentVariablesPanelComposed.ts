@@ -302,13 +302,13 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 			defaultSortColumn: 'schemaName',
 			defaultSortDirection: 'asc',
 			columns: [
-				{ key: 'schemaName', label: 'Schema Name' },
-				{ key: 'displayName', label: 'Display Name' },
-				{ key: 'type', label: 'Type' },
-				{ key: 'currentValue', label: 'Current Value' },
-				{ key: 'defaultValue', label: 'Default Value' },
-				{ key: 'isManaged', label: 'Managed' },
-				{ key: 'modifiedOn', label: 'Modified On' }
+				{ key: 'schemaName', label: 'Schema Name', type: 'identifier' },
+				{ key: 'displayName', label: 'Display Name', type: 'name' },
+				{ key: 'type', label: 'Type', type: 'status' },
+				{ key: 'defaultValue', label: 'Default Value', type: 'description' },
+				{ key: 'currentValue', label: 'Current Value', type: 'description' },
+				{ key: 'isManaged', label: 'Managed', type: 'boolean' },
+				{ key: 'modifiedOn', label: 'Modified On', type: 'datetime' }
 			],
 			searchPlaceholder: '🔍 Search environment variables...',
 			noDataMessage: 'No environment variables found.',

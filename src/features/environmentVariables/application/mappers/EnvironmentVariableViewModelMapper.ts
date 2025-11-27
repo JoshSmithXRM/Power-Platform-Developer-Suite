@@ -23,7 +23,7 @@ export class EnvironmentVariableViewModelMapper {
 			type: EnvironmentVariableTypeFormatter.formatTypeName(envVar.type),
 			currentValue: envVar.currentValue ?? '',
 			defaultValue: envVar.defaultValue ?? '',
-			isManaged: envVar.isManaged ? 'Managed' : 'Unmanaged',
+			isManaged: envVar.isManaged ? 'Yes' : 'No',
 			description: envVar.description,
 			modifiedOn: DateFormatter.formatDate(envVar.modifiedOn)
 		};

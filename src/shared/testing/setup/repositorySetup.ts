@@ -45,7 +45,9 @@ export function createMockEnvironmentRepository(): jest.Mocked<IEnvironmentRepos
 export function createMockSolutionRepository(): jest.Mocked<ISolutionRepository> {
 	return {
 		findAll: jest.fn(),
-		findAllForDropdown: jest.fn()
+		findAllForDropdown: jest.fn(),
+		findPaginated: jest.fn(),
+		getCount: jest.fn()
 	};
 }
 
