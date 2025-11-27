@@ -274,8 +274,8 @@
 			// Check for pre-rendered HTML content (from trusted backend)
 			const cellHtml = row[col.key + 'Html'];
 			if (cellHtml) {
-				// Pre-rendered HTML from backend - use sanitized insertion
-				td.innerHTML = sanitizeHtml(cellHtml);
+				// Pre-rendered HTML from backend - append sanitized DOM nodes
+				appendSanitizedHtml(cellHtml, td);
 			} else {
 				// Plain text - use textContent for automatic escaping
 				td.textContent = plainText;
@@ -350,53 +350,93 @@
 	}
 
 	/**
-	 * Sanitizes HTML content by allowing only safe tags and attributes.
-	 * Used for pre-rendered HTML from trusted backend.
+	 * Dangerous URL schemes that must be blocked.
+	 */
+	const DANGEROUS_URL_SCHEMES = ['javascript:', 'data:', 'vbscript:'];
+
+	/**
+	 * Checks if a URL uses a dangerous scheme.
+	 *
+	 * @param {string} url - URL to check
+	 * @returns {boolean} True if dangerous
+	 */
+	function isDangerousUrl(url) {
+		const normalized = url.toLowerCase().trim();
+		return DANGEROUS_URL_SCHEMES.some(scheme => normalized.startsWith(scheme));
+	}
+
+	/**
+	 * Sanitizes HTML content and appends it directly to target element.
+	 * Uses DOM manipulation instead of innerHTML to prevent XSS.
 	 *
 	 * @param {string} html - HTML string to sanitize
-	 * @returns {string} Sanitized HTML string
+	 * @param {HTMLElement} target - Target element to append sanitized content to
 	 */
-	function sanitizeHtml(html) {
+	function appendSanitizedHtml(html, target) {
 		// Allowed tags for cell content (badges, icons, links)
 		const allowedTags = ['span', 'a', 'strong', 'em', 'i', 'b', 'code', 'br'];
 		// Allowed attributes
 		const allowedAttributes = ['class', 'title', 'href', 'target', 'rel'];
 
-		const template = document.createElement('template');
-		template.innerHTML = html;
+		// Use DOMParser to safely parse HTML without executing scripts
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(html, 'text/html');
 
-		const sanitize = (element) => {
-			const children = Array.from(element.childNodes);
-			children.forEach(child => {
-				if (child.nodeType === Node.ELEMENT_NODE) {
-					const tagName = child.tagName.toLowerCase();
-					if (!allowedTags.includes(tagName)) {
-						// Replace disallowed tags with text content
-						const text = document.createTextNode(child.textContent || '');
-						element.replaceChild(text, child);
-					} else {
-						// Remove disallowed attributes
-						Array.from(child.attributes).forEach(attr => {
-							if (!allowedAttributes.includes(attr.name.toLowerCase())) {
-								child.removeAttribute(attr.name);
-							}
-							// Sanitize href to prevent javascript: URLs
-							if (attr.name.toLowerCase() === 'href') {
-								const href = attr.value.toLowerCase().trim();
-								if (href.startsWith('javascript:') || href.startsWith('data:')) {
-									child.removeAttribute('href');
-								}
-							}
-						});
-						// Recursively sanitize children
-						sanitize(child);
-					}
+		/**
+		 * Recursively sanitizes and clones a node.
+		 *
+		 * @param {Node} node - Node to sanitize
+		 * @returns {Node|null} Sanitized node or null if should be removed
+		 */
+		function sanitizeNode(node) {
+			if (node.nodeType === Node.TEXT_NODE) {
+				return document.createTextNode(node.textContent || '');
+			}
+
+			if (node.nodeType === Node.ELEMENT_NODE) {
+				const tagName = node.tagName.toLowerCase();
+
+				if (!allowedTags.includes(tagName)) {
+					// Disallowed tag - return text content only
+					return document.createTextNode(node.textContent || '');
 				}
-			});
-		};
 
-		sanitize(template.content);
-		return template.innerHTML;
+				// Create clean element with only allowed attributes
+				const cleanElement = document.createElement(tagName);
+
+				// Copy only allowed attributes
+				Array.from(node.attributes).forEach(attr => {
+					const attrName = attr.name.toLowerCase();
+					if (allowedAttributes.includes(attrName)) {
+						// Special handling for href - block dangerous schemes
+						if (attrName === 'href' && isDangerousUrl(attr.value)) {
+							return; // Skip dangerous URLs
+						}
+						cleanElement.setAttribute(attr.name, attr.value);
+					}
+				});
+
+				// Recursively sanitize children
+				Array.from(node.childNodes).forEach(child => {
+					const sanitizedChild = sanitizeNode(child);
+					if (sanitizedChild) {
+						cleanElement.appendChild(sanitizedChild);
+					}
+				});
+
+				return cleanElement;
+			}
+
+			return null;
+		}
+
+		// Process body children (DOMParser wraps content in html/body)
+		Array.from(doc.body.childNodes).forEach(node => {
+			const sanitized = sanitizeNode(node);
+			if (sanitized) {
+				target.appendChild(sanitized);
+			}
+		});
 	}
 
 	/**

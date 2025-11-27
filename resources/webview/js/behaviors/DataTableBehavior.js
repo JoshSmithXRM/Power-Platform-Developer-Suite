@@ -134,10 +134,28 @@
 
 			let comparison;
 			if (columnType === 'datetime' || columnType === 'date') {
-				// Parse dates for proper chronological sorting
-				const aDate = new Date(aText);
-				const bDate = new Date(bText);
-				comparison = aDate.getTime() - bDate.getTime();
+				// Use data-sort-value if available (ISO timestamp), otherwise parse text
+				// data-sort-value provides reliable sorting regardless of display format
+				const aSortValue = aCell.dataset.sortValue;
+				const bSortValue = bCell.dataset.sortValue;
+
+				let aTime, bTime;
+				if (aSortValue !== undefined && bSortValue !== undefined) {
+					// Prefer machine-readable sort values (timestamps or ISO strings)
+					aTime = Number(aSortValue) || new Date(aSortValue).getTime();
+					bTime = Number(bSortValue) || new Date(bSortValue).getTime();
+				} else {
+					// Fallback: parse text content (may be locale-dependent)
+					aTime = new Date(aText).getTime();
+					bTime = new Date(bText).getTime();
+				}
+
+				// Handle invalid dates by falling back to string comparison
+				if (isNaN(aTime) || isNaN(bTime)) {
+					comparison = aText.localeCompare(bText);
+				} else {
+					comparison = aTime - bTime;
+				}
 			} else if (columnType === 'numeric') {
 				// Parse numbers for proper numeric sorting
 				const aNum = parseFloat(aText.replace(/[^0-9.-]/g, '')) || 0;

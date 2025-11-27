@@ -206,7 +206,10 @@ function renderTableRow(
 		// Plain text value for tooltip (strip HTML)
 		const plainText = String(value ?? '');
 		const titleAttr = plainText ? ` title="${escapeHtml(plainText)}"` : '';
-		return `<td class="${cellClass}"${titleAttr}>${cellHtml}</td>`;
+		// Sort value for reliable date/numeric sorting (timestamps, ISO strings)
+		const sortValue = row[col.key + 'SortValue'];
+		const sortAttr = sortValue !== undefined ? ` data-sort-value="${escapeHtml(String(sortValue))}"` : '';
+		return `<td class="${cellClass}"${titleAttr}${sortAttr}>${cellHtml}</td>`;
 	}).join('');
 
 	return `<tr data-index="${index}" style="height: ${rowHeight}px;">${cells}</tr>`;

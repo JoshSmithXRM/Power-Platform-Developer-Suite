@@ -129,6 +129,7 @@ function renderTableHeader(
  * Renders table data row.
  * Supports custom HTML via {columnKey}Html properties (caller must sanitize).
  * Includes title attribute for tooltip on truncated content.
+ * Supports {columnKey}SortValue for reliable date/numeric sorting.
  */
 function renderTableRow(
 	row: Record<string, unknown>,
@@ -141,7 +142,10 @@ function renderTableRow(
 		// Plain text value for tooltip (strip HTML)
 		const plainText = String(value ?? '');
 		const titleAttr = plainText ? ` title="${escapeHtml(plainText)}"` : '';
-		return `<td class="${cellClass}"${titleAttr}>${cellHtml}</td>`;
+		// Sort value for reliable date/numeric sorting (timestamps, ISO strings)
+		const sortValue = row[col.key + 'SortValue'];
+		const sortAttr = sortValue !== undefined ? ` data-sort-value="${escapeHtml(String(sortValue))}"` : '';
+		return `<td class="${cellClass}"${titleAttr}${sortAttr}>${cellHtml}</td>`;
 	}).join('');
 
 	return `<tr>${cells}</tr>`;

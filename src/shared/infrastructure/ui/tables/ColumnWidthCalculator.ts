@@ -159,6 +159,10 @@ function calculateSingleColumnWidth(
  *
  * Converts values to their display representation for accurate width estimation.
  * Uses type-specific formatting for consistent measurement.
+ *
+ * Note: Date formats use US locale approximations. Locales with longer month names
+ * (e.g., "September") may produce wider dates than estimated. The column max
+ * constraints handle overflow, and title tooltips show truncated content on hover.
  */
 function formatForMeasurement(value: unknown, type: ColumnType): string {
 	if (value === null || value === undefined) {
@@ -171,11 +175,13 @@ function formatForMeasurement(value: unknown, type: ColumnType): string {
 			return value ? 'Yes' : 'No';
 
 		case 'date':
-			// Use standard date format length
+			// Use standard date format length (US locale approximation)
+			// Longer formats like "September 25, 2024" handled by max constraint
 			return '12/31/2024';
 
 		case 'datetime':
-			// Use standard datetime format length
+			// Use standard datetime format length (US locale approximation)
+			// Longer formats handled by max constraint; tooltips show full value
 			return '12/31/2024, 11:59 PM';
 
 		case 'numeric':
