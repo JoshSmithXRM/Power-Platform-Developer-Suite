@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **User Configuration System** - Customizable extension settings via VS Code Settings UI
+  - `powerPlatformDevSuite.pluginTrace.defaultLimit` - Configure default number of plugin traces to fetch (1-5000, default: 100)
+  - Settings accessible via Command Palette: "Power Platform Developer Suite: Open Settings"
+  - Settings entry in Tools sidebar for quick access
+  - Clean Architecture implementation: `IConfigurationService` interface in domain, `VsCodeConfigurationService` in infrastructure
+  - `NullConfigurationService` test stub for unit testing
+
 ## [0.2.2] - 2025-11-26
 
 ### Added
@@ -34,7 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Environment Setup integration tests - Form field validation, Service Principal auth
   - Solutions Panel integration tests - Real API calls, 1000+ solutions loading verified
   - Auto-loading credentials via `dotenv` from `.env.e2e.local`
-  - Design doc: `docs/designs/PLAYWRIGHT_E2E_DESIGN.md`
 
 ### Changed
 

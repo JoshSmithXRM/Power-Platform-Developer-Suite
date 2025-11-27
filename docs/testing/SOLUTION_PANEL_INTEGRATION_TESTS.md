@@ -594,7 +594,7 @@ This document outlines integration tests needed for the Solution Explorer panel.
 ## Architect Review - Open Decisions
 
 **Review Date**: 2025-01-04
-**Reviewed By**: clean-architecture-guardian
+**Reviewed By**: code-guardian
 **Status**: 2 open architectural decisions (user will decide later)
 
 ### 1. ⚠️ Singleton vs Instance Pattern

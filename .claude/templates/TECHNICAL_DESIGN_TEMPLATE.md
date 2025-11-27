@@ -656,24 +656,21 @@ describe('[UseCase]', () => {
 ## Review & Approval
 
 ### Design Phase
-- [ ] clean-architecture-guardian design review (all layers)
-- [ ] typescript-pro type contract review
+- [ ] design-architect invoked (for complex features)
 - [ ] Human approval of design
 
 ### Implementation Phase (per slice)
-- [ ] Slice 1 implemented and reviewed
-- [ ] Slice 2 implemented and reviewed
+- [ ] Slice 1 implemented
+- [ ] Slice 2 implemented
 - [ ] [Continue for each slice]
 
 ### Final Approval
 - [ ] All slices implemented
-- [ ] Tests written and passing (npm test ✅)
-- [ ] Manual testing completed
-- [ ] Documentation updated (if new patterns)
-- [ ] clean-architecture-guardian final approval
+- [ ] Tests written and passing (`npm test`)
+- [ ] Manual testing completed (F5)
+- [ ] `/code-review` - code-guardian APPROVED
 
 **Status:** Pending | Approved | Changes Requested
-**Approver:** [Name]
 **Date:** [Date]
 
 ---
@@ -690,4 +687,4 @@ describe('[UseCase]', () => {
 - Related features: [Links to similar features]
 - External documentation: [API docs, etc.]
 - Design inspiration: [What patterns we're following]
-- Workflow guide: `.claude/workflows/DESIGN_WORKFLOW.md`
+- Workflow guide: `.claude/WORKFLOW.md`

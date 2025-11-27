@@ -1,3 +1,4 @@
+import type { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
 import {
 	TraceFilter,
 	FilterCondition,
@@ -16,6 +17,10 @@ import type {
  * Handles type conversions and validation.
  */
 export class FilterCriteriaMapper {
+	constructor(
+		private readonly configService?: IConfigurationService
+	) {}
+
 	/**
 	 * Maps ViewModel (query builder form) to domain TraceFilter entity.
 	 */
@@ -28,7 +33,7 @@ export class FilterCriteriaMapper {
 		return TraceFilter.create({
 			top: viewModel.top,
 			conditions
-		});
+		}, this.configService);
 	}
 
 	/**
@@ -92,13 +97,19 @@ export class FilterCriteriaMapper {
 		};
 	}
 
+	/** Default limit when no configuration is provided. */
+	private static readonly DEFAULT_LIMIT = 100;
+
 	/**
 	 * Creates empty filter criteria with no conditions.
+	 * Uses configured default limit if config service is available.
 	 */
-	public static empty(): FilterCriteriaViewModel {
+	public empty(): FilterCriteriaViewModel {
+		const defaultLimit = this.configService?.get('pluginTrace.defaultLimit', FilterCriteriaMapper.DEFAULT_LIMIT)
+			?? FilterCriteriaMapper.DEFAULT_LIMIT;
 		return {
 			conditions: [],
-			top: 100
+			top: defaultLimit
 		};
 	}
 

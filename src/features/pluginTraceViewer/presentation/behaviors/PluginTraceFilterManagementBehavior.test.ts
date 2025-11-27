@@ -3,7 +3,6 @@ import * as vscode from 'vscode';
 import { PluginTraceFilterManagementBehavior } from './PluginTraceFilterManagementBehavior';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
-import { FilterCriteriaMapper } from '../mappers/FilterCriteriaMapper';
 import type { FilterCriteriaViewModel } from '../../application/viewModels/FilterCriteriaViewModel';
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
 import { assertDefined } from '../../../../shared/testing';
@@ -53,7 +52,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 		it('should initialize with empty filter criteria', () => {
 			const criteria = behavior.getFilterCriteria();
 
-			expect(criteria).toEqual(FilterCriteriaMapper.empty());
+			expect(criteria).toEqual({ conditions: [], top: 100 });
 		});
 
 		it('should initialize with empty reconstructed quick filter IDs', () => {
@@ -229,7 +228,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 			await behavior.clearFilters();
 
 			const criteria = behavior.getFilterCriteria();
-			expect(criteria).toEqual(FilterCriteriaMapper.empty());
+			expect(criteria).toEqual({ conditions: [], top: 100 });
 		});
 
 		it('should persist empty filter criteria', async () => {
@@ -460,7 +459,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 			await behavior.loadFilterCriteria(TEST_ENVIRONMENT_ID);
 
 			const criteria = behavior.getFilterCriteria();
-			expect(criteria).toEqual(FilterCriteriaMapper.empty());
+			expect(criteria).toEqual({ conditions: [], top: 100 });
 		});
 
 		it('should handle null repository gracefully', async () => {
@@ -476,7 +475,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 			await behaviorWithoutRepo.loadFilterCriteria(TEST_ENVIRONMENT_ID);
 
 			const criteria = behaviorWithoutRepo.getFilterCriteria();
-			expect(criteria).toEqual(FilterCriteriaMapper.empty());
+			expect(criteria).toEqual({ conditions: [], top: 100 });
 		});
 
 		it('should handle invalid stored data gracefully', async () => {
@@ -488,7 +487,7 @@ describe('PluginTraceFilterManagementBehavior', () => {
 
 			// Should not throw, should handle gracefully
 			const criteria = behavior.getFilterCriteria();
-			expect(criteria).toEqual(FilterCriteriaMapper.empty());
+			expect(criteria).toEqual({ conditions: [], top: 100 });
 		});
 	});
 

@@ -229,6 +229,10 @@ export function activate(context: vscode.ExtensionContext): void {
 		environmentsProvider.refresh();
 	});
 
+	const openSettingsCommand = vscode.commands.registerCommand('power-platform-dev-suite.openSettings', () => {
+		vscode.commands.executeCommand('workbench.action.openSettings', 'powerPlatformDevSuite');
+	});
+
 	// Subscribe to domain events
 	container.eventPublisher.subscribe(EnvironmentCreated, () => environmentsProvider.refresh());
 	container.eventPublisher.subscribe(EnvironmentUpdated, () => environmentsProvider.refresh());
@@ -345,7 +349,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const pluginTraceViewerCommand = vscode.commands.registerCommand('power-platform-dev-suite.pluginTraceViewer', async (environmentItem?: { envId: string }) => {
 		try {
-			void initializePluginTraceViewer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, environmentItem?.envId);
+			void initializePluginTraceViewer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, container.configService, environmentItem?.envId);
 		} catch (error) {
 			container.logger.error('Failed to open Plugin Trace Viewer', error);
 			vscode.window.showErrorMessage(
@@ -359,7 +363,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			await showEnvironmentPickerAndExecute(
 				container.environmentRepository,
 				'Select an environment to view Plugin Traces',
-				async (envId) => initializePluginTraceViewer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, envId)
+				async (envId) => initializePluginTraceViewer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, container.configService, envId)
 			);
 		} catch (error) {
 			container.logger.error('Failed to open Plugin Trace Viewer with environment picker', error);
@@ -451,6 +455,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		openMakerCommand,
 		openDynamicsCommand,
 		refreshEnvironmentsCommand,
+		openSettingsCommand,
 		container.eventPublisher
 	);
 

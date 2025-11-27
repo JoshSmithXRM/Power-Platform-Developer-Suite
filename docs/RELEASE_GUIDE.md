@@ -532,7 +532,7 @@ Instead of manual version bumping, use the GitHub Actions workflow:
 
 **Format:** `0.3.0-beta.1`, `0.3.0-rc.1`
 
-**See:** [FUTURE_ENHANCEMENTS.md](../FUTURE_ENHANCEMENTS.md#pre-release-channel-beta-versions)
+**See:** [ALM_DEVOPS.md](./future/ALM_DEVOPS.md#pre-release-channel-support)
 
 ---
 

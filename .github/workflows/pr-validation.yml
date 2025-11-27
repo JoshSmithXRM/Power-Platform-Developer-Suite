@@ -42,3 +42,19 @@ jobs:
 
       - name: Validate architecture rules
         run: npm run lint:architecture
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E smoke tests
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" npm run e2e:smoke
+
+      - name: Upload E2E artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            e2e/results/
+            e2e/screenshots/
+          retention-days: 7

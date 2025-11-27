@@ -38,6 +38,7 @@
 13. **Write tests for domain and application layers** - Domain: 100% target, use cases: 90% target
 14. **Test-driven bug fixes** - Write failing test, fix bug, verify test passes
 15. **VS Code panel singleton** - `private static currentPanel` + `createOrShow()` factory
+16. **Explore before implementing** - Search for existing patterns/code before creating new
 
 ---
 
@@ -102,18 +103,7 @@
 - ✅ Via injected `ILogger` (constructor injection, testable)
 - ✅ Use `NullLogger` in tests (silent by default, `SpyLogger` for assertions)
 
-**Logging Levels:**
-- `trace` - Extremely verbose (loop iterations, raw payloads, method entry/exit)
-- `debug` - Technical details, method flow, API calls
-- `info` - Business events, use case completion, state changes
-- `warn` - Recoverable issues, fallbacks, missing optional config
-- `error` - Failures, exceptions (always pass error object)
-
-**Message Format:**
-- ✅ Capitalize first letter (sentence case)
-- ✅ No period at end
-- ✅ Structured data in args: `logger.info('Deleted traces', { count: 15 })`
-- ❌ No string interpolation: `` logger.info(`Deleted ${count} traces`) ``
+**See [LOGGING_GUIDE.md](docs/architecture/LOGGING_GUIDE.md)** for levels and message formatting.
 
 ---
 
@@ -201,98 +191,27 @@ For complex/uncertain problems, trigger extended thinking modes:
 
 ---
 
-## 📦 Version Management & Local Installation
+## 📦 Version Management
 
-**For full release process, see:** [Release Guide](docs/RELEASE_GUIDE.md)
+**Full process:** [Release Guide](docs/RELEASE_GUIDE.md)
 
-### Quick Rules
+**Quick Rules:**
+1. `package.json` version is ALWAYS production version (no dev suffixes)
+2. Use F5 for development, `npm run local` for production testing
+3. Node.js 20.x for packaging (22+ has vsce issues)
 
-1. **`package.json` version is ALWAYS production version** - Never commit dev suffixes
-2. **Use F5 for 99% of development** - Extension Development Host (fastest iteration)
-3. **Use `npm run local` for production testing** - Auto-appends `-dev.X` suffix, safe to commit
-4. **Node.js 20.x for packaging** - Node 22+ has vsce module resolution issues
+**Before ANY PR to main:** Update `CHANGELOG.md`
 
-### Release Checklist (MANDATORY)
-
-**Before merging ANY PR to main:**
-- [ ] Update `CHANGELOG.md` with changes under correct version section
-
-**For version releases (use `/prepare-release` command):**
-- [ ] Bump version in `package.json`
-- [ ] Update `CHANGELOG.md` date to release date
-- [ ] Create release notes file: `docs/releases/vX.X.X.md`
-- [ ] All tests pass (`npm test`)
-- [ ] Compilation succeeds (`npm run compile`)
-
-### Commands
-
-**Primary Development:**
-```bash
-npm run watch  # Auto-compile on save
-# Press F5 - Launch Extension Development Host
-```
-
-**Production Testing (Rare):**
-```bash
-npm run local        # Build, package, install dev version locally
-npm run marketplace  # Revert to marketplace version
-```
-
-**Release Process:**
-1. Run `/prepare-release` command (creates release notes, updates version)
-2. Merge to `main`
-3. Create GitHub Release (tag `v0.X.X`)
-4. GitHub Actions auto-publishes to marketplace
-
-See [Release Guide](docs/RELEASE_GUIDE.md) for detailed steps and troubleshooting.
+**For releases:** Use `/prepare-release` command
 
 ---
 
-## ⚡ Parallel Execution (Maximize Efficiency)
+## ⚡ Parallel Execution
 
-**ALWAYS use parallel tool calls when operations are independent:**
+**Parallelize independent operations** (multiple reads, searches, git commands).
+**Sequentialize dependent operations** (write → read same file, compile → test).
 
-**✅ DO parallelize:**
-- Reading multiple unrelated files
-- Multiple grep searches for different patterns
-- Multiple glob searches
-- Independent bash commands (git status + git diff + git log)
-- Analysis tasks that don't depend on each other
-
-**❌ DON'T parallelize:**
-- Operations where second depends on first result
-- Write then Read same file
-- Compile then test (sequential dependency)
-- Create directory then write file to it
-
-**Examples:**
-
-**✅ GOOD - Parallel reads:**
-```
-Read Environment.ts
-Read EnvironmentRepository.ts
-Read EnvironmentMapper.ts
-(All in single message - 3 tool calls)
-```
-
-**✅ GOOD - Parallel searches:**
-```
-Grep for "StorageEntry" pattern
-Grep for "StorageCollection" pattern
-Glob for "*Storage*.ts" files
-(All in single message - 3 tool calls)
-```
-
-**❌ BAD - False parallelization:**
-```
-Write new file
-Read same file (depends on write completing)
-(Must be sequential)
-```
-
-**Rule of thumb:** If tool call B doesn't need the result of tool call A, parallelize them.
-
-**See:** `.claude/WORKFLOW.md` for detailed parallel execution patterns
+**Rule:** If tool call B doesn't need the result of tool call A, parallelize them.
 
 ---
 
@@ -318,6 +237,7 @@ Read same file (depends on write completing)
 **Design outside-in** (user perspective: panel → ViewModels → use cases → domain)
 **Implement inside-out** (technical: domain → application → infrastructure → presentation)
 **Review once per feature** (after all 4 layers complete, not per layer)
+**Design docs are temporary** - Delete after PR merge (extract patterns → `docs/architecture/`, ideas → `docs/future/`)
 
 ### Building Features
 
@@ -345,6 +265,14 @@ Read same file (depends on write completing)
 1. Write failing test (reproduces bug)
 2. Fix bug (test passes)
 3. Commit with test (prevents regression)
+
+**E2E tests for bugs:** Only write E2E tests for UI/workflow/timing bugs - not every bug.
+| Bug Type | Unit Test | E2E Test |
+|----------|-----------|----------|
+| Domain/use case logic | ✅ Always | ❌ No |
+| Panel rendering | ✅ If possible | ✅ Yes |
+| User workflow broken | ❌ Hard | ✅ Yes |
+| Race condition/timing | ❌ Hard | ✅ Yes |
 
 ### Refactoring
 
@@ -388,11 +316,12 @@ See `.claude/agents/` for agent definitions.
 **Testing guides:**
 - `docs/testing/TESTING_GUIDE.md` - Unit testing patterns and test factories
 - `docs/testing/INTEGRATION_TESTING_GUIDE.md` - Panel integration testing patterns
-- `docs/designs/PLAYWRIGHT_E2E_DESIGN.md` - E2E testing infrastructure (Playwright + VS Code)
+- `e2e/README.md` - E2E testing infrastructure (Playwright + VS Code)
 
 **Project management:**
 - `TECHNICAL_DEBT.md` - Code quality issues requiring remediation
-- `FUTURE_ENHANCEMENTS.md` - Planned features and improvements (deferred work)
+- `docs/future/` - Planned features and improvements (per-feature files)
+- `docs/requirements/` - Feature requirements documentation
 
 ---
 
@@ -401,10 +330,44 @@ See `.claude/agents/` for agent definitions.
 | When | Action |
 |------|--------|
 | Complex feature (3+ files) | `/design` first |
-| Before commit | `/code-review` |
+| Before PR | `/code-review` (mandatory) |
 | End session | `/handoff` |
 | Context full/switching tasks | `/clear` |
 | Uncertain architecture | "think harder" before designing |
+
+---
+
+## 📝 Commit Guidance
+
+**Context-aware approach** - not one-size-fits-all:
+
+**Code changes:**
+- Commit per layer during implementation
+- Follow session pattern if established (user said "commit and proceed" = do it going forward)
+- Ask if unclear on significant code changes
+
+**Documentation/planning:**
+- Commit at logical checkpoints WITHOUT asking
+- After each completed phase
+- When tracking doc updated significantly
+
+**Never commit:**
+- Failing tests
+- Compilation errors
+- Incomplete implementations (unless WIP branch)
+
+---
+
+## 📂 Work Tracking
+
+**For multi-phase work, create tracking doc:** `docs/work/[FEATURE]_TODO.md`
+
+- Use template: `.claude/templates/TASK_TRACKING_TEMPLATE.md`
+- Update as work progresses (check boxes)
+- Track bugs found during manual testing
+- Delete after PR merge (git history preserves it)
+
+**Keep in sync:** TodoWrite (in-session) + tracking doc (persistent)
 
 ---
 
