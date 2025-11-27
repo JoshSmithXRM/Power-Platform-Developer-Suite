@@ -34,7 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Environment Setup integration tests - Form field validation, Service Principal auth
   - Solutions Panel integration tests - Real API calls, 1000+ solutions loading verified
   - Auto-loading credentials via `dotenv` from `.env.e2e.local`
-  - Design doc: `docs/design/PLAYWRIGHT_E2E_DESIGN.md`
 
 ### Changed
 

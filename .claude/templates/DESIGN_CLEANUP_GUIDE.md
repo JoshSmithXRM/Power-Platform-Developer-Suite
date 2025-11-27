@@ -26,7 +26,7 @@ Example:
 ## Key Architectural Decisions
 
 ### Decision 1: Mapper Location
-**Considered:** Application layer (clean-architecture-guardian suggested)
+**Considered:** Application layer (code-guardian suggested)
 **Chosen:** Presentation layer
 **Rationale:** Mapper depends on presentation formatters. Moving to
   application would create app→pres dependency violation.
@@ -108,18 +108,6 @@ Final version approved [DATE]. See git history for detailed iteration.
 
 ---
 
-## Pending Cleanup Tasks
-
-**Plugin Traces Phase 4:**
-- Status: Ready for Final Architecture Review (not yet approved)
-- Action: After approval, apply cleanup steps 1-5
-- Files to clean:
-  - `PLUGIN_TRACES_PHASE4_DESIGN_V2.md` (delete)
-  - `PLUGIN_TRACES_PHASE4_DESIGN_V3.md` (delete)
-  - `PLUGIN_TRACES_PHASE4_DESIGN_V4.md` (rename to `PLUGIN_TRACES_PHASE4_DESIGN.md`)
-
----
-
 ## Why Clean Up?
 
 **Benefits:**
@@ -138,6 +126,6 @@ Final version approved [DATE]. See git history for detailed iteration.
 
 ## Related Documentation
 
-- `.claude/workflows/DESIGN_WORKFLOW.md` - Design process
-- `CLAUDE.md` - Design documentation rules
+- `.claude/WORKFLOW.md` - Development workflows (Phase 9: Cleanup)
+- `CLAUDE.md` - Project rules and patterns
 - `docs/design/reviews/README.md` - Review directory purpose

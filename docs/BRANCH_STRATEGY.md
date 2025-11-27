@@ -39,7 +39,24 @@ main (protected)
 1. **No direct commits to main** - All changes via pull request
 2. **Branch from main** - Always branch from latest main
 3. **Keep branches short-lived** - Merge or close within days, not weeks
-4. **Delete after merge** - Clean up merged branches
+4. **Delete after merge** - Clean up merged branches (see below)
+
+### Branch Deletion After Merge
+
+**Always delete branches after merge.** GitHub auto-deletes branches when configured (Settings > General > "Automatically delete head branches").
+
+**Why delete:**
+- Reduces branch clutter (stale branches confuse contributors)
+- Signals work is complete (no ambiguity about branch status)
+- Branch history preserved in merge commit (nothing lost)
+- Forces clean workflow (new work = new branch from main)
+
+**Why NOT keep branches:**
+- "In case we need it" - The merge commit preserves all history
+- "For reference" - Use tags for releases, not branches
+- "Still working on it" - Then don't merge yet
+
+**Recovery:** If you accidentally delete a branch, the commits still exist. Use `git reflog` or find the merge commit.
 
 ---
 

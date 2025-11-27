@@ -214,7 +214,7 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 2. Used during implementation as reference
 3. Patterns extracted to `docs/architecture/` during Phase 9
 4. Future ideas migrated to `docs/future/` during Phase 9
-5. Deleted before PR (git history preserves)
+5. Deleted after PR merge (git history preserves)
 
 ---
 
