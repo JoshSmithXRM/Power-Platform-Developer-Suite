@@ -305,8 +305,8 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 				{ key: 'schemaName', label: 'Schema Name', type: 'identifier' },
 				{ key: 'displayName', label: 'Display Name', type: 'name' },
 				{ key: 'type', label: 'Type', type: 'status' },
-				{ key: 'currentValue', label: 'Current Value', type: 'description' },
 				{ key: 'defaultValue', label: 'Default Value', type: 'description' },
+				{ key: 'currentValue', label: 'Current Value', type: 'description' },
 				{ key: 'isManaged', label: 'Managed', type: 'boolean' },
 				{ key: 'modifiedOn', label: 'Modified On', type: 'datetime' }
 			],

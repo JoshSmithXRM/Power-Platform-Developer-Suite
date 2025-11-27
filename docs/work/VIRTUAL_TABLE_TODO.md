@@ -134,16 +134,19 @@
 - [x] `tables/index.ts` - Re-exports
 - [x] CSS updates - `table-layout: fixed`, `white-space: nowrap`
 - [x] `VirtualDataTableSection` - Use calculator
-- [x] `virtualTableSectionView.ts` - Apply widths, add title attributes
+- [x] `virtualTableSectionView.ts` - Apply widths, add title attributes, data-type for sorting
 - [x] `DataTableSection` - Use calculator
-- [x] `dataTableSectionView.ts` - Apply widths, add title attributes
+- [x] `dataTableSectionView.ts` - Apply widths, add title attributes, data-type for sorting
 - [x] Solutions panel - Add column types
 - [x] Import Jobs panel - Add column types
-- [x] Environment Variables panel - Add column types
-- [x] Plugin Trace Viewer panel - Add column types
-- [x] Connection References panel - Add column types
+- [x] Environment Variables panel - Add column types, fix "Yes/No" display, reorder columns
+- [x] Plugin Trace Viewer panel - Add column types, reorder columns
+- [x] Connection References panel - Add column types, fix "Yes/No" display, reorder columns
+- [x] Metadata Browser - Add tooltips to all tables (Attributes, Keys, Relationships, Privileges, Choices)
+- [x] `DataTableBehavior.js` - Type-aware sorting (datetime, numeric, text)
+- [x] `VirtualTableRenderer.js` - Fix scrollbar height calculation
 - [x] `npm run compile` passes (all tests pass)
-- [ ] Manual F5 testing across all panels
+- [x] Manual F5 testing across all panels - COMPLETE
 
 ### Deferred Work (Slice 3)
 - [ ] Server-side search fallback - Query server when search term not in cache
@@ -383,17 +386,54 @@
   4. Metadata Browser tooltips - Still not working (different rendering path)
   5. Solutions scrollbar - Shows scrollbar when filtered to few items
 
-### Issues to Fix (Session 10)
-- [ ] Boolean consistency: Change "Managed/Unmanaged" to "Yes/No" on Env Vars & Connection Refs
-- [ ] Date/time sorting: Implement proper date comparison
-- [ ] Column reordering:
+### Session 10 (2025-11-27) - Final Bug Fixes (ALL COMPLETE)
+- **Fixed Boolean Display Inconsistency:**
+  - `EnvironmentVariableViewModelMapper.ts` - Changed "Managed/Unmanaged" to "Yes/No"
+  - `FlowConnectionRelationshipViewModelMapper.ts` - Changed for both flowIsManaged and connectionReferenceIsManaged
+  - Updated related tests to expect "Yes/No"
+
+- **Fixed Date/Time Sorting:**
+  - Added `data-type` attribute to table headers in `dataTableSectionView.ts` and `virtualTableSectionView.ts`
+  - Updated `DataTableBehavior.js` with type-aware sorting:
+    - `datetime`/`date` columns: Parse dates for chronological comparison
+    - `numeric` columns: Parse numbers for numeric comparison
+    - Default: Locale-aware text comparison
+
+- **Fixed Column Ordering:**
   - Connection References: Flow Name, CR Display Name, Connection Reference, Status, Flow Managed, Flow Modified, CR Managed, CR Modified On
   - Environment Variables: Schema Name, Display Name, Type, Default Value, Current Value, Managed, Modified On
   - Plugin Traces: Status, Started, Duration, Operation, Plugin Name, Entity, Message, Depth, Mode
-- [ ] Metadata Browser tooltips: Investigate different rendering path
-- [ ] Solutions scrollbar: Fix container height calculation when filtered
+
+- **Fixed Metadata Browser Tooltips:**
+  - Updated `MetadataBrowserBehavior.js` with title attributes in:
+    - `renderTable()` method - Generic table rendering for attributes, keys, privileges, choice values
+    - `renderOneToManyRelationshipsTable()` - 1:N relationship cells
+    - `renderManyToOneRelationshipsTable()` - N:1 relationship cells
+    - `renderManyToManyRelationshipsTable()` - N:N relationship cells
+    - `renderRelatedEntity()` - Navigation links
+    - `renderOptionsTable()` - Option set values in detail panel
+
+- **Fixed Solutions Scrollbar Issue:**
+  - Root cause: Container height calculation didn't account for horizontal scrollbar space (~17px)
+  - Multiple iterations to find correct solution:
+    1. Added header height to calculation - still off
+    2. Measured table.offsetHeight - still off by ~half row
+    3. Used getBoundingClientRect - parent constraints caused issues
+    4. **Final fix:** Set container to 10000px temporarily, measure `scrollHeight`, set to exact value
+  - Updated `VirtualTableRenderer.js` `updateContainerHeight()`:
+    - Sets temporary large height (10000px) to eliminate scrollbar influence
+    - Uses `scrollHeight` to get true content height
+    - Sets container to exact content height (capped at MAX_HEIGHT 600px)
+  - Also fixed call order in `filterRows()`: render first, then measure height
+
+- **All Tests Pass:** `npm run compile` successful
+- **Status:** All issues from Session 9 testing are RESOLVED ✓
+- **Manual Testing:** Verified scrollbar no longer appears when filtering to small result sets
 
 ### Next Steps
-1. Commit current tooltip fixes
-2. Fix remaining issues identified above
-3. Code review and merge
+1. ~~Manual F5 testing to verify all fixes~~ ✓
+2. Commit changes
+3. Analyze Slice 3 timing (server-side search fallback)
+4. Code review (`/code-review`)
+5. Update CHANGELOG.md
+6. Create PR and merge

@@ -106,6 +106,7 @@ function renderTable(
 /**
  * Renders table header cell with sort indicator.
  * Uses calculated width if available, otherwise falls back to manual width.
+ * Includes data-type for proper sorting (e.g., datetime columns).
  */
 function renderTableHeader(
 	column: ColumnWithCalculatedWidth,
@@ -118,8 +119,10 @@ function renderTableHeader(
 	// Prefer calculated width, fall back to manual width
 	const width = column.calculatedWidth ?? column.width;
 	const widthAttr = width ? ` style="width: ${width}"` : '';
+	// Include type for proper sorting (datetime, numeric)
+	const typeAttr = column.type ? ` data-type="${column.type}"` : '';
 
-	return `<th data-sort="${column.key}"${widthAttr}>${escapeHtml(column.label)}${sortIndicator}</th>`;
+	return `<th data-sort="${column.key}"${typeAttr}${widthAttr}>${escapeHtml(column.label)}${sortIndicator}</th>`;
 }
 
 /**

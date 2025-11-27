@@ -611,9 +611,9 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 				{ key: 'createdOn', label: 'Started', type: 'datetime' },
 				{ key: 'duration', label: 'Duration', type: 'status' },
 				{ key: 'operationType', label: 'Operation', type: 'status' },
+				{ key: 'pluginName', label: 'Plugin', type: 'name' },
 				{ key: 'entityName', label: 'Entity', type: 'identifier' },
 				{ key: 'messageName', label: 'Message', type: 'identifier' },
-				{ key: 'pluginName', label: 'Plugin', type: 'name' },
 				{ key: 'depth', label: 'Depth', type: 'numeric' },
 				{ key: 'mode', label: 'Mode', type: 'status' }
 			],

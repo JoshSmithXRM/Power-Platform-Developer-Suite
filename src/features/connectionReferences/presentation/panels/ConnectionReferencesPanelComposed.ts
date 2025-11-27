@@ -135,13 +135,13 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	private getTableConfig(): DataTableConfig {
 		const columns: DataTableColumn[] = [
 			{ key: 'flowName', label: 'Flow Name', type: 'name' },
-			{ key: 'connectionReferenceLogicalName', label: 'Connection Reference', type: 'identifier' },
 			{ key: 'connectionReferenceDisplayName', label: 'CR Display Name', type: 'name' },
+			{ key: 'connectionReferenceLogicalName', label: 'Connection Reference', type: 'identifier' },
 			{ key: 'relationshipType', label: 'Status', type: 'status' },
 			{ key: 'flowIsManaged', label: 'Flow Managed', type: 'boolean' },
 			{ key: 'flowModifiedOn', label: 'Flow Modified', type: 'datetime' },
 			{ key: 'connectionReferenceIsManaged', label: 'CR Managed', type: 'boolean' },
-			{ key: 'connectionReferenceModifiedOn', label: 'CR Modified', type: 'datetime' }
+			{ key: 'connectionReferenceModifiedOn', label: 'CR Modified On', type: 'datetime' }
 		];
 
 		return {

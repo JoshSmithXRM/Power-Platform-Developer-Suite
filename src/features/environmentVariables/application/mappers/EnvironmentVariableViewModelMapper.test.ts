@@ -146,7 +146,7 @@ describe('EnvironmentVariableViewModelMapper', () => {
 			expect(result.defaultValue).toBe('');
 		});
 
-		it('should map isManaged to "Managed" when true', () => {
+		it('should map isManaged to "Yes" when true', () => {
 			// Arrange
 			const envVar = createEnvironmentVariable('var1', {
 				isManaged: true
@@ -156,10 +156,10 @@ describe('EnvironmentVariableViewModelMapper', () => {
 			const result = mapper.toViewModel(envVar);
 
 			// Assert
-			expect(result.isManaged).toBe('Managed');
+			expect(result.isManaged).toBe('Yes');
 		});
 
-		it('should map isManaged to "Unmanaged" when false', () => {
+		it('should map isManaged to "No" when false', () => {
 			// Arrange
 			const envVar = createEnvironmentVariable('var1', {
 				isManaged: false
@@ -169,7 +169,7 @@ describe('EnvironmentVariableViewModelMapper', () => {
 			const result = mapper.toViewModel(envVar);
 
 			// Assert
-			expect(result.isManaged).toBe('Unmanaged');
+			expect(result.isManaged).toBe('No');
 		});
 
 		it('should map description', () => {

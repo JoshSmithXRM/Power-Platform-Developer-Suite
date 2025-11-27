@@ -109,8 +109,11 @@ function renderVirtualTable(
 	estimatedRowHeight: number
 ): string {
 	// Calculate container height for virtual scrolling
+	// Must account for header row + data rows
 	const visibleRows = Math.min(data.length, 20); // Show roughly 20 rows max initially
-	const containerHeight = visibleRows * estimatedRowHeight;
+	const headerHeight = estimatedRowHeight; // Header uses similar height to data rows
+	const dataRowsHeight = visibleRows * estimatedRowHeight;
+	const containerHeight = headerHeight + dataRowsHeight;
 
 	// Scroll wrapper handles both horizontal and vertical scrolling
 	// Table uses natural layout - no display:block hacks
@@ -148,6 +151,7 @@ function renderVirtualTable(
 /**
  * Renders table header cell with sort indicator.
  * Uses calculated width if available, otherwise falls back to manual width.
+ * Includes data-type for proper sorting (e.g., datetime columns).
  */
 function renderTableHeader(
 	column: ColumnWithCalculatedWidth,
@@ -160,8 +164,10 @@ function renderTableHeader(
 	// Prefer calculated width, fall back to manual width
 	const width = column.calculatedWidth ?? column.width;
 	const widthAttr = width ? ` style="width: ${width}"` : '';
+	// Include type for proper sorting (datetime, numeric)
+	const typeAttr = column.type ? ` data-type="${column.type}"` : '';
 
-	return `<th data-sort="${column.key}"${widthAttr}>${escapeHtml(column.label)}${sortIndicator}</th>`;
+	return `<th data-sort="${column.key}"${typeAttr}${widthAttr}>${escapeHtml(column.label)}${sortIndicator}</th>`;
 }
 
 /**

@@ -90,6 +90,7 @@
 
 	/**
 	 * Sorts table rows by column (client-side).
+	 * Uses data-type attribute to determine proper sorting (datetime, numeric, text).
 	 * @param {HTMLTableElement} table - The table element
 	 * @param {string} column - Column key to sort by
 	 * @param {string} direction - Sort direction ('asc' or 'desc')
@@ -103,13 +104,16 @@
 		// Get all rows and convert to array
 		const rows = Array.from(tbody.querySelectorAll('tr'));
 
-		// Get column index from headers
+		// Get column index and type from headers
 		const headers = Array.from(table.querySelectorAll('th[data-sort]'));
 		const columnIndex = headers.findIndex(h => h.getAttribute('data-sort') === column);
 
 		if (columnIndex === -1) {
 			return;
 		}
+
+		// Get column type for proper sorting
+		const columnType = headers[columnIndex]?.getAttribute('data-type') || 'text';
 
 		// Sort rows by column content
 		rows.sort((a, b) => {
@@ -128,8 +132,22 @@
 			if (!aText) return 1;
 			if (!bText) return -1;
 
-			// Locale-aware comparison
-			const comparison = aText.localeCompare(bText);
+			let comparison;
+			if (columnType === 'datetime' || columnType === 'date') {
+				// Parse dates for proper chronological sorting
+				const aDate = new Date(aText);
+				const bDate = new Date(bText);
+				comparison = aDate.getTime() - bDate.getTime();
+			} else if (columnType === 'numeric') {
+				// Parse numbers for proper numeric sorting
+				const aNum = parseFloat(aText.replace(/[^0-9.-]/g, '')) || 0;
+				const bNum = parseFloat(bText.replace(/[^0-9.-]/g, '')) || 0;
+				comparison = aNum - bNum;
+			} else {
+				// Locale-aware text comparison
+				comparison = aText.localeCompare(bText);
+			}
+
 			return direction === 'asc' ? comparison : -comparison;
 		});
 

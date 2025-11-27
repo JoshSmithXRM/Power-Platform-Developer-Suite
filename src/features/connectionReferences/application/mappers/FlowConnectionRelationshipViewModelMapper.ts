@@ -20,10 +20,10 @@ export class FlowConnectionRelationshipViewModelMapper {
 			connectionReferenceDisplayName: relationship.connectionReferenceDisplayName,
 			relationshipType: this.getRelationshipTypeLabel(relationship.relationshipType),
 			flowIsManaged: relationship.flowIsManaged !== null
-				? relationship.flowIsManaged ? 'Managed' : 'Unmanaged'
+				? relationship.flowIsManaged ? 'Yes' : 'No'
 				: '',
 			connectionReferenceIsManaged: relationship.connectionReferenceIsManaged !== null
-				? relationship.connectionReferenceIsManaged ? 'Managed' : 'Unmanaged'
+				? relationship.connectionReferenceIsManaged ? 'Yes' : 'No'
 				: '',
 			flowModifiedOn: DateFormatter.formatDate(relationship.flowModifiedOn),
 			connectionReferenceModifiedOn: DateFormatter.formatDate(relationship.connectionReferenceModifiedOn)

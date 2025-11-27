@@ -156,23 +156,37 @@
 			visibleStart = 0;
 			visibleEnd = Math.min(filteredRows.length, 50);
 			scrollContainer.scrollTop = 0;
-			updateContainerHeight(scrollContainer);
-			renderVisibleRows(tbody);
+			renderVisibleRows(tbody);              // Render FIRST
+			updateContainerHeight(scrollContainer); // THEN measure actual height
 			updateFooter();
 		}
 	}
 
 	/**
-	 * Updates container height based on total filtered rows.
+	 * Updates container height based on actual content that needs to be displayed.
+	 * Uses scrollHeight measurement with large temporary height to avoid scrollbar influence.
+	 * When content fits, use exact height (no scrollbar).
+	 * When content exceeds max, cap at max height (enable scrollbar).
 	 *
 	 * @param {HTMLElement} scrollContainer - The scroll container element (wrapper or tbody)
 	 */
 	function updateContainerHeight(scrollContainer) {
-		const totalHeight = filteredRows.length * rowHeight;
-		const minHeight = Math.min(400, totalHeight); // Min 400px or total height
-		const maxHeight = Math.min(600, totalHeight); // Max 600px
+		const MAX_HEIGHT = 600; // Cap at 600px to enable virtual scrolling for large datasets
 
-		scrollContainer.style.height = `${Math.max(minHeight, maxHeight)}px`;
+		// Set very large height temporarily - ensures no scrollbar affects measurement
+		// This makes the container bigger than any possible content
+		scrollContainer.style.height = '10000px';
+
+		// Force browser to recalculate layout
+		void scrollContainer.offsetHeight;
+
+		// scrollHeight now gives true content height (no scrollbar taking space)
+		const contentHeight = scrollContainer.scrollHeight;
+
+		// Set final height: exact content height, capped at MAX
+		const finalHeight = Math.min(contentHeight, MAX_HEIGHT);
+
+		scrollContainer.style.height = `${finalHeight}px`;
 	}
 
 	/**
