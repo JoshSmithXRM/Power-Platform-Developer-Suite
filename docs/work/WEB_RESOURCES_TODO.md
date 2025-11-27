@@ -152,8 +152,8 @@ feature/web-resources (this branch - completes virtual table + web resources)
 - [x] Unit tests pass: `npm test` (6,800 tests)
 - [x] Lint passes: `npm run lint:all`
 - [x] Build passes: `npm run compile`
+- [x] E2E tests pass: `npm run e2e:smoke` (6/6)
 - [ ] Manual testing (F5) with 65k+ web resources environment
-- [ ] E2E tests: `npm run e2e:smoke`
 
 ### Bugs Found During Manual Testing
 
@@ -183,8 +183,8 @@ These items were identified during virtual table development but are deferred:
 - [ ] Manual testing complete (F5)
 - [ ] All bugs from manual testing fixed
 - [ ] `/code-review` - APPROVED
-- [ ] CHANGELOG.md updated
-- [ ] PR created
+- [x] CHANGELOG.md updated
+- [x] PR created: https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/pull/31
 - [ ] CI passes
 
 ---
