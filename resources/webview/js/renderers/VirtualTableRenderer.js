@@ -245,6 +245,36 @@
 	}
 
 	/**
+	 * Creates a link element from structured CellLink data.
+	 * No HTML parsing - builds DOM directly from data.
+	 *
+	 * @param {string} text - Link text content
+	 * @param {Object} linkData - CellLink structure { command, commandData, className, title? }
+	 * @returns {HTMLAnchorElement} Link element
+	 */
+	function createLinkElement(text, linkData) {
+		const link = document.createElement('a');
+		link.href = '#';
+		link.className = linkData.className || '';
+		link.textContent = text;
+		link.title = linkData.title || text;
+
+		// Set data-command attribute
+		if (linkData.command) {
+			link.setAttribute('data-command', linkData.command);
+		}
+
+		// Set additional data attributes from commandData
+		if (linkData.commandData && typeof linkData.commandData === 'object') {
+			Object.entries(linkData.commandData).forEach(([key, value]) => {
+				link.setAttribute('data-' + key, String(value));
+			});
+		}
+
+		return link;
+	}
+
+	/**
 	 * Creates a single row element using safe DOM manipulation.
 	 *
 	 * @param {Object} row - Row data object
@@ -271,11 +301,17 @@
 				td.title = plainText;
 			}
 
-			// Check for pre-rendered HTML content (from trusted backend)
-			const cellHtml = row[col.key + 'Html'];
-			if (cellHtml) {
-				// Pre-rendered HTML from backend - append sanitized DOM nodes
-				appendSanitizedHtml(cellHtml, td);
+			// Add sort value if available (for date/numeric sorting)
+			const sortValue = row[col.key + 'SortValue'];
+			if (sortValue !== undefined) {
+				td.setAttribute('data-sort-value', String(sortValue));
+			}
+
+			// Check for structured link data (preferred - no HTML parsing)
+			const cellLink = row[col.key + 'Link'];
+			if (cellLink && typeof cellLink === 'object') {
+				// Create link from structured data - safe, no HTML parsing
+				td.appendChild(createLinkElement(plainText, cellLink));
 			} else {
 				// Plain text - use textContent for automatic escaping
 				td.textContent = plainText;
@@ -347,96 +383,6 @@
 			// No filter - show "X records"
 			footer.innerHTML = `${totalCount.toLocaleString()} ${recordText}${loadingHtml}`;
 		}
-	}
-
-	/**
-	 * Dangerous URL schemes that must be blocked.
-	 */
-	const DANGEROUS_URL_SCHEMES = ['javascript:', 'data:', 'vbscript:'];
-
-	/**
-	 * Checks if a URL uses a dangerous scheme.
-	 *
-	 * @param {string} url - URL to check
-	 * @returns {boolean} True if dangerous
-	 */
-	function isDangerousUrl(url) {
-		const normalized = url.toLowerCase().trim();
-		return DANGEROUS_URL_SCHEMES.some(scheme => normalized.startsWith(scheme));
-	}
-
-	/**
-	 * Sanitizes HTML content and appends it directly to target element.
-	 * Uses DOM manipulation instead of innerHTML to prevent XSS.
-	 *
-	 * @param {string} html - HTML string to sanitize
-	 * @param {HTMLElement} target - Target element to append sanitized content to
-	 */
-	function appendSanitizedHtml(html, target) {
-		// Allowed tags for cell content (badges, icons, links)
-		const allowedTags = ['span', 'a', 'strong', 'em', 'i', 'b', 'code', 'br'];
-		// Allowed attributes
-		const allowedAttributes = ['class', 'title', 'href', 'target', 'rel'];
-
-		// Use DOMParser to safely parse HTML without executing scripts
-		const parser = new DOMParser();
-		const doc = parser.parseFromString(html, 'text/html');
-
-		/**
-		 * Recursively sanitizes and clones a node.
-		 *
-		 * @param {Node} node - Node to sanitize
-		 * @returns {Node|null} Sanitized node or null if should be removed
-		 */
-		function sanitizeNode(node) {
-			if (node.nodeType === Node.TEXT_NODE) {
-				return document.createTextNode(node.textContent || '');
-			}
-
-			if (node.nodeType === Node.ELEMENT_NODE) {
-				const tagName = node.tagName.toLowerCase();
-
-				if (!allowedTags.includes(tagName)) {
-					// Disallowed tag - return text content only
-					return document.createTextNode(node.textContent || '');
-				}
-
-				// Create clean element with only allowed attributes
-				const cleanElement = document.createElement(tagName);
-
-				// Copy only allowed attributes
-				Array.from(node.attributes).forEach(attr => {
-					const attrName = attr.name.toLowerCase();
-					if (allowedAttributes.includes(attrName)) {
-						// Special handling for href - block dangerous schemes
-						if (attrName === 'href' && isDangerousUrl(attr.value)) {
-							return; // Skip dangerous URLs
-						}
-						cleanElement.setAttribute(attr.name, attr.value);
-					}
-				});
-
-				// Recursively sanitize children
-				Array.from(node.childNodes).forEach(child => {
-					const sanitizedChild = sanitizeNode(child);
-					if (sanitizedChild) {
-						cleanElement.appendChild(sanitizedChild);
-					}
-				});
-
-				return cleanElement;
-			}
-
-			return null;
-		}
-
-		// Process body children (DOMParser wraps content in html/body)
-		Array.from(doc.body.childNodes).forEach(node => {
-			const sanitized = sanitizeNode(node);
-			if (sanitized) {
-				target.appendChild(sanitized);
-			}
-		});
 	}
 
 	/**

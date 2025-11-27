@@ -9,6 +9,7 @@ import {
 	hasTypedColumns,
 	type ColumnWithCalculatedWidth
 } from '../tables';
+import { isCellLink, type CellLink } from '../types/CellLink';
 
 import { escapeHtml } from './htmlHelpers';
 
@@ -126,9 +127,27 @@ function renderTableHeader(
 }
 
 /**
+ * Renders a link element from structured CellLink data.
+ * All values are escaped to prevent XSS.
+ */
+function renderCellLink(text: string, linkData: CellLink): string {
+	const escapedText = escapeHtml(text);
+	const escapedClass = escapeHtml(linkData.className);
+	const escapedCommand = escapeHtml(linkData.command);
+	const escapedTitle = escapeHtml(linkData.title ?? text);
+
+	// Build data attributes from commandData
+	const dataAttrs = Object.entries(linkData.commandData)
+		.map(([key, value]) => `data-${escapeHtml(key)}="${escapeHtml(value)}"`)
+		.join(' ');
+
+	return `<a href="#" class="${escapedClass}" data-command="${escapedCommand}" ${dataAttrs} title="${escapedTitle}">${escapedText}</a>`;
+}
+
+/**
  * Renders table data row.
- * Supports custom HTML via {columnKey}Html properties (caller must sanitize).
  * Includes title attribute for tooltip on truncated content.
+ * Supports {columnKey}Link for structured link data (no raw HTML parsing).
  * Supports {columnKey}SortValue for reliable date/numeric sorting.
  */
 function renderTableRow(
@@ -138,14 +157,23 @@ function renderTableRow(
 	const cells = columns.map(col => {
 		const value = row[col.key];
 		const cellClass = row[col.key + 'Class'] || '';
-		const cellHtml = row[col.key + 'Html'] || escapeHtml(String(value ?? ''));
-		// Plain text value for tooltip (strip HTML)
 		const plainText = String(value ?? '');
 		const titleAttr = plainText ? ` title="${escapeHtml(plainText)}"` : '';
+
 		// Sort value for reliable date/numeric sorting (timestamps, ISO strings)
 		const sortValue = row[col.key + 'SortValue'];
 		const sortAttr = sortValue !== undefined ? ` data-sort-value="${escapeHtml(String(sortValue))}"` : '';
-		return `<td class="${cellClass}"${titleAttr}${sortAttr}>${cellHtml}</td>`;
+
+		// Check for structured link data (preferred - no HTML parsing)
+		const cellLink = row[col.key + 'Link'];
+		let cellContent: string;
+		if (isCellLink(cellLink)) {
+			cellContent = renderCellLink(plainText, cellLink);
+		} else {
+			cellContent = escapeHtml(plainText);
+		}
+
+		return `<td class="${cellClass}"${titleAttr}${sortAttr}>${cellContent}</td>`;
 	}).join('');
 
 	return `<tr>${cells}</tr>`;

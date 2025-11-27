@@ -89,7 +89,7 @@ describe('SolutionViewModelMapper', () => {
 			expect(result.friendlyName).toBe('My Test Solution');
 		});
 
-		it('should create friendlyNameHtml with escaped HTML', () => {
+		it('should create friendlyNameLink with structured link data', () => {
 			// Arrange
 			const solution = createSolution('test', {
 				id: 'sol-123',
@@ -99,25 +99,26 @@ describe('SolutionViewModelMapper', () => {
 			// Act
 			const result = mapper.toViewModel(solution);
 
-			// Assert
-			expect(result.friendlyNameHtml).toContain('data-solution-id="sol-123"');
-			expect(result.friendlyNameHtml).toContain('Test Solution');
-			expect(result.friendlyNameHtml).toContain('solution-link');
+			// Assert - structured link data, not HTML
+			expect(result.friendlyNameLink).toBeDefined();
+			expect(result.friendlyNameLink.command).toBe('openInMaker');
+			expect(result.friendlyNameLink.commandData['solution-id']).toBe('sol-123');
+			expect(result.friendlyNameLink.className).toBe('solution-link');
 		});
 
-		it('should escape special characters in friendlyNameHtml', () => {
-			// Arrange
+		it('should store raw id in friendlyNameLink (escaping happens in renderer)', () => {
+			// Arrange - IDs with special chars (escaping is done by renderer, not mapper)
 			const solution = createSolution('test', {
-				id: '<script>',
+				id: 'sol-with-special<chars>',
 				friendlyName: '<script>alert("xss")</script>'
 			});
 
 			// Act
 			const result = mapper.toViewModel(solution);
 
-			// Assert
-			expect(result.friendlyNameHtml).not.toContain('<script>');
-			expect(result.friendlyNameHtml).toContain('&lt;script&gt;');
+			// Assert - Raw values stored (renderer handles escaping)
+			expect(result.friendlyNameLink.commandData['solution-id']).toBe('sol-with-special<chars>');
+			expect(result.friendlyName).toBe('<script>alert("xss")</script>');
 		});
 
 		it('should map version', () => {
