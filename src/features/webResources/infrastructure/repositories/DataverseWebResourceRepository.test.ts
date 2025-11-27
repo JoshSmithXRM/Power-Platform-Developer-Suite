@@ -368,4 +368,93 @@ describe('DataverseWebResourceRepository', () => {
 			).rejects.toThrow(OperationCancelledException);
 		});
 	});
+
+	describe('updateContent', () => {
+		it('should update web resource content via PATCH', async () => {
+			mockApiService.patch.mockResolvedValue(undefined);
+
+			const base64Content = 'Y29uc29sZS5sb2coIkhlbGxvIik7'; // base64 for console.log("Hello");
+
+			await repository.updateContent('env-123', 'wr-123', base64Content);
+
+			expect(mockApiService.patch).toHaveBeenCalledWith(
+				'env-123',
+				'/api/data/v9.2/webresourceset(wr-123)',
+				{ content: base64Content },
+				undefined
+			);
+		});
+
+		it('should pass cancellation token to API service', async () => {
+			mockApiService.patch.mockResolvedValue(undefined);
+
+			const cancellationToken: ICancellationToken = {
+				isCancellationRequested: false,
+				onCancellationRequested: jest.fn()
+			};
+
+			await repository.updateContent('env-123', 'wr-123', 'dGVzdA==', cancellationToken);
+
+			expect(mockApiService.patch).toHaveBeenCalledWith(
+				'env-123',
+				'/api/data/v9.2/webresourceset(wr-123)',
+				{ content: 'dGVzdA==' },
+				cancellationToken
+			);
+		});
+
+		it('should handle cancellation before API call', async () => {
+			const cancellationToken: ICancellationToken = {
+				isCancellationRequested: true,
+				onCancellationRequested: jest.fn()
+			};
+
+			await expect(
+				repository.updateContent('env-123', 'wr-123', 'dGVzdA==', cancellationToken)
+			).rejects.toThrow(OperationCancelledException);
+
+			expect(mockApiService.patch).not.toHaveBeenCalled();
+		});
+
+		it('should handle API errors', async () => {
+			const apiError = new Error('Failed to update content');
+			mockApiService.patch.mockRejectedValue(apiError);
+
+			await expect(repository.updateContent('env-123', 'wr-123', 'dGVzdA==')).rejects.toThrow(
+				'Failed to update content'
+			);
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to update web resource content',
+				expect.any(Error)
+			);
+		});
+
+		it('should log debug messages', async () => {
+			mockApiService.patch.mockResolvedValue(undefined);
+
+			await repository.updateContent('env-123', 'wr-123', 'dGVzdA==');
+
+			expect(mockLogger.debug).toHaveBeenCalledWith('Updating web resource content', {
+				environmentId: 'env-123',
+				webResourceId: 'wr-123',
+				contentLength: 8
+			});
+			expect(mockLogger.debug).toHaveBeenCalledWith('Updated web resource content', {
+				webResourceId: 'wr-123'
+			});
+		});
+
+		it('should handle empty content', async () => {
+			mockApiService.patch.mockResolvedValue(undefined);
+
+			await repository.updateContent('env-123', 'wr-123', '');
+
+			expect(mockApiService.patch).toHaveBeenCalledWith(
+				'env-123',
+				'/api/data/v9.2/webresourceset(wr-123)',
+				{ content: '' },
+				undefined
+			);
+		});
+	});
 });

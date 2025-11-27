@@ -18,7 +18,8 @@ describe('GetWebResourceContentUseCase', () => {
 		mockWebResourceRepository = {
 			findAll: jest.fn(),
 			findById: jest.fn(),
-			getContent: jest.fn()
+			getContent: jest.fn(),
+			updateContent: jest.fn()
 		};
 
 		useCase = new GetWebResourceContentUseCase(

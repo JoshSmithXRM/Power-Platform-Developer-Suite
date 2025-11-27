@@ -40,7 +40,7 @@ feature/web-resources (this branch - adopts virtual table for Slice 2)
 |-------|-------------|--------|-------|
 | 1 | Browse & View (read-only) | ✅ Complete | Works but unusable at 70k scale |
 | 2 | Adopt Virtual Table | ⏳ Blocked | Waiting on `feature/virtual-table` |
-| 3 | Edit & Save | ⏳ Planned | Design after Slice 2 |
+| 3 | Edit & Save | ✅ Complete | Ctrl+S saves to Dataverse |
 | 4 | Publish | ⏳ Planned | |
 | 5 | Enhanced UX | ⏳ Planned | |
 
@@ -73,18 +73,22 @@ Once virtual table merges to main:
 
 ---
 
-## Slice 3: Edit & Save ⏳ PLANNED
+## Slice 3: Edit & Save ✅ COMPLETE
 
-**Prerequisites:** Slice 2 complete (users need to find files before editing)
-
-- [ ] Design document created
-- [ ] Update `WebResourceFileSystemProvider.writeFile()` (currently throws read-only)
-- [ ] Create `UpdateWebResourceUseCase`
-- [ ] Add save-to-Dynamics functionality
-- [ ] Dirty indicator in editor
-- [ ] Error handling for save failures
-- [ ] Tests
-- [ ] Committed
+**Implementation:**
+- [x] Domain: Added `updateContent()` to `IWebResourceRepository`
+- [x] Application: Created `UpdateWebResourceUseCase` with validation
+- [x] Infrastructure: Implemented `updateContent()` in `DataverseWebResourceRepository`
+- [x] Infrastructure: Implemented `writeFile()` in `WebResourceFileSystemProvider`
+- [x] Business rule: Managed web resources cannot be edited
+- [x] Business rule: Non-text-based types (PNG, JPG, etc.) cannot be edited
+- [x] Cache updated after save
+- [x] `onDidChangeFile` event fired after save
+- [x] Error handling for save failures
+- [x] Tests for UpdateWebResourceUseCase (21 tests)
+- [x] Tests for repository updateContent (7 tests)
+- [x] Tests for FileSystemProvider writeFile (5 tests)
+- [x] Total web resources tests: 288 (was 255)
 
 ---
 
@@ -185,3 +189,19 @@ Once virtual table merges to main:
   - Total web resources tests now: 255
   - Committed: `bcd6af8`
 - **Current status:** All cleanup complete. Branch blocked on `feature/virtual-table`
+
+### Session 3 (2025-11-27)
+- Implemented Slice 3: Edit & Save functionality
+- Added `updateContent()` to `IWebResourceRepository` interface
+- Implemented `updateContent()` in `DataverseWebResourceRepository` (PATCH to webresourceset)
+- Created `UpdateWebResourceUseCase` with business rule validation
+- Updated `WebResourceFileSystemProvider` to support write operations
+- Business rules enforced:
+  - Managed web resources throw `ManagedWebResourceError`
+  - Non-text-based types (PNG, JPG, GIF, ICO, XAP) cannot be edited
+  - SVG is editable (it's text-based XML)
+- Cache is updated after successful save
+- `onDidChangeFile` event fired for VS Code to detect changes
+- Removed `isReadonly: true` from FileSystemProvider registration
+- Added 33 new tests (288 total for web resources feature)
+- **Current status:** Slice 3 complete. Ready for manual testing (F5)

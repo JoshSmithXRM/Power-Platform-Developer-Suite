@@ -6,17 +6,25 @@ import {
 	createWebResourceUri
 } from './WebResourceFileSystemProvider';
 import type { GetWebResourceContentUseCase, WebResourceContentResult } from '../../application/useCases/GetWebResourceContentUseCase';
+import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
+import { ManagedWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
 
 // Mock vscode module
 jest.mock('vscode', () => ({
 	FileSystemError: {
 		FileNotFound: jest.fn((uri) => new Error(`File not found: ${uri}`)),
-		NoPermissions: jest.fn((msg) => new Error(msg))
+		NoPermissions: jest.fn((msg) => new Error(msg)),
+		Unavailable: jest.fn((uri) => new Error(`Unavailable: ${uri}`))
 	},
 	FileType: {
 		File: 1,
 		Directory: 2
+	},
+	FileChangeType: {
+		Changed: 1,
+		Created: 2,
+		Deleted: 3
 	},
 	Uri: {
 		parse: jest.fn((str: string) => {
@@ -51,7 +59,7 @@ describe('WebResourceFileSystemProvider', () => {
 			execute: jest.fn()
 		} as unknown as jest.Mocked<GetWebResourceContentUseCase>;
 
-		provider = new WebResourceFileSystemProvider(mockUseCase, new NullLogger());
+		provider = new WebResourceFileSystemProvider(mockUseCase, null, new NullLogger());
 	});
 
 	describe('parseWebResourceUri', () => {
@@ -207,12 +215,18 @@ describe('WebResourceFileSystemProvider', () => {
 		});
 	});
 
-	describe('read-only operations', () => {
-		it('should throw NoPermissions for writeFile', () => {
-			// Act & Assert
-			expect(() => provider.writeFile()).toThrow('Web resources are read-only');
-		});
+	describe('write operations without update use case', () => {
+		it('should throw NoPermissions for writeFile when update use case is null', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const content = new Uint8Array([72, 101, 108, 108, 111]);
 
+			// Act & Assert
+			await expect(provider.writeFile(uri, content)).rejects.toThrow('Web resource editing is not available');
+		});
+	});
+
+	describe('unsupported operations', () => {
 		it('should throw NoPermissions for delete', () => {
 			// Act & Assert
 			expect(() => provider.delete()).toThrow('Web resources are read-only');
@@ -305,6 +319,107 @@ describe('WebResourceFileSystemProvider', () => {
 	describe('WEB_RESOURCE_SCHEME constant', () => {
 		it('should have correct scheme value', () => {
 			expect(WEB_RESOURCE_SCHEME).toBe('ppds-webresource');
+		});
+	});
+});
+
+describe('WebResourceFileSystemProvider with write support', () => {
+	let provider: WebResourceFileSystemProvider;
+	let mockGetUseCase: jest.Mocked<GetWebResourceContentUseCase>;
+	let mockUpdateUseCase: jest.Mocked<UpdateWebResourceUseCase>;
+
+	const testEnvironmentId = 'env-00000000-0000-0000-0000-000000000001';
+	const testWebResourceId = 'wr-00000000-0000-0000-0000-000000000002';
+	const testFilename = 'new_script.js';
+
+	beforeEach(() => {
+		jest.clearAllMocks();
+
+		mockGetUseCase = {
+			execute: jest.fn()
+		} as unknown as jest.Mocked<GetWebResourceContentUseCase>;
+
+		mockUpdateUseCase = {
+			execute: jest.fn()
+		} as unknown as jest.Mocked<UpdateWebResourceUseCase>;
+
+		provider = new WebResourceFileSystemProvider(mockGetUseCase, mockUpdateUseCase, new NullLogger());
+	});
+
+	describe('writeFile', () => {
+		it('should save web resource content', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const content = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
+			mockUpdateUseCase.execute.mockResolvedValue();
+
+			// Act
+			await provider.writeFile(uri, content);
+
+			// Assert
+			expect(mockUpdateUseCase.execute).toHaveBeenCalledWith(
+				testEnvironmentId,
+				testWebResourceId,
+				content
+			);
+		});
+
+		it('should update cache after successful save', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const originalContent = new Uint8Array([79, 108, 100]); // "Old"
+			const newContent = new Uint8Array([78, 101, 119]); // "New"
+			const mockResult: WebResourceContentResult = {
+				content: originalContent,
+				fileExtension: '.js',
+				displayName: 'Script',
+				name: 'new_script.js'
+			};
+			mockGetUseCase.execute.mockResolvedValue(mockResult);
+			mockUpdateUseCase.execute.mockResolvedValue();
+
+			// First read to populate cache
+			await provider.readFile(uri);
+			expect(mockGetUseCase.execute).toHaveBeenCalledTimes(1);
+
+			// Act - Write new content
+			await provider.writeFile(uri, newContent);
+
+			// Read again - should use updated cache, not call getUseCase
+			const result = await provider.readFile(uri);
+
+			// Assert
+			expect(mockGetUseCase.execute).toHaveBeenCalledTimes(1); // Still 1, used cache
+			expect(result).toEqual(newContent);
+		});
+
+		it('should throw NoPermissions for managed web resource', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const content = new Uint8Array([72, 101, 108, 108, 111]);
+			mockUpdateUseCase.execute.mockRejectedValue(new ManagedWebResourceError(testWebResourceId));
+
+			// Act & Assert
+			await expect(provider.writeFile(uri, content)).rejects.toThrow('Cannot edit managed web resource');
+		});
+
+		it('should throw Unavailable for other errors', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const content = new Uint8Array([72, 101, 108, 108, 111]);
+			mockUpdateUseCase.execute.mockRejectedValue(new Error('Network error'));
+
+			// Act & Assert
+			await expect(provider.writeFile(uri, content)).rejects.toThrow(/Unavailable/);
+		});
+
+		it('should throw FileNotFound for invalid URI', async () => {
+			// Arrange
+			const uri = vscode.Uri.parse(`file://${testEnvironmentId}/${testWebResourceId}`);
+			const content = new Uint8Array([72, 101, 108, 108, 111]);
+
+			// Act & Assert
+			await expect(provider.writeFile(uri, content)).rejects.toThrow();
 		});
 	});
 });

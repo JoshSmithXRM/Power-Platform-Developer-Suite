@@ -224,6 +224,40 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 		}
 	}
 
+	async updateContent(
+		environmentId: string,
+		webResourceId: string,
+		base64Content: string,
+		cancellationToken?: ICancellationToken
+	): Promise<void> {
+		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})`;
+
+		this.logger.debug('Updating web resource content', {
+			environmentId,
+			webResourceId,
+			contentLength: base64Content.length
+		});
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			await this.apiService.patch(
+				environmentId,
+				endpoint,
+				{ content: base64Content },
+				cancellationToken
+			);
+
+			CancellationHelper.throwIfCancelled(cancellationToken);
+
+			this.logger.debug('Updated web resource content', { webResourceId });
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to update web resource content', normalizedError);
+			throw normalizedError;
+		}
+	}
+
 	private mapToEntity(dto: DataverseWebResourceDto): WebResource {
 		return new WebResource(
 			dto.webresourceid,

@@ -48,4 +48,19 @@ export interface IWebResourceRepository {
 		webResourceId: string,
 		cancellationToken?: ICancellationToken
 	): Promise<string>;
+
+	/**
+	 * Updates the content of a web resource.
+	 *
+	 * @param environmentId - Environment ID
+	 * @param webResourceId - Web resource GUID
+	 * @param base64Content - New content encoded as base64
+	 * @param cancellationToken - Optional token to cancel the operation
+	 */
+	updateContent(
+		environmentId: string,
+		webResourceId: string,
+		base64Content: string,
+		cancellationToken?: ICancellationToken
+	): Promise<void>;
 }

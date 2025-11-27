@@ -21,7 +21,8 @@ describe('ListWebResourcesUseCase', () => {
 		mockWebResourceRepository = {
 			findAll: jest.fn(),
 			findById: jest.fn(),
-			getContent: jest.fn()
+			getContent: jest.fn(),
+			updateContent: jest.fn()
 		};
 
 		mockSolutionComponentRepository = {

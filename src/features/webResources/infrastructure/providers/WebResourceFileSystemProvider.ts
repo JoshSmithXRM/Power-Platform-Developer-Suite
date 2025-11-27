@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
 
 import type { GetWebResourceContentUseCase } from '../../application/useCases/GetWebResourceContentUseCase';
+import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import { ManagedWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
 
 /**
  * URI scheme for web resources.
@@ -53,10 +55,11 @@ export function createWebResourceUri(
 }
 
 /**
- * Read-only FileSystemProvider for web resources.
+ * FileSystemProvider for web resources supporting read and write operations.
  *
  * Enables opening web resources directly in VS Code editor without
- * downloading files to disk. Content is fetched on-demand from Dataverse.
+ * downloading files to disk. Content is fetched on-demand from Dataverse
+ * and changes are saved back automatically.
  *
  * URI format: ppds-webresource://environmentId/webResourceId/filename.ext
  */
@@ -70,6 +73,7 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 
 	constructor(
 		private readonly getWebResourceContentUseCase: GetWebResourceContentUseCase,
+		private readonly updateWebResourceUseCase: UpdateWebResourceUseCase | null,
 		private readonly logger: ILogger
 	) {}
 
@@ -161,8 +165,48 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		}
 	}
 
-	writeFile(): void {
-		throw vscode.FileSystemError.NoPermissions('Web resources are read-only');
+	async writeFile(uri: vscode.Uri, content: Uint8Array): Promise<void> {
+		const parsed = parseWebResourceUri(uri);
+		if (parsed === null) {
+			throw vscode.FileSystemError.FileNotFound(uri);
+		}
+
+		if (this.updateWebResourceUseCase === null) {
+			throw vscode.FileSystemError.NoPermissions('Web resource editing is not available');
+		}
+
+		this.logger.debug('WebResourceFileSystemProvider writeFile', {
+			uri: uri.toString(),
+			environmentId: parsed.environmentId,
+			webResourceId: parsed.webResourceId,
+			contentSize: content.length
+		});
+
+		try {
+			await this.updateWebResourceUseCase.execute(
+				parsed.environmentId,
+				parsed.webResourceId,
+				content
+			);
+
+			// Update cache with new content
+			const cacheKey = `${parsed.environmentId}:${parsed.webResourceId}`;
+			this.contentCache.set(cacheKey, { content, timestamp: Date.now() });
+
+			// Fire change event
+			this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
+
+			this.logger.info('Web resource saved', {
+				webResourceId: parsed.webResourceId,
+				size: content.length
+			});
+		} catch (error) {
+			if (error instanceof ManagedWebResourceError) {
+				throw vscode.FileSystemError.NoPermissions('Cannot edit managed web resource');
+			}
+			this.logger.error('Failed to save web resource', error);
+			throw vscode.FileSystemError.Unavailable(uri);
+		}
 	}
 
 	delete(): void {
