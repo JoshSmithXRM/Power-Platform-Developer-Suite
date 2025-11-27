@@ -34,6 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Export dropdown visibility tests
   - CSV export flow tests
 
+- **User Configuration System** - Customizable extension settings via VS Code Settings UI
+  - `powerPlatformDevSuite.pluginTrace.defaultLimit` - Configure default number of plugin traces to fetch (1-5000, default: 100)
+  - Settings accessible via Command Palette: "Power Platform Developer Suite: Open Settings"
+  - Settings entry in Tools sidebar for quick access
+  - Clean Architecture implementation: `IConfigurationService` interface in domain, `VsCodeConfigurationService` in infrastructure
+  - `NullConfigurationService` test stub for unit testing
+
 ### Changed
 
 - **Plugin Trace Viewer:** Refactored `FileSystemPluginTraceExporter` to use shared `CsvExportService`

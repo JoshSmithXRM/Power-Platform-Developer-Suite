@@ -34,9 +34,9 @@ export class QueryEditorSection implements ISection {
 		const errorPosition = customData['errorPosition'] as
 			| { line: number; column: number }
 			| undefined;
-		const transpilationWarnings = customData['transpilationWarnings'] as
+		const transpilationWarnings = (customData['transpilationWarnings'] as
 			| readonly TranspilationWarning[]
-			| undefined;
+			| undefined) ?? [];
 
 		return renderQueryEditorSection({
 			sql,

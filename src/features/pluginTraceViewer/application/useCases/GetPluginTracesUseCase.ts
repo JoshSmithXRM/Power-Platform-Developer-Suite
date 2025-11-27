@@ -1,4 +1,5 @@
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
 import type { IPluginTraceRepository } from '../../domain/repositories/IPluginTraceRepository';
 import type { PluginTrace } from '../../domain/entities/PluginTrace';
 import { TraceFilter } from '../../domain/entities/TraceFilter';
@@ -13,7 +14,8 @@ import type { CorrelationId } from '../../domain/valueObjects/CorrelationId';
 export class GetPluginTracesUseCase {
 	constructor(
 		private readonly repository: IPluginTraceRepository,
-		private readonly logger: ILogger
+		private readonly logger: ILogger,
+		private readonly configService?: IConfigurationService
 	) {}
 
 	/**
@@ -27,7 +29,7 @@ export class GetPluginTracesUseCase {
 		environmentId: string,
 		filter?: TraceFilter
 	): Promise<readonly PluginTrace[]> {
-		const actualFilter = filter ?? TraceFilter.default();
+		const actualFilter = filter ?? TraceFilter.default(this.configService);
 
 		this.logger.debug(
 			'GetPluginTracesUseCase: Starting trace retrieval',
@@ -93,11 +95,14 @@ export class GetPluginTracesUseCase {
 
 		// Create filter with ONLY correlation ID - no other filters applied
 		// This ensures we get the complete execution chain for investigation
-		const filter = TraceFilter.create({
-			correlationIdFilter: correlationId,
-			top,
-			orderBy: 'createdon asc'
-		});
+		const filter = TraceFilter.create(
+			{
+				correlationIdFilter: correlationId,
+				top,
+				orderBy: 'createdon asc'
+			},
+			this.configService
+		);
 
 		return await this.repository.getTraces(environmentId, filter);
 	}

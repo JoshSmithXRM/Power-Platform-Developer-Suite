@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 
+import { IConfigurationService } from '../../shared/domain/services/IConfigurationService';
+import { VsCodeConfigurationService } from '../configuration/VsCodeConfigurationService';
 import { ILogger } from '../logging/ILogger';
 import { OutputChannelLogger } from '../logging/OutputChannelLogger';
 import { IEnvironmentRepository } from '../../features/environmentSetup/domain/interfaces/IEnvironmentRepository';
@@ -18,6 +20,7 @@ import { VsCodeEventPublisher } from '../../features/environmentSetup/infrastruc
  */
 export class CoreServicesContainer {
 	public readonly logger: ILogger;
+	public readonly configService: IConfigurationService;
 	public readonly environmentRepository: IEnvironmentRepository;
 	public readonly authService: MsalAuthenticationService;
 	public readonly whoAmIService: WhoAmIService;
@@ -28,6 +31,9 @@ export class CoreServicesContainer {
 		// Create logger first (no dependencies)
 		const outputChannel = vscode.window.createOutputChannel('Power Platform Developer Suite', { log: true });
 		this.logger = new OutputChannelLogger(outputChannel);
+
+		// Create configuration service (no dependencies)
+		this.configService = new VsCodeConfigurationService();
 
 		// Create environment repository (depends on logger)
 		const environmentDomainMapper = new EnvironmentDomainMapper(this.logger);

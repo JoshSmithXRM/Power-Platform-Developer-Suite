@@ -1,3 +1,5 @@
+import { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
+import { NullConfigurationService } from '../../../../infrastructure/configuration/NullConfigurationService';
 import { TraceFilter } from './TraceFilter';
 import { FilterCondition } from './FilterCondition';
 import { ExecutionMode } from '../valueObjects/ExecutionMode';
@@ -28,6 +30,41 @@ describe('TraceFilter', () => {
 		it('should generate no OData filter', () => {
 			const filter = TraceFilter.default();
 			expect(filter.buildFilterExpression()).toBeUndefined();
+		});
+
+		it('should use configured limit when config service provided', () => {
+			const mockConfigService: IConfigurationService = {
+				get: jest.fn().mockReturnValue(250)
+			};
+
+			const filter = TraceFilter.default(mockConfigService);
+
+			expect(filter.top).toBe(250);
+			expect(mockConfigService.get).toHaveBeenCalledWith('pluginTrace.defaultLimit', 100);
+		});
+
+		it('should use default limit when config service not provided', () => {
+			const filter = TraceFilter.default();
+
+			expect(filter.top).toBe(100);
+		});
+
+		it('should use default limit when config service returns undefined', () => {
+			const mockConfigService: IConfigurationService = {
+				get: jest.fn().mockReturnValue(undefined)
+			};
+
+			const filter = TraceFilter.default(mockConfigService);
+
+			expect(filter.top).toBe(100);
+		});
+
+		it('should work with NullConfigurationService', () => {
+			const configService = new NullConfigurationService();
+
+			const filter = TraceFilter.default(configService);
+
+			expect(filter.top).toBe(100); // Returns default value
 		});
 	});
 
@@ -76,6 +113,41 @@ describe('TraceFilter', () => {
 		it('should accept statusFilter', () => {
 			const filter = TraceFilter.create({ statusFilter: TraceStatus.Exception });
 			expect(filter.statusFilter).toBe(TraceStatus.Exception);
+		});
+
+		it('should use configured limit as default when config service provided', () => {
+			const mockConfigService: IConfigurationService = {
+				get: jest.fn().mockReturnValue(500)
+			};
+
+			const filter = TraceFilter.create({}, mockConfigService);
+
+			expect(filter.top).toBe(500);
+			expect(mockConfigService.get).toHaveBeenCalledWith('pluginTrace.defaultLimit', 100);
+		});
+
+		it('should use explicit top over configured limit', () => {
+			const mockConfigService: IConfigurationService = {
+				get: jest.fn().mockReturnValue(500)
+			};
+
+			const filter = TraceFilter.create({ top: 25 }, mockConfigService);
+
+			expect(filter.top).toBe(25); // Explicit top wins
+		});
+
+		it('should use default limit when config service not provided to create', () => {
+			const filter = TraceFilter.create({});
+
+			expect(filter.top).toBe(100);
+		});
+
+		it('should work with NullConfigurationService in create', () => {
+			const configService = new NullConfigurationService();
+
+			const filter = TraceFilter.create({}, configService);
+
+			expect(filter.top).toBe(100); // Returns default value
 		});
 	});
 

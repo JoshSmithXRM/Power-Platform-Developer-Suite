@@ -176,6 +176,7 @@ export class EnvironmentSetupPanelComposed {
 
 	private createCoordinator(): { coordinator: PanelCoordinator<EnvironmentSetupCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
 		const formSection = new EnvironmentFormSection();
+
 		// customHandler: true prevents messaging.js from attaching generic click handlers,
 		// since EnvironmentSetupBehavior.js attaches its own handlers that validate and collect form data
 		const actionButtons = new ActionButtonsSection({
