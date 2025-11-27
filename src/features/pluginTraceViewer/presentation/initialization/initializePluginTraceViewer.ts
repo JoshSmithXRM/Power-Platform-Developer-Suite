@@ -60,6 +60,7 @@ export async function initializePluginTraceViewer(
 		viewModelMapper,
 		logger,
 		initialEnvironmentId,
-		panelStateRepository
+		panelStateRepository,
+		configService
 	);
 }

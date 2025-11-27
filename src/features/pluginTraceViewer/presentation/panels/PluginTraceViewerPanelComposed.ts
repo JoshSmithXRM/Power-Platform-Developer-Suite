@@ -10,6 +10,7 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
 import type { DataTableConfig, EnvironmentOption } from '../../../../shared/infrastructure/ui/DataTablePanel';
 import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
 import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
@@ -121,6 +122,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		private readonly viewModelMapper: PluginTraceViewModelMapper,
 		private readonly logger: ILogger,
 		private readonly panelStateRepository: IPanelStateRepository | null,
+		private readonly configService: IConfigurationService | undefined,
 		environmentId: string
 	) {
 		super();
@@ -169,7 +171,8 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			panelStateRepository,
 			PluginTraceViewerPanelComposed.viewType,
 			async () => this.handleRefresh(),
-			async () => this.saveFilterCriteria()
+			async () => this.saveFilterCriteria(),
+			configService
 		);
 
 		this.registerCommandHandlers();
@@ -198,7 +201,8 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		viewModelMapper: PluginTraceViewModelMapper,
 		logger: ILogger,
 		initialEnvironmentId?: string,
-		panelStateRepository?: IPanelStateRepository
+		panelStateRepository?: IPanelStateRepository,
+		configService?: IConfigurationService
 	): Promise<PluginTraceViewerPanelComposed> {
 		return EnvironmentScopedPanel.createOrShowPanel({
 			viewType: PluginTraceViewerPanelComposed.viewType,
@@ -221,6 +225,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 				viewModelMapper,
 				logger,
 				panelStateRepository || null,
+				configService,
 				envId
 			),
 			webviewOptions: {
@@ -284,7 +289,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 
 		// Build and send OData query preview for loaded filters
 		const loadedFilterCriteria = this.filterManagementBehavior.getAppliedFilterCriteria();
-		const filterMapper = new FilterCriteriaMapper();
+		const filterMapper = new FilterCriteriaMapper(this.configService);
 		const domainFilter = filterMapper.toDomain(loadedFilterCriteria);
 		const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
 		await this.panel.webview.postMessage({
