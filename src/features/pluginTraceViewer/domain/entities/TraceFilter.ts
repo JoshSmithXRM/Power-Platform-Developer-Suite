@@ -1,3 +1,4 @@
+import { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
 import { ValidationError } from '../../../../shared/domain/errors/ValidationError';
 import { ODataQueryBuilder } from '../services/ODataQueryBuilder';
 import { CorrelationId } from '../valueObjects/CorrelationId';
@@ -172,34 +173,54 @@ export class TraceFilter {
 	}
 
 	/**
-	 * Factory method: Create default filter (no criteria)
+	 * Default limit when no configuration is provided.
+	 * Matches VS Code setting default in package.json.
 	 */
-	static default(): TraceFilter {
-		return new TraceFilter(100, 'createdon desc');
+	private static readonly DEFAULT_LIMIT = 100;
+
+	/**
+	 * Factory method: Create default filter (no criteria).
+	 *
+	 * @param configService - Optional configuration service for reading user settings
+	 * @returns TraceFilter with default top limit from config or hardcoded fallback
+	 */
+	static default(configService?: IConfigurationService): TraceFilter {
+		const defaultLimit = configService?.get('pluginTrace.defaultLimit', TraceFilter.DEFAULT_LIMIT)
+			?? TraceFilter.DEFAULT_LIMIT;
+		return new TraceFilter(defaultLimit, 'createdon desc');
 	}
 
 	/**
-	 * Factory method: Create filter from parameters
+	 * Factory method: Create filter from parameters.
+	 *
+	 * @param params - Filter parameters
+	 * @param configService - Optional configuration service for reading default top limit
 	 */
-	static create(params: {
-		top?: number;
-		orderBy?: string;
-		conditions?: readonly FilterCondition[];
-		pluginNameFilter?: string;
-		entityNameFilter?: string;
-		messageNameFilter?: string;
-		operationTypeFilter?: OperationType;
-		modeFilter?: ExecutionMode;
-		statusFilter?: TraceStatus;
-		createdOnFrom?: Date;
-		createdOnTo?: Date;
-		durationMin?: number;
-		durationMax?: number;
-		hasExceptionFilter?: boolean;
-		correlationIdFilter?: CorrelationId;
-	}): TraceFilter {
+	static create(
+		params: {
+			top?: number;
+			orderBy?: string;
+			conditions?: readonly FilterCondition[];
+			pluginNameFilter?: string;
+			entityNameFilter?: string;
+			messageNameFilter?: string;
+			operationTypeFilter?: OperationType;
+			modeFilter?: ExecutionMode;
+			statusFilter?: TraceStatus;
+			createdOnFrom?: Date;
+			createdOnTo?: Date;
+			durationMin?: number;
+			durationMax?: number;
+			hasExceptionFilter?: boolean;
+			correlationIdFilter?: CorrelationId;
+		},
+		configService?: IConfigurationService
+	): TraceFilter {
+		const defaultLimit = configService?.get('pluginTrace.defaultLimit', TraceFilter.DEFAULT_LIMIT)
+			?? TraceFilter.DEFAULT_LIMIT;
+
 		return new TraceFilter(
-			params.top ?? 100,
+			params.top ?? defaultLimit,
 			params.orderBy ?? 'createdon desc',
 			params.conditions ?? [],
 			params.pluginNameFilter,

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
 
 /**
  * Lazy-loads and initializes Plugin Trace Viewer panel.
@@ -12,6 +13,7 @@ export async function initializePluginTraceViewer(
 	getEnvironmentById: (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId: string | undefined } | null>,
 	dataverseApiServiceFactory: { getAccessToken: (envId: string) => Promise<string>; getDataverseUrl: (envId: string) => Promise<string> },
 	logger: ILogger,
+	configService: IConfigurationService,
 	initialEnvironmentId?: string
 ): Promise<void> {
 	const { DataverseApiService } = await import('../../../../shared/infrastructure/services/DataverseApiService.js');
@@ -32,7 +34,7 @@ export async function initializePluginTraceViewer(
 	const pluginTraceRepository = new DataversePluginTraceRepository(dataverseApiService, logger);
 	const pluginTraceExporter = new FileSystemPluginTraceExporter(logger);
 
-	const getPluginTracesUseCase = new GetPluginTracesUseCase(pluginTraceRepository, logger);
+	const getPluginTracesUseCase = new GetPluginTracesUseCase(pluginTraceRepository, logger, configService);
 	const deleteTracesUseCase = new DeleteTracesUseCase(pluginTraceRepository, logger);
 	const exportTracesUseCase = new ExportTracesUseCase(pluginTraceExporter, logger);
 	const getTraceLevelUseCase = new GetTraceLevelUseCase(pluginTraceRepository, logger);

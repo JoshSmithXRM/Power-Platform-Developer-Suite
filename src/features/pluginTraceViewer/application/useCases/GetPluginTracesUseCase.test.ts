@@ -6,6 +6,7 @@ import { Duration } from './../../domain/valueObjects/Duration';
 import { ExecutionMode } from './../../domain/valueObjects/ExecutionMode';
 import { OperationType } from './../../domain/valueObjects/OperationType';
 import { createMockPluginTraceRepository, createMockLogger } from '../../../../shared/testing';
+import type { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
 
 describe('GetPluginTracesUseCase', () => {
 	let useCase: GetPluginTracesUseCase;
@@ -236,6 +237,73 @@ describe('GetPluginTracesUseCase', () => {
 			const result = await useCase.getTracesByCorrelationId(environmentId, correlationId);
 
 			expect(result).toEqual([]);
+		});
+	});
+
+	describe('configuration service integration', () => {
+		it('should use configured default limit when no filter provided', async () => {
+			const mockConfigService: IConfigurationService = {
+				get: jest.fn().mockReturnValue(250)
+			};
+			const useCaseWithConfig = new GetPluginTracesUseCase(
+				mockRepository,
+				mockLogger,
+				mockConfigService
+			);
+			const environmentId = 'env-123';
+
+			mockRepository.getTraces.mockResolvedValue([]);
+
+			await useCaseWithConfig.execute(environmentId);
+
+			// Verify config service was called for default limit
+			expect(mockConfigService.get).toHaveBeenCalledWith('pluginTrace.defaultLimit', 100);
+
+			// Verify filter uses configured limit
+			const callArgs = mockRepository.getTraces.mock.calls[0];
+			const passedFilter = callArgs![1] as TraceFilter;
+			expect(passedFilter.top).toBe(250);
+		});
+
+		it('should use default limit when config service not provided', async () => {
+			const useCaseWithoutConfig = new GetPluginTracesUseCase(
+				mockRepository,
+				mockLogger
+				// No config service
+			);
+			const environmentId = 'env-123';
+
+			mockRepository.getTraces.mockResolvedValue([]);
+
+			await useCaseWithoutConfig.execute(environmentId);
+
+			// Verify default filter uses hardcoded limit
+			const callArgs = mockRepository.getTraces.mock.calls[0];
+			const passedFilter = callArgs![1] as TraceFilter;
+			expect(passedFilter.top).toBe(100);
+		});
+
+		it('should pass config service to TraceFilter.create in getTracesByCorrelationId', async () => {
+			const mockConfigService: IConfigurationService = {
+				get: jest.fn().mockReturnValue(300)
+			};
+			const useCaseWithConfig = new GetPluginTracesUseCase(
+				mockRepository,
+				mockLogger,
+				mockConfigService
+			);
+			const environmentId = 'env-123';
+			const correlationId = CorrelationId.create('corr-test');
+
+			mockRepository.getTraces.mockResolvedValue([]);
+
+			// Use custom top (500) - should override config default
+			await useCaseWithConfig.getTracesByCorrelationId(environmentId, correlationId, 500);
+
+			// Explicit top should win over config
+			const callArgs = mockRepository.getTraces.mock.calls[0];
+			const passedFilter = callArgs![1] as TraceFilter;
+			expect(passedFilter.top).toBe(500);
 		});
 	});
 });
