@@ -14,7 +14,7 @@ export interface IConfigurationService {
 	/**
 	 * Gets configuration value with type-safe default.
 	 *
-	 * @param key - Setting key relative to 'ppds' namespace (e.g., 'pluginTrace.defaultLimit')
+	 * @param key - Setting key relative to 'powerPlatformDevSuite' namespace (e.g., 'pluginTrace.defaultLimit')
 	 * @param defaultValue - Value returned if setting not configured
 	 * @returns Configured value or default
 	 */

@@ -178,6 +178,9 @@ export class TraceFilter {
 	 */
 	private static readonly DEFAULT_LIMIT = 100;
 
+	/** Configuration key for the default trace limit setting. */
+	private static readonly CONFIG_KEY_DEFAULT_LIMIT = 'pluginTrace.defaultLimit';
+
 	/**
 	 * Factory method: Create default filter (no criteria).
 	 *
@@ -185,7 +188,7 @@ export class TraceFilter {
 	 * @returns TraceFilter with default top limit from config or hardcoded fallback
 	 */
 	static default(configService?: IConfigurationService): TraceFilter {
-		const defaultLimit = configService?.get('pluginTrace.defaultLimit', TraceFilter.DEFAULT_LIMIT)
+		const defaultLimit = configService?.get(TraceFilter.CONFIG_KEY_DEFAULT_LIMIT, TraceFilter.DEFAULT_LIMIT)
 			?? TraceFilter.DEFAULT_LIMIT;
 		return new TraceFilter(defaultLimit, 'createdon desc');
 	}
@@ -216,7 +219,7 @@ export class TraceFilter {
 		},
 		configService?: IConfigurationService
 	): TraceFilter {
-		const defaultLimit = configService?.get('pluginTrace.defaultLimit', TraceFilter.DEFAULT_LIMIT)
+		const defaultLimit = configService?.get(TraceFilter.CONFIG_KEY_DEFAULT_LIMIT, TraceFilter.DEFAULT_LIMIT)
 			?? TraceFilter.DEFAULT_LIMIT;
 
 		return new TraceFilter(
