@@ -297,8 +297,26 @@
   - Performance tests with real benchmarks
   - Code review and merge
 
-### Next Session
-1. Run E2E tests to verify search fix with real data
-2. Manual F5 testing to confirm search works
-3. Request code review
-4. Prepare for merge to main
+### Session 7 (2025-11-27) - Data Table Consistency Pattern Design
+- **Issue Identified:** Virtual table columns resize during scroll (Solutions), text wraps in regular tables (Import Jobs "Created By")
+- **Root Cause:** Virtual tables use `width: max-content` which recalculates based on visible rows only
+- **Solution Designed:** Data-Driven Column Width Pattern
+  - Calculate optimal widths from ALL data (not just visible)
+  - Lock widths after calculation
+  - Use `table-layout: fixed` + `white-space: nowrap` for consistency
+  - Add tooltips for truncated content
+- **Design Documents Created:**
+  - `docs/design/DATA_TABLE_CONSISTENCY_DESIGN.md` - Full technical design
+  - `docs/architecture/DATA_TABLE_PATTERN.md` - Pattern documentation for ongoing reference
+- **Scope:** ALL panels (mandatory pattern, not optional)
+- **Status:** Design complete, ready for implementation
+
+### Next Steps
+1. Commit design documents
+2. Implement ColumnWidthCalculator utility
+3. Update CSS for table consistency
+4. Update Solutions panel with column types
+5. Update Import Jobs panel with column types
+6. Update remaining panels
+7. Test across all panels
+8. Code review and merge
