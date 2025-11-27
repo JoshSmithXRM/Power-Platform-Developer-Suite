@@ -63,6 +63,11 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 2. Invokes design-architect with project context
 3. Saves to `docs/design/[FEATURE]_DESIGN.md`
 
+**Design Doc Scope:**
+- **Focus on MVP only** - What we're building now, not future possibilities
+- Include "Future Enhancements" section for ideas that won't make MVP
+- Design docs are temporary artifacts - deleted after implementation
+
 **Slice-based approach:**
 - Design MVP slice first (minimal end-to-end)
 - Implement and ship slice
@@ -191,17 +196,25 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 
 ### Phase 9: Cleanup (After Merge)
 
-**Purpose:** Remove transient artifacts, preserve patterns.
+**Purpose:** Remove transient artifacts, preserve patterns and future ideas.
 
 ```
 □ If design doc has reusable patterns:
   - Extract to docs/architecture/[PATTERN].md
-  - Delete design doc
-□ If design doc has no reusable patterns:
-  - Delete design doc (tests are the spec)
-□ Delete tracking doc: git rm docs/work/[FEATURE]_TODO.md
+□ If design doc has "Future Enhancements" section:
+  - Migrate to docs/future/[FEATURE].md (create if doesn't exist)
+  - Or add to existing feature file in docs/future/
+□ Delete design doc (git rm docs/design/[FEATURE]_DESIGN.md)
+□ Delete tracking doc (git rm docs/work/[FEATURE]_TODO.md)
 □ Update any documentation affected by feature
 ```
+
+**Design Doc Lifecycle:**
+1. Created during Phase 3 (Design)
+2. Used during implementation as reference
+3. Patterns extracted to `docs/architecture/` during Phase 9
+4. Future ideas migrated to `docs/future/` during Phase 9
+5. Deleted before PR (git history preserves)
 
 ---
 

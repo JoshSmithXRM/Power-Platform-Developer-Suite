@@ -583,7 +583,7 @@ Document git worktrees + symlinks pattern for parallel feature work.
 - [x] Update references to FUTURE_ENHANCEMENTS.md in CLAUDE.md, RELEASE_GUIDE.md, DATA_EXPLORER_DESIGN.md
 
 #### Workflow Updates
-- [ ] Update `.claude/WORKFLOW.md` with design doc lifecycle:
+- [x] Update `.claude/WORKFLOW.md` with design doc lifecycle:
   - Design docs scope MVP only
   - Extract patterns to `docs/architecture/` during implementation
   - Migrate future enhancements to `docs/future/[FEATURE].md` before deletion
