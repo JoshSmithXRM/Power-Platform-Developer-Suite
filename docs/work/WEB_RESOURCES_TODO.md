@@ -38,8 +38,8 @@ feature/web-resources (this branch - completes virtual table + web resources)
 | 1 | Browse & View (read-only) | ✅ Complete | Works but unusable at 70k scale |
 | 2 | Adopt Virtual Table | ✅ Complete | 5k cache + server search fallback |
 | 3 | Edit & Save | ✅ Complete | Ctrl+S saves to Dataverse |
-| 4 | Publish | ⏳ Planned | |
-| 5 | Enhanced UX | ⏳ Planned | |
+| 4 | Publish | ⏳ In Progress | Toolbar + notification + Publish All |
+| 5 | Enhanced UX | ⏳ Deferred | Conflict detection, etc. - future PR |
 
 ---
 
@@ -108,25 +108,31 @@ feature/web-resources (this branch - completes virtual table + web resources)
 
 ---
 
-## Slice 4: Publish ⏳ PLANNED
+## Slice 4: Publish ⏳ IN PROGRESS
 
+**Design Decision:** Option B + C + Publish All
+
+### Domain Layer
+- [ ] Add `publish(environmentId, webResourceId)` to `IWebResourceRepository`
 - [ ] Create `PublishWebResourceUseCase`
-- [ ] Call Dataverse `PublishXml` action
-- [ ] UI for publish button/command
-- [ ] Batch publish support
+
+### Infrastructure Layer
+- [ ] Implement `publish()` in `DataverseWebResourceRepository`
+  - POST `/api/data/v9.2/PublishXml`
+  - Body: `{ "ParameterXml": "<importexportxml><webresources><webresource>{guid}</webresource></webresources></importexportxml>" }`
+
+### Presentation Layer
+- [ ] Add "Publish" toolbar button (publishes selected row)
+- [ ] Add "Publish All" toolbar button with warning dialog (like data table warning pattern for Playwright)
+- [ ] After save success, show VS Code notification with "Publish" action button
+- [ ] Handle row selection for single publish
 - [ ] Tests
-- [ ] Committed
 
 ---
 
-## Slice 5: Enhanced UX ⏳ PLANNED
+## Slice 5: Enhanced UX ⏳ DEFERRED
 
-- [ ] Conflict detection (modified by another user)
-- [ ] Auto-refresh on external changes
-- [ ] Diff view (local vs server)
-- [ ] Keyboard shortcuts
-- [ ] Tests
-- [ ] Committed
+Deferred to future PR - see "Future Work" section below.
 
 ---
 
@@ -168,12 +174,18 @@ feature/web-resources (this branch - completes virtual table + web resources)
 These items were identified during virtual table development but are deferred:
 
 ### Panel Migrations to Virtual Table
-- [ ] **Plugin Trace Viewer** - Remove 100 record hardcoded limit (`TraceFilter.ts:178`)
-- [ ] **Import Jobs** - Reported slow with large datasets
+- [x] **Plugin Trace Viewer** - ~~Remove 100 record hardcoded limit~~ ALREADY DONE - configurable via `pluginTrace.defaultLimit` setting (1-5000)
+- [ ] **Import Jobs** - Migrate to virtual table (separate session)
 
 ### Performance Benchmarks
 - [ ] Create formal performance test suite (1k, 5k, 10k, 70k records)
 - [ ] Document actual load times and memory usage
+
+### Slice 5: Enhanced UX (Deferred)
+- [ ] Conflict detection (check modifiedOn before save, warn if changed)
+- [ ] Auto-refresh on external changes
+- [ ] Diff view (local vs server)
+- [ ] Keyboard shortcuts
 
 ---
 
