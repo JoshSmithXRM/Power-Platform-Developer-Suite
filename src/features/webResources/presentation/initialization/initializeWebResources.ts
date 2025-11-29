@@ -24,6 +24,7 @@ export async function initializeWebResources(
 	const { ListWebResourcesUseCase } = await import('../../application/useCases/ListWebResourcesUseCase.js');
 	const { GetWebResourceContentUseCase } = await import('../../application/useCases/GetWebResourceContentUseCase.js');
 	const { UpdateWebResourceUseCase } = await import('../../application/useCases/UpdateWebResourceUseCase.js');
+	const { PublishWebResourceUseCase } = await import('../../application/useCases/PublishWebResourceUseCase.js');
 	const { WebResourcesPanelComposed } = await import('../panels/WebResourcesPanelComposed.js');
 	const { VSCodePanelStateRepository } = await import('../../../../shared/infrastructure/ui/VSCodePanelStateRepository.js');
 	const { MakerUrlBuilder } = await import('../../../../shared/infrastructure/services/MakerUrlBuilder.js');
@@ -56,11 +57,17 @@ export async function initializeWebResources(
 		logger
 	);
 
+	const publishWebResourceUseCase = new PublishWebResourceUseCase(
+		webResourceRepository,
+		logger
+	);
+
 	// Register FileSystemProvider once per extension lifecycle
 	if (!fileSystemProviderRegistered) {
 		const fileSystemProvider = new WebResourceFileSystemProvider(
 			getWebResourceContentUseCase,
 			updateWebResourceUseCase,
+			publishWebResourceUseCase,
 			logger
 		);
 
@@ -81,6 +88,7 @@ export async function initializeWebResources(
 		getEnvironments,
 		getEnvironmentById,
 		listWebResourcesUseCase,
+		publishWebResourceUseCase,
 		webResourceRepository,
 		solutionRepository,
 		urlBuilder,

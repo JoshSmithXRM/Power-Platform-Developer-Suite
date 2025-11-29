@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import type { GetWebResourceContentUseCase } from '../../application/useCases/GetWebResourceContentUseCase';
 import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
+import type { PublishWebResourceUseCase } from '../../application/useCases/PublishWebResourceUseCase';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ManagedWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
 
@@ -74,6 +75,7 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	constructor(
 		private readonly getWebResourceContentUseCase: GetWebResourceContentUseCase,
 		private readonly updateWebResourceUseCase: UpdateWebResourceUseCase | null,
+		private readonly publishWebResourceUseCase: PublishWebResourceUseCase | null,
 		private readonly logger: ILogger
 	) {}
 
@@ -200,6 +202,9 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 				webResourceId: parsed.webResourceId,
 				size: content.length
 			});
+
+			// Show notification with Publish action (async - don't await)
+			this.showPublishNotification(parsed.environmentId, parsed.webResourceId, parsed.filename);
 		} catch (error) {
 			if (error instanceof ManagedWebResourceError) {
 				throw vscode.FileSystemError.NoPermissions('Cannot edit managed web resource');
@@ -233,5 +238,39 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	clearCache(): void {
 		this.contentCache.clear();
 		this.logger.debug('WebResourceFileSystemProvider cache cleared');
+	}
+
+	/**
+	 * Shows a notification after save with a Publish action button.
+	 * When clicked, publishes the web resource to make changes visible.
+	 */
+	private showPublishNotification(
+		environmentId: string,
+		webResourceId: string,
+		filename: string
+	): void {
+		if (this.publishWebResourceUseCase === null) {
+			return;
+		}
+
+		// Capture reference for use in async callback
+		const publishUseCase = this.publishWebResourceUseCase;
+
+		// Use void to explicitly ignore the promise (fire-and-forget pattern)
+		void vscode.window.showInformationMessage(
+			`Saved: ${filename}`,
+			'Publish'
+		).then(async (selection) => {
+			if (selection === 'Publish') {
+				try {
+					await publishUseCase.execute(environmentId, webResourceId);
+					vscode.window.showInformationMessage(`Published: ${filename}`);
+				} catch (error) {
+					this.logger.error('Failed to publish web resource', error);
+					const message = error instanceof Error ? error.message : 'Unknown error';
+					vscode.window.showErrorMessage(`Failed to publish: ${message}`);
+				}
+			}
+		});
 	}
 }

@@ -379,6 +379,102 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 		}
 	}
 
+	/**
+	 * Publishes a single web resource using the PublishXml action.
+	 * Makes changes visible to users after updating content.
+	 */
+	async publish(
+		environmentId: string,
+		webResourceId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<void> {
+		await this.publishMultiple(environmentId, [webResourceId], cancellationToken);
+	}
+
+	/**
+	 * Publishes multiple web resources at once using the PublishXml action.
+	 * More efficient than publishing one at a time for bulk operations.
+	 */
+	async publishMultiple(
+		environmentId: string,
+		webResourceIds: string[],
+		cancellationToken?: ICancellationToken
+	): Promise<void> {
+		if (webResourceIds.length === 0) {
+			return;
+		}
+
+		// Build ParameterXml for PublishXml action
+		// Format: <importexportxml><webresources><webresource>{guid}</webresource>...</webresources></importexportxml>
+		const webResourceElements = webResourceIds
+			.map((id) => `<webresource>{${id}}</webresource>`)
+			.join('');
+		const parameterXml = `<importexportxml><webresources>${webResourceElements}</webresources></importexportxml>`;
+
+		const endpoint = '/api/data/v9.2/PublishXml';
+
+		this.logger.debug('Publishing web resources via PublishXml', {
+			environmentId,
+			count: webResourceIds.length,
+			webResourceIds
+		});
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			await this.apiService.post(
+				environmentId,
+				endpoint,
+				{ ParameterXml: parameterXml },
+				cancellationToken
+			);
+
+			CancellationHelper.throwIfCancelled(cancellationToken);
+
+			this.logger.info('Web resources published successfully', {
+				environmentId,
+				count: webResourceIds.length
+			});
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to publish web resources', normalizedError);
+			throw normalizedError;
+		}
+	}
+
+	/**
+	 * Publishes all customizations in the environment using PublishAllXml.
+	 * This publishes ALL solution components (entities, web resources, etc.), not just web resources.
+	 */
+	async publishAll(
+		environmentId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<void> {
+		const endpoint = '/api/data/v9.2/PublishAllXml';
+
+		this.logger.debug('Publishing all customizations via PublishAllXml', { environmentId });
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			// PublishAllXml takes no parameters - just POST to the endpoint
+			await this.apiService.post(
+				environmentId,
+				endpoint,
+				{},
+				cancellationToken
+			);
+
+			CancellationHelper.throwIfCancelled(cancellationToken);
+
+			this.logger.info('All customizations published successfully', { environmentId });
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to publish all customizations', normalizedError);
+			throw normalizedError;
+		}
+	}
+
 	private mapToEntity(dto: DataverseWebResourceDto): WebResource {
 		return new WebResource(
 			dto.webresourceid,

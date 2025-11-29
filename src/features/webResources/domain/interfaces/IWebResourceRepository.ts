@@ -98,4 +98,44 @@ export interface IWebResourceRepository {
 		options?: QueryOptions,
 		cancellationToken?: ICancellationToken
 	): Promise<number>;
+
+	/**
+	 * Publishes a web resource to make changes visible to users.
+	 * Only publishes customizations - does not update content.
+	 *
+	 * @param environmentId - Environment ID
+	 * @param webResourceId - Web resource GUID to publish
+	 * @param cancellationToken - Optional token to cancel the operation
+	 */
+	publish(
+		environmentId: string,
+		webResourceId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<void>;
+
+	/**
+	 * Publishes multiple web resources at once.
+	 * More efficient than publishing one at a time for bulk operations.
+	 *
+	 * @param environmentId - Environment ID
+	 * @param webResourceIds - Array of web resource GUIDs to publish
+	 * @param cancellationToken - Optional token to cancel the operation
+	 */
+	publishMultiple(
+		environmentId: string,
+		webResourceIds: string[],
+		cancellationToken?: ICancellationToken
+	): Promise<void>;
+
+	/**
+	 * Publishes all customizations in the environment using PublishAllXml.
+	 * This publishes ALL solution components, not just web resources.
+	 *
+	 * @param environmentId - Environment ID
+	 * @param cancellationToken - Optional token to cancel the operation
+	 */
+	publishAll(
+		environmentId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<void>;
 }

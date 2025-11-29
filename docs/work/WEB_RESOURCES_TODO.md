@@ -13,8 +13,9 @@
 **Key Constraint:** User environment has **65,000+ web resources** in a single solution - requires virtual table with server-side search fallback
 
 **What's Included in This PR:**
-- Web Resources panel (browse, edit, save)
+- Web Resources panel (browse, edit, save, publish)
 - Virtual table infrastructure with 5k cache + server search fallback
+- Publish: single resource, bulk publish all, and post-save notification
 - All virtual table work from merged `feature/virtual-table` branch
 
 ---
@@ -38,7 +39,7 @@ feature/web-resources (this branch - completes virtual table + web resources)
 | 1 | Browse & View (read-only) | ✅ Complete | Works but unusable at 70k scale |
 | 2 | Adopt Virtual Table | ✅ Complete | 5k cache + server search fallback |
 | 3 | Edit & Save | ✅ Complete | Ctrl+S saves to Dataverse |
-| 4 | Publish | ⏳ In Progress | Toolbar + notification + Publish All |
+| 4 | Publish | ✅ Complete | Toolbar + notification + Publish All |
 | 5 | Enhanced UX | ⏳ Deferred | Conflict detection, etc. - future PR |
 
 ---
@@ -108,25 +109,32 @@ feature/web-resources (this branch - completes virtual table + web resources)
 
 ---
 
-## Slice 4: Publish ⏳ IN PROGRESS
+## Slice 4: Publish ✅ COMPLETE
 
-**Design Decision:** Option B + C + Publish All
+**Design Decision:** Option B + C + Publish All + Publish Solution
 
 ### Domain Layer
-- [ ] Add `publish(environmentId, webResourceId)` to `IWebResourceRepository`
-- [ ] Create `PublishWebResourceUseCase`
+- [x] Add `publish(environmentId, webResourceId)` to `IWebResourceRepository`
+- [x] Add `publishMultiple(environmentId, webResourceIds)` to `IWebResourceRepository`
+- [x] Add `publishAll(environmentId)` to `IWebResourceRepository` (uses PublishAllXml)
+- [x] Create `PublishWebResourceUseCase` with `execute()`, `executeMultiple()`, and `executeAll()`
 
 ### Infrastructure Layer
-- [ ] Implement `publish()` in `DataverseWebResourceRepository`
+- [x] Implement `publish()` and `publishMultiple()` in `DataverseWebResourceRepository`
   - POST `/api/data/v9.2/PublishXml`
-  - Body: `{ "ParameterXml": "<importexportxml><webresources><webresource>{guid}</webresource></webresources></importexportxml>" }`
+  - Body: `{ "ParameterXml": "<importexportxml><webresources><webresource>{guid}</webresource>...</webresources></importexportxml>" }`
+- [x] Implement `publishAll()` in `DataverseWebResourceRepository`
+  - POST `/api/data/v9.2/PublishAllXml` (no body - publishes ALL customizations)
 
 ### Presentation Layer
-- [ ] Add "Publish" toolbar button (publishes selected row)
-- [ ] Add "Publish All" toolbar button with warning dialog (like data table warning pattern for Playwright)
-- [ ] After save success, show VS Code notification with "Publish" action button
-- [ ] Handle row selection for single publish
-- [ ] Tests
+- [x] Add "Publish" toolbar button (publishes selected row, disabled when no selection)
+- [x] Add "Publish Solution" toolbar button (publishes web resources in current solution, disabled when "All Web Resources")
+- [x] Add "Publish All" toolbar button (uses PublishAllXml - publishes ALL customizations, not just web resources)
+- [x] After save success in FileSystemProvider, show VS Code notification with "Publish" action button
+- [x] Handle row selection via `rowSelect` command
+- [x] Dynamic enable/disable of "Publish Solution" based on solution filter selection
+- [x] Tests: PublishWebResourceUseCase (14 tests), repository publish (17 tests)
+- [x] Total web resources tests: 322 (was 288)
 
 ---
 

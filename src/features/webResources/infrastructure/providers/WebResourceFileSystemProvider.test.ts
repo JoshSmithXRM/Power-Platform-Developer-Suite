@@ -59,7 +59,7 @@ describe('WebResourceFileSystemProvider', () => {
 			execute: jest.fn()
 		} as unknown as jest.Mocked<GetWebResourceContentUseCase>;
 
-		provider = new WebResourceFileSystemProvider(mockUseCase, null, new NullLogger());
+		provider = new WebResourceFileSystemProvider(mockUseCase, null, null, new NullLogger());
 	});
 
 	describe('parseWebResourceUri', () => {
@@ -343,7 +343,7 @@ describe('WebResourceFileSystemProvider with write support', () => {
 			execute: jest.fn()
 		} as unknown as jest.Mocked<UpdateWebResourceUseCase>;
 
-		provider = new WebResourceFileSystemProvider(mockGetUseCase, mockUpdateUseCase, new NullLogger());
+		provider = new WebResourceFileSystemProvider(mockGetUseCase, mockUpdateUseCase, null, new NullLogger());
 	});
 
 	describe('writeFile', () => {

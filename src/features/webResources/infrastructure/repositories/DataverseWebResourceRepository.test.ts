@@ -457,4 +457,231 @@ describe('DataverseWebResourceRepository', () => {
 			);
 		});
 	});
+
+	describe('publish', () => {
+		it('should publish a single web resource via PublishXml action', async () => {
+			mockApiService.post.mockResolvedValue(undefined);
+
+			await repository.publish('env-123', 'wr-guid-123');
+
+			expect(mockApiService.post).toHaveBeenCalledWith(
+				'env-123',
+				'/api/data/v9.2/PublishXml',
+				{
+					ParameterXml: '<importexportxml><webresources><webresource>{wr-guid-123}</webresource></webresources></importexportxml>'
+				},
+				undefined
+			);
+		});
+
+		it('should pass cancellation token to API service', async () => {
+			mockApiService.post.mockResolvedValue(undefined);
+
+			const cancellationToken: ICancellationToken = {
+				isCancellationRequested: false,
+				onCancellationRequested: jest.fn()
+			};
+
+			await repository.publish('env-123', 'wr-guid-123', cancellationToken);
+
+			expect(mockApiService.post).toHaveBeenCalledWith(
+				'env-123',
+				'/api/data/v9.2/PublishXml',
+				expect.any(Object),
+				cancellationToken
+			);
+		});
+
+		it('should handle cancellation before API call', async () => {
+			const cancellationToken: ICancellationToken = {
+				isCancellationRequested: true,
+				onCancellationRequested: jest.fn()
+			};
+
+			await expect(
+				repository.publish('env-123', 'wr-guid-123', cancellationToken)
+			).rejects.toThrow(OperationCancelledException);
+
+			expect(mockApiService.post).not.toHaveBeenCalled();
+		});
+
+		it('should handle API errors', async () => {
+			const apiError = new Error('Failed to publish');
+			mockApiService.post.mockRejectedValue(apiError);
+
+			await expect(repository.publish('env-123', 'wr-guid-123')).rejects.toThrow(
+				'Failed to publish'
+			);
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to publish web resources',
+				expect.any(Error)
+			);
+		});
+
+		it('should log success messages', async () => {
+			mockApiService.post.mockResolvedValue(undefined);
+
+			await repository.publish('env-123', 'wr-guid-123');
+
+			expect(mockLogger.info).toHaveBeenCalledWith('Web resources published successfully', {
+				environmentId: 'env-123',
+				count: 1
+			});
+		});
+	});
+
+	describe('publishMultiple', () => {
+		it('should publish multiple web resources via PublishXml action', async () => {
+			mockApiService.post.mockResolvedValue(undefined);
+
+			await repository.publishMultiple('env-123', ['wr-1', 'wr-2', 'wr-3']);
+
+			expect(mockApiService.post).toHaveBeenCalledWith(
+				'env-123',
+				'/api/data/v9.2/PublishXml',
+				{
+					ParameterXml: '<importexportxml><webresources><webresource>{wr-1}</webresource><webresource>{wr-2}</webresource><webresource>{wr-3}</webresource></webresources></importexportxml>'
+				},
+				undefined
+			);
+		});
+
+		it('should not call API when ids array is empty', async () => {
+			await repository.publishMultiple('env-123', []);
+
+			expect(mockApiService.post).not.toHaveBeenCalled();
+		});
+
+		it('should pass cancellation token to API service', async () => {
+			mockApiService.post.mockResolvedValue(undefined);
+
+			const cancellationToken: ICancellationToken = {
+				isCancellationRequested: false,
+				onCancellationRequested: jest.fn()
+			};
+
+			await repository.publishMultiple('env-123', ['wr-1', 'wr-2'], cancellationToken);
+
+			expect(mockApiService.post).toHaveBeenCalledWith(
+				'env-123',
+				'/api/data/v9.2/PublishXml',
+				expect.any(Object),
+				cancellationToken
+			);
+		});
+
+		it('should handle cancellation before API call', async () => {
+			const cancellationToken: ICancellationToken = {
+				isCancellationRequested: true,
+				onCancellationRequested: jest.fn()
+			};
+
+			await expect(
+				repository.publishMultiple('env-123', ['wr-1', 'wr-2'], cancellationToken)
+			).rejects.toThrow(OperationCancelledException);
+
+			expect(mockApiService.post).not.toHaveBeenCalled();
+		});
+
+		it('should handle API errors', async () => {
+			const apiError = new Error('Bulk publish failed');
+			mockApiService.post.mockRejectedValue(apiError);
+
+			await expect(repository.publishMultiple('env-123', ['wr-1', 'wr-2'])).rejects.toThrow(
+				'Bulk publish failed'
+			);
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to publish web resources',
+				expect.any(Error)
+			);
+		});
+
+		it('should log debug and success messages', async () => {
+			mockApiService.post.mockResolvedValue(undefined);
+
+			await repository.publishMultiple('env-123', ['wr-1', 'wr-2']);
+
+			expect(mockLogger.debug).toHaveBeenCalledWith('Publishing web resources via PublishXml', {
+				environmentId: 'env-123',
+				count: 2,
+				webResourceIds: ['wr-1', 'wr-2']
+			});
+			expect(mockLogger.info).toHaveBeenCalledWith('Web resources published successfully', {
+				environmentId: 'env-123',
+				count: 2
+			});
+		});
+	});
+
+	describe('publishAll', () => {
+		it('should call PublishAllXml endpoint with empty body', async () => {
+			mockApiService.post.mockResolvedValue(undefined);
+
+			await repository.publishAll('env-123');
+
+			expect(mockApiService.post).toHaveBeenCalledWith(
+				'env-123',
+				'/api/data/v9.2/PublishAllXml',
+				{},
+				undefined
+			);
+		});
+
+		it('should pass cancellation token to API service', async () => {
+			mockApiService.post.mockResolvedValue(undefined);
+
+			const cancellationToken: ICancellationToken = {
+				isCancellationRequested: false,
+				onCancellationRequested: jest.fn()
+			};
+
+			await repository.publishAll('env-123', cancellationToken);
+
+			expect(mockApiService.post).toHaveBeenCalledWith(
+				'env-123',
+				'/api/data/v9.2/PublishAllXml',
+				{},
+				cancellationToken
+			);
+		});
+
+		it('should handle cancellation before API call', async () => {
+			const cancellationToken: ICancellationToken = {
+				isCancellationRequested: true,
+				onCancellationRequested: jest.fn()
+			};
+
+			await expect(
+				repository.publishAll('env-123', cancellationToken)
+			).rejects.toThrow(OperationCancelledException);
+
+			expect(mockApiService.post).not.toHaveBeenCalled();
+		});
+
+		it('should handle API errors', async () => {
+			const apiError = new Error('PublishAllXml failed');
+			mockApiService.post.mockRejectedValue(apiError);
+
+			await expect(repository.publishAll('env-123')).rejects.toThrow(
+				'PublishAllXml failed'
+			);
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to publish all customizations',
+				expect.any(Error)
+			);
+		});
+
+		it('should log debug and success messages', async () => {
+			mockApiService.post.mockResolvedValue(undefined);
+
+			await repository.publishAll('env-123');
+
+			expect(mockLogger.debug).toHaveBeenCalledWith('Publishing all customizations via PublishAllXml', {
+				environmentId: 'env-123'
+			});
+			expect(mockLogger.info).toHaveBeenCalledWith('All customizations published successfully', {
+				environmentId: 'env-123'
+			});
+		});
+	});
 });
