@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Virtual scrolling renders only visible rows to DOM (50-100 rows vs all rows)
   - Background data loading with cache management (up to 5,000 records)
   - Solutions panel migrated to virtual table (tested with 1,246 solutions)
+  - Import Jobs panel migrated to virtual table
   - Domain layer: `IVirtualTableDataProvider`, `PaginatedResult`, `VirtualTableConfig`, `VirtualTableCacheState`
   - Application layer: `VirtualTableCacheManager` with background loading
   - Infrastructure layer: `VirtualDataTableSection`, `VirtualTableRenderer.js`
