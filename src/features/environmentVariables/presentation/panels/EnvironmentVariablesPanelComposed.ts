@@ -329,6 +329,9 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing environment variables');
 
+		this.setButtonLoading('refresh', true);
+		this.showTableLoading();
+
 		try {
 			const environmentVariables = await this.listEnvVarsUseCase.execute(
 				this.currentEnvironmentId,
@@ -342,18 +345,23 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 
 			this.logger.info('Environment variables loaded successfully', { count: viewModels.length });
 
+			const config = this.getTableConfig();
+
 			// Data-driven update: Send ViewModels to frontend
 			await this.panel.webview.postMessage({
 				command: 'updateTableData',
 				data: {
 					viewModels,
-					columns: this.getTableConfig().columns
+					columns: config.columns,
+					noDataMessage: config.noDataMessage
 				}
 			});
 		} catch (error: unknown) {
 			this.logger.error('Error refreshing environment variables', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh environment variables: ${errorMessage}`);
+		} finally {
+			this.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -417,57 +425,45 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		this.setButtonLoading('refresh', true);
-		this.showTableLoading();
+		const oldEnvironmentId = this.currentEnvironmentId;
+		this.currentEnvironmentId = environmentId;
+		this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
 
-		try {
-			const oldEnvironmentId = this.currentEnvironmentId;
-			this.currentEnvironmentId = environmentId;
-			this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
+		// Re-register panel in map for new environment
+		this.reregisterPanel(EnvironmentVariablesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
-			// Re-register panel in map for new environment
-			this.reregisterPanel(EnvironmentVariablesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
-
-			const environment = await this.getEnvironmentById(environmentId);
-			if (environment) {
-				this.panel.title = `Environment Variables - ${environment.name}`;
-			}
-
-			this.solutionOptions = await this.loadSolutions();
-
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
+		const environment = await this.getEnvironmentById(environmentId);
+		if (environment) {
+			this.panel.title = `Environment Variables - ${environment.name}`;
 		}
+
+		this.solutionOptions = await this.loadSolutions();
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 	private async handleSolutionChange(solutionId: string): Promise<void> {
 		this.logger.debug('Solution filter changed', { solutionId });
 
-		this.setButtonLoading('refresh', true);
-		this.showTableLoading();
+		this.currentSolutionId = solutionId;
 
-		try {
-			this.currentSolutionId = solutionId;
-
-			// Always save concrete solution selection to panel state
-			if (this.panelStateRepository) {
-				await this.panelStateRepository.save(
-					{
-						panelType: 'environmentVariables',
-						environmentId: this.currentEnvironmentId
-					},
-					{
-						selectedSolutionId: solutionId,
-						lastUpdated: new Date().toISOString()
-					}
-				);
-			}
-
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
+		// Always save concrete solution selection to panel state
+		if (this.panelStateRepository) {
+			await this.panelStateRepository.save(
+				{
+					panelType: 'environmentVariables',
+					environmentId: this.currentEnvironmentId
+				},
+				{
+					selectedSolutionId: solutionId,
+					lastUpdated: new Date().toISOString()
+				}
+			);
 		}
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 	/**

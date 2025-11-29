@@ -311,6 +311,9 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing import jobs with virtual table');
 
+		this.setButtonLoading('refresh', true);
+		this.showTableLoading();
+
 		try {
 			// Clear existing cache and reload
 			this.cacheManager.clearCache();
@@ -347,6 +350,8 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 			this.logger.error('Error refreshing import jobs', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh import jobs: ${errorMessage}`);
+		} finally {
+			this.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -382,53 +387,47 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		this.setButtonLoading('refresh', true);
-		this.showTableLoading();
+		const oldEnvironmentId = this.currentEnvironmentId;
+		this.currentEnvironmentId = environmentId;
 
-		try {
-			const oldEnvironmentId = this.currentEnvironmentId;
-			this.currentEnvironmentId = environmentId;
+		// Clear old cache and create new cache manager for new environment
+		this.cacheManager.clearCache();
+		const newProvider = new ImportJobDataProviderAdapter(this.importJobRepository, environmentId);
+		this.cacheManager = new VirtualTableCacheManager(newProvider, this.virtualTableConfig, this.logger);
 
-			// Clear old cache and create new cache manager for new environment
-			this.cacheManager.clearCache();
-			const newProvider = new ImportJobDataProviderAdapter(this.importJobRepository, environmentId);
-			this.cacheManager = new VirtualTableCacheManager(newProvider, this.virtualTableConfig, this.logger);
+		// Re-register state change callback for background loading updates
+		this.cacheManager.onStateChange((state, cachedRecords) => {
+			const updatedViewModels = cachedRecords
+				.map(job => this.viewModelMapper.toViewModel(job));
 
-			// Re-register state change callback for background loading updates
-			this.cacheManager.onStateChange((state, cachedRecords) => {
-				const updatedViewModels = cachedRecords
-					.map(job => this.viewModelMapper.toViewModel(job));
-
-				this.panel.webview.postMessage({
-					command: 'updateVirtualTable',
-					data: {
-						rows: updatedViewModels,
-						pagination: {
-							cachedCount: state.getCachedRecordCount(),
-							totalCount: state.getTotalRecordCount(),
-							isLoading: state.getIsLoading(),
-							currentPage: state.getCurrentPage(),
-							isFullyCached: state.isFullyCached()
-						}
+			this.panel.webview.postMessage({
+				command: 'updateVirtualTable',
+				data: {
+					rows: updatedViewModels,
+					pagination: {
+						cachedCount: state.getCachedRecordCount(),
+						totalCount: state.getTotalRecordCount(),
+						isLoading: state.getIsLoading(),
+						currentPage: state.getCurrentPage(),
+						isFullyCached: state.isFullyCached()
 					}
-				}).then(
-					() => { /* success */ },
-					(error) => this.logger.error('Failed to send virtual table update', error)
-				);
-			});
+				}
+			}).then(
+				() => { /* success */ },
+				(error) => this.logger.error('Failed to send virtual table update', error)
+			);
+		});
 
-			// Re-register panel in map for new environment
-			this.reregisterPanel(ImportJobViewerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
+		// Re-register panel in map for new environment
+		this.reregisterPanel(ImportJobViewerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
-			const environment = await this.getEnvironmentById(environmentId);
-			if (environment) {
-				this.panel.title = `Import Jobs - ${environment.name}`;
-			}
-
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
+		const environment = await this.getEnvironmentById(environmentId);
+		if (environment) {
+			this.panel.title = `Import Jobs - ${environment.name}`;
 		}
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 	/**

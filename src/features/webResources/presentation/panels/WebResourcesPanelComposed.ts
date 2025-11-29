@@ -417,6 +417,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing web resources', { solutionId: this.currentSolutionId });
 
+		this.setButtonLoading('refresh', true);
+		this.showTableLoading();
+
 		try {
 			const webResources = await this.listWebResourcesUseCase.execute(
 				this.currentEnvironmentId,
@@ -428,16 +431,25 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			this.logger.info('Web resources loaded successfully', { count: viewModels.length });
 
 			await this.panel.webview.postMessage({
-				command: 'updateTableData',
+				command: 'updateVirtualTable',
 				data: {
-					viewModels,
-					columns: this.getTableConfig().columns
+					rows: viewModels,
+					columns: this.getTableConfig().columns,
+					pagination: {
+						cachedCount: viewModels.length,
+						totalCount: viewModels.length,
+						isLoading: false,
+						currentPage: 0,
+						isFullyCached: true
+					}
 				}
 			});
 		} catch (error: unknown) {
 			this.logger.error('Error refreshing web resources', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh web resources: ${errorMessage}`);
+		} finally {
+			this.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -460,66 +472,54 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		this.setButtonLoading('refresh', true);
-		this.showTableLoading();
+		const oldEnvironmentId = this.currentEnvironmentId;
+		this.currentEnvironmentId = environmentId;
+		this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
 
-		try {
-			const oldEnvironmentId = this.currentEnvironmentId;
-			this.currentEnvironmentId = environmentId;
-			this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
+		// Disable "Publish Solution" since we're back to Default Solution
+		this.updatePublishSolutionButtonState();
 
-			// Disable "Publish Solution" since we're back to Default Solution
-			this.updatePublishSolutionButtonState();
+		// Re-register panel in map for new environment
+		this.reregisterPanel(WebResourcesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
-			// Re-register panel in map for new environment
-			this.reregisterPanel(WebResourcesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
+		// Reinitialize virtual table for new environment
+		this.initializeVirtualTable(environmentId);
 
-			// Reinitialize virtual table for new environment
-			this.initializeVirtualTable(environmentId);
-
-			const environment = await this.getEnvironmentById(environmentId);
-			if (environment) {
-				this.panel.title = `Web Resources - ${environment.name}`;
-			}
-
-			this.solutionOptions = await this.loadSolutions();
-
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
+		const environment = await this.getEnvironmentById(environmentId);
+		if (environment) {
+			this.panel.title = `Web Resources - ${environment.name}`;
 		}
+
+		this.solutionOptions = await this.loadSolutions();
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 	private async handleSolutionChange(solutionId: string): Promise<void> {
 		this.logger.debug('Solution filter changed', { solutionId });
 
-		this.setButtonLoading('refresh', true);
-		this.showTableLoading();
+		this.currentSolutionId = solutionId;
 
-		try {
-			this.currentSolutionId = solutionId;
+		// Enable/disable "Publish Solution" based on selection
+		this.updatePublishSolutionButtonState();
 
-			// Enable/disable "Publish Solution" based on selection
-			this.updatePublishSolutionButtonState();
-
-			// Persist solution selection
-			if (this.panelStateRepository) {
-				await this.panelStateRepository.save(
-					{
-						panelType: 'webResources',
-						environmentId: this.currentEnvironmentId
-					},
-					{
-						selectedSolutionId: solutionId,
-						lastUpdated: new Date().toISOString()
-					}
-				);
-			}
-
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
+		// Persist solution selection
+		if (this.panelStateRepository) {
+			await this.panelStateRepository.save(
+				{
+					panelType: 'webResources',
+					environmentId: this.currentEnvironmentId
+				},
+				{
+					selectedSolutionId: solutionId,
+					lastUpdated: new Date().toISOString()
+				}
+			);
 		}
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 	/**

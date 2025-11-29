@@ -645,13 +645,21 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing current selection');
 
-		// Clear cache to force fresh data
-		this.entityMetadataRepository.clearCache();
+		// Show loading state
+		this.setButtonLoading('refresh', true);
+		await this.panel.webview.postMessage({ command: 'showDetailLoading' });
 
-		if (this.currentSelectionType === 'entity' && this.currentSelectionId) {
-			await this.handleSelectEntity(this.currentSelectionId);
-		} else if (this.currentSelectionType === 'choice' && this.currentSelectionId) {
-			await this.handleSelectChoice(this.currentSelectionId);
+		try {
+			// Clear cache to force fresh data
+			this.entityMetadataRepository.clearCache();
+
+			if (this.currentSelectionType === 'entity' && this.currentSelectionId) {
+				await this.handleSelectEntity(this.currentSelectionId);
+			} else if (this.currentSelectionType === 'choice' && this.currentSelectionId) {
+				await this.handleSelectChoice(this.currentSelectionId);
+			}
+		} finally {
+			this.setButtonLoading('refresh', false);
 		}
 	}
 

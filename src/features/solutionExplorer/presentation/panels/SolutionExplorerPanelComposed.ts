@@ -310,6 +310,9 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing solutions with virtual table');
 
+		this.setButtonLoading('refresh', true);
+		this.showTableLoading();
+
 		try {
 			// Clear existing cache and reload
 			this.cacheManager.clearCache();
@@ -348,6 +351,8 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 			this.logger.error('Error refreshing solutions', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh solutions: ${errorMessage}`);
+		} finally {
+			this.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -380,30 +385,24 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		this.setButtonLoading('refresh', true);
-		this.showTableLoading();
+		const oldEnvironmentId = this.currentEnvironmentId;
+		this.currentEnvironmentId = environmentId;
 
-		try {
-			const oldEnvironmentId = this.currentEnvironmentId;
-			this.currentEnvironmentId = environmentId;
+		// Clear old cache and create new cache manager for new environment
+		this.cacheManager.clearCache();
+		const newProvider = new SolutionDataProviderAdapter(this.solutionRepository, environmentId);
+		this.cacheManager = new VirtualTableCacheManager(newProvider, this.virtualTableConfig, this.logger);
 
-			// Clear old cache and create new cache manager for new environment
-			this.cacheManager.clearCache();
-			const newProvider = new SolutionDataProviderAdapter(this.solutionRepository, environmentId);
-			this.cacheManager = new VirtualTableCacheManager(newProvider, this.virtualTableConfig, this.logger);
+		// Re-register panel in map for new environment
+		this.reregisterPanel(SolutionExplorerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
-			// Re-register panel in map for new environment
-			this.reregisterPanel(SolutionExplorerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
-
-			const environment = await this.getEnvironmentById(environmentId);
-			if (environment) {
-				this.panel.title = `Solutions - ${environment.name}`;
-			}
-
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
+		const environment = await this.getEnvironmentById(environmentId);
+		if (environment) {
+			this.panel.title = `Solutions - ${environment.name}`;
 		}
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 	/**

@@ -336,13 +336,15 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 
 	private async render(): Promise<void> {
 		const data = await this.loadData();
+		const config = this.getTableConfig();
 
 		// Data-driven update: Send ViewModels to frontend
 		await this.panel.webview.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels: data,
-				columns: this.getTableConfig().columns
+				columns: config.columns,
+				noDataMessage: config.noDataMessage
 			}
 		});
 	}
@@ -404,67 +406,62 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	}
 
 	private async handleRefresh(): Promise<void> {
-		await this.render();
+		this.setButtonLoading('refresh', true);
+		this.showTableLoading();
+
+		try {
+			await this.render();
+		} finally {
+			this.setButtonLoading('refresh', false);
+		}
 	}
 
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
-		this.setButtonLoading('refresh', true);
-		this.showTableLoading();
+		const oldEnvironmentId = this.currentEnvironmentId;
+		this.currentEnvironmentId = environmentId;
+		this.currentSolutionId = DEFAULT_SOLUTION_ID;
 
-		try {
-			const oldEnvironmentId = this.currentEnvironmentId;
-			this.currentEnvironmentId = environmentId;
-			this.currentSolutionId = DEFAULT_SOLUTION_ID;
+		// Re-register panel in map for new environment
+		this.reregisterPanel(ConnectionReferencesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
-			// Re-register panel in map for new environment
-			this.reregisterPanel(ConnectionReferencesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
+		const environment = await this.getEnvironmentById(environmentId);
+		this.panel.title = `Connection References - ${environment?.name || 'Unknown'}`;
 
-			const environment = await this.getEnvironmentById(environmentId);
-			this.panel.title = `Connection References - ${environment?.name || 'Unknown'}`;
-
-			// Load saved solution selection for new environment
-			if (this.panelStateRepository) {
-				try {
-					const state = await this.panelStateRepository.load({
-						panelType: 'connectionReferences',
-						environmentId: this.currentEnvironmentId
-					});
-					if (state && typeof state === 'object' && 'selectedSolutionId' in state) {
-						const savedId = state.selectedSolutionId as string | undefined;
-						if (savedId) {
-							this.currentSolutionId = savedId;
-						}
+		// Load saved solution selection for new environment
+		if (this.panelStateRepository) {
+			try {
+				const state = await this.panelStateRepository.load({
+					panelType: 'connectionReferences',
+					environmentId: this.currentEnvironmentId
+				});
+				if (state && typeof state === 'object' && 'selectedSolutionId' in state) {
+					const savedId = state.selectedSolutionId as string | undefined;
+					if (savedId) {
+						this.currentSolutionId = savedId;
 					}
-				} catch (error) {
-					this.logger.warn('Failed to load panel state for new environment', error);
 				}
+			} catch (error) {
+				this.logger.warn('Failed to load panel state for new environment', error);
 			}
-
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
 		}
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 	private async handleSolutionChange(solutionId: string): Promise<void> {
-		this.setButtonLoading('refresh', true);
-		this.showTableLoading();
+		this.currentSolutionId = solutionId;
 
-		try {
-			this.currentSolutionId = solutionId;
-
-			// Always save concrete solution selection to panel state
-			if (this.panelStateRepository) {
-				await this.panelStateRepository.save(
-					{ panelType: 'connectionReferences', environmentId: this.currentEnvironmentId },
-					{ selectedSolutionId: solutionId, lastUpdated: new Date().toISOString() }
-				);
-			}
-
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
+		// Always save concrete solution selection to panel state
+		if (this.panelStateRepository) {
+			await this.panelStateRepository.save(
+				{ panelType: 'connectionReferences', environmentId: this.currentEnvironmentId },
+				{ selectedSolutionId: solutionId, lastUpdated: new Date().toISOString() }
+			);
 		}
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 	private async handleOpenFlow(flowId: string): Promise<void> {

@@ -626,6 +626,9 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing plugin traces');
 
+		this.setButtonLoading('refresh', true);
+		this.showTableLoading();
+
 		try {
 			// Get expanded filter criteria (includes quick filters) from behavior
 			const filterCriteria = this.filterManagementBehavior.getAppliedFilterCriteria();
@@ -641,18 +644,23 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 
 			this.logger.info('Plugin traces loaded successfully', { count: viewModels.length });
 
+			const config = this.getTableConfig();
+
 			// Data-driven update: Send ViewModels to frontend
 			await this.panel.webview.postMessage({
 				command: 'updateTableData',
 				data: {
 					viewModels,
-					columns: this.getTableConfig().columns,
+					columns: config.columns,
+					noDataMessage: config.noDataMessage,
 					isLoading: false
 				}
 			});
 		} catch (error) {
 			this.logger.error('Failed to load plugin traces', error);
 			await vscode.window.showErrorMessage('Failed to load plugin traces');
+		} finally {
+			this.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -674,26 +682,20 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		this.setButtonLoading('refresh', true);
-		this.showTableLoading();
+		const oldEnvironmentId = this.currentEnvironmentId;
+		this.currentEnvironmentId = environmentId;
 
-		try {
-			const oldEnvironmentId = this.currentEnvironmentId;
-			this.currentEnvironmentId = environmentId;
+		// Reregister panel with new environment in singleton map
+		this.reregisterPanel(PluginTraceViewerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
-			// Reregister panel with new environment in singleton map
-			this.reregisterPanel(PluginTraceViewerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
-
-			const environment = await this.getEnvironmentById(environmentId);
-			if (environment) {
-				this.panel.title = `Plugin Traces - ${environment.name}`;
-			}
-
-			await this.loadTraceLevel();
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
+		const environment = await this.getEnvironmentById(environmentId);
+		if (environment) {
+			this.panel.title = `Plugin Traces - ${environment.name}`;
 		}
+
+		await this.loadTraceLevel();
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 
