@@ -383,7 +383,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 		this.logger.debug('Environment changed', { environmentId });
 
 		this.setButtonLoading('refresh', true);
-		this.clearTable();
+		this.showTableLoading();
 
 		try {
 			const oldEnvironmentId = this.currentEnvironmentId;
@@ -432,10 +432,10 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 	}
 
 	/**
-	 * Clears the table by sending empty data to the webview.
-	 * Provides immediate visual feedback during environment switches.
+	 * Shows loading spinner in the table.
+	 * Provides visual feedback during environment switches.
 	 */
-	private clearTable(): void {
+	private showTableLoading(): void {
 		this.panel.webview.postMessage({
 			command: 'updateVirtualTable',
 			data: {

@@ -409,7 +409,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.setButtonLoading('refresh', true);
-		this.clearTable();
+		this.showTableLoading();
 
 		try {
 			const oldEnvironmentId = this.currentEnvironmentId;
@@ -447,18 +447,24 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	}
 
 	private async handleSolutionChange(solutionId: string): Promise<void> {
-		this.currentSolutionId = solutionId;
-		this.clearTable();
+		this.setButtonLoading('refresh', true);
+		this.showTableLoading();
 
-		// Always save concrete solution selection to panel state
-		if (this.panelStateRepository) {
-			await this.panelStateRepository.save(
-				{ panelType: 'connectionReferences', environmentId: this.currentEnvironmentId },
-				{ selectedSolutionId: solutionId, lastUpdated: new Date().toISOString() }
-			);
+		try {
+			this.currentSolutionId = solutionId;
+
+			// Always save concrete solution selection to panel state
+			if (this.panelStateRepository) {
+				await this.panelStateRepository.save(
+					{ panelType: 'connectionReferences', environmentId: this.currentEnvironmentId },
+					{ selectedSolutionId: solutionId, lastUpdated: new Date().toISOString() }
+				);
+			}
+
+			await this.handleRefresh();
+		} finally {
+			this.setButtonLoading('refresh', false);
 		}
-
-		await this.handleRefresh();
 	}
 
 	private async handleOpenFlow(flowId: string): Promise<void> {
@@ -539,15 +545,16 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	}
 
 	/**
-	 * Clears the table by sending empty data to the webview.
-	 * Provides immediate visual feedback during environment switches.
+	 * Shows loading spinner in the table.
+	 * Provides visual feedback during environment/solution switches.
 	 */
-	private clearTable(): void {
+	private showTableLoading(): void {
 		this.panel.webview.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels: [],
-				columns: this.getTableConfig().columns
+				columns: this.getTableConfig().columns,
+				isLoading: true
 			}
 		});
 	}

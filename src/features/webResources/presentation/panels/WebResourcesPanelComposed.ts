@@ -461,7 +461,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.logger.debug('Environment changed', { environmentId });
 
 		this.setButtonLoading('refresh', true);
-		this.showTableLoading('Loading web resources...');
+		this.showTableLoading();
 
 		try {
 			const oldEnvironmentId = this.currentEnvironmentId;
@@ -494,7 +494,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.logger.debug('Solution filter changed', { solutionId });
 
 		this.setButtonLoading('refresh', true);
-		this.showTableLoading('Loading web resources...');
+		this.showTableLoading();
 
 		try {
 			this.currentSolutionId = solutionId;
@@ -535,13 +535,23 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	}
 
 	/**
-	 * Shows loading indicator in the table.
+	 * Shows loading spinner in the table.
 	 * Provides visual feedback during environment/solution switches.
 	 */
-	private showTableLoading(message = 'Loading...'): void {
+	private showTableLoading(): void {
 		this.panel.webview.postMessage({
-			command: 'showLoading',
-			message
+			command: 'updateVirtualTable',
+			data: {
+				rows: [],
+				columns: this.getTableConfig().columns,
+				pagination: {
+					cachedCount: 0,
+					totalCount: 0,
+					isLoading: true,
+					currentPage: 0,
+					isFullyCached: false
+				}
+			}
 		});
 	}
 

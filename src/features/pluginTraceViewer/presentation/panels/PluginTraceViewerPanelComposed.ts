@@ -675,7 +675,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		this.logger.debug('Environment changed', { environmentId });
 
 		this.setButtonLoading('refresh', true);
-		this.clearTable();
+		this.showTableLoading();
 
 		try {
 			const oldEnvironmentId = this.currentEnvironmentId;
@@ -868,15 +868,16 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	}
 
 	/**
-	 * Clears the table by sending empty data to the webview.
-	 * Provides immediate visual feedback during environment switches.
+	 * Shows loading spinner in the table.
+	 * Provides visual feedback during environment switches.
 	 */
-	private clearTable(): void {
+	private showTableLoading(): void {
 		this.panel.webview.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels: [],
-				columns: this.getTableConfig().columns
+				columns: this.getTableConfig().columns,
+				isLoading: true
 			}
 		});
 	}

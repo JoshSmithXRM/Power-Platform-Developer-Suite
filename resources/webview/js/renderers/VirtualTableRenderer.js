@@ -665,7 +665,17 @@
 	 * @param {Object} data - Virtual table data from backend
 	 */
 	function updateVirtualTable(data) {
-		if (!data || !data.rows) {
+		if (!data) {
+			return;
+		}
+
+		// Show loading spinner if rows is empty and isLoading is true
+		if ((!data.rows || data.rows.length === 0) && data.pagination?.isLoading) {
+			showLoadingIndicator('Loading...');
+			return;
+		}
+
+		if (!data.rows) {
 			return;
 		}
 
