@@ -19,7 +19,6 @@ export async function initializeImportJobViewer(
 	const { XmlFormatter } = await import('../../../../shared/infrastructure/formatters/XmlFormatter.js');
 	const { VsCodeEditorService } = await import('../../../../shared/infrastructure/services/VsCodeEditorService.js');
 	const { DataverseApiImportJobRepository } = await import('../../infrastructure/repositories/DataverseApiImportJobRepository.js');
-	const { ListImportJobsUseCase } = await import('../../application/useCases/ListImportJobsUseCase.js');
 	const { OpenImportLogUseCase } = await import('../../application/useCases/OpenImportLogUseCase.js');
 	const { ImportJobViewerPanelComposed } = await import('../panels/ImportJobViewerPanelComposed.js');
 	const { ImportJobViewModelMapper } = await import('../../application/mappers/ImportJobViewModelMapper.js');
@@ -33,7 +32,6 @@ export async function initializeImportJobViewer(
 	const xmlFormatter = new XmlFormatter();
 	const editorService = new VsCodeEditorService(logger, xmlFormatter);
 
-	const listImportJobsUseCase = new ListImportJobsUseCase(importJobRepository, logger);
 	const openImportLogUseCase = new OpenImportLogUseCase(importJobRepository, editorService, logger);
 
 	const collectionService = new ImportJobCollectionService();
@@ -43,7 +41,7 @@ export async function initializeImportJobViewer(
 		context.extensionUri,
 		getEnvironments,
 		getEnvironmentById,
-		listImportJobsUseCase,
+		importJobRepository,
 		openImportLogUseCase,
 		urlBuilder,
 		viewModelMapper,
