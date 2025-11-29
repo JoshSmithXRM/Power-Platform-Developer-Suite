@@ -30,7 +30,7 @@ export class ListConnectionReferencesUseCase {
 	/**
 	 * Lists flow-connection reference relationships.
 	 * @param environmentId - Power Platform environment GUID
-	 * @param solutionId - Solution GUID to filter by (use DEFAULT_SOLUTION_ID to show all)
+	 * @param solutionId - Solution GUID to filter by (Default Solution returns all)
 	 * @param cancellationToken - Optional token to cancel the operation
 	 * @returns Relationships and filtered connection references
 	 */

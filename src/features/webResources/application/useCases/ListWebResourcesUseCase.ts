@@ -5,7 +5,6 @@ import { IWebResourceRepository } from '../../domain/interfaces/IWebResourceRepo
 import { ISolutionComponentRepository } from '../../../../shared/domain/interfaces/ISolutionComponentRepository';
 import { WebResource } from '../../domain/entities/WebResource';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
-import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 
 /**
  * Options for listing web resources.
@@ -29,7 +28,7 @@ export class ListWebResourcesUseCase {
 	/**
 	 * Executes the use case to list web resources.
 	 * @param environmentId - Power Platform environment GUID
-	 * @param solutionId - Solution GUID to filter by (use DEFAULT_SOLUTION_ID to show all)
+	 * @param solutionId - Solution GUID to filter by (Default Solution returns all web resources)
 	 * @param cancellationToken - Optional token to cancel the operation
 	 * @param options - Optional filtering options
 	 * @returns Promise resolving to array of WebResource entities
@@ -98,11 +97,6 @@ export class ListWebResourcesUseCase {
 		webResources: WebResource[],
 		cancellationToken?: ICancellationToken
 	): Promise<WebResource[]> {
-		// Default solution means show all web resources
-		if (solutionId === DEFAULT_SOLUTION_ID) {
-			return webResources;
-		}
-
 		const componentIds = await this.solutionComponentRepository.findComponentIdsBySolution(
 			environmentId,
 			solutionId,

@@ -27,6 +27,7 @@
 	let visibleStart = 0;
 	let visibleEnd = 50;
 	let scrollDebounceTimer = null;
+	let selectedRowId = null; // Currently selected row ID for publish functionality
 
 	// Pagination state for server search fallback
 	let paginationState = {
@@ -79,11 +80,26 @@
 		// Set up search handling
 		setupSearchHandler();
 
+		// Set up row selection handling
+		setupRowSelectionHandler(tbody);
+
+		// Calculate visible range based on container height
+		const containerHeight = scrollContainer.clientHeight || 600;
+		const visibleCount = Math.ceil(containerHeight / rowHeight);
+		visibleStart = 0;
+		visibleEnd = Math.min(filteredRows.length, visibleCount + OVERSCAN_COUNT * 2);
+
 		// Initial render
 		renderVisibleRows(tbody);
 
 		// Update container height for scrollbar
 		updateContainerHeight(scrollContainer);
+
+		// Recalculate visible range after container height update
+		const finalHeight = scrollContainer.clientHeight;
+		const finalVisibleCount = Math.ceil(finalHeight / rowHeight);
+		visibleEnd = Math.min(filteredRows.length, finalVisibleCount + OVERSCAN_COUNT * 2);
+		renderVisibleRows(tbody);
 	}
 
 	/**
@@ -131,6 +147,72 @@
 			const query = searchInput.value.toLowerCase().trim();
 			filterRows(query);
 		});
+	}
+
+	/**
+	 * Sets up row selection handling for publish functionality.
+	 * Clicking a row (not a link) selects it and sends rowSelect message.
+	 *
+	 * @param {HTMLElement} tbody - The table body element
+	 */
+	function setupRowSelectionHandler(tbody) {
+		tbody.addEventListener('click', (e) => {
+			// Ignore clicks on links (those trigger their own commands)
+			if (e.target.tagName === 'A' || e.target.closest('a')) {
+				return;
+			}
+
+			// Find the clicked row
+			const row = e.target.closest('tr');
+			if (!row || row.classList.contains('virtual-spacer-top') || row.classList.contains('virtual-spacer-bottom')) {
+				return;
+			}
+
+			const rowIndex = parseInt(row.getAttribute('data-index'), 10);
+			if (isNaN(rowIndex) || rowIndex < 0 || rowIndex >= filteredRows.length) {
+				return;
+			}
+
+			const rowData = filteredRows[rowIndex];
+			if (!rowData) {
+				return;
+			}
+
+			// Toggle selection: if clicking same row, deselect; otherwise select new row
+			const rowId = rowData.id;
+			if (selectedRowId === rowId) {
+				// Deselect
+				selectedRowId = null;
+				row.classList.remove('row-selected');
+				sendRowSelectMessage(null, null);
+			} else {
+				// Select new row
+				// Remove selection from previously selected row
+				const previousSelected = tbody.querySelector('.row-selected');
+				if (previousSelected) {
+					previousSelected.classList.remove('row-selected');
+				}
+
+				selectedRowId = rowId;
+				row.classList.add('row-selected');
+				sendRowSelectMessage(rowId, rowData.name || rowData.displayName);
+			}
+		});
+	}
+
+	/**
+	 * Sends rowSelect message to VS Code extension.
+	 *
+	 * @param {string|null} id - Selected row ID or null for deselection
+	 * @param {string|null} name - Selected row name or null for deselection
+	 */
+	function sendRowSelectMessage(id, name) {
+		if (typeof vscode !== 'undefined') {
+			vscode.postMessage({
+				command: 'rowSelect',
+				data: { id, name }
+			});
+		}
 	}
 
 	/**
@@ -198,6 +280,63 @@
 				data: { query: query }
 			});
 		}
+	}
+
+	/**
+	 * Shows loading indicator in the table.
+	 * Called when switching solutions/environments.
+	 *
+	 * @param {string} [message='Loading...'] - Optional custom loading message
+	 */
+	function showLoadingIndicator(message = 'Loading...') {
+		const tbody = document.getElementById('virtualTableBody');
+		if (!tbody) {
+			return;
+		}
+
+		// Clear internal state
+		allRows = [];
+		filteredRows = [];
+		selectedRowId = null;
+
+		// Clear existing content
+		while (tbody.firstChild) {
+			tbody.removeChild(tbody.firstChild);
+		}
+
+		// Create loading indicator row
+		const tr = document.createElement('tr');
+		const td = document.createElement('td');
+		td.colSpan = columns.length || 5; // Fallback to 5 if columns not yet set
+		td.style.textAlign = 'center';
+		td.style.padding = '24px';
+		td.style.color = 'var(--vscode-descriptionForeground)';
+		td.innerHTML = '<span class="spinner" style="margin-right: 8px;"></span>' + escapeHtmlSimple(message);
+		tr.appendChild(td);
+		tbody.appendChild(tr);
+
+		// Update footer to show loading state
+		const footer = document.querySelector('.table-footer');
+		if (footer) {
+			footer.textContent = message;
+		}
+	}
+
+	/**
+	 * Simple HTML escape for loading messages.
+	 *
+	 * @param {string} text - Text to escape
+	 * @returns {string} Escaped text
+	 */
+	function escapeHtmlSimple(text) {
+		const map = {
+			'&': '&amp;',
+			'<': '&lt;',
+			'>': '&gt;',
+			'"': '&quot;',
+			"'": '&#039;'
+		};
+		return String(text).replace(/[&<>"']/g, char => map[char] || char);
 	}
 
 	/**
@@ -415,6 +554,11 @@
 		tr.setAttribute('data-index', String(index));
 		tr.style.height = `${rowHeight}px`;
 
+		// Apply selection state if this row is selected
+		if (row.id && row.id === selectedRowId) {
+			tr.classList.add('row-selected');
+		}
+
 		columns.forEach(col => {
 			const td = document.createElement('td');
 			const value = row[col.key];
@@ -610,7 +754,8 @@
 				renderVisibleRows(tbody);
 			}
 		},
-		handleServerSearchResults: handleServerSearchResults
+		handleServerSearchResults: handleServerSearchResults,
+		showLoading: showLoadingIndicator
 	};
 
 	// Listen for table update messages from VS Code webview API
@@ -635,6 +780,9 @@
 					break;
 				case 'serverSearchResults':
 					handleServerSearchResults(message.data);
+					break;
+				case 'showLoading':
+					showLoadingIndicator(message.message || 'Loading...');
 					break;
 			}
 		}

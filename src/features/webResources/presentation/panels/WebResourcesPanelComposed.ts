@@ -85,7 +85,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		// Configure virtual table: 100 initial, up to 5000 cached, background loading enabled
 		this.virtualTableConfig = VirtualTableConfig.create(100, 5000, 500, true);
 
-		// Initialize virtual table infrastructure for "All Web Resources"
+		// Initialize virtual table infrastructure for Default Solution
 		this.initializeVirtualTable(environmentId);
 
 		// Configure webview
@@ -232,47 +232,25 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			}
 		}
 
-		// Use virtual table for "All Web Resources", use case for solution-filtered
-		if (finalSolutionId === DEFAULT_SOLUTION_ID && this.cacheManager) {
-			// Virtual table mode: load initial page, background loading will continue
-			this.logger.debug('Using virtual table for All Web Resources');
-			const initialData = await this.cacheManager.loadInitialPage();
-			const viewModels = this.viewModelMapper.toViewModels(initialData.getItems());
-			const cacheState = this.cacheManager.getCacheState();
+		// Load web resources for the selected solution
+		this.logger.debug('Loading web resources', { solutionId: finalSolutionId });
+		const webResources = await this.listWebResourcesUseCase.execute(
+			this.currentEnvironmentId,
+			finalSolutionId
+		);
+		const viewModels = this.viewModelMapper.toViewModels(webResources);
 
-			// Final render with solutions and initial page
-			await this.scaffoldingBehavior.refresh({
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				solutions,
-				currentSolutionId: finalSolutionId,
-				tableData: viewModels,
-				pagination: {
-					cachedCount: cacheState.getCachedRecordCount(),
-					totalCount: cacheState.getTotalRecordCount(),
-					isLoading: cacheState.getIsLoading(),
-					currentPage: cacheState.getCurrentPage(),
-					isFullyCached: cacheState.isFullyCached()
-				}
-			});
-		} else {
-			// Solution-filtered: use traditional use case (solution filtering not supported by virtual table yet)
-			this.logger.debug('Using list use case for solution-filtered query', { solutionId: finalSolutionId });
-			const webResources = await this.listWebResourcesUseCase.execute(
-				this.currentEnvironmentId,
-				finalSolutionId
-			);
-			const viewModels = this.viewModelMapper.toViewModels(webResources);
+		// Final render with solutions and data
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			solutions,
+			currentSolutionId: finalSolutionId,
+			tableData: viewModels
+		});
 
-			// Final render with both solutions and data
-			await this.scaffoldingBehavior.refresh({
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				solutions,
-				currentSolutionId: finalSolutionId,
-				tableData: viewModels
-			});
-		}
+		// Update publish button states based on current solution selection
+		this.updatePublishSolutionButtonState();
 	}
 
 	private createCoordinator(): { coordinator: PanelCoordinator<WebResourcesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
@@ -440,51 +418,22 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.logger.debug('Refreshing web resources', { solutionId: this.currentSolutionId });
 
 		try {
-			if (this.currentSolutionId === DEFAULT_SOLUTION_ID && this.cacheManager) {
-				// Virtual table mode: reset and reload cache
-				this.cacheManager.clearCache();
-				const initialData = await this.cacheManager.loadInitialPage();
-				const viewModels = this.viewModelMapper.toViewModels(initialData.getItems());
-				const cacheState = this.cacheManager.getCacheState();
+			const webResources = await this.listWebResourcesUseCase.execute(
+				this.currentEnvironmentId,
+				this.currentSolutionId
+			);
 
-				this.logger.info('Web resources refreshed via virtual table', {
-					count: viewModels.length,
-					totalCount: cacheState.getTotalRecordCount()
-				});
+			const viewModels = this.viewModelMapper.toViewModels(webResources);
 
-				await this.panel.webview.postMessage({
-					command: 'updateTableData',
-					data: {
-						viewModels,
-						columns: this.getTableConfig().columns,
-						pagination: {
-							cachedCount: cacheState.getCachedRecordCount(),
-							totalCount: cacheState.getTotalRecordCount(),
-							isLoading: cacheState.getIsLoading(),
-							currentPage: cacheState.getCurrentPage(),
-							isFullyCached: cacheState.isFullyCached()
-						}
-					}
-				});
-			} else {
-				// Solution-filtered: use traditional use case
-				const webResources = await this.listWebResourcesUseCase.execute(
-					this.currentEnvironmentId,
-					this.currentSolutionId
-				);
+			this.logger.info('Web resources loaded successfully', { count: viewModels.length });
 
-				const viewModels = this.viewModelMapper.toViewModels(webResources);
-
-				this.logger.info('Web resources loaded successfully', { count: viewModels.length });
-
-				await this.panel.webview.postMessage({
-					command: 'updateTableData',
-					data: {
-						viewModels,
-						columns: this.getTableConfig().columns
-					}
-				});
-			}
+			await this.panel.webview.postMessage({
+				command: 'updateTableData',
+				data: {
+					viewModels,
+					columns: this.getTableConfig().columns
+				}
+			});
 		} catch (error: unknown) {
 			this.logger.error('Error refreshing web resources', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -512,14 +461,14 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.logger.debug('Environment changed', { environmentId });
 
 		this.setButtonLoading('refresh', true);
-		this.clearTable();
+		this.showTableLoading('Loading web resources...');
 
 		try {
 			const oldEnvironmentId = this.currentEnvironmentId;
 			this.currentEnvironmentId = environmentId;
 			this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
 
-			// Disable "Publish Solution" since we're back to "All Web Resources"
+			// Disable "Publish Solution" since we're back to Default Solution
 			this.updatePublishSolutionButtonState();
 
 			// Re-register panel in map for new environment
@@ -545,7 +494,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.logger.debug('Solution filter changed', { solutionId });
 
 		this.setButtonLoading('refresh', true);
-		this.clearTable();
+		this.showTableLoading('Loading web resources...');
 
 		try {
 			this.currentSolutionId = solutionId;
@@ -574,28 +523,25 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	}
 
 	/**
-	 * Enables or disables the "Publish Solution" button based on whether a specific solution is selected.
+	 * Enables the "Publish Solution" button when a solution is selected.
 	 */
 	private updatePublishSolutionButtonState(): void {
-		const isSpecificSolution = this.currentSolutionId !== DEFAULT_SOLUTION_ID;
+		const hasSolutionSelected = !!this.currentSolutionId;
 		this.panel.webview.postMessage({
 			command: 'setButtonState',
 			buttonId: 'publishSolution',
-			disabled: !isSpecificSolution
+			disabled: !hasSolutionSelected
 		});
 	}
 
 	/**
-	 * Clears the table by sending empty data to the webview.
-	 * Provides immediate visual feedback during environment switches.
+	 * Shows loading indicator in the table.
+	 * Provides visual feedback during environment/solution switches.
 	 */
-	private clearTable(): void {
+	private showTableLoading(message = 'Loading...'): void {
 		this.panel.webview.postMessage({
-			command: 'updateTableData',
-			data: {
-				viewModels: [],
-				columns: this.getTableConfig().columns
-			}
+			command: 'showLoading',
+			message
 		});
 	}
 
@@ -720,11 +666,10 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	/**
 	 * Publishes all web resources in the current solution.
 	 * Dynamically fetches web resource IDs from the solution.
-	 * Only enabled when a specific solution is selected (not "All Web Resources").
 	 */
 	private async handlePublishSolution(): Promise<void> {
-		if (this.currentSolutionId === DEFAULT_SOLUTION_ID) {
-			vscode.window.showWarningMessage('Select a solution to publish its web resources.');
+		if (!this.currentSolutionId) {
+			vscode.window.showWarningMessage('No solution selected.');
 			return;
 		}
 
@@ -863,12 +808,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	/**
 	 * Updates the virtual table display when cache state changes.
 	 * Called by VirtualTableCacheManager.onStateChange callback.
+	 * Note: Virtual table infrastructure is currently unused - all solutions use the use case path.
 	 */
 	private async updateVirtualTableData(records: readonly WebResource[], state: VirtualTableCacheState): Promise<void> {
-		// Only update if we're in "All Web Resources" mode
-		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
-			return;
-		}
 
 		const viewModels = this.viewModelMapper.toViewModels(records);
 

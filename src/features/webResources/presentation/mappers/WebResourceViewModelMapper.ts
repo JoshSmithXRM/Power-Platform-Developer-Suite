@@ -3,7 +3,7 @@ import { WebResourceViewModel } from '../../application/viewModels/WebResourceVi
 import { WebResourceTypeFormatter } from '../utils/WebResourceTypeFormatter';
 import { StorageSizeFormatter } from '../../../../shared/infrastructure/ui/utils/StorageSizeFormatter';
 import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
-import { escapeHtml } from '../../../../shared/infrastructure/ui/views/htmlHelpers';
+import type { CellLink } from '../../../../shared/infrastructure/ui/types/CellLink';
 
 /**
  * Mapper: WebResource to View Models
@@ -19,17 +19,24 @@ export class WebResourceViewModelMapper {
 	 */
 	public toViewModel(webResource: WebResource): WebResourceViewModel {
 		const name = webResource.name.getValue();
-		const escapedName = escapeHtml(name);
 		const typeCode = webResource.webResourceType.getCode();
 
-		// Create clickable link that triggers openWebResource command
+		// Structured link data for virtual table renderer
 		// data-* attributes are collected by wireDataCommands in messaging.js
-		const nameHtml = `<a href="#" class="clickable-link" data-command="openWebResource" data-id="${escapeHtml(webResource.id)}" data-name="${escapedName}" data-type-code="${typeCode}">${escapedName}</a>`;
+		const nameLink: CellLink = {
+			command: 'openWebResource',
+			commandData: {
+				id: webResource.id,
+				name: name,
+				'type-code': String(typeCode)
+			},
+			className: 'clickable-link'
+		};
 
 		return {
 			id: webResource.id,
 			name,
-			nameHtml,
+			nameLink,
 			displayName: webResource.displayName || name,
 			type: WebResourceTypeFormatter.formatDisplayName(webResource.webResourceType),
 			typeCode,

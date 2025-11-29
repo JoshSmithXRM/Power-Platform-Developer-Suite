@@ -68,8 +68,8 @@ describe('ListWebResourcesUseCase', () => {
 		};
 	}
 
-	describe('successful execution - default solution (no filter)', () => {
-		it('should list all web resources when using DEFAULT_SOLUTION_ID', async () => {
+	describe('successful execution', () => {
+		it('should list web resources for a solution', async () => {
 			// Arrange
 			const webResources = [
 				createTestWebResource('wr-1', 'new_script1.js', 'Script 1'),
@@ -78,6 +78,8 @@ describe('ListWebResourcesUseCase', () => {
 			];
 
 			mockWebResourceRepository.findAll.mockResolvedValue(webResources);
+			// Mock solution components - all web resources are in the solution
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1', 'wr-2', 'wr-3']);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
@@ -89,12 +91,19 @@ describe('ListWebResourcesUseCase', () => {
 				undefined,
 				undefined
 			);
-			expect(mockSolutionComponentRepository.findComponentIdsBySolution).not.toHaveBeenCalled();
+			expect(mockSolutionComponentRepository.findComponentIdsBySolution).toHaveBeenCalledWith(
+				testEnvironmentId,
+				DEFAULT_SOLUTION_ID,
+				'webresource',
+				undefined,
+				undefined
+			);
 		});
 
 		it('should handle empty web resources list', async () => {
 			// Arrange
 			mockWebResourceRepository.findAll.mockResolvedValue([]);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue([]);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
@@ -107,6 +116,7 @@ describe('ListWebResourcesUseCase', () => {
 			// Arrange
 			const cancellationToken = createCancellationToken(false);
 			mockWebResourceRepository.findAll.mockResolvedValue([]);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue([]);
 
 			// Act
 			await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, cancellationToken);
@@ -319,8 +329,10 @@ describe('ListWebResourcesUseCase', () => {
 			const webResources = Array.from({ length: 500 }, (_, i) =>
 				createTestWebResource(`wr-${i}`, `new_script${i}.js`, `Script ${i}`)
 			);
+			const componentIds = Array.from({ length: 500 }, (_, i) => `wr-${i}`);
 
 			mockWebResourceRepository.findAll.mockResolvedValue(webResources);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(componentIds);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
@@ -340,6 +352,7 @@ describe('ListWebResourcesUseCase', () => {
 			];
 
 			mockWebResourceRepository.findAll.mockResolvedValue(webResources);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1', 'wr-2', 'wr-3', 'wr-4', 'wr-5']);
 
 			// Act - default textBasedOnly: true filters out PNG
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
@@ -360,6 +373,7 @@ describe('ListWebResourcesUseCase', () => {
 			];
 
 			mockWebResourceRepository.findAll.mockResolvedValue(webResources);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1', 'wr-2', 'wr-3', 'wr-4', 'wr-5']);
 
 			// Act - include all types
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, undefined, { textBasedOnly: false });
@@ -376,6 +390,7 @@ describe('ListWebResourcesUseCase', () => {
 			];
 
 			mockWebResourceRepository.findAll.mockResolvedValue(webResources);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1', 'wr-2']);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
@@ -394,6 +409,7 @@ describe('ListWebResourcesUseCase', () => {
 			];
 
 			mockWebResourceRepository.findAll.mockResolvedValue(webResources);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1', 'wr-2']);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
@@ -430,6 +446,7 @@ describe('ListWebResourcesUseCase', () => {
 			];
 
 			mockWebResourceRepository.findAll.mockResolvedValue(webResources);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-a', 'wr-b', 'wr-c']);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
@@ -449,6 +466,7 @@ describe('ListWebResourcesUseCase', () => {
 			];
 
 			mockWebResourceRepository.findAll.mockResolvedValue(webResources);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1']);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
@@ -468,6 +486,7 @@ describe('ListWebResourcesUseCase', () => {
 			];
 
 			mockWebResourceRepository.findAll.mockResolvedValue(webResources);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1', 'wr-2', 'wr-3']);
 
 			// Act - include all types to test PNG editability
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, undefined, { textBasedOnly: false });

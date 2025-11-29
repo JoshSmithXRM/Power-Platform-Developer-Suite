@@ -173,7 +173,11 @@ Deferred to future PR - see "Future Work" section below.
 
 | Bug | Status | Notes |
 |-----|--------|-------|
-| | | |
+| Web resources not clickable | ✅ Fixed | Changed from `nameHtml` to `nameLink` CellLink structure |
+| Publish buttons not working | ✅ Fixed | Added row selection to VirtualTableRenderer, fixed button state updates |
+| "All Solutions" causing confusion | ✅ Fixed | Removed synthetic "All Solutions" option - Default Solution is the default |
+| Virtual table only shows 16 rows | ✅ Fixed | Fixed initial container height and visible row calculation |
+| No loading state when switching | ✅ Fixed | Added `showLoading` command to VirtualTableRenderer |
 
 ---
 

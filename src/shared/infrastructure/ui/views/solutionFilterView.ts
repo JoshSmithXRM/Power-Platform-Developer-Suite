@@ -13,25 +13,23 @@ export interface SolutionOption {
 
 /**
  * Renders solution filter dropdown.
- * @param solutions - Available solutions
- * @param currentSolutionId - Currently selected solution ID
+ *
+ * The Default Solution (which exists in every Dataverse environment) acts as the
+ * "show all" option since it contains all unmanaged customizations.
+ *
+ * @param solutions - Available solutions from the API (should include Default Solution)
+ * @param currentSolutionId - Currently selected solution ID (defaults to Default Solution)
  * @param label - Label text for the filter
- * @param includeAllOption - Whether to include an "All" option for showing all items
  * @returns HTML string with solution filter
  */
 export function renderSolutionFilter(
 	solutions: ReadonlyArray<SolutionOption>,
 	currentSolutionId: string | undefined,
-	label: string,
-	includeAllOption = true
+	label: string
 ): string {
 	if (solutions.length === 0) {
 		return '';
 	}
-
-	const allOption = includeAllOption
-		? `<option value=""${!currentSolutionId ? ' selected' : ''}>All Solutions</option>`
-		: '';
 
 	const options = solutions.map(solution => {
 		const selected = solution.id === currentSolutionId ? ' selected' : '';
@@ -42,7 +40,6 @@ export function renderSolutionFilter(
 		<div class="solution-filter">
 			<label for="solutionSelect">${escapeHtml(label)}</label>
 			<select id="solutionSelect">
-				${allOption}
 				${options}
 			</select>
 		</div>
