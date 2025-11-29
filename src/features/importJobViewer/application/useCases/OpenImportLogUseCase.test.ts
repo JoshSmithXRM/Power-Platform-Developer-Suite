@@ -16,7 +16,9 @@ describe('OpenImportLogUseCase', () => {
 	beforeEach(() => {
 		mockRepository = {
 			findAll: jest.fn(),
-			findByIdWithLog: jest.fn()
+			findByIdWithLog: jest.fn(),
+			findPaginated: jest.fn(),
+			getCount: jest.fn()
 		};
 
 		mockEditorService = {

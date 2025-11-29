@@ -1,6 +1,7 @@
 import { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 import { QueryOptions } from '../../../../shared/domain/interfaces/QueryOptions';
+import { PaginatedResult } from '../../../../shared/domain/valueObjects/PaginatedResult';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../../../../shared/infrastructure/utils/ODataQueryBuilder';
 import { CancellationHelper } from '../../../../shared/infrastructure/utils/CancellationHelper';
@@ -164,8 +165,74 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 	}
 
 	/**
-	 * Maps Dataverse DTO to ImportJob domain entity without log data.
+	 * Retrieves a paginated subset of import jobs from the specified environment.
+	 * Note: Dataverse importjobs entity doesn't support $skip, so we load all in page 1.
 	 */
+	async findPaginated(
+		environmentId: string,
+		page: number,
+		_pageSize: number,
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
+	): Promise<PaginatedResult<ImportJob>> {
+		if (page > 1) {
+			this.logger.debug('Import jobs pagination: returning empty for page > 1 (all loaded in page 1)', { page });
+			return PaginatedResult.create([], page, _pageSize, 0);
+		}
+
+		this.logger.debug('Fetching all import jobs from Dataverse API (no $skip support)', { environmentId });
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			const importJobs = await this.findAll(environmentId, options, cancellationToken);
+
+			this.logger.debug('Fetched all import jobs from Dataverse', {
+				environmentId,
+				count: importJobs.length
+			});
+
+			return PaginatedResult.create(importJobs, 1, importJobs.length, importJobs.length);
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to fetch import jobs from Dataverse API', normalizedError);
+			throw normalizedError;
+		}
+	}
+
+	/**
+	 * Gets the total count of import jobs in the specified environment.
+	 */
+	async getCount(
+		environmentId: string,
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
+	): Promise<number> {
+		const filterParam = options?.filter ? `&$filter=${options.filter}` : '';
+		const endpoint = `/api/data/v9.2/importjobs?$count=true&$top=1&$select=importjobid${filterParam}`;
+
+		this.logger.debug('Fetching import job count from Dataverse API', { environmentId });
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			const response = await this.apiService.get<{ '@odata.count': number }>(
+				environmentId,
+				endpoint,
+				cancellationToken
+			);
+
+			const count = response['@odata.count'];
+			this.logger.debug('Fetched import job count from Dataverse', { environmentId, count });
+
+			return count;
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to fetch import job count from Dataverse API', normalizedError);
+			throw normalizedError;
+		}
+	}
+
 	private mapToEntity(dto: DataverseImportJobDto): ImportJob {
 		const factoryData: ImportJobFactoryData = {
 			id: dto.importjobid,
