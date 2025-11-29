@@ -208,7 +208,7 @@ export class DataverseApiImportJobRepository implements IImportJobRepository {
 		options?: QueryOptions,
 		cancellationToken?: ICancellationToken
 	): Promise<number> {
-		const filterParam = options?.filter ? `&$filter=${encodeURIComponent(options.filter)}` : '';
+		const filterParam = options?.filter ? `&$filter=${options.filter}` : '';
 		const endpoint = `/api/data/v9.2/importjobs?$count=true&$top=1&$select=importjobid${filterParam}`;
 
 		this.logger.debug('Fetching import job count from Dataverse API', { environmentId });

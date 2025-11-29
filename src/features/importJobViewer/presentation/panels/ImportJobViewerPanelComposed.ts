@@ -394,6 +394,29 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 			const newProvider = new ImportJobDataProviderAdapter(this.importJobRepository, environmentId);
 			this.cacheManager = new VirtualTableCacheManager(newProvider, this.virtualTableConfig, this.logger);
 
+			// Re-register state change callback for background loading updates
+			this.cacheManager.onStateChange((state, cachedRecords) => {
+				const updatedViewModels = cachedRecords
+					.map(job => this.viewModelMapper.toViewModel(job));
+
+				this.panel.webview.postMessage({
+					command: 'updateVirtualTable',
+					data: {
+						rows: updatedViewModels,
+						pagination: {
+							cachedCount: state.getCachedRecordCount(),
+							totalCount: state.getTotalRecordCount(),
+							isLoading: state.getIsLoading(),
+							currentPage: state.getCurrentPage(),
+							isFullyCached: state.isFullyCached()
+						}
+					}
+				}).then(
+					() => { /* success */ },
+					(error) => this.logger.error('Failed to send virtual table update', error)
+				);
+			});
+
 			// Re-register panel in map for new environment
 			this.reregisterPanel(ImportJobViewerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
@@ -414,10 +437,17 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 	 */
 	private clearTable(): void {
 		this.panel.webview.postMessage({
-			command: 'updateTableData',
+			command: 'updateVirtualTable',
 			data: {
-				viewModels: [],
-				columns: this.getTableConfig().columns
+				rows: [],
+				columns: this.getTableConfig().columns,
+				pagination: {
+					cachedCount: 0,
+					totalCount: 0,
+					isLoading: true,
+					currentPage: 0,
+					isFullyCached: false
+				}
 			}
 		});
 	}
