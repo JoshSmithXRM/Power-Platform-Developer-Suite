@@ -137,16 +137,16 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 		// Load environments first so they appear on initial render
 		const environments = await this.getEnvironments();
 
-		// Initialize coordinator with environments and loading state
+		// Initial render - openMaker stays enabled (only needs environmentId)
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
-			tableData: [],
-			isLoading: true
+			tableData: []
 		});
 
-		// Disable all buttons during initial load (refresh shows spinner)
+		// Disable refresh button during initial load (shows spinner)
 		await this.loadingBehavior.setLoading(true);
+		this.showTableLoading();
 
 		try {
 			// Load initial page of import jobs using cache manager

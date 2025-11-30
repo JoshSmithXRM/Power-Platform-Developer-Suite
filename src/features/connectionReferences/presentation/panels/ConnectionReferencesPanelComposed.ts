@@ -297,19 +297,19 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			}
 		}
 
-		// Show initial loading state with known solution ID
+		// Initial render - openMaker stays enabled (only needs environmentId)
 		const environments = await this.getEnvironments();
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			solutions: [],
 			currentSolutionId: this.currentSolutionId,
-			tableData: [],
-			isLoading: true
+			tableData: []
 		});
 
-		// Disable all buttons during initial load (refresh shows spinner)
+		// Disable refresh button during initial load (shows spinner)
 		await this.loadingBehavior.setLoading(true);
+		this.showTableLoading();
 
 		try {
 			// PARALLEL LOADING - Don't wait for solutions to load data!
