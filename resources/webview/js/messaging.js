@@ -213,6 +213,17 @@
 				}
 			}
 		}
+
+		if (message.command === 'setButtonLabel') {
+			const button = document.getElementById(message.buttonId);
+			if (!button) {
+				console.warn(`Button not found: ${message.buttonId}`);
+				return;
+			}
+			button.textContent = message.label;
+			// Clear any stored original content since label is explicitly changing
+			buttonOriginalContent.delete(message.buttonId);
+		}
 	});
 
 	// Initialize on DOM ready

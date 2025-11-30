@@ -33,11 +33,12 @@ import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 import { createWebResourceUri } from '../../infrastructure/providers/WebResourceFileSystemProvider';
 import { PublishBehavior } from '../../../../shared/infrastructure/ui/behaviors/PublishBehavior';
+import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 
 /**
  * Commands supported by Web Resources panel.
  */
-type WebResourcesCommands = 'refresh' | 'openMaker' | 'environmentChange' | 'solutionChange' | 'openWebResource' | 'searchServer' | 'publish' | 'publishAll' | 'rowSelect';
+type WebResourcesCommands = 'refresh' | 'openMaker' | 'environmentChange' | 'solutionChange' | 'openWebResource' | 'searchServer' | 'publish' | 'publishAll' | 'rowSelect' | 'toggleShowAll';
 
 /**
  * Web Resources panel using PanelCoordinator architecture with virtual table.
@@ -52,6 +53,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	private readonly coordinator: PanelCoordinator<WebResourcesCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
 	private readonly publishBehavior: PublishBehavior;
+	private readonly loadingBehavior: LoadingStateBehavior;
 	private readonly virtualTableConfig: VirtualTableConfig;
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
@@ -64,6 +66,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	// Row selection for publish
 	private selectedWebResourceId: string | null = null;
 	private selectedWebResourceName: string | null = null;
+
+	// Filter state: true = text-based only (default), false = show all types
+	private showTextBasedOnly: boolean = true;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -105,6 +110,17 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			panel,
 			() => this.currentEnvironmentId,
 			['publish', 'publishAll'],
+			logger
+		);
+
+		// Initialize loading behavior for all toolbar buttons
+		// Publish button stays disabled until row is selected
+		this.loadingBehavior = new LoadingStateBehavior(
+			panel,
+			LoadingStateBehavior.createButtonConfigs(
+				['openMaker', 'refresh', 'publish', 'publishAll', 'toggleShowAll'],
+				{ keepDisabledButtons: ['publish'] } // Publish requires row selection
+			),
 			logger
 		);
 
@@ -221,46 +237,56 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			isLoading: true
 		});
 
-		// Load solutions in parallel with initial data
-		const solutionsPromise = this.loadSolutions();
+		// Disable all buttons during initial load (refresh shows spinner)
+		await this.loadingBehavior.setLoading(true);
 
-		// Post-load validation: Check if persisted solution still exists
-		const solutions = await solutionsPromise;
-		let finalSolutionId = this.currentSolutionId;
-		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
-			if (!solutions.some(s => s.id === this.currentSolutionId)) {
-				this.logger.warn('Persisted solution no longer exists, falling back to default', {
-					invalidSolutionId: this.currentSolutionId
-				});
-				finalSolutionId = DEFAULT_SOLUTION_ID;
-				this.currentSolutionId = DEFAULT_SOLUTION_ID;
+		try {
+			// Load solutions in parallel with initial data
+			const solutionsPromise = this.loadSolutions();
 
-				// Save corrected state
-				if (this.panelStateRepository) {
-					await this.panelStateRepository.save(
-						{ panelType: 'webResources', environmentId: this.currentEnvironmentId },
-						{ selectedSolutionId: DEFAULT_SOLUTION_ID, lastUpdated: new Date().toISOString() }
-					);
+			// Post-load validation: Check if persisted solution still exists
+			const solutions = await solutionsPromise;
+			let finalSolutionId = this.currentSolutionId;
+			if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+				if (!solutions.some(s => s.id === this.currentSolutionId)) {
+					this.logger.warn('Persisted solution no longer exists, falling back to default', {
+						invalidSolutionId: this.currentSolutionId
+					});
+					finalSolutionId = DEFAULT_SOLUTION_ID;
+					this.currentSolutionId = DEFAULT_SOLUTION_ID;
+
+					// Save corrected state
+					if (this.panelStateRepository) {
+						await this.panelStateRepository.save(
+							{ panelType: 'webResources', environmentId: this.currentEnvironmentId },
+							{ selectedSolutionId: DEFAULT_SOLUTION_ID, lastUpdated: new Date().toISOString() }
+						);
+					}
 				}
 			}
+
+			// Load web resources for the selected solution
+			this.logger.debug('Loading web resources', { solutionId: finalSolutionId, textBasedOnly: this.showTextBasedOnly });
+			const webResources = await this.listWebResourcesUseCase.execute(
+				this.currentEnvironmentId,
+				finalSolutionId,
+				undefined,
+				{ textBasedOnly: this.showTextBasedOnly }
+			);
+			const viewModels = this.viewModelMapper.toViewModels(webResources);
+
+			// Final render with solutions and data
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				solutions,
+				currentSolutionId: finalSolutionId,
+				tableData: viewModels
+			});
+		} finally {
+			// Re-enable buttons after load completes (publish stays disabled until row selected)
+			await this.loadingBehavior.setLoading(false);
 		}
-
-		// Load web resources for the selected solution
-		this.logger.debug('Loading web resources', { solutionId: finalSolutionId });
-		const webResources = await this.listWebResourcesUseCase.execute(
-			this.currentEnvironmentId,
-			finalSolutionId
-		);
-		const viewModels = this.viewModelMapper.toViewModels(webResources);
-
-		// Final render with solutions and data
-		await this.scaffoldingBehavior.refresh({
-			environments,
-			currentEnvironmentId: this.currentEnvironmentId,
-			solutions,
-			currentSolutionId: finalSolutionId,
-			tableData: viewModels
-		});
 	}
 
 	private createCoordinator(): { coordinator: PanelCoordinator<WebResourcesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
@@ -270,12 +296,14 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		const solutionFilter = new SolutionFilterSection();
 		const tableSection = new VirtualDataTableSection(config);
 		// Note: Button IDs must match command names registered in registerCommandHandlers()
+		// Order: Open in Maker, Refresh, publish actions, then Show All toggle
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
+				{ id: 'openMaker', label: 'Open in Maker' },
+				{ id: 'refresh', label: 'Refresh' },
 				{ id: 'publish', label: 'Publish', disabled: true },
 				{ id: 'publishAll', label: 'Publish All' },
-				{ id: 'openMaker', label: 'Open in Maker' },
-				{ id: 'refresh', label: 'Refresh' }
+				{ id: 'toggleShowAll', label: 'Show All' }
 			]
 		}, SectionPosition.Toolbar);
 
@@ -386,6 +414,11 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.coordinator.registerHandler('publishAll', async () => {
 			await this.handlePublishAll();
 		});
+
+		// Toggle between text-based only and all types
+		this.coordinator.registerHandler('toggleShowAll', async () => {
+			await this.handleToggleShowAll();
+		});
 	}
 
 	private getTableConfig(): DataTableConfig {
@@ -399,7 +432,8 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				{ key: 'name', label: 'Name' },
 				{ key: 'displayName', label: 'Display Name' },
 				{ key: 'type', label: 'Type' },
-				{ key: 'modifiedOn', label: 'Modified On' }
+				{ key: 'createdOn', label: 'Created On', type: 'datetime' },
+				{ key: 'modifiedOn', label: 'Modified On', type: 'datetime' }
 			],
 			searchPlaceholder: '🔍 Search web resources...',
 			noDataMessage: 'No web resources found.',
@@ -418,15 +452,17 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	}
 
 	private async handleRefresh(): Promise<void> {
-		this.logger.debug('Refreshing web resources', { solutionId: this.currentSolutionId });
+		this.logger.debug('Refreshing web resources', { solutionId: this.currentSolutionId, textBasedOnly: this.showTextBasedOnly });
 
-		this.setButtonLoading('refresh', true);
+		await this.loadingBehavior.setButtonLoading('refresh', true);
 		this.showTableLoading();
 
 		try {
 			const webResources = await this.listWebResourcesUseCase.execute(
 				this.currentEnvironmentId,
-				this.currentSolutionId
+				this.currentSolutionId,
+				undefined,
+				{ textBasedOnly: this.showTextBasedOnly }
 			);
 
 			const viewModels = this.viewModelMapper.toViewModels(webResources);
@@ -452,7 +488,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh web resources: ${errorMessage}`);
 		} finally {
-			this.setButtonLoading('refresh', false);
+			await this.loadingBehavior.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -537,15 +573,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 					isFullyCached: false
 				}
 			}
-		});
-	}
-
-	private setButtonLoading(buttonId: string, isLoading: boolean): void {
-		this.panel.webview.postMessage({
-			command: 'setButtonState',
-			buttonId,
-			disabled: isLoading,
-			showSpinner: isLoading,
 		});
 	}
 
@@ -651,6 +678,26 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			async () => this.publishWebResourceUseCase.executeAll(this.currentEnvironmentId),
 			'All customizations published successfully'
 		);
+	}
+
+	/**
+	 * Toggles between showing text-based types only and all types.
+	 */
+	private async handleToggleShowAll(): Promise<void> {
+		this.showTextBasedOnly = !this.showTextBasedOnly;
+		const newLabel = this.showTextBasedOnly ? 'Show All' : 'Text Only';
+
+		this.logger.debug('Toggle show all types', { showTextBasedOnly: this.showTextBasedOnly });
+
+		// Update button label
+		await this.panel.webview.postMessage({
+			command: 'setButtonLabel',
+			buttonId: 'toggleShowAll',
+			label: newLabel
+		});
+
+		// Reload data with new filter setting
+		await this.handleRefresh();
 	}
 
 	/**

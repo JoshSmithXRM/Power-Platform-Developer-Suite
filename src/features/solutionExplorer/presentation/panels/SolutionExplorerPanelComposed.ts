@@ -19,6 +19,7 @@ import type { Solution } from '../../domain/entities/Solution';
 import { SolutionDataProviderAdapter } from '../../infrastructure/adapters/SolutionDataProviderAdapter';
 import type { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 
 /**
  * Commands supported by Solution Explorer panel.
@@ -36,6 +37,7 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 
 	private readonly coordinator: PanelCoordinator<SolutionExplorerCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private readonly loadingBehavior: LoadingStateBehavior;
 	private readonly virtualTableConfig: VirtualTableConfig;
 	private currentEnvironmentId: string;
 	private cacheManager: VirtualTableCacheManager<Solution>;
@@ -71,6 +73,13 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
+
+		// Initialize loading behavior for toolbar buttons
+		this.loadingBehavior = new LoadingStateBehavior(
+			panel,
+			LoadingStateBehavior.createButtonConfigs(['openMaker', 'refresh']),
+			logger
+		);
 
 		this.registerCommandHandlers();
 
@@ -130,33 +139,41 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 			isLoading: true
 		});
 
-		// Load initial page of solutions using cache manager
-		const result = await this.cacheManager.loadInitialPage();
-		const cacheState = this.cacheManager.getCacheState();
+		// Disable all buttons during initial load (refresh shows spinner)
+		await this.loadingBehavior.setLoading(true);
 
-		// Map to ViewModels and sort
-		const viewModels = result.getItems()
-			.map(s => this.viewModelMapper.toViewModel(s))
-			.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName));
+		try {
+			// Load initial page of solutions using cache manager
+			const result = await this.cacheManager.loadInitialPage();
+			const cacheState = this.cacheManager.getCacheState();
 
-		this.logger.info('Solutions loaded with virtual table', {
-			initialCount: viewModels.length,
-			totalCount: cacheState.getTotalRecordCount()
-		});
+			// Map to ViewModels and sort
+			const viewModels = result.getItems()
+				.map(s => this.viewModelMapper.toViewModel(s))
+				.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName));
 
-		// Re-render with actual data and pagination state
-		await this.scaffoldingBehavior.refresh({
-			environments,
-			currentEnvironmentId: this.currentEnvironmentId,
-			tableData: viewModels,
-			pagination: {
-				cachedCount: cacheState.getCachedRecordCount(),
-				totalCount: cacheState.getTotalRecordCount(),
-				isLoading: cacheState.getIsLoading(),
-				currentPage: cacheState.getCurrentPage(),
-				isFullyCached: cacheState.isFullyCached()
-			}
-		});
+			this.logger.info('Solutions loaded with virtual table', {
+				initialCount: viewModels.length,
+				totalCount: cacheState.getTotalRecordCount()
+			});
+
+			// Re-render with actual data and pagination state
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				tableData: viewModels,
+				pagination: {
+					cachedCount: cacheState.getCachedRecordCount(),
+					totalCount: cacheState.getTotalRecordCount(),
+					isLoading: cacheState.getIsLoading(),
+					currentPage: cacheState.getCurrentPage(),
+					isFullyCached: cacheState.isFullyCached()
+				}
+			});
+		} finally {
+			// Re-enable buttons after load completes
+			await this.loadingBehavior.setLoading(false);
+		}
 
 		// Set up callback to update UI during background loading
 		this.cacheManager.onStateChange((state, cachedRecords) => {
@@ -310,7 +327,7 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing solutions with virtual table');
 
-		this.setButtonLoading('refresh', true);
+		await this.loadingBehavior.setButtonLoading('refresh', true);
 		this.showTableLoading();
 
 		try {
@@ -352,7 +369,7 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh solutions: ${errorMessage}`);
 		} finally {
-			this.setButtonLoading('refresh', false);
+			await this.loadingBehavior.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -420,12 +437,4 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 		});
 	}
 
-	private setButtonLoading(buttonId: string, isLoading: boolean): void {
-		this.panel.webview.postMessage({
-			command: 'setButtonState',
-			buttonId,
-			disabled: isLoading,
-			showSpinner: isLoading,
-		});
-	}
 }

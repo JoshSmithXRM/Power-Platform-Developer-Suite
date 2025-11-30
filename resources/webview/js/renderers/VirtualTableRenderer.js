@@ -36,6 +36,12 @@
 		lastSearchQuery: ''
 	};
 
+	// Sorting state
+	let sortState = {
+		column: null,
+		direction: 'asc'
+	};
+
 	/**
 	 * Calculates how many visible rows fit in the container's data viewport.
 	 * Accounts for sticky header taking space in the viewport.
@@ -96,6 +102,9 @@
 
 		// Set up row selection handling
 		setupRowSelectionHandler(tbody);
+
+		// Set up column sorting
+		setupSortingHandler();
 
 		// Calculate visible range based on container height
 		const visibleCount = calculateVisibleRowCount(scrollContainer);
@@ -626,6 +635,117 @@
 		rows.forEach((row, index) => {
 			row.classList.remove('row-even', 'row-odd');
 			row.classList.add(index % 2 === 0 ? 'row-even' : 'row-odd');
+		});
+	}
+
+	/**
+	 * Sets up column header click handlers for sorting.
+	 */
+	function setupSortingHandler() {
+		const table = document.querySelector('.virtual-table');
+		if (!table) {
+			return;
+		}
+
+		const headers = table.querySelectorAll('th[data-sort]');
+		headers.forEach(header => {
+			header.style.cursor = 'pointer';
+			header.addEventListener('click', () => {
+				const column = header.getAttribute('data-sort');
+
+				// Toggle direction if same column, reset to asc if different
+				if (sortState.column === column) {
+					sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+				} else {
+					sortState.column = column;
+					sortState.direction = 'asc';
+				}
+
+				sortRows(column, sortState.direction);
+				updateSortIndicators(table, column, sortState.direction);
+			});
+		});
+	}
+
+	/**
+	 * Sorts the filtered rows by the specified column.
+	 *
+	 * @param {string} column - Column key to sort by
+	 * @param {string} direction - Sort direction ('asc' or 'desc')
+	 */
+	function sortRows(column, direction) {
+		// Find column config to get type
+		const colConfig = columns.find(c => c.key === column);
+		const columnType = colConfig?.type || 'text';
+
+		filteredRows.sort((a, b) => {
+			// Use sort value if available (for dates/numbers)
+			const aSortValue = a[column + 'SortValue'];
+			const bSortValue = b[column + 'SortValue'];
+
+			let aVal, bVal;
+			if (aSortValue !== undefined && bSortValue !== undefined) {
+				aVal = aSortValue;
+				bVal = bSortValue;
+			} else {
+				aVal = a[column];
+				bVal = b[column];
+			}
+
+			// Handle null/undefined
+			if (aVal == null && bVal == null) return 0;
+			if (aVal == null) return 1;
+			if (bVal == null) return -1;
+
+			let comparison;
+			if (columnType === 'datetime' || columnType === 'date') {
+				// Numeric comparison for dates (sort values are timestamps)
+				const aTime = typeof aVal === 'number' ? aVal : new Date(aVal).getTime();
+				const bTime = typeof bVal === 'number' ? bVal : new Date(bVal).getTime();
+				comparison = aTime - bTime;
+			} else if (columnType === 'numeric') {
+				comparison = Number(aVal) - Number(bVal);
+			} else {
+				// Text comparison
+				comparison = String(aVal).localeCompare(String(bVal));
+			}
+
+			return direction === 'asc' ? comparison : -comparison;
+		});
+
+		// Re-render with sorted data
+		const tbody = document.getElementById('virtualTableBody');
+		const scrollWrapper = document.getElementById('virtualScrollWrapper');
+		const scrollContainer = scrollWrapper || tbody;
+
+		if (tbody) {
+			// Reset to top after sort
+			scrollContainer.scrollTop = 0;
+			const visibleCount = calculateVisibleRowCount(scrollContainer);
+			visibleStart = 0;
+			visibleEnd = Math.min(filteredRows.length, visibleCount + OVERSCAN_COUNT * 2);
+			renderVisibleRows(tbody);
+		}
+	}
+
+	/**
+	 * Updates sort indicator arrows in column headers.
+	 *
+	 * @param {HTMLElement} table - The table element
+	 * @param {string} activeColumn - Currently sorted column
+	 * @param {string} direction - Sort direction
+	 */
+	function updateSortIndicators(table, activeColumn, direction) {
+		const headers = table.querySelectorAll('th[data-sort]');
+		headers.forEach(header => {
+			const column = header.getAttribute('data-sort');
+			// Remove existing indicator
+			header.textContent = header.textContent.replace(/ [▲▼]$/, '');
+
+			// Add indicator to active column
+			if (column === activeColumn) {
+				header.textContent += direction === 'asc' ? ' ▲' : ' ▼';
+			}
 		});
 	}
 

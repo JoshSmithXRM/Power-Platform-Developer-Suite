@@ -19,30 +19,39 @@ export class WebResourceViewModelMapper {
 	public toViewModel(webResource: WebResource): WebResourceViewModel {
 		const name = webResource.name.getValue();
 		const typeCode = webResource.webResourceType.getCode();
+		const canEdit = webResource.canEdit();
 
-		// Structured link data for virtual table renderer
-		// data-* attributes are collected by wireDataCommands in messaging.js
-		const nameLink: CellLink = {
-			command: 'openWebResource',
-			commandData: {
-				id: webResource.id,
-				name: name,
-				'type-code': String(typeCode)
-			},
-			className: 'clickable-link'
-		};
-
-		return {
+		// Base view model without optional nameLink
+		const baseViewModel = {
 			id: webResource.id,
 			name,
-			nameLink,
 			displayName: webResource.displayName || name,
 			type: WebResourceTypeFormatter.formatDisplayName(webResource.webResourceType),
 			typeCode,
+			createdOn: DateFormatter.formatDate(webResource.createdOn),
+			createdOnSortValue: webResource.createdOn.getTime(),
 			modifiedOn: DateFormatter.formatDate(webResource.modifiedOn),
+			modifiedOnSortValue: webResource.modifiedOn.getTime(),
 			isManaged: webResource.isManaged,
-			isEditable: webResource.canEdit()
+			isEditable: canEdit
 		};
+
+		// Only add nameLink for editable resources (text-based, not managed)
+		// Non-editable resources (images, managed) display as plain text since clicking would fail
+		if (canEdit) {
+			const nameLink: CellLink = {
+				command: 'openWebResource',
+				commandData: {
+					id: webResource.id,
+					name: name,
+					'type-code': String(typeCode)
+				},
+				className: 'clickable-link'
+			};
+			return { ...baseViewModel, nameLink };
+		}
+
+		return baseViewModel;
 	}
 
 	/**

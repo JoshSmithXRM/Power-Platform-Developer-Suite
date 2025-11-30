@@ -27,6 +27,7 @@ import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
 import type { HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
+import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 
 /**
  * Commands that the Connection References panel can receive from the webview.
@@ -44,6 +45,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 
 	private coordinator!: PanelCoordinator<ConnectionReferencesCommands>;
 	private scaffoldingBehavior!: HtmlScaffoldingBehavior;
+	private loadingBehavior!: LoadingStateBehavior;
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
 	private connectionReferences: ConnectionReference[] = [];
@@ -77,6 +79,13 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		const { coordinator, scaffoldingBehavior } = this.createCoordinator();
 		this.coordinator = coordinator;
 		this.scaffoldingBehavior = scaffoldingBehavior;
+
+		// Initialize loading behavior for toolbar buttons
+		this.loadingBehavior = new LoadingStateBehavior(
+			panel,
+			LoadingStateBehavior.createButtonConfigs(['openMaker', 'refresh', 'syncDeploymentSettings']),
+			logger
+		);
 
 		this.registerPanelCommands();
 
@@ -298,40 +307,48 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			isLoading: true
 		});
 
-		// PARALLEL LOADING - Don't wait for solutions to load data!
-		const [solutions, data] = await Promise.all([
-			this.loadSolutions(),
-			this.loadData()
-		]);
+		// Disable all buttons during initial load (refresh shows spinner)
+		await this.loadingBehavior.setLoading(true);
 
-		// Post-load validation: Check if persisted solution still exists
-		let finalSolutionId = this.currentSolutionId;
-		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
-			if (!solutions.some(s => s.id === this.currentSolutionId)) {
-				this.logger.warn('Persisted solution no longer exists, falling back to default', {
-					invalidSolutionId: this.currentSolutionId
-				});
-				finalSolutionId = DEFAULT_SOLUTION_ID;
-				this.currentSolutionId = DEFAULT_SOLUTION_ID;
+		try {
+			// PARALLEL LOADING - Don't wait for solutions to load data!
+			const [solutions, data] = await Promise.all([
+				this.loadSolutions(),
+				this.loadData()
+			]);
 
-				// Save corrected state
-				if (this.panelStateRepository) {
-					await this.panelStateRepository.save(
-						{ panelType: 'connectionReferences', environmentId: this.currentEnvironmentId },
-						{ selectedSolutionId: DEFAULT_SOLUTION_ID, lastUpdated: new Date().toISOString() }
-					);
+			// Post-load validation: Check if persisted solution still exists
+			let finalSolutionId = this.currentSolutionId;
+			if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+				if (!solutions.some(s => s.id === this.currentSolutionId)) {
+					this.logger.warn('Persisted solution no longer exists, falling back to default', {
+						invalidSolutionId: this.currentSolutionId
+					});
+					finalSolutionId = DEFAULT_SOLUTION_ID;
+					this.currentSolutionId = DEFAULT_SOLUTION_ID;
+
+					// Save corrected state
+					if (this.panelStateRepository) {
+						await this.panelStateRepository.save(
+							{ panelType: 'connectionReferences', environmentId: this.currentEnvironmentId },
+							{ selectedSolutionId: DEFAULT_SOLUTION_ID, lastUpdated: new Date().toISOString() }
+						);
+					}
 				}
 			}
-		}
 
-		// Final render with both solutions and data
-		await this.scaffoldingBehavior.refresh({
-			environments,
-			currentEnvironmentId: this.currentEnvironmentId,
-			solutions,
-			currentSolutionId: finalSolutionId,
-			tableData: data
-		});
+			// Final render with both solutions and data
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				solutions,
+				currentSolutionId: finalSolutionId,
+				tableData: data
+			});
+		} finally {
+			// Re-enable buttons after load completes
+			await this.loadingBehavior.setLoading(false);
+		}
 	}
 
 	private async render(): Promise<void> {
@@ -406,13 +423,13 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	}
 
 	private async handleRefresh(): Promise<void> {
-		this.setButtonLoading('refresh', true);
+		await this.loadingBehavior.setButtonLoading('refresh', true);
 		this.showTableLoading();
 
 		try {
 			await this.render();
 		} finally {
-			this.setButtonLoading('refresh', false);
+			await this.loadingBehavior.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -556,16 +573,4 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		});
 	}
 
-	/**
-	 * Sets button loading state via webview message.
-	 * Disables button and shows spinner during async operations.
-	 */
-	private setButtonLoading(buttonId: string, isLoading: boolean): void {
-		this.panel.webview.postMessage({
-			command: 'setButtonState',
-			buttonId,
-			disabled: isLoading,
-			showSpinner: isLoading,
-		});
-	}
 }

@@ -21,6 +21,7 @@ export class WebResource {
 		public readonly displayName: string,
 		public readonly webResourceType: WebResourceType,
 		public readonly isManaged: boolean,
+		public readonly createdOn: Date,
 		public readonly modifiedOn: Date
 	) {}
 

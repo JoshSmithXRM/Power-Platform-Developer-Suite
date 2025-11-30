@@ -234,6 +234,10 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.executeCommand('workbench.action.openSettings', 'powerPlatformDevSuite');
 	});
 
+	const showOutputCommand = vscode.commands.registerCommand('power-platform-dev-suite.showOutput', () => {
+		container.outputChannel.show();
+	});
+
 	// Subscribe to domain events
 	container.eventPublisher.subscribe(EnvironmentCreated, () => environmentsProvider.refresh());
 	container.eventPublisher.subscribe(EnvironmentUpdated, () => environmentsProvider.refresh());
@@ -485,6 +489,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		openDynamicsCommand,
 		refreshEnvironmentsCommand,
 		openSettingsCommand,
+		showOutputCommand,
 		container.eventPublisher
 	);
 

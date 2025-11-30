@@ -22,6 +22,7 @@ import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
+import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 
 /**
  * Commands supported by Environment Variables panel.
@@ -39,6 +40,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 
 	private readonly coordinator: PanelCoordinator<EnvironmentVariablesCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private readonly loadingBehavior: LoadingStateBehavior;
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
 	private solutionOptions: SolutionOption[] = [];
@@ -70,6 +72,13 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
+
+		// Initialize loading behavior for toolbar buttons
+		this.loadingBehavior = new LoadingStateBehavior(
+			panel,
+			LoadingStateBehavior.createButtonConfigs(['openMaker', 'refresh', 'syncDeploymentSettings']),
+			logger
+		);
 
 		this.registerCommandHandlers();
 
@@ -146,47 +155,55 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 			isLoading: true
 		});
 
-		// PARALLEL LOADING - Don't wait for solutions to load data!
-		const [solutions, environmentVariables] = await Promise.all([
-			this.loadSolutions(),
-			this.listEnvVarsUseCase.execute(
-				this.currentEnvironmentId,
-				this.currentSolutionId
-			)
-		]);
+		// Disable all buttons during initial load (refresh shows spinner)
+		await this.loadingBehavior.setLoading(true);
 
-		// Post-load validation: Check if persisted solution still exists
-		let finalSolutionId = this.currentSolutionId;
-		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
-			if (!solutions.some(s => s.id === this.currentSolutionId)) {
-				this.logger.warn('Persisted solution no longer exists, falling back to default', {
-					invalidSolutionId: this.currentSolutionId
-				});
-				finalSolutionId = DEFAULT_SOLUTION_ID;
-				this.currentSolutionId = DEFAULT_SOLUTION_ID;
+		try {
+			// PARALLEL LOADING - Don't wait for solutions to load data!
+			const [solutions, environmentVariables] = await Promise.all([
+				this.loadSolutions(),
+				this.listEnvVarsUseCase.execute(
+					this.currentEnvironmentId,
+					this.currentSolutionId
+				)
+			]);
 
-				// Save corrected state
-				if (this.panelStateRepository) {
-					await this.panelStateRepository.save(
-						{ panelType: 'environmentVariables', environmentId: this.currentEnvironmentId },
-						{ selectedSolutionId: DEFAULT_SOLUTION_ID, lastUpdated: new Date().toISOString() }
-					);
+			// Post-load validation: Check if persisted solution still exists
+			let finalSolutionId = this.currentSolutionId;
+			if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+				if (!solutions.some(s => s.id === this.currentSolutionId)) {
+					this.logger.warn('Persisted solution no longer exists, falling back to default', {
+						invalidSolutionId: this.currentSolutionId
+					});
+					finalSolutionId = DEFAULT_SOLUTION_ID;
+					this.currentSolutionId = DEFAULT_SOLUTION_ID;
+
+					// Save corrected state
+					if (this.panelStateRepository) {
+						await this.panelStateRepository.save(
+							{ panelType: 'environmentVariables', environmentId: this.currentEnvironmentId },
+							{ selectedSolutionId: DEFAULT_SOLUTION_ID, lastUpdated: new Date().toISOString() }
+						);
+					}
 				}
 			}
+
+			const viewModels = environmentVariables
+				.map(envVar => this.viewModelMapper.toViewModel(envVar))
+				.sort((a, b) => a.schemaName.localeCompare(b.schemaName));
+
+			// Final render with both solutions and data
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				solutions,
+				currentSolutionId: finalSolutionId,
+				tableData: viewModels
+			});
+		} finally {
+			// Re-enable buttons after load completes
+			await this.loadingBehavior.setLoading(false);
 		}
-
-		const viewModels = environmentVariables
-			.map(envVar => this.viewModelMapper.toViewModel(envVar))
-			.sort((a, b) => a.schemaName.localeCompare(b.schemaName));
-
-		// Final render with both solutions and data
-		await this.scaffoldingBehavior.refresh({
-			environments,
-			currentEnvironmentId: this.currentEnvironmentId,
-			solutions,
-			currentSolutionId: finalSolutionId,
-			tableData: viewModels
-		});
 	}
 
 	private createCoordinator(): { coordinator: PanelCoordinator<EnvironmentVariablesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
@@ -329,7 +346,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing environment variables');
 
-		this.setButtonLoading('refresh', true);
+		await this.loadingBehavior.setButtonLoading('refresh', true);
 		this.showTableLoading();
 
 		try {
@@ -361,7 +378,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh environment variables: ${errorMessage}`);
 		} finally {
-			this.setButtonLoading('refresh', false);
+			await this.loadingBehavior.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -481,12 +498,4 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		});
 	}
 
-	private setButtonLoading(buttonId: string, isLoading: boolean): void {
-		this.panel.webview.postMessage({
-			command: 'setButtonState',
-			buttonId,
-			disabled: isLoading,
-			showSpinner: isLoading,
-		});
-	}
 }

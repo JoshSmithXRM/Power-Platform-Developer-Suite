@@ -16,6 +16,7 @@ describe('WebResourceViewModelMapper', () => {
 		displayName?: string;
 		type?: WebResourceType;
 		isManaged?: boolean;
+		createdOn?: Date;
 		modifiedOn?: Date;
 	} = {}): WebResource {
 		return new WebResource(
@@ -24,6 +25,7 @@ describe('WebResourceViewModelMapper', () => {
 			overrides.displayName ?? 'Test Script',
 			overrides.type ?? WebResourceType.JAVASCRIPT,
 			overrides.isManaged ?? false,
+			overrides.createdOn ?? new Date('2024-01-01T08:00:00Z'),
 			overrides.modifiedOn ?? new Date('2024-01-15T10:30:00Z')
 		);
 	}
@@ -296,6 +298,74 @@ describe('WebResourceViewModelMapper', () => {
 
 			// Assert
 			expect(viewModel.isEditable).toBe(false);
+		});
+
+		it('should include nameLink for editable text-based resource', () => {
+			// Arrange
+			const webResource = createTestWebResource({
+				id: 'wr-123',
+				name: 'new_script.js',
+				type: WebResourceType.JAVASCRIPT,
+				isManaged: false
+			});
+
+			// Act
+			const viewModel = mapper.toViewModel(webResource);
+
+			// Assert
+			expect(viewModel.nameLink).toBeDefined();
+			expect(viewModel.nameLink!.command).toBe('openWebResource');
+			expect(viewModel.nameLink!.commandData).toEqual({
+				id: 'wr-123',
+				name: 'new_script.js',
+				'type-code': '3'
+			});
+			expect(viewModel.nameLink!.className).toBe('clickable-link');
+		});
+
+		it('should not include nameLink for managed resource', () => {
+			// Arrange
+			const webResource = createTestWebResource({
+				type: WebResourceType.JAVASCRIPT,
+				isManaged: true
+			});
+
+			// Act
+			const viewModel = mapper.toViewModel(webResource);
+
+			// Assert
+			expect(viewModel.nameLink).toBeUndefined();
+		});
+
+		it('should not include nameLink for image resource', () => {
+			// Arrange
+			const webResource = createTestWebResource({
+				type: WebResourceType.PNG,
+				isManaged: false
+			});
+
+			// Act
+			const viewModel = mapper.toViewModel(webResource);
+
+			// Assert
+			expect(viewModel.nameLink).toBeUndefined();
+		});
+
+		it('should include nameLink for SVG (text-based image)', () => {
+			// Arrange - SVG is technically an image but is text-based XML so can be edited
+			const webResource = createTestWebResource({
+				id: 'svg-123',
+				name: 'new_icon.svg',
+				type: WebResourceType.SVG,
+				isManaged: false
+			});
+
+			// Act
+			const viewModel = mapper.toViewModel(webResource);
+
+			// Assert
+			expect(viewModel.nameLink).toBeDefined();
+			expect(viewModel.nameLink!.command).toBe('openWebResource');
 		});
 	});
 

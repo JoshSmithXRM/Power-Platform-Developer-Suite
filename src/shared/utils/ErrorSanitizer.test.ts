@@ -19,13 +19,13 @@ describe('ErrorSanitizer', () => {
             expect(result).not.toContain('xyz789');
         });
 
-        it('should remove GUIDs from error messages', () => {
+        it('should preserve GUIDs in error messages (useful for debugging)', () => {
             const error = new Error('Entity 12345678-1234-1234-1234-123456789012 not found in environment f0a1b2c3-d4e5-f6a7-b8c9-d0e1f2a3b4c5');
             const result = ErrorSanitizer.sanitize(error);
 
-            expect(result).toBe('Entity [REDACTED] not found in environment [REDACTED]');
-            expect(result).not.toContain('12345678-1234-1234-1234-123456789012');
-            expect(result).not.toContain('f0a1b2c3-d4e5-f6a7-b8c9-d0e1f2a3b4c5');
+            // GUIDs are intentionally NOT redacted - they're useful for debugging
+            expect(result).toContain('12345678-1234-1234-1234-123456789012');
+            expect(result).toContain('f0a1b2c3-d4e5-f6a7-b8c9-d0e1f2a3b4c5');
         });
 
         it('should remove Windows file paths from error messages', () => {
@@ -80,10 +80,11 @@ describe('ErrorSanitizer', () => {
             expect(result).toContain('...');
         });
 
-        it('should handle string errors', () => {
+        it('should handle string errors and preserve GUIDs', () => {
             const result = ErrorSanitizer.sanitize('Simple error with GUID 12345678-1234-1234-1234-123456789012');
 
-            expect(result).toBe('Simple error with GUID [REDACTED]');
+            // GUIDs preserved for debugging
+            expect(result).toBe('Simple error with GUID 12345678-1234-1234-1234-123456789012');
         });
 
         it('should handle error objects with message property', () => {
@@ -103,16 +104,16 @@ describe('ErrorSanitizer', () => {
             expect(ErrorSanitizer.sanitize(new Error(''))).toBe('An unexpected error occurred');
         });
 
-        it('should handle errors with multiple sensitive patterns', () => {
+        it('should handle errors with multiple sensitive patterns but preserve GUIDs', () => {
             const error = new Error(
                 'API failed at /usr/local/app with Bearer abc123 for org 12345678-1234-1234-1234-123456789012 password=secret123'
             );
             const result = ErrorSanitizer.sanitize(error);
 
-            expect(result).toBe('API failed at [REDACTED] with [REDACTED] for org [REDACTED] [REDACTED]');
+            // GUIDs preserved, other sensitive data redacted
+            expect(result).toContain('12345678-1234-1234-1234-123456789012');
             expect(result).not.toContain('Bearer');
             expect(result).not.toContain('abc123');
-            expect(result).not.toContain('12345678');
             expect(result).not.toContain('secret123');
             expect(result).not.toContain('/usr/local');
         });

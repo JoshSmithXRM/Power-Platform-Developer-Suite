@@ -11,6 +11,7 @@ describe('WebResource', () => {
 		displayName: string;
 		webResourceType: WebResourceType;
 		isManaged: boolean;
+		createdOn: Date;
 		modifiedOn: Date;
 	}> = {}): WebResource {
 		return new WebResource(
@@ -19,6 +20,7 @@ describe('WebResource', () => {
 			overrides.displayName ?? 'Test Script',
 			overrides.webResourceType ?? WebResourceType.JAVASCRIPT,
 			overrides.isManaged ?? false,
+			overrides.createdOn ?? new Date('2024-01-01T08:00:00Z'),
 			overrides.modifiedOn ?? new Date('2024-01-15T10:30:00Z')
 		);
 	}
@@ -33,6 +35,7 @@ describe('WebResource', () => {
 			const displayName = 'Contoso Script';
 			const type = WebResourceType.JAVASCRIPT;
 			const isManaged = false;
+			const createdOn = new Date('2024-01-01T08:00:00Z');
 			const modifiedOn = new Date('2024-01-15T10:30:00Z');
 
 			// Act
@@ -42,6 +45,7 @@ describe('WebResource', () => {
 				displayName,
 				type,
 				isManaged,
+				createdOn,
 				modifiedOn
 			);
 
@@ -51,6 +55,7 @@ describe('WebResource', () => {
 			expect(resource.displayName).toBe(displayName);
 			expect(resource.webResourceType).toBe(type);
 			expect(resource.isManaged).toBe(isManaged);
+			expect(resource.createdOn).toBe(createdOn);
 			expect(resource.modifiedOn).toBe(modifiedOn);
 		});
 

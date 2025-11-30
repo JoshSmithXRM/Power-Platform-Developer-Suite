@@ -5,6 +5,11 @@ import type { UpdateWebResourceUseCase } from '../../application/useCases/Update
 import type { PublishWebResourceUseCase } from '../../application/useCases/PublishWebResourceUseCase';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { ManagedWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
+import { PublishCoordinator } from '../../../../shared/infrastructure/coordination/PublishCoordinator';
+import {
+	isPublishInProgressError,
+	getPublishInProgressMessage
+} from '../../../../shared/infrastructure/errors/PublishInProgressError';
 
 /**
  * URI scheme for web resources.
@@ -177,6 +182,17 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			throw vscode.FileSystemError.NoPermissions('Web resource editing is not available');
 		}
 
+		// Check if content has actually changed (prevents unnecessary writes from auto-save)
+		const cacheKey = `${parsed.environmentId}:${parsed.webResourceId}`;
+		const cached = this.contentCache.get(cacheKey);
+		if (cached !== undefined && this.contentEquals(cached.content, content)) {
+			this.logger.debug('WebResourceFileSystemProvider writeFile skipped - no changes', {
+				uri: uri.toString(),
+				webResourceId: parsed.webResourceId
+			});
+			return;
+		}
+
 		this.logger.debug('WebResourceFileSystemProvider writeFile', {
 			uri: uri.toString(),
 			environmentId: parsed.environmentId,
@@ -241,8 +257,25 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	/**
+	 * Compares two Uint8Array buffers for equality.
+	 * Used to detect if content has actually changed before writing.
+	 */
+	private contentEquals(a: Uint8Array, b: Uint8Array): boolean {
+		if (a.length !== b.length) {
+			return false;
+		}
+		for (let i = 0; i < a.length; i++) {
+			if (a[i] !== b[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
 	 * Shows a notification after save with a Publish action button.
 	 * When clicked, publishes the web resource to make changes visible.
+	 * Coordinates with PublishCoordinator to prevent concurrent publishes.
 	 */
 	private showPublishNotification(
 		environmentId: string,
@@ -262,13 +295,29 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			'Publish'
 		).then(async (selection) => {
 			if (selection === 'Publish') {
+				// Check if already publishing in this environment
+				if (PublishCoordinator.isPublishing(environmentId)) {
+					vscode.window.showWarningMessage(
+						'A publish operation is already in progress. Please wait for it to complete.'
+					);
+					return;
+				}
+
+				// Notify coordinator and execute
+				PublishCoordinator.notifyPublishStarted(environmentId);
 				try {
 					await publishUseCase.execute(environmentId, webResourceId);
 					vscode.window.showInformationMessage(`Published: ${filename}`);
 				} catch (error) {
-					this.logger.error('Failed to publish web resource', error);
-					const message = error instanceof Error ? error.message : 'Unknown error';
-					vscode.window.showErrorMessage(`Failed to publish: ${message}`);
+					if (isPublishInProgressError(error)) {
+						vscode.window.showWarningMessage(getPublishInProgressMessage());
+					} else {
+						this.logger.error('Failed to publish web resource', error);
+						const message = error instanceof Error ? error.message : 'Unknown error';
+						vscode.window.showErrorMessage(`Failed to publish: ${message}`);
+					}
+				} finally {
+					PublishCoordinator.notifyPublishCompleted(environmentId);
 				}
 			}
 		});

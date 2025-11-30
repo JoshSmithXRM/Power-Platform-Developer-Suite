@@ -73,6 +73,20 @@ tbody tr:hover {
 	background: var(--vscode-list-hoverBackground);
 }
 
+/* Selected row state (virtual table row selection for publish, etc.) */
+tbody tr.row-selected {
+	background: var(--vscode-list-activeSelectionBackground) !important;
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+tbody tr.row-selected td {
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+tbody tr.row-selected a {
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
 /* Link styling within tables */
 .solution-link,
 .table-link,

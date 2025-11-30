@@ -6,11 +6,13 @@
  *
  * Security Concerns Addressed:
  * - OAuth/Bearer tokens in error responses
- * - Environment/tenant/organization GUIDs
  * - File system paths (Windows and Unix)
  * - Passwords and API keys in query strings
  * - Stack trace information
  * - Raw HTTP response bodies
+ *
+ * Note: GUIDs are intentionally NOT redacted - they're useful for debugging
+ * and are not sensitive (internal record IDs, not secrets).
  */
 export class ErrorSanitizer {
     /**
@@ -21,8 +23,8 @@ export class ErrorSanitizer {
         // OAuth/Bearer tokens (JWT format or random strings) - match token only, not "Bearer" keyword
         /Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi,
 
-        // GUIDs (environment IDs, tenant IDs, organization IDs)
-        /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+        // Note: GUIDs are NOT redacted - they're useful for debugging in a developer tool
+        // and are not considered sensitive (they're internal record IDs, not secrets)
 
         // Windows file paths
         /[A-Za-z]:\\[^\s"'<>|]*/g,

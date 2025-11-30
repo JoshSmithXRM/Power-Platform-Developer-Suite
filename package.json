@@ -79,6 +79,12 @@
                 "icon": "$(gear)"
             },
             {
+                "command": "power-platform-dev-suite.showOutput",
+                "title": "Show Output",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(output)"
+            },
+            {
                 "command": "power-platform-dev-suite.addEnvironment",
                 "title": "Add Environment",
                 "category": "Power Platform Developer Suite",

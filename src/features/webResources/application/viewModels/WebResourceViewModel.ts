@@ -9,12 +9,17 @@ export interface WebResourceViewModel {
 	[key: string]: unknown;
 	readonly id: string;
 	readonly name: string;
-	/** Structured link data for name column (used by virtual table renderer) */
-	readonly nameLink: CellLink;
+	/** Structured link data for name column (used by virtual table renderer). Only present for editable (text-based) resources. */
+	readonly nameLink?: CellLink;
 	readonly displayName: string;
 	readonly type: string;
 	readonly typeCode: number;
+	readonly createdOn: string;
+	/** Sort value for createdOn (timestamp for proper date sorting) */
+	readonly createdOnSortValue: number;
 	readonly modifiedOn: string;
+	/** Sort value for modifiedOn (timestamp for proper date sorting) */
+	readonly modifiedOnSortValue: number;
 	readonly isManaged: boolean;
 	readonly isEditable: boolean;
 }

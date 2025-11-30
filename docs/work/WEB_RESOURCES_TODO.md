@@ -180,6 +180,11 @@ Deferred to future PR - see "Future Work" section below.
 | .js appended to all files | ✅ Fixed | Web resource name already includes extension - don't append again |
 | Size shows 0 B for all rows | ✅ Fixed | Removed Size column - Dataverse doesn't expose file size without fetching content |
 | No loading state when switching | ✅ Fixed | Added `showLoading` command to VirtualTableRenderer |
+| Publish 429 error handling | ✅ Fixed | Added PublishCoordinator + PublishBehavior for cross-panel coordination |
+| Sorting not working | ✅ Fixed | Added sorting to VirtualTableRenderer.js with ascending/descending toggle |
+| Missing Created On column | ✅ Fixed | Added createdon to entity, ViewModel, mapper, and table config |
+| Selected row not visible | ✅ Fixed | Added .row-selected CSS with VS Code theme colors |
+| No command to show output | ✅ Fixed | Added "Show Output" command in Command Palette |
 
 ---
 

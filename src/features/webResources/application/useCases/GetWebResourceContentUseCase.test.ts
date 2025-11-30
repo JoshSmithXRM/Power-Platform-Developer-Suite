@@ -45,6 +45,7 @@ describe('GetWebResourceContentUseCase', () => {
 			displayName,
 			type,
 			false,
+			new Date('2024-01-01T08:00:00Z'),
 			new Date('2024-01-15T10:30:00Z')
 		);
 	}

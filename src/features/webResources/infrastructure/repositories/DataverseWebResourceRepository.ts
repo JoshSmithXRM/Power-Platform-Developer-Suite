@@ -47,6 +47,8 @@ interface DataverseWebResourceDto {
 	webresourcetype: number;
 	/** ismanaged field - Whether in managed solution */
 	ismanaged: boolean;
+	/** createdon field - Creation timestamp */
+	createdon: string;
 	/** modifiedon field - Last modification timestamp */
 	modifiedon: string;
 }
@@ -72,6 +74,7 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 				'displayname',
 				'webresourcetype',
 				'ismanaged',
+				'createdon',
 				'modifiedon'
 			],
 			orderBy: 'name'
@@ -482,6 +485,7 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 			dto.displayname ?? dto.name,
 			WebResourceType.fromCode(dto.webresourcetype),
 			dto.ismanaged,
+			new Date(dto.createdon),
 			new Date(dto.modifiedon)
 		);
 	}
