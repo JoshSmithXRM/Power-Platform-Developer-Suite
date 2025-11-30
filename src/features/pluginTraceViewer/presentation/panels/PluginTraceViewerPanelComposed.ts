@@ -297,6 +297,34 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			this.currentEnvironmentId
 		);
 
+		this.logger.debug('Initializing with auto-refresh interval', {
+			interval: this.autoRefreshBehavior.getInterval()
+		});
+
+		// Start auto-refresh timer if interval was persisted
+		this.autoRefreshBehavior.startIfEnabled();
+
+		// Get reconstructed quick filter IDs before initial render
+		const reconstructedQuickFilterIds = this.filterManagementBehavior.getReconstructedQuickFilterIds();
+
+		// Single scaffold render with all persisted state included
+		// No second render needed - handleRefresh() uses data-driven updateTableData
+		// Note: Don't pass isLoading:true - openMaker should stay enabled
+		await this.scaffoldingBehavior.refresh({
+			environments,
+			currentEnvironmentId: this.currentEnvironmentId,
+			tableData: [],
+			state: {
+				traceLevel: this.currentTraceLevel?.value,
+				autoRefreshInterval: this.autoRefreshBehavior.getInterval(),
+				filterCriteria: this.filterManagementBehavior.getFilterCriteria(),
+				detailPanelWidth: this.detailPanelBehavior.getDetailPanelWidth(),
+				filterPanelCollapsed,
+				filterPanelHeight,
+				quickFilterIds: reconstructedQuickFilterIds
+			}
+		});
+
 		// Build and send OData query preview for loaded filters
 		const loadedFilterCriteria = this.filterManagementBehavior.getAppliedFilterCriteria();
 		const filterMapper = new FilterCriteriaMapper(this.configService);
@@ -307,85 +335,11 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			data: { query: odataQuery }
 		});
 
-		this.logger.debug('Initializing with auto-refresh interval', {
-			interval: this.autoRefreshBehavior.getInterval()
-		});
-
-		// Start auto-refresh timer if interval was persisted
-		this.autoRefreshBehavior.startIfEnabled();
-
-		// Initial render - buttons enabled (openMaker can be used immediately)
-		await this.scaffoldingBehavior.refresh({
-			environments,
-			currentEnvironmentId: this.currentEnvironmentId,
-			tableData: [],
-			state: {
-				traceLevel: this.currentTraceLevel?.value,
-				autoRefreshInterval: this.autoRefreshBehavior.getInterval(),
-				filterCriteria: this.filterManagementBehavior.getFilterCriteria(),
-				detailPanelWidth: this.detailPanelBehavior.getDetailPanelWidth()
-			}
-		});
-
+		// Load data - handleRefresh() manages button loading state and shows table loading
 		await this.handleRefresh();
 
+		// Load trace level (updates dropdown via message)
 		await this.loadTraceLevel();
-
-		// Send detail panel width to webview if it was persisted
-		const detailPanelWidth = this.detailPanelBehavior.getDetailPanelWidth();
-		if (detailPanelWidth !== null) {
-			await this.panel.webview.postMessage({
-				command: 'restoreDetailPanelWidth',
-				data: { width: detailPanelWidth }
-			});
-		}
-
-		const viewModels = this.traces.map(t => this.viewModelMapper.toTableRowViewModel(t));
-
-		await this.scaffoldingBehavior.refresh({
-			tableData: viewModels,
-			environments,
-			currentEnvironmentId: this.currentEnvironmentId,
-			state: {
-				traceLevel: this.currentTraceLevel?.value,
-				autoRefreshInterval: this.autoRefreshBehavior.getInterval(),
-				filterCriteria: this.filterManagementBehavior.getFilterCriteria()
-			}
-		});
-
-		// Explicitly update dropdown state to ensure button label shows correct value
-		await this.panel.webview.postMessage({
-			command: 'updateDropdownState',
-			data: {
-				dropdownId: 'autoRefreshDropdown',
-				selectedId: this.autoRefreshBehavior.getInterval().toString()
-			}
-		});
-
-		// Send reconstructed quick filter checkbox state to webview
-		const reconstructedQuickFilterIds = this.filterManagementBehavior.getReconstructedQuickFilterIds();
-		if (reconstructedQuickFilterIds.length > 0) {
-			await this.panel.webview.postMessage({
-				command: 'updateQuickFilterState',
-				data: { quickFilterIds: reconstructedQuickFilterIds }
-			});
-		}
-
-		// Send filter panel collapsed state to webview if it was persisted (before height)
-		if (filterPanelCollapsed !== null) {
-			await this.panel.webview.postMessage({
-				command: 'restoreFilterPanelCollapsed',
-				data: { collapsed: filterPanelCollapsed }
-			});
-		}
-
-		// Send filter panel height to webview if it was persisted (after collapsed state)
-		if (filterPanelHeight !== null) {
-			await this.panel.webview.postMessage({
-				command: 'restoreFilterPanelHeight',
-				data: { height: filterPanelHeight }
-			});
-		}
 	}
 
 	private createCoordinator(): {
