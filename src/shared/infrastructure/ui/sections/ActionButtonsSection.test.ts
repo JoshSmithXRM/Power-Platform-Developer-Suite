@@ -123,5 +123,70 @@ describe('ActionButtonsSection', () => {
 			expect(html).toContain('&lt;script&gt;');
 			expect(html).not.toContain('<script>alert');
 		});
+
+		it('should disable all buttons when isLoading is true', () => {
+			const config: ActionButtonsConfig = {
+				buttons: [
+					{ id: 'refresh', label: 'Refresh' },
+					{ id: 'openMaker', label: 'Open in Maker' }
+				]
+			};
+			const section = new ActionButtonsSection(config);
+
+			const html = section.render({ isLoading: true });
+
+			// Both buttons should be disabled
+			const refreshMatch = html.match(/<button[^>]*id="refresh"[^>]*>/);
+			const openMakerMatch = html.match(/<button[^>]*id="openMaker"[^>]*>/);
+			expect(refreshMatch?.[0]).toContain('disabled');
+			expect(openMakerMatch?.[0]).toContain('disabled');
+		});
+
+		it('should not disable buttons when isLoading is false', () => {
+			const config: ActionButtonsConfig = {
+				buttons: [
+					{ id: 'refresh', label: 'Refresh' },
+					{ id: 'openMaker', label: 'Open in Maker' }
+				]
+			};
+			const section = new ActionButtonsSection(config);
+
+			const html = section.render({ isLoading: false });
+
+			// Neither button should be disabled
+			const refreshMatch = html.match(/<button[^>]*id="refresh"[^>]*>/);
+			const openMakerMatch = html.match(/<button[^>]*id="openMaker"[^>]*>/);
+			expect(refreshMatch?.[0]).not.toContain('disabled');
+			expect(openMakerMatch?.[0]).not.toContain('disabled');
+		});
+
+		it('should not disable buttons when isLoading is undefined', () => {
+			const config: ActionButtonsConfig = {
+				buttons: [{ id: 'refresh', label: 'Refresh' }]
+			};
+			const section = new ActionButtonsSection(config);
+
+			const html = section.render({});
+
+			const buttonMatch = html.match(/<button[^>]*id="refresh"[^>]*>/);
+			expect(buttonMatch?.[0]).not.toContain('disabled');
+		});
+
+		it('should preserve existing disabled state on buttons when not loading', () => {
+			const config: ActionButtonsConfig = {
+				buttons: [
+					{ id: 'save', label: 'Save', disabled: true },
+					{ id: 'cancel', label: 'Cancel', disabled: false }
+				]
+			};
+			const section = new ActionButtonsSection(config);
+
+			const html = section.render({ isLoading: false });
+
+			const saveMatch = html.match(/<button[^>]*id="save"[^>]*>/);
+			const cancelMatch = html.match(/<button[^>]*id="cancel"[^>]*>/);
+			expect(saveMatch?.[0]).toContain('disabled');
+			expect(cancelMatch?.[0]).not.toContain('disabled');
+		});
 	});
 });

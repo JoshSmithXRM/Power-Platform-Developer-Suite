@@ -21,6 +21,7 @@ import type { OpenImportLogUseCase } from '../../application/useCases/OpenImport
 import type { ImportJobViewModelMapper } from '../../application/mappers/ImportJobViewModelMapper';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 
 /**
  * Commands supported by Import Job Viewer panel.
@@ -38,6 +39,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 
 	private readonly coordinator: PanelCoordinator<ImportJobViewerCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private readonly loadingBehavior: LoadingStateBehavior;
 	private readonly virtualTableConfig: VirtualTableConfig;
 	private currentEnvironmentId: string;
 	private cacheManager: VirtualTableCacheManager<ImportJob>;
@@ -74,6 +76,13 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
+
+		// Initialize loading behavior for toolbar buttons
+		this.loadingBehavior = new LoadingStateBehavior(
+			panel,
+			LoadingStateBehavior.createButtonConfigs(['openMaker', 'refresh']),
+			logger
+		);
 
 		this.registerCommandHandlers();
 
@@ -135,32 +144,40 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 			isLoading: true
 		});
 
-		// Load initial page of import jobs using cache manager
-		const result = await this.cacheManager.loadInitialPage();
-		const cacheState = this.cacheManager.getCacheState();
+		// Disable all buttons during initial load (refresh shows spinner)
+		await this.loadingBehavior.setLoading(true);
 
-		// Map to ViewModels (sorting handled by ImportJobCollectionService via mapper)
-		const viewModels = result.getItems()
-			.map(job => this.viewModelMapper.toViewModel(job));
+		try {
+			// Load initial page of import jobs using cache manager
+			const result = await this.cacheManager.loadInitialPage();
+			const cacheState = this.cacheManager.getCacheState();
 
-		this.logger.info('Import jobs loaded with virtual table', {
-			initialCount: viewModels.length,
-			totalCount: cacheState.getTotalRecordCount()
-		});
+			// Map to ViewModels (sorting handled by ImportJobCollectionService via mapper)
+			const viewModels = result.getItems()
+				.map(job => this.viewModelMapper.toViewModel(job));
 
-		// Re-render with actual data and pagination state
-		await this.scaffoldingBehavior.refresh({
-			environments,
-			currentEnvironmentId: this.currentEnvironmentId,
-			tableData: viewModels,
-			pagination: {
-				cachedCount: cacheState.getCachedRecordCount(),
-				totalCount: cacheState.getTotalRecordCount(),
-				isLoading: cacheState.getIsLoading(),
-				currentPage: cacheState.getCurrentPage(),
-				isFullyCached: cacheState.isFullyCached()
-			}
-		});
+			this.logger.info('Import jobs loaded with virtual table', {
+				initialCount: viewModels.length,
+				totalCount: cacheState.getTotalRecordCount()
+			});
+
+			// Re-render with actual data and pagination state
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				tableData: viewModels,
+				pagination: {
+					cachedCount: cacheState.getCachedRecordCount(),
+					totalCount: cacheState.getTotalRecordCount(),
+					isLoading: cacheState.getIsLoading(),
+					currentPage: cacheState.getCurrentPage(),
+					isFullyCached: cacheState.isFullyCached()
+				}
+			});
+		} finally {
+			// Re-enable buttons after load completes
+			await this.loadingBehavior.setLoading(false);
+		}
 
 		// Set up callback to update UI during background loading
 		this.cacheManager.onStateChange((state, cachedRecords) => {
@@ -311,7 +328,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing import jobs with virtual table');
 
-		this.setButtonLoading('refresh', true);
+		await this.loadingBehavior.setButtonLoading('refresh', true);
 		this.showTableLoading();
 
 		try {
@@ -351,7 +368,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh import jobs: ${errorMessage}`);
 		} finally {
-			this.setButtonLoading('refresh', false);
+			await this.loadingBehavior.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -451,12 +468,4 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 		});
 	}
 
-	private setButtonLoading(buttonId: string, isLoading: boolean): void {
-		this.panel.webview.postMessage({
-			command: 'setButtonState',
-			buttonId,
-			disabled: isLoading,
-			showSpinner: isLoading,
-		});
-	}
 }
