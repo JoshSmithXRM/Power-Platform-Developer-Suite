@@ -20,6 +20,7 @@ import { VsCodeEventPublisher } from '../../features/environmentSetup/infrastruc
  */
 export class CoreServicesContainer {
 	public readonly logger: ILogger;
+	public readonly outputChannel: vscode.LogOutputChannel;
 	public readonly configService: IConfigurationService;
 	public readonly environmentRepository: IEnvironmentRepository;
 	public readonly authService: MsalAuthenticationService;
@@ -29,8 +30,8 @@ export class CoreServicesContainer {
 
 	constructor(context: vscode.ExtensionContext) {
 		// Create logger first (no dependencies)
-		const outputChannel = vscode.window.createOutputChannel('Power Platform Developer Suite', { log: true });
-		this.logger = new OutputChannelLogger(outputChannel);
+		this.outputChannel = vscode.window.createOutputChannel('Power Platform Developer Suite', { log: true });
+		this.logger = new OutputChannelLogger(this.outputChannel);
 
 		// Create configuration service (no dependencies)
 		this.configService = new VsCodeConfigurationService();

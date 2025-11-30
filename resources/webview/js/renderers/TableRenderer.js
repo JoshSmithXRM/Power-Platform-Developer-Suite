@@ -25,13 +25,14 @@ function escapeHtml(text) {
 /**
  * Renders table rows from ViewModels.
  *
- * @param {Array} viewModels - Array of PluginTraceTableRowViewModel objects
+ * @param {Array} viewModels - Array of view model objects
  * @param {Array} columns - Column configuration [{key, label, width}]
+ * @param {string} [noDataMessage='No data found.'] - Message to show when no data
  * @returns {string} HTML string for table rows
  */
-function renderTableRows(viewModels, columns) {
+function renderTableRows(viewModels, columns, noDataMessage = 'No data found.') {
 	if (!viewModels || viewModels.length === 0) {
-		return renderNoDataRow(columns.length, 'No plugin traces found. Adjust your trace level to start logging.');
+		return renderNoDataRow(columns.length, noDataMessage);
 	}
 
 	return viewModels.map((row, index) => renderTableRow(row, columns, index)).join('');

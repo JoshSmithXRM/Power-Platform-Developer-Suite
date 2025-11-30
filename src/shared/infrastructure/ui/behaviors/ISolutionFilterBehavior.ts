@@ -11,7 +11,7 @@ export interface ISolutionFilterBehavior {
 
 	/**
 	 * Gets the currently selected solution ID.
-	 * @returns Current solution ID (DEFAULT_SOLUTION_ID if none/all)
+	 * @returns Current solution ID (DEFAULT_SOLUTION_ID if none selected)
 	 */
 	getCurrentSolutionId(): string;
 

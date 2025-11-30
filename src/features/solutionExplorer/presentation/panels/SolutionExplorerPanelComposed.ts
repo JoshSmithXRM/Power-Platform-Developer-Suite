@@ -19,6 +19,7 @@ import type { Solution } from '../../domain/entities/Solution';
 import { SolutionDataProviderAdapter } from '../../infrastructure/adapters/SolutionDataProviderAdapter';
 import type { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 
 /**
  * Commands supported by Solution Explorer panel.
@@ -36,6 +37,7 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 
 	private readonly coordinator: PanelCoordinator<SolutionExplorerCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private readonly loadingBehavior: LoadingStateBehavior;
 	private readonly virtualTableConfig: VirtualTableConfig;
 	private currentEnvironmentId: string;
 	private cacheManager: VirtualTableCacheManager<Solution>;
@@ -71,6 +73,14 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
+
+		// Initialize loading behavior for toolbar buttons
+		// Note: openMaker excluded - it only needs environmentId which is already known
+		this.loadingBehavior = new LoadingStateBehavior(
+			panel,
+			LoadingStateBehavior.createButtonConfigs(['refresh']),
+			logger
+		);
 
 		this.registerCommandHandlers();
 
@@ -122,41 +132,49 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 		// Load environments first so they appear on initial render
 		const environments = await this.getEnvironments();
 
-		// Initialize coordinator with environments and loading state
+		// Initial render - openMaker stays enabled (only needs environmentId)
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
-			tableData: [],
-			isLoading: true
+			tableData: []
 		});
 
-		// Load initial page of solutions using cache manager
-		const result = await this.cacheManager.loadInitialPage();
-		const cacheState = this.cacheManager.getCacheState();
+		// Disable refresh button during initial load (shows spinner)
+		await this.loadingBehavior.setLoading(true);
+		this.showTableLoading();
 
-		// Map to ViewModels and sort
-		const viewModels = result.getItems()
-			.map(s => this.viewModelMapper.toViewModel(s))
-			.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName));
+		try {
+			// Load initial page of solutions using cache manager
+			const result = await this.cacheManager.loadInitialPage();
+			const cacheState = this.cacheManager.getCacheState();
 
-		this.logger.info('Solutions loaded with virtual table', {
-			initialCount: viewModels.length,
-			totalCount: cacheState.getTotalRecordCount()
-		});
+			// Map to ViewModels and sort
+			const viewModels = result.getItems()
+				.map(s => this.viewModelMapper.toViewModel(s))
+				.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName));
 
-		// Re-render with actual data and pagination state
-		await this.scaffoldingBehavior.refresh({
-			environments,
-			currentEnvironmentId: this.currentEnvironmentId,
-			tableData: viewModels,
-			pagination: {
-				cachedCount: cacheState.getCachedRecordCount(),
-				totalCount: cacheState.getTotalRecordCount(),
-				isLoading: cacheState.getIsLoading(),
-				currentPage: cacheState.getCurrentPage(),
-				isFullyCached: cacheState.isFullyCached()
-			}
-		});
+			this.logger.info('Solutions loaded with virtual table', {
+				initialCount: viewModels.length,
+				totalCount: cacheState.getTotalRecordCount()
+			});
+
+			// Re-render with actual data and pagination state
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				tableData: viewModels,
+				pagination: {
+					cachedCount: cacheState.getCachedRecordCount(),
+					totalCount: cacheState.getTotalRecordCount(),
+					isLoading: cacheState.getIsLoading(),
+					currentPage: cacheState.getCurrentPage(),
+					isFullyCached: cacheState.isFullyCached()
+				}
+			});
+		} finally {
+			// Re-enable buttons after load completes
+			await this.loadingBehavior.setLoading(false);
+		}
 
 		// Set up callback to update UI during background loading
 		this.cacheManager.onStateChange((state, cachedRecords) => {
@@ -310,6 +328,9 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing solutions with virtual table');
 
+		await this.loadingBehavior.setButtonLoading('refresh', true);
+		this.showTableLoading();
+
 		try {
 			// Clear existing cache and reload
 			this.cacheManager.clearCache();
@@ -348,6 +369,8 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 			this.logger.error('Error refreshing solutions', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh solutions: ${errorMessage}`);
+		} finally {
+			await this.loadingBehavior.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -380,52 +403,39 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		this.setButtonLoading('refresh', true);
-		this.clearTable();
+		const oldEnvironmentId = this.currentEnvironmentId;
+		this.currentEnvironmentId = environmentId;
 
-		try {
-			const oldEnvironmentId = this.currentEnvironmentId;
-			this.currentEnvironmentId = environmentId;
+		// Clear old cache and create new cache manager for new environment
+		this.cacheManager.clearCache();
+		const newProvider = new SolutionDataProviderAdapter(this.solutionRepository, environmentId);
+		this.cacheManager = new VirtualTableCacheManager(newProvider, this.virtualTableConfig, this.logger);
 
-			// Clear old cache and create new cache manager for new environment
-			this.cacheManager.clearCache();
-			const newProvider = new SolutionDataProviderAdapter(this.solutionRepository, environmentId);
-			this.cacheManager = new VirtualTableCacheManager(newProvider, this.virtualTableConfig, this.logger);
+		// Re-register panel in map for new environment
+		this.reregisterPanel(SolutionExplorerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
-			// Re-register panel in map for new environment
-			this.reregisterPanel(SolutionExplorerPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
-
-			const environment = await this.getEnvironmentById(environmentId);
-			if (environment) {
-				this.panel.title = `Solutions - ${environment.name}`;
-			}
-
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
+		const environment = await this.getEnvironmentById(environmentId);
+		if (environment) {
+			this.panel.title = `Solutions - ${environment.name}`;
 		}
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 	/**
-	 * Clears the table by sending empty data to the webview.
-	 * Provides immediate visual feedback during environment switches.
+	 * Shows loading spinner in the table.
+	 * Provides visual feedback during environment switches.
 	 */
-	private clearTable(): void {
+	private showTableLoading(): void {
 		this.panel.webview.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels: [],
-				columns: this.getTableConfig().columns
+				columns: this.getTableConfig().columns,
+				isLoading: true
 			}
 		});
 	}
 
-	private setButtonLoading(buttonId: string, isLoading: boolean): void {
-		this.panel.webview.postMessage({
-			command: 'setButtonState',
-			buttonId,
-			disabled: isLoading,
-			showSpinner: isLoading,
-		});
-	}
 }

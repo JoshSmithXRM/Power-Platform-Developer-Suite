@@ -26,7 +26,7 @@ export class ListEnvironmentVariablesUseCase {
 	/**
 	 * Executes the use case to list environment variables.
 	 * @param environmentId - Power Platform environment GUID
-	 * @param solutionId - Solution GUID to filter by (use DEFAULT_SOLUTION_ID to show all)
+	 * @param solutionId - Solution GUID to filter by (Default Solution returns all environment variables)
 	 * @param cancellationToken - Optional token to cancel the operation
 	 * @returns Promise resolving to array of EnvironmentVariable entities
 	 */

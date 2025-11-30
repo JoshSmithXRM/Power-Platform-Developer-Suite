@@ -28,6 +28,7 @@ export class ToolsTreeProvider implements vscode.TreeDataProvider<ToolItem> {
 			new ToolItem('Plugin Traces', 'View and manage plugin trace logs', 'pluginTraceViewer', 'power-platform-dev-suite.pluginTraceViewer', 'bug'),
 			new ToolItem('Metadata Browser', 'Browse entity metadata and attributes', 'metadataBrowser', 'power-platform-dev-suite.metadataBrowser', 'database'),
 			new ToolItem('Data Explorer', 'Query data with SQL syntax', 'dataExplorer', 'power-platform-dev-suite.dataExplorer', 'search'),
+			new ToolItem('Web Resources', 'Browse and edit web resources', 'webResources', 'power-platform-dev-suite.webResources', 'file-code'),
 			new ToolItem('Settings', 'Configure extension settings', 'settings', 'power-platform-dev-suite.openSettings', 'gear')
 		];
 	}

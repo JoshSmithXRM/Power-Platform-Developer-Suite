@@ -15,12 +15,6 @@ describe('SolutionFilterSection', () => {
 
 			expect(section).toBeDefined();
 		});
-
-		it('should create section with includeAllOption config', () => {
-			const section = new SolutionFilterSection({ includeAllOption: false });
-
-			expect(section).toBeDefined();
-		});
 	});
 
 	describe('render', () => {
@@ -60,42 +54,6 @@ describe('SolutionFilterSection', () => {
 			expect(html).toContain('Solution B');
 		});
 
-		it('should include "All Solutions" option by default', () => {
-			const section = new SolutionFilterSection();
-			const solutions: SolutionOption[] = [
-				{ id: 'sol-1', name: 'My Solution', uniqueName: 'MySolution' }
-			];
-
-			const html = section.render({ solutions });
-
-			expect(html).toContain('All Solutions');
-			expect(html).toContain('value=""');
-		});
-
-		it('should not include "All Solutions" option when includeAllOption is false', () => {
-			const section = new SolutionFilterSection({ includeAllOption: false });
-			const solutions: SolutionOption[] = [
-				{ id: 'sol-1', name: 'My Solution', uniqueName: 'MySolution' }
-			];
-
-			const html = section.render({ solutions });
-
-			expect(html).not.toContain('All Solutions');
-		});
-
-		it('should mark "All Solutions" as selected when currentSolutionId is undefined', () => {
-			const section = new SolutionFilterSection();
-			const solutions: SolutionOption[] = [
-				{ id: 'sol-1', name: 'My Solution', uniqueName: 'MySolution' }
-			];
-
-			const html = section.render({ solutions });
-
-			const allOption = html.match(/<option value=""[^>]*>/);
-			expect(allOption).toBeDefined();
-			expect(allOption![0]).toContain('selected');
-		});
-
 		it('should mark selected solution with selected attribute', () => {
 			const section = new SolutionFilterSection();
 			const solutions: SolutionOption[] = [
@@ -111,22 +69,6 @@ describe('SolutionFilterSection', () => {
 			const solutionBOption = html.match(/<option value="sol-2"[^>]*>/);
 			expect(solutionBOption).toBeDefined();
 			expect(solutionBOption![0]).toContain('selected');
-		});
-
-		it('should not mark "All Solutions" as selected when a specific solution is selected', () => {
-			const section = new SolutionFilterSection();
-			const solutions: SolutionOption[] = [
-				{ id: 'sol-1', name: 'My Solution', uniqueName: 'MySolution' }
-			];
-
-			const html = section.render({
-				solutions,
-				currentSolutionId: 'sol-1'
-			});
-
-			const allOption = html.match(/<option value=""[^>]*>/);
-			expect(allOption).toBeDefined();
-			expect(allOption![0]).not.toContain('selected');
 		});
 
 		it('should render custom label', () => {

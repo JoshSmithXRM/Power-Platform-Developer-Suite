@@ -36,6 +36,9 @@ window.createBehavior({
 			case 'clearSelection':
 				this.clearSelection();
 				break;
+			case 'showDetailLoading':
+				this.showDetailLoading();
+				break;
 			case 'showDetailPanel':
 				this.showDetailPanel(message.data);
 				break;
@@ -122,6 +125,34 @@ window.createBehavior({
 		if (choicesTree) {
 			choicesTree.innerHTML = '<div class="tree-loading">Loading choices...</div>';
 		}
+	},
+
+	/**
+	 * Shows loading state in detail panel tables.
+	 * Used during refresh to show loading spinner while fetching data.
+	 */
+	showDetailLoading() {
+		const tables = ['attributesTable', 'keysTable', 'oneToManyTable', 'manyToOneTable', 'manyToManyTable', 'privilegesTable', 'choiceValuesTable'];
+
+		tables.forEach(tableId => {
+			const tbody = document.querySelector(`#${tableId} tbody`);
+			if (tbody) {
+				// Get column count from thead
+				const thead = document.querySelector(`#${tableId} thead`);
+				const columnCount = thead ? thead.querySelectorAll('th').length : 5;
+
+				tbody.innerHTML = `
+					<tr>
+						<td colspan="${columnCount}" class="table-loading">
+							<div class="loading-container">
+								<span class="spinner"></span>
+								<span>Loading...</span>
+							</div>
+						</td>
+					</tr>
+				`;
+			}
+		});
 	},
 
 	/**

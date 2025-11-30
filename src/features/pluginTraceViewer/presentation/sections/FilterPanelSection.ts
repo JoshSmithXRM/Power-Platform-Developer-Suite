@@ -21,6 +21,17 @@ export class FilterPanelSection implements ISection {
 
 	public render(data: SectionRenderData): string {
 		const filterState = this.extractFilterState(data);
+		const panelState = this.extractPanelState(data);
+
+		// Determine collapsed state from persisted state (default: collapsed)
+		const isCollapsed = panelState.filterPanelCollapsed !== false;
+		const collapsedClass = isCollapsed ? 'collapsed' : '';
+		const chevronClass = isCollapsed ? 'codicon-chevron-down' : 'codicon-chevron-up';
+
+		// Build inline style for height if persisted
+		const bodyStyle = panelState.filterPanelHeight && !isCollapsed
+			? `style="height: ${panelState.filterPanelHeight}px;"`
+			: '';
 
 		return `
 			<div class="filter-panel" id="filterPanel">
@@ -31,12 +42,12 @@ export class FilterPanelSection implements ISection {
 						Filters (${filterState.activeCount} / ${filterState.totalCount})
 					</span>
 					<button class="filter-toggle-btn" id="filterToggleBtn" title="Expand/Collapse">
-						<span class="codicon codicon-chevron-down"></span>
+						<span class="codicon ${chevronClass}"></span>
 					</button>
 				</div>
 
 				<!-- Tab Navigation -->
-				<div class="filter-panel-tab-navigation collapsed" id="filterPanelTabNav">
+				<div class="filter-panel-tab-navigation ${collapsedClass}" id="filterPanelTabNav">
 					<button class="filter-tab-button active" data-tab="quick" id="quickFiltersTab">
 						Quick Filters
 					</button>
@@ -49,10 +60,10 @@ export class FilterPanelSection implements ISection {
 				</div>
 
 				<!-- Tab Content Container -->
-				<div class="filter-panel-body collapsed" id="filterPanelBody">
+				<div class="filter-panel-body ${collapsedClass}" id="filterPanelBody" ${bodyStyle}>
 					<!-- Quick Filters Tab -->
 					<div class="filter-tab-panel active" id="quickFiltersPanel" data-tab="quick">
-						${this.renderQuickFiltersTab()}
+						${this.renderQuickFiltersTab(panelState.quickFilterIds)}
 					</div>
 
 					<!-- Advanced Filters Tab -->
@@ -68,7 +79,7 @@ export class FilterPanelSection implements ISection {
 
 				<!-- Vertical Resize Handle (bottom edge) -->
 				<div
-					class="filter-panel-resize-handle collapsed"
+					class="filter-panel-resize-handle ${collapsedClass}"
 					id="filterPanelResizeHandle"
 					title="Drag to resize"
 				></div>
@@ -78,12 +89,14 @@ export class FilterPanelSection implements ISection {
 
 	/**
 	 * Renders the Quick Filters tab content.
+	 * @param activeQuickFilterIds - IDs of quick filters that should be checked
 	 */
-	private renderQuickFiltersTab(): string {
+	private renderQuickFiltersTab(activeQuickFilterIds: readonly string[]): string {
+		const activeSet = new Set(activeQuickFilterIds);
 		return `
 			<div class="quick-filters-section">
 				<div class="quick-filters">
-					${QUICK_FILTER_DEFINITIONS.map(qf => this.renderQuickFilter(qf)).join('')}
+					${QUICK_FILTER_DEFINITIONS.map(qf => this.renderQuickFilter(qf, activeSet.has(qf.id))).join('')}
 				</div>
 			</div>
 		`;
@@ -144,13 +157,15 @@ export class FilterPanelSection implements ISection {
 		`;
 	}
 
-	private renderQuickFilter(filter: typeof QUICK_FILTER_DEFINITIONS[number]): string {
+	private renderQuickFilter(filter: typeof QUICK_FILTER_DEFINITIONS[number], isChecked: boolean): string {
+		const checkedAttr = isChecked ? 'checked' : '';
 		return `
 			<label class="quick-filter-item" title="${escapeHtml(filter.tooltip)}">
 				<input
 					type="checkbox"
 					class="quick-filter-checkbox"
 					data-filter-id="${filter.id}"
+					${checkedAttr}
 				/>
 				<span class="quick-filter-label">${escapeHtml(filter.label)}</span>
 				<span class="quick-filter-badge">${escapeHtml(filter.odataField)}</span>
@@ -346,6 +361,37 @@ export class FilterPanelSection implements ISection {
 			conditions,
 			activeCount,
 			totalCount
+		};
+	}
+
+	/**
+	 * Extracts panel state for filter panel rendering.
+	 */
+	private extractPanelState(data: SectionRenderData): {
+		filterPanelCollapsed: boolean | null;
+		filterPanelHeight: number | null;
+		quickFilterIds: readonly string[];
+	} {
+		const defaultState = {
+			filterPanelCollapsed: null,
+			filterPanelHeight: null,
+			quickFilterIds: [] as readonly string[]
+		};
+
+		if (!data.state || typeof data.state !== 'object') {
+			return defaultState;
+		}
+
+		const state = data.state as {
+			filterPanelCollapsed?: boolean | null;
+			filterPanelHeight?: number | null;
+			quickFilterIds?: readonly string[];
+		};
+
+		return {
+			filterPanelCollapsed: state.filterPanelCollapsed ?? null,
+			filterPanelHeight: state.filterPanelHeight ?? null,
+			quickFilterIds: state.quickFilterIds ?? []
 		};
 	}
 

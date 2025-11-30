@@ -2,7 +2,7 @@
     "name": "power-platform-developer-suite",
     "displayName": "Power Platform Developer Suite",
     "description": "A comprehensive VSCode extension for Power Platform development and administration - your complete toolkit for Dynamics 365, Dataverse, and Power Platform solutions",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "icon": "images/icon.png",
     "publisher": "JoshSmithXRM",
     "repository": {
@@ -66,7 +66,8 @@
         "onCommand:power-platform-dev-suite.solutionExplorer",
         "onCommand:power-platform-dev-suite.importJobViewer",
         "onCommand:power-platform-dev-suite.connectionReferences",
-        "onCommand:power-platform-dev-suite.environmentVariables"
+        "onCommand:power-platform-dev-suite.environmentVariables",
+        "onCommand:power-platform-dev-suite.webResources"
     ],
     "main": "./dist/extension.js",
     "contributes": {
@@ -76,6 +77,12 @@
                 "title": "Open Settings",
                 "category": "Power Platform Developer Suite",
                 "icon": "$(gear)"
+            },
+            {
+                "command": "power-platform-dev-suite.showOutput",
+                "title": "Show Output",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(output)"
             },
             {
                 "command": "power-platform-dev-suite.addEnvironment",
@@ -196,6 +203,16 @@
                 "command": "power-platform-dev-suite.dataExplorerPickEnvironment",
                 "title": "Data Explorer: Choose Environment",
                 "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.webResources",
+                "title": "Web Resources",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.webResourcesPickEnvironment",
+                "title": "Web Resources: Choose Environment",
+                "category": "Power Platform Developer Suite"
             }
         ],
         "viewsContainers": {
@@ -296,6 +313,11 @@
                     "command": "power-platform-dev-suite.dataExplorerPickEnvironment",
                     "when": "view == power-platform-dev-suite-tools && viewItem == dataExplorer",
                     "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.webResourcesPickEnvironment",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == webResources",
+                    "group": "1_environment@1"
                 }
             ],
             "webview/context": [
@@ -332,6 +354,11 @@
                 {
                     "command": "power-platform-dev-suite.dataExplorerPickEnvironment",
                     "when": "webviewId == 'powerPlatformDevSuite.dataExplorer'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.webResourcesPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.webResources'",
                     "group": "1_environment@1"
                 }
             ]
