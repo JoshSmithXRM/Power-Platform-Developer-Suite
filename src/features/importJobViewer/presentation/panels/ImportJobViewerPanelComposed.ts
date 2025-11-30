@@ -78,9 +78,10 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
 
 		// Initialize loading behavior for toolbar buttons
+		// Note: openMaker excluded - it only needs environmentId which is already known
 		this.loadingBehavior = new LoadingStateBehavior(
 			panel,
-			LoadingStateBehavior.createButtonConfigs(['openMaker', 'refresh']),
+			LoadingStateBehavior.createButtonConfigs(['refresh']),
 			logger
 		);
 

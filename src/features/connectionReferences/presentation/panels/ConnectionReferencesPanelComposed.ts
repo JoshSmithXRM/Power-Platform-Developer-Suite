@@ -81,9 +81,10 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		this.scaffoldingBehavior = scaffoldingBehavior;
 
 		// Initialize loading behavior for toolbar buttons
+		// Note: openMaker excluded - it only needs environmentId which is already known
 		this.loadingBehavior = new LoadingStateBehavior(
 			panel,
-			LoadingStateBehavior.createButtonConfigs(['openMaker', 'refresh', 'syncDeploymentSettings']),
+			LoadingStateBehavior.createButtonConfigs(['refresh', 'syncDeploymentSettings']),
 			logger
 		);
 

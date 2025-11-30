@@ -113,12 +113,13 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			logger
 		);
 
-		// Initialize loading behavior for all toolbar buttons
+		// Initialize loading behavior for toolbar buttons
+		// Note: openMaker excluded - it only needs environmentId which is already known
 		// Publish button stays disabled until row is selected
 		this.loadingBehavior = new LoadingStateBehavior(
 			panel,
 			LoadingStateBehavior.createButtonConfigs(
-				['openMaker', 'refresh', 'publish', 'publishAll', 'toggleShowAll'],
+				['refresh', 'publish', 'publishAll', 'toggleShowAll'],
 				{ keepDisabledButtons: ['publish'] } // Publish requires row selection
 			),
 			logger
