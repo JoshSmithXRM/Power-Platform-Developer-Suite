@@ -35,6 +35,127 @@ Testing infrastructure, tooling, and user experience improvements.
 
 ---
 
+## High Priority
+
+### Version Roadmap Planning
+**Status**: Future
+**Priority**: High
+**Estimated Effort**: 2-4 hours
+**Value**: Clear versioning strategy and user visibility into project direction
+
+**Description**:
+Create a `ROADMAP.md` file documenting version bump criteria and planned milestones.
+
+**Questions to Answer**:
+- What constitutes a MINOR bump (0.2 → 0.3)?
+- What signals 1.0 "production ready"?
+- What are the major feature themes for each version?
+
+**Suggested Structure**:
+```markdown
+# Version Roadmap
+
+## Versioning Philosophy
+- PATCH (0.2.x): Bug fixes, small improvements
+- MINOR (0.x.0): Significant new capability area
+- MAJOR (x.0.0): Production ready declaration
+
+## 0.3.0 - ALM & Deployment
+- Solution export/import
+- Environment comparison
+
+## 1.0.0 - Production Ready
+- All core panels stable
+- Documentation complete
+```
+
+**Success Criteria**:
+- Clear criteria for version bumps documented
+- Users can see project direction
+- Release planning is predictable
+
+---
+
+### User Configuration System
+**Status**: ✅ Implemented (v0.2.3)
+**Priority**: High
+**Estimated Effort**: 8-12 hours
+**Value**: User-configurable settings for record limits, page sizes, and panel behavior
+
+**Description**:
+Add VS Code configuration contribution point to allow users to customize extension behavior. Currently all limits are hardcoded (e.g., plugin trace 100 limit in `TraceFilter.ts:178`).
+
+**Core Features**:
+- VS Code Settings UI integration (`contributes.configuration` in package.json)
+- `IConfigurationService` domain interface
+- `VSCodeConfigurationService` infrastructure implementation
+- Settings exposed via VS Code Settings editor
+
+**Planned Settings**:
+```json
+{
+  "ppds.table.defaultPageSize": 100,
+  "ppds.table.maxCachedRecords": 5000,
+  "ppds.pluginTrace.defaultLimit": 100
+}
+```
+
+**Technical Considerations**:
+- Domain layer defines interface (no VS Code dependency)
+- Infrastructure implements using `vscode.workspace.getConfiguration()`
+- Inject via constructor (testable with mock)
+- Settings should have sensible defaults
+
+**Success Criteria**:
+- Users can adjust record limits without code changes
+- Settings appear in VS Code Settings UI under "Power Platform Developer Suite"
+- All panels respect configured values
+
+**Dependencies**:
+- Required for Virtual Data Table (large dataset support)
+
+---
+
+### Virtual Data Table
+**Status**: ✅ Implemented (v0.2.3)
+**Priority**: High
+**Estimated Effort**: 16-24 hours
+**Value**: Support large datasets (70k+ records) without browser/memory issues
+
+**Description**:
+New data table component with virtual scrolling and server-side pagination. Current `DataTableSection` renders ALL rows to DOM, causing performance issues with large datasets.
+
+**Core Features**:
+- Virtual scrolling (only render visible rows + buffer)
+- Server-side pagination (`$top`, `$skip` OData parameters)
+- Background caching up to configurable limit
+- Client-side search within cache (instant)
+- Server-side search fallback (for records beyond cache)
+- "X of Y loaded" status indicator
+
+**Technical Approach**:
+1. Fetch first page immediately (fast initial load)
+2. Background-fetch additional pages up to `maxCachedRecords`
+3. Virtual scroll renders ~50-100 rows in DOM at a time
+4. Search filters cached data; falls back to server if not found
+
+**Panels to Update**:
+- Web Resources (70k+ records - critical)
+- Plugin Trace Viewer (remove hardcoded 100 limit)
+- Solutions (user reports slow)
+- Import Jobs (user reports slow)
+
+**Success Criteria**:
+- 70k records: Initial load < 2 seconds
+- Smooth scrolling through large datasets
+- Instant search within cached records
+- No browser memory issues
+
+**Dependencies**:
+- User Configuration System (for page size settings)
+
+---
+
 ## Low Priority
 
 ### Integration Testing Framework
@@ -139,4 +260,4 @@ Add command to report issues directly from VS Code.
 
 ---
 
-**Last Updated**: 2025-11-26
+**Last Updated**: 2025-11-27

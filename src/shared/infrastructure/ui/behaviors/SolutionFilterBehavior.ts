@@ -53,7 +53,7 @@ export class SolutionFilterBehavior implements ISolutionFilterBehavior {
 	 * Gets the currently selected solution ID.
 	 *
 	 * Returns the solution ID that is currently selected in the filter dropdown,
-	 * or the default "All Solutions" ID if no solution is selected.
+	 * or the Default Solution ID if no solution is selected.
 	 */
 	public getCurrentSolutionId(): string {
 		return this.currentSolutionId;

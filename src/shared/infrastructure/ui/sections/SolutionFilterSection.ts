@@ -10,12 +10,14 @@ import type { ISection } from './ISection';
 
 export interface SolutionFilterConfig {
 	readonly label?: string;
-	readonly includeAllOption?: boolean;
 }
 
 /**
  * Section for rendering solution filter dropdown.
  * Positioned in toolbar by default, typically after environment selector.
+ *
+ * The Default Solution in Dataverse acts as "show all" since it contains
+ * all unmanaged customizations. No synthetic "All" option is needed.
  */
 export class SolutionFilterSection implements ISection {
 	public readonly position = SectionPosition.Toolbar;
@@ -29,8 +31,7 @@ export class SolutionFilterSection implements ISection {
 		const solutions = data.solutions || [];
 		const currentSolutionId = data.currentSolutionId;
 		const label = this.config.label || 'Solution:';
-		const includeAllOption = this.config.includeAllOption ?? true;
 
-		return renderSolutionFilter(solutions, currentSolutionId, label, includeAllOption);
+		return renderSolutionFilter(solutions, currentSolutionId, label);
 	}
 }

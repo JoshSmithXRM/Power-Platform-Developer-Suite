@@ -206,6 +206,36 @@ For complex/uncertain problems, trigger extended thinking modes:
 
 ---
 
+## 🌳 Git Worktrees (Parallel Development)
+
+Use git worktrees for parallel feature development in separate Claude Code sessions.
+
+**Creating a worktree:**
+```bash
+# From main repo, create worktree as sibling directory
+git worktree add "../Power-Platform-Developer-Suite-[feature]" -b feature/[branch-name]
+```
+
+**Conventions:**
+- **Location**: Always sibling directory (e.g., `../Power-Platform-Developer-Suite-data-explorer`)
+- **Naming**: `Power-Platform-Developer-Suite-[feature-shortname]`
+- **Branch**: Create new branch with `-b` flag
+
+**Managing worktrees:**
+```bash
+git worktree list              # List all worktrees
+git worktree remove <path>     # Remove worktree (after merging branch)
+git worktree prune             # Clean up stale worktree references
+```
+
+**Best practices:**
+- Each worktree = separate Claude Code session
+- Don't switch branches within a worktree (defeats the purpose)
+- Remove worktree after feature is merged
+- Main repo stays on its own feature branch
+
+---
+
 ## ⚡ Parallel Execution
 
 **Parallelize independent operations** (multiple reads, searches, git commands).

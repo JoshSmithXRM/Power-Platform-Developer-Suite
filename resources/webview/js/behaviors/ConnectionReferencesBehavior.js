@@ -19,10 +19,10 @@ window.createBehavior({
  * Updates table data without full page refresh.
  * Uses TableRenderer to update tbody only, preserving event listeners.
  *
- * @param {Object} data - Update data containing viewModels, columns, and optional isLoading flag
+ * @param {Object} data - Update data containing viewModels, columns, noDataMessage, and optional isLoading flag
  */
 function updateTableData(data) {
-	const { viewModels, columns, isLoading } = data;
+	const { viewModels, columns, isLoading, noDataMessage } = data;
 
 	// Get table body
 	const tbody = document.querySelector('tbody');
@@ -39,7 +39,7 @@ function updateTableData(data) {
 	}
 
 	// Render new rows using TableRenderer
-	const rowsHtml = window.TableRenderer.renderTableRows(viewModels, columns);
+	const rowsHtml = window.TableRenderer.renderTableRows(viewModels, columns, noDataMessage);
 
 	// Update tbody (preserves event listeners on other elements)
 	tbody.innerHTML = rowsHtml;

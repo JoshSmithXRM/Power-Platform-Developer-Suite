@@ -40,6 +40,18 @@ interface SolutionComponentDto {
 }
 
 /**
+ * Standard solution component type codes for entities whose componenttype
+ * differs from their ObjectTypeCode. For custom entities, ObjectTypeCode = componenttype.
+ *
+ * @see https://learn.microsoft.com/en-us/power-apps/developer/data-platform/reference/entities/solutioncomponent
+ */
+const STANDARD_COMPONENT_TYPE_CODES: Record<string, number> = {
+	webresource: 61,
+	workflow: 29,
+	// Add other standard entities as needed
+};
+
+/**
  * Infrastructure implementation of ISolutionComponentRepository using Dataverse Web API.
  */
 export class DataverseApiSolutionComponentRepository implements ISolutionComponentRepository {
@@ -129,23 +141,34 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 			entityLogicalName
 		});
 
-		// First, get the ObjectTypeCode for the entity
-		const objectTypeCode = await this.getObjectTypeCode(
-			environmentId,
-			entityLogicalName,
-			undefined,
-			cancellationToken
-		);
+		// Use standard component type code if available (for standard entities like webresource, workflow)
+		// Otherwise, fall back to ObjectTypeCode (for custom entities where ObjectTypeCode = componenttype)
+		let componentType: number | null = STANDARD_COMPONENT_TYPE_CODES[entityLogicalName] ?? null;
 
-		if (objectTypeCode === null) {
-			this.logger.warn('Cannot fetch solution components - no ObjectTypeCode', { entityLogicalName });
-			return [];
+		if (componentType === null) {
+			// Custom entity - use ObjectTypeCode as componenttype
+			componentType = await this.getObjectTypeCode(
+				environmentId,
+				entityLogicalName,
+				undefined,
+				cancellationToken
+			);
+
+			if (componentType === null) {
+				this.logger.warn('Cannot fetch solution components - no ObjectTypeCode', { entityLogicalName });
+				return [];
+			}
+		} else {
+			this.logger.debug('Using standard component type code', {
+				entityLogicalName,
+				componentType
+			});
 		}
 
 		// Now fetch solution components for this solution and component type
 		const defaultOptions: QueryOptions = {
 			select: ['solutioncomponentid', 'objectid'],
-			filter: `_solutionid_value eq ${solutionId} and componenttype eq ${objectTypeCode}`
+			filter: `_solutionid_value eq ${solutionId} and componenttype eq ${componentType}`
 		};
 
 		const mergedOptions: QueryOptions = {
@@ -173,7 +196,7 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 				environmentId,
 				solutionId,
 				entityLogicalName,
-				objectTypeCode,
+				componentType,
 				count: componentIds.length
 			});
 

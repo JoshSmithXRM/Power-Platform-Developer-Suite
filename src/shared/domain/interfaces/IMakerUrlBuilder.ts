@@ -14,4 +14,5 @@ export interface IMakerUrlBuilder {
   buildConnectionReferencesUrl(environmentId: string, solutionId?: string): string;
   buildEnvironmentVariablesObjectsUrl(environmentId: string, solutionId?: string): string;
   buildFlowUrl(environmentId: string, solutionId: string, flowId: string): string;
+  buildWebResourcesUrl(environmentId: string, solutionId?: string): string;
 }

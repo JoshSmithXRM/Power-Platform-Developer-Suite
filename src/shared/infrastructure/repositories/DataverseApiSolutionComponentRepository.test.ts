@@ -260,7 +260,7 @@ describe('DataverseApiSolutionComponentRepository', () => {
 			);
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				'Fetched solution components from Dataverse',
-				{ environmentId: 'env-123', solutionId: 'sol-123', entityLogicalName: 'connectionreference', objectTypeCode: 10051, count: 2 }
+				{ environmentId: 'env-123', solutionId: 'sol-123', entityLogicalName: 'connectionreference', componentType: 10051, count: 2 }
 			);
 		});
 
@@ -305,7 +305,7 @@ describe('DataverseApiSolutionComponentRepository', () => {
 			expect(result).toEqual([]);
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				'Fetched solution components from Dataverse',
-				{ environmentId: 'env-123', solutionId: 'sol-123', entityLogicalName: 'connectionreference', objectTypeCode: 10051, count: 0 }
+				{ environmentId: 'env-123', solutionId: 'sol-123', entityLogicalName: 'connectionreference', componentType: 10051, count: 0 }
 			);
 		});
 
@@ -593,6 +593,73 @@ describe('DataverseApiSolutionComponentRepository', () => {
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				'Fetching ObjectTypeCode from Dataverse API',
 				{ environmentId: 'env-123', entityLogicalName: 'connectionreference' }
+			);
+		});
+
+		it('should use standard component type 61 for webresource without querying EntityDefinitions', async () => {
+			// Arrange
+			const mockSolutionComponentsResponse = {
+				value: [
+					{
+						solutioncomponentid: 'comp-1',
+						objectid: 'wr-1',
+						componenttype: 61,
+						_solutionid_value: 'sol-123'
+					},
+					{
+						solutioncomponentid: 'comp-2',
+						objectid: 'wr-2',
+						componenttype: 61,
+						_solutionid_value: 'sol-123'
+					}
+				]
+			};
+
+			// Only one API call for solutioncomponents (no EntityDefinitions call)
+			mockApiService.get.mockResolvedValueOnce(mockSolutionComponentsResponse);
+
+			// Act
+			const result = await repository.findComponentIdsBySolution(
+				'env-123',
+				'sol-123',
+				'webresource'
+			);
+
+			// Assert
+			expect(result).toEqual(['wr-1', 'wr-2']);
+			expect(mockApiService.get).toHaveBeenCalledTimes(1);
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				'env-123',
+				expect.stringMatching(/\/api\/data\/v9\.2\/solutioncomponents\?.*componenttype%20eq%2061/),
+				undefined
+			);
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				'Using standard component type code',
+				{ entityLogicalName: 'webresource', componentType: 61 }
+			);
+		});
+
+		it('should use standard component type 29 for workflow without querying EntityDefinitions', async () => {
+			// Arrange
+			mockApiService.get.mockResolvedValueOnce({ value: [] });
+
+			// Act
+			await repository.findComponentIdsBySolution(
+				'env-123',
+				'sol-123',
+				'workflow'
+			);
+
+			// Assert - only solutioncomponents call, no EntityDefinitions
+			expect(mockApiService.get).toHaveBeenCalledTimes(1);
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				'env-123',
+				expect.stringMatching(/componenttype%20eq%2029/),
+				undefined
+			);
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				'Using standard component type code',
+				{ entityLogicalName: 'workflow', componentType: 29 }
 			);
 		});
 	});

@@ -22,6 +22,7 @@ import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
+import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 
 /**
  * Commands supported by Environment Variables panel.
@@ -39,6 +40,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 
 	private readonly coordinator: PanelCoordinator<EnvironmentVariablesCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private readonly loadingBehavior: LoadingStateBehavior;
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
 	private solutionOptions: SolutionOption[] = [];
@@ -70,6 +72,14 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
+
+		// Initialize loading behavior for toolbar buttons
+		// Note: openMaker excluded - it only needs environmentId which is already known
+		this.loadingBehavior = new LoadingStateBehavior(
+			panel,
+			LoadingStateBehavior.createButtonConfigs(['refresh', 'syncDeploymentSettings']),
+			logger
+		);
 
 		this.registerCommandHandlers();
 
@@ -135,58 +145,66 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 			}
 		}
 
-		// Show initial loading state with known solution ID
+		// Initial render - openMaker stays enabled (only needs environmentId)
 		const environments = await this.getEnvironments();
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			solutions: [],
 			currentSolutionId: this.currentSolutionId,
-			tableData: [],
-			isLoading: true
+			tableData: []
 		});
 
-		// PARALLEL LOADING - Don't wait for solutions to load data!
-		const [solutions, environmentVariables] = await Promise.all([
-			this.loadSolutions(),
-			this.listEnvVarsUseCase.execute(
-				this.currentEnvironmentId,
-				this.currentSolutionId
-			)
-		]);
+		// Disable refresh button during initial load (shows spinner)
+		await this.loadingBehavior.setLoading(true);
+		this.showTableLoading();
 
-		// Post-load validation: Check if persisted solution still exists
-		let finalSolutionId = this.currentSolutionId;
-		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
-			if (!solutions.some(s => s.id === this.currentSolutionId)) {
-				this.logger.warn('Persisted solution no longer exists, falling back to default', {
-					invalidSolutionId: this.currentSolutionId
-				});
-				finalSolutionId = DEFAULT_SOLUTION_ID;
-				this.currentSolutionId = DEFAULT_SOLUTION_ID;
+		try {
+			// PARALLEL LOADING - Don't wait for solutions to load data!
+			const [solutions, environmentVariables] = await Promise.all([
+				this.loadSolutions(),
+				this.listEnvVarsUseCase.execute(
+					this.currentEnvironmentId,
+					this.currentSolutionId
+				)
+			]);
 
-				// Save corrected state
-				if (this.panelStateRepository) {
-					await this.panelStateRepository.save(
-						{ panelType: 'environmentVariables', environmentId: this.currentEnvironmentId },
-						{ selectedSolutionId: DEFAULT_SOLUTION_ID, lastUpdated: new Date().toISOString() }
-					);
+			// Post-load validation: Check if persisted solution still exists
+			let finalSolutionId = this.currentSolutionId;
+			if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+				if (!solutions.some(s => s.id === this.currentSolutionId)) {
+					this.logger.warn('Persisted solution no longer exists, falling back to default', {
+						invalidSolutionId: this.currentSolutionId
+					});
+					finalSolutionId = DEFAULT_SOLUTION_ID;
+					this.currentSolutionId = DEFAULT_SOLUTION_ID;
+
+					// Save corrected state
+					if (this.panelStateRepository) {
+						await this.panelStateRepository.save(
+							{ panelType: 'environmentVariables', environmentId: this.currentEnvironmentId },
+							{ selectedSolutionId: DEFAULT_SOLUTION_ID, lastUpdated: new Date().toISOString() }
+						);
+					}
 				}
 			}
+
+			const viewModels = environmentVariables
+				.map(envVar => this.viewModelMapper.toViewModel(envVar))
+				.sort((a, b) => a.schemaName.localeCompare(b.schemaName));
+
+			// Final render with both solutions and data
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				solutions,
+				currentSolutionId: finalSolutionId,
+				tableData: viewModels
+			});
+		} finally {
+			// Re-enable buttons after load completes
+			await this.loadingBehavior.setLoading(false);
 		}
-
-		const viewModels = environmentVariables
-			.map(envVar => this.viewModelMapper.toViewModel(envVar))
-			.sort((a, b) => a.schemaName.localeCompare(b.schemaName));
-
-		// Final render with both solutions and data
-		await this.scaffoldingBehavior.refresh({
-			environments,
-			currentEnvironmentId: this.currentEnvironmentId,
-			solutions,
-			currentSolutionId: finalSolutionId,
-			tableData: viewModels
-		});
 	}
 
 	private createCoordinator(): { coordinator: PanelCoordinator<EnvironmentVariablesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
@@ -329,6 +347,9 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing environment variables');
 
+		await this.loadingBehavior.setButtonLoading('refresh', true);
+		this.showTableLoading();
+
 		try {
 			const environmentVariables = await this.listEnvVarsUseCase.execute(
 				this.currentEnvironmentId,
@@ -342,18 +363,23 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 
 			this.logger.info('Environment variables loaded successfully', { count: viewModels.length });
 
+			const config = this.getTableConfig();
+
 			// Data-driven update: Send ViewModels to frontend
 			await this.panel.webview.postMessage({
 				command: 'updateTableData',
 				data: {
 					viewModels,
-					columns: this.getTableConfig().columns
+					columns: config.columns,
+					noDataMessage: config.noDataMessage
 				}
 			});
 		} catch (error: unknown) {
 			this.logger.error('Error refreshing environment variables', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh environment variables: ${errorMessage}`);
+		} finally {
+			await this.loadingBehavior.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -417,79 +443,60 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		this.setButtonLoading('refresh', true);
-		this.clearTable();
+		const oldEnvironmentId = this.currentEnvironmentId;
+		this.currentEnvironmentId = environmentId;
+		this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
 
-		try {
-			const oldEnvironmentId = this.currentEnvironmentId;
-			this.currentEnvironmentId = environmentId;
-			this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
+		// Re-register panel in map for new environment
+		this.reregisterPanel(EnvironmentVariablesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
-			// Re-register panel in map for new environment
-			this.reregisterPanel(EnvironmentVariablesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
-
-			const environment = await this.getEnvironmentById(environmentId);
-			if (environment) {
-				this.panel.title = `Environment Variables - ${environment.name}`;
-			}
-
-			this.solutionOptions = await this.loadSolutions();
-
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
+		const environment = await this.getEnvironmentById(environmentId);
+		if (environment) {
+			this.panel.title = `Environment Variables - ${environment.name}`;
 		}
+
+		this.solutionOptions = await this.loadSolutions();
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 	private async handleSolutionChange(solutionId: string): Promise<void> {
 		this.logger.debug('Solution filter changed', { solutionId });
 
-		this.setButtonLoading('refresh', true);
-		this.clearTable();
+		this.currentSolutionId = solutionId;
 
-		try {
-			this.currentSolutionId = solutionId;
-
-			// Always save concrete solution selection to panel state
-			if (this.panelStateRepository) {
-				await this.panelStateRepository.save(
-					{
-						panelType: 'environmentVariables',
-						environmentId: this.currentEnvironmentId
-					},
-					{
-						selectedSolutionId: solutionId,
-						lastUpdated: new Date().toISOString()
-					}
-				);
-			}
-
-			await this.handleRefresh();
-		} finally {
-			this.setButtonLoading('refresh', false);
+		// Always save concrete solution selection to panel state
+		if (this.panelStateRepository) {
+			await this.panelStateRepository.save(
+				{
+					panelType: 'environmentVariables',
+					environmentId: this.currentEnvironmentId
+				},
+				{
+					selectedSolutionId: solutionId,
+					lastUpdated: new Date().toISOString()
+				}
+			);
 		}
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
 	}
 
 	/**
-	 * Clears the table by sending empty data to the webview.
-	 * Provides immediate visual feedback during environment switches.
+	 * Shows loading spinner in the table.
+	 * Provides visual feedback during environment/solution switches.
 	 */
-	private clearTable(): void {
+	private showTableLoading(): void {
 		this.panel.webview.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels: [],
-				columns: this.getTableConfig().columns
+				columns: this.getTableConfig().columns,
+				isLoading: true
 			}
 		});
 	}
 
-	private setButtonLoading(buttonId: string, isLoading: boolean): void {
-		this.panel.webview.postMessage({
-			command: 'setButtonState',
-			buttonId,
-			disabled: isLoading,
-			showSpinner: isLoading,
-		});
-	}
 }

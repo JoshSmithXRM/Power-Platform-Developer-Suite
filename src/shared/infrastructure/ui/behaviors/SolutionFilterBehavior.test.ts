@@ -27,7 +27,7 @@ describe('SolutionFilterBehavior', () => {
 	let behavior: SolutionFilterBehavior;
 
 	const mockSolutions: SolutionOption[] = [
-		{ id: DEFAULT_SOLUTION_ID, name: 'All Solutions', uniqueName: 'all' },
+		{ id: DEFAULT_SOLUTION_ID, name: 'Default Solution', uniqueName: 'Default' },
 		{ id: 'sol-1', name: 'Solution 1', uniqueName: 'solution1' },
 		{ id: 'sol-2', name: 'Solution 2', uniqueName: 'solution2' }
 	];
