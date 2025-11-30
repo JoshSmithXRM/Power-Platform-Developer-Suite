@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.3] - 2025-11-29
+## [0.2.4] - 2025-11-30
 
 ### Added
 
@@ -31,10 +31,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `escapeCsvField()` helper for RFC 4180 compliant CSV escaping
   - `saveToFile()` using VS Code save dialog
 
-- **Plugin Trace Viewer E2E Tests:** Playwright integration tests
-  - Panel open/close tests
-  - Export dropdown visibility tests
-  - CSV export flow tests
+- **Data Explorer E2E Tests:** Playwright integration tests for Data Explorer panel
+  - Query execution tests
+  - Results display verification
+  - Mode switching tests
+
+### Changed
+
+- **Plugin Trace Viewer:** Refactored `FileSystemPluginTraceExporter` to use shared `CsvExportService`
+  - Reduced code duplication
+  - Consistent CSV formatting across features
+
+### Fixed
+
+- **Data Explorer:** Column headers now display formatted display names instead of raw logical names
+  - `accountid` displays as "Account ID", `createdon` as "Created On"
+  - Title-case formatting with proper word breaks on capital letters
+
+- **Data Explorer:** OData annotation fields (`@Microsoft.Dynamics.CRM.*`) no longer appear in query results
+  - Annotation fields filtered at repository layer before mapping to ViewModels
+
+- **Data Explorer:** FetchXML editor now renders immediately when switching modes
+  - Both SQL and FetchXML panels rendered on load, visibility toggled via CSS
+  - Eliminates blank editor state during mode switch
+
+- **Data Explorer:** Export CSV button no longer gets stuck in loading state after export completes
+  - Root cause: `await vscode.window.showInformationMessage()` blocking finally block
+  - Success message now shown fire-and-forget without await
+
+- **Data Explorer:** Lookup fields with JSON object values now display correctly
+  - Falls back to ID when lookup value is a JSON object instead of GUID string
+  - Prevents "[object Object]" display in lookup columns
+
+## [0.2.3] - 2025-11-29
+
+### Added
 
 - **Web Resources Panel** - Browse, edit, save, and publish web resources directly in VS Code
   - Browse web resources with solution filtering
@@ -86,15 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - "Open in Maker" stays enabled during loading (only needs environment ID)
   - Panel-specific "no data" messages instead of hardcoded text
 
-### Changed
-
-- **Plugin Trace Viewer:** Refactored `FileSystemPluginTraceExporter` to use shared `CsvExportService`
-  - Reduced code duplication
-  - Consistent CSV formatting across features
-
 ### Fixed
-
-- **Data Explorer:** Export CSV button no longer gets stuck in loading state after export completes
 
 - **Plugin Trace Viewer** - Eliminate double-render flash on panel initialization
   - Single scaffold render with all persisted state (filter panel, quick filters)
