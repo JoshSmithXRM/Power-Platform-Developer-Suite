@@ -44,6 +44,7 @@ import type { FilterCriteriaViewModel } from '../../application/viewModels/Filte
 import { FilterField } from '../../application/types';
 import { FILTER_ENUM_OPTIONS } from '../constants/FilterFieldConfiguration';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 import { PluginTraceExportBehavior } from '../behaviors/PluginTraceExportBehavior';
 import { PluginTraceDeleteBehavior } from '../behaviors/PluginTraceDeleteBehavior';
 import { PluginTraceAutoRefreshBehavior } from '../behaviors/PluginTraceAutoRefreshBehavior';
@@ -98,6 +99,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	private readonly detailSection: PluginTraceDetailSection;
 
 	// Behaviors (encapsulate panel operations)
+	private readonly loadingBehavior: LoadingStateBehavior;
 	private readonly exportBehavior: PluginTraceExportBehavior;
 	private readonly deleteBehavior: PluginTraceDeleteBehavior;
 	private readonly autoRefreshBehavior: PluginTraceAutoRefreshBehavior;
@@ -138,6 +140,14 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
 		this.detailSection = result.detailSection;
+
+		// Initialize loading behavior for toolbar buttons
+		// Note: openMaker excluded - it only needs environmentId which is already known
+		this.loadingBehavior = new LoadingStateBehavior(
+			panel,
+			LoadingStateBehavior.createButtonConfigs(['refresh']),
+			logger
+		);
 
 		// Initialize behaviors (encapsulate panel operations)
 		this.exportBehavior = new PluginTraceExportBehavior(exportTracesUseCase, logger);
@@ -304,11 +314,11 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		// Start auto-refresh timer if interval was persisted
 		this.autoRefreshBehavior.startIfEnabled();
 
+		// Initial render - buttons enabled (openMaker can be used immediately)
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			tableData: [],
-			isLoading: true,
 			state: {
 				traceLevel: this.currentTraceLevel?.value,
 				autoRefreshInterval: this.autoRefreshBehavior.getInterval(),
@@ -626,7 +636,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	private async handleRefresh(): Promise<void> {
 		this.logger.debug('Refreshing plugin traces');
 
-		this.setButtonLoading('refresh', true);
+		await this.loadingBehavior.setButtonLoading('refresh', true);
 		this.showTableLoading();
 
 		try {
@@ -660,7 +670,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			this.logger.error('Failed to load plugin traces', error);
 			await vscode.window.showErrorMessage('Failed to load plugin traces');
 		} finally {
-			this.setButtonLoading('refresh', false);
+			await this.loadingBehavior.setButtonLoading('refresh', false);
 		}
 	}
 
@@ -881,19 +891,6 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 				columns: this.getTableConfig().columns,
 				isLoading: true
 			}
-		});
-	}
-
-	/**
-	 * Sets button loading state via webview message.
-	 * Disables button and shows spinner during async operations.
-	 */
-	private setButtonLoading(buttonId: string, isLoading: boolean): void {
-		this.panel.webview.postMessage({
-			command: 'setButtonState',
-			buttonId,
-			disabled: isLoading,
-			showSpinner: isLoading,
 		});
 	}
 }
