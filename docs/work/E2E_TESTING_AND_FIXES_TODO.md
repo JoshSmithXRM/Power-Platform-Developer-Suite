@@ -17,6 +17,7 @@
 ### Bug Fixes
 
 - [x] Environment Setup panel not scrollable on 1920x1080 displays
+- [x] Save button stuck on "Saving..." after error (design smell fix)
 - [ ] (Add more as discovered)
 
 ### E2E Testing Improvements
@@ -54,3 +55,13 @@
 - Created branch `chore/e2e-testing-and-fixes`
 - Identified scrolling issue in Environment Setup panel
 - Fixed by adding scroll support to `.form-container`
+
+**Button State Management Design Smell Fix:**
+- **Problem:** Save button stuck on "Saving..." after errors; two competing button state systems
+- **Root Cause:** EnvironmentSetupBehavior.js manually managed button state (`button.textContent`, `button.disabled`) while PanelCoordinator also managed state via `setButtonState` messages
+- **Analysis:** Only EnvironmentSetup panel had this issue - all other panels correctly used coordinator pattern
+- **Fix:**
+  - Removed manual button state management from `sendFormCommand()`, `handleSaveComplete()`, `handleTestResult()`, `handleDiscoverResult()`
+  - Changed `testConnection` and `discoverEnvironmentId` handlers from `disableOnExecute: false` to `disableOnExecute: true`
+  - Kept business logic: success/error CSS styling, validation error display, "Saved!" feedback via `setButtonLabel` message
+- **Result:** All button state now managed by PanelCoordinator with automatic spinner and guaranteed state restoration on errors
