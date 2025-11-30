@@ -10,7 +10,6 @@ describe('WebResource', () => {
 		name: WebResourceName;
 		displayName: string;
 		webResourceType: WebResourceType;
-		contentSize: number;
 		isManaged: boolean;
 		modifiedOn: Date;
 	}> = {}): WebResource {
@@ -19,7 +18,6 @@ describe('WebResource', () => {
 			overrides.name ?? WebResourceName.create('new_test.js'),
 			overrides.displayName ?? 'Test Script',
 			overrides.webResourceType ?? WebResourceType.JAVASCRIPT,
-			overrides.contentSize ?? 1024,
 			overrides.isManaged ?? false,
 			overrides.modifiedOn ?? new Date('2024-01-15T10:30:00Z')
 		);
@@ -34,7 +32,6 @@ describe('WebResource', () => {
 			const name = WebResourceName.create('contoso_script.js');
 			const displayName = 'Contoso Script';
 			const type = WebResourceType.JAVASCRIPT;
-			const contentSize = 2048;
 			const isManaged = false;
 			const modifiedOn = new Date('2024-01-15T10:30:00Z');
 
@@ -44,7 +41,6 @@ describe('WebResource', () => {
 				name,
 				displayName,
 				type,
-				contentSize,
 				isManaged,
 				modifiedOn
 			);
@@ -54,7 +50,6 @@ describe('WebResource', () => {
 			expect(resource.name).toBe(name);
 			expect(resource.displayName).toBe(displayName);
 			expect(resource.webResourceType).toBe(type);
-			expect(resource.contentSize).toBe(contentSize);
 			expect(resource.isManaged).toBe(isManaged);
 			expect(resource.modifiedOn).toBe(modifiedOn);
 		});
@@ -65,14 +60,6 @@ describe('WebResource', () => {
 
 			// Assert
 			expect(resource.isManaged).toBe(true);
-		});
-
-		it('should create WebResource with zero content size', () => {
-			// Arrange & Act
-			const resource = createTestWebResource({ contentSize: 0 });
-
-			// Assert
-			expect(resource.contentSize).toBe(0);
 		});
 	});
 
@@ -571,7 +558,6 @@ describe('WebResource', () => {
 			expect(resource.name).toBeDefined();
 			expect(resource.displayName).toBeDefined();
 			expect(resource.webResourceType).toBeDefined();
-			expect(resource.contentSize).toBeDefined();
 			expect(resource.isManaged).toBeDefined();
 			expect(resource.modifiedOn).toBeDefined();
 		});

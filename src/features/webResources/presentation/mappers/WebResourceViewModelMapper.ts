@@ -1,7 +1,6 @@
 import type { WebResource } from '../../domain/entities/WebResource';
 import { WebResourceViewModel } from '../../application/viewModels/WebResourceViewModel';
 import { WebResourceTypeFormatter } from '../utils/WebResourceTypeFormatter';
-import { StorageSizeFormatter } from '../../../../shared/infrastructure/ui/utils/StorageSizeFormatter';
 import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
 import type { CellLink } from '../../../../shared/infrastructure/ui/types/CellLink';
 
@@ -40,7 +39,6 @@ export class WebResourceViewModelMapper {
 			displayName: webResource.displayName || name,
 			type: WebResourceTypeFormatter.formatDisplayName(webResource.webResourceType),
 			typeCode,
-			size: StorageSizeFormatter.formatSize(webResource.contentSize),
 			modifiedOn: DateFormatter.formatDate(webResource.modifiedOn),
 			isManaged: webResource.isManaged,
 			isEditable: webResource.canEdit()

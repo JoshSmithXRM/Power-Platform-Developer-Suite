@@ -20,7 +20,6 @@ export class WebResource {
 		public readonly name: WebResourceName,
 		public readonly displayName: string,
 		public readonly webResourceType: WebResourceType,
-		public readonly contentSize: number,
 		public readonly isManaged: boolean,
 		public readonly modifiedOn: Date
 	) {}

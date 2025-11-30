@@ -47,15 +47,13 @@ describe('ListWebResourcesUseCase', () => {
 		name: string,
 		displayName: string,
 		type: WebResourceType = WebResourceType.JAVASCRIPT,
-		isManaged = false,
-		contentSize = 1024
+		isManaged = false
 	): WebResource {
 		return new WebResource(
 			id,
 			WebResourceName.create(name),
 			displayName,
 			type,
-			contentSize,
 			isManaged,
 			new Date('2024-01-15T10:30:00Z')
 		);

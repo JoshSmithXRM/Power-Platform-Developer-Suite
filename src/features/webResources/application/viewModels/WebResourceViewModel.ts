@@ -14,7 +14,6 @@ export interface WebResourceViewModel {
 	readonly displayName: string;
 	readonly type: string;
 	readonly typeCode: number;
-	readonly size: string;
 	readonly modifiedOn: string;
 	readonly isManaged: boolean;
 	readonly isEditable: boolean;

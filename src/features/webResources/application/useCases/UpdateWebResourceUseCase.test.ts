@@ -46,7 +46,6 @@ describe('UpdateWebResourceUseCase', () => {
 			WebResourceName.create(name),
 			displayName,
 			type,
-			1024,
 			isManaged,
 			new Date('2024-01-15T10:30:00Z')
 		);

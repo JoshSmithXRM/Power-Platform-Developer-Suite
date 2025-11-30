@@ -395,7 +395,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				{ key: 'name', label: 'Name' },
 				{ key: 'displayName', label: 'Display Name' },
 				{ key: 'type', label: 'Type' },
-				{ key: 'size', label: 'Size' },
 				{ key: 'modifiedOn', label: 'Modified On' }
 			],
 			searchPlaceholder: '🔍 Search web resources...',
@@ -571,12 +570,13 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	 * @param name - Web resource name (used for filename)
 	 * @param typeCode - Web resource type code (determines file extension)
 	 */
-	private async handleOpenWebResource(webResourceId: string, name: string, typeCode: number): Promise<void> {
-		this.logger.debug('Opening web resource in editor', { webResourceId, name, typeCode });
+	private async handleOpenWebResource(webResourceId: string, name: string, _typeCode: number): Promise<void> {
+		this.logger.debug('Opening web resource in editor', { webResourceId, name });
 
 		try {
-			const fileExtension = this.getFileExtensionFromTypeCode(typeCode);
-			const filename = `${name}${fileExtension}`;
+			// Web resource name already includes the file extension (e.g., "new_script.js")
+			// No need to append extension based on type code
+			const filename = name;
 
 			const uri = createWebResourceUri(
 				this.currentEnvironmentId,
@@ -593,28 +593,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			const message = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to open web resource: ${message}`);
 		}
-	}
-
-	/**
-	 * Maps Dataverse type code to file extension.
-	 * Duplicates logic from WebResourceType value object to avoid domain import.
-	 */
-	private getFileExtensionFromTypeCode(typeCode: number): string {
-		const extensionMap: Record<number, string> = {
-			1: '.html',
-			2: '.css',
-			3: '.js',
-			4: '.xml',
-			5: '.png',
-			6: '.jpg',
-			7: '.gif',
-			8: '.xap',
-			9: '.xsl',
-			10: '.ico',
-			11: '.svg',
-			12: '.resx'
-		};
-		return extensionMap[typeCode] ?? '.txt';
 	}
 
 	/**

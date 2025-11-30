@@ -15,7 +15,6 @@ describe('WebResourceViewModelMapper', () => {
 		name?: string;
 		displayName?: string;
 		type?: WebResourceType;
-		contentSize?: number;
 		isManaged?: boolean;
 		modifiedOn?: Date;
 	} = {}): WebResource {
@@ -24,7 +23,6 @@ describe('WebResourceViewModelMapper', () => {
 			WebResourceName.create(overrides.name ?? 'new_test.js'),
 			overrides.displayName ?? 'Test Script',
 			overrides.type ?? WebResourceType.JAVASCRIPT,
-			overrides.contentSize ?? 1024,
 			overrides.isManaged ?? false,
 			overrides.modifiedOn ?? new Date('2024-01-15T10:30:00Z')
 		);
@@ -220,50 +218,6 @@ describe('WebResourceViewModelMapper', () => {
 			// Assert
 			expect(viewModel.type).toBe('String (RESX)');
 			expect(viewModel.typeCode).toBe(12);
-		});
-
-		it('should format size for bytes', () => {
-			// Arrange
-			const webResource = createTestWebResource({ contentSize: 512 });
-
-			// Act
-			const viewModel = mapper.toViewModel(webResource);
-
-			// Assert
-			expect(viewModel.size).toBe('512 B');
-		});
-
-		it('should format size for kilobytes', () => {
-			// Arrange
-			const webResource = createTestWebResource({ contentSize: 2048 });
-
-			// Act
-			const viewModel = mapper.toViewModel(webResource);
-
-			// Assert
-			expect(viewModel.size).toBe('2.00 KB');
-		});
-
-		it('should format size for megabytes', () => {
-			// Arrange
-			const webResource = createTestWebResource({ contentSize: 2 * 1024 * 1024 });
-
-			// Act
-			const viewModel = mapper.toViewModel(webResource);
-
-			// Assert
-			expect(viewModel.size).toBe('2.00 MB');
-		});
-
-		it('should format size for zero bytes', () => {
-			// Arrange
-			const webResource = createTestWebResource({ contentSize: 0 });
-
-			// Act
-			const viewModel = mapper.toViewModel(webResource);
-
-			// Assert
-			expect(viewModel.size).toBe('0 B');
 		});
 
 		it('should format modified date', () => {
@@ -469,19 +423,6 @@ describe('WebResourceViewModelMapper', () => {
 
 			// Assert
 			expect(viewModel.displayName).toBe('Script avec accents et symboles');
-		});
-
-		it('should handle very large content size', () => {
-			// Arrange
-			const webResource = createTestWebResource({
-				contentSize: 10 * 1024 * 1024 // 10 MB (formatter only supports up to MB)
-			});
-
-			// Act
-			const viewModel = mapper.toViewModel(webResource);
-
-			// Assert
-			expect(viewModel.size).toBe('10.00 MB');
 		});
 	});
 });

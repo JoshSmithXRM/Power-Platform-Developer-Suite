@@ -481,7 +481,6 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 			WebResourceName.create(dto.name),
 			dto.displayname ?? dto.name,
 			WebResourceType.fromCode(dto.webresourcetype),
-			0, // contentSize - calculated when content is fetched (Slice 2)
 			dto.ismanaged,
 			new Date(dto.modifiedon)
 		);

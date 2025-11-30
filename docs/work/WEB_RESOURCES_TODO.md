@@ -176,7 +176,9 @@ Deferred to future PR - see "Future Work" section below.
 | Web resources not clickable | ✅ Fixed | Changed from `nameHtml` to `nameLink` CellLink structure |
 | Publish buttons not working | ✅ Fixed | Added row selection to VirtualTableRenderer, fixed button state updates |
 | "All Solutions" causing confusion | ✅ Fixed | Removed synthetic "All Solutions" option - Default Solution is the default |
-| Virtual table only shows 16 rows | ✅ Fixed | Fixed initial container height and visible row calculation |
+| Virtual table only shows 16 rows | ✅ Fixed | Root cause: hardcoded 600px max. Fixed with CSS flexbox layout to fill available viewport |
+| .js appended to all files | ✅ Fixed | Web resource name already includes extension - don't append again |
+| Size shows 0 B for all rows | ✅ Fixed | Removed Size column - Dataverse doesn't expose file size without fetching content |
 | No loading state when switching | ✅ Fixed | Added `showLoading` command to VirtualTableRenderer |
 
 ---

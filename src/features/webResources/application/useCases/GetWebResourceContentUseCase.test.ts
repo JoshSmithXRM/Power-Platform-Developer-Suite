@@ -44,7 +44,6 @@ describe('GetWebResourceContentUseCase', () => {
 			WebResourceName.create(name),
 			displayName,
 			type,
-			1024,
 			false,
 			new Date('2024-01-15T10:30:00Z')
 		);
