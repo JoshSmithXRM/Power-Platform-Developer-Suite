@@ -37,8 +37,47 @@ Testing infrastructure, tooling, and user experience improvements.
 
 ## High Priority
 
+### Version Roadmap Planning
+**Status**: Future
+**Priority**: High
+**Estimated Effort**: 2-4 hours
+**Value**: Clear versioning strategy and user visibility into project direction
+
+**Description**:
+Create a `ROADMAP.md` file documenting version bump criteria and planned milestones.
+
+**Questions to Answer**:
+- What constitutes a MINOR bump (0.2 → 0.3)?
+- What signals 1.0 "production ready"?
+- What are the major feature themes for each version?
+
+**Suggested Structure**:
+```markdown
+# Version Roadmap
+
+## Versioning Philosophy
+- PATCH (0.2.x): Bug fixes, small improvements
+- MINOR (0.x.0): Significant new capability area
+- MAJOR (x.0.0): Production ready declaration
+
+## 0.3.0 - ALM & Deployment
+- Solution export/import
+- Environment comparison
+
+## 1.0.0 - Production Ready
+- All core panels stable
+- Documentation complete
+```
+
+**Success Criteria**:
+- Clear criteria for version bumps documented
+- Users can see project direction
+- Release planning is predictable
+
+---
+
 ### User Configuration System
-**Status**: In Progress (feature/web-resources branch)
+**Status**: ✅ Implemented (v0.2.3)
 **Priority**: High
 **Estimated Effort**: 8-12 hours
 **Value**: User-configurable settings for record limits, page sizes, and panel behavior
@@ -78,7 +117,7 @@ Add VS Code configuration contribution point to allow users to customize extensi
 ---
 
 ### Virtual Data Table
-**Status**: In Progress (feature/web-resources branch)
+**Status**: ✅ Implemented (v0.2.3)
 **Priority**: High
 **Estimated Effort**: 16-24 hours
 **Value**: Support large datasets (70k+ records) without browser/memory issues
