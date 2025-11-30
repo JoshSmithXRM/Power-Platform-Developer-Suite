@@ -9,14 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Web Resources Panel** - Browse, edit, and save web resources directly in VS Code
+- **Web Resources Panel** - Browse, edit, save, and publish web resources directly in VS Code
   - Browse web resources with solution filtering
   - Open web resources in VS Code editor with syntax highlighting
   - Edit and save changes directly to Dataverse (Ctrl+S)
+  - Publish: single resource, publish all customizations, post-save notification with publish action
   - Business rules: managed resources read-only, binary types (PNG, JPG, etc.) not editable
   - Custom URI scheme: `ppds-webresource://` for VS Code file system integration
   - 60-second content cache for performance
   - Virtual table integration for 65k+ web resources
+
+- **Cross-Panel Publish Coordination** - Prevent concurrent publish conflicts
+  - `PublishCoordinator` tracks publish state per environment
+  - `PublishBehavior` composable for reusable publish functionality
+  - Detects Dataverse 429 "publish in progress" errors with user-friendly messages
 
 - **Server-Side Search Fallback** - Search large datasets beyond local cache
   - `SearchVirtualTableUseCase` orchestrates client-cache + server search
@@ -46,6 +52,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Settings entry in Tools sidebar for quick access
   - Clean Architecture implementation: `IConfigurationService` interface in domain, `VsCodeConfigurationService` in infrastructure
   - `NullConfigurationService` test stub for unit testing
+
+- **Panel Loading State Consistency** - Unified loading behavior across all panels
+  - `LoadingStateBehavior` manages button states during initialization and refresh
+  - Loading spinner shown on refresh button while data loads
+  - "Open in Maker" stays enabled during loading (only needs environment ID)
+  - Panel-specific "no data" messages instead of hardcoded text
+
+### Fixed
+
+- **Plugin Trace Viewer** - Eliminate double-render flash on panel initialization
+  - Single scaffold render with all persisted state (filter panel, quick filters)
+  - Removes visible re-render when filters restore after initial load
+
+- **Virtual Tables** - Tables now fill available viewport space
+  - Removed hardcoded 600px max height limitation
+  - CSS flexbox layout properly constrains virtual scroll container
 
 ## [0.2.2] - 2025-11-26
 
