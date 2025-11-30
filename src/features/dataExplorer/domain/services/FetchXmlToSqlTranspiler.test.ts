@@ -950,5 +950,227 @@ describe('FetchXmlToSqlTranspiler', () => {
 				expect(result.sql).toContain("O''Brien");
 			});
 		});
+
+		describe('branch coverage edge cases', () => {
+			it('should handle begins-with without value', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="firstname" operator="begins-with" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain("LIKE '%'");
+			});
+
+			it('should handle ends-with without value', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="lastname" operator="ends-with" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain("LIKE '%'");
+			});
+
+			it('should handle not-begin-with without value', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="firstname" operator="not-begin-with" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain("NOT LIKE '%'");
+			});
+
+			it('should handle not-end-with without value', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="lastname" operator="not-end-with" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain("NOT LIKE '%'");
+			});
+
+			it('should skip link-entity missing required from attribute', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<link-entity name="account" to="parentcustomerid">
+								<attribute name="name" />
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// Link entity should be skipped, no JOIN in output
+				expect(result.sql).not.toContain('JOIN');
+			});
+
+			it('should skip link-entity missing required to attribute', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<link-entity name="account" from="accountid">
+								<attribute name="name" />
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).not.toContain('JOIN');
+			});
+
+			it('should skip link-entity missing name attribute', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<link-entity from="accountid" to="parentcustomerid">
+								<attribute name="name" />
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).not.toContain('JOIN');
+			});
+
+			it('should skip condition missing attribute', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition operator="eq" value="test" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// Condition should be skipped
+				expect(result.sql).not.toContain('WHERE');
+			});
+
+			it('should skip condition missing operator', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="firstname" value="test" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).not.toContain('WHERE');
+			});
+
+			it('should handle filter with only invalid conditions', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition operator="eq" value="test" />
+								<condition attribute="name" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// No valid conditions, no WHERE clause
+				expect(result.sql).not.toContain('WHERE');
+			});
+
+			it('should handle attribute without name in link-entity', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<link-entity name="account" from="accountid" to="parentcustomerid" alias="acc">
+								<attribute alias="somealias" />
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// Attribute without name should be skipped
+				expect(result.sql).toContain('JOIN');
+				expect(result.sql).not.toContain('somealias');
+			});
+
+			it('should handle attribute without name in main entity', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute alias="myalias" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// Empty column list should result in SELECT *
+				expect(result.sql).toContain('SELECT *');
+			});
+		});
 	});
 });

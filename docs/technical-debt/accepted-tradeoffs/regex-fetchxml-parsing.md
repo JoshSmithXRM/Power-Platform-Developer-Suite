@@ -32,6 +32,7 @@ The transpiler uses regex patterns to extract FetchXML elements and convert them
 - Successfully parses ~95% of real-world FetchXML queries
 - Handles attributes, filters, conditions, link-entities, orders
 - Nested filters are flattened (conditions extracted, joined with parent's AND/OR)
+- 90.66% branch coverage achieved (meets domain threshold)
 
 ---
 
@@ -76,9 +77,10 @@ The transpiler uses regex patterns to extract FetchXML elements and convert them
    - XML comments
    - Unusual attribute quoting
 
-3. **Coverage threshold exception**
-   - File has 84% branch coverage threshold (vs 90% for other domain services)
-   - Documented in jest.config.js with explanation
+3. **Remaining uncovered branches (~9%)**
+   - Defensive nullish coalescing (`match[1] ?? ''`) for regex capture groups
+   - Non-Error exception handling (unreachable in practice)
+   - These are safety fallbacks, not functional gaps
 
 ---
 
@@ -172,10 +174,9 @@ export class FetchXmlToSqlTranspiler {
 
 **Code Locations:**
 - `src/features/dataExplorer/domain/services/FetchXmlToSqlTranspiler.ts` - Main transpiler
-- `jest.config.js:25-30` - Coverage exception with explanation
 
 **Pattern Documentation:**
 - [DOMAIN_SERVICE_PATTERNS.md](../../architecture/DOMAIN_SERVICE_PATTERNS.md#pattern-6-transpiler-services) - Transpiler pattern documentation
 
 **Tests:**
-- `src/features/dataExplorer/domain/services/FetchXmlToSqlTranspiler.test.ts` - 53 tests
+- `src/features/dataExplorer/domain/services/FetchXmlToSqlTranspiler.test.ts` - 65 tests (90.66% branch coverage)
