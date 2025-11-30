@@ -442,30 +442,16 @@
 	}
 
 	/**
-	 * Updates container height based on actual content that needs to be displayed.
-	 * Uses scrollHeight measurement with large temporary height to avoid scrollbar influence.
-	 * When content fits, use exact height (no scrollbar).
-	 * When content exceeds max, cap at max height (enable scrollbar).
+	 * Triggers a layout recalculation for the scroll container.
+	 * The container height is now managed by CSS flexbox (fills available space).
+	 * This function forces a reflow so JS can read accurate dimensions.
 	 *
 	 * @param {HTMLElement} scrollContainer - The scroll container element (wrapper or tbody)
 	 */
 	function updateContainerHeight(scrollContainer) {
-		const MAX_HEIGHT = 600; // Cap at 600px to enable virtual scrolling for large datasets
-
-		// Set very large height temporarily - ensures no scrollbar affects measurement
-		// This makes the container bigger than any possible content
-		scrollContainer.style.height = '10000px';
-
 		// Force browser to recalculate layout
+		// Container height is managed by CSS (flex: 1), not JavaScript
 		void scrollContainer.offsetHeight;
-
-		// scrollHeight now gives true content height (no scrollbar taking space)
-		const contentHeight = scrollContainer.scrollHeight;
-
-		// Set final height: exact content height, capped at MAX
-		const finalHeight = Math.min(contentHeight, MAX_HEIGHT);
-
-		scrollContainer.style.height = `${finalHeight}px`;
 	}
 
 	/**

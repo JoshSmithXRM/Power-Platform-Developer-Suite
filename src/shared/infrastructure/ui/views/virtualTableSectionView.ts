@@ -109,14 +109,9 @@ function renderVirtualTable(
 	rowDataJson: string,
 	estimatedRowHeight: number
 ): string {
-	// Calculate container height for virtual scrolling
-	// Must account for header row + data rows
-	// JS will recalculate and cap at 600px; set generous initial height to avoid clipping
-	const MAX_INITIAL_HEIGHT = 600;
-	const visibleRows = Math.min(data.length, Math.floor(MAX_INITIAL_HEIGHT / estimatedRowHeight));
-	const headerHeight = estimatedRowHeight; // Header uses similar height to data rows
-	const dataRowsHeight = visibleRows * estimatedRowHeight;
-	const containerHeight = Math.min(headerHeight + dataRowsHeight, MAX_INITIAL_HEIGHT);
+	// Virtual scroll wrapper fills available space via CSS (height: 100%)
+	// JS reads actual container height and calculates visible rows dynamically
+	// No hardcoded max height - parent container controls available space
 
 	// Scroll wrapper handles both horizontal and vertical scrolling
 	// Table uses natural layout - no display:block hacks
@@ -126,7 +121,6 @@ function renderVirtualTable(
 			<div
 				id="virtualScrollWrapper"
 				class="virtual-scroll-wrapper"
-				style="height: ${containerHeight}px; overflow: auto;"
 			>
 				<table class="virtual-table">
 					<thead>

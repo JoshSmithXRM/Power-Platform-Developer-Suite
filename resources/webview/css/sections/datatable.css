@@ -146,14 +146,28 @@ tbody tr:hover {
    Scroll wrapper approach - natural table layout
    =========================================== */
 
-/* Disable double scrollbar - table-content normally scrolls, but not for virtual tables */
+/* For virtual tables, table-content becomes a flex container with hidden overflow
+   so height percentages work correctly on children */
 .table-content:has(.virtual-scroll-wrapper) {
-	overflow: visible;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	min-height: 0; /* Allow flex child to shrink */
 }
 
-/* Scroll wrapper handles both horizontal and vertical scrolling */
+/* Virtual table container fills available space */
+.virtual-table-container {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0; /* Allow flex child to shrink */
+}
+
+/* Scroll wrapper fills remaining space and handles both horizontal and vertical scrolling */
 .virtual-scroll-wrapper {
+	flex: 1;
 	overflow: auto;
+	min-height: 0; /* Allow flex child to shrink and scroll */
 }
 
 /* Virtual table - fixed layout with calculated widths */
