@@ -32,11 +32,12 @@ import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 import { createWebResourceUri } from '../../infrastructure/providers/WebResourceFileSystemProvider';
+import { PublishBehavior } from '../../../../shared/infrastructure/ui/behaviors/PublishBehavior';
 
 /**
  * Commands supported by Web Resources panel.
  */
-type WebResourcesCommands = 'refresh' | 'openMaker' | 'environmentChange' | 'solutionChange' | 'openWebResource' | 'searchServer' | 'publish' | 'publishSolution' | 'publishAll' | 'rowSelect';
+type WebResourcesCommands = 'refresh' | 'openMaker' | 'environmentChange' | 'solutionChange' | 'openWebResource' | 'searchServer' | 'publish' | 'publishAll' | 'rowSelect';
 
 /**
  * Web Resources panel using PanelCoordinator architecture with virtual table.
@@ -50,6 +51,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 	private readonly coordinator: PanelCoordinator<WebResourcesCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
+	private readonly publishBehavior: PublishBehavior;
 	private readonly virtualTableConfig: VirtualTableConfig;
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
@@ -97,6 +99,14 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
+
+		// Initialize publish behavior with Publish and Publish All buttons
+		this.publishBehavior = new PublishBehavior(
+			panel,
+			() => this.currentEnvironmentId,
+			['publish', 'publishAll'],
+			logger
+		);
 
 		this.registerCommandHandlers();
 
@@ -181,6 +191,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				localResourceRoots: [extensionUri],
 				retainContextWhenHidden: true,
 				enableFindWidget: true
+			},
+			onDispose: (instance) => {
+				instance.publishBehavior.dispose();
 			}
 		}, WebResourcesPanelComposed.panels);
 	}
@@ -248,9 +261,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			currentSolutionId: finalSolutionId,
 			tableData: viewModels
 		});
-
-		// Update publish button states based on current solution selection
-		this.updatePublishSolutionButtonState();
 	}
 
 	private createCoordinator(): { coordinator: PanelCoordinator<WebResourcesCommands>; scaffoldingBehavior: HtmlScaffoldingBehavior } {
@@ -263,7 +273,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
 				{ id: 'publish', label: 'Publish', disabled: true },
-				{ id: 'publishSolution', label: 'Publish Solution', disabled: true },
 				{ id: 'publishAll', label: 'Publish All' },
 				{ id: 'openMaker', label: 'Open in Maker' },
 				{ id: 'refresh', label: 'Refresh' }
@@ -373,11 +382,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			await this.handlePublish();
 		});
 
-		// Publish all web resources in current solution (dynamically fetches IDs)
-		this.coordinator.registerHandler('publishSolution', async () => {
-			await this.handlePublishSolution();
-		});
-
 		// Publish all customizations (uses PublishAllXml)
 		this.coordinator.registerHandler('publishAll', async () => {
 			await this.handlePublishAll();
@@ -475,9 +479,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.currentEnvironmentId = environmentId;
 		this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
 
-		// Disable "Publish Solution" since we're back to Default Solution
-		this.updatePublishSolutionButtonState();
-
 		// Re-register panel in map for new environment
 		this.reregisterPanel(WebResourcesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
 
@@ -500,9 +501,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		this.currentSolutionId = solutionId;
 
-		// Enable/disable "Publish Solution" based on selection
-		this.updatePublishSolutionButtonState();
-
 		// Persist solution selection
 		if (this.panelStateRepository) {
 			await this.panelStateRepository.save(
@@ -519,18 +517,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		// handleRefresh handles loading state
 		await this.handleRefresh();
-	}
-
-	/**
-	 * Enables the "Publish Solution" button when a solution is selected.
-	 */
-	private updatePublishSolutionButtonState(): void {
-		const hasSolutionSelected = !!this.currentSolutionId;
-		this.panel.webview.postMessage({
-			command: 'setButtonState',
-			buttonId: 'publishSolution',
-			disabled: !hasSolutionSelected
-		});
 	}
 
 	/**
@@ -626,90 +612,19 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			return;
 		}
 
+		const webResourceId = this.selectedWebResourceId;
+		const displayName = this.selectedWebResourceName ?? webResourceId;
+
 		this.logger.info('Publishing web resource', {
-			webResourceId: this.selectedWebResourceId,
+			webResourceId,
 			name: this.selectedWebResourceName
 		});
 
-		this.setButtonLoading('publish', true);
-
-		try {
-			await this.publishWebResourceUseCase.execute(
-				this.currentEnvironmentId,
-				this.selectedWebResourceId
-			);
-
-			vscode.window.showInformationMessage(
-				`Published: ${this.selectedWebResourceName ?? this.selectedWebResourceId}`
-			);
-		} catch (error) {
-			this.logger.error('Failed to publish web resource', error);
-			const message = error instanceof Error ? error.message : 'Unknown error';
-			vscode.window.showErrorMessage(`Failed to publish web resource: ${message}`);
-		} finally {
-			this.setButtonLoading('publish', false);
-		}
-	}
-
-	/**
-	 * Publishes all web resources in the current solution.
-	 * Dynamically fetches web resource IDs from the solution.
-	 */
-	private async handlePublishSolution(): Promise<void> {
-		if (!this.currentSolutionId) {
-			vscode.window.showWarningMessage('No solution selected.');
-			return;
-		}
-
-		// Dynamically fetch web resource IDs from the solution
-		this.logger.debug('Fetching web resource IDs for solution publish', {
-			solutionId: this.currentSolutionId
-		});
-
-		const webResources = await this.listWebResourcesUseCase.execute(
-			this.currentEnvironmentId,
-			this.currentSolutionId
+		await this.publishBehavior.executePublish(
+			'publish',
+			async () => this.publishWebResourceUseCase.execute(this.currentEnvironmentId, webResourceId),
+			`Published: ${displayName}`
 		);
-		const webResourceIds = webResources.map(r => r.id);
-
-		if (webResourceIds.length === 0) {
-			vscode.window.showInformationMessage('No web resources in this solution to publish.');
-			return;
-		}
-
-		// Show warning dialog
-		const confirmed = await vscode.window.showWarningMessage(
-			`Publish ${webResourceIds.length} web resource(s) from this solution? This will make all changes visible to users.`,
-			{ modal: true },
-			'Publish Solution',
-			'Cancel'
-		);
-
-		if (confirmed !== 'Publish Solution') {
-			return;
-		}
-
-		this.logger.info('Publishing solution web resources', {
-			solutionId: this.currentSolutionId,
-			count: webResourceIds.length
-		});
-
-		this.setButtonLoading('publishSolution', true);
-
-		try {
-			await this.publishWebResourceUseCase.executeMultiple(
-				this.currentEnvironmentId,
-				webResourceIds
-			);
-
-			vscode.window.showInformationMessage(`Published ${webResourceIds.length} web resource(s)`);
-		} catch (error) {
-			this.logger.error('Failed to publish solution web resources', error);
-			const message = error instanceof Error ? error.message : 'Unknown error';
-			vscode.window.showErrorMessage(`Failed to publish web resources: ${message}`);
-		} finally {
-			this.setButtonLoading('publishSolution', false);
-		}
 	}
 
 	/**
@@ -731,19 +646,11 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		this.logger.info('Publishing all customizations via PublishAllXml');
 
-		this.setButtonLoading('publishAll', true);
-
-		try {
-			await this.publishWebResourceUseCase.executeAll(this.currentEnvironmentId);
-
-			vscode.window.showInformationMessage('All customizations published successfully');
-		} catch (error) {
-			this.logger.error('Failed to publish all customizations', error);
-			const message = error instanceof Error ? error.message : 'Unknown error';
-			vscode.window.showErrorMessage(`Failed to publish all customizations: ${message}`);
-		} finally {
-			this.setButtonLoading('publishAll', false);
-		}
+		await this.publishBehavior.executePublish(
+			'publishAll',
+			async () => this.publishWebResourceUseCase.executeAll(this.currentEnvironmentId),
+			'All customizations published successfully'
+		);
 	}
 
 	/**
