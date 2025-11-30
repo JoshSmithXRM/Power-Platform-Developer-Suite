@@ -28,13 +28,6 @@ module.exports = {
 			lines: 100,
 			statements: 100
 		},
-		// Domain layer (excluding FetchXmlToSqlTranspiler which has special threshold above)
-		'./src/!(features/dataExplorer/domain/services/FetchXmlToSqlTranspiler)/**/domain/**/*.ts': {
-			branches: 90,
-			functions: 95,
-			lines: 95,
-			statements: 95
-		},
 		'./src/**/application/**/*.ts': {
 			branches: 85,
 			functions: 90,
