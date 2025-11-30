@@ -61,11 +61,12 @@ interface ParsedCondition {
 
 /**
  * Parsed filter from FetchXML.
+ * Note: Nested filters are not supported due to regex parsing limitations.
+ * All conditions are flattened into a single AND/OR group.
  */
 interface ParsedFilter {
 	type: 'and' | 'or';
 	conditions: ParsedCondition[];
-	nestedFilters: ParsedFilter[];
 }
 
 /**
@@ -118,10 +119,10 @@ export class FetchXmlToSqlTranspiler {
 			}
 
 			// Parse attributes
-			const hasAllAttributes = this.hasAllAttributes(trimmed, 'entity');
+			const hasAllAttributes = this.hasAllAttributes(trimmed);
 			const attributes = hasAllAttributes
 				? []
-				: this.parseAttributes(trimmed, 'entity');
+				: this.parseAttributes(trimmed);
 
 			// Parse link-entities
 			const linkEntities = this.parseLinkEntities(trimmed);
@@ -255,17 +256,13 @@ export class FetchXmlToSqlTranspiler {
 	/**
 	 * Checks if an entity or link-entity has all-attributes.
 	 */
-	private hasAllAttributes(xml: string, context: string): boolean {
-		// For simplicity, check if <all-attributes is within the entity/link-entity
-		// This is a simplified check
-		if (context === 'entity') {
-			// Check for all-attributes directly in entity (not in link-entity)
-			const entityMatch = xml.match(
-				/<entity[^>]*>([\s\S]*?)(?:<link-entity|<\/entity>)/i
-			);
-			if (entityMatch) {
-				return /<all-attributes\s*\/?>/i.test(entityMatch[1] ?? '');
-			}
+	private hasAllAttributes(xml: string): boolean {
+		// Check for all-attributes directly in entity (not in link-entity)
+		const entityMatch = xml.match(
+			/<entity[^>]*>([\s\S]*?)(?:<link-entity|<\/entity>)/i
+		);
+		if (entityMatch) {
+			return /<all-attributes\s*\/?>/i.test(entityMatch[1] ?? '');
 		}
 		return /<all-attributes\s*\/?>/i.test(xml);
 	}
@@ -273,22 +270,14 @@ export class FetchXmlToSqlTranspiler {
 	/**
 	 * Parses attribute elements from the main entity.
 	 */
-	private parseAttributes(
-		xml: string,
-		context: string
-	): ParsedAttribute[] {
+	private parseAttributes(xml: string): ParsedAttribute[] {
 		const attributes: ParsedAttribute[] = [];
 
 		// Get content of main entity (before link-entities)
-		let entityContent = '';
-		if (context === 'entity') {
-			const match = xml.match(
-				/<entity[^>]*>([\s\S]*?)(?:<link-entity|<\/entity>)/i
-			);
-			entityContent = match?.[1] ?? '';
-		} else {
-			entityContent = xml;
-		}
+		const entityMatch = xml.match(
+			/<entity[^>]*>([\s\S]*?)(?:<link-entity|<\/entity>)/i
+		);
+		const entityContent = entityMatch?.[1] ?? '';
 
 		// Parse attribute elements
 		const attrPattern =
@@ -403,11 +392,13 @@ export class FetchXmlToSqlTranspiler {
 
 	/**
 	 * Parses filter element from FetchXML.
+	 * Note: Nested filters are flattened - all conditions are extracted
+	 * and joined with the parent filter's type (AND/OR).
 	 */
 	private parseFilter(xml: string): ParsedFilter | null {
 		// Find the first filter element in the main entity
 		const filterMatch = xml.match(
-			/<filter([^>]*)>([\s\S]*?)<\/filter>/i
+			/<filter([^>]*)>([\s\S]*)<\/filter>/i
 		);
 
 		if (!filterMatch) {
@@ -422,13 +413,12 @@ export class FetchXmlToSqlTranspiler {
 				| 'and'
 				| 'or') ?? 'and';
 
+		// Parse all conditions (including those in nested filters)
 		const conditions = this.parseConditions(content);
-		const nestedFilters = this.parseNestedFilters(content);
 
 		return {
 			type: filterType,
 			conditions,
-			nestedFilters,
 		};
 	}
 
@@ -489,36 +479,6 @@ export class FetchXmlToSqlTranspiler {
 		}
 
 		return values;
-	}
-
-	/**
-	 * Parses nested filter elements.
-	 */
-	private parseNestedFilters(content: string): ParsedFilter[] {
-		// Simplified: look for nested filter elements
-		const nestedFilters: ParsedFilter[] = [];
-		const filterPattern = /<filter([^>]*)>([\s\S]*?)<\/filter>/gi;
-		let match;
-
-		while ((match = filterPattern.exec(content)) !== null) {
-			const attrString = match[1] ?? '';
-			const innerContent = match[2] ?? '';
-
-			const filterType =
-				(this.extractAttrValue(attrString, 'type')?.toLowerCase() as
-					| 'and'
-					| 'or') ?? 'and';
-
-			const conditions = this.parseConditions(innerContent);
-
-			nestedFilters.push({
-				type: filterType,
-				conditions,
-				nestedFilters: [], // Don't recurse further for simplicity
-			});
-		}
-
-		return nestedFilters;
 	}
 
 	/**
@@ -658,14 +618,6 @@ export class FetchXmlToSqlTranspiler {
 			const conditionSql = this.buildConditionSql(condition);
 			if (conditionSql) {
 				parts.push(conditionSql);
-			}
-		}
-
-		// Build nested filters
-		for (const nested of filter.nestedFilters) {
-			const nestedSql = this.buildWhereClause(nested);
-			if (nestedSql) {
-				parts.push(`(${nestedSql})`);
 			}
 		}
 

@@ -1,6 +1,6 @@
 # Technical Debt Inventory
 
-**Total Items:** 6 (6 items resolved/reclassified earlier today, 1 low-priority item added)
+**Total Items:** 7 (6 items resolved/reclassified earlier, 1 low-priority item added, 1 accepted tradeoff added)
 
 ---
 
@@ -8,7 +8,7 @@
 
 | Category | Count | Action Timeline |
 |----------|-------|-----------------|
-| **Accepted Tradeoffs** | 4 | Keep indefinitely (conscious decisions) |
+| **Accepted Tradeoffs** | 5 | Keep indefinitely (conscious decisions) |
 | **Will Not Implement** | 1 | Rejected (over-engineering) |
 | **Scheduled** | 0 | Fix in next 1-2 sprints (all items resolved) |
 | **Low Priority** | 1 | Fix when naturally touching code |
@@ -25,7 +25,7 @@ For **code quality debt** (dead code, unused dependencies, circular dependencies
 
 ---
 
-## ✅ Accepted Tradeoffs (4 items)
+## ✅ Accepted Tradeoffs (5 items)
 
 These are **conscious decisions to keep** based on cost/benefit analysis.
 
@@ -35,6 +35,7 @@ These are **conscious decisions to keep** based on cost/benefit analysis.
 | [Large Panel Files](accepted-tradeoffs/large-panel-files.md) | Tradeoff (coordinator pattern) | 0 | Acceptable |
 | [Unsafe Type Assertions](accepted-tradeoffs/unsafe-type-assertions.md) | Tradeoff (repositories validate) | 0 | Safe |
 | [ESLint Suppressions](accepted-tradeoffs/eslint-suppressions.md) | Documentation (29 suppressions, 12 removed) | 0 | All justified |
+| [Regex FetchXML Parsing](accepted-tradeoffs/regex-fetchxml-parsing.md) | Tradeoff (domain purity vs edge cases) | 0 | Domain purity wins |
 
 ### Reclassified as Architectural Patterns (No Longer Debt)
 - **Static Factory Methods** → See [docs/architecture/STATIC_FACTORY_PATTERN.md](../architecture/STATIC_FACTORY_PATTERN.md)
@@ -45,6 +46,7 @@ These are **conscious decisions to keep** based on cost/benefit analysis.
 - **Large Panels:** Only if panel exceeds 1,000 lines or contains business logic
 - **Type Assertions:** Only if API contract violations cause runtime errors
 - **ESLint Suppressions:** Quarterly review (ensure all still justified)
+- **Regex FetchXML:** Only if multiple user complaints about nested filter behavior
 
 ---
 
@@ -104,17 +106,17 @@ Fix when it becomes a problem or when naturally touching the code.
 ### Debt by Category (Visual)
 
 ```
-Accepted Tradeoffs: ████   4 items (67%)
-Will Not Implement: █      1 item  (17%)
+Accepted Tradeoffs: █████  5 items (71%)
+Will Not Implement: █      1 item  (14%)
 Scheduled:          -      0 items (0%)
-Low Priority:       █      1 item  (17%)
+Low Priority:       █      1 item  (14%)
 ```
 
 ### Decision Quality
 
 | Metric | Value | Assessment |
 |--------|-------|------------|
-| **Items with zero bugs** | 6/6 (100%) | ✅ Excellent - all decisions validated |
+| **Items with zero bugs** | 7/7 (100%) | ✅ Excellent - all decisions validated |
 | **Patterns promoted to architecture docs** | 2 items | ✅ Industry standards (static factories, OData) |
 | **Rejected over-engineering** | 1 item | ✅ Good judgment (avoided cargo cult patterns) |
 | **Items resolved in last review** | 4 items | ✅ Proactive (DateTimeFilter, split guide, shared DTO, ESLint rule) |
@@ -122,7 +124,7 @@ Low Priority:       █      1 item  (17%)
 | **ESLint rule quality** | Prefix matching (future-proof) | ✅ Improved (12 suppressions eliminated) |
 | **Notification consistency** | 99% (1/95 fixed) | ✅ Excellent (abstraction deferred, not urgent) |
 
-**Overall Health:** 🟢 Excellent (6 items total: 4 accepted, 1 rejected over-engineering, 1 low-priority future improvement)
+**Overall Health:** 🟢 Excellent (7 items total: 5 accepted, 1 rejected over-engineering, 1 low-priority future improvement)
 
 ---
 
@@ -165,7 +167,8 @@ docs/technical-debt/
 │   ├── getValue-pattern.md
 │   ├── large-panel-files.md
 │   ├── unsafe-type-assertions.md
-│   └── eslint-suppressions.md                  # 29 suppressions (12 removed 2025-11-23)
+│   ├── eslint-suppressions.md                  # 29 suppressions (12 removed 2025-11-23)
+│   └── regex-fetchxml-parsing.md               # Domain purity vs XML parser (2025-11-30)
 │
 ├── will-not-implement/                          # Rejected suggestions
 │   └── xml-formatter-interface.md

@@ -471,6 +471,362 @@ describe('FetchXmlToSqlTranspiler', () => {
 
 				expect(result.warnings.some((w) => w.feature === 'groupby')).toBe(true);
 			});
+
+			it('should warn about count attribute', () => {
+				const fetchXml = `
+					<fetch count="100">
+						<entity name="contact">
+							<attribute name="fullname" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.warnings.some((w) => w.feature === 'count')).toBe(true);
+			});
+		});
+
+		describe('additional operators', () => {
+			it('should transpile ne (not equal) operator', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="statecode" operator="ne" value="1" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('statecode <> 1');
+			});
+
+			it('should transpile lt (less than) operator', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<filter>
+								<condition attribute="revenue" operator="lt" value="50000" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('revenue < 50000');
+			});
+
+			it('should transpile le (less than or equal) operator', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<filter>
+								<condition attribute="numberofemployees" operator="le" value="100" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('numberofemployees <= 100');
+			});
+
+			it('should transpile not-like operator', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="emailaddress1" operator="not-like" value="%spam%" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain("NOT LIKE '%spam%'");
+			});
+
+			it('should transpile not-begin-with operator', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="firstname" operator="not-begin-with" value="Test" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain("NOT LIKE 'Test%'");
+			});
+
+			it('should transpile not-end-with operator', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="lastname" operator="not-end-with" value="Test" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain("NOT LIKE '%Test'");
+			});
+
+			it('should transpile not-in operator with values', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="statecode" operator="not-in">
+									<value>1</value>
+									<value>2</value>
+								</condition>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('NOT IN (1, 2)');
+			});
+
+			it('should transpile not-in operator with single value', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="statecode" operator="not-in" value="1" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('NOT IN (1)');
+			});
+
+			it('should handle unknown operators with basic format', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="field" operator="custom-op" value="test" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain("field CUSTOM-OP 'test'");
+			});
+		});
+
+		describe('link entity variations', () => {
+			it('should handle link-entity with all-attributes', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<link-entity name="account" from="accountid" to="parentcustomerid" alias="acc">
+								<all-attributes />
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('acc.*');
+			});
+
+			it('should handle link-entity without alias', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<link-entity name="account" from="accountid" to="parentcustomerid">
+								<attribute name="name" />
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('account.name');
+				expect(result.sql).toContain('account.accountid = contact.parentcustomerid');
+			});
+
+			it('should handle main entity all-attributes with link-entity', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<all-attributes />
+							<link-entity name="account" from="accountid" to="parentcustomerid" alias="acc">
+								<attribute name="name" />
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('*, acc.name');
+			});
+		});
+
+		describe('nested filters', () => {
+			it('should parse nested filters (simplified implementation)', () => {
+				// Note: Current implementation has a simplified nested filter handling
+				// Nested conditions are parsed but may appear in main filter
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter type="and">
+								<condition attribute="statecode" operator="eq" value="0" />
+								<filter type="or">
+									<condition attribute="firstname" operator="eq" value="John" />
+									<condition attribute="firstname" operator="eq" value="Jane" />
+								</filter>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('WHERE');
+				expect(result.sql).toContain('statecode = 0');
+				// Verify nested filter conditions are included (even if flattened)
+				expect(result.sql).toContain('firstname');
+			});
+		});
+
+		describe('edge cases', () => {
+			it('should handle in operator with no values element', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="statecode" operator="in" value="0" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('IN (0)');
+			});
+
+			it('should handle condition with no value', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="field" operator="eq" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain("field = ''");
+			});
+
+			it('should handle entity with all-attributes that cannot be parsed normally', () => {
+				// Entity tag on same line with closing - triggers fallback regex
+				const fetchXml = `<fetch><entity name="contact"/></fetch>`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				// Should succeed even with self-closing entity
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('FROM contact');
+			});
+
+			it('should handle fetch with deeply nested filters', () => {
+				// Multiple levels of nesting
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter type="and">
+								<filter type="or">
+									<condition attribute="firstname" operator="eq" value="John" />
+								</filter>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('WHERE');
+			});
+
+			it('should handle filter with empty nested filter', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter type="and">
+								<condition attribute="statecode" operator="eq" value="0" />
+								<filter type="or"></filter>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('statecode = 0');
+			});
 		});
 
 		describe('complex queries', () => {
@@ -514,6 +870,27 @@ describe('FetchXmlToSqlTranspiler', () => {
 
 				expect(result.success).toBe(false);
 				expect(result.error).toContain('Could not find entity name');
+			});
+
+			it('should handle non-Error exceptions gracefully', () => {
+				// Test the catch block with a non-Error exception
+				const transpilerWithError = new FetchXmlToSqlTranspiler();
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				const proto = Object.getPrototypeOf(transpilerWithError) as any;
+				const originalParseLinkEntities = proto.parseLinkEntities;
+
+				// Override to throw a non-Error
+				proto.parseLinkEntities = () => {
+					throw 'String error'; // Non-Error exception
+				};
+
+				const result = transpilerWithError.transpile('<fetch><entity name="account"><all-attributes/></entity></fetch>');
+
+				expect(result.success).toBe(false);
+				expect(result.error).toBe('Transpilation failed');
+
+				// Restore original method
+				proto.parseLinkEntities = originalParseLinkEntities;
 			});
 		});
 

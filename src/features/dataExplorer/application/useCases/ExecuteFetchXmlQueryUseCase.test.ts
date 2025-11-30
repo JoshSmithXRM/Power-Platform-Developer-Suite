@@ -134,6 +134,21 @@ describe('ExecuteFetchXmlQueryUseCase', () => {
 			expect(mockRepository.executeQuery).not.toHaveBeenCalled();
 		});
 
+		it('should throw FetchXmlValidationError when entity name attribute is present but cannot be parsed', async () => {
+			// Create use case with mocked internal method to test the specific branch
+			// where validation passes but extractEntityName returns undefined
+			const useCaseWithMock = new ExecuteFetchXmlQueryUseCase(mockRepository, mockLogger);
+			// Override extractEntityName to return undefined while keeping valid FetchXML structure
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(useCaseWithMock as any).extractEntityName = () => undefined;
+
+			await expect(
+				useCaseWithMock.execute('env-123', validFetchXml)
+			).rejects.toThrow(FetchXmlValidationError);
+
+			expect(mockRepository.executeQuery).not.toHaveBeenCalled();
+		});
+
 		it('should log and rethrow repository errors', async () => {
 			const error = new Error('API call failed');
 			mockRepository.getEntitySetName.mockRejectedValue(error);
@@ -268,6 +283,48 @@ describe('ExecuteFetchXmlQueryUseCase', () => {
 			expect(result.success).toBe(true);
 			if (result.success) {
 				expect(result.entityName).toBe('contact');
+			}
+		});
+
+		it('should return error when transpiler fails on valid FetchXML', () => {
+			// Create use case with mocked transpiler that returns failure
+			const useCaseWithMock = new ExecuteFetchXmlQueryUseCase(mockRepository, mockLogger);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(useCaseWithMock as any).transpiler = {
+				transpile: () => ({
+					success: false,
+					sql: '',
+					warnings: [],
+					error: 'Transpilation error'
+				})
+			};
+
+			const result = useCaseWithMock.transpileToSql(validFetchXml);
+
+			expect(result.success).toBe(false);
+			if (!result.success) {
+				expect(result.error).toBe('Transpilation error');
+			}
+		});
+
+		it('should return default error message when transpiler fails without error message', () => {
+			// Create use case with mocked transpiler that returns failure without error message
+			const useCaseWithMock = new ExecuteFetchXmlQueryUseCase(mockRepository, mockLogger);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(useCaseWithMock as any).transpiler = {
+				transpile: () => ({
+					success: false,
+					sql: '',
+					warnings: [],
+					// No error message
+				})
+			};
+
+			const result = useCaseWithMock.transpileToSql(validFetchXml);
+
+			expect(result.success).toBe(false);
+			if (!result.success) {
+				expect(result.error).toBe('Transpilation failed');
 			}
 		});
 	});
