@@ -17,7 +17,7 @@
 (function () {
 	// Configuration
 	const OVERSCAN_COUNT = 5; // Extra rows to render above/below viewport
-	const DEFAULT_ROW_HEIGHT = 32;
+	const DEFAULT_ROW_HEIGHT = 36; // Must match CSS td height (36px)
 
 	// State
 	let allRows = [];
@@ -35,6 +35,20 @@
 		isServerSearching: false,
 		lastSearchQuery: ''
 	};
+
+	/**
+	 * Calculates how many visible rows fit in the container's data viewport.
+	 * Accounts for sticky header taking space in the viewport.
+	 *
+	 * @param {HTMLElement} scrollContainer - The scroll container element
+	 * @returns {number} Number of visible rows that fit in the data viewport
+	 */
+	function calculateVisibleRowCount(scrollContainer) {
+		const containerHeight = scrollContainer.clientHeight || 600;
+		const headerHeight = rowHeight; // Sticky header uses same height as data rows
+		const dataViewportHeight = Math.max(containerHeight - headerHeight, rowHeight);
+		return Math.ceil(dataViewportHeight / rowHeight);
+	}
 
 	/**
 	 * Initializes the virtual table renderer.
@@ -84,21 +98,18 @@
 		setupRowSelectionHandler(tbody);
 
 		// Calculate visible range based on container height
-		const containerHeight = scrollContainer.clientHeight || 600;
-		const visibleCount = Math.ceil(containerHeight / rowHeight);
+		const visibleCount = calculateVisibleRowCount(scrollContainer);
 		visibleStart = 0;
 		visibleEnd = Math.min(filteredRows.length, visibleCount + OVERSCAN_COUNT * 2);
-
-		// Initial render
-		renderVisibleRows(tbody);
 
 		// Update container height for scrollbar
 		updateContainerHeight(scrollContainer);
 
 		// Recalculate visible range after container height update
-		const finalHeight = scrollContainer.clientHeight;
-		const finalVisibleCount = Math.ceil(finalHeight / rowHeight);
+		const finalVisibleCount = calculateVisibleRowCount(scrollContainer);
 		visibleEnd = Math.min(filteredRows.length, finalVisibleCount + OVERSCAN_COUNT * 2);
+
+		// Initial render
 		renderVisibleRows(tbody);
 	}
 
@@ -117,11 +128,10 @@
 
 			scrollDebounceTimer = requestAnimationFrame(() => {
 				const scrollTop = scrollContainer.scrollTop;
-				const containerHeight = scrollContainer.clientHeight;
 
-				// Calculate visible range
+				// Calculate visible range, accounting for sticky header
 				const newStart = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN_COUNT);
-				const visibleCount = Math.ceil(containerHeight / rowHeight);
+				const visibleCount = calculateVisibleRowCount(scrollContainer);
 				const newEnd = Math.min(filteredRows.length, newStart + visibleCount + OVERSCAN_COUNT * 2);
 
 				// Only re-render if range changed significantly
@@ -252,8 +262,9 @@
 		const scrollContainer = scrollWrapper || tbody;
 
 		if (tbody) {
+			const visibleCount = calculateVisibleRowCount(scrollContainer);
 			visibleStart = 0;
-			visibleEnd = Math.min(filteredRows.length, 50);
+			visibleEnd = Math.min(filteredRows.length, visibleCount + OVERSCAN_COUNT * 2);
 			scrollContainer.scrollTop = 0;
 			renderVisibleRows(tbody);              // Render FIRST
 			updateContainerHeight(scrollContainer); // THEN measure actual height
@@ -393,8 +404,9 @@
 		const scrollContainer = scrollWrapper || tbody;
 
 		if (tbody) {
+			const visibleCount = calculateVisibleRowCount(scrollContainer);
 			visibleStart = 0;
-			visibleEnd = Math.min(filteredRows.length, 50);
+			visibleEnd = Math.min(filteredRows.length, visibleCount + OVERSCAN_COUNT * 2);
 			scrollContainer.scrollTop = 0;
 			renderVisibleRows(tbody);
 			updateContainerHeight(scrollContainer);
@@ -697,13 +709,17 @@
 
 		// Reset and re-render
 		const tbody = document.getElementById('virtualTableBody');
+		const scrollWrapper = document.getElementById('virtualScrollWrapper');
+		const scrollContainer = scrollWrapper || tbody;
+
 		if (tbody) {
 			// Update data attributes
 			tbody.setAttribute('data-rows', JSON.stringify(allRows));
 
+			const visibleCount = calculateVisibleRowCount(scrollContainer);
 			visibleStart = 0;
-			visibleEnd = Math.min(filteredRows.length, 50);
-			updateContainerHeight(tbody);
+			visibleEnd = Math.min(filteredRows.length, visibleCount + OVERSCAN_COUNT * 2);
+			updateContainerHeight(scrollContainer);
 			renderVisibleRows(tbody);
 		}
 
