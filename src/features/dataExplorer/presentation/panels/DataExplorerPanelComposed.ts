@@ -976,7 +976,8 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Save to file
 			const savedPath = await this.csvExportService.saveToFile(csvContent, suggestedFilename);
 
-			await vscode.window.showInformationMessage(
+			// Show notification without awaiting - don't block on user dismissing toast
+			void vscode.window.showInformationMessage(
 				`Exported ${rowCount} rows to ${savedPath}`
 			);
 		} catch (error) {
@@ -1024,6 +1025,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	}
 
 	private setButtonLoading(buttonId: string, isLoading: boolean): void {
+		this.logger.debug('Setting button loading state', { buttonId, isLoading });
 		this.panel.webview.postMessage({
 			command: 'setButtonState',
 			buttonId,

@@ -33,20 +33,18 @@ export interface QueryEditorRenderData {
 /**
  * Renders the Query Editor section HTML.
  * Contains mode toggle tabs, SQL/FetchXML editors, and preview panels.
+ * IMPORTANT: Both panels are always rendered with full content to support mode switching.
+ * The inactive panel is hidden but its elements exist for JavaScript to populate.
  */
 export function renderQueryEditorSection(data: QueryEditorRenderData): string {
-	const errorHtml = data.errorMessage
-		? renderErrorBanner(data.errorMessage, data.errorPosition)
-		: '';
-
-	const warningsHtml = renderWarnings(data.transpilationWarnings);
 	const isSqlMode = data.queryMode === 'sql';
 
 	return `
 		<div class="query-editor-section">
 			<div class="editor-container">
 				${renderModeToggle(data.queryMode)}
-				${isSqlMode ? renderSqlModeEditor(data, errorHtml) : renderFetchXmlModeEditor(data, errorHtml, warningsHtml)}
+				${renderSqlPanel(data, isSqlMode)}
+				${renderFetchXmlPanel(data, !isSqlMode)}
 			</div>
 		</div>
 		<div class="query-results-section">
@@ -91,11 +89,17 @@ function renderModeToggle(currentMode: QueryMode): string {
 }
 
 /**
- * Renders the SQL mode editor (SQL editable, FetchXML preview).
+ * Renders the SQL mode panel (SQL editable, FetchXML preview).
+ * Always renders full content; visibility controlled by isVisible flag.
  */
-function renderSqlModeEditor(data: QueryEditorRenderData, errorHtml: string): string {
+function renderSqlPanel(data: QueryEditorRenderData, isVisible: boolean): string {
+	const hiddenAttr = isVisible ? '' : 'hidden';
+	const errorHtml = data.errorMessage && isVisible
+		? renderErrorBanner(data.errorMessage, data.errorPosition)
+		: '';
+
 	return `
-		<div id="sql-editor-panel" class="editor-panel" role="tabpanel" aria-labelledby="mode-sql">
+		<div id="sql-editor-panel" class="editor-panel" role="tabpanel" aria-labelledby="mode-sql" ${hiddenAttr}>
 			<div class="sql-editor-wrapper">
 				<label for="sql-editor" class="editor-label">SQL Query</label>
 				<textarea
@@ -113,23 +117,22 @@ function renderSqlModeEditor(data: QueryEditorRenderData, errorHtml: string): st
 				</details>
 			</div>
 		</div>
-		<div id="fetchxml-editor-panel" class="editor-panel" role="tabpanel" aria-labelledby="mode-fetchxml" hidden>
-		</div>
 	`;
 }
 
 /**
- * Renders the FetchXML mode editor (FetchXML editable, SQL preview).
+ * Renders the FetchXML mode panel (FetchXML editable, SQL preview).
+ * Always renders full content; visibility controlled by isVisible flag.
  */
-function renderFetchXmlModeEditor(
-	data: QueryEditorRenderData,
-	errorHtml: string,
-	warningsHtml: string
-): string {
+function renderFetchXmlPanel(data: QueryEditorRenderData, isVisible: boolean): string {
+	const hiddenAttr = isVisible ? '' : 'hidden';
+	const errorHtml = data.errorMessage && isVisible
+		? renderErrorBanner(data.errorMessage, data.errorPosition)
+		: '';
+	const warningsHtml = isVisible ? renderWarnings(data.transpilationWarnings) : '';
+
 	return `
-		<div id="sql-editor-panel" class="editor-panel" role="tabpanel" aria-labelledby="mode-sql" hidden>
-		</div>
-		<div id="fetchxml-editor-panel" class="editor-panel" role="tabpanel" aria-labelledby="mode-fetchxml">
+		<div id="fetchxml-editor-panel" class="editor-panel" role="tabpanel" aria-labelledby="mode-fetchxml" ${hiddenAttr}>
 			<div class="fetchxml-editor-wrapper">
 				<label for="fetchxml-editor" class="editor-label">FetchXML Query</label>
 				<textarea

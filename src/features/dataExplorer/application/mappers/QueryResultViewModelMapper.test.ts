@@ -66,7 +66,7 @@ describe('QueryResultViewModelMapper', () => {
 			expect(viewModel.columns[0]!.header).toBe('Account Name');
 		});
 
-		it('should format logicalName when displayName matches', () => {
+		it('should use logicalName as-is when displayName matches', () => {
 			const columns = [
 				new QueryResultColumn('accountname', 'accountname', 'string'),
 			];
@@ -74,10 +74,10 @@ describe('QueryResultViewModelMapper', () => {
 
 			const viewModel = mapper.toViewModel(result);
 
-			expect(viewModel.columns[0]!.header).toBe('Accountname');
+			expect(viewModel.columns[0]!.header).toBe('accountname');
 		});
 
-		it('should format underscored names to title case', () => {
+		it('should preserve underscores in logicalName when no distinct displayName', () => {
 			const columns = [
 				new QueryResultColumn(
 					'primary_contact_id',
@@ -89,16 +89,16 @@ describe('QueryResultViewModelMapper', () => {
 
 			const viewModel = mapper.toViewModel(result);
 
-			expect(viewModel.columns[0]!.header).toBe('Primary Contact Id');
+			expect(viewModel.columns[0]!.header).toBe('primary_contact_id');
 		});
 
-		it('should format logicalName when displayName is empty', () => {
+		it('should use logicalName when displayName is empty', () => {
 			const columns = [new QueryResultColumn('name', '', 'string')];
 			const result = new QueryResult(columns, [], 0, false, null, '', 0);
 
 			const viewModel = mapper.toViewModel(result);
 
-			expect(viewModel.columns[0]!.header).toBe('Name');
+			expect(viewModel.columns[0]!.header).toBe('name');
 		});
 	});
 
@@ -178,7 +178,7 @@ describe('QueryResultViewModelMapper', () => {
 			expect(viewModel.rows[0]!['primarycontactid']).toBe('John Smith');
 		});
 
-		it('should JSON stringify lookup without name', () => {
+		it('should use ID for lookup without name', () => {
 			const lookupValue: QueryLookupValue = {
 				id: '123',
 				name: undefined,
@@ -186,7 +186,8 @@ describe('QueryResultViewModelMapper', () => {
 			};
 			const result = createResultWithValue('primarycontactid', lookupValue);
 			const viewModel = mapper.toViewModel(result);
-			expect(viewModel.rows[0]!['primarycontactid']).toContain('123');
+			// Falls back to ID when name is missing (e.g., owninguser system field)
+			expect(viewModel.rows[0]!['primarycontactid']).toBe('123');
 		});
 	});
 });

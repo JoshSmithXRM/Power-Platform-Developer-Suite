@@ -46,14 +46,34 @@
 - [x] Committed: `b3b2afc`
 
 ### Testing
-- [x] Unit tests pass: `npm test` (6,394 tests, 97 new this session)
+- [x] Unit tests pass: `npm test` (6,955 tests passing)
 - [ ] E2E tests: Mode switching, FetchXML execution (optional)
-- [ ] Manual testing (F5): Full workflow test
+- [x] Manual testing (F5): Bug fixes verified
+- [ ] Final manual test pass after bug fixes
 
 ### Bugs Found During Manual Testing
 | Bug | Status | Notes |
 |-----|--------|-------|
-| | | |
+| Column headers have extra formatting applied | ✅ Fixed | Use logical name as-is when no display name |
+| Extra OData annotation fields showing in results | ✅ Fixed | Filter `@Microsoft.Dynamics.CRM.` annotations |
+| FetchXML tab shows table only, no editor | ✅ Fixed | Render both panels with content, toggle visibility |
+| Export CSV button stays spinning after export | ✅ Fixed | Added defensive spinner removal in messaging.js |
+| Lookup values showing raw JSON vs display name | ✅ Fixed | Fall back to ID when name missing (owninguser case) |
+
+### Bug Fix Details
+
+**Bug 1 - Column Headers:** `QueryResultViewModelMapper.toHeaderText()` now returns logical name as-is instead of applying title-case formatting.
+
+**Bug 2 - OData Annotations:** Added filter in `DataverseDataExplorerQueryRepository` to skip keys containing `@Microsoft.Dynamics.CRM.` or `@OData.Community.Display.` in both `extractColumnsFromRecord()` and `mapRecordToRow()`.
+
+**Bug 3 - FetchXML Editor:** Refactored `queryEditorView.ts` to always render both SQL and FetchXML panels with full content. The inactive panel is hidden but its elements exist for JavaScript event wiring.
+
+**Bug 4 - Export CSV Spinner:** Added defensive logic in `messaging.js` to remove spinner element even if original content wasn't saved (can happen if panel refreshes during export).
+
+**Bug 5 - Lookup JSON Display:**
+- Root cause: Dataverse returns `@OData.Community.Display.V1.FormattedValue` for some lookups but NOT for system-computed fields like `owninguser`
+- `owninguser` is derived from `ownerid` when owner is a user (vs team), and doesn't get full OData annotation support
+- Fix: `QueryResultViewModelMapper.toDisplayString()` now falls back to ID when lookup has `entityType` but no `name`
 
 ---
 

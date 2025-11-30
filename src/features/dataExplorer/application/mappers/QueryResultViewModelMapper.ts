@@ -52,7 +52,7 @@ export class QueryResultViewModelMapper {
 
 	/**
 	 * Converts column to display header text.
-	 * Uses displayName if available, otherwise transforms logicalName to title case.
+	 * Uses displayName if distinct from logicalName, otherwise uses logicalName as-is.
 	 *
 	 * @param column - Domain column
 	 * @returns Display-ready header text
@@ -61,10 +61,8 @@ export class QueryResultViewModelMapper {
 		if (column.displayName && column.displayName !== column.logicalName) {
 			return column.displayName;
 		}
-		// Convert logical_name to Logical Name
-		return column.logicalName
-			.replace(/_/g, ' ')
-			.replace(/\b\w/g, (c) => c.toUpperCase());
+		// Use logical name as-is - no formatting transformation
+		return column.logicalName;
 	}
 
 	/**
@@ -115,6 +113,12 @@ export class QueryResultViewModelMapper {
 			}
 			if ('name' in value && value.name !== undefined) {
 				return String(value.name);
+			}
+			// Lookup without name - fall back to ID (more useful than JSON)
+			// This happens when Dataverse doesn't return FormattedValue annotation
+			// (e.g., owninguser, owningteam system fields)
+			if ('id' in value && value.id !== undefined) {
+				return String(value.id);
 			}
 			return JSON.stringify(value);
 		}

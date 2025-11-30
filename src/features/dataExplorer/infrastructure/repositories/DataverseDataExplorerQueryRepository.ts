@@ -448,12 +448,20 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 		const seenColumns = new Set<string>();
 
 		for (const key of Object.keys(record)) {
-			// Skip OData annotations
+			// Skip OData annotations (start with @)
 			if (key.startsWith('@')) {
 				continue;
 			}
 
-			// Skip formatted value keys (handled with main column)
+			// Skip OData annotation keys embedded in field names
+			// Examples: _owninguser_value@Microsoft.Dynamics.CRM.lookuplogicalname
+			//           _modifiedby_value@OData.Community.Display.V1.FormattedValue
+			if (key.includes('@Microsoft.Dynamics.CRM.') ||
+				key.includes('@OData.Community.Display.')) {
+				continue;
+			}
+
+			// Skip formatted value keys (handled with main column) - legacy check
 			if (key.endsWith('@OData.Community.Display.V1.FormattedValue')) {
 				continue;
 			}
@@ -539,12 +547,19 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 		const cells = new Map<string, QueryCellValue>();
 
 		for (const [key, value] of Object.entries(record)) {
-			// Skip OData annotations except formatted values
+			// Skip OData annotations (start with @)
 			if (key.startsWith('@')) {
 				continue;
 			}
 
-			// Handle formatted values
+			// Skip OData annotation keys embedded in field names
+			// Examples: _owninguser_value@Microsoft.Dynamics.CRM.lookuplogicalname
+			if (key.includes('@Microsoft.Dynamics.CRM.') ||
+				key.includes('@OData.Community.Display.')) {
+				continue;
+			}
+
+			// Handle formatted values (legacy check - now covered above)
 			if (key.endsWith('@OData.Community.Display.V1.FormattedValue')) {
 				continue; // Processed with main column
 			}
