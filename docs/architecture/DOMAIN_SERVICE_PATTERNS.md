@@ -869,6 +869,195 @@ export class TimelineHierarchyService {
 
 ---
 
+### Pattern 6: Transpiler Services
+
+**Purpose:** Transform between domain-specific languages (DSLs) while keeping the domain layer pure
+
+Transpiler services convert one query format to another (e.g., SQL ↔ FetchXML). Key design decisions:
+
+1. **String-based XML parsing** - Use regex/string manipulation instead of XML libraries to avoid infrastructure dependencies
+2. **Warning system** - Return warnings for features that can't be transpiled (unsupported but non-fatal)
+3. **Bidirectional support** - Separate services for each direction with consistent interfaces
+
+```typescript
+/**
+ * Transpiles FetchXML queries to SQL syntax.
+ *
+ * Design decisions:
+ * - Uses string-based XML parsing (regex) to stay pure in domain layer
+ * - Returns warnings for unsupported features (aggregates, distinct, paging)
+ * - Does NOT execute queries - only transforms syntax
+ */
+export class FetchXmlToSqlTranspiler {
+    /**
+     * Transpiles FetchXML to SQL with optional warnings.
+     *
+     * @param fetchXml - Valid FetchXML query string
+     * @returns SQL string + array of warnings for unsupported features
+     */
+    transpile(fetchXml: string): FetchXmlToSqlResult {
+        const warnings: string[] = [];
+
+        // Extract entity name using regex (no XML library)
+        const entityMatch = fetchXml.match(/<entity\s+name=["']([^"']+)["']/i);
+        if (!entityMatch) {
+            return { sql: '', warnings: ['Could not find entity name'] };
+        }
+        const entityName = entityMatch[1];
+
+        // Detect unsupported features and add warnings
+        if (this.hasAggregate(fetchXml)) {
+            warnings.push('Aggregate functions not supported in SQL preview');
+        }
+        if (this.hasDistinct(fetchXml)) {
+            warnings.push('DISTINCT not supported in SQL preview');
+        }
+
+        // Build SQL from FetchXML structure
+        const attributes = this.extractAttributes(fetchXml);
+        const conditions = this.extractConditions(fetchXml);
+        const orders = this.extractOrders(fetchXml);
+
+        const sql = this.buildSql(entityName, attributes, conditions, orders);
+
+        return { sql, warnings };
+    }
+
+    /**
+     * String-based attribute extraction (keeps domain pure).
+     */
+    private extractAttributes(fetchXml: string): string[] {
+        const attributes: string[] = [];
+        // Regex-based extraction - no XML library needed
+        const attrRegex = /<attribute\s+name=["']([^"']+)["']/gi;
+        let match: RegExpExecArray | null;
+
+        while ((match = attrRegex.exec(fetchXml)) !== null) {
+            attributes.push(match[1]);
+        }
+
+        return attributes;
+    }
+
+    // ... additional private methods for conditions, orders, etc.
+}
+
+// Result type with warnings support
+export interface FetchXmlToSqlResult {
+    readonly sql: string;
+    readonly warnings: readonly string[];
+}
+```
+
+**Why String-Based Parsing?**
+
+Domain services must have zero infrastructure dependencies. XML parsing libraries (DOMParser, xml2js) are infrastructure concerns:
+
+```typescript
+// ❌ Bad - Infrastructure dependency in domain
+import { DOMParser } from 'xmldom';
+
+export class FetchXmlToSqlTranspiler {
+    transpile(fetchXml: string): string {
+        const doc = new DOMParser().parseFromString(fetchXml, 'text/xml');
+        // Uses external library - not pure domain
+    }
+}
+
+// ✅ Good - String-based parsing keeps domain pure
+export class FetchXmlToSqlTranspiler {
+    transpile(fetchXml: string): FetchXmlToSqlResult {
+        // Regex/string manipulation - no external dependencies
+        const entityMatch = fetchXml.match(/<entity\s+name=["']([^"']+)["']/i);
+        // Pure transformation logic
+    }
+}
+```
+
+**Companion Validator Service:**
+
+Transpilers often pair with validators that check input validity before transformation:
+
+```typescript
+export class FetchXmlValidator {
+    /**
+     * Validates FetchXML structure without executing.
+     * Uses string-based validation to stay in domain layer.
+     */
+    validate(fetchXml: string): FetchXmlValidationResult {
+        const errors: string[] = [];
+
+        // Check for required root element
+        if (!fetchXml.includes('<fetch')) {
+            errors.push('Missing <fetch> root element');
+        }
+
+        // Check for entity element
+        if (!fetchXml.includes('<entity')) {
+            errors.push('Missing <entity> element');
+        }
+
+        // Check for balanced tags (simplified)
+        const openTags = (fetchXml.match(/<[^/][^>]*[^/]>/g) || []).length;
+        const closeTags = (fetchXml.match(/<\/[^>]+>/g) || []).length;
+        const selfClosing = (fetchXml.match(/<[^>]+\/>/g) || []).length;
+
+        if (openTags !== closeTags + selfClosing) {
+            errors.push('Unbalanced XML tags');
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors
+        };
+    }
+}
+```
+
+**Testing Transpiler Services:**
+
+```typescript
+describe('FetchXmlToSqlTranspiler', () => {
+    let transpiler: FetchXmlToSqlTranspiler;
+
+    beforeEach(() => {
+        transpiler = new FetchXmlToSqlTranspiler();
+    });
+
+    it('should transpile simple query', () => {
+        const fetchXml = `
+            <fetch>
+                <entity name="account">
+                    <attribute name="name" />
+                    <attribute name="accountid" />
+                </entity>
+            </fetch>
+        `;
+
+        const result = transpiler.transpile(fetchXml);
+
+        expect(result.sql).toBe('SELECT name, accountid FROM account');
+        expect(result.warnings).toHaveLength(0);
+    });
+
+    it('should return warning for unsupported aggregate', () => {
+        const fetchXml = `
+            <fetch aggregate="true">
+                <entity name="account">
+                    <attribute name="name" aggregate="count" alias="count" />
+                </entity>
+            </fetch>
+        `;
+
+        const result = transpiler.transpile(fetchXml);
+
+        expect(result.warnings).toContain('Aggregate functions not supported in SQL preview');
+    });
+});
+```
+
+---
+
 ## Production Examples
 
 ### Example 1: EnvironmentValidationService (Multi-Entity Validation)

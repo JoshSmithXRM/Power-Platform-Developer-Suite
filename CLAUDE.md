@@ -349,7 +349,7 @@ See `.claude/agents/` for agent definitions.
 - `e2e/README.md` - E2E testing infrastructure (Playwright + VS Code)
 
 **Project management:**
-- `TECHNICAL_DEBT.md` - Code quality issues requiring remediation
+- `docs/technical-debt/` - Technical debt inventory (categorized: accepted-tradeoffs, scheduled, low-priority)
 - `docs/future/` - Planned features and improvements (per-feature files)
 - `docs/requirements/` - Feature requirements documentation
 

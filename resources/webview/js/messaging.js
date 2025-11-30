@@ -188,6 +188,7 @@
 		const message = event.data;
 
 		if (message.command === 'setButtonState') {
+			console.debug('setButtonState received:', message.buttonId, 'disabled:', message.disabled, 'showSpinner:', message.showSpinner);
 			const button = document.getElementById(message.buttonId);
 			if (!button) {
 				console.warn(`Button not found: ${message.buttonId}`);
@@ -205,11 +206,18 @@
 				button.innerHTML = (buttonOriginalContent.get(message.buttonId) || '') +
 					' <span class="spinner"></span>';
 			} else {
-				// Restore original content
+				// Restore original content or remove spinner if original wasn't saved
 				const original = buttonOriginalContent.get(message.buttonId);
 				if (original) {
 					button.innerHTML = original;
 					buttonOriginalContent.delete(message.buttonId);
+				} else {
+					// Defensive: remove spinner if present but original wasn't saved
+					// This can happen if panel was refreshed during loading
+					const spinner = button.querySelector('.spinner');
+					if (spinner) {
+						spinner.remove();
+					}
 				}
 			}
 		}

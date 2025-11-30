@@ -22,8 +22,61 @@
 	gap: 12px;
 }
 
+/* ============================================
+   MODE TOGGLE TABS
+   ============================================ */
+
+.query-mode-toggle {
+	display: flex;
+	gap: 0;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	margin-bottom: 4px;
+}
+
+.mode-tab {
+	padding: 8px 16px;
+	font-size: 13px;
+	font-weight: 500;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	margin-bottom: -1px;
+}
+
+.mode-tab:hover {
+	color: var(--vscode-textLink-foreground);
+	background: var(--vscode-list-hoverBackground);
+}
+
+.mode-tab.active {
+	color: var(--vscode-textLink-foreground);
+	border-bottom-color: var(--vscode-textLink-foreground);
+}
+
+.mode-tab:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+/* Editor panels - one visible at a time */
+.editor-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.editor-panel[hidden] {
+	display: none;
+}
+
 .sql-editor-wrapper,
-.fetchxml-preview-wrapper {
+.fetchxml-preview-wrapper,
+.fetchxml-editor-wrapper,
+.sql-preview-wrapper {
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
@@ -118,6 +171,153 @@
 	border-radius: 0;
 	font-family: inherit;
 	font-size: inherit;
+}
+
+/* ============================================
+   FETCHXML EDITOR (FetchXML Mode)
+   ============================================ */
+
+.fetchxml-editor {
+	min-height: 200px;
+}
+
+/* FetchXML Editor with highlighting overlay */
+.fetchxml-editor-container {
+	position: relative;
+	width: 100%;
+}
+
+.fetchxml-editor-highlight {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	padding: 12px;
+	margin: 0;
+	font-family: var(--vscode-editor-font-family);
+	font-size: 13px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	overflow: hidden;
+	pointer-events: none;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	box-sizing: border-box;
+	background: var(--vscode-input-background);
+	z-index: 0;
+}
+
+.fetchxml-editor-container .fetchxml-editor {
+	position: relative;
+	background: transparent;
+	caret-color: var(--vscode-editor-foreground);
+	color: transparent;
+	z-index: 1;
+}
+
+.fetchxml-editor-container .fetchxml-editor::selection {
+	background: var(--vscode-editor-selectionBackground);
+}
+
+/* ============================================
+   SQL PREVIEW (FetchXML Mode)
+   ============================================ */
+
+.sql-preview {
+	background: var(--vscode-textCodeBlock-background);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.sql-summary {
+	padding: 10px 14px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+	user-select: none;
+	background: var(--vscode-editorWidget-background);
+	border-bottom: 1px solid transparent;
+}
+
+.sql-summary:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.sql-preview[open] .sql-summary {
+	border-bottom-color: var(--vscode-input-border);
+}
+
+.sql-content {
+	margin: 0;
+	padding: 12px 14px;
+	font-family: var(--vscode-editor-font-family);
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--vscode-editor-foreground);
+	white-space: pre-wrap;
+	word-break: break-word;
+	overflow-x: auto;
+	max-height: 200px;
+	overflow-y: auto;
+}
+
+/* Reset code element styling inside SQL preview */
+.sql-content code {
+	background: transparent;
+	padding: 0;
+	border: none;
+	border-radius: 0;
+	font-family: inherit;
+	font-size: inherit;
+}
+
+/* ============================================
+   TRANSPILATION WARNINGS BANNER
+   ============================================ */
+
+.warnings-banner {
+	padding: 12px 14px;
+	background: var(--vscode-inputValidation-warningBackground);
+	border: 1px solid var(--vscode-inputValidation-warningBorder);
+	border-radius: 4px;
+	margin-bottom: 8px;
+}
+
+.warnings-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.warning-icon {
+	font-size: 14px;
+}
+
+.warning-title {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--vscode-editorWarning-foreground);
+}
+
+.warnings-list {
+	margin: 0;
+	padding-left: 24px;
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--vscode-foreground);
+}
+
+.warnings-list li {
+	margin-bottom: 4px;
+}
+
+.warnings-list li:last-child {
+	margin-bottom: 0;
 }
 
 /* ============================================
@@ -312,6 +512,124 @@
 	to {
 		transform: rotate(360deg);
 	}
+}
+
+/* ============================================
+   WARNING MODAL DIALOG
+   In-webview modal for row limit warnings
+   ============================================ */
+
+.modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
+.modal-overlay.visible {
+	opacity: 1;
+	visibility: visible;
+}
+
+.modal-dialog {
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+	border-radius: 6px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+	max-width: 450px;
+	width: 90%;
+	transform: scale(0.95);
+	transition: transform 0.15s ease;
+}
+
+.modal-overlay.visible .modal-dialog {
+	transform: scale(1);
+}
+
+.modal-header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 16px 20px 12px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.modal-icon {
+	font-size: 20px;
+	color: var(--vscode-editorWarning-foreground);
+}
+
+.modal-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	margin: 0;
+}
+
+.modal-body {
+	padding: 16px 20px;
+}
+
+.modal-message {
+	font-size: 13px;
+	line-height: 1.5;
+	color: var(--vscode-foreground);
+	margin: 0;
+}
+
+.modal-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	padding: 12px 20px 16px;
+}
+
+.modal-btn {
+	padding: 6px 14px;
+	font-size: 13px;
+	font-family: var(--vscode-font-family);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: background 0.1s ease;
+}
+
+.modal-btn-primary {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: none;
+}
+
+.modal-btn-primary:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+.modal-btn-secondary {
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+	border: none;
+}
+
+.modal-btn-secondary:hover {
+	background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.modal-btn-cancel {
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: 1px solid var(--vscode-button-border, var(--vscode-panel-border));
+}
+
+.modal-btn-cancel:hover {
+	background: var(--vscode-toolbar-hoverBackground);
 }
 
 /* ============================================

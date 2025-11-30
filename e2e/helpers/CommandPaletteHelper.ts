@@ -9,6 +9,16 @@
 import type { Page } from '@playwright/test';
 
 /**
+ * Result of command execution attempt.
+ */
+export interface CommandExecutionResult {
+  /** Whether the command executed successfully */
+  success: boolean;
+  /** Error message if command failed */
+  errorMessage?: string;
+}
+
+/**
  * Helper class for interacting with VS Code's command palette.
  *
  * Enables E2E tests to execute commands just like a user would
@@ -88,19 +98,79 @@ export class CommandPaletteHelper {
    * This is a convenience method that combines open(), search(), and selectResult().
    *
    * @param command - Full or partial command name to execute
+   * @param options - Execution options
+   * @returns Result indicating success or failure with error details
    * @example
    * ```typescript
-   * await commandPalette.executeCommand('Power Platform Developer Suite: Data Explorer');
+   * const result = await commandPalette.executeCommand('Power Platform Developer Suite: Data Explorer');
+   * if (!result.success) {
+   *   throw new Error(`Command failed: ${result.errorMessage}`);
+   * }
    * ```
    */
-  async executeCommand(command: string): Promise<void> {
+  async executeCommand(
+    command: string,
+    options: { throwOnError?: boolean } = { throwOnError: false }
+  ): Promise<CommandExecutionResult> {
     console.log(`Executing command: ${command}`);
 
     await this.open();
     await this.search(command);
     await this.selectResult(0);
 
+    // Check for error notifications after command execution
+    const errorResult = await this.checkForCommandErrors();
+
+    if (errorResult.errorMessage) {
+      console.log(`⚠️ Command may have failed: ${errorResult.errorMessage}`);
+
+      if (options.throwOnError) {
+        throw new Error(`Command "${command}" failed: ${errorResult.errorMessage}`);
+      }
+
+      return { success: false, errorMessage: errorResult.errorMessage };
+    }
+
     console.log(`Command executed: ${command}`);
+    return { success: true };
+  }
+
+  /**
+   * Checks for VS Code error notifications/dialogs after command execution.
+   *
+   * VS Code shows errors in:
+   * - Notification toasts (.notifications-toasts)
+   * - Dialog boxes (.monaco-dialog-box)
+   * - Quick input error messages
+   *
+   * @returns Object with error message if found
+   */
+  private async checkForCommandErrors(): Promise<{ errorMessage?: string }> {
+    // Wait a moment for any error UI to appear
+    await this.page.waitForTimeout(500);
+
+    // Check for notification toasts with error class
+    const errorNotification = this.page.locator(
+      '.notifications-toasts .notification-toast.error, ' +
+      '.notifications-toasts .notification-toast:has-text("not found"), ' +
+      '.notifications-toasts .notification-toast:has-text("command"), ' +
+      '.monaco-dialog-box:has-text("not found"), ' +
+      '.monaco-dialog-box:has-text("error")'
+    );
+
+    if (await errorNotification.count() > 0) {
+      const errorText = await errorNotification.first().textContent();
+      return { errorMessage: errorText ?? 'Unknown error' };
+    }
+
+    // Check for "command not found" style messages in quick input
+    const quickInputMessage = this.page.locator('.quick-input-message:has-text("not found")');
+    if (await quickInputMessage.count() > 0) {
+      const errorText = await quickInputMessage.first().textContent();
+      return { errorMessage: errorText ?? 'Command not found' };
+    }
+
+    return {};
   }
 
   /**

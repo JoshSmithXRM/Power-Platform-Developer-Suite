@@ -15,6 +15,9 @@ dotenv.config({ path: path.resolve(__dirname, '.env.e2e.local') });
  * - npm run e2e:debug - Step-by-step debugging
  */
 export default defineConfig({
+  // Global setup - compile extension before running tests
+  globalSetup: './e2e/globalSetup.ts',
+
   // Test directory
   testDir: './e2e/tests',
 

@@ -1,12 +1,17 @@
 import type { ISection } from '../../../../shared/infrastructure/ui/sections/ISection';
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
 import type { SectionRenderData } from '../../../../shared/infrastructure/ui/types/SectionRenderData';
-import { renderQueryEditorSection } from '../views/queryEditorView';
+import {
+	renderQueryEditorSection,
+	type QueryMode,
+	type TranspilationWarning,
+} from '../views/queryEditorView';
 
 /**
  * Section: Query Editor
  *
- * Displays SQL editor with FetchXML preview for the Data Explorer panel.
+ * Displays SQL/FetchXML editor with preview for the Data Explorer panel.
+ * Supports mode toggle between SQL and FetchXML editing.
  * Positioned in the main content area.
  */
 export class QueryEditorSection implements ISection {
@@ -14,9 +19,9 @@ export class QueryEditorSection implements ISection {
 
 	/**
 	 * Renders the Query Editor section.
-	 * Extracts SQL and FetchXML from customData.
+	 * Extracts SQL, FetchXML, and query mode from customData.
 	 *
-	 * @param data - Section render data with customData containing sql, fetchXml, error info
+	 * @param data - Section render data with customData containing sql, fetchXml, queryMode, error info
 	 * @returns HTML string for the query editor section
 	 */
 	public render(data: SectionRenderData): string {
@@ -24,16 +29,22 @@ export class QueryEditorSection implements ISection {
 
 		const sql = (customData['sql'] as string) || '';
 		const fetchXml = (customData['fetchXml'] as string) || '';
+		const queryMode = (customData['queryMode'] as QueryMode) || 'sql';
 		const errorMessage = customData['errorMessage'] as string | undefined;
 		const errorPosition = customData['errorPosition'] as
 			| { line: number; column: number }
 			| undefined;
+		const transpilationWarnings = (customData['transpilationWarnings'] as
+			| readonly TranspilationWarning[]
+			| undefined) ?? [];
 
 		return renderQueryEditorSection({
 			sql,
 			fetchXml,
+			queryMode,
 			errorMessage,
 			errorPosition,
+			transpilationWarnings,
 		});
 	}
 }
