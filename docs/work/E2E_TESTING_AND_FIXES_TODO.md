@@ -22,7 +22,7 @@
 ### Open Issues (Under Discussion)
 
 1. ~~**Default Environment & Ordering** - Left-click in tool menu opens default environment, but no way to set default or reorder environments~~ ✅ DONE
-2. **Environment Switch Persistence Behavior** - Switching environments overwrites target environment's persisted settings with source environment's settings (needs E2E test to verify behavior)
+2. ~~**Environment Switch Persistence Behavior** - Switching environments overwrites target environment's persisted settings with source environment's settings~~ ✅ FIXED (see Session 2 notes below)
 
 ### Future Enhancements (Parking Lot)
 
@@ -35,10 +35,11 @@
 - [x] **Default Environment & Ordering** - Added "Set as Default" command and context menu; default environment shown with ★ icon
 - [x] **Token Cache in Persistence Inspector** - MSAL token cache entries now visible in Persistence Inspector secrets section
 - [x] **Move Up/Move Down Environment Ordering** - Context menu commands for reordering environments in the list
+- [x] **Environment Switch Persistence Bug Fix** - Fixed all panels to load target environment's persisted state on environment switch (Option A: Fresh Start)
 
 ### E2E Testing Improvements
 
-- [ ] (Add specific E2E tasks as identified)
+- [x] **Environment Switch Persistence E2E Test** - Created `e2e/tests/integration/environment-switch-persistence.spec.ts` to verify state isolation per environment
 
 ### Configuration Settings
 
@@ -165,3 +166,45 @@
   - `src/infrastructure/dependencyInjection/EnvironmentFeature.ts`
   - `src/extension.ts`
 - **Result:** Right-click environment → Move Up/Move Down to reorder; Set as Default moved to its own section
+
+### Session 2 (2025-11-30)
+
+**Environment Switch Persistence Bug Fix:**
+- **Problem:** When switching between environments, settings from the source environment would override/overwrite the persisted settings for the target environment
+- **Root Cause:** `handleEnvironmentChange()` in all panel files did NOT load the target environment's persisted state. In-memory state from the source environment carried over, then got saved to the target environment's storage on any subsequent action.
+- **Analysis:** Traced the flow:
+  1. User on Env A with SQL query "SELECT * FROM account"
+  2. User switches to Env B
+  3. `handleEnvironmentChange()` updates `currentEnvironmentId` but leaves in-memory state (SQL query, filters) unchanged
+  4. User makes any change → state saved to Env B's storage slot
+  5. Env B's previously saved state is now overwritten with Env A's state
+- **Solution:** Option A (Fresh Start) - When switching environments, load the target environment's persisted state
+- **Implementation:**
+  - Added `loadPersistedStateForEnvironment(environmentId)` method to each affected panel
+  - Called at the end of `handleEnvironmentChange()` after updating environment context
+  - Reset in-memory state to defaults, then load persisted state for new environment
+  - Update webview with loaded state
+- **Panels Fixed:**
+  - `DataExplorerPanelComposed` - Loads SQL/FetchXML query and query mode for target environment
+  - `PluginTraceViewerPanelComposed` - Loads filter criteria, auto-refresh interval, detail panel width for target environment
+  - `MetadataBrowserPanel` - Loads selected tab, selected entity/choice, detail panel width for target environment
+  - `EnvironmentVariablesPanelComposed` - Loads selected solution filter for target environment
+  - `WebResourcesPanelComposed` - Loads selected solution filter for target environment
+- **Panels Already Correct:**
+  - `ConnectionReferencesPanelComposed` - Already loaded persisted state for new environment (lines 449-464)
+  - `SolutionExplorerPanelComposed` - No persistent state to carry over (stateless refresh)
+  - `ImportJobViewerPanelComposed` - No persistent state (stateless refresh)
+- **E2E Test Created:**
+  - `e2e/tests/integration/environment-switch-persistence.spec.ts`
+  - Test creates two environments (Test Env A, Test Env B)
+  - Sets distinct query in each environment (with unique marker comments)
+  - Switches between environments and verifies state is correctly restored
+  - Test confirmed FAILING before fix, PASSING after fix
+- **Files changed:**
+  - `src/features/dataExplorer/presentation/panels/DataExplorerPanelComposed.ts` - Added `loadPersistedStateForEnvironment()`
+  - `src/features/pluginTraceViewer/presentation/panels/PluginTraceViewerPanelComposed.ts` - Added `loadPersistedStateForEnvironment()`
+  - `src/features/metadataBrowser/presentation/panels/MetadataBrowserPanel.ts` - Added `loadPersistedStateForEnvironment()`
+  - `src/features/environmentVariables/presentation/panels/EnvironmentVariablesPanelComposed.ts` - Added `loadPersistedStateForEnvironment()`
+  - `src/features/webResources/presentation/panels/WebResourcesPanelComposed.ts` - Added `loadPersistedStateForEnvironment()`
+  - `e2e/tests/integration/environment-switch-persistence.spec.ts` (new)
+- **Result:** Each environment now correctly maintains its own independent state. Switching environments loads the target environment's saved state rather than carrying over source environment state.

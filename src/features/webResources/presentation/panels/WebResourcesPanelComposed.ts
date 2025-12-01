@@ -514,7 +514,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		const oldEnvironmentId = this.currentEnvironmentId;
 		this.currentEnvironmentId = environmentId;
-		this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
 
 		// Re-register panel in map for new environment
 		this.reregisterPanel(WebResourcesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
@@ -527,10 +526,59 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			this.panel.title = `Web Resources - ${environment.name}`;
 		}
 
+		// Load persisted state for the NEW environment (Option A: Fresh Start)
+		await this.loadPersistedStateForEnvironment(environmentId);
+
 		this.solutionOptions = await this.loadSolutions();
+
+		// Post-load validation: Check if persisted solution still exists
+		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+			if (!this.solutionOptions.some(s => s.id === this.currentSolutionId)) {
+				this.logger.warn('Persisted solution no longer exists, falling back to default', {
+					invalidSolutionId: this.currentSolutionId
+				});
+				this.currentSolutionId = DEFAULT_SOLUTION_ID;
+			}
+		}
+
+		// Update solution selector in UI
+		await this.panel.webview.postMessage({
+			command: 'updateSolutionSelector',
+			data: {
+				solutions: this.solutionOptions,
+				currentSolutionId: this.currentSolutionId
+			}
+		});
 
 		// handleRefresh handles loading state
 		await this.handleRefresh();
+	}
+
+	/**
+	 * Loads persisted state for a specific environment.
+	 * Called during environment switch to restore the target environment's saved state.
+	 */
+	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
+		// Reset to defaults first
+		this.currentSolutionId = DEFAULT_SOLUTION_ID;
+
+		if (this.panelStateRepository) {
+			try {
+				const state = await this.panelStateRepository.load({
+					panelType: 'webResources',
+					environmentId
+				});
+				if (state?.selectedSolutionId) {
+					this.currentSolutionId = state.selectedSolutionId;
+					this.logger.debug('Loaded persisted solution for environment', {
+						environmentId,
+						solutionId: this.currentSolutionId
+					});
+				}
+			} catch (error) {
+				this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
+			}
+		}
 	}
 
 	private async handleSolutionChange(solutionId: string): Promise<void> {

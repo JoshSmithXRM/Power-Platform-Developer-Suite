@@ -657,9 +657,81 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			this.panel.title = `Plugin Traces - ${environment.name}`;
 		}
 
+		// Load persisted state for the NEW environment (Option A: Fresh Start)
+		// This ensures each environment maintains its own independent filter/settings state
+		await this.loadPersistedStateForEnvironment(environmentId);
+
 		await this.loadTraceLevel();
 		// handleRefresh handles loading state
 		await this.handleRefresh();
+	}
+
+	/**
+	 * Loads persisted state for a specific environment and updates the UI.
+	 * Called during environment switch to restore the target environment's saved state.
+	 */
+	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
+		// Reset behaviors to defaults first
+		this.autoRefreshBehavior.setInterval(0);
+
+		// Load filter criteria for the new environment
+		await this.filterManagementBehavior.loadFilterCriteria(environmentId);
+
+		// Load auto-refresh interval and panel widths from storage
+		if (this.panelStateRepository) {
+			try {
+				const state = await this.panelStateRepository.load({
+					panelType: PluginTraceViewerPanelComposed.viewType,
+					environmentId
+				});
+
+				if (state) {
+					// Set auto-refresh interval
+					if (state.autoRefreshInterval && typeof state.autoRefreshInterval === 'number' && state.autoRefreshInterval > 0) {
+						this.autoRefreshBehavior.setInterval(state.autoRefreshInterval);
+					}
+
+					// Set detail panel width
+					if (state.detailPanelWidth && typeof state.detailPanelWidth === 'number') {
+						this.detailPanelBehavior.setDetailPanelWidth(state.detailPanelWidth);
+					}
+
+					this.logger.debug('Loaded persisted state for environment', {
+						environmentId,
+						autoRefreshInterval: state.autoRefreshInterval,
+						detailPanelWidth: state.detailPanelWidth
+					});
+				}
+			} catch (error) {
+				this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
+			}
+		}
+
+		// Update webview with loaded filter state
+		const filterCriteria = this.filterManagementBehavior.getFilterCriteria();
+		const reconstructedQuickFilterIds = this.filterManagementBehavior.getReconstructedQuickFilterIds();
+
+		await this.panel.webview.postMessage({
+			command: 'updateFilterState',
+			data: {
+				filterCriteria,
+				quickFilterIds: reconstructedQuickFilterIds,
+				autoRefreshInterval: this.autoRefreshBehavior.getInterval()
+			}
+		});
+
+		// Build and send OData query preview for loaded filters
+		const loadedFilterCriteria = this.filterManagementBehavior.getAppliedFilterCriteria();
+		const filterMapper = new FilterCriteriaMapper(this.configService);
+		const domainFilter = filterMapper.toDomain(loadedFilterCriteria);
+		const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
+		await this.panel.webview.postMessage({
+			command: 'updateODataPreview',
+			data: { query: odataQuery }
+		});
+
+		// Restart auto-refresh timer if interval was persisted
+		this.autoRefreshBehavior.startIfEnabled();
 	}
 
 

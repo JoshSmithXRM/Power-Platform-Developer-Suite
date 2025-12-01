@@ -680,6 +680,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	/**
 	 * Handles environment change.
 	 * Clears current selection, cache, and reloads tree.
+	 * Loads persisted state for the NEW environment (Option A: Fresh Start).
 	 */
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
@@ -693,10 +694,6 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 
 			// Reregister panel with new environment in singleton map
 			this.reregisterPanel(MetadataBrowserPanel.panels, oldEnvironmentId, this.currentEnvironmentId);
-
-			this.currentSelectionType = null;
-			this.currentSelectionId = null;
-			this.currentTab = 'attributes';
 
 			// Clear cache when switching environments
 			this.entityMetadataRepository.clearCache();
@@ -714,9 +711,81 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 
 			// Reload tree
 			await this.handleLoadTree();
+
+			// Load persisted state for the NEW environment (Option A: Fresh Start)
+			await this.loadPersistedStateForEnvironment(environmentId);
 		} finally {
 			// Disable refresh button (no selection) and stop spinner
 			this.setButtonState('refresh', true);
+		}
+	}
+
+	/**
+	 * Loads persisted state for a specific environment.
+	 * Called during environment switch to restore the target environment's saved state.
+	 */
+	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
+		// Reset to defaults first
+		this.currentSelectionType = null;
+		this.currentSelectionId = null;
+		this.currentTab = 'attributes';
+		this.detailPanelWidth = null;
+
+		// Load persisted state for the new environment
+		const state = await this.stateRepository.load({
+			panelType: MetadataBrowserPanel.viewType,
+			environmentId
+		});
+
+		// Restore state from filterCriteria
+		let restoredItemType: 'entity' | 'choice' | null = null;
+		let restoredItemId: string | null = null;
+
+		if (state && typeof state === 'object' && 'filterCriteria' in state) {
+			const filterCriteria = state.filterCriteria as {
+				selectedTab?: string;
+				selectedItemType?: 'entity' | 'choice' | null;
+				selectedItemId?: string | null;
+			};
+
+			// Restore selected tab
+			const selectedTab = filterCriteria?.selectedTab;
+			if (typeof selectedTab === 'string' && this.isValidMetadataTab(selectedTab)) {
+				this.currentTab = selectedTab;
+			}
+
+			// Restore selected item (to reload after tree loads)
+			if (filterCriteria?.selectedItemType && filterCriteria?.selectedItemId) {
+				restoredItemType = filterCriteria.selectedItemType;
+				restoredItemId = filterCriteria.selectedItemId;
+			}
+		}
+
+		// Load detail panel width if persisted
+		if (state?.detailPanelWidth && typeof state.detailPanelWidth === 'number') {
+			this.detailPanelWidth = state.detailPanelWidth;
+			this.logger.debug('Detail panel width loaded from storage', { width: state.detailPanelWidth });
+
+			// Send detail panel width to webview
+			await this.panel.webview.postMessage({
+				command: 'restoreDetailPanelWidth',
+				data: { width: this.detailPanelWidth }
+			});
+		}
+
+		// Restore previous selection if it existed
+		if (restoredItemType && restoredItemId) {
+			this.logger.debug('Restoring previous selection for environment', {
+				environmentId,
+				type: restoredItemType,
+				id: restoredItemId
+			});
+
+			if (restoredItemType === 'entity') {
+				await this.handleSelectEntity(restoredItemId);
+			} else if (restoredItemType === 'choice') {
+				await this.handleSelectChoice(restoredItemId);
+			}
 		}
 	}
 

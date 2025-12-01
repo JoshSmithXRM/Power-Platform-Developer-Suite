@@ -681,9 +681,67 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			await this.panel.webview.postMessage({
 				command: 'clearResults',
 			});
+
+			// Load persisted state for the NEW environment (Option A: Fresh Start)
+			// This ensures each environment maintains its own independent query state
+			await this.loadPersistedStateForEnvironment(environmentId);
 		} finally {
 			this.setButtonLoading('executeQuery', false);
 		}
+	}
+
+	/**
+	 * Loads persisted query state for a specific environment and updates the UI.
+	 * Called during environment switch to restore the target environment's saved state.
+	 */
+	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
+		// Reset to defaults first
+		this.currentSqlQuery = '';
+		this.currentFetchXml = '';
+		this.currentQueryMode = 'sql';
+		this.currentTranspilationWarnings = [];
+
+		try {
+			const state = await this.panelStateRepository.load({
+				panelType: DataExplorerPanelComposed.viewType,
+				environmentId,
+			});
+
+			if (state) {
+				const savedSql = state['sqlQuery'];
+				if (savedSql && typeof savedSql === 'string') {
+					this.currentSqlQuery = savedSql;
+				}
+				const savedFetchXml = state['fetchXmlQuery'];
+				if (savedFetchXml && typeof savedFetchXml === 'string') {
+					this.currentFetchXml = savedFetchXml;
+				}
+				const savedMode = state['queryMode'];
+				if (savedMode === 'sql' || savedMode === 'fetchxml') {
+					this.currentQueryMode = savedMode;
+				}
+
+				this.logger.debug('Loaded persisted state for environment', {
+					environmentId,
+					hasSql: this.currentSqlQuery.length > 0,
+					hasFetchXml: this.currentFetchXml.length > 0,
+					queryMode: this.currentQueryMode,
+				});
+			}
+		} catch (error) {
+			this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
+		}
+
+		// Update webview with loaded state
+		await this.panel.webview.postMessage({
+			command: 'queryModeChanged',
+			data: {
+				mode: this.currentQueryMode,
+				sql: this.currentSqlQuery,
+				fetchXml: this.currentFetchXml,
+				transpilationWarnings: this.currentTranspilationWarnings,
+			},
+		});
 	}
 
 	/**
