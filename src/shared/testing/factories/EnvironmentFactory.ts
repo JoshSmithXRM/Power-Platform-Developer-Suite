@@ -22,6 +22,8 @@ export function createTestEnvironment(overrides?: {
 	powerPlatformEnvironmentId?: string;
 	clientId?: string;
 	username?: string;
+	sortOrder?: number;
+	isDefault?: boolean;
 }): Environment {
 	const authMethod = overrides?.authenticationMethod ?? AuthenticationMethodType.Interactive;
 
@@ -36,7 +38,9 @@ export function createTestEnvironment(overrides?: {
 		overrides?.lastUsed,
 		overrides?.powerPlatformEnvironmentId,
 		overrides?.clientId ? new ClientId(overrides.clientId) : undefined,
-		overrides?.username
+		overrides?.username,
+		overrides?.sortOrder ?? 0,
+		overrides?.isDefault ?? false
 	);
 }
 
@@ -52,6 +56,8 @@ export function createTestServicePrincipalEnvironment(overrides?: {
 	publicClientId?: string;
 	clientId?: string;
 	isActive?: boolean;
+	sortOrder?: number;
+	isDefault?: boolean;
 }): Environment {
 	return new Environment(
 		new EnvironmentId(overrides?.id ?? 'test-env-sp-123'),
@@ -64,7 +70,9 @@ export function createTestServicePrincipalEnvironment(overrides?: {
 		undefined,
 		undefined,
 		new ClientId(overrides?.clientId ?? '11111111-1111-1111-1111-111111111111'),
-		undefined
+		undefined,
+		overrides?.sortOrder ?? 0,
+		overrides?.isDefault ?? false
 	);
 }
 
@@ -80,6 +88,8 @@ export function createTestUsernamePasswordEnvironment(overrides?: {
 	publicClientId?: string;
 	username?: string;
 	isActive?: boolean;
+	sortOrder?: number;
+	isDefault?: boolean;
 }): Environment {
 	return new Environment(
 		new EnvironmentId(overrides?.id ?? 'test-env-up-123'),
@@ -92,6 +102,8 @@ export function createTestUsernamePasswordEnvironment(overrides?: {
 		undefined,
 		undefined,
 		undefined,
-		overrides?.username ?? 'user@example.com'
+		overrides?.username ?? 'user@example.com',
+		overrides?.sortOrder ?? 0,
+		overrides?.isDefault ?? false
 	);
 }

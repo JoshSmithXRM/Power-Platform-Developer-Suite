@@ -26,6 +26,7 @@ export class EnvironmentListViewModelMapper {
 			dataverseUrl: environment.getDataverseUrl().getValue(),
 			authenticationMethod: environment.getAuthenticationMethod().toString(),
 			isActive: environment.getIsActive(),
+			isDefault: environment.getIsDefault(),
 			lastUsedDisplay: RelativeTimeFormatter.formatRelativeTime(lastUsed),
 			statusBadge: environment.getIsActive() ? 'active' : 'inactive',
 			...(lastUsed !== undefined && { lastUsedTimestamp: lastUsed.getTime() })

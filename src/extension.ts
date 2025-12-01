@@ -148,6 +148,75 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	);
 
+	const setDefaultEnvironmentCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.setDefaultEnvironment',
+		async (environmentItem?: { envId: string; label: string }) => {
+			if (!environmentItem?.envId) {
+				vscode.window.showErrorMessage('No environment selected');
+				return;
+			}
+
+			try {
+				await environmentFeature.setDefaultEnvironmentUseCase.execute(environmentItem.envId);
+				environmentsProvider.refresh();
+				vscode.window.showInformationMessage(`"${environmentItem.label}" set as default environment`);
+			} catch (error) {
+				container.logger.error('Failed to set default environment', error);
+				vscode.window.showErrorMessage(
+					`Failed to set default environment: ${error instanceof Error ? error.message : String(error)}`
+				);
+			}
+		}
+	);
+
+	const moveEnvironmentUpCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.moveEnvironmentUp',
+		async (environmentItem?: { envId: string; label: string }) => {
+			if (!environmentItem?.envId) {
+				vscode.window.showErrorMessage('No environment selected');
+				return;
+			}
+
+			try {
+				const moved = await environmentFeature.moveEnvironmentUseCase.execute(environmentItem.envId, 'up');
+				if (moved) {
+					environmentsProvider.refresh();
+				} else {
+					vscode.window.showInformationMessage(`"${environmentItem.label}" is already at the top`);
+				}
+			} catch (error) {
+				container.logger.error('Failed to move environment up', error);
+				vscode.window.showErrorMessage(
+					`Failed to move environment: ${error instanceof Error ? error.message : String(error)}`
+				);
+			}
+		}
+	);
+
+	const moveEnvironmentDownCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.moveEnvironmentDown',
+		async (environmentItem?: { envId: string; label: string }) => {
+			if (!environmentItem?.envId) {
+				vscode.window.showErrorMessage('No environment selected');
+				return;
+			}
+
+			try {
+				const moved = await environmentFeature.moveEnvironmentUseCase.execute(environmentItem.envId, 'down');
+				if (moved) {
+					environmentsProvider.refresh();
+				} else {
+					vscode.window.showInformationMessage(`"${environmentItem.label}" is already at the bottom`);
+				}
+			} catch (error) {
+				container.logger.error('Failed to move environment down', error);
+				vscode.window.showErrorMessage(
+					`Failed to move environment: ${error instanceof Error ? error.message : String(error)}`
+				);
+			}
+		}
+	);
+
 	const removeEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.removeEnvironment', async (environmentItem?: { envId: string; label: string }) => {
 		if (!environmentItem?.envId) {
 			vscode.window.showErrorMessage('No environment selected');
@@ -468,6 +537,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		addEnvironmentCommand,
 		editEnvironmentCommand,
 		testEnvironmentConnectionCommand,
+		setDefaultEnvironmentCommand,
+		moveEnvironmentUpCommand,
+		moveEnvironmentDownCommand,
 		solutionExplorerCommand,
 		solutionExplorerPickEnvironmentCommand,
 		importJobViewerCommand,

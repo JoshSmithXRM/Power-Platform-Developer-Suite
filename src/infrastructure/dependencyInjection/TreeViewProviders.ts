@@ -60,12 +60,12 @@ export class EnvironmentsTreeProvider implements vscode.TreeDataProvider<Environ
 
 		if (environments.length === 0) {
 			return [
-				new EnvironmentItem('No environments configured', 'Click + to add an environment', 'placeholder', undefined)
+				new EnvironmentItem('No environments configured', 'Click + to add an environment', 'placeholder', undefined, false)
 			];
 		}
 		return environments.map(env => {
 			const vm = this.mapper.toViewModel(env);
-			return new EnvironmentItem(vm.name, vm.dataverseUrl, 'environment', vm.id);
+			return new EnvironmentItem(vm.name, vm.dataverseUrl, 'environment', vm.id, vm.isDefault);
 		});
 	}
 }
@@ -100,12 +100,13 @@ class EnvironmentItem extends vscode.TreeItem {
 		public readonly label: string,
 		public readonly description: string,
 		public readonly contextValue: string,
-		public readonly envId?: string
+		public readonly envId?: string,
+		public readonly isDefault?: boolean
 	) {
 		super(label, vscode.TreeItemCollapsibleState.None);
-		this.description = description;
-		this.tooltip = `${label} - ${description}`;
+		this.description = isDefault ? `${description} ★` : description;
+		this.tooltip = isDefault ? `${label} - ${description} (Default)` : `${label} - ${description}`;
 		this.contextValue = contextValue;
-		this.iconPath = new vscode.ThemeIcon('cloud');
+		this.iconPath = new vscode.ThemeIcon(isDefault ? 'star-full' : 'cloud');
 	}
 }

@@ -57,7 +57,9 @@ export class Environment {
 		private lastUsed?: Date,
 		private powerPlatformEnvironmentId?: string,
 		private clientId?: ClientId,
-		private username?: string
+		private username?: string,
+		private sortOrder: number = 0,
+		private isDefault: boolean = false
 	) {
 		this.validate();
 	}
@@ -305,6 +307,29 @@ export class Environment {
 		this.validate();
 	}
 
+	/**
+	 * Sets this environment as the default for tool clicks.
+	 * Note: Caller is responsible for clearing default from other environments.
+	 */
+	public setAsDefault(): void {
+		this.isDefault = true;
+	}
+
+	/**
+	 * Clears the default flag from this environment.
+	 */
+	public clearDefault(): void {
+		this.isDefault = false;
+	}
+
+	/**
+	 * Updates the sort order for this environment.
+	 * @param order - New sort order (lower numbers appear first)
+	 */
+	public setSortOrder(order: number): void {
+		this.sortOrder = order;
+	}
+
 	public getId(): EnvironmentId { return this.id; }
 	public getName(): EnvironmentName { return this.name; }
 	public getDataverseUrl(): DataverseUrl { return this.dataverseUrl; }
@@ -316,4 +341,6 @@ export class Environment {
 	public getPowerPlatformEnvironmentId(): string | undefined { return this.powerPlatformEnvironmentId; }
 	public getClientId(): ClientId | undefined { return this.clientId; }
 	public getUsername(): string | undefined { return this.username; }
+	public getSortOrder(): number { return this.sortOrder; }
+	public getIsDefault(): boolean { return this.isDefault; }
 }

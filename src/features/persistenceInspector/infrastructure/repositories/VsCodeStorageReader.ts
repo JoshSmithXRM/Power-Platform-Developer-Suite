@@ -11,6 +11,7 @@ export class VsCodeStorageReader implements IStorageReader {
 	private static readonly ENVIRONMENTS_KEY = 'power-platform-dev-suite-environments';
 	private static readonly SECRET_PREFIX_CLIENT = 'power-platform-dev-suite-secret-';
 	private static readonly SECRET_PREFIX_PASSWORD = 'power-platform-dev-suite-password-';
+	private static readonly MSAL_CACHE_PREFIX = 'power-platform-dev-suite-msal-cache-';
 
 	public constructor(
 		private readonly globalState: vscode.Memento,
@@ -53,8 +54,8 @@ export class VsCodeStorageReader implements IStorageReader {
 	}
 
 	/**
-	 * Reads all secret storage keys by inspecting environment configurations
-	 * Derives secret keys from clientId and username patterns in stored environments
+	 * Reads all secret storage keys by inspecting environment configurations.
+	 * Derives secret keys from clientId, username, and MSAL cache patterns in stored environments.
 	 * @returns Array of secret storage keys
 	 */
 	public async readAllSecretKeys(): Promise<string[]> {
@@ -66,7 +67,7 @@ export class VsCodeStorageReader implements IStorageReader {
 			[]
 		);
 
-		// Extract secret keys based on clientId and username patterns
+		// Extract secret keys based on clientId, username, and MSAL cache patterns
 		for (const env of environments) {
 			if (env.settings.clientId) {
 				secretKeys.push(`${VsCodeStorageReader.SECRET_PREFIX_CLIENT}${env.settings.clientId}`);
@@ -74,6 +75,8 @@ export class VsCodeStorageReader implements IStorageReader {
 			if (env.settings.username) {
 				secretKeys.push(`${VsCodeStorageReader.SECRET_PREFIX_PASSWORD}${env.settings.username}`);
 			}
+			// MSAL token cache key for each environment (Interactive authentication)
+			secretKeys.push(`${VsCodeStorageReader.MSAL_CACHE_PREFIX}${env.id}`);
 		}
 
 		return secretKeys;

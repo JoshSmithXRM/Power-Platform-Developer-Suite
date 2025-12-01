@@ -119,6 +119,21 @@
                 "category": "Power Platform Developer Suite"
             },
             {
+                "command": "power-platform-dev-suite.setDefaultEnvironment",
+                "title": "Set as Default",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.moveEnvironmentUp",
+                "title": "Move Up",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.moveEnvironmentDown",
+                "title": "Move Down",
+                "category": "Power Platform Developer Suite"
+            },
+            {
                 "command": "power-platform-dev-suite.testEnvironmentConnection",
                 "title": "Test Environment Connection",
                 "category": "Power Platform Developer Suite"
@@ -278,6 +293,21 @@
                     "command": "power-platform-dev-suite.removeEnvironment",
                     "when": "view == power-platform-dev-suite-environments && viewItem == environment",
                     "group": "3_remove@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.setDefaultEnvironment",
+                    "when": "view == power-platform-dev-suite-environments && viewItem == environment",
+                    "group": "4_order@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.moveEnvironmentUp",
+                    "when": "view == power-platform-dev-suite-environments && viewItem == environment",
+                    "group": "4_order@2"
+                },
+                {
+                    "command": "power-platform-dev-suite.moveEnvironmentDown",
+                    "when": "view == power-platform-dev-suite-environments && viewItem == environment",
+                    "group": "4_order@3"
                 },
                 {
                     "command": "power-platform-dev-suite.solutionExplorerPickEnvironment",

@@ -39,7 +39,9 @@ export class EnvironmentDomainMapper {
 				dto.lastUsed ? new Date(dto.lastUsed) : undefined,
 				dto.environmentId,
 				dto.settings.clientId ? new ClientId(dto.settings.clientId) : undefined,
-				dto.settings.username
+				dto.settings.username,
+				dto.sortOrder ?? 0,
+				dto.isDefault ?? false
 			);
 
 			this.logger.debug('Successfully mapped DTO to domain entity');
@@ -84,7 +86,9 @@ export class EnvironmentDomainMapper {
 				id: environment.getId().getValue(),
 				name: environment.getName().getValue(),
 				settings,
-				isActive: environment.getIsActive()
+				isActive: environment.getIsActive(),
+				sortOrder: environment.getSortOrder(),
+				isDefault: environment.getIsDefault()
 			};
 
 			const lastUsed = environment.getLastUsed();

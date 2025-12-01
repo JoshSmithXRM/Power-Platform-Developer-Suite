@@ -8,6 +8,7 @@ export interface EnvironmentListViewModel {
 	readonly dataverseUrl: string;
 	readonly authenticationMethod: string;
 	readonly isActive: boolean;
+	readonly isDefault: boolean;
 	readonly lastUsedTimestamp?: number;
 	readonly lastUsedDisplay: string;
 	readonly statusBadge: 'active' | 'inactive';

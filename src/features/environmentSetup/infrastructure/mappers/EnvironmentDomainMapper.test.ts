@@ -437,7 +437,9 @@ describe('EnvironmentDomainMapper', () => {
 				},
 				isActive: true,
 				lastUsed: '2025-11-23T10:30:00.000Z',
-				environmentId: 'pp-env-guid-123'
+				environmentId: 'pp-env-guid-123',
+				sortOrder: 0,
+				isDefault: false
 			};
 
 			// Act
@@ -462,7 +464,9 @@ describe('EnvironmentDomainMapper', () => {
 				},
 				isActive: true,
 				lastUsed: '2025-11-23T10:30:00.000Z',
-				environmentId: 'pp-env-guid-123'
+				environmentId: 'pp-env-guid-123',
+				sortOrder: 0,
+				isDefault: false
 			};
 
 			// Act
@@ -484,7 +488,9 @@ describe('EnvironmentDomainMapper', () => {
 					authenticationMethod: 'Interactive',
 					publicClientId: '51f81489-12ee-4a9e-aaae-a2591f45987d'
 				},
-				isActive: false
+				isActive: false,
+				sortOrder: 0,
+				isDefault: false
 			};
 
 			// Act
@@ -508,7 +514,9 @@ describe('EnvironmentDomainMapper', () => {
 				},
 				isActive: true,
 				lastUsed: '2025-11-23T10:30:00.000Z',
-				environmentId: 'pp-env-guid-123'
+				environmentId: 'pp-env-guid-123',
+				sortOrder: 0,
+				isDefault: false
 			};
 
 			// Act
@@ -530,7 +538,9 @@ describe('EnvironmentDomainMapper', () => {
 					authenticationMethod: 'Interactive',
 					publicClientId: '51f81489-12ee-4a9e-aaae-a2591f45987d'
 				},
-				isActive: false
+				isActive: false,
+				sortOrder: 0,
+				isDefault: false
 			};
 
 			// Act

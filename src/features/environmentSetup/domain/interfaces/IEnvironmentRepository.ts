@@ -34,6 +34,12 @@ export interface IEnvironmentRepository {
 	getActive(): Promise<Environment | null>;
 
 	/**
+	 * Retrieves the default environment for tool clicks.
+	 * Returns the environment marked as default, or the first by sort order if none marked.
+	 */
+	getDefault(): Promise<Environment | null>;
+
+	/**
 	 * Saves environment (create or update) with optional credentials.
 	 *
 	 * @param environment - Environment to save

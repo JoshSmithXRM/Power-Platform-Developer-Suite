@@ -9,6 +9,10 @@ export interface EnvironmentConnectionDto {
 	isActive: boolean;
 	lastUsed?: string;
 	environmentId?: string;
+	/** Sort order for display in UI. Lower numbers appear first. */
+	sortOrder?: number;
+	/** Whether this is the default environment opened on tool clicks. */
+	isDefault?: boolean;
 }
 
 export interface PowerPlatformSettingsDto {

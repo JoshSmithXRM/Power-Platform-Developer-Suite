@@ -11,6 +11,8 @@ import { TestExistingEnvironmentConnectionUseCase } from '../../features/environ
 import { DiscoverEnvironmentIdUseCase } from '../../features/environmentSetup/application/useCases/DiscoverEnvironmentIdUseCase';
 import { ValidateUniqueNameUseCase } from '../../features/environmentSetup/application/useCases/ValidateUniqueNameUseCase';
 import { CheckConcurrentEditUseCase } from '../../features/environmentSetup/application/useCases/CheckConcurrentEditUseCase';
+import { SetDefaultEnvironmentUseCase } from '../../features/environmentSetup/application/useCases/SetDefaultEnvironmentUseCase';
+import { MoveEnvironmentUseCase } from '../../features/environmentSetup/application/useCases/MoveEnvironmentUseCase';
 import { TestEnvironmentConnectionCommandHandler } from '../../features/environmentSetup/presentation/commands/TestEnvironmentConnectionCommandHandler';
 
 import { CoreServicesContainer } from './CoreServicesContainer';
@@ -41,6 +43,8 @@ export class EnvironmentFeature {
 	public readonly discoverEnvironmentIdUseCase: DiscoverEnvironmentIdUseCase;
 	public readonly validateUniqueNameUseCase: ValidateUniqueNameUseCase;
 	public readonly checkConcurrentEditUseCase: CheckConcurrentEditUseCase;
+	public readonly setDefaultEnvironmentUseCase: SetDefaultEnvironmentUseCase;
+	public readonly moveEnvironmentUseCase: MoveEnvironmentUseCase;
 
 	// Command Handlers
 	public readonly testEnvironmentConnectionCommandHandler: TestEnvironmentConnectionCommandHandler;
@@ -105,6 +109,16 @@ export class EnvironmentFeature {
 		);
 
 		this.checkConcurrentEditUseCase = new CheckConcurrentEditUseCase(container.logger);
+
+		this.setDefaultEnvironmentUseCase = new SetDefaultEnvironmentUseCase(
+			container.environmentRepository,
+			container.logger
+		);
+
+		this.moveEnvironmentUseCase = new MoveEnvironmentUseCase(
+			container.environmentRepository,
+			container.logger
+		);
 
 		// Create command handlers (depend on use cases)
 		this.testEnvironmentConnectionCommandHandler = new TestEnvironmentConnectionCommandHandler(
