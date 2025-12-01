@@ -786,6 +786,118 @@ await this.scaffoldingBehavior.refresh({ solutions, tableData: viewModels });
 
 ---
 
+## Session 6 - Race Condition Fix & UX Design (2025-11-30)
+
+### Bug 10: Race Condition on Solution Change ✅ FIXED
+
+**Problem:** When solutions load immediately and users can switch solutions while data is still loading, stale responses can overwrite fresh data. This occurred in TWO scenarios:
+
+**Scenario 1: Solution-to-Solution Switch**
+1. User on Solution A (large, slow API call)
+2. Switches to Solution B (small, fast API call)
+3. Solution B loads instantly, displays correctly
+4. Solution A's stale response arrives and overwrites UI
+
+**Scenario 2: Initialization-to-Solution Switch (CRITICAL)**
+1. Panel loads with persisted Solution A (slow API call starts)
+2. User sees solutions dropdown, switches to Solution B (fast)
+3. Solution B loads instantly, displays correctly
+4. **Initial load's stale response arrives and overwrites UI**
+5. Panel shows Solution A's data but dropdown says "Solution B"
+
+**Root Cause:**
+- `handleSolutionChange()` is async but had no request versioning/cancellation
+- `initializeAndLoadData()` did NOT participate in the cancellation pattern - initial loads could not be cancelled by subsequent solution changes
+
+**Fix:** Two-pronged approach (belt and suspenders):
+
+1. **Request Versioning** (discard stale responses):
+   - Add `private requestVersion: number = 0` field
+   - Increment version at start of each data load
+   - After async fetch, check if version still matches
+   - If stale, discard response without updating UI
+
+2. **Request Cancellation** (stop in-flight requests):
+   - Add `private currentCancellationSource: vscode.CancellationTokenSource | null`
+   - Cancel previous request before starting new one
+   - Pass cancellation token through call chain to use cases
+   - Handle `OperationCancelledException` gracefully
+
+3. **BOTH initialization AND solution change use this pattern**:
+   - Initial load in `initializeAndLoadData()` sets up version/token
+   - When user switches solution, it cancels initial load AND discards its stale response
+
+**Additional Fix:** Loading indicator cleared prematurely
+- **Problem:** Table showed "no data" briefly before data appeared during init
+- **Root Cause:** `showTableLoading()` was called BEFORE `scaffoldingBehavior.refresh()` which replaces the HTML, losing the loading state
+- **Fix:** Move `showTableLoading()` to AFTER the scaffold refresh with empty tableData
+
+**Panels Fixed:**
+- [x] WebResourcesPanelComposed - both init and solution change use cancellation
+- [x] EnvironmentVariablesPanelComposed - both init and solution change use cancellation
+- [x] ConnectionReferencesPanelComposed - both init and solution change use cancellation
+
+**Integration Tests:**
+- Created `WebResourcesPanelComposed.integration.test.ts`
+- Tests verify:
+  1. `should display only the latest solution data when rapid solution changes occur`
+  2. `should not update UI with stale data from earlier request`
+  3. `should not overwrite solution change data with slow initial load` (NEW - regression test)
+- All tests confirmed FAILING before fix, PASSING after fix
+
+**Files Changed:**
+- `src/features/webResources/presentation/panels/WebResourcesPanelComposed.ts`
+- `src/features/webResources/presentation/panels/WebResourcesPanelComposed.integration.test.ts` (new)
+- `src/features/environmentVariables/presentation/panels/EnvironmentVariablesPanelComposed.ts`
+- `src/features/environmentVariables/presentation/panels/EnvironmentVariablesPanelComposed.integration.test.ts`
+- `src/features/connectionReferences/presentation/panels/ConnectionReferencesPanelComposed.ts`
+- `src/features/connectionReferences/presentation/panels/ConnectionReferencesPanelComposed.integration.test.ts`
+
+**Verification:**
+- All 7006 tests pass
+- `npm run compile` passes
+
+---
+
+### Design: Ctrl+A Select All UX ⏳ READY TO IMPLEMENT
+
+**Problem:** When user presses Ctrl+A in panels, browser default selects ALL visible content (not useful).
+
+**Design Decisions:**
+
+1. **Behavior**: Context-aware
+   - Table focused → Select all table rows
+   - Input/textarea focused → Browser default (select text)
+   - Nothing specific focused → Select all table rows (default action)
+
+2. **Actions on Selection:**
+   - Copy to clipboard (immediate action)
+   - Visual highlighting (rows show selected state)
+   - Leave door open for future bulk operations (export, delete, etc.)
+
+3. **Implementation**: Shared reusable behavior (`KeyboardSelectionBehavior`)
+   - Create in `src/shared/infrastructure/ui/behaviors/`
+   - All panels with tables can opt-in
+   - Consistent behavior across extension
+
+4. **Panels to Apply:**
+   - Data Explorer (query results)
+   - Web Resources
+   - Plugin Traces
+   - Connection References
+   - Environment Variables
+   - Solutions Explorer
+
+**Implementation Plan:**
+- [ ] Create `KeyboardSelectionBehavior` class
+- [ ] Handle `keydown` event for Ctrl+A
+- [ ] Integrate with VirtualTable row selection
+- [ ] Add copy-to-clipboard functionality
+- [ ] Apply to panels one by one
+- [ ] Update webview CSS for selection styling
+
+---
+
 ## Remaining Topics
 
 | # | Topic | Status | Notes |

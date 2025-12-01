@@ -34,6 +34,8 @@ import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/Solutio
 import { createWebResourceUri, WebResourceFileSystemProvider } from '../../infrastructure/providers/WebResourceFileSystemProvider';
 import { PublishBehavior } from '../../../../shared/infrastructure/ui/behaviors/PublishBehavior';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
+import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
+import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 
 /**
  * Commands supported by Web Resources panel.
@@ -77,6 +79,14 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 	// Subscription to FileSystemProvider save events for auto-refresh
 	private saveSubscription: vscode.Disposable | undefined;
+
+	// Request versioning to prevent stale responses from overwriting fresh data
+	// Incremented on each solution change; responses with outdated version are discarded
+	private requestVersion: number = 0;
+
+	// Cancellation source for in-flight solution data requests
+	// Cancelled when user switches solutions to stop wasted API calls
+	private currentCancellationSource: vscode.CancellationTokenSource | null = null;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -191,6 +201,13 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	public dispose(): void {
 		this.logger.debug('WebResourcesPanel: Disposing');
 
+		// Cancel any in-flight solution data request
+		if (this.currentCancellationSource) {
+			this.currentCancellationSource.cancel();
+			this.currentCancellationSource.dispose();
+			this.currentCancellationSource = null;
+		}
+
 		// Cancel any background loading in progress
 		if (this.cacheManager) {
 			this.cacheManager.cancelBackgroundLoading();
@@ -283,7 +300,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		// Disable refresh button during initial load (shows spinner)
 		await this.loadingBehavior.setLoading(true);
-		this.showTableLoading();
 
 		try {
 			// Load solutions first
@@ -318,8 +334,30 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				tableData: []
 			});
 
+			// Show loading state in table AFTER scaffold refresh (refresh replaces HTML, so loading must come after)
+			this.showTableLoading();
+
+			// Set up cancellation for initial data load (can be cancelled by solution change)
+			const myVersion = ++this.requestVersion;
+			if (this.currentCancellationSource) {
+				this.currentCancellationSource.cancel();
+				this.currentCancellationSource.dispose();
+			}
+			this.currentCancellationSource = new vscode.CancellationTokenSource();
+			const cancellationToken = this.currentCancellationSource.token;
+
 			// NOW load data (user sees solutions dropdown, can change selection while waiting)
-			const webResources = await this.getFilteredWebResources(false);
+			const webResources = await this.getFilteredWebResources(false, cancellationToken);
+
+			// Check if superseded by solution change during load
+			if (this.requestVersion !== myVersion) {
+				this.logger.debug('Initial load superseded by solution change, discarding', {
+					myVersion,
+					currentVersion: this.requestVersion
+				});
+				return;
+			}
+
 			const viewModels = this.viewModelMapper.toViewModels(webResources);
 
 			// Final render with data
@@ -522,9 +560,13 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	 * Does NOT apply textBasedOnly filter - returns full unfiltered dataset.
 	 *
 	 * @param forceRefresh - If true, bypasses cache and fetches from server
+	 * @param cancellationToken - Optional token to cancel the operation
 	 * @returns ALL web resources for the current solution (unfiltered)
 	 */
-	private async getAllWebResourcesWithCache(forceRefresh: boolean = false): Promise<readonly WebResource[]> {
+	private async getAllWebResourcesWithCache(
+		forceRefresh: boolean = false,
+		cancellationToken?: vscode.CancellationToken
+	): Promise<readonly WebResource[]> {
 		const cacheKey = this.getCacheKey(this.currentSolutionId);
 
 		// Return cached data if available and not forcing refresh
@@ -542,10 +584,15 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			solutionId: this.currentSolutionId
 		});
 
+		// Wrap VS Code token in domain adapter if provided
+		const domainToken = cancellationToken
+			? new VsCodeCancellationTokenAdapter(cancellationToken)
+			: undefined;
+
 		const webResources = await this.listWebResourcesUseCase.execute(
 			this.currentEnvironmentId,
 			this.currentSolutionId,
-			undefined,
+			domainToken, // Pass cancellation token to use case
 			{ textBasedOnly: false } // Always fetch ALL types
 		);
 
@@ -564,10 +611,14 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	 * Uses cached data and applies textBasedOnly filter client-side.
 	 *
 	 * @param forceRefresh - If true, bypasses cache and fetches from server
+	 * @param cancellationToken - Optional token to cancel the operation
 	 * @returns Filtered web resources based on current showTextBasedOnly setting
 	 */
-	private async getFilteredWebResources(forceRefresh: boolean = false): Promise<readonly WebResource[]> {
-		const allResources = await this.getAllWebResourcesWithCache(forceRefresh);
+	private async getFilteredWebResources(
+		forceRefresh: boolean = false,
+		cancellationToken?: vscode.CancellationToken
+	): Promise<readonly WebResource[]> {
+		const allResources = await this.getAllWebResourcesWithCache(forceRefresh, cancellationToken);
 
 		// Apply filter client-side
 		if (this.showTextBasedOnly) {
@@ -687,6 +738,20 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		this.currentSolutionId = solutionId;
 
+		// Increment request version to detect stale responses
+		const myVersion = ++this.requestVersion;
+
+		// Cancel any in-flight request from previous solution change
+		if (this.currentCancellationSource) {
+			this.logger.debug('Cancelling previous solution data request');
+			this.currentCancellationSource.cancel();
+			this.currentCancellationSource.dispose();
+		}
+
+		// Create new cancellation source for this request
+		this.currentCancellationSource = new vscode.CancellationTokenSource();
+		const cancellationToken = this.currentCancellationSource.token;
+
 		// Persist solution selection
 		if (this.panelStateRepository) {
 			await this.panelStateRepository.save(
@@ -702,7 +767,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		}
 
 		// Load with caching - use cached data if switching back to previously viewed solution
-		await this.loadAndDisplayWebResources(false);
+		// Pass version to detect if another solution change occurred during async operation
+		// Pass cancellation token to stop API calls if user changes solution again
+		await this.loadAndDisplayWebResources(false, myVersion, cancellationToken);
 	}
 
 	/**
@@ -710,13 +777,30 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	 * Fetches ALL types and filters client-side based on showTextBasedOnly.
 	 *
 	 * @param forceRefresh - If true, bypass cache and fetch from server
+	 * @param requestVersion - Optional version to detect stale responses. If provided and
+	 *                         doesn't match current version, the response is discarded.
+	 * @param cancellationToken - Optional token to cancel the operation if user changes solution
 	 */
-	private async loadAndDisplayWebResources(forceRefresh: boolean): Promise<void> {
+	private async loadAndDisplayWebResources(
+		forceRefresh: boolean,
+		requestVersion?: number,
+		cancellationToken?: vscode.CancellationToken
+	): Promise<void> {
 		await this.loadingBehavior.setButtonLoading('refresh', true);
 		this.showTableLoading();
 
 		try {
-			const webResources = await this.getFilteredWebResources(forceRefresh);
+			const webResources = await this.getFilteredWebResources(forceRefresh, cancellationToken);
+
+			// Check for stale response: if version was provided and has changed, discard this response
+			if (requestVersion !== undefined && requestVersion !== this.requestVersion) {
+				this.logger.debug('Discarding stale web resources response', {
+					requestVersion,
+					currentVersion: this.requestVersion
+				});
+				return;
+			}
+
 			const viewModels = this.viewModelMapper.toViewModels(webResources);
 
 			this.logger.info('Web resources displayed', {
@@ -740,6 +824,11 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				}
 			});
 		} catch (error: unknown) {
+			// Silently ignore cancellation - user switched solutions so this response is not needed
+			if (error instanceof OperationCancelledException) {
+				this.logger.debug('Web resources request cancelled - user switched solutions');
+				return;
+			}
 			this.logger.error('Error loading web resources', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to load web resources: ${errorMessage}`);

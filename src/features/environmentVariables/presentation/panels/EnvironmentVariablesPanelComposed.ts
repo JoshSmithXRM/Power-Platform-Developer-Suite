@@ -23,6 +23,8 @@ import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
+import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
+import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 
 /**
  * Commands supported by Environment Variables panel.
@@ -44,6 +46,14 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
 	private solutionOptions: SolutionOption[] = [];
+
+	// Request versioning to prevent stale responses from overwriting fresh data
+	// Incremented on each solution change; responses with outdated version are discarded
+	private requestVersion: number = 0;
+
+	// Cancellation source for in-flight solution data requests
+	// Cancelled when user switches solutions to stop wasted API calls
+	private currentCancellationSource: vscode.CancellationTokenSource | null = null;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -157,7 +167,6 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 
 		// Disable refresh button during initial load (shows spinner)
 		await this.loadingBehavior.setLoading(true);
-		this.showTableLoading();
 
 		try {
 			// Load solutions first so user can see/interact with dropdown while data loads
@@ -192,11 +201,33 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 				tableData: []
 			});
 
+			// Show loading state in table AFTER scaffold refresh (refresh replaces HTML, so loading must come after)
+			this.showTableLoading();
+
+			// Set up cancellation for initial data load (can be cancelled by solution change)
+			const myVersion = ++this.requestVersion;
+			if (this.currentCancellationSource) {
+				this.currentCancellationSource.cancel();
+				this.currentCancellationSource.dispose();
+			}
+			this.currentCancellationSource = new vscode.CancellationTokenSource();
+			const domainToken = new VsCodeCancellationTokenAdapter(this.currentCancellationSource.token);
+
 			// NOW load data (user sees solutions dropdown, can change selection while waiting)
 			const environmentVariables = await this.listEnvVarsUseCase.execute(
 				this.currentEnvironmentId,
-				this.currentSolutionId
+				this.currentSolutionId,
+				domainToken
 			);
+
+			// Check if superseded by solution change during load
+			if (this.requestVersion !== myVersion) {
+				this.logger.debug('Initial load superseded by solution change, discarding', {
+					myVersion,
+					currentVersion: this.requestVersion
+				});
+				return;
+			}
 
 			const viewModels = environmentVariables
 				.map(envVar => this.viewModelMapper.toViewModel(envVar))
@@ -353,17 +384,42 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		}
 	}
 
-	private async handleRefresh(): Promise<void> {
+	/**
+	 * Refreshes environment variables data.
+	 *
+	 * @param requestVersion - Optional version to detect stale responses. If provided and
+	 *                         doesn't match current version, the response is discarded.
+	 * @param cancellationToken - Optional token to cancel the operation if user changes solution
+	 */
+	private async handleRefresh(
+		requestVersion?: number,
+		cancellationToken?: vscode.CancellationToken
+	): Promise<void> {
 		this.logger.debug('Refreshing environment variables');
 
 		await this.loadingBehavior.setButtonLoading('refresh', true);
 		this.showTableLoading();
 
 		try {
+			// Wrap VS Code token in domain adapter if provided
+			const domainToken = cancellationToken
+				? new VsCodeCancellationTokenAdapter(cancellationToken)
+				: undefined;
+
 			const environmentVariables = await this.listEnvVarsUseCase.execute(
 				this.currentEnvironmentId,
-				this.currentSolutionId
+				this.currentSolutionId,
+				domainToken // Pass cancellation token to use case
 			);
+
+			// Check for stale response: if version was provided and has changed, discard this response
+			if (requestVersion !== undefined && requestVersion !== this.requestVersion) {
+				this.logger.debug('Discarding stale environment variables response', {
+					requestVersion,
+					currentVersion: this.requestVersion
+				});
+				return;
+			}
 
 			// Map to view models and sort
 			const viewModels = environmentVariables
@@ -384,6 +440,11 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 				}
 			});
 		} catch (error: unknown) {
+			// Silently ignore cancellation - user switched solutions so this response is not needed
+			if (error instanceof OperationCancelledException) {
+				this.logger.debug('Environment variables request cancelled - user switched solutions');
+				return;
+			}
 			this.logger.error('Error refreshing environment variables', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh environment variables: ${errorMessage}`);
@@ -523,6 +584,20 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 
 		this.currentSolutionId = solutionId;
 
+		// Increment request version to detect stale responses
+		const myVersion = ++this.requestVersion;
+
+		// Cancel any in-flight request from previous solution change
+		if (this.currentCancellationSource) {
+			this.logger.debug('Cancelling previous solution data request');
+			this.currentCancellationSource.cancel();
+			this.currentCancellationSource.dispose();
+		}
+
+		// Create new cancellation source for this request
+		this.currentCancellationSource = new vscode.CancellationTokenSource();
+		const cancellationToken = this.currentCancellationSource.token;
+
 		// Always save concrete solution selection to panel state
 		if (this.panelStateRepository) {
 			await this.panelStateRepository.save(
@@ -538,7 +613,8 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		}
 
 		// handleRefresh handles loading state
-		await this.handleRefresh();
+		// Pass version and cancellation token to detect/cancel stale operations
+		await this.handleRefresh(myVersion, cancellationToken);
 	}
 
 	/**
