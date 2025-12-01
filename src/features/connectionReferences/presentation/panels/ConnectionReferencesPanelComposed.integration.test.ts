@@ -103,7 +103,8 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 
 		mockSolutions = [
 			{ id: 'sol1', name: 'Solution 1', uniqueName: 'sol_one' },
-			{ id: 'sol2', name: 'Solution 2', uniqueName: 'sol_two' }
+			{ id: 'sol2', name: 'Solution 2', uniqueName: 'sol_two' },
+			{ id: TEST_SOLUTION_ID, name: 'Test Solution', uniqueName: 'test_solution' }
 		];
 
 		mockGetEnvironments = jest.fn().mockResolvedValue(mockEnvironments);

@@ -285,11 +285,10 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.showTableLoading();
 
 		try {
-			// Load solutions in parallel with initial data
-			const solutionsPromise = this.loadSolutions();
+			// Load solutions first
+			const solutions = await this.loadSolutions();
 
-			// Post-load validation: Check if persisted solution still exists
-			const solutions = await solutionsPromise;
+			// Validate persisted solution still exists
 			let finalSolutionId = this.currentSolutionId;
 			if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
 				if (!solutions.some(s => s.id === this.currentSolutionId)) {
@@ -309,11 +308,20 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				}
 			}
 
-			// Load ALL web resources for the selected solution, filter client-side
+			// IMMEDIATELY render solutions (user can interact while data loads)
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				solutions,
+				currentSolutionId: finalSolutionId,
+				tableData: []
+			});
+
+			// NOW load data (user sees solutions dropdown, can change selection while waiting)
 			const webResources = await this.getFilteredWebResources(false);
 			const viewModels = this.viewModelMapper.toViewModels(webResources);
 
-			// Final render with solutions and data
+			// Final render with data
 			await this.scaffoldingBehavior.refresh({
 				environments,
 				currentEnvironmentId: this.currentEnvironmentId,

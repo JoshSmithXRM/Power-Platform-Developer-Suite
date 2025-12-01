@@ -160,16 +160,10 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		this.showTableLoading();
 
 		try {
-			// PARALLEL LOADING - Don't wait for solutions to load data!
-			const [solutions, environmentVariables] = await Promise.all([
-				this.loadSolutions(),
-				this.listEnvVarsUseCase.execute(
-					this.currentEnvironmentId,
-					this.currentSolutionId
-				)
-			]);
+			// Load solutions first so user can see/interact with dropdown while data loads
+			const solutions = await this.loadSolutions();
 
-			// Post-load validation: Check if persisted solution still exists
+			// Validate persisted solution still exists
 			let finalSolutionId = this.currentSolutionId;
 			if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
 				if (!solutions.some(s => s.id === this.currentSolutionId)) {
@@ -189,11 +183,26 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 				}
 			}
 
+			// IMMEDIATELY render solutions (user can interact while data loads)
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				solutions,
+				currentSolutionId: finalSolutionId,
+				tableData: []
+			});
+
+			// NOW load data (user sees solutions dropdown, can change selection while waiting)
+			const environmentVariables = await this.listEnvVarsUseCase.execute(
+				this.currentEnvironmentId,
+				this.currentSolutionId
+			);
+
 			const viewModels = environmentVariables
 				.map(envVar => this.viewModelMapper.toViewModel(envVar))
 				.sort((a, b) => a.schemaName.localeCompare(b.schemaName));
 
-			// Final render with both solutions and data
+			// Final render with data
 			await this.scaffoldingBehavior.refresh({
 				environments,
 				currentEnvironmentId: this.currentEnvironmentId,

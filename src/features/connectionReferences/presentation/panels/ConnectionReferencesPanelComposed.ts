@@ -312,13 +312,10 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		this.showTableLoading();
 
 		try {
-			// PARALLEL LOADING - Don't wait for solutions to load data!
-			const [solutions, data] = await Promise.all([
-				this.loadSolutions(),
-				this.loadData()
-			]);
+			// Load solutions first so user can see/interact with dropdown while data loads
+			const solutions = await this.loadSolutions();
 
-			// Post-load validation: Check if persisted solution still exists
+			// Validate persisted solution still exists
 			let finalSolutionId = this.currentSolutionId;
 			if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
 				if (!solutions.some(s => s.id === this.currentSolutionId)) {
@@ -338,7 +335,19 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 				}
 			}
 
-			// Final render with both solutions and data
+			// IMMEDIATELY render solutions (user can interact while data loads)
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				solutions,
+				currentSolutionId: finalSolutionId,
+				tableData: []
+			});
+
+			// NOW load data (user sees solutions dropdown, can change selection while waiting)
+			const data = await this.loadData();
+
+			// Final render with data
 			await this.scaffoldingBehavior.refresh({
 				environments,
 				currentEnvironmentId: this.currentEnvironmentId,

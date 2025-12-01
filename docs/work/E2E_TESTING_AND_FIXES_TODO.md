@@ -664,6 +664,67 @@ Both have value, but Playwright E2E gives more coverage for UI bugs.
 - All 7001 tests pass
 - `npm run compile` passes (lint, test, build)
 
+### Session 5 Testing
+- All 266 test suites pass (7001 tests)
+- Fixed ConnectionReferencesPanelComposed.integration.test.ts (added TEST_SOLUTION_ID to mockSolutions)
+
+---
+
+## Session 5 - Solutions Dropdown Loading Issue (2025-11-30)
+
+### Bug 6: Solutions Dropdown Not Shown Until Data Loads ✅
+
+**Problem:** When a panel loads, the solutions dropdown remains empty until after the main data finishes loading. Users expect to see available solutions immediately so they can change selection while waiting for data.
+
+**Root Cause Analysis:**
+The `initializeAndLoadData()` method does a single "final render" that includes both solutions and data:
+```
+1. Initial render with solutions: []     ← Empty dropdown
+2. Load solutions (async)                ← Solutions ready
+3. Validate persisted solution
+4. Load web resources (SLOW!)            ← Blocks for seconds on large datasets
+5. Final render with solutions + data    ← ONLY NOW shows solutions
+```
+
+Solutions are ready after step 2, but not rendered until step 5. For environments with 56K+ web resources, users wait several seconds seeing an empty dropdown.
+
+**Fix:** Render solutions immediately after they load, before waiting for data:
+```typescript
+// Load solutions
+const solutions = await solutionsPromise;
+
+// IMMEDIATELY render solutions (user can interact while data loads)
+await this.scaffoldingBehavior.refresh({
+    solutions,           // ← Show these NOW
+    tableData: []        // ← Still empty, that's OK
+});
+
+// NOW load data (user sees solutions, can change selection)
+const webResources = await this.getFilteredWebResources(false);
+
+// Final render with data
+await this.scaffoldingBehavior.refresh({ solutions, tableData: viewModels });
+```
+
+**Affected Panels:**
+- WebResourcesPanelComposed
+- EnvironmentVariablesPanelComposed
+- ConnectionReferencesPanelComposed
+
+**Files Changed:**
+- `src/features/webResources/presentation/panels/WebResourcesPanelComposed.ts`
+- `src/features/environmentVariables/presentation/panels/EnvironmentVariablesPanelComposed.ts`
+- `src/features/connectionReferences/presentation/panels/ConnectionReferencesPanelComposed.ts`
+
+**Test Fix:**
+- Updated `ConnectionReferencesPanelComposed.integration.test.ts` to include `TEST_SOLUTION_ID` in `mockSolutions`
+- Root cause: New validation logic checks if persisted solution exists in loaded solutions list. Tests mocked a solution ID not in the mock list.
+
+**Verification:**
+- All 266 test suites pass (7001 tests)
+- `npm run compile` passes
+- Ready for manual testing (F5)
+
 ---
 
 ## Remaining Topics
