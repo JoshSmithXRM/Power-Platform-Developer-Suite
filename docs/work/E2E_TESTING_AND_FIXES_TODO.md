@@ -24,6 +24,10 @@
 1. ~~**Default Environment & Ordering** - Left-click in tool menu opens default environment, but no way to set default or reorder environments~~ ✅ DONE
 2. **Environment Switch Persistence Behavior** - Switching environments overwrites target environment's persisted settings with source environment's settings (needs E2E test to verify behavior)
 
+### Future Enhancements (Parking Lot)
+
+- [ ] **Environment Reorder Refresh in Panels** - When using Move Up/Down, open panel environment dropdowns don't immediately reflect the new order (they refresh when reopened). Could add `EnvironmentOrderChanged` domain event for immediate sync across all panels. Low priority UX improvement.
+
 ### Implemented This Session
 
 - [x] **Interactive Authentication Token Caching** - Implemented persistent token caching via VS Code SecretStorage
