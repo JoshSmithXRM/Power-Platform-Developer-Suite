@@ -558,12 +558,117 @@ Both have value, but Playwright E2E gives more coverage for UI bugs.
 
 ---
 
-## Awaiting Your Decisions
+---
 
-Please review each topic and indicate your decisions:
+## Session 4 - Web Resources Fixes (2025-11-30)
 
-1. **Roadmap**: Which versioning philosophy? Create ROADMAP.md?
-2. **Workflow**: Fix all 4 release process issues?
-3. **Tech Debt**: Confirm keep all current decisions?
-4. **Warnings**: Which approach (A/B/C/D)?
-5. **E2E Testing**: Which strategy (A/B/C/D)?
+### Bugs Identified and Fixed
+
+**Bug 1: Missing "Managed" Column in Web Resources Panel** ✅
+- **Problem:** Users couldn't see if a web resource was managed or unmanaged
+- **Root Cause:** `WebResourceViewModel` had `isManaged: boolean` but no human-readable display
+- **Fix:**
+  - Added `managed: string` field to `WebResourceViewModel` (displays "Yes" or "No")
+  - Added column to `WebResourcesPanelComposed` table config
+  - Updated `WebResourceViewModelMapper` to map `managed` field
+  - Updated tests to verify new field
+- **Files changed:**
+  - `src/features/webResources/presentation/viewModels/WebResourceViewModel.ts`
+  - `src/features/webResources/presentation/mappers/WebResourceViewModelMapper.ts`
+  - `src/features/webResources/presentation/mappers/WebResourceViewModelMapper.test.ts`
+  - `src/features/webResources/presentation/panels/WebResourcesPanelComposed.ts`
+
+**Bug 2: Managed Web Resources Not Editable** ✅
+- **Problem:** Managed web resources were blocked from editing with error message
+- **Analysis:** User tested in Dataverse and confirmed managed web resources CAN be edited
+- **Decision:** Allow editing managed text-based resources (supports production hotfix scenarios)
+- **Fix:**
+  - Changed `WebResource.canEdit()` to only check `isTextBased()`, not `isManaged`
+  - Updated `ManagedWebResourceError` message to clarify binary types aren't supported
+  - Updated ~30 tests across 4 test files to reflect new behavior
+- **Files changed:**
+  - `src/features/webResources/domain/entities/WebResource.ts`
+  - `src/features/webResources/domain/entities/WebResource.test.ts`
+  - `src/features/webResources/application/useCases/UpdateWebResourceUseCase.ts`
+  - `src/features/webResources/application/useCases/UpdateWebResourceUseCase.test.ts`
+  - `src/features/webResources/presentation/mappers/WebResourceViewModelMapper.test.ts`
+  - `src/features/webResources/application/useCases/ListWebResourcesUseCase.test.ts`
+
+**Bug 3: Constant Downloading in Web Resources Panel** ✅ (REVISED)
+- **Problem:** Every toggle, solution change, or filter action triggered a server request
+- **Root Cause #1:** Cache key included `showTextBasedOnly` flag, so toggling "Show All" caused cache miss
+- **Root Cause #2:** VirtualTableConfig capped at 5000 records (never used but conceptually wrong)
+- **Correct Approach:**
+  - Cache ALL web resources per solution (no filter in cache key)
+  - Apply `textBasedOnly` filter CLIENT-SIDE from cached full dataset
+  - Toggle "Show All" = instant filter from cache, no server call
+- **Fix:**
+  - Cache key is now just `solutionId` (removed `textBasedOnly` from key)
+  - `getAllWebResourcesWithCache(forceRefresh)` - fetches ALL types, stores in cache
+  - `getFilteredWebResources(forceRefresh)` - applies `isTextBased()` filter client-side
+  - Use case always called with `textBasedOnly: false` to get complete dataset
+- **Caching behavior:**
+  - **Initial load**: Fetches ALL web resources, caches them, displays filtered view
+  - **Toggle Show All**: Instant - filters cached data client-side (NO server call)
+  - **Refresh button**: Fetches from server (bypasses cache)
+  - **Solution change**: Uses cache if switching back to previously viewed solution
+  - **Environment change**: Clears cache entirely (new environment = fresh data)
+- **Files changed:**
+  - `src/features/webResources/presentation/panels/WebResourcesPanelComposed.ts`
+
+**Bug 4: Error on Close Due to Background Tasks** ✅
+- **Problem:** Closing Web Resources panel could cause errors from in-progress background loading
+- **Root Cause:** No proper cleanup on panel dispose
+- **Fix:**
+  - Added `dispose()` method to `WebResourcesPanelComposed`
+  - Cancels background loading via `cacheManager.cancelBackgroundLoading()`
+  - Clears both VirtualTableCacheManager and local data cache
+  - Disposes PublishBehavior
+  - Updated `onDispose` callback to call new `dispose()` method
+- **Files changed:**
+  - `src/features/webResources/presentation/panels/WebResourcesPanelComposed.ts`
+
+**Bug 5: Solution Filtering Always Loaded ALL Web Resources** ✅
+- **Problem:** Even when a specific solution was selected, the panel fetched ALL web resources from the environment, then filtered client-side
+- **Root Cause:** `ListWebResourcesUseCase` always called `fetchAllWebResources()` regardless of which solution was selected
+- **Impact:** Solutions with few web resources still had to wait for massive environment-wide queries
+- **Fix (Unified Approach):**
+  - Single code path for ALL solutions (including Default Solution) - no special cases
+  - Always gets solution component IDs first, then queries only those web resources
+  - For small solutions (≤100 IDs): uses OData `$filter` for efficient server-side query
+  - For large solutions (>100 IDs): falls back to fetch all + client-side filter (URL length limits)
+  - **No artificial record limits** - repository follows OData pagination to fetch ALL pages
+  - New methods: `fetchWebResourcesForSolution()`, `fetchWebResourcesByIds()`, `fetchAllWebResources()` (fallback)
+  - Updated tests to reflect unified approach
+- **Design rationale:** User feedback emphasized simplicity over micro-optimization. One code path is easier to maintain and debug than branching logic.
+- **Files changed:**
+  - `src/features/webResources/application/useCases/ListWebResourcesUseCase.ts`
+  - `src/features/webResources/application/useCases/ListWebResourcesUseCase.test.ts`
+
+**Enhancement: Auto-Refresh Row After Edit** ✅
+- **Problem:** After editing a web resource in VS Code editor, the table row didn't reflect updated metadata (modified date)
+- **Solution:** Subscribe to FileSystemProvider's save event and refresh the specific row
+- **Implementation:**
+  - Added `WebResourceSavedEvent` interface and `onDidSaveWebResource` event to `WebResourceFileSystemProvider`
+  - Fire event in `writeFile()` after successful save
+  - Store `fileSystemProviderInstance` globally in initialization module
+  - Pass provider to panel via `createOrShow()`
+  - Panel subscribes to event in constructor, disposes in `dispose()`
+  - `handleWebResourceSaved()` fetches updated resource, updates cache, re-renders table
+- **Files changed:**
+  - `src/features/webResources/infrastructure/providers/WebResourceFileSystemProvider.ts`
+  - `src/features/webResources/presentation/initialization/initializeWebResources.ts`
+  - `src/features/webResources/presentation/panels/WebResourcesPanelComposed.ts`
+
+### Testing
+- All 7001 tests pass
+- `npm run compile` passes (lint, test, build)
+
+---
+
+## Remaining Topics
+
+| # | Topic | Status | Notes |
+|---|-------|--------|-------|
+| 6 | Code Cleanup | ⏳ Pending | Comments/logging review |
+| 7 | Code Review | ⏳ Pending | After cleanup complete |

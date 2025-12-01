@@ -20,6 +20,9 @@ export interface WebResourceViewModel {
 	readonly modifiedOn: string;
 	/** Sort value for modifiedOn (timestamp for proper date sorting) */
 	readonly modifiedOnSortValue: number;
+	/** Display value for isManaged ('Yes' or 'No') */
+	readonly managed: string;
+	/** Raw boolean for isManaged (used for filtering/logic) */
 	readonly isManaged: boolean;
 	readonly isEditable: boolean;
 }

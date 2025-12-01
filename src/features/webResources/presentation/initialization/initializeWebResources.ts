@@ -1,9 +1,13 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { WebResourceFileSystemProvider as WebResourceFileSystemProviderType } from '../../infrastructure/providers/WebResourceFileSystemProvider';
 
 /** Tracks whether the FileSystemProvider has been registered (once per extension lifecycle) */
 let fileSystemProviderRegistered = false;
+
+/** Singleton instance of the FileSystemProvider (shared across all panel instances) */
+let fileSystemProviderInstance: WebResourceFileSystemProviderType | null = null;
 
 /**
  * Lazy-loads and initializes Web Resources panel.
@@ -64,7 +68,7 @@ export async function initializeWebResources(
 
 	// Register FileSystemProvider once per extension lifecycle
 	if (!fileSystemProviderRegistered) {
-		const fileSystemProvider = new WebResourceFileSystemProvider(
+		fileSystemProviderInstance = new WebResourceFileSystemProvider(
 			getWebResourceContentUseCase,
 			updateWebResourceUseCase,
 			publishWebResourceUseCase,
@@ -74,7 +78,7 @@ export async function initializeWebResources(
 		context.subscriptions.push(
 			vscode.workspace.registerFileSystemProvider(
 				WEB_RESOURCE_SCHEME,
-				fileSystemProvider,
+				fileSystemProviderInstance,
 				{ isCaseSensitive: true }
 			)
 		);
@@ -95,6 +99,7 @@ export async function initializeWebResources(
 		viewModelMapper,
 		logger,
 		initialEnvironmentId,
-		panelStateRepository
+		panelStateRepository,
+		fileSystemProviderInstance ?? undefined
 	);
 }

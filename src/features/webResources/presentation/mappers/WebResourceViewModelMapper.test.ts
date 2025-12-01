@@ -245,6 +245,7 @@ describe('WebResourceViewModelMapper', () => {
 
 			// Assert
 			expect(viewModel.isManaged).toBe(true);
+			expect(viewModel.managed).toBe('Yes');
 		});
 
 		it('should map isManaged correctly for unmanaged resource', () => {
@@ -256,6 +257,7 @@ describe('WebResourceViewModelMapper', () => {
 
 			// Assert
 			expect(viewModel.isManaged).toBe(false);
+			expect(viewModel.managed).toBe('No');
 		});
 
 		it('should set isEditable to true for unmanaged text-based resource', () => {
@@ -272,8 +274,8 @@ describe('WebResourceViewModelMapper', () => {
 			expect(viewModel.isEditable).toBe(true);
 		});
 
-		it('should set isEditable to false for managed resource', () => {
-			// Arrange
+		it('should set isEditable to true for managed text-based resource (hotfix support)', () => {
+			// Arrange - Managed resources are editable for production hotfixes
 			const webResource = createTestWebResource({
 				type: WebResourceType.JAVASCRIPT,
 				isManaged: true
@@ -283,7 +285,7 @@ describe('WebResourceViewModelMapper', () => {
 			const viewModel = mapper.toViewModel(webResource);
 
 			// Assert
-			expect(viewModel.isEditable).toBe(false);
+			expect(viewModel.isEditable).toBe(true);
 		});
 
 		it('should set isEditable to false for image resource', () => {
@@ -323,9 +325,11 @@ describe('WebResourceViewModelMapper', () => {
 			expect(viewModel.nameLink!.className).toBe('clickable-link');
 		});
 
-		it('should not include nameLink for managed resource', () => {
-			// Arrange
+		it('should include nameLink for managed text-based resource (hotfix support)', () => {
+			// Arrange - Managed resources get nameLink since they are editable
 			const webResource = createTestWebResource({
+				id: 'managed-wr-123',
+				name: 'new_managed_script.js',
 				type: WebResourceType.JAVASCRIPT,
 				isManaged: true
 			});
@@ -334,7 +338,8 @@ describe('WebResourceViewModelMapper', () => {
 			const viewModel = mapper.toViewModel(webResource);
 
 			// Assert
-			expect(viewModel.nameLink).toBeUndefined();
+			expect(viewModel.nameLink).toBeDefined();
+			expect(viewModel.nameLink!.command).toBe('openWebResource');
 		});
 
 		it('should not include nameLink for image resource', () => {

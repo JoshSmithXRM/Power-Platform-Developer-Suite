@@ -6,11 +6,13 @@ import { WebResource } from '../../domain/entities/WebResource';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
- * Error thrown when attempting to edit a managed web resource.
+ * Error thrown when attempting to edit a non-editable web resource.
+ * This applies to binary resource types (PNG, JPG, GIF, ICO, XAP).
+ * Note: Managed text-based resources ARE editable (supports hotfix scenarios).
  */
 export class ManagedWebResourceError extends Error {
 	constructor(webResourceId: string) {
-		super(`Cannot edit managed web resource: ${webResourceId}`);
+		super(`Cannot edit web resource (binary type not supported): ${webResourceId}`);
 		this.name = 'ManagedWebResourceError';
 	}
 }

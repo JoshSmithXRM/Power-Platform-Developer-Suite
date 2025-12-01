@@ -31,7 +31,7 @@ import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
-import { createWebResourceUri } from '../../infrastructure/providers/WebResourceFileSystemProvider';
+import { createWebResourceUri, WebResourceFileSystemProvider } from '../../infrastructure/providers/WebResourceFileSystemProvider';
 import { PublishBehavior } from '../../../../shared/infrastructure/ui/behaviors/PublishBehavior';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 
@@ -70,6 +70,14 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	// Filter state: true = text-based only (default), false = show all types
 	private showTextBasedOnly: boolean = true;
 
+	// Client-side cache: stores ALL web resources per solution (unfiltered)
+	// Filter (textBasedOnly) is applied client-side from this cache
+	// Cache key is just solutionId - filter state is NOT part of the key
+	private dataCache: Map<string, readonly WebResource[]> = new Map();
+
+	// Subscription to FileSystemProvider save events for auto-refresh
+	private saveSubscription: vscode.Disposable | undefined;
+
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
 		private readonly extensionUri: vscode.Uri,
@@ -83,7 +91,8 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		private readonly viewModelMapper: WebResourceViewModelMapper,
 		private readonly logger: ILogger,
 		environmentId: string,
-		private readonly panelStateRepository: IPanelStateRepository | undefined
+		private readonly panelStateRepository: IPanelStateRepository | undefined,
+		private readonly fileSystemProvider: WebResourceFileSystemProvider | undefined
 	) {
 		super();
 		this.currentEnvironmentId = environmentId;
@@ -127,6 +136,13 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		this.registerCommandHandlers();
 
+		// Subscribe to FileSystemProvider save events for auto-refresh
+		if (this.fileSystemProvider) {
+			this.saveSubscription = this.fileSystemProvider.onDidSaveWebResource((event) => {
+				void this.handleWebResourceSaved(event.environmentId, event.webResourceId);
+			});
+		}
+
 		void this.initializeAndLoadData();
 	}
 
@@ -167,6 +183,31 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.panel.reveal(column);
 	}
 
+	/**
+	 * Cleans up resources when the panel is disposed.
+	 * Cancels any background loading and clears caches.
+	 */
+	public dispose(): void {
+		this.logger.debug('WebResourcesPanel: Disposing');
+
+		// Cancel any background loading in progress
+		if (this.cacheManager) {
+			this.cacheManager.cancelBackgroundLoading();
+			this.cacheManager.clearCache();
+		}
+
+		// Clear local data cache
+		this.clearCache();
+
+		// Dispose FileSystemProvider subscription
+		this.saveSubscription?.dispose();
+
+		// Dispose behaviors
+		this.publishBehavior.dispose();
+
+		this.logger.debug('WebResourcesPanel: Disposed successfully');
+	}
+
 	public static async createOrShow(
 		extensionUri: vscode.Uri,
 		getEnvironments: () => Promise<EnvironmentOption[]>,
@@ -179,7 +220,8 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		viewModelMapper: WebResourceViewModelMapper,
 		logger: ILogger,
 		initialEnvironmentId?: string,
-		panelStateRepository?: IPanelStateRepository
+		panelStateRepository?: IPanelStateRepository,
+		fileSystemProvider?: WebResourceFileSystemProvider
 	): Promise<WebResourcesPanelComposed> {
 		return EnvironmentScopedPanel.createOrShowPanel({
 			viewType: WebResourcesPanelComposed.viewType,
@@ -201,7 +243,8 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				viewModelMapper,
 				logger,
 				envId,
-				panelStateRepository
+				panelStateRepository,
+				fileSystemProvider
 			),
 			webviewOptions: {
 				enableScripts: true,
@@ -210,7 +253,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				enableFindWidget: true
 			},
 			onDispose: (instance) => {
-				instance.publishBehavior.dispose();
+				instance.dispose();
 			}
 		}, WebResourcesPanelComposed.panels);
 	}
@@ -266,14 +309,8 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				}
 			}
 
-			// Load web resources for the selected solution
-			this.logger.debug('Loading web resources', { solutionId: finalSolutionId, textBasedOnly: this.showTextBasedOnly });
-			const webResources = await this.listWebResourcesUseCase.execute(
-				this.currentEnvironmentId,
-				finalSolutionId,
-				undefined,
-				{ textBasedOnly: this.showTextBasedOnly }
-			);
+			// Load ALL web resources for the selected solution, filter client-side
+			const webResources = await this.getFilteredWebResources(false);
 			const viewModels = this.viewModelMapper.toViewModels(webResources);
 
 			// Final render with solutions and data
@@ -433,6 +470,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				{ key: 'name', label: 'Name' },
 				{ key: 'displayName', label: 'Display Name' },
 				{ key: 'type', label: 'Type' },
+				{ key: 'managed', label: 'Managed' },
 				{ key: 'createdOn', label: 'Created On', type: 'datetime' },
 				{ key: 'modifiedOn', label: 'Modified On', type: 'datetime' }
 			],
@@ -452,45 +490,96 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		}
 	}
 
-	private async handleRefresh(): Promise<void> {
-		this.logger.debug('Refreshing web resources', { solutionId: this.currentSolutionId, textBasedOnly: this.showTextBasedOnly });
+	/**
+	 * Generates a cache key for the solution.
+	 * Cache stores ALL web resources per solution (unfiltered).
+	 * Filter (textBasedOnly) is applied client-side from cached data.
+	 */
+	private getCacheKey(solutionId: string): string {
+		return solutionId;
+	}
 
-		await this.loadingBehavior.setButtonLoading('refresh', true);
-		this.showTableLoading();
+	/**
+	 * Clears the data cache.
+	 * Called on environment change to ensure fresh data.
+	 */
+	private clearCache(): void {
+		this.dataCache.clear();
+		this.logger.debug('Data cache cleared');
+	}
 
-		try {
-			const webResources = await this.listWebResourcesUseCase.execute(
-				this.currentEnvironmentId,
-				this.currentSolutionId,
-				undefined,
-				{ textBasedOnly: this.showTextBasedOnly }
-			);
+	/**
+	 * Gets ALL web resources for the current solution (from cache or server).
+	 * Does NOT apply textBasedOnly filter - returns full unfiltered dataset.
+	 *
+	 * @param forceRefresh - If true, bypasses cache and fetches from server
+	 * @returns ALL web resources for the current solution (unfiltered)
+	 */
+	private async getAllWebResourcesWithCache(forceRefresh: boolean = false): Promise<readonly WebResource[]> {
+		const cacheKey = this.getCacheKey(this.currentSolutionId);
 
-			const viewModels = this.viewModelMapper.toViewModels(webResources);
-
-			this.logger.info('Web resources loaded successfully', { count: viewModels.length });
-
-			await this.panel.webview.postMessage({
-				command: 'updateVirtualTable',
-				data: {
-					rows: viewModels,
-					columns: this.getTableConfig().columns,
-					pagination: {
-						cachedCount: viewModels.length,
-						totalCount: viewModels.length,
-						isLoading: false,
-						currentPage: 0,
-						isFullyCached: true
-					}
-				}
+		// Return cached data if available and not forcing refresh
+		const cached = this.dataCache.get(cacheKey);
+		if (!forceRefresh && cached !== undefined) {
+			this.logger.debug('Returning cached web resources (all types)', {
+				cacheKey,
+				cachedCount: cached.length
 			});
-		} catch (error: unknown) {
-			this.logger.error('Error refreshing web resources', error);
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-			vscode.window.showErrorMessage(`Failed to refresh web resources: ${errorMessage}`);
-		} finally {
-			await this.loadingBehavior.setButtonLoading('refresh', false);
+			return cached;
 		}
+
+		// Fetch ALL from server (textBasedOnly = false to get everything)
+		this.logger.debug('Loading ALL web resources from server', {
+			solutionId: this.currentSolutionId
+		});
+
+		const webResources = await this.listWebResourcesUseCase.execute(
+			this.currentEnvironmentId,
+			this.currentSolutionId,
+			undefined,
+			{ textBasedOnly: false } // Always fetch ALL types
+		);
+
+		// Store in cache
+		this.dataCache.set(cacheKey, webResources);
+
+		this.logger.info('Web resources cached (all types)', {
+			cacheKey,
+			count: webResources.length
+		});
+		return webResources;
+	}
+
+	/**
+	 * Gets web resources filtered by current display settings.
+	 * Uses cached data and applies textBasedOnly filter client-side.
+	 *
+	 * @param forceRefresh - If true, bypasses cache and fetches from server
+	 * @returns Filtered web resources based on current showTextBasedOnly setting
+	 */
+	private async getFilteredWebResources(forceRefresh: boolean = false): Promise<readonly WebResource[]> {
+		const allResources = await this.getAllWebResourcesWithCache(forceRefresh);
+
+		// Apply filter client-side
+		if (this.showTextBasedOnly) {
+			const filtered = allResources.filter(wr => wr.isTextBased());
+			this.logger.debug('Filtered to text-based types (client-side)', {
+				totalCount: allResources.length,
+				filteredCount: filtered.length
+			});
+			return filtered;
+		}
+
+		return allResources;
+	}
+
+	private async handleRefresh(): Promise<void> {
+		this.logger.debug('Refreshing web resources (force refresh from server)', {
+			solutionId: this.currentSolutionId,
+			textBasedOnly: this.showTextBasedOnly
+		});
+		// Force refresh bypasses cache
+		await this.loadAndDisplayWebResources(true);
 	}
 
 	private async handleOpenMaker(): Promise<void> {
@@ -514,6 +603,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		const oldEnvironmentId = this.currentEnvironmentId;
 		this.currentEnvironmentId = environmentId;
+
+		// Clear cache - new environment means fresh data
+		this.clearCache();
 
 		// Re-register panel in map for new environment
 		this.reregisterPanel(WebResourcesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
@@ -600,8 +692,51 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			);
 		}
 
-		// handleRefresh handles loading state
-		await this.handleRefresh();
+		// Load with caching - use cached data if switching back to previously viewed solution
+		await this.loadAndDisplayWebResources(false);
+	}
+
+	/**
+	 * Loads web resources and updates the display.
+	 * Fetches ALL types and filters client-side based on showTextBasedOnly.
+	 *
+	 * @param forceRefresh - If true, bypass cache and fetch from server
+	 */
+	private async loadAndDisplayWebResources(forceRefresh: boolean): Promise<void> {
+		await this.loadingBehavior.setButtonLoading('refresh', true);
+		this.showTableLoading();
+
+		try {
+			const webResources = await this.getFilteredWebResources(forceRefresh);
+			const viewModels = this.viewModelMapper.toViewModels(webResources);
+
+			this.logger.info('Web resources displayed', {
+				count: viewModels.length,
+				showTextBasedOnly: this.showTextBasedOnly,
+				fromCache: !forceRefresh && this.dataCache.has(this.getCacheKey(this.currentSolutionId))
+			});
+
+			await this.panel.webview.postMessage({
+				command: 'updateVirtualTable',
+				data: {
+					rows: viewModels,
+					columns: this.getTableConfig().columns,
+					pagination: {
+						cachedCount: viewModels.length,
+						totalCount: viewModels.length,
+						isLoading: false,
+						currentPage: 0,
+						isFullyCached: true
+					}
+				}
+			});
+		} catch (error: unknown) {
+			this.logger.error('Error loading web resources', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			vscode.window.showErrorMessage(`Failed to load web resources: ${errorMessage}`);
+		} finally {
+			await this.loadingBehavior.setButtonLoading('refresh', false);
+		}
 	}
 
 	/**
@@ -745,8 +880,8 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			label: newLabel
 		});
 
-		// Reload data with new filter setting
-		await this.handleRefresh();
+		// Load with caching - use cached data if we've seen this filter state before
+		await this.loadAndDisplayWebResources(false);
 	}
 
 	/**
@@ -793,6 +928,49 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 					error: error instanceof Error ? error.message : 'Search failed'
 				}
 			});
+		}
+	}
+
+	/**
+	 * Handles web resource save events from FileSystemProvider.
+	 * Fetches the updated web resource and refreshes the table row.
+	 */
+	private async handleWebResourceSaved(environmentId: string, webResourceId: string): Promise<void> {
+		// Only process events for the current environment
+		if (environmentId !== this.currentEnvironmentId) {
+			return;
+		}
+
+		this.logger.debug('WebResourcesPanel: Handling save event', { webResourceId });
+
+		try {
+			// Fetch the updated web resource from the server
+			const updatedResource = await this.webResourceRepository.findById(environmentId, webResourceId);
+
+			if (updatedResource === null) {
+				this.logger.warn('WebResourcesPanel: Saved web resource not found', { webResourceId });
+				return;
+			}
+
+			// Update the cache with the new data
+			const cacheKey = this.getCacheKey(this.currentSolutionId);
+			const cachedData = this.dataCache.get(cacheKey);
+
+			if (cachedData) {
+				// Replace the old resource with the updated one in the cache
+				const updatedCache = cachedData.map(wr =>
+					wr.id === webResourceId ? updatedResource : wr
+				);
+				this.dataCache.set(cacheKey, updatedCache);
+			}
+
+			// Update the view (don't force refresh since we already have fresh data in cache)
+			await this.loadAndDisplayWebResources(false);
+
+			this.logger.info('WebResourcesPanel: Row refreshed after save', { webResourceId });
+		} catch (error) {
+			this.logger.error('WebResourcesPanel: Failed to refresh after save', error);
+			// Don't throw - save was successful, just couldn't refresh
 		}
 	}
 

@@ -36,11 +36,15 @@ export class WebResource {
 	}
 
 	/**
-	 * Business rule: Can edit if not managed and type is text-based.
-	 * Used by ViewModel mapper to set isEditable flag.
+	 * Business rule: Can edit if type is text-based.
+	 *
+	 * Note: We intentionally allow editing managed web resources.
+	 * While not best practice, Dataverse permits it and it's a valid
+	 * scenario for production hotfixes. The "Managed" column indicates
+	 * the resource's managed state to inform the user's decision.
 	 */
 	public canEdit(): boolean {
-		return !this.isManaged && this.webResourceType.isTextBased();
+		return this.webResourceType.isTextBased();
 	}
 
 	/**
