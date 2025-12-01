@@ -154,7 +154,7 @@ export class PluginTrace {
 	/**
 	 * Validates required fields (id, pluginName, messageName) before construction.
 	 */
-	// eslint-disable-next-line complexity -- Parameter assignment complexity (26 params), not business logic
+	 
 	static create(params: {
 		// Required fields
 		id: string;

@@ -7,7 +7,8 @@ Features for querying, manipulating, and managing Dataverse data.
 ## High Priority
 
 ### Data Explorer (Ad-hoc Advanced Find)
-**Status**: In Development (see `docs/design/DATA_EXPLORER_DESIGN.md`)
+**Status**: In Development
+**Target Version**: v0.3.0
 **Priority**: High
 **Estimated Effort**: 32-40 hours
 **Value**: Query data without leaving VSCode, save and reuse queries
@@ -49,9 +50,10 @@ Interactive query builder for Dataverse data with live results and saved queries
 ---
 
 ### SQL to FetchXML (SQL4CDS-style)
-**Status**: Planned
+**Status**: Partially Implemented (basic SQL parsing done)
+**Target Version**: v0.4.0 (aggregates, JOINs)
 **Priority**: High
-**Estimated Effort**: 24-32 hours
+**Estimated Effort**: 24-32 hours (remaining: aggregates, JOINs ~16-28h)
 **Value**: Query Dataverse using familiar SQL syntax
 
 **Description**:
@@ -118,6 +120,7 @@ GROUP BY statecode
 
 ### Record Cloning (Cross-Environment)
 **Status**: Planned
+**Target Version**: v1.1+
 **Priority**: High
 **Estimated Effort**: 16-24 hours
 **Value**: Copy records between environments for testing/data migration
@@ -149,7 +152,8 @@ Query records in source environment and clone to target environment.
 ## Medium Priority
 
 ### Bulk Data Operations
-**Status**: Future
+**Status**: Planned
+**Target Version**: v1.1+
 **Priority**: Medium
 **Estimated Effort**: 16-24 hours
 **Value**: Safe bulk update/delete with preview
@@ -177,4 +181,4 @@ Bulk update or delete records with preview and confirmation.
 
 ---
 
-**Last Updated**: 2025-11-26
+**Last Updated**: 2025-11-30

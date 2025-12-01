@@ -83,7 +83,20 @@ Read `package.json` and check version field:
 
 ---
 
-## STEP 5: CREATE RELEASE NOTES
+## STEP 5: VERIFY README VERSION BADGE
+
+Check `README.md` for version badge:
+
+1. **Verify badge is dynamic:** Should use `github/package-json/v/JoshSmithXRM/Power-Platform-Developer-Suite`
+2. **If static badge found:** Convert to dynamic format:
+   ```markdown
+   ![version](https://img.shields.io/github/package-json/v/JoshSmithXRM/Power-Platform-Developer-Suite)
+   ```
+3. **Dynamic badge auto-updates** from package.json on each push - no manual update needed
+
+---
+
+## STEP 6: CREATE RELEASE NOTES
 
 Check if `docs/releases/vX.Y.Z.md` exists:
 
@@ -121,9 +134,9 @@ Extract the changes from CHANGELOG.md for this version and populate the template
 
 ---
 
-## STEP 6: COMMIT CHANGES
+## STEP 7: COMMIT CHANGES
 
-If any files were modified (package.json, CHANGELOG.md, release notes):
+If any files were modified (package.json, CHANGELOG.md, README.md, release notes):
 
 1. Show user what changed
 2. Ask: "Commit these release preparation changes?"
@@ -133,12 +146,13 @@ If any files were modified (package.json, CHANGELOG.md, release notes):
 
    - Update version in package.json
    - Update CHANGELOG.md date
+   - Update README.md version badge
    - Add release notes
    ```
 
 ---
 
-## STEP 7: SUMMARY
+## STEP 8: SUMMARY
 
 Show completion summary:
 

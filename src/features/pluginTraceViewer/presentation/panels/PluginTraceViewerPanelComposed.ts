@@ -5,7 +5,7 @@
  * NO business logic - delegates all operations to use cases.
  */
 
-/* eslint-disable max-lines -- Panel coordinator with 11 simple command handlers */
+ 
 
 import * as vscode from 'vscode';
 

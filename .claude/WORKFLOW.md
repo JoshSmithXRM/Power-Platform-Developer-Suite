@@ -181,14 +181,35 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 
 **Purpose:** Merge to main via pull request.
 
+**Pre-PR Checklist (MANDATORY):**
 ```
 □ Ensure all tracking doc boxes checked
-□ Update CHANGELOG.md
+□ npm run compile passes (0 errors, 0 warnings)
+□ npm test passes
+□ Manual testing (F5) complete
+□ Update CHANGELOG.md [Unreleased] section with changes
 □ Final commit if any remaining changes
+```
+
+**PR Creation:**
+```
 □ Push branch: git push -u origin [branch]
 □ Create PR: gh pr create --title "..." --body "..."
 □ Verify CI passes
 ```
+
+**For RELEASES (when merging to main for a version bump):**
+```
+□ Run /prepare-release X.Y.Z before creating PR
+□ Verify docs/releases/vX.Y.Z.md was created
+□ Verify README.md version badge is updated
+□ Verify CHANGELOG.md [Unreleased] moved to [X.Y.Z]
+```
+
+**CHANGELOG Workflow:**
+- During development: Add changes to `[Unreleased]` section
+- At release time: `/prepare-release` converts `[Unreleased]` → `[X.Y.Z]`
+- Every PR should update CHANGELOG under `[Unreleased]`
 
 **PR creation uses `gh` CLI** (documented in CLAUDE.md).
 
