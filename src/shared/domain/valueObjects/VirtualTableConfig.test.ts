@@ -6,7 +6,7 @@ describe('VirtualTableConfig', () => {
 			const config = VirtualTableConfig.createDefault();
 
 			expect(config.getInitialPageSize()).toBe(100);
-			expect(config.getMaxCachedRecords()).toBe(5000);
+			expect(config.getMaxCachedRecords()).toBe(Number.MAX_SAFE_INTEGER); // Unlimited
 			expect(config.getBackgroundPageSize()).toBe(500);
 			expect(config.isBackgroundLoadingEnabled()).toBe(true);
 		});
@@ -43,13 +43,7 @@ describe('VirtualTableConfig', () => {
 	describe('validation - initialPageSize', () => {
 		it('should throw if initialPageSize is below minimum', () => {
 			expect(() => VirtualTableConfig.create(9, 5000, 500)).toThrow(
-				'Initial page size must be between 10 and 1000'
-			);
-		});
-
-		it('should throw if initialPageSize is above maximum', () => {
-			expect(() => VirtualTableConfig.create(1001, 5000, 500)).toThrow(
-				'Initial page size must be between 10 and 1000'
+				'Initial page size must be at least 10'
 			);
 		});
 
@@ -58,22 +52,16 @@ describe('VirtualTableConfig', () => {
 			expect(config.getInitialPageSize()).toBe(10);
 		});
 
-		it('should accept maximum initialPageSize', () => {
-			const config = VirtualTableConfig.create(1000, 5000, 500);
-			expect(config.getInitialPageSize()).toBe(1000);
+		it('should accept large initialPageSize (no upper limit)', () => {
+			const config = VirtualTableConfig.create(5000, 10000, 500);
+			expect(config.getInitialPageSize()).toBe(5000);
 		});
 	});
 
 	describe('validation - maxCachedRecords', () => {
 		it('should throw if maxCachedRecords is below minimum', () => {
 			expect(() => VirtualTableConfig.create(100, 99, 100)).toThrow(
-				'Max cached records must be between 100 and 50000'
-			);
-		});
-
-		it('should throw if maxCachedRecords is above maximum', () => {
-			expect(() => VirtualTableConfig.create(100, 50001, 500)).toThrow(
-				'Max cached records must be between 100 and 50000'
+				'Max cached records must be at least 100'
 			);
 		});
 
@@ -82,22 +70,16 @@ describe('VirtualTableConfig', () => {
 			expect(config.getMaxCachedRecords()).toBe(100);
 		});
 
-		it('should accept maximum maxCachedRecords', () => {
-			const config = VirtualTableConfig.create(100, 50000, 500);
-			expect(config.getMaxCachedRecords()).toBe(50000);
+		it('should accept very large maxCachedRecords (no upper limit)', () => {
+			const config = VirtualTableConfig.create(100, 1000000, 500);
+			expect(config.getMaxCachedRecords()).toBe(1000000);
 		});
 	});
 
 	describe('validation - backgroundPageSize', () => {
 		it('should throw if backgroundPageSize is below minimum', () => {
 			expect(() => VirtualTableConfig.create(100, 5000, 99)).toThrow(
-				'Background page size must be between 100 and 5000'
-			);
-		});
-
-		it('should throw if backgroundPageSize is above maximum', () => {
-			expect(() => VirtualTableConfig.create(100, 5000, 5001)).toThrow(
-				'Background page size must be between 100 and 5000'
+				'Background page size must be at least 100'
 			);
 		});
 
@@ -106,9 +88,9 @@ describe('VirtualTableConfig', () => {
 			expect(config.getBackgroundPageSize()).toBe(100);
 		});
 
-		it('should accept maximum backgroundPageSize', () => {
-			const config = VirtualTableConfig.create(100, 5000, 5000);
-			expect(config.getBackgroundPageSize()).toBe(5000);
+		it('should accept large backgroundPageSize (no upper limit)', () => {
+			const config = VirtualTableConfig.create(100, 50000, 10000);
+			expect(config.getBackgroundPageSize()).toBe(10000);
 		});
 	});
 
@@ -139,8 +121,8 @@ describe('VirtualTableConfig', () => {
 	});
 
 	describe('getBackgroundPageCount', () => {
-		it('should calculate correct page count with default config', () => {
-			const config = VirtualTableConfig.createDefault();
+		it('should calculate correct page count with custom config', () => {
+			const config = VirtualTableConfig.create(100, 5000, 500, true);
 			// (5000 - 100) / 500 = 9.8 → ceil = 10
 			expect(config.getBackgroundPageCount()).toBe(10);
 		});
@@ -182,7 +164,7 @@ describe('VirtualTableConfig', () => {
 
 	describe('withBackgroundLoadingDisabled', () => {
 		it('should return new config with background loading disabled', () => {
-			const original = VirtualTableConfig.createDefault();
+			const original = VirtualTableConfig.create(100, 5000, 500, true);
 			const disabled = original.withBackgroundLoadingDisabled();
 
 			expect(original.isBackgroundLoadingEnabled()).toBe(true);
@@ -205,7 +187,7 @@ describe('VirtualTableConfig', () => {
 
 	describe('withInitialPageSize', () => {
 		it('should return new config with different initial page size', () => {
-			const original = VirtualTableConfig.createDefault();
+			const original = VirtualTableConfig.create(100, 5000, 500, true);
 			const modified = original.withInitialPageSize(200);
 
 			expect(original.getInitialPageSize()).toBe(100);
@@ -218,16 +200,16 @@ describe('VirtualTableConfig', () => {
 		});
 
 		it('should validate new page size', () => {
-			const config = VirtualTableConfig.createDefault();
+			const config = VirtualTableConfig.create(100, 5000, 500, true);
 			expect(() => config.withInitialPageSize(5)).toThrow(
-				'Initial page size must be between 10 and 1000'
+				'Initial page size must be at least 10'
 			);
 		});
 	});
 
 	describe('withMaxCachedRecords', () => {
 		it('should return new config with different max cached records', () => {
-			const original = VirtualTableConfig.createDefault();
+			const original = VirtualTableConfig.create(100, 5000, 500, true);
 			const modified = original.withMaxCachedRecords(10000);
 
 			expect(original.getMaxCachedRecords()).toBe(5000);
@@ -239,17 +221,17 @@ describe('VirtualTableConfig', () => {
 		});
 
 		it('should validate new max cached records against minimum', () => {
-			const config = VirtualTableConfig.createDefault();
-			// 50 is below minimum (100), so fails range validation first
+			const config = VirtualTableConfig.create(100, 5000, 500, true);
+			// 50 is below minimum (100)
 			expect(() => config.withMaxCachedRecords(50)).toThrow(
-				'Max cached records must be between 100 and 50000'
+				'Max cached records must be at least 100'
 			);
 		});
 
 		it('should validate new max cached records against initial page size', () => {
 			// Create config with initial page size of 200
 			const config = VirtualTableConfig.create(200, 5000, 500, true);
-			// 150 is valid range but less than initial page size (200)
+			// 150 is valid minimum but less than initial page size (200)
 			expect(() => config.withMaxCachedRecords(150)).toThrow(
 				'Max cached records must be >= initial page size'
 			);
@@ -257,19 +239,16 @@ describe('VirtualTableConfig', () => {
 	});
 
 	describe('static constants', () => {
-		it('should expose validation constants', () => {
+		it('should expose minimum validation constants (no upper limits)', () => {
 			expect(VirtualTableConfig.MIN_INITIAL_PAGE_SIZE).toBe(10);
-			expect(VirtualTableConfig.MAX_INITIAL_PAGE_SIZE).toBe(1000);
 			expect(VirtualTableConfig.MIN_MAX_CACHED_RECORDS).toBe(100);
-			expect(VirtualTableConfig.MAX_MAX_CACHED_RECORDS).toBe(50000);
 			expect(VirtualTableConfig.MIN_BACKGROUND_PAGE_SIZE).toBe(100);
-			expect(VirtualTableConfig.MAX_BACKGROUND_PAGE_SIZE).toBe(5000);
 		});
 	});
 
 	describe('immutability', () => {
 		it('should not modify original when creating with methods', () => {
-			const original = VirtualTableConfig.createDefault();
+			const original = VirtualTableConfig.create(100, 5000, 500, true);
 			const modified = original
 				.withInitialPageSize(200)
 				.withMaxCachedRecords(10000)

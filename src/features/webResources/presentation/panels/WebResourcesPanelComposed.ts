@@ -98,8 +98,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.currentEnvironmentId = environmentId;
 		logger.debug('WebResourcesPanel: Initialized with virtual table architecture');
 
-		// Configure virtual table: 100 initial, up to 5000 cached, background loading enabled
-		this.virtualTableConfig = VirtualTableConfig.create(100, 5000, 500, true);
+		// Virtual table config - no artificial limits. Primary data display uses
+		// listWebResourcesUseCase with OData pagination (unlimited records).
+		this.virtualTableConfig = VirtualTableConfig.createDefault();
 
 		// Initialize virtual table infrastructure for Default Solution
 		this.initializeVirtualTable(environmentId);

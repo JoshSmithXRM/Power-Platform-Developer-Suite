@@ -133,8 +133,8 @@ export class MakerUrlBuilder implements IMakerUrlBuilder {
    * Builds Maker Portal URL for web resources.
    *
    * Two patterns based on context:
-   * - With solution: /environments/{envId}/solutions/{solutionId}/objects/webresources
-   * - Without solution: /environments/{envId}/webresources (not available, redirects to solutions)
+   * - With solution: /environments/{envId}/solutions/{solutionId}/objects/web%20resources
+   * - Without solution: /environments/{envId}/solutions (no direct web resources list outside solutions)
    *
    * @param environmentId - Power Platform environment GUID
    * @param solutionId - Optional solution GUID for solution-scoped view
@@ -142,7 +142,7 @@ export class MakerUrlBuilder implements IMakerUrlBuilder {
    */
   buildWebResourcesUrl(environmentId: string, solutionId?: string): string {
     if (solutionId) {
-      return `${this.baseUrl}/environments/${environmentId}/solutions/${solutionId}/objects/webresources`;
+      return `${this.baseUrl}/environments/${environmentId}/solutions/${solutionId}/objects/web%20resources`;
     }
     // Without solution, link to solutions list (no direct web resources list outside solutions)
     return `${this.baseUrl}/environments/${environmentId}/solutions`;

@@ -260,7 +260,7 @@ describe('DataverseApiSolutionComponentRepository', () => {
 			);
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				'Fetched solution components from Dataverse',
-				{ environmentId: 'env-123', solutionId: 'sol-123', entityLogicalName: 'connectionreference', componentType: 10051, count: 2 }
+				{ environmentId: 'env-123', solutionId: 'sol-123', entityLogicalName: 'connectionreference', componentType: 10051, count: 2, pages: 1 }
 			);
 		});
 
@@ -305,7 +305,7 @@ describe('DataverseApiSolutionComponentRepository', () => {
 			expect(result).toEqual([]);
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				'Fetched solution components from Dataverse',
-				{ environmentId: 'env-123', solutionId: 'sol-123', entityLogicalName: 'connectionreference', componentType: 10051, count: 0 }
+				{ environmentId: 'env-123', solutionId: 'sol-123', entityLogicalName: 'connectionreference', componentType: 10051, count: 0, pages: 1 }
 			);
 		});
 
@@ -661,6 +661,78 @@ describe('DataverseApiSolutionComponentRepository', () => {
 				'Using standard component type code',
 				{ entityLogicalName: 'workflow', componentType: 29 }
 			);
+		});
+
+		it('should follow @odata.nextLink to fetch ALL component IDs (pagination)', async () => {
+			// Arrange - simulate Dataverse returning paginated results
+			// This is the bug: Dataverse defaults to 5000 records per page
+			// Without pagination, we only get the first page
+			const page1Response = {
+				value: [
+					{ solutioncomponentid: 'comp-1', objectid: 'wr-1', componenttype: 61, _solutionid_value: 'sol-123' },
+					{ solutioncomponentid: 'comp-2', objectid: 'wr-2', componenttype: 61, _solutionid_value: 'sol-123' },
+					{ solutioncomponentid: 'comp-3', objectid: 'wr-3', componenttype: 61, _solutionid_value: 'sol-123' }
+				],
+				'@odata.nextLink': 'https://org.crm.dynamics.com/api/data/v9.2/solutioncomponents?$skiptoken=page2'
+			};
+
+			const page2Response = {
+				value: [
+					{ solutioncomponentid: 'comp-4', objectid: 'wr-4', componenttype: 61, _solutionid_value: 'sol-123' },
+					{ solutioncomponentid: 'comp-5', objectid: 'wr-5', componenttype: 61, _solutionid_value: 'sol-123' }
+				],
+				'@odata.nextLink': 'https://org.crm.dynamics.com/api/data/v9.2/solutioncomponents?$skiptoken=page3'
+			};
+
+			const page3Response = {
+				value: [
+					{ solutioncomponentid: 'comp-6', objectid: 'wr-6', componenttype: 61, _solutionid_value: 'sol-123' }
+				]
+				// No nextLink = last page
+			};
+
+			mockApiService.get
+				.mockResolvedValueOnce(page1Response)
+				.mockResolvedValueOnce(page2Response)
+				.mockResolvedValueOnce(page3Response);
+
+			// Act
+			const result = await repository.findComponentIdsBySolution(
+				'env-123',
+				'sol-123',
+				'webresource'
+			);
+
+			// Assert - should have ALL 6 component IDs from ALL 3 pages
+			expect(result).toEqual(['wr-1', 'wr-2', 'wr-3', 'wr-4', 'wr-5', 'wr-6']);
+			expect(result).toHaveLength(6);
+
+			// Should have made 3 API calls (one per page)
+			expect(mockApiService.get).toHaveBeenCalledTimes(3);
+		});
+
+		it('should handle single page response (no nextLink)', async () => {
+			// Arrange - response without nextLink means single page
+			const singlePageResponse = {
+				value: [
+					{ solutioncomponentid: 'comp-1', objectid: 'wr-1', componenttype: 61, _solutionid_value: 'sol-123' },
+					{ solutioncomponentid: 'comp-2', objectid: 'wr-2', componenttype: 61, _solutionid_value: 'sol-123' }
+				]
+				// No @odata.nextLink
+			};
+
+			mockApiService.get.mockResolvedValueOnce(singlePageResponse);
+
+			// Act
+			const result = await repository.findComponentIdsBySolution(
+				'env-123',
+				'sol-123',
+				'webresource'
+			);
+
+			// Assert
+			expect(result).toEqual(['wr-1', 'wr-2']);
+			expect(mockApiService.get).toHaveBeenCalledTimes(1);
 		});
 	});
 });

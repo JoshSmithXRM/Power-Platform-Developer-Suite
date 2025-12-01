@@ -727,6 +727,65 @@ await this.scaffoldingBehavior.refresh({ solutions, tableData: viewModels });
 
 ---
 
+### Bug 7: Artificial Record Limits ✅ FIXED
+
+**Problem:** VirtualTableConfig had artificial limits (max 50,000 records) that caused confusion and potential data truncation.
+
+**Root Cause:** Legacy design assumed large datasets needed capping. At 100k records with ~400 bytes each = ~40MB - trivial for modern systems.
+
+**Fix:**
+- Removed `MAX_INITIAL_PAGE_SIZE`, `MAX_MAX_CACHED_RECORDS`, `MAX_BACKGROUND_PAGE_SIZE` constants
+- Only minimum values now enforced (10, 100, 100 respectively)
+- Default `maxCachedRecords` changed from 5,000 to `Number.MAX_SAFE_INTEGER` (unlimited)
+- Updated all related tests
+
+**Files Changed:**
+- `src/shared/domain/valueObjects/VirtualTableConfig.ts`
+- `src/shared/domain/valueObjects/VirtualTableConfig.test.ts`
+- `src/features/webResources/presentation/panels/WebResourcesPanelComposed.ts`
+
+---
+
+### Bug 8: Maker URL for Web Resources ✅ FIXED
+
+**Problem:** "Open in Maker" button for Web Resources generated incorrect URL.
+
+**Root Cause:** URL path was `/objects/webresources` but should be `/objects/web%20resources` (URL-encoded space).
+
+**Fix:** Updated `MakerUrlBuilder.buildWebResourcesUrl()` to use correct path.
+
+**Files Changed:**
+- `src/shared/infrastructure/services/MakerUrlBuilder.ts`
+
+---
+
+### Bug 9: Solution Component Repository 5,000 Record Limit ✅ FIXED
+
+**Problem:** Despite repository fetching 56,745 web resources, use case only returned 5,000.
+
+**Root Cause:** `DataverseApiSolutionComponentRepository.findComponentIdsBySolution()` made a single GET request without pagination. Dataverse defaults to 5,000 records per page, so only first 5,000 component IDs were fetched.
+
+**Why tests didn't catch it:** All tests mocked the repository - no test verified `@odata.nextLink` pagination behavior.
+
+**Fix:**
+- Added `@odata.nextLink` to `SolutionComponentsResponse` interface
+- Changed single GET to pagination loop that follows nextLink until exhausted
+- Added cancellation check after each API call
+
+**Tests Added (regression prevention):**
+- `should follow @odata.nextLink to fetch ALL component IDs (pagination)` - simulates 3-page response
+- `should handle single page response (no nextLink)` - verifies single-page still works
+
+**Files Changed:**
+- `src/shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.ts`
+- `src/shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.test.ts`
+
+**Verification:**
+- All 266 test suites pass (7000 tests)
+- Default Solution now returns all 56,745 web resources
+
+---
+
 ## Remaining Topics
 
 | # | Topic | Status | Notes |

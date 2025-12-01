@@ -2,31 +2,27 @@
  * Immutable configuration for virtual table behavior.
  *
  * Business Rules:
- * - initialPageSize: First page load (default: 100, range: 10-1000)
- * - maxCachedRecords: Max records in memory (default: 5000, range: 100-50000)
- * - backgroundPageSize: Background load page size (default: 500, range: 100-5000)
+ * - initialPageSize: First page load (default: 100, min: 10)
+ * - maxCachedRecords: Max records in memory (no artificial limit - modern browsers handle 100k+ records easily)
+ * - backgroundPageSize: Background load page size (default: 500, min: 100)
  * - maxCachedRecords must be >= initialPageSize
+ *
+ * Note: At 100k records with ~400 bytes each, we're talking ~40MB - trivial for modern systems.
  *
  * @example
  * // Use defaults (recommended for most cases)
  * const config = VirtualTableConfig.createDefault();
  *
- * // Custom configuration
- * const customConfig = VirtualTableConfig.create(50, 10000, 1000, true);
+ * // Custom configuration - no artificial upper limits
+ * const customConfig = VirtualTableConfig.create(50, 100000, 1000, true);
  */
 export class VirtualTableConfig {
 	/** Minimum allowed initial page size */
 	public static readonly MIN_INITIAL_PAGE_SIZE = 10;
-	/** Maximum allowed initial page size */
-	public static readonly MAX_INITIAL_PAGE_SIZE = 1000;
 	/** Minimum allowed max cached records */
 	public static readonly MIN_MAX_CACHED_RECORDS = 100;
-	/** Maximum allowed max cached records */
-	public static readonly MAX_MAX_CACHED_RECORDS = 50000;
 	/** Minimum allowed background page size */
 	public static readonly MIN_BACKGROUND_PAGE_SIZE = 100;
-	/** Maximum allowed background page size */
-	public static readonly MAX_BACKGROUND_PAGE_SIZE = 5000;
 
 	private constructor(
 		private readonly initialPageSize: number,
@@ -40,16 +36,16 @@ export class VirtualTableConfig {
 	/**
 	 * Creates default configuration.
 	 *
-	 * Defaults optimized for 70k record datasets:
-	 * - initialPageSize: 100 (instant load)
-	 * - maxCachedRecords: 5000 (reasonable memory footprint)
+	 * Defaults optimized for large datasets (100k+ records):
+	 * - initialPageSize: 100 (instant initial render)
+	 * - maxCachedRecords: unlimited (Number.MAX_SAFE_INTEGER)
 	 * - backgroundPageSize: 500 (efficient batching)
 	 * - enableBackgroundLoading: true
 	 */
 	public static createDefault(): VirtualTableConfig {
 		return new VirtualTableConfig(
 			100, // initialPageSize
-			5000, // maxCachedRecords
+			Number.MAX_SAFE_INTEGER, // maxCachedRecords - no artificial limit
 			500, // backgroundPageSize
 			true // enableBackgroundLoading
 		);
@@ -58,9 +54,9 @@ export class VirtualTableConfig {
 	/**
 	 * Creates custom configuration.
 	 *
-	 * @param initialPageSize - Records to load on first page (10-1000)
-	 * @param maxCachedRecords - Maximum records to cache in memory (100-50000)
-	 * @param backgroundPageSize - Records per background load batch (100-5000)
+	 * @param initialPageSize - Records to load on first page (min: 10)
+	 * @param maxCachedRecords - Maximum records to cache in memory (min: 100, no upper limit)
+	 * @param backgroundPageSize - Records per background load batch (min: 100)
 	 * @param enableBackgroundLoading - Whether to load additional pages in background
 	 * @returns Immutable VirtualTableConfig instance
 	 * @throws Error if validation fails
@@ -81,34 +77,26 @@ export class VirtualTableConfig {
 
 	/**
 	 * Validates business rules.
+	 * Only enforces minimum values - no artificial upper limits.
 	 *
 	 * @throws Error if constraints violated
 	 */
 	private validate(): void {
-		if (
-			this.initialPageSize < VirtualTableConfig.MIN_INITIAL_PAGE_SIZE ||
-			this.initialPageSize > VirtualTableConfig.MAX_INITIAL_PAGE_SIZE
-		) {
+		if (this.initialPageSize < VirtualTableConfig.MIN_INITIAL_PAGE_SIZE) {
 			throw new Error(
-				`Initial page size must be between ${VirtualTableConfig.MIN_INITIAL_PAGE_SIZE} and ${VirtualTableConfig.MAX_INITIAL_PAGE_SIZE}`
+				`Initial page size must be at least ${VirtualTableConfig.MIN_INITIAL_PAGE_SIZE}`
 			);
 		}
 
-		if (
-			this.maxCachedRecords < VirtualTableConfig.MIN_MAX_CACHED_RECORDS ||
-			this.maxCachedRecords > VirtualTableConfig.MAX_MAX_CACHED_RECORDS
-		) {
+		if (this.maxCachedRecords < VirtualTableConfig.MIN_MAX_CACHED_RECORDS) {
 			throw new Error(
-				`Max cached records must be between ${VirtualTableConfig.MIN_MAX_CACHED_RECORDS} and ${VirtualTableConfig.MAX_MAX_CACHED_RECORDS}`
+				`Max cached records must be at least ${VirtualTableConfig.MIN_MAX_CACHED_RECORDS}`
 			);
 		}
 
-		if (
-			this.backgroundPageSize < VirtualTableConfig.MIN_BACKGROUND_PAGE_SIZE ||
-			this.backgroundPageSize > VirtualTableConfig.MAX_BACKGROUND_PAGE_SIZE
-		) {
+		if (this.backgroundPageSize < VirtualTableConfig.MIN_BACKGROUND_PAGE_SIZE) {
 			throw new Error(
-				`Background page size must be between ${VirtualTableConfig.MIN_BACKGROUND_PAGE_SIZE} and ${VirtualTableConfig.MAX_BACKGROUND_PAGE_SIZE}`
+				`Background page size must be at least ${VirtualTableConfig.MIN_BACKGROUND_PAGE_SIZE}`
 			);
 		}
 
