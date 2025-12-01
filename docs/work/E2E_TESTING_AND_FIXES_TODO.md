@@ -64,7 +64,7 @@
 - [x] Manual testing (F5): Low resolution buttons wrap correctly
 - [x] Manual testing (F5): Token caching persists across VS Code restarts
 - [x] `npm run compile` passes
-- [ ] E2E smoke tests pass (if applicable)
+- [x] E2E environment switch persistence tests pass (2/2)
 
 ---
 
