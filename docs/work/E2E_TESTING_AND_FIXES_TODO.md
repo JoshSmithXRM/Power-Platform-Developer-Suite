@@ -945,6 +945,19 @@ Note: `DataTableSectionView.ts` (non-virtual) already had zones - only virtual t
 
 ---
 
+### Bug 13: Preview Syntax Highlighting Missing on Page Load ✅ FIXED
+
+**Problem:** FetchXML Preview and SQL Preview didn't have syntax highlighting until after executing a query.
+
+**Root Cause:** Preview content was rendered server-side as plain text. The highlighting functions (`updateFetchXmlPreview`, `updateSqlPreview`) only ran when messages were received from the extension after query execution.
+
+**Fix:** Added `highlightInitialPreviews()` to the `initialize()` function in `DataExplorerBehavior.js`. This applies syntax highlighting to any preview content that exists on page load.
+
+**Files Changed:**
+- `resources/webview/js/behaviors/DataExplorerBehavior.js`
+
+---
+
 ### E2E Test Cleanup
 
 **Deleted:** `e2e/tests/integration/keyboard-selection.spec.ts` (759 lines)
