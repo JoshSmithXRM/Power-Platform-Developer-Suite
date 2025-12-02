@@ -10,6 +10,7 @@ This command ensures all release artifacts are properly created before merging t
 - Version bump in package.json
 - CHANGELOG.md updated with release date
 - Release notes file created in docs/releases/
+- Work tracking documents cleaned up
 - All tests pass
 - Compilation succeeds
 
@@ -134,7 +135,21 @@ Extract the changes from CHANGELOG.md for this version and populate the template
 
 ---
 
-## STEP 7: COMMIT CHANGES
+## STEP 7: CLEAN UP WORK TRACKING DOCUMENTS
+
+Check for work tracking documents in `docs/work/`:
+
+1. **List files:** `ls docs/work/*.md` (excluding README.md)
+2. **If tracking docs exist for this branch/feature:**
+   - Delete them with `git rm docs/work/[FEATURE]_TODO.md`
+   - These are preserved in git history and no longer needed after release
+3. **If no tracking docs:** Continue to next step
+
+**Note:** Work tracking documents follow the pattern `docs/work/[FEATURE]_TODO.md` as defined in CLAUDE.md.
+
+---
+
+## STEP 8: COMMIT CHANGES
 
 If any files were modified (package.json, CHANGELOG.md, README.md, release notes):
 
@@ -148,11 +163,12 @@ If any files were modified (package.json, CHANGELOG.md, README.md, release notes
    - Update CHANGELOG.md date
    - Update README.md version badge
    - Add release notes
+   - Remove work tracking docs (if any)
    ```
 
 ---
 
-## STEP 8: SUMMARY
+## STEP 9: SUMMARY
 
 Show completion summary:
 
@@ -163,6 +179,7 @@ Files updated:
 - package.json (version: X.Y.Z)
 - CHANGELOG.md (date updated)
 - docs/releases/vX.Y.Z.md (created)
+- docs/work/[FEATURE]_TODO.md (removed, if existed)
 
 Next steps:
 1. Push changes: git push
