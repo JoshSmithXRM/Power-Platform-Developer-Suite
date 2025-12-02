@@ -20,7 +20,6 @@ docs/
 ├── README.md              # This file - master index
 ├── architecture/          # Architecture patterns and guides (permanent)
 ├── design/                # Feature designs (temporary - deleted after implementation)
-├── requirements/          # Feature requirements (kept as documentation)
 ├── future/                # Planned enhancements by feature area
 ├── testing/               # Testing guides
 ├── releases/              # Release notes
@@ -35,7 +34,6 @@ docs/
 |------|----------|-----------|
 | Architecture patterns | `docs/architecture/` | Permanent - evolves with codebase |
 | Design docs | `docs/design/` | Temporary - deleted after implementation |
-| Requirements | `docs/requirements/` | Kept as feature documentation |
 | Future enhancements | `docs/future/` | Updated as items are implemented |
 | Work tracking | `docs/work/` | Deleted before PR merge |
 
@@ -102,21 +100,9 @@ docs/
 ## Feature Documentation
 
 ### Active Design Docs
-Design documents for features currently in development:
+*No active designs - all current features implemented.*
 
-| Document | Feature | Status |
-|----------|---------|--------|
-| [DATA_EXPLORER_DESIGN.md](design/DATA_EXPLORER_DESIGN.md) | Data Explorer panel | In Development |
-| [DATA_EXPLORER_INTELLISENSE_DESIGN_V2.md](design/DATA_EXPLORER_INTELLISENSE_DESIGN_V2.md) | IntelliSense for SQL editor | Planned |
-| [METADATA_BROWSER_PRESENTATION_DESIGN.md](design/METADATA_BROWSER_PRESENTATION_DESIGN.md) | Metadata Browser | In Development |
-| [FILTER_PANEL_IMPROVEMENTS_DESIGN.md](design/FILTER_PANEL_IMPROVEMENTS_DESIGN.md) | Filter panel enhancements | Planned |
-| [WEBVIEW_TYPESCRIPT_MIGRATION_DESIGN.md](design/WEBVIEW_TYPESCRIPT_MIGRATION_DESIGN.md) | TypeScript webview migration | Future |
-
-### Requirements
-| Document | Feature |
-|----------|---------|
-| [METADATA_BROWSER_REQUIREMENTS.md](requirements/METADATA_BROWSER_REQUIREMENTS.md) | Metadata Browser |
-| [METADATA_BROWSER_PRESENTATION_REQUIREMENTS.md](requirements/METADATA_BROWSER_PRESENTATION_REQUIREMENTS.md) | Metadata Browser Presentation |
+See [docs/design/README.md](design/README.md) for design document lifecycle.
 
 ### Future Enhancements
 Planned features organized by area - see [docs/future/README.md](future/README.md):
@@ -129,6 +115,7 @@ Planned features organized by area - see [docs/future/README.md](future/README.m
 | [ADMINISTRATION.md](future/ADMINISTRATION.md) | Connection Manager, Async Jobs, Security |
 | [OBSERVABILITY.md](future/OBSERVABILITY.md) | Flow History, Telemetry |
 | [INFRASTRUCTURE.md](future/INFRASTRUCTURE.md) | Testing infrastructure, Multi-environment |
+| [METADATA_BROWSER_ENHANCEMENTS.md](future/METADATA_BROWSER_ENHANCEMENTS.md) | Metadata export, comparison, global search |
 
 ---
 
