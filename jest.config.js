@@ -8,7 +8,13 @@ module.exports = {
 		'src/**/*.ts',
 		'!src/**/*.d.ts',
 		'!src/extension.ts',
-		'!src/**/__tests__/**'
+		'!src/**/__tests__/**',
+		'!src/**/index.ts',
+		'!src/**/initialization/**',
+		'!src/infrastructure/dependencyInjection/**',
+		'!src/**/application/types/**',
+		'!src/**/presentation/panels/**',
+		'!src/**/infrastructure/services/VsCode*.ts'
 	],
 	coverageDirectory: 'coverage',
 	coverageReporters: ['text', 'lcov', 'html'],

@@ -829,4 +829,56 @@ describe('Environment', () => {
 			});
 		});
 	});
+
+	describe('setAsDefault', () => {
+		it('should set isDefault flag to true', () => {
+			const env = createValidEnvironment();
+			expect(env.getIsDefault()).toBe(false);
+
+			env.setAsDefault();
+
+			expect(env.getIsDefault()).toBe(true);
+		});
+	});
+
+	describe('clearDefault', () => {
+		it('should set isDefault flag to false', () => {
+			const env = createValidEnvironment();
+			env.setAsDefault();
+			expect(env.getIsDefault()).toBe(true);
+
+			env.clearDefault();
+
+			expect(env.getIsDefault()).toBe(false);
+		});
+
+		it('should have no effect when already not default', () => {
+			const env = createValidEnvironment();
+			expect(env.getIsDefault()).toBe(false);
+
+			env.clearDefault();
+
+			expect(env.getIsDefault()).toBe(false);
+		});
+	});
+
+	describe('setSortOrder', () => {
+		it('should update sort order to specified value', () => {
+			const env = createValidEnvironment();
+			expect(env.getSortOrder()).toBe(0);
+
+			env.setSortOrder(5);
+
+			expect(env.getSortOrder()).toBe(5);
+		});
+
+		it('should allow setting sort order to zero', () => {
+			const env = createValidEnvironment();
+			env.setSortOrder(10);
+
+			env.setSortOrder(0);
+
+			expect(env.getSortOrder()).toBe(0);
+		});
+	});
 });
