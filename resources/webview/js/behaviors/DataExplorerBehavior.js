@@ -19,6 +19,7 @@ window.createBehavior({
 		detectInitialMode();
 		setupSqlEditorHighlighting();
 		setupFetchXmlEditorHighlighting();
+		highlightInitialPreviews();
 		wireSqlEditor();
 		wireFetchXmlEditor();
 		wireExecuteButton();
@@ -1109,6 +1110,24 @@ function setupFetchXmlEditorHighlighting() {
 		highlightLayer.scrollTop = fetchXmlEditor.scrollTop;
 		highlightLayer.scrollLeft = fetchXmlEditor.scrollLeft;
 	});
+}
+
+/**
+ * Highlights any preview content that was rendered server-side.
+ * Called on page load to ensure syntax highlighting is applied immediately.
+ */
+function highlightInitialPreviews() {
+	// Highlight FetchXML preview if it has content
+	const fetchXmlPreview = document.getElementById('fetchxml-preview-content');
+	if (fetchXmlPreview && fetchXmlPreview.textContent.trim()) {
+		fetchXmlPreview.innerHTML = XmlHighlighter.highlight(fetchXmlPreview.textContent);
+	}
+
+	// Highlight SQL preview if it has content
+	const sqlPreview = document.getElementById('sql-preview-content');
+	if (sqlPreview && sqlPreview.textContent.trim()) {
+		sqlPreview.innerHTML = SqlHighlighter.highlight(sqlPreview.textContent);
+	}
 }
 
 /**
