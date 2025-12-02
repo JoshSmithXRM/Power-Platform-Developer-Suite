@@ -43,7 +43,8 @@ type DataExplorerCommands =
 	| 'switchQueryMode'
 	| 'openRecord'
 	| 'copyRecordUrl'
-	| 'warningModalResponse';
+	| 'warningModalResponse'
+	| 'copySuccess';
 
 /**
  * Type-safe actions for the row limit warning modal.
@@ -292,7 +293,29 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 							this.extensionUri,
 							'dist',
 							'webview',
+							'DataTableBehavior.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
+							'dist',
+							'webview',
 							'DataExplorerBehavior.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
+							'resources',
+							'webview',
+							'js',
+							'behaviors',
+							'KeyboardSelectionBehavior.js'
 						)
 					)
 					.toString(),
@@ -416,6 +439,13 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				// Persist FetchXML to state (already debounced by webview)
 				void this.saveQueryStateToStorage();
 			}
+		});
+
+		// Copy success notification from KeyboardSelectionBehavior
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
 		});
 	}
 

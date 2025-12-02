@@ -62,7 +62,7 @@ export function renderDataTableSection(viewData: DataTableViewData): string {
  */
 function renderSearchBox(placeholder: string, searchQuery?: string): string {
 	return `
-		<div class="search-container">
+		<div class="search-container" data-selection-zone="search">
 			<input
 				type="text"
 				id="searchInput"
@@ -86,7 +86,7 @@ function renderTable(
 	searchQuery?: string
 ): string {
 	return `
-		<div class="table-container">
+		<div class="table-container" data-selection-zone="table">
 			<table class="data-table">
 				<thead>
 					<tr>

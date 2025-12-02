@@ -24,7 +24,7 @@ import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behav
 /**
  * Commands supported by Solution Explorer panel.
  */
-type SolutionExplorerCommands = 'refresh' | 'openMaker' | 'openInMaker' | 'environmentChange';
+type SolutionExplorerCommands = 'refresh' | 'openMaker' | 'openInMaker' | 'environmentChange' | 'copySuccess';
 
 /**
  * Solution Explorer panel using new PanelCoordinator architecture.
@@ -251,6 +251,9 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 				).toString(),
 				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'SolutionExplorerBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'KeyboardSelectionBehavior.js')
 				).toString()
 			],
 			cspNonce: getNonce(),
@@ -298,6 +301,13 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 			if (environmentId) {
 				await this.handleEnvironmentChange(environmentId);
 			}
+		});
+
+		// Copy success notification from KeyboardSelectionBehavior
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
 		});
 	}
 

@@ -139,6 +139,7 @@ export abstract class ResizableDetailPanelSection implements ISection {
 							id="${featurePrefix}${this.capitalize(tab.id)}Content"
 							class="detail-tab-panel${tab.id === defaultTab?.id ? ' active' : ''}"
 							data-tab="${tab.id}"
+							data-selection-zone="detail-${tab.id}"
 						></div>
 					`).join('')}
 				</div>

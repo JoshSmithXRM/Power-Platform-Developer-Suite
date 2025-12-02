@@ -248,3 +248,30 @@ table.virtual-table td {
 td[title] {
 	cursor: default;
 }
+
+/* ===========================================
+   Selection Badge (Ctrl+A select all)
+   Displayed in table footer when rows selected
+   =========================================== */
+
+.selection-badge {
+	color: var(--vscode-descriptionForeground);
+	font-weight: normal;
+}
+
+/* ===========================================
+   Prevent Browser Text Selection on Tables
+   Ctrl+A uses programmatic row selection instead
+   =========================================== */
+
+/* Disable browser text selection on table body */
+tbody {
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+/* Re-enable text selection for links (they should be clickable/selectable) */
+tbody a {
+	user-select: text;
+	-webkit-user-select: text;
+}

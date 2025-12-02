@@ -859,42 +859,46 @@ await this.scaffoldingBehavior.refresh({ solutions, tableData: viewModels });
 
 ---
 
-### Design: Ctrl+A Select All UX ⏳ READY TO IMPLEMENT
+### Ctrl+A Zone Architecture ⏳ IN PROGRESS
 
-**Problem:** When user presses Ctrl+A in panels, browser default selects ALL visible content (not useful).
+**Problem:** Current implementation has flawed zone isolation - Ctrl+A selects content from multiple areas (SQL input + data table, FetchXML preview + everything else, etc.)
 
-**Design Decisions:**
+**Root Cause Analysis (Session 7):**
+- CSS `user-select: text` on input/textarea/pre/code creates "islands" that browser's native Ctrl+A selects simultaneously
+- JavaScript `e.preventDefault()` called too late (after conditional checks)
+- `lastClickedContext === null` fallback triggers unintended table selection
+- No proper zone boundaries defined
 
-1. **Behavior**: Context-aware
-   - Table focused → Select all table rows
-   - Input/textarea focused → Browser default (select text)
-   - Nothing specific focused → Select all table rows (default action)
+**Solution: Zone-Based Architecture**
 
-2. **Actions on Selection:**
-   - Copy to clipboard (immediate action)
-   - Visual highlighting (rows show selected state)
-   - Leave door open for future bulk operations (export, delete, etc.)
+See detailed spec: `docs/work/CTRL_A_ZONE_ARCHITECTURE.md`
 
-3. **Implementation**: Shared reusable behavior (`KeyboardSelectionBehavior`)
-   - Create in `src/shared/infrastructure/ui/behaviors/`
-   - All panels with tables can opt-in
-   - Consistent behavior across extension
+**Key Changes:**
+1. Always `e.preventDefault()` + `removeAllRanges()` FIRST for Ctrl+A
+2. Use `data-selection-zone` attributes to define boundaries
+3. Support nested zones (e.g., Exception block inside Overview tab)
+4. Find CLOSEST zone to click target (not just element type)
 
-4. **Panels to Apply:**
-   - Data Explorer (query results)
-   - Web Resources
-   - Plugin Traces
-   - Connection References
-   - Environment Variables
-   - Solutions Explorer
+**Zones by Panel:**
+- **Data Explorer**: sql-query, fetchxml-preview, fetchxml-query, sql-preview, results-search (NEW), results-table
+- **Plugin Traces**: trace-search, trace-table, odata-preview, overview-tab, exception-text (nested), message-block (nested), details-tab, timeline-tab, raw-data
+- **Metadata Browser**: tree-search, 7 table zones (one per tab), properties-tab, raw-data
+- **Other Panels**: search + table zones each
 
-**Implementation Plan:**
-- [ ] Create `KeyboardSelectionBehavior` class
-- [ ] Handle `keydown` event for Ctrl+A
-- [ ] Integrate with VirtualTable row selection
-- [ ] Add copy-to-clipboard functionality
-- [ ] Apply to panels one by one
-- [ ] Update webview CSS for selection styling
+**Implementation Status:**
+- [x] Initial implementation created (has bugs)
+- [x] Root cause analysis complete
+- [x] Zone architecture designed
+- [x] Implementation spec documented
+- [ ] Fix KeyboardSelectionBehavior.js core algorithm
+- [ ] Add zones to Data Explorer (+ new search bar)
+- [ ] Validate with E2E tests
+- [ ] Add zones to Plugin Traces
+- [ ] Add zones to Metadata Browser
+- [ ] Add zones to remaining panels
+- [ ] Final E2E validation
+
+**E2E Test Strategy:** API-based testing (call JS APIs directly, verify DOM state)
 
 ---
 

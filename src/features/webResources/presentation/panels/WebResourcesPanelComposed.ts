@@ -40,7 +40,7 @@ import { OperationCancelledException } from '../../../../shared/domain/errors/Op
 /**
  * Commands supported by Web Resources panel.
  */
-type WebResourcesCommands = 'refresh' | 'openMaker' | 'environmentChange' | 'solutionChange' | 'openWebResource' | 'searchServer' | 'publish' | 'publishAll' | 'rowSelect' | 'toggleShowAll';
+type WebResourcesCommands = 'refresh' | 'openMaker' | 'environmentChange' | 'solutionChange' | 'openWebResource' | 'searchServer' | 'publish' | 'publishAll' | 'rowSelect' | 'toggleShowAll' | 'copySuccess';
 
 /**
  * Web Resources panel using PanelCoordinator architecture with virtual table.
@@ -419,6 +419,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				).toString(),
 				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'renderers', 'VirtualTableRenderer.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'KeyboardSelectionBehavior.js')
 				).toString()
 			],
 			cspNonce: getNonce(),
@@ -503,6 +506,13 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		// Toggle between text-based only and all types
 		this.coordinator.registerHandler('toggleShowAll', async () => {
 			await this.handleToggleShowAll();
+		});
+
+		// Copy success notification from KeyboardSelectionBehavior
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
 		});
 	}
 

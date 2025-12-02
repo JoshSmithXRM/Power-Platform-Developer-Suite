@@ -22,4 +22,29 @@ body {
 	font-size: var(--vscode-font-size);
 	color: var(--vscode-foreground);
 	background: var(--vscode-editor-background);
+	/* Prevent browser Ctrl+A from selecting entire page.
+	   Text selection is re-enabled on specific elements below. */
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+/* ===========================================
+   Text Selection Whitelist
+   Allow native text selection on text-entry and content elements.
+   This prevents Ctrl+A from selecting buttons, labels, etc.
+   =========================================== */
+
+/* Input fields - allow native selection and Ctrl+A */
+input,
+textarea,
+[contenteditable="true"] {
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+/* Code/preformatted blocks - allow selection for copying code */
+pre,
+code {
+	user-select: text;
+	-webkit-user-select: text;
 }

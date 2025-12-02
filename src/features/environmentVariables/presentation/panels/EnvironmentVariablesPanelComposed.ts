@@ -29,7 +29,7 @@ import { OperationCancelledException } from '../../../../shared/domain/errors/Op
 /**
  * Commands supported by Environment Variables panel.
  */
-type EnvironmentVariablesCommands = 'refresh' | 'openMaker' | 'syncDeploymentSettings' | 'environmentChange' | 'solutionChange';
+type EnvironmentVariablesCommands = 'refresh' | 'openMaker' | 'syncDeploymentSettings' | 'environmentChange' | 'solutionChange' | 'copySuccess';
 
 /**
  * Environment Variables panel using new PanelCoordinator architecture.
@@ -296,6 +296,9 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'KeyboardSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'EnvironmentVariablesBehavior.js')
 				).toString()
 			],
@@ -349,6 +352,12 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 			if (solutionId) {
 				await this.handleSolutionChange(solutionId);
 			}
+		});
+
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
 		});
 	}
 

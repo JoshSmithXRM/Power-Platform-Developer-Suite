@@ -28,6 +28,7 @@
 	let visibleEnd = 50;
 	let scrollDebounceTimer = null;
 	let selectedRowId = null; // Currently selected row ID for publish functionality
+	let selectedRowIds = new Set(); // Multi-select state for Ctrl+A select all
 
 	// Pagination state for server search fallback
 	let paginationState = {
@@ -198,15 +199,26 @@
 			}
 
 			// Toggle selection: if clicking same row, deselect; otherwise select new row
+			// Also clears multi-selection - clicking enters single-select mode
 			const rowId = rowData.id;
-			if (selectedRowId === rowId) {
-				// Deselect
+
+			// Clear multi-selection when clicking (enter single-select mode)
+			const hadMultiSelection = selectedRowIds.size > 0;
+			if (hadMultiSelection) {
+				selectedRowIds.clear();
+				// Remove visual selection from all rows
+				const allSelected = tbody.querySelectorAll('.row-selected');
+				allSelected.forEach(r => r.classList.remove('row-selected'));
+			}
+
+			if (selectedRowId === rowId && !hadMultiSelection) {
+				// Deselect (only if wasn't in multi-select mode)
 				selectedRowId = null;
 				row.classList.remove('row-selected');
 				sendRowSelectMessage(null, null);
 			} else {
 				// Select new row
-				// Remove selection from previously selected row
+				// Remove selection from previously selected row (single-select)
 				const previousSelected = tbody.querySelector('.row-selected');
 				if (previousSelected) {
 					previousSelected.classList.remove('row-selected');
@@ -561,8 +573,14 @@
 		tr.setAttribute('data-index', String(index));
 		tr.style.height = `${rowHeight}px`;
 
-		// Apply selection state if this row is selected
-		if (row.id && row.id === selectedRowId) {
+		// Add data-id for selection tracking (use id or index as fallback)
+		const rowId = row.id || String(index);
+		tr.setAttribute('data-id', rowId);
+
+		// Apply selection state - check both single-select and multi-select
+		const isSingleSelected = row.id && row.id === selectedRowId;
+		const isMultiSelected = selectedRowIds.has(rowId);
+		if (isSingleSelected || isMultiSelected) {
 			tr.classList.add('row-selected');
 		}
 
@@ -800,6 +818,10 @@
 		allRows = data.rows;
 		filteredRows = [...allRows];
 
+		// Clear selection on new data (both single and multi-select)
+		selectedRowId = null;
+		selectedRowIds.clear();
+
 		// Update columns if provided
 		if (data.columns) {
 			columns = data.columns;
@@ -877,6 +899,89 @@
 		}
 	}
 
+	// ============================================
+	// Multi-Selection Functions (Ctrl+A support)
+	// ============================================
+
+	/**
+	 * Selects all rows in the current filtered view.
+	 * Used by KeyboardSelectionBehavior for Ctrl+A.
+	 */
+	function selectAllRows() {
+		// Clear single-select state
+		selectedRowId = null;
+
+		// Select all filtered rows
+		selectedRowIds.clear();
+		filteredRows.forEach((row, index) => {
+			// Use row.id if available, fall back to index
+			const id = row.id || String(index);
+			selectedRowIds.add(id);
+		});
+
+		// Re-render to apply selection visuals
+		const tbody = document.getElementById('virtualTableBody');
+		if (tbody) {
+			renderVisibleRows(tbody);
+		}
+	}
+
+	/**
+	 * Clears all multi-select selections.
+	 * Used by KeyboardSelectionBehavior for Escape key.
+	 */
+	function clearSelection() {
+		selectedRowIds.clear();
+		// Also clear single-select for consistency
+		selectedRowId = null;
+
+		// Re-render to remove selection visuals
+		const tbody = document.getElementById('virtualTableBody');
+		if (tbody) {
+			renderVisibleRows(tbody);
+		}
+	}
+
+	/**
+	 * Gets the count of currently selected rows.
+	 * @returns {number} Number of selected rows
+	 */
+	function getSelectionCount() {
+		return selectedRowIds.size;
+	}
+
+	/**
+	 * Gets selected rows data as TSV (tab-separated values) for clipboard.
+	 * Format: Header row + data rows, columns separated by tabs.
+	 * @returns {string|null} TSV string or null if no selection
+	 */
+	function getSelectedDataAsTsv() {
+		if (selectedRowIds.size === 0) {
+			return null;
+		}
+
+		// Build header row from column config
+		const headers = columns.map(c => c.header || c.label || c.key).join('\t');
+
+		// Build data rows (only selected, in filtered order)
+		const dataRows = filteredRows
+			.filter((row, index) => {
+				const id = row.id || String(index);
+				return selectedRowIds.has(id);
+			})
+			.map(row =>
+				columns
+					.map(c => {
+						const val = row[c.key];
+						// Convert to string, handle null/undefined
+						return val !== null && val !== undefined ? String(val) : '';
+					})
+					.join('\t')
+			);
+
+		return [headers, ...dataRows].join('\n');
+	}
+
 	// Expose update function globally for message handling
 	window.VirtualTableRenderer = {
 		update: updateVirtualTable,
@@ -887,7 +992,12 @@
 			}
 		},
 		handleServerSearchResults: handleServerSearchResults,
-		showLoading: showLoadingIndicator
+		showLoading: showLoadingIndicator,
+		// Multi-selection API for KeyboardSelectionBehavior
+		selectAllRows: selectAllRows,
+		clearSelection: clearSelection,
+		getSelectionCount: getSelectionCount,
+		getSelectedDataAsTsv: getSelectedDataAsTsv
 	};
 
 	// Listen for table update messages from VS Code webview API

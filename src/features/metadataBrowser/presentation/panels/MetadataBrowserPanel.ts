@@ -39,7 +39,8 @@ type MetadataBrowserCommands =
 	| 'openDetailPanel'
 	| 'closeDetailPanel'
 	| 'tabChange'
-	| 'saveDetailPanelWidth';
+	| 'saveDetailPanelWidth'
+	| 'copySuccess';
 
 /**
  * Metadata Browser panel using PanelCoordinator architecture.
@@ -259,6 +260,9 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'KeyboardSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'MetadataBrowserBehavior.js')
 				).toString()
 			],
@@ -372,6 +376,12 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 				await this.handleSaveDetailPanelWidth(width);
 			}
 		}, { disableOnExecute: false });
+
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
+		});
 	}
 
 	/**

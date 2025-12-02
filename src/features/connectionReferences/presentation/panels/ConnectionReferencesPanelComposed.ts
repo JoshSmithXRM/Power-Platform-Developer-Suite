@@ -33,7 +33,7 @@ import { OperationCancelledException } from '../../../../shared/domain/errors/Op
 /**
  * Commands that the Connection References panel can receive from the webview.
  */
-type ConnectionReferencesCommands = 'refresh' | 'openMaker' | 'syncDeploymentSettings' | 'openFlow' | 'environmentChange' | 'solutionChange';
+type ConnectionReferencesCommands = 'refresh' | 'openMaker' | 'syncDeploymentSettings' | 'openFlow' | 'environmentChange' | 'solutionChange' | 'copySuccess';
 
 /**
  * Presentation layer panel for Connection References.
@@ -227,6 +227,9 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 					vscodeImpl.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscodeImpl.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'KeyboardSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscodeImpl.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'ConnectionReferencesBehavior.js')
 				).toString()
 			],
@@ -282,6 +285,12 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			if (flowId) {
 				await this.handleOpenFlow(flowId);
 			}
+		});
+
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscodeImpl.window.showInformationMessage(`${count} rows copied to clipboard`);
 		});
 
 		// Note: Panel disposal is handled by EnvironmentScopedPanel base class

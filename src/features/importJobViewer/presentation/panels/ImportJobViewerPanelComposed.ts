@@ -26,7 +26,7 @@ import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behav
 /**
  * Commands supported by Import Job Viewer panel.
  */
-type ImportJobViewerCommands = 'refresh' | 'openMaker' | 'viewImportJob' | 'environmentChange';
+type ImportJobViewerCommands = 'refresh' | 'openMaker' | 'viewImportJob' | 'environmentChange' | 'copySuccess';
 
 /**
  * Import Job Viewer panel using new PanelCoordinator architecture.
@@ -254,6 +254,9 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 				).toString(),
 				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'ImportJobViewerBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'KeyboardSelectionBehavior.js')
 				).toString()
 			],
 			cspNonce: getNonce(),
@@ -301,6 +304,13 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 			if (environmentId) {
 				await this.handleEnvironmentChange(environmentId);
 			}
+		});
+
+		// Copy success notification from KeyboardSelectionBehavior
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
 		});
 	}
 

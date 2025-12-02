@@ -77,7 +77,8 @@ type PluginTraceViewerCommands =
 	| 'saveFilterPanelHeight'
 	| 'restoreFilterPanelHeight'
 	| 'saveFilterPanelCollapsed'
-	| 'restoreFilterPanelCollapsed';
+	| 'restoreFilterPanelCollapsed'
+	| 'copySuccess';
 
 /**
  * Plugin Trace Viewer panel using new PanelCoordinator architecture.
@@ -424,6 +425,9 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'KeyboardSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'PluginTraceViewerBehavior.js')
 				).toString()
 			],
@@ -560,6 +564,12 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			if (collapsed !== undefined) {
 				await this.saveFilterPanelCollapsed(collapsed);
 			}
+		});
+
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
 		});
 	}
 
