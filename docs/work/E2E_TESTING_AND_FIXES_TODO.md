@@ -909,6 +909,50 @@ await this.scaffoldingBehavior.refresh({ solutions, tableData: viewModels });
 
 ---
 
+## Session 7 - Bug Fixes (2025-12-01)
+
+### Bug 11: Trace Level Dropdown Shows "..." Instead of Value ✅ FIXED
+
+**Problem:** Plugin Trace Viewer's Trace Level dropdown displayed "Trace Level: ..." instead of the actual value (Off/Exception/All). When clicking the dropdown, the selected option wasn't highlighted.
+
+**Root Cause:** `loadTraceLevel()` fetched the trace level from the server but never updated the webview. The dropdown was rendered before the API call completed, and no message was sent to update it afterward.
+
+**Fix:**
+- Added `updateDropdownState` message to `loadTraceLevel()` after fetching value
+- Added message handler in `PluginTraceViewerBehavior.js` to call `window.updateDropdownState()`
+- This updates both the button label ("Trace Level: Exception") and the checkmark in the dropdown
+
+**Files Changed:**
+- `src/features/pluginTraceViewer/presentation/panels/PluginTraceViewerPanelComposed.ts`
+- `resources/webview/js/behaviors/PluginTraceViewerBehavior.js`
+
+---
+
+### Bug 12: Ctrl+A Not Working in Virtual Table Panels ✅ FIXED
+
+**Problem:** Ctrl+A did nothing in Web Resources, Solutions, Environment Variables, Connection References, and Import Jobs panels.
+
+**Root Cause:** `VirtualTableSectionView.ts` was missing `data-selection-zone` attributes. The `KeyboardSelectionBehavior.js` returns early when no zone is found (safe default), so Ctrl+A had no effect.
+
+**Fix:** Added zones to `virtualTableSectionView.ts`:
+- `data-selection-zone="search"` on search container
+- `data-selection-zone="table"` on table container
+
+Note: `DataTableSectionView.ts` (non-virtual) already had zones - only virtual tables were affected.
+
+**Files Changed:**
+- `src/shared/infrastructure/ui/views/virtualTableSectionView.ts`
+
+---
+
+### E2E Test Cleanup
+
+**Deleted:** `e2e/tests/integration/keyboard-selection.spec.ts` (759 lines)
+
+**Rationale:** Tests couldn't reliably verify keyboard shortcuts in webview iframes. The tests called JS APIs directly (`VirtualTableRenderer.selectAllRows()`) instead of simulating Ctrl+A keypresses, so they tested the API exists but not that keyboard handling works. Manual F5 testing is the only reliable verification method for keyboard shortcuts.
+
+---
+
 ## Remaining Topics
 
 | # | Topic | Status | Notes |
