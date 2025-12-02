@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2025-12-01
+
+### Added
+
+- **Environment Ordering & Default** - Organize and prioritize environments
+  - "Set as Default" command and context menu - default environment shown with ★ icon
+  - "Move Up" / "Move Down" commands to reorder environments in the list
+  - Default environment opens when clicking tools in sidebar
+
+- **Persistent Token Caching** - Interactive authentication tokens now persist across VS Code restarts
+  - MSAL tokens stored in VS Code SecretStorage (encrypted via OS credential manager)
+  - Each environment gets isolated cache key
+  - No more frequent re-authentication for interactive auth users
+  - Token cache visible in Persistence Inspector
+
+- **Zone-Based Ctrl+A Selection** - Intelligent keyboard selection across all panels
+  - Ctrl+A selects content within the focused zone only (not entire page)
+  - Zones defined for: editors, search boxes, data tables, detail panels
+  - Multi-row table selection with clipboard copy as TSV
+  - Selection count badge in table footer
+  - Architecture documentation: `docs/architecture/KEYBOARD_SELECTION_PATTERN.md`
+
+- **E2E Testing Infrastructure** - Comprehensive Playwright-based E2E testing
+  - Environment switch persistence tests (state isolation verification)
+  - Race condition regression tests for solution switching
+  - Integration tests for panel initialization and data loading
+
+### Changed
+
+- **Virtual Tables Unlimited** - Removed artificial record limits
+  - Previous 5,000 record cache limit removed
+  - `maxCachedRecords` now defaults to unlimited
+  - Systems can now display 50k+ records without truncation
+
+- **Managed Web Resources Editable** - Removed managed resource editing restriction
+  - Managed text-based web resources can now be edited (supports production hotfix scenarios)
+  - Binary types (images) still not editable (technical limitation)
+
+### Fixed
+
+- **Race Condition on Solution Change** - Stale data no longer overwrites fresh data
+  - Request versioning discards responses from cancelled requests
+  - Cancellation tokens stop in-flight API calls
+  - Affects: Web Resources, Environment Variables, Connection References panels
+
+- **Environment Switch State Isolation** - Each environment now maintains independent state
+  - Switching environments loads target environment's persisted settings
+  - Fixed: Source environment's state no longer carries over to target
+  - Affects: Data Explorer, Plugin Traces, Metadata Browser, Environment Variables, Web Resources
+
+- **Solutions Dropdown Loading** - Dropdown now appears immediately while data loads
+  - Users can switch solutions while waiting for large datasets to load
+  - Previously: dropdown hidden until all data loaded
+
+- **Solution Component Pagination** - Large solutions now return all components
+  - Fixed OData `@odata.nextLink` pagination - fetches ALL pages
+  - Previously: only first 5,000 components returned due to missing pagination
+
+- **Plugin Trace Level Dropdown** - Now shows actual value instead of "..."
+  - Dropdown updates after fetching trace level from server
+  - Selected option now highlighted correctly
+
+- **Data Explorer Preview Highlighting** - Syntax highlighting on page load
+  - FetchXML and SQL previews now highlighted immediately
+  - Previously: only highlighted after query execution
+
+- **Web Resources Fixes**
+  - Added "Managed" column to table (Yes/No display)
+  - Solution filtering now queries only selected solution's resources (faster)
+  - "Open in Maker" URL corrected (`/objects/web%20resources`)
+  - Auto-refresh row after editing in VS Code editor
+  - Proper cleanup on panel close (cancels background loading)
+
+- **Environment Setup Panel** - Scrollable on smaller displays (1920x1080)
+  - Added scroll support to form container
+  - Button state management consolidated to PanelCoordinator (no more stuck buttons)
+
+- **Low Resolution UI** - Buttons wrap correctly at narrow widths (<500px)
+
 ## [0.2.4] - 2025-11-30
 
 ### Added
