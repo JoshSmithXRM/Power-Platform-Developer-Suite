@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 
 /**@type {import('webpack').Configuration}*/
 const config = {
@@ -43,5 +44,18 @@ const config = {
     infrastructureLogging: {
         level: "log", // enables logging required for problem matchers
     },
+    // Disable code splitting - VS Code extensions should be a single bundle
+    // This prevents numbered chunk files (1.extension.js, 2.extension.js, etc.)
+    optimization: {
+        splitChunks: false,
+        runtimeChunk: false
+    },
+    plugins: [
+        // Force all dynamic imports into the main bundle
+        // This ensures the extension is a single file for faster loading
+        new webpack.optimize.LimitChunkCountPlugin({
+            maxChunks: 1
+        })
+    ]
 };
 module.exports = config;
