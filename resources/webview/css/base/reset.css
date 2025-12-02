@@ -48,3 +48,31 @@ code {
 	user-select: text;
 	-webkit-user-select: text;
 }
+
+/* Detail panel content - allow selection for copying properties/values */
+/* Metadata Browser property items */
+.detail-tab-panel,
+.property-item,
+.property-value,
+.property-name,
+.property-section,
+.options-table,
+.options-table td,
+.options-table th,
+/* Plugin Traces detail sections */
+.detail-section,
+.detail-grid,
+.detail-label,
+.detail-value,
+.detail-code,
+/* Plugin Traces timeline */
+.timeline-container,
+.timeline-item,
+.timeline-item-header,
+.timeline-item-title,
+.timeline-item-message,
+.timeline-item-entity,
+.timeline-meta {
+	user-select: text;
+	-webkit-user-select: text;
+}

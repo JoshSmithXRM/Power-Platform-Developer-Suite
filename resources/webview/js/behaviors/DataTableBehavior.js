@@ -261,9 +261,21 @@
 	/**
 	 * Selects all rows in the table.
 	 * Used by KeyboardSelectionBehavior for Ctrl+A.
+	 * @param {Element} [tableElement] - Optional specific table element to select rows in.
+	 *                                   If not provided, selects first table in document.
 	 */
-	function selectAllRows() {
-		const tbody = document.querySelector('.data-table tbody, table tbody');
+	function selectAllRows(tableElement) {
+		let tbody;
+		if (tableElement) {
+			// Use the specific table element provided
+			tbody = tableElement.tagName === 'TBODY'
+				? tableElement
+				: tableElement.querySelector('tbody');
+		} else {
+			// Fallback to first table in document (legacy behavior)
+			tbody = document.querySelector('.data-table tbody, table tbody');
+		}
+
 		if (!tbody) {
 			return;
 		}

@@ -20,9 +20,11 @@
 
 	/**
 	 * Initializes keyboard event handlers and click tracking.
+	 * Uses CAPTURE phase (true) for keydown to intercept before other handlers.
 	 */
 	function initialize() {
-		document.addEventListener('keydown', handleKeydown);
+		// CRITICAL: Use capture phase to run BEFORE other handlers
+		document.addEventListener('keydown', handleKeydown, true);
 		document.addEventListener('click', trackClickedZone, true);
 	}
 
@@ -60,44 +62,53 @@
 	}
 
 	/**
+	 * Checks if an element is directly owned by this zone (not in a nested zone).
+	 * @param {Element} element - The element to check
+	 * @param {Element} zone - The zone that should own the element
+	 * @returns {boolean} True if element belongs directly to this zone
+	 */
+	function isDirectlyInZone(element, zone) {
+		// Find the element's closest zone
+		const elementZone = element.closest('[data-selection-zone]');
+		// It's directly in our zone if its closest zone IS our zone
+		return elementZone === zone;
+	}
+
+	/**
 	 * Selects content within the given zone based on element type.
+	 * Only selects elements that are DIRECTLY in this zone (not in nested zones).
 	 * @param {Element} zone - The zone element
 	 */
 	function selectZoneContent(zone) {
-		const zoneName = zone.getAttribute('data-selection-zone');
-		console.log('[KeyboardSelection] selectZoneContent for zone:', zoneName);
-
-		// Check for textarea first
+		// Check for textarea first (only if directly in this zone)
 		const textarea = zone.querySelector('textarea');
-		if (textarea) {
-			console.log('[KeyboardSelection] Found textarea, selecting');
+		if (textarea && isDirectlyInZone(textarea, zone)) {
 			textarea.focus();
 			textarea.select();
 			return;
 		}
 
-		// Check for text/search input
+		// Check for text/search input (only if directly in this zone)
 		const input = zone.querySelector('input[type="text"], input[type="search"], input:not([type])');
-		if (input && input instanceof HTMLInputElement) {
-			console.log('[KeyboardSelection] Found input, selecting');
+		if (input && input instanceof HTMLInputElement && isDirectlyInZone(input, zone)) {
 			input.focus();
 			input.select();
 			return;
 		}
 
-		// Check for pre/code element
+		// Check for pre/code element (only if directly in this zone)
 		const pre = zone.querySelector('pre');
-		if (pre) {
-			console.log('[KeyboardSelection] Found pre element, selecting contents');
+		if (pre && isDirectlyInZone(pre, zone)) {
 			selectNodeContents(pre);
 			return;
 		}
 
-		// Check for table (virtual or regular)
-		const table = zone.querySelector('table, .virtual-table-container, #virtualTableBody');
-		if (table) {
-			console.log('[KeyboardSelection] Found table, selecting rows');
-			const handled = selectAllTableRows();
+		// Check for DATA table (with .data-table class) or virtual table - only if directly in this zone
+		// Layout tables (without .data-table) should fall through to text selection
+		const dataTable = zone.querySelector('table.data-table, .virtual-table-container, #virtualTableBody');
+		if (dataTable && isDirectlyInZone(dataTable, zone)) {
+			// Pass the specific table element to select rows in THIS table, not first in document
+			const handled = selectAllTableRows(dataTable);
 			if (handled) {
 				updateFooter();
 				return;
@@ -105,7 +116,6 @@
 		}
 
 		// Fallback: select entire zone content (for detail panels)
-		console.log('[KeyboardSelection] Fallback: selecting entire zone content');
 		selectNodeContents(zone);
 	}
 
@@ -126,9 +136,10 @@
 	/**
 	 * Selects all rows in the table.
 	 * Delegates to VirtualTableRenderer or DataTableBehavior based on table type.
+	 * @param {Element} tableElement - The specific table element to select rows in
 	 * @returns {boolean} True if selection was handled
 	 */
-	function selectAllTableRows() {
+	function selectAllTableRows(tableElement) {
 		// Try VirtualTableRenderer first (most common)
 		if (window.VirtualTableRenderer?.selectAllRows) {
 			window.VirtualTableRenderer.selectAllRows();
@@ -136,8 +147,9 @@
 		}
 
 		// Fall back to DataTableBehavior for non-virtual tables
+		// Pass the specific table element so it selects THIS table, not first in document
 		if (window.DataTableBehavior?.selectAllRows) {
-			window.DataTableBehavior.selectAllRows();
+			window.DataTableBehavior.selectAllRows(tableElement);
 			return true;
 		}
 
@@ -152,28 +164,18 @@
 		const isCtrl = e.ctrlKey || e.metaKey;
 
 		// Ctrl+A: Zone-aware select all
-		if (isCtrl && e.key === 'a') {
-			// ALWAYS prevent browser default FIRST (critical fix)
+		if (isCtrl && (e.key === 'a' || e.key === 'A')) {
+			// CRITICAL: Stop ALL event handling - browser AND VS Code webview
 			e.preventDefault();
+			e.stopPropagation();
+			e.stopImmediatePropagation();
 			window.getSelection()?.removeAllRanges();
-
-			// DEBUG: Log ALL zones in document
-			const allZones = document.querySelectorAll('[data-selection-zone]');
-			console.log('[KeyboardSelection] === Ctrl+A Debug ===');
-			console.log('[KeyboardSelection] All zones in document:', allZones.length);
-			allZones.forEach((z, i) => {
-				console.log(`[KeyboardSelection]   Zone ${i}: ${z.getAttribute('data-selection-zone')} (${z.tagName}.${z.className})`);
-			});
-			console.log('[KeyboardSelection] activeElement:', document.activeElement?.tagName, document.activeElement?.id || document.activeElement?.className);
-			console.log('[KeyboardSelection] lastClickedZone:', lastClickedZone?.getAttribute('data-selection-zone'), lastClickedZone?.tagName);
 
 			// Find the active zone
 			const zone = findActiveZone();
-			console.log('[KeyboardSelection] Found zone:', zone?.getAttribute('data-selection-zone'));
 
 			// No zone = no selection (safe default)
 			if (!zone) {
-				console.log('[KeyboardSelection] No zone found, doing nothing');
 				return;
 			}
 
@@ -231,31 +233,10 @@
 			return;
 		}
 
-		const count =
-			window.VirtualTableRenderer?.getSelectionCount?.() ||
-			window.DataTableBehavior?.getSelectionCount?.() ||
-			0;
-
 		navigator.clipboard
 			.writeText(data)
-			.then(() => {
-				// Notify extension for VS Code toast
-				if (typeof vscode !== 'undefined') {
-					vscode.postMessage({
-						command: 'copySuccess',
-						data: { count }
-					});
-				}
-			})
 			.catch(err => {
 				console.error('KeyboardSelectionBehavior: Failed to copy to clipboard', err);
-				// Notify extension of error
-				if (typeof vscode !== 'undefined') {
-					vscode.postMessage({
-						command: 'copyError',
-						data: { message: 'Failed to copy to clipboard' }
-					});
-				}
 			});
 	}
 

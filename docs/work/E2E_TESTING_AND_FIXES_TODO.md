@@ -859,46 +859,53 @@ await this.scaffoldingBehavior.refresh({ solutions, tableData: viewModels });
 
 ---
 
-### Ctrl+A Zone Architecture ⏳ IN PROGRESS
+### Ctrl+A Zone Architecture ✅ COMPLETE
 
-**Problem:** Current implementation has flawed zone isolation - Ctrl+A selects content from multiple areas (SQL input + data table, FetchXML preview + everything else, etc.)
+**Problem:** Browser's native Ctrl+A selected ALL visible content regardless of context, making it useless.
 
-**Root Cause Analysis (Session 7):**
-- CSS `user-select: text` on input/textarea/pre/code creates "islands" that browser's native Ctrl+A selects simultaneously
-- JavaScript `e.preventDefault()` called too late (after conditional checks)
-- `lastClickedContext === null` fallback triggers unintended table selection
-- No proper zone boundaries defined
+**Solution:** Zone-based selection architecture - Ctrl+A only selects content within the currently active zone.
 
-**Solution: Zone-Based Architecture**
+**Architecture Documentation:** `docs/architecture/KEYBOARD_SELECTION_PATTERN.md`
 
-See detailed spec: `docs/work/CTRL_A_ZONE_ARCHITECTURE.md`
+**Infrastructure (COMPLETE):**
+- [x] `KeyboardSelectionBehavior.js` - Core algorithm with zone detection
+- [x] CSS reset (`user-select: none` by default, whitelist for content classes)
+- [x] `VirtualTableRenderer` multi-select API (`selectAllRows`, `clearSelection`, `getSelectedDataAsTsv`)
+- [x] `DataTableBehavior` multi-select API (same functions, accepts table element)
+- [x] Selection badge in table footer showing count
 
-**Key Changes:**
-1. Always `e.preventDefault()` + `removeAllRanges()` FIRST for Ctrl+A
-2. Use `data-selection-zone` attributes to define boundaries
-3. Support nested zones (e.g., Exception block inside Overview tab)
-4. Find CLOSEST zone to click target (not just element type)
+**Zone Implementation by Panel:**
 
-**Zones by Panel:**
-- **Data Explorer**: sql-query, fetchxml-preview, fetchxml-query, sql-preview, results-search (NEW), results-table
-- **Plugin Traces**: trace-search, trace-table, odata-preview, overview-tab, exception-text (nested), message-block (nested), details-tab, timeline-tab, raw-data
-- **Metadata Browser**: tree-search, 7 table zones (one per tab), properties-tab, raw-data
-- **Other Panels**: search + table zones each
+| Panel | Zones | Status |
+|-------|-------|--------|
+| Data Explorer | sql-query, fetchxml-preview, fetchxml-query, sql-preview, results-table, results-search | ✅ |
+| Metadata Browser | tree-search + 14 zones (7 tables + 7 searches) + detail zones | ✅ |
+| Plugin Traces | search, table, odata-preview, detail-*, exception-details, message-block | ✅ |
+| Solutions | search, table (via shared) | ✅ |
+| Web Resources | search, table (via shared) | ✅ |
+| Env Variables | search, table (via shared) | ✅ |
+| Connection Refs | search, table (via shared) | ✅ |
+| Import Jobs | search, table (via shared) | ✅ |
 
-**Implementation Status:**
-- [x] Initial implementation created (has bugs)
-- [x] Root cause analysis complete
-- [x] Zone architecture designed
-- [x] Implementation spec documented
-- [ ] Fix KeyboardSelectionBehavior.js core algorithm
-- [ ] Add zones to Data Explorer (+ new search bar)
-- [ ] Validate with E2E tests
-- [ ] Add zones to Plugin Traces
-- [ ] Add zones to Metadata Browser
-- [ ] Add zones to remaining panels
-- [ ] Final E2E validation
+**Bugs Fixed During Testing:**
 
-**E2E Test Strategy:** API-based testing (call JS APIs directly, verify DOM state)
+1. **Ctrl+A selecting everything despite zones** - Use capture phase + stopImmediatePropagation
+2. **Nested zone selection issues** - Added `isDirectlyInZone()` check
+3. **Wrong table selected** - Pass specific table element to `selectAllRows()`
+4. **Layout tables treated as data tables** - Changed selector to `table.data-table`
+5. **Detail panel content not selectable** - Added content classes to CSS whitelist
+6. **Optionset values table not selectable** - Added `.options-table` to whitelist
+7. **Timeline content not selectable** - Added `.timeline-*` classes to whitelist
+8. **Exception/message block not individually selectable** - Added dedicated zones
+
+**Files Changed:**
+- `resources/webview/css/base/reset.css` - CSS selection whitelist
+- `resources/webview/js/behaviors/KeyboardSelectionBehavior.js` - Zone detection
+- `resources/webview/js/behaviors/DataTableBehavior.js` - Table element parameter
+- `resources/webview/js/behaviors/DataExplorerBehavior.js` - Results search bar + zone
+- `resources/webview/js/behaviors/PluginTraceViewerBehavior.js` - Exception/message zones
+
+**UX Decision:** Removed toast notification for clipboard copy (unnecessary for dev/admin tool)
 
 ---
 
