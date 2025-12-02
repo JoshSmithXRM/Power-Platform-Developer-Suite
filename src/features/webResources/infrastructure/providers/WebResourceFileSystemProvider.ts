@@ -4,6 +4,7 @@ import type { GetWebResourceContentUseCase } from '../../application/useCases/Ge
 import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
 import type { PublishWebResourceUseCase } from '../../application/useCases/PublishWebResourceUseCase';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
 import { NonEditableWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
 import { PublishCoordinator } from '../../../../shared/infrastructure/coordination/PublishCoordinator';
 import {
@@ -87,14 +88,24 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 
 	/** Cache for web resource content to avoid repeated API calls */
 	private readonly contentCache = new Map<string, { content: Uint8Array; timestamp: number }>();
-	private readonly CACHE_TTL_MS = 60000; // 1 minute cache
+
+	/** Default cache TTL in seconds (configurable via webResources.cacheTTL) */
+	private static readonly DEFAULT_CACHE_TTL_SECONDS = 60;
+
+	/** Configured cache TTL in milliseconds */
+	private readonly cacheTtlMs: number;
 
 	constructor(
 		private readonly getWebResourceContentUseCase: GetWebResourceContentUseCase,
 		private readonly updateWebResourceUseCase: UpdateWebResourceUseCase | null,
 		private readonly publishWebResourceUseCase: PublishWebResourceUseCase | null,
-		private readonly logger: ILogger
-	) {}
+		private readonly logger: ILogger,
+		configService?: IConfigurationService
+	) {
+		const cacheTtlSeconds = configService?.get('webResources.cacheTTL', WebResourceFileSystemProvider.DEFAULT_CACHE_TTL_SECONDS)
+			?? WebResourceFileSystemProvider.DEFAULT_CACHE_TTL_SECONDS;
+		this.cacheTtlMs = cacheTtlSeconds * 1000;
+	}
 
 	watch(): vscode.Disposable {
 		// Read-only: no file watching needed
@@ -146,7 +157,7 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 
 		// Check cache
 		const cached = this.contentCache.get(cacheKey);
-		if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+		if (cached && Date.now() - cached.timestamp < this.cacheTtlMs) {
 			this.logger.debug('WebResourceFileSystemProvider readFile (cached)', {
 				webResourceId: parsed.webResourceId,
 				size: cached.content.length

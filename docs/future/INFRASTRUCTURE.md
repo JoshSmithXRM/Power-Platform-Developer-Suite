@@ -236,4 +236,34 @@ Add command to report issues directly from VS Code.
 
 ---
 
-**Last Updated**: 2025-11-30
+### Advanced Configuration Settings
+**Status**: Future (Low Priority)
+**Priority**: Low
+**Estimated Effort**: 4-6 hours
+**Value**: Power users can fine-tune advanced behavior
+
+**Description**:
+Additional VS Code settings for advanced users identified during the v0.2.5 settings audit. These are lower priority because they affect edge cases or technical behavior that most users won't need to change.
+
+**Proposed Settings**:
+
+| Setting | Current Value | Description |
+|---------|---------------|-------------|
+| `authentication.timeout` | 90s | Browser auth timeout for slow MFA |
+| `api.retryBackoff` | 1000ms | Base exponential backoff delay |
+| `publish.lockTimeout` | 5min | Safety timeout for publish locks |
+| `connectionTest.timeout` | 10s | WhoAmI API timeout |
+| `virtualTable.searchLimit` | 1000 | Max server search records |
+| `webResources.maxFilterIds` | 100 | Max IDs in OData filter |
+| `errors.maxMessageLength` | 200 | Error message truncation length |
+
+**Implementation Pattern**:
+Same as HIGH/MEDIUM priority settings already implemented - read via `IConfigurationService` with sensible defaults.
+
+**Add When**:
+- Users explicitly request any of these settings
+- Edge case bugs surface that require user-configurable workarounds
+
+---
+
+**Last Updated**: 2025-12-02

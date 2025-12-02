@@ -2,6 +2,7 @@ import { ICancellationToken } from '../../domain/interfaces/ICancellationToken';
 import { OperationCancelledException } from '../../domain/errors/OperationCancelledException';
 import { ILogger } from '../../../infrastructure/logging/ILogger';
 import { IDataverseApiService } from '../interfaces/IDataverseApiService';
+import { IConfigurationService } from '../../domain/services/IConfigurationService';
 import { normalizeError } from '../../utils/ErrorUtils';
 import { ErrorSanitizer } from '../../utils/ErrorSanitizer';
 
@@ -10,11 +11,8 @@ import { ErrorSanitizer } from '../../utils/ErrorSanitizer';
  * Handles authentication token retrieval and request construction.
  */
 export class DataverseApiService implements IDataverseApiService {
-  /**
-   * Maximum number of retry attempts for failed requests.
-   * Retries transient failures (429, 503, 504, network errors).
-   */
-  private static readonly MAX_RETRY_ATTEMPTS = 3;
+  /** Default maximum retry attempts (configurable via api.maxRetries setting) */
+  private static readonly DEFAULT_MAX_RETRY_ATTEMPTS = 3;
 
   /**
    * Base delay in milliseconds for exponential backoff calculation.
@@ -45,11 +43,18 @@ export class DataverseApiService implements IDataverseApiService {
    */
   private static readonly HTTP_STATUS_NO_CONTENT = 204;
 
+  /** Configured maximum retry attempts */
+  private readonly maxRetryAttempts: number;
+
   constructor(
     private readonly getAccessToken: (environmentId: string) => Promise<string>,
     private readonly getEnvironmentUrl: (environmentId: string) => Promise<string>,
-    private readonly logger: ILogger
-  ) {}
+    private readonly logger: ILogger,
+    configService?: IConfigurationService
+  ) {
+    this.maxRetryAttempts = configService?.get('api.maxRetries', DataverseApiService.DEFAULT_MAX_RETRY_ATTEMPTS)
+      ?? DataverseApiService.DEFAULT_MAX_RETRY_ATTEMPTS;
+  }
 
   /**
    * Performs a GET request to the Dataverse Web API.
@@ -225,13 +230,14 @@ export class DataverseApiService implements IDataverseApiService {
     endpoint: string,
     body: unknown | undefined,
     cancellationToken?: ICancellationToken,
-    retries = DataverseApiService.MAX_RETRY_ATTEMPTS
+    retries?: number
   ): Promise<T> {
+    const effectiveRetries = retries ?? this.maxRetryAttempts;
     if (cancellationToken?.isCancellationRequested) {
       throw new OperationCancelledException();
     }
 
-    for (let attempt = 1; attempt <= retries; attempt++) {
+    for (let attempt = 1; attempt <= effectiveRetries; attempt++) {
       try {
         return await this.executeRequest<T>(
           method,
@@ -240,14 +246,14 @@ export class DataverseApiService implements IDataverseApiService {
           body,
           cancellationToken,
           attempt,
-          retries
+          effectiveRetries
         );
       } catch (error) {
         if (error instanceof OperationCancelledException) {
           throw error;
         }
 
-        const isLastAttempt = attempt === retries;
+        const isLastAttempt = attempt === effectiveRetries;
         const status = (error as Error & { status?: number }).status || 0;
         const isRetryable = this.isRetryableError(status, error);
 

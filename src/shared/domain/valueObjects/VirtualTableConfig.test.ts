@@ -1,4 +1,5 @@
 import { VirtualTableConfig } from './VirtualTableConfig';
+import { IConfigurationService } from '../services/IConfigurationService';
 
 describe('VirtualTableConfig', () => {
 	describe('createDefault', () => {
@@ -6,7 +7,7 @@ describe('VirtualTableConfig', () => {
 			const config = VirtualTableConfig.createDefault();
 
 			expect(config.getInitialPageSize()).toBe(100);
-			expect(config.getMaxCachedRecords()).toBe(Number.MAX_SAFE_INTEGER); // Unlimited
+			expect(config.getMaxCachedRecords()).toBe(10000); // Configurable default
 			expect(config.getBackgroundPageSize()).toBe(500);
 			expect(config.isBackgroundLoadingEnabled()).toBe(true);
 		});
@@ -14,6 +15,40 @@ describe('VirtualTableConfig', () => {
 		it('should enable background loading by default', () => {
 			const config = VirtualTableConfig.createDefault();
 			expect(config.shouldLoadInBackground()).toBe(true);
+		});
+	});
+
+	describe('createFromConfig', () => {
+		it('should read settings from configuration service', () => {
+			const mockConfigService: IConfigurationService = {
+				get: <T>(key: string, defaultValue: T): T => {
+					switch (key) {
+						case 'virtualTable.initialPageSize': return 50 as T;
+						case 'virtualTable.maxCachedRecords': return 5000 as T;
+						case 'virtualTable.backgroundPageSize': return 250 as T;
+						default: return defaultValue;
+					}
+				}
+			};
+
+			const config = VirtualTableConfig.createFromConfig(mockConfigService);
+
+			expect(config.getInitialPageSize()).toBe(50);
+			expect(config.getMaxCachedRecords()).toBe(5000);
+			expect(config.getBackgroundPageSize()).toBe(250);
+			expect(config.isBackgroundLoadingEnabled()).toBe(true);
+		});
+
+		it('should use defaults when config service returns defaults', () => {
+			const mockConfigService: IConfigurationService = {
+				get: <T>(_key: string, defaultValue: T): T => defaultValue
+			};
+
+			const config = VirtualTableConfig.createFromConfig(mockConfigService);
+
+			expect(config.getInitialPageSize()).toBe(100);
+			expect(config.getMaxCachedRecords()).toBe(10000);
+			expect(config.getBackgroundPageSize()).toBe(500);
 		});
 	});
 

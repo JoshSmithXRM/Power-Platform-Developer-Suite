@@ -12,7 +12,7 @@
 | 5 | Plugin traces spinning after successful login (port 3000 conflict) | ✅ Complete | Critical |
 | 1 | Environment tab switching issue with Tool Provider | ✅ Complete | High |
 | 2 | SQL query box disabled state after Top 100 prompt | ✅ Complete | Medium |
-| 3 | Settings extraction to configurations | ✅ Complete (N/A) | Low |
+| 3 | Settings extraction to configurations | ✅ Complete (8 settings) | Low |
 | 4 | Plugin traces filter menu sizing issue | ✅ Complete | Medium |
 
 ---
@@ -138,25 +138,47 @@ Two changes implemented:
 ## Bug #3: Settings Extraction to Configurations
 
 ### Problem Description
-Review all settings that might benefit from being moved to the new configurations system (currently only used by Plugin Traces).
+Audit codebase for hardcoded values that should be exposed as user-configurable VS Code settings.
 
-### Audit Results
-- [x] Investigated configuration service implementation
-- [x] Found: Configuration system is already well-designed and working correctly
-- [x] Current architecture follows Clean Architecture with dependency injection
-- [x] Plugin Traces demonstrates the correct pattern for using settings
-- [x] Only 1 setting exists (`pluginTrace.defaultLimit`) - already using config system
+### Current State
+Only 1 setting exists: `powerPlatformDevSuite.pluginTrace.defaultLimit` (default: 100)
 
-### Finding: No Bug - This is a Feature Request
-The configuration system is correctly implemented. This "bug" was actually an audit request.
+### Implementation
 
-**Recommended future settings to add (not blocking):**
-- `dataExplorer.maxRows` - Maximum rows to fetch in queries
-- `environment.defaultRefreshInterval` - Cache TTL for environment data
-- `logging.verbosityLevel` - Control log detail level
+#### HIGH PRIORITY - ✅ Implemented
 
-### Status: Complete (No Changes Needed)
-System is ready for expansion when new settings are needed.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `virtualTable.initialPageSize` | 100 | Records loaded on first page render (10-500) |
+| `virtualTable.maxCachedRecords` | 10000 | Max records in memory cache (100-100000) |
+| `webResources.cacheTTL` | 60s | Web resource content cache duration (10-600s) |
+| `api.maxRetries` | 3 | Retry attempts for transient failures (0-10) |
+
+#### MEDIUM PRIORITY - ✅ Implemented
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `pluginTrace.batchDeleteSize` | 100 | Records deleted per batch (50-1000) |
+| `pluginTrace.defaultDeleteOldDays` | 30 | Default "delete older than" days (1-365) |
+| `virtualTable.backgroundPageSize` | 500 | Records per background fetch (100-2000) |
+| `metadata.cacheDuration` | 300s | Entity metadata cache TTL (60-3600s) |
+
+#### LOW PRIORITY - Deferred to Future Work
+
+See `docs/future/INFRASTRUCTURE.md` → "Advanced Configuration Settings"
+
+| Setting | Current Value | Description |
+|---------|---------------|-------------|
+| `authentication.timeout` | 90s | Browser auth timeout for slow MFA |
+| `api.retryBackoff` | 1000ms | Base exponential backoff delay |
+| `publish.lockTimeout` | 5min | Safety timeout for publish locks |
+| `connectionTest.timeout` | 10s | WhoAmI API timeout |
+| `virtualTable.searchLimit` | 1000 | Max server search records |
+| `webResources.maxFilterIds` | 100 | Max IDs in OData filter |
+| `errors.maxMessageLength` | 200 | Error message truncation length |
+
+### Status: ✅ Complete
+8 user-configurable settings implemented. 7 advanced settings documented for future.
 
 ---
 

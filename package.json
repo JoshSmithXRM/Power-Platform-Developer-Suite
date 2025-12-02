@@ -402,6 +402,62 @@
                     "minimum": 1,
                     "maximum": 5000,
                     "description": "Default number of plugin traces to fetch (1-5000). Increase for powerful environments, decrease for slower connections."
+                },
+                "powerPlatformDevSuite.pluginTrace.batchDeleteSize": {
+                    "type": "number",
+                    "default": 100,
+                    "minimum": 50,
+                    "maximum": 1000,
+                    "description": "Number of trace records deleted per batch operation. Higher values are faster but may timeout on slower connections."
+                },
+                "powerPlatformDevSuite.pluginTrace.defaultDeleteOldDays": {
+                    "type": "number",
+                    "default": 30,
+                    "minimum": 1,
+                    "maximum": 365,
+                    "description": "Default number of days when using 'Delete traces older than X days'. Adjust based on your compliance requirements."
+                },
+                "powerPlatformDevSuite.virtualTable.initialPageSize": {
+                    "type": "number",
+                    "default": 100,
+                    "minimum": 10,
+                    "maximum": 500,
+                    "description": "Number of records loaded on first page render. Lower values improve initial load time, higher values show more data immediately."
+                },
+                "powerPlatformDevSuite.virtualTable.backgroundPageSize": {
+                    "type": "number",
+                    "default": 500,
+                    "minimum": 100,
+                    "maximum": 2000,
+                    "description": "Number of records fetched per batch during background loading. Higher values mean fewer API calls but more memory per call."
+                },
+                "powerPlatformDevSuite.virtualTable.maxCachedRecords": {
+                    "type": "number",
+                    "default": 10000,
+                    "minimum": 100,
+                    "maximum": 100000,
+                    "description": "Maximum records to keep in memory cache. Set based on your system memory and typical dataset sizes."
+                },
+                "powerPlatformDevSuite.webResources.cacheTTL": {
+                    "type": "number",
+                    "default": 60,
+                    "minimum": 10,
+                    "maximum": 600,
+                    "description": "Web resource content cache duration in seconds. Lower values ensure fresher content, higher values reduce API calls."
+                },
+                "powerPlatformDevSuite.metadata.cacheDuration": {
+                    "type": "number",
+                    "default": 300,
+                    "minimum": 60,
+                    "maximum": 3600,
+                    "description": "Entity metadata cache duration in seconds. Metadata rarely changes, so longer values are usually fine."
+                },
+                "powerPlatformDevSuite.api.maxRetries": {
+                    "type": "number",
+                    "default": 3,
+                    "minimum": 0,
+                    "maximum": 10,
+                    "description": "Number of retry attempts for transient API failures (rate limiting, timeouts). Increase for unstable networks."
                 }
             }
         }
