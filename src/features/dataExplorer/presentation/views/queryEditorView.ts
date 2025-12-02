@@ -48,7 +48,7 @@ export function renderQueryEditorSection(data: QueryEditorRenderData): string {
 			</div>
 		</div>
 		<div class="query-results-section">
-			<div id="results-table-container">
+			<div id="results-table-container" data-selection-zone="results-table">
 				<div class="empty-state">
 					<p>Run a query to see results</p>
 				</div>
@@ -100,7 +100,7 @@ function renderSqlPanel(data: QueryEditorRenderData, isVisible: boolean): string
 
 	return `
 		<div id="sql-editor-panel" class="editor-panel" role="tabpanel" aria-labelledby="mode-sql" ${hiddenAttr}>
-			<div class="sql-editor-wrapper">
+			<div class="sql-editor-wrapper" data-selection-zone="sql-query">
 				<label for="sql-editor" class="editor-label">SQL Query</label>
 				<textarea
 					id="sql-editor"
@@ -110,10 +110,10 @@ function renderSqlPanel(data: QueryEditorRenderData, isVisible: boolean): string
 				>${escapeHtml(data.sql)}</textarea>
 			</div>
 			${errorHtml}
-			<div class="fetchxml-preview-wrapper">
+			<div class="fetchxml-preview-wrapper" data-selection-zone="fetchxml-preview">
 				<details class="fetchxml-preview" ${data.fetchXml ? 'open' : ''}>
 					<summary class="fetchxml-summary">FetchXML Preview</summary>
-					<pre class="fetchxml-content"><code id="fetchxml-preview-content">${escapeHtml(data.fetchXml)}</code></pre>
+					<pre class="fetchxml-content" tabindex="0"><code id="fetchxml-preview-content">${escapeHtml(data.fetchXml)}</code></pre>
 				</details>
 			</div>
 		</div>
@@ -133,7 +133,7 @@ function renderFetchXmlPanel(data: QueryEditorRenderData, isVisible: boolean): s
 
 	return `
 		<div id="fetchxml-editor-panel" class="editor-panel" role="tabpanel" aria-labelledby="mode-fetchxml" ${hiddenAttr}>
-			<div class="fetchxml-editor-wrapper">
+			<div class="fetchxml-editor-wrapper" data-selection-zone="fetchxml-query">
 				<label for="fetchxml-editor" class="editor-label">FetchXML Query</label>
 				<textarea
 					id="fetchxml-editor"
@@ -144,10 +144,10 @@ function renderFetchXmlPanel(data: QueryEditorRenderData, isVisible: boolean): s
 			</div>
 			${errorHtml}
 			${warningsHtml}
-			<div class="sql-preview-wrapper">
+			<div class="sql-preview-wrapper" data-selection-zone="sql-preview">
 				<details class="sql-preview" ${data.sql ? 'open' : ''}>
 					<summary class="sql-summary">SQL Preview</summary>
-					<pre class="sql-content"><code id="sql-preview-content">${escapeHtml(data.sql)}</code></pre>
+					<pre class="sql-content" tabindex="0"><code id="sql-preview-content">${escapeHtml(data.sql)}</code></pre>
 				</details>
 			</div>
 		</div>

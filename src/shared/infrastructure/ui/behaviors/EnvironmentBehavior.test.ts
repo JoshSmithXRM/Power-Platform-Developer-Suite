@@ -247,7 +247,7 @@ describe('EnvironmentBehavior', () => {
 		it('should log environment switch', async () => {
 			await behavior.switchEnvironment('env-2');
 
-			expect(loggerMock.info).toHaveBeenCalledWith('Switching environment', {
+			expect(loggerMock.debug).toHaveBeenCalledWith('Switching environment', {
 				from: 'env-1',
 				to: 'env-2'
 			});

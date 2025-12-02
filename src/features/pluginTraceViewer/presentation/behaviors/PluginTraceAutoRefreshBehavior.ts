@@ -61,7 +61,7 @@ export class PluginTraceAutoRefreshBehavior {
 	 */
 	public async setAutoRefresh(interval: number): Promise<void> {
 		try {
-			this.logger.info('Setting auto-refresh interval', { interval });
+			this.logger.debug('Setting auto-refresh interval', { interval });
 
 			this.autoRefreshInterval = interval;
 

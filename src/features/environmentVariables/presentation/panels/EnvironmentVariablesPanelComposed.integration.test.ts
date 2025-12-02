@@ -46,6 +46,23 @@ jest.mock('vscode', () => ({
 	},
 	env: {
 		openExternal: jest.fn()
+	},
+	CancellationTokenSource: class {
+		private _listeners: Set<() => void> = new Set();
+		token = {
+			isCancellationRequested: false,
+			onCancellationRequested: (listener: () => void): { dispose: () => void } => {
+				this._listeners.add(listener);
+				return { dispose: () => this._listeners.delete(listener) };
+			}
+		};
+		cancel(): void {
+			this.token.isCancellationRequested = true;
+			this._listeners.forEach(l => l());
+		}
+		dispose(): void {
+			this._listeners.clear();
+		}
 	}
 }), { virtual: true });
 
@@ -270,9 +287,11 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 
 			await createPanelAndWait();
 
+			// Initialization now uses cancellation token for race condition protection
 			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
-				DEFAULT_SOLUTION_ID
+				DEFAULT_SOLUTION_ID,
+				expect.anything()
 			);
 			expect(mockViewModelMapper.toViewModel).toHaveBeenCalledTimes(2);
 		});
@@ -374,10 +393,11 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 			await createPanelAndWait();
 
 			// The panel uses scaffoldingBehavior.refresh which posts htmlUpdated, not updateTableData
-			// Verify the use case was called with empty result
+			// Verify the use case was called with empty result (initialization uses cancellation token)
 			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
-				DEFAULT_SOLUTION_ID
+				DEFAULT_SOLUTION_ID,
+				expect.anything()
 			);
 		});
 
@@ -439,10 +459,11 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 				environmentId: TEST_ENVIRONMENT_ID
 			});
 
-			// Should pass solution ID to use case
+			// Should pass solution ID to use case (initialization uses cancellation token)
 			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
-				'sol1'
+				'sol1',
+				expect.anything()
 			);
 		});
 
@@ -486,9 +507,11 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 			await new Promise(resolve => process.nextTick(resolve));
 			await new Promise(resolve => process.nextTick(resolve));
 
+			// Solution change uses cancellation token (3rd param) for cancellable requests
 			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
-				TEST_SOLUTION_ID
+				TEST_SOLUTION_ID,
+				expect.anything() // Cancellation token adapter
 			);
 
 			expect(mockPanelStateRepository.save).toHaveBeenCalledWith(
@@ -550,7 +573,7 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 			await new Promise(resolve => process.nextTick(resolve));
 			await new Promise(resolve => process.nextTick(resolve));
 
-			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith('env2', DEFAULT_SOLUTION_ID);
+			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith('env2', DEFAULT_SOLUTION_ID, undefined);
 			expect(mockSolutionRepository.findAllForDropdown).toHaveBeenCalledWith('env2');
 		});
 
@@ -574,8 +597,8 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 			await new Promise(resolve => process.nextTick(resolve));
 			await new Promise(resolve => process.nextTick(resolve));
 
-			// Should load with DEFAULT_SOLUTION_ID in new environment
-			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith('env2', DEFAULT_SOLUTION_ID);
+			// Should load with DEFAULT_SOLUTION_ID in new environment (3rd param is undefined when not using cancellation)
+			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith('env2', DEFAULT_SOLUTION_ID, undefined);
 		});
 	});
 
@@ -720,7 +743,8 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 
 			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
-				DEFAULT_SOLUTION_ID
+				DEFAULT_SOLUTION_ID,
+				undefined
 			);
 
 			expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
@@ -816,11 +840,11 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 
 			await createPanelAndWait();
 
-			// Verify full initialization sequence
+			// Verify full initialization sequence (initialization uses cancellation token)
 			expect(mockGetEnvironments).toHaveBeenCalled();
 			expect(mockSolutionRepository.findAllForDropdown).toHaveBeenCalledWith(TEST_ENVIRONMENT_ID);
 			expect(mockPanelStateRepository.load).toHaveBeenCalled();
-			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith(TEST_ENVIRONMENT_ID, 'sol1');
+			expect(mockListEnvVarsUseCase.execute).toHaveBeenCalledWith(TEST_ENVIRONMENT_ID, 'sol1', expect.anything());
 			expect(mockViewModelMapper.toViewModel).toHaveBeenCalledTimes(2);
 		});
 

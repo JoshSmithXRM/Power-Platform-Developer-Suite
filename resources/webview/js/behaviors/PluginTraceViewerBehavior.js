@@ -231,14 +231,14 @@ function renderOverviewTab(trace) {
 		${trace.exceptionDetails ? `
 			<div class="detail-section">
 				<div class="detail-section-title">Exception Details</div>
-				<div class="detail-code exception">${escapeHtml(trace.exceptionDetails)}</div>
+				<div class="detail-code exception" data-selection-zone="exception-details">${escapeHtml(trace.exceptionDetails)}</div>
 			</div>
 		` : ''}
 
 		${trace.messageBlock ? `
 			<div class="detail-section">
 				<div class="detail-section-title">Message Block</div>
-				<div class="detail-code">${escapeHtml(trace.messageBlock)}</div>
+				<div class="detail-code" data-selection-zone="message-block">${escapeHtml(trace.messageBlock)}</div>
 			</div>
 		` : ''}
 	`;
@@ -457,6 +457,12 @@ function setupDetailPanelVisibility() {
 		} else if (message.command === 'selectRow' && message.traceId) {
 			// Find and select the row with the matching trace ID
 			selectRowByTraceId(message.traceId);
+		} else if (message.command === 'updateDropdownState' && message.data) {
+			// Update dropdown selection state (e.g., trace level loaded from server)
+			const { dropdownId, selectedId } = message.data;
+			if (dropdownId && selectedId && window.updateDropdownState) {
+				window.updateDropdownState(dropdownId, selectedId);
+			}
 		}
 	});
 }

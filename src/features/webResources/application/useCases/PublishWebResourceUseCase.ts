@@ -116,7 +116,7 @@ export class PublishWebResourceUseCase {
 
 	private throwIfCancelled(cancellationToken: ICancellationToken | undefined, context: string): void {
 		if (cancellationToken?.isCancellationRequested) {
-			this.logger.info(`PublishWebResourceUseCase cancelled ${context}`);
+			this.logger.info('PublishWebResourceUseCase cancelled', { context });
 			throw new OperationCancelledException();
 		}
 	}

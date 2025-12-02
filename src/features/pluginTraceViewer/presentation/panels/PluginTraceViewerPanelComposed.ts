@@ -5,7 +5,7 @@
  * NO business logic - delegates all operations to use cases.
  */
 
-/* eslint-disable max-lines -- Panel coordinator with 11 simple command handlers */
+ 
 
 import * as vscode from 'vscode';
 
@@ -77,7 +77,8 @@ type PluginTraceViewerCommands =
 	| 'saveFilterPanelHeight'
 	| 'restoreFilterPanelHeight'
 	| 'saveFilterPanelCollapsed'
-	| 'restoreFilterPanelCollapsed';
+	| 'restoreFilterPanelCollapsed'
+	| 'copySuccess';
 
 /**
  * Plugin Trace Viewer panel using new PanelCoordinator architecture.
@@ -424,6 +425,9 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'KeyboardSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'PluginTraceViewerBehavior.js')
 				).toString()
 			],
@@ -561,6 +565,12 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 				await this.saveFilterPanelCollapsed(collapsed);
 			}
 		});
+
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
+		});
 	}
 
 	private getTableConfig(): DataTableConfig {
@@ -657,9 +667,81 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			this.panel.title = `Plugin Traces - ${environment.name}`;
 		}
 
+		// Load persisted state for the NEW environment (Option A: Fresh Start)
+		// This ensures each environment maintains its own independent filter/settings state
+		await this.loadPersistedStateForEnvironment(environmentId);
+
 		await this.loadTraceLevel();
 		// handleRefresh handles loading state
 		await this.handleRefresh();
+	}
+
+	/**
+	 * Loads persisted state for a specific environment and updates the UI.
+	 * Called during environment switch to restore the target environment's saved state.
+	 */
+	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
+		// Reset behaviors to defaults first
+		this.autoRefreshBehavior.setInterval(0);
+
+		// Load filter criteria for the new environment
+		await this.filterManagementBehavior.loadFilterCriteria(environmentId);
+
+		// Load auto-refresh interval and panel widths from storage
+		if (this.panelStateRepository) {
+			try {
+				const state = await this.panelStateRepository.load({
+					panelType: PluginTraceViewerPanelComposed.viewType,
+					environmentId
+				});
+
+				if (state) {
+					// Set auto-refresh interval
+					if (state.autoRefreshInterval && typeof state.autoRefreshInterval === 'number' && state.autoRefreshInterval > 0) {
+						this.autoRefreshBehavior.setInterval(state.autoRefreshInterval);
+					}
+
+					// Set detail panel width
+					if (state.detailPanelWidth && typeof state.detailPanelWidth === 'number') {
+						this.detailPanelBehavior.setDetailPanelWidth(state.detailPanelWidth);
+					}
+
+					this.logger.debug('Loaded persisted state for environment', {
+						environmentId,
+						autoRefreshInterval: state.autoRefreshInterval,
+						detailPanelWidth: state.detailPanelWidth
+					});
+				}
+			} catch (error) {
+				this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
+			}
+		}
+
+		// Update webview with loaded filter state
+		const filterCriteria = this.filterManagementBehavior.getFilterCriteria();
+		const reconstructedQuickFilterIds = this.filterManagementBehavior.getReconstructedQuickFilterIds();
+
+		await this.panel.webview.postMessage({
+			command: 'updateFilterState',
+			data: {
+				filterCriteria,
+				quickFilterIds: reconstructedQuickFilterIds,
+				autoRefreshInterval: this.autoRefreshBehavior.getInterval()
+			}
+		});
+
+		// Build and send OData query preview for loaded filters
+		const loadedFilterCriteria = this.filterManagementBehavior.getAppliedFilterCriteria();
+		const filterMapper = new FilterCriteriaMapper(this.configService);
+		const domainFilter = filterMapper.toDomain(loadedFilterCriteria);
+		const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
+		await this.panel.webview.postMessage({
+			command: 'updateODataPreview',
+			data: { query: odataQuery }
+		});
+
+		// Restart auto-refresh timer if interval was persisted
+		this.autoRefreshBehavior.startIfEnabled();
 	}
 
 
@@ -680,7 +762,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 				}
 			}
 
-			this.logger.info('Setting trace level', { level: level.value });
+			this.logger.debug('Setting trace level', { level: level.value });
 
 			await this.setTraceLevelUseCase.execute(this.currentEnvironmentId, level);
 			this.currentTraceLevel = level;
@@ -710,6 +792,15 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			this.currentTraceLevel = level;
 
 			this.logger.debug('Trace level loaded', { level: level.value });
+
+			// Update the dropdown in the webview to show current selection
+			await this.panel.webview.postMessage({
+				command: 'updateDropdownState',
+				data: {
+					dropdownId: 'traceLevelDropdown',
+					selectedId: level.value.toString()
+				}
+			});
 		} catch (error) {
 			this.logger.error('Failed to load trace level', error);
 		}

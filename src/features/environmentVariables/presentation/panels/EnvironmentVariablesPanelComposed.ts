@@ -23,11 +23,13 @@ import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
+import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
+import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 
 /**
  * Commands supported by Environment Variables panel.
  */
-type EnvironmentVariablesCommands = 'refresh' | 'openMaker' | 'syncDeploymentSettings' | 'environmentChange' | 'solutionChange';
+type EnvironmentVariablesCommands = 'refresh' | 'openMaker' | 'syncDeploymentSettings' | 'environmentChange' | 'solutionChange' | 'copySuccess';
 
 /**
  * Environment Variables panel using new PanelCoordinator architecture.
@@ -44,6 +46,14 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
 	private solutionOptions: SolutionOption[] = [];
+
+	// Request versioning to prevent stale responses from overwriting fresh data
+	// Incremented on each solution change; responses with outdated version are discarded
+	private requestVersion: number = 0;
+
+	// Cancellation source for in-flight solution data requests
+	// Cancelled when user switches solutions to stop wasted API calls
+	private currentCancellationSource: vscode.CancellationTokenSource | null = null;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -157,19 +167,12 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 
 		// Disable refresh button during initial load (shows spinner)
 		await this.loadingBehavior.setLoading(true);
-		this.showTableLoading();
 
 		try {
-			// PARALLEL LOADING - Don't wait for solutions to load data!
-			const [solutions, environmentVariables] = await Promise.all([
-				this.loadSolutions(),
-				this.listEnvVarsUseCase.execute(
-					this.currentEnvironmentId,
-					this.currentSolutionId
-				)
-			]);
+			// Load solutions first so user can see/interact with dropdown while data loads
+			const solutions = await this.loadSolutions();
 
-			// Post-load validation: Check if persisted solution still exists
+			// Validate persisted solution still exists
 			let finalSolutionId = this.currentSolutionId;
 			if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
 				if (!solutions.some(s => s.id === this.currentSolutionId)) {
@@ -189,11 +192,48 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 				}
 			}
 
+			// IMMEDIATELY render solutions (user can interact while data loads)
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				solutions,
+				currentSolutionId: finalSolutionId,
+				tableData: []
+			});
+
+			// Show loading state in table AFTER scaffold refresh (refresh replaces HTML, so loading must come after)
+			this.showTableLoading();
+
+			// Set up cancellation for initial data load (can be cancelled by solution change)
+			const myVersion = ++this.requestVersion;
+			if (this.currentCancellationSource) {
+				this.currentCancellationSource.cancel();
+				this.currentCancellationSource.dispose();
+			}
+			this.currentCancellationSource = new vscode.CancellationTokenSource();
+			const domainToken = new VsCodeCancellationTokenAdapter(this.currentCancellationSource.token);
+
+			// NOW load data (user sees solutions dropdown, can change selection while waiting)
+			const environmentVariables = await this.listEnvVarsUseCase.execute(
+				this.currentEnvironmentId,
+				this.currentSolutionId,
+				domainToken
+			);
+
+			// Check if superseded by solution change during load
+			if (this.requestVersion !== myVersion) {
+				this.logger.debug('Initial load superseded by solution change, discarding', {
+					myVersion,
+					currentVersion: this.requestVersion
+				});
+				return;
+			}
+
 			const viewModels = environmentVariables
 				.map(envVar => this.viewModelMapper.toViewModel(envVar))
 				.sort((a, b) => a.schemaName.localeCompare(b.schemaName));
 
-			// Final render with both solutions and data
+			// Final render with data
 			await this.scaffoldingBehavior.refresh({
 				environments,
 				currentEnvironmentId: this.currentEnvironmentId,
@@ -256,6 +296,9 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'KeyboardSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'EnvironmentVariablesBehavior.js')
 				).toString()
 			],
@@ -310,6 +353,12 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 				await this.handleSolutionChange(solutionId);
 			}
 		});
+
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
+		});
 	}
 
 	private getTableConfig(): DataTableConfig {
@@ -344,17 +393,42 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		}
 	}
 
-	private async handleRefresh(): Promise<void> {
+	/**
+	 * Refreshes environment variables data.
+	 *
+	 * @param requestVersion - Optional version to detect stale responses. If provided and
+	 *                         doesn't match current version, the response is discarded.
+	 * @param cancellationToken - Optional token to cancel the operation if user changes solution
+	 */
+	private async handleRefresh(
+		requestVersion?: number,
+		cancellationToken?: vscode.CancellationToken
+	): Promise<void> {
 		this.logger.debug('Refreshing environment variables');
 
 		await this.loadingBehavior.setButtonLoading('refresh', true);
 		this.showTableLoading();
 
 		try {
+			// Wrap VS Code token in domain adapter if provided
+			const domainToken = cancellationToken
+				? new VsCodeCancellationTokenAdapter(cancellationToken)
+				: undefined;
+
 			const environmentVariables = await this.listEnvVarsUseCase.execute(
 				this.currentEnvironmentId,
-				this.currentSolutionId
+				this.currentSolutionId,
+				domainToken // Pass cancellation token to use case
 			);
+
+			// Check for stale response: if version was provided and has changed, discard this response
+			if (requestVersion !== undefined && requestVersion !== this.requestVersion) {
+				this.logger.debug('Discarding stale environment variables response', {
+					requestVersion,
+					currentVersion: this.requestVersion
+				});
+				return;
+			}
 
 			// Map to view models and sort
 			const viewModels = environmentVariables
@@ -375,6 +449,11 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 				}
 			});
 		} catch (error: unknown) {
+			// Silently ignore cancellation - user switched solutions so this response is not needed
+			if (error instanceof OperationCancelledException) {
+				this.logger.debug('Environment variables request cancelled - user switched solutions');
+				return;
+			}
 			this.logger.error('Error refreshing environment variables', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to refresh environment variables: ${errorMessage}`);
@@ -419,7 +498,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 				? `${currentSolution.uniqueName}.deploymentsettings.json`
 				: 'deploymentsettings.json';
 
-			this.logger.info('Syncing deployment settings', {
+			this.logger.debug('Syncing deployment settings', {
 				count: environmentVariables.length,
 				filename
 			});
@@ -431,7 +510,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 
 			if (result) {
 				const message = `Synced deployment settings: ${result.added} added, ${result.removed} removed, ${result.preserved} preserved`;
-				this.logger.info(message);
+				this.logger.debug(message);
 				vscode.window.showInformationMessage(message);
 			}
 		} catch (error) {
@@ -445,7 +524,6 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 
 		const oldEnvironmentId = this.currentEnvironmentId;
 		this.currentEnvironmentId = environmentId;
-		this.currentSolutionId = DEFAULT_SOLUTION_ID; // Reset to default solution
 
 		// Re-register panel in map for new environment
 		this.reregisterPanel(EnvironmentVariablesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
@@ -455,16 +533,79 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 			this.panel.title = `Environment Variables - ${environment.name}`;
 		}
 
+		// Load persisted state for the NEW environment (Option A: Fresh Start)
+		await this.loadPersistedStateForEnvironment(environmentId);
+
 		this.solutionOptions = await this.loadSolutions();
+
+		// Post-load validation: Check if persisted solution still exists
+		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+			if (!this.solutionOptions.some(s => s.id === this.currentSolutionId)) {
+				this.logger.warn('Persisted solution no longer exists, falling back to default', {
+					invalidSolutionId: this.currentSolutionId
+				});
+				this.currentSolutionId = DEFAULT_SOLUTION_ID;
+			}
+		}
+
+		// Update solution selector in UI
+		await this.panel.webview.postMessage({
+			command: 'updateSolutionSelector',
+			data: {
+				solutions: this.solutionOptions,
+				currentSolutionId: this.currentSolutionId
+			}
+		});
 
 		// handleRefresh handles loading state
 		await this.handleRefresh();
+	}
+
+	/**
+	 * Loads persisted state for a specific environment.
+	 * Called during environment switch to restore the target environment's saved state.
+	 */
+	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
+		// Reset to defaults first
+		this.currentSolutionId = DEFAULT_SOLUTION_ID;
+
+		if (this.panelStateRepository) {
+			try {
+				const state = await this.panelStateRepository.load({
+					panelType: 'environmentVariables',
+					environmentId
+				});
+				if (state?.selectedSolutionId) {
+					this.currentSolutionId = state.selectedSolutionId;
+					this.logger.debug('Loaded persisted solution for environment', {
+						environmentId,
+						solutionId: this.currentSolutionId
+					});
+				}
+			} catch (error) {
+				this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
+			}
+		}
 	}
 
 	private async handleSolutionChange(solutionId: string): Promise<void> {
 		this.logger.debug('Solution filter changed', { solutionId });
 
 		this.currentSolutionId = solutionId;
+
+		// Increment request version to detect stale responses
+		const myVersion = ++this.requestVersion;
+
+		// Cancel any in-flight request from previous solution change
+		if (this.currentCancellationSource) {
+			this.logger.debug('Cancelling previous solution data request');
+			this.currentCancellationSource.cancel();
+			this.currentCancellationSource.dispose();
+		}
+
+		// Create new cancellation source for this request
+		this.currentCancellationSource = new vscode.CancellationTokenSource();
+		const cancellationToken = this.currentCancellationSource.token;
 
 		// Always save concrete solution selection to panel state
 		if (this.panelStateRepository) {
@@ -481,7 +622,8 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		}
 
 		// handleRefresh handles loading state
-		await this.handleRefresh();
+		// Pass version and cancellation token to detect/cancel stale operations
+		await this.handleRefresh(myVersion, cancellationToken);
 	}
 
 	/**

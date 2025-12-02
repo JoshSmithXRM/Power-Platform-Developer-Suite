@@ -296,13 +296,24 @@ git worktree prune             # Clean up stale worktree references
 2. Fix bug (test passes)
 3. Commit with test (prevents regression)
 
-**E2E tests for bugs:** Only write E2E tests for UI/workflow/timing bugs - not every bug.
-| Bug Type | Unit Test | E2E Test |
-|----------|-----------|----------|
-| Domain/use case logic | ✅ Always | ❌ No |
-| Panel rendering | ✅ If possible | ✅ Yes |
-| User workflow broken | ❌ Hard | ✅ Yes |
-| Race condition/timing | ❌ Hard | ✅ Yes |
+**Choose test type based on bug category:**
+
+| Bug Type | Unit Test | E2E Test | Example |
+|----------|-----------|----------|---------|
+| Domain/use case logic | ✅ Always | ❌ No | Validation rule wrong |
+| Mapper/transformer | ✅ Always | ❌ No | Field not mapped |
+| Panel rendering | ✅ If possible | ✅ Yes | Button not disabled |
+| User workflow broken | ❌ Hard | ✅ Yes | Env switch overwrites state |
+| Race condition/timing | ❌ Hard | ✅ Yes | Data loads before panel ready |
+| State persistence | ❌ Hard | ✅ Yes | Settings not restored |
+
+**E2E-driven bug fix process** (for workflow/UI/state bugs):
+1. **Reproduce manually** - Confirm bug exists via F5
+2. **Write E2E test** - Capture the expected workflow behavior
+3. **Run test** - Verify it FAILS (proves test catches the bug)
+4. **Fix the bug** - Implement the fix
+5. **Run test** - Verify it PASSES (proves fix works)
+6. **Commit with test** - Regression protection automatic
 
 ### Refactoring
 

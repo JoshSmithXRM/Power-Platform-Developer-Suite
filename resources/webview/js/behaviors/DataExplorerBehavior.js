@@ -19,6 +19,7 @@ window.createBehavior({
 		detectInitialMode();
 		setupSqlEditorHighlighting();
 		setupFetchXmlEditorHighlighting();
+		highlightInitialPreviews();
 		wireSqlEditor();
 		wireFetchXmlEditor();
 		wireExecuteButton();
@@ -208,8 +209,13 @@ function updateQueryResults(data) {
 	// Determine the primary key column name (entityname + "id")
 	const primaryKeyColumn = entityLogicalName ? `${entityLogicalName}id` : null;
 
-	// Build table HTML
-	let tableHtml = '<table class="data-table">';
+	// Build table HTML with search bar
+	let tableHtml = `
+		<div class="search-container" data-selection-zone="results-search">
+			<input type="text" id="resultsSearchInput" placeholder="🔍 Filter results..." />
+		</div>
+	`;
+	tableHtml += '<table class="data-table">';
 
 	// Header
 	tableHtml += '<thead><tr>';
@@ -270,6 +276,8 @@ function updateQueryResults(data) {
 		wireSorting(table);
 		// Wire up record link clicks
 		wireRecordLinks(table);
+		// Wire up search filter
+		wireResultsSearch(table);
 	}
 }
 
@@ -308,6 +316,46 @@ function wireRecordLinks(table) {
 				});
 			}
 		});
+	});
+}
+
+/**
+ * Wires up search filter for results table.
+ */
+function wireResultsSearch(table) {
+	const searchInput = document.getElementById('resultsSearchInput');
+	if (!searchInput) {
+		return;
+	}
+
+	searchInput.addEventListener('input', () => {
+		const query = searchInput.value.toLowerCase();
+		const rows = table.querySelectorAll('tbody tr');
+		const totalCount = rows.length;
+
+		// Filter rows
+		rows.forEach(row => {
+			const text = row.textContent.toLowerCase();
+			if (text.includes(query)) {
+				row.style.display = '';
+			} else {
+				row.style.display = 'none';
+			}
+		});
+
+		// Re-apply striping to visible rows
+		applyRowStriping(table);
+
+		// Update status with filtered count
+		const visibleCount = Array.from(rows).filter(row => row.style.display !== 'none').length;
+		const resultsCount = document.getElementById('results-count');
+		if (resultsCount) {
+			if (visibleCount === totalCount) {
+				resultsCount.textContent = `${totalCount} rows`;
+			} else {
+				resultsCount.textContent = `${visibleCount} of ${totalCount} rows`;
+			}
+		}
 	});
 }
 
@@ -1062,6 +1110,24 @@ function setupFetchXmlEditorHighlighting() {
 		highlightLayer.scrollTop = fetchXmlEditor.scrollTop;
 		highlightLayer.scrollLeft = fetchXmlEditor.scrollLeft;
 	});
+}
+
+/**
+ * Highlights any preview content that was rendered server-side.
+ * Called on page load to ensure syntax highlighting is applied immediately.
+ */
+function highlightInitialPreviews() {
+	// Highlight FetchXML preview if it has content
+	const fetchXmlPreview = document.getElementById('fetchxml-preview-content');
+	if (fetchXmlPreview && fetchXmlPreview.textContent.trim()) {
+		fetchXmlPreview.innerHTML = XmlHighlighter.highlight(fetchXmlPreview.textContent);
+	}
+
+	// Highlight SQL preview if it has content
+	const sqlPreview = document.getElementById('sql-preview-content');
+	if (sqlPreview && sqlPreview.textContent.trim()) {
+		sqlPreview.innerHTML = SqlHighlighter.highlight(sqlPreview.textContent);
+	}
 }
 
 /**

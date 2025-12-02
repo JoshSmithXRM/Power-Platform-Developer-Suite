@@ -143,7 +143,7 @@ export class FilterPanelSection implements ISection {
 	 */
 	private renderODataTab(): string {
 		return `
-			<div class="odata-preview-section">
+			<div class="odata-preview-section" data-selection-zone="odata-preview">
 				<pre class="odata-query-text" id="odataQueryText">No filters applied</pre>
 				<button
 					class="icon-button copy-query-button"

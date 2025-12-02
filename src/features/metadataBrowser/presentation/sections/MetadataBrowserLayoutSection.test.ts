@@ -558,9 +558,9 @@ describe('MetadataBrowserLayoutSection', () => {
 		it('should nest table wrappers inside table containers', () => {
 			const html = section.render({});
 
-			// Each table container should contain table-wrapper
+			// Each table container should contain table-wrapper (with optional data-selection-zone attribute)
 			const containerMatches = html.match(
-				/<div class="table-container">[\s\S]*?<div class="table-wrapper">/g
+				/<div class="table-container"[^>]*>[\s\S]*?<div class="table-wrapper">/g
 			);
 			expect(containerMatches).toHaveLength(7);
 		});

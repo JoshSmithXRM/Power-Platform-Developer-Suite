@@ -6,12 +6,14 @@ import { WebResource } from '../../domain/entities/WebResource';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 
 /**
- * Error thrown when attempting to edit a managed web resource.
+ * Error thrown when attempting to edit a non-editable web resource.
+ * This applies to binary resource types (PNG, JPG, GIF, ICO, XAP).
+ * Note: Managed text-based resources ARE editable (supports hotfix scenarios).
  */
-export class ManagedWebResourceError extends Error {
+export class NonEditableWebResourceError extends Error {
 	constructor(webResourceId: string) {
-		super(`Cannot edit managed web resource: ${webResourceId}`);
-		this.name = 'ManagedWebResourceError';
+		super(`Cannot edit web resource (binary type not supported): ${webResourceId}`);
+		this.name = 'NonEditableWebResourceError';
 	}
 }
 
@@ -32,7 +34,7 @@ export class UpdateWebResourceUseCase {
 	 * @param webResourceId - Web resource GUID
 	 * @param content - New content as bytes
 	 * @param cancellationToken - Optional token to cancel the operation
-	 * @throws ManagedWebResourceError if web resource is managed
+	 * @throws NonEditableWebResourceError if web resource is a non-editable binary type
 	 * @throws Error if web resource not found
 	 */
 	async execute(
@@ -76,7 +78,7 @@ export class UpdateWebResourceUseCase {
 		}
 
 		if (!webResource.canEdit()) {
-			throw new ManagedWebResourceError(webResourceId);
+			throw new NonEditableWebResourceError(webResourceId);
 		}
 
 		return webResource;
@@ -84,7 +86,7 @@ export class UpdateWebResourceUseCase {
 
 	private throwIfCancelled(cancellationToken: ICancellationToken | undefined, context: string): void {
 		if (cancellationToken?.isCancellationRequested) {
-			this.logger.info(`UpdateWebResourceUseCase cancelled ${context}`);
+			this.logger.info('UpdateWebResourceUseCase cancelled', { context });
 			throw new OperationCancelledException();
 		}
 	}

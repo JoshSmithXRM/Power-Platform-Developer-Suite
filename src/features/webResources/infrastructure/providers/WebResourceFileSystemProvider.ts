@@ -4,7 +4,7 @@ import type { GetWebResourceContentUseCase } from '../../application/useCases/Ge
 import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
 import type { PublishWebResourceUseCase } from '../../application/useCases/PublishWebResourceUseCase';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
-import { ManagedWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
+import { NonEditableWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
 import { PublishCoordinator } from '../../../../shared/infrastructure/coordination/PublishCoordinator';
 import {
 	isPublishInProgressError,
@@ -69,9 +69,21 @@ export function createWebResourceUri(
  *
  * URI format: ppds-webresource://environmentId/webResourceId/filename.ext
  */
+/**
+ * Event data emitted when a web resource is successfully saved.
+ */
+export interface WebResourceSavedEvent {
+	readonly environmentId: string;
+	readonly webResourceId: string;
+}
+
 export class WebResourceFileSystemProvider implements vscode.FileSystemProvider {
 	private readonly _onDidChangeFile = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
 	readonly onDidChangeFile = this._onDidChangeFile.event;
+
+	/** Event fired when a web resource is successfully saved to the server */
+	private readonly _onDidSaveWebResource = new vscode.EventEmitter<WebResourceSavedEvent>();
+	readonly onDidSaveWebResource = this._onDidSaveWebResource.event;
 
 	/** Cache for web resource content to avoid repeated API calls */
 	private readonly contentCache = new Map<string, { content: Uint8Array; timestamp: number }>();
@@ -211,8 +223,14 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			const cacheKey = `${parsed.environmentId}:${parsed.webResourceId}`;
 			this.contentCache.set(cacheKey, { content, timestamp: Date.now() });
 
-			// Fire change event
+			// Fire change event for VS Code
 			this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
+
+			// Fire saved event for panel updates (allows panel to refresh this row)
+			this._onDidSaveWebResource.fire({
+				environmentId: parsed.environmentId,
+				webResourceId: parsed.webResourceId
+			});
 
 			this.logger.info('Web resource saved', {
 				webResourceId: parsed.webResourceId,
@@ -222,8 +240,8 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			// Show notification with Publish action (async - don't await)
 			this.showPublishNotification(parsed.environmentId, parsed.webResourceId, parsed.filename);
 		} catch (error) {
-			if (error instanceof ManagedWebResourceError) {
-				throw vscode.FileSystemError.NoPermissions('Cannot edit managed web resource');
+			if (error instanceof NonEditableWebResourceError) {
+				throw vscode.FileSystemError.NoPermissions('Cannot edit binary web resource');
 			}
 			this.logger.error('Failed to save web resource', error);
 			throw vscode.FileSystemError.Unavailable(uri);

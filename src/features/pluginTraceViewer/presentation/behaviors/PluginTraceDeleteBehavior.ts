@@ -44,7 +44,7 @@ export class PluginTraceDeleteBehavior {
 		}
 
 		try {
-			this.logger.info('Deleting selected traces', { count: traceIds.length });
+			this.logger.debug('Deleting selected traces', { count: traceIds.length });
 
 			const deletedCount = await this.deleteTracesUseCase.deleteMultiple(environmentId, traceIds);
 
@@ -74,7 +74,7 @@ export class PluginTraceDeleteBehavior {
 		}
 
 		try {
-			this.logger.info('Deleting all traces');
+			this.logger.debug('Deleting all traces');
 
 			const deletedCount = await this.deleteTracesUseCase.deleteAll(environmentId);
 
@@ -105,7 +105,7 @@ export class PluginTraceDeleteBehavior {
 		}
 
 		try {
-			this.logger.info('Deleting old traces', { olderThanDays });
+			this.logger.debug('Deleting old traces', { olderThanDays });
 
 			const deletedCount = await this.deleteTracesUseCase.deleteOldTraces(environmentId, olderThanDays);
 

@@ -19,6 +19,17 @@ Track features and improvements that are planned but not actively being worked o
 | [ADMINISTRATION.md](ADMINISTRATION.md) | Connection Manager, Async Jobs, Security Roles, Workflows | High |
 | [OBSERVABILITY.md](OBSERVABILITY.md) | Flow History, Dependencies, Telemetry | Medium |
 | [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | Testing infrastructure, Multi-environment, UX | Low |
+| [METADATA_BROWSER_ENHANCEMENTS.md](METADATA_BROWSER_ENHANCEMENTS.md) | Metadata export, comparison, global search | Medium/Low |
+
+## Design Docs (Detailed Technical Designs)
+
+Detailed technical designs for complex features that require significant planning:
+
+| File | Description | Status |
+|------|-------------|--------|
+| [DATA_EXPLORER_INTELLISENSE_DESIGN.md](DATA_EXPLORER_INTELLISENSE_DESIGN.md) | SQL/FetchXML IntelliSense | Planned |
+| [FILTER_PANEL_IMPROVEMENTS_DESIGN.md](FILTER_PANEL_IMPROVEMENTS_DESIGN.md) | Plugin Trace filter enhancements | Planned |
+| [WEBVIEW_TYPESCRIPT_MIGRATION_DESIGN.md](WEBVIEW_TYPESCRIPT_MIGRATION_DESIGN.md) | TypeScript webview behaviors | Planned |
 
 ## Lifecycle
 
@@ -82,4 +93,4 @@ Items moved here from feature files with rejection reason.
 
 ---
 
-**Last Reviewed**: 2025-11-26
+**Last Reviewed**: 2025-12-01

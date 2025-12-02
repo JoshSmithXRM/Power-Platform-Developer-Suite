@@ -48,6 +48,23 @@ jest.mock('vscode', () => ({
 	},
 	env: {
 		openExternal: jest.fn()
+	},
+	CancellationTokenSource: class {
+		private _listeners: Set<() => void> = new Set();
+		token = {
+			isCancellationRequested: false,
+			onCancellationRequested: (listener: () => void): { dispose: () => void } => {
+				this._listeners.add(listener);
+				return { dispose: () => this._listeners.delete(listener) };
+			}
+		};
+		cancel(): void {
+			this.token.isCancellationRequested = true;
+			this._listeners.forEach(l => l());
+		}
+		dispose(): void {
+			this._listeners.clear();
+		}
 	}
 }), { virtual: true });
 
@@ -103,7 +120,8 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 
 		mockSolutions = [
 			{ id: 'sol1', name: 'Solution 1', uniqueName: 'sol_one' },
-			{ id: 'sol2', name: 'Solution 2', uniqueName: 'sol_two' }
+			{ id: 'sol2', name: 'Solution 2', uniqueName: 'sol_two' },
+			{ id: TEST_SOLUTION_ID, name: 'Test Solution', uniqueName: 'test_solution' }
 		];
 
 		mockGetEnvironments = jest.fn().mockResolvedValue(mockEnvironments);
@@ -247,10 +265,11 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 
 			expect(mockGetEnvironments).toHaveBeenCalled();
 			expect(mockSolutionRepository.findAllForDropdown).toHaveBeenCalledWith(TEST_ENVIRONMENT_ID);
+			// Initialization now uses cancellation token for race condition protection
 			expect(mockListConnectionReferencesUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
 				DEFAULT_SOLUTION_ID,
-				expect.any(Object)
+				expect.anything()
 			);
 		});
 
@@ -288,10 +307,11 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 				environmentId: TEST_ENVIRONMENT_ID
 			});
 
+			// Initialization now uses cancellation token for race condition protection
 			expect(mockListConnectionReferencesUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
 				TEST_SOLUTION_ID,
-				expect.any(Object)
+				expect.anything()
 			);
 		});
 
@@ -429,20 +449,22 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 
 			await createPanelAndWait();
 
+			// Initialization now uses cancellation token for race condition protection
 			expect(mockListConnectionReferencesUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
 				TEST_SOLUTION_ID,
-				expect.any(Object)
+				expect.anything()
 			);
 		});
 
 		it('should load all connection references when no solution is selected', async () => {
 			await createPanelAndWait();
 
+			// Initialization now uses cancellation token for race condition protection
 			expect(mockListConnectionReferencesUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
 				DEFAULT_SOLUTION_ID,
-				expect.any(Object)
+				expect.anything()
 			);
 		});
 
@@ -709,10 +731,11 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 			expect(mockGetEnvironments).toHaveBeenCalled();
 			expect(mockSolutionRepository.findAllForDropdown).toHaveBeenCalled();
 			expect(mockPanelStateRepository.load).toHaveBeenCalled();
+			// Initialization now uses cancellation token for race condition protection
 			expect(mockListConnectionReferencesUseCase.execute).toHaveBeenCalledWith(
 				TEST_ENVIRONMENT_ID,
 				TEST_SOLUTION_ID,
-				expect.any(Object)
+				expect.anything()
 			);
 			expect(mockRelationshipCollectionService.sort).toHaveBeenCalled();
 			// Scaffolding behavior sends htmlUpdated

@@ -34,10 +34,10 @@ Power Platform development tools for plugins and web resources.
 
 ### Web Resources Edit & Publish (Slices 3-5)
 **Status**: Planned
+**Target Version**: v0.3.0
 **Priority**: High
 **Estimated Effort**: 8-12 hours
 **Value**: Full edit cycle without leaving VS Code
-**Depends On**: Virtual Table (`feature/virtual-table`) for 70k+ record support
 
 **Description**:
 Extend the existing read-only Web Resources Browser to support editing, saving, and publishing web resources directly from VS Code.
@@ -79,8 +79,9 @@ Extend the existing read-only Web Resources Browser to support editing, saving, 
 
 ### Plugin Registration Tool
 **Status**: Planned
+**Target Version**: v0.6.0
 **Priority**: High
-**Estimated Effort**: 40+ hours
+**Estimated Effort**: 40-60 hours
 **Value**: VSCode-native plugin registration without leaving the IDE
 
 **Description**:
@@ -111,6 +112,7 @@ Port of Microsoft's Plugin Registration Tool (PRT) functionality to VSCode. Regi
 
 ### Web Resources Sync (Local Folder Mapping)
 **Status**: Planned
+**Target Version**: v0.6.0
 **Priority**: Medium
 **Estimated Effort**: 16-24 hours
 **Value**: CI/CD integration, version control for web resources
@@ -145,4 +147,4 @@ Map local folder to solution's web resources for two-way sync. Enables version c
 
 ---
 
-**Last Updated**: 2025-11-27
+**Last Updated**: 2025-11-30

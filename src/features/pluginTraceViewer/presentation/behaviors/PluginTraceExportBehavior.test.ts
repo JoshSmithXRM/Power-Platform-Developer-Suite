@@ -547,7 +547,7 @@ describe('PluginTraceExportBehavior', () => {
 
 			await behaviorWithLogger.exportTraces(traces, traceIds, format);
 
-			expect(mockLoggerWithSpy.info).toHaveBeenCalledWith(
+			expect(mockLoggerWithSpy.debug).toHaveBeenCalledWith(
 				'Exporting traces',
 				{ count: 2, format: 'csv' }
 			);

@@ -43,7 +43,8 @@ type DataExplorerCommands =
 	| 'switchQueryMode'
 	| 'openRecord'
 	| 'copyRecordUrl'
-	| 'warningModalResponse';
+	| 'warningModalResponse'
+	| 'copySuccess';
 
 /**
  * Type-safe actions for the row limit warning modal.
@@ -292,7 +293,29 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 							this.extensionUri,
 							'dist',
 							'webview',
+							'DataTableBehavior.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
+							'dist',
+							'webview',
 							'DataExplorerBehavior.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
+							'resources',
+							'webview',
+							'js',
+							'behaviors',
+							'KeyboardSelectionBehavior.js'
 						)
 					)
 					.toString(),
@@ -417,6 +440,13 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				void this.saveQueryStateToStorage();
 			}
 		});
+
+		// Copy success notification from KeyboardSelectionBehavior
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
+		});
 	}
 
 	/**
@@ -504,7 +534,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Update stored SQL
 		this.currentSqlQuery = trimmedSql;
 
-		this.logger.info('Executing SQL query', {
+		this.logger.debug('Executing SQL query', {
 			environmentId: this.currentEnvironmentId,
 			sqlLength: trimmedSql.length,
 			queryId,
@@ -537,7 +567,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Map to ViewModel
 			const viewModel = this.resultMapper.toViewModel(result);
 
-			this.logger.info('SQL query executed successfully', {
+			this.logger.debug('SQL query executed successfully', {
 				rowCount: result.getRowCount(),
 				executionTimeMs: result.executionTimeMs,
 				queryId,
@@ -681,9 +711,67 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			await this.panel.webview.postMessage({
 				command: 'clearResults',
 			});
+
+			// Load persisted state for the NEW environment (Option A: Fresh Start)
+			// This ensures each environment maintains its own independent query state
+			await this.loadPersistedStateForEnvironment(environmentId);
 		} finally {
 			this.setButtonLoading('executeQuery', false);
 		}
+	}
+
+	/**
+	 * Loads persisted query state for a specific environment and updates the UI.
+	 * Called during environment switch to restore the target environment's saved state.
+	 */
+	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
+		// Reset to defaults first
+		this.currentSqlQuery = '';
+		this.currentFetchXml = '';
+		this.currentQueryMode = 'sql';
+		this.currentTranspilationWarnings = [];
+
+		try {
+			const state = await this.panelStateRepository.load({
+				panelType: DataExplorerPanelComposed.viewType,
+				environmentId,
+			});
+
+			if (state) {
+				const savedSql = state['sqlQuery'];
+				if (savedSql && typeof savedSql === 'string') {
+					this.currentSqlQuery = savedSql;
+				}
+				const savedFetchXml = state['fetchXmlQuery'];
+				if (savedFetchXml && typeof savedFetchXml === 'string') {
+					this.currentFetchXml = savedFetchXml;
+				}
+				const savedMode = state['queryMode'];
+				if (savedMode === 'sql' || savedMode === 'fetchxml') {
+					this.currentQueryMode = savedMode;
+				}
+
+				this.logger.debug('Loaded persisted state for environment', {
+					environmentId,
+					hasSql: this.currentSqlQuery.length > 0,
+					hasFetchXml: this.currentFetchXml.length > 0,
+					queryMode: this.currentQueryMode,
+				});
+			}
+		} catch (error) {
+			this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
+		}
+
+		// Update webview with loaded state
+		await this.panel.webview.postMessage({
+			command: 'queryModeChanged',
+			data: {
+				mode: this.currentQueryMode,
+				sql: this.currentSqlQuery,
+				fetchXml: this.currentFetchXml,
+				transpilationWarnings: this.currentTranspilationWarnings,
+			},
+		});
 	}
 
 	/**
@@ -742,7 +830,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Update stored FetchXML
 		this.currentFetchXml = trimmedFetchXml;
 
-		this.logger.info('Executing FetchXML query', {
+		this.logger.debug('Executing FetchXML query', {
 			environmentId: this.currentEnvironmentId,
 			fetchXmlLength: trimmedFetchXml.length,
 			queryId,
@@ -777,7 +865,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Map to ViewModel
 			const viewModel = this.resultMapper.toViewModel(result);
 
-			this.logger.info('FetchXML query executed successfully', {
+			this.logger.debug('FetchXML query executed successfully', {
 				rowCount: result.getRowCount(),
 				executionTimeMs: result.executionTimeMs,
 				queryId,
@@ -952,7 +1040,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			return;
 		}
 
-		this.logger.info('Exporting query results to CSV', { rowCount });
+		this.logger.debug('Exporting query results to CSV', { rowCount });
 		this.setButtonLoading('exportCsv', true);
 
 		try {

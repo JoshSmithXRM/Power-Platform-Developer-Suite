@@ -119,7 +119,7 @@ export class PluginTraceDetailPanelBehavior {
 				totalDurationMs
 			);
 
-			this.logger.info('Detail view model created, sending data to frontend', {
+			this.logger.debug('Detail view model created, sending data to frontend', {
 				relatedTracesCount: relatedTraceViewModels.length,
 				timelineTraceCount: timelineViewModel.traceCount
 			});

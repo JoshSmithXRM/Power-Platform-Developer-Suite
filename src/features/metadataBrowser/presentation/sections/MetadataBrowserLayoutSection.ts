@@ -31,7 +31,7 @@ export class MetadataBrowserLayoutSection implements ISection {
 			<div class="metadata-browser-container">
 				<!-- Left Sidebar: Tree View -->
 				<div class="metadata-sidebar">
-					<div class="tree-search-container">
+					<div class="tree-search-container" data-selection-zone="tree-search">
 						<input
 							type="text"
 							id="treeSearch"
@@ -95,8 +95,8 @@ export class MetadataBrowserLayoutSection implements ISection {
 					<div class="tab-content-container">
 						<!-- Attributes Tab -->
 						<div class="tab-panel active" data-tab-panel="attributes">
-							<div class="table-container">
-								<div class="table-toolbar">
+							<div class="table-container" data-selection-zone="attributes-table">
+								<div class="table-toolbar" data-selection-zone="attributes-search">
 									<input
 										type="text"
 										class="table-search"
@@ -126,8 +126,8 @@ export class MetadataBrowserLayoutSection implements ISection {
 
 						<!-- Keys Tab -->
 						<div class="tab-panel" data-tab-panel="keys">
-							<div class="table-container">
-								<div class="table-toolbar">
+							<div class="table-container" data-selection-zone="keys-table">
+								<div class="table-toolbar" data-selection-zone="keys-search">
 									<input
 										type="text"
 										class="table-search"
@@ -155,8 +155,8 @@ export class MetadataBrowserLayoutSection implements ISection {
 
 						<!-- 1:N Relationships Tab -->
 						<div class="tab-panel" data-tab-panel="oneToMany">
-							<div class="table-container">
-								<div class="table-toolbar">
+							<div class="table-container" data-selection-zone="onetomany-table">
+								<div class="table-toolbar" data-selection-zone="onetomany-search">
 									<input
 										type="text"
 										class="table-search"
@@ -184,8 +184,8 @@ export class MetadataBrowserLayoutSection implements ISection {
 
 						<!-- N:1 Relationships Tab -->
 						<div class="tab-panel" data-tab-panel="manyToOne">
-							<div class="table-container">
-								<div class="table-toolbar">
+							<div class="table-container" data-selection-zone="manytoone-table">
+								<div class="table-toolbar" data-selection-zone="manytoone-search">
 									<input
 										type="text"
 										class="table-search"
@@ -213,8 +213,8 @@ export class MetadataBrowserLayoutSection implements ISection {
 
 						<!-- N:N Relationships Tab -->
 						<div class="tab-panel" data-tab-panel="manyToMany">
-							<div class="table-container">
-								<div class="table-toolbar">
+							<div class="table-container" data-selection-zone="manytomany-table">
+								<div class="table-toolbar" data-selection-zone="manytomany-search">
 									<input
 										type="text"
 										class="table-search"
@@ -242,8 +242,8 @@ export class MetadataBrowserLayoutSection implements ISection {
 
 						<!-- Privileges Tab -->
 						<div class="tab-panel" data-tab-panel="privileges">
-							<div class="table-container">
-								<div class="table-toolbar">
+							<div class="table-container" data-selection-zone="privileges-table">
+								<div class="table-toolbar" data-selection-zone="privileges-search">
 									<input
 										type="text"
 										class="table-search"
@@ -271,8 +271,8 @@ export class MetadataBrowserLayoutSection implements ISection {
 
 						<!-- Choice Values Tab -->
 						<div class="tab-panel" data-tab-panel="choiceValues">
-							<div class="table-container">
-								<div class="table-toolbar">
+							<div class="table-container" data-selection-zone="choicevalues-table">
+								<div class="table-toolbar" data-selection-zone="choicevalues-search">
 									<input
 										type="text"
 										class="table-search"

@@ -28,7 +28,15 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 
 		try {
 			const dtos = await this.loadDtos();
-			const environments = dtos.map(dto => this.mapper.toDomain(dto));
+			// Sort by sortOrder (lower first), with default environments prioritized
+			const sortedDtos = [...dtos].sort((a, b) => {
+				// Default environment always comes first
+				if (a.isDefault && !b.isDefault) return -1;
+				if (!a.isDefault && b.isDefault) return 1;
+				// Then sort by sortOrder
+				return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+			});
+			const environments = sortedDtos.map(dto => this.mapper.toDomain(dto));
 
 			this.logger.debug('Loaded environments from storage', { count: environments.length });
 
@@ -68,6 +76,19 @@ export class EnvironmentRepository implements IEnvironmentRepository {
 		const dtos = await this.loadDtos();
 		const dto = dtos.find(d => d.isActive);
 		return dto ? this.mapper.toDomain(dto) : null;
+	}
+
+	public async getDefault(): Promise<Environment | null> {
+		const dtos = await this.loadDtos();
+		// Find explicitly marked default, or fall back to first by sort order
+		const defaultDto = dtos.find(d => d.isDefault);
+		if (defaultDto) {
+			return this.mapper.toDomain(defaultDto);
+		}
+		// Fall back to first by sort order
+		const sortedDtos = [...dtos].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+		const firstDto = sortedDtos[0];
+		return firstDto ? this.mapper.toDomain(firstDto) : null;
 	}
 
 	/**

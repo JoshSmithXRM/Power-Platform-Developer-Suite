@@ -22,4 +22,57 @@ body {
 	font-size: var(--vscode-font-size);
 	color: var(--vscode-foreground);
 	background: var(--vscode-editor-background);
+	/* Prevent browser Ctrl+A from selecting entire page.
+	   Text selection is re-enabled on specific elements below. */
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+/* ===========================================
+   Text Selection Whitelist
+   Allow native text selection on text-entry and content elements.
+   This prevents Ctrl+A from selecting buttons, labels, etc.
+   =========================================== */
+
+/* Input fields - allow native selection and Ctrl+A */
+input,
+textarea,
+[contenteditable="true"] {
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+/* Code/preformatted blocks - allow selection for copying code */
+pre,
+code {
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+/* Detail panel content - allow selection for copying properties/values */
+/* Metadata Browser property items */
+.detail-tab-panel,
+.property-item,
+.property-value,
+.property-name,
+.property-section,
+.options-table,
+.options-table td,
+.options-table th,
+/* Plugin Traces detail sections */
+.detail-section,
+.detail-grid,
+.detail-label,
+.detail-value,
+.detail-code,
+/* Plugin Traces timeline */
+.timeline-container,
+.timeline-item,
+.timeline-item-header,
+.timeline-item-title,
+.timeline-item-message,
+.timeline-item-entity,
+.timeline-meta {
+	user-select: text;
+	-webkit-user-select: text;
 }

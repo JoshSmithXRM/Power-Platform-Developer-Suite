@@ -26,7 +26,7 @@ import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behav
 /**
  * Commands supported by Import Job Viewer panel.
  */
-type ImportJobViewerCommands = 'refresh' | 'openMaker' | 'viewImportJob' | 'environmentChange';
+type ImportJobViewerCommands = 'refresh' | 'openMaker' | 'viewImportJob' | 'environmentChange' | 'copySuccess';
 
 /**
  * Import Job Viewer panel using new PanelCoordinator architecture.
@@ -254,6 +254,9 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 				).toString(),
 				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'ImportJobViewerBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'KeyboardSelectionBehavior.js')
 				).toString()
 			],
 			cspNonce: getNonce(),
@@ -301,6 +304,13 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 			if (environmentId) {
 				await this.handleEnvironmentChange(environmentId);
 			}
+		});
+
+		// Copy success notification from KeyboardSelectionBehavior
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
 		});
 	}
 
@@ -375,14 +385,14 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 
 	private async handleViewImportLog(importJobId: string): Promise<void> {
 		try {
-			this.logger.info('Opening import log', { importJobId });
+			this.logger.debug('Opening import log', { importJobId });
 
 			const cancellationTokenSource = new vscode.CancellationTokenSource();
 			const cancellationToken = new VsCodeCancellationTokenAdapter(cancellationTokenSource.token);
 
 			await this.openImportLogUseCase.execute(this.currentEnvironmentId, importJobId, cancellationToken);
 
-			this.logger.info('Import log opened successfully', { importJobId });
+			this.logger.debug('Import log opened successfully', { importJobId });
 		} catch (error) {
 			this.logger.error('Failed to open import log', error);
 			vscode.window.showErrorMessage(`Failed to open import log: ${error instanceof Error ? error.message : String(error)}`);

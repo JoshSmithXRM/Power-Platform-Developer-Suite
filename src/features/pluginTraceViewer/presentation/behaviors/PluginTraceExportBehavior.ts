@@ -35,7 +35,7 @@ export class PluginTraceExportBehavior {
 		format: ExportFormat
 	): Promise<void> {
 		try {
-			this.logger.info('Exporting traces', { count: traceIds.length, format });
+			this.logger.debug('Exporting traces', { count: traceIds.length, format });
 
 			const tracesToExport = traces.filter(t => traceIds.includes(t.id));
 

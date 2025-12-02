@@ -175,19 +175,12 @@ function loadEnvironmentData(data) {
 
 /**
  * Collects form data and sends a command to the extension host.
- * Optionally updates button state during the operation.
+ * Button state (disabled/spinner) is managed by PanelCoordinator via setButtonState messages.
  * @param {string} command - The command to send to the extension host
- * @param {HTMLButtonElement|null} button - Optional button to update state
- * @param {string} loadingText - Text to show while operation is in progress
  */
-function sendFormCommand(command, button, loadingText) {
+function sendFormCommand(command) {
 	const formData = new FormData(form);
 	const data = Object.fromEntries(formData.entries());
-
-	if (button) {
-		button.disabled = true;
-		button.textContent = loadingText;
-	}
 
 	window.vscode.postMessage({
 		command: command,
@@ -200,7 +193,7 @@ function sendFormCommand(command, button, loadingText) {
  * Shows "Saved!" feedback on success.
  */
 function saveEnvironment() {
-	sendFormCommand('saveEnvironment', saveButton, 'Saving...');
+	sendFormCommand('saveEnvironment');
 }
 
 /**
@@ -208,7 +201,7 @@ function saveEnvironment() {
  * Panel closes automatically on success.
  */
 function saveAndCloseEnvironment() {
-	sendFormCommand('saveAndCloseEnvironment', saveAndCloseButton, 'Saving...');
+	sendFormCommand('saveAndCloseEnvironment');
 }
 
 /**
@@ -216,7 +209,7 @@ function saveAndCloseEnvironment() {
  * Shows success/error feedback via VS Code notifications.
  */
 function testConnection() {
-	sendFormCommand('testConnection', testButton, 'Testing...');
+	sendFormCommand('testConnection');
 }
 
 /**
@@ -224,7 +217,7 @@ function testConnection() {
  * Queries the BAP API and populates the environmentId field on success.
  */
 function discoverEnvironmentId() {
-	sendFormCommand('discoverEnvironmentId', discoverButton, 'Discovering...');
+	sendFormCommand('discoverEnvironmentId');
 }
 
 function validateName() {
@@ -280,15 +273,8 @@ function updateConditionalFields() {
 }
 
 function handleSaveComplete(data) {
-	// Reset both save buttons
-	if (saveButton) {
-		saveButton.disabled = false;
-		saveButton.textContent = 'Save';
-	}
-	if (saveAndCloseButton) {
-		saveAndCloseButton.disabled = false;
-		saveAndCloseButton.textContent = 'Save & Close';
-	}
+	// Button state (disabled/enabled) is managed by PanelCoordinator.
+	// This handler focuses on business logic: validation errors, success feedback, UI updates.
 
 	if (data.success) {
 		// Clear any existing validation errors
@@ -303,14 +289,20 @@ function handleSaveComplete(data) {
 			}
 		}
 
-		// Show brief "Saved!" feedback if not closing
-		if (!data.closeAfterSave) {
-			if (saveButton) {
-				saveButton.textContent = 'Saved!';
-				setTimeout(() => {
-					saveButton.textContent = 'Save';
-				}, 2000);
-			}
+		// Show brief "Saved!" feedback via button label (if not closing)
+		if (!data.closeAfterSave && saveButton) {
+			window.vscode.postMessage({
+				command: 'setButtonLabel',
+				buttonId: 'saveEnvironment',
+				label: 'Saved!'
+			});
+			setTimeout(() => {
+				window.vscode.postMessage({
+					command: 'setButtonLabel',
+					buttonId: 'saveEnvironment',
+					label: 'Save'
+				});
+			}, 2000);
 		}
 
 		// Show delete button if newly created
@@ -424,14 +416,11 @@ function clearAllValidationErrors() {
 
 /**
  * Handles the test connection result from the extension host.
- * Updates button state with success/error styling feedback.
+ * Applies success/error styling feedback. Button state is managed by PanelCoordinator.
  * @param {Object} data - Result object with success field
  */
 function handleTestResult(data) {
 	if (testButton) {
-		testButton.disabled = false;
-		testButton.textContent = 'Test Connection';
-
 		if (data.success) {
 			testButton.classList.add('success');
 			setTimeout(() => {
@@ -448,31 +437,29 @@ function handleTestResult(data) {
 
 /**
  * Handles the discover environment ID result from the extension host.
- * Updates button state and populates the environment ID field on success.
+ * Populates environment ID field on success and applies styling feedback.
+ * Button state is managed by PanelCoordinator.
  * @param {Object} data - Result object with success, cancelled, and environmentId fields
  */
 function handleDiscoverResult(data) {
-	if (discoverButton) {
-		discoverButton.disabled = false;
-		discoverButton.textContent = 'Discover ID';
-
-		if (data.success && data.environmentId) {
-			// Populate the environment ID field
-			const envIdInput = document.getElementById('environmentId');
-			if (envIdInput) {
-				envIdInput.value = data.environmentId;
-			}
+	if (data.success && data.environmentId) {
+		// Populate the environment ID field
+		const envIdInput = document.getElementById('environmentId');
+		if (envIdInput) {
+			envIdInput.value = data.environmentId;
+		}
+		if (discoverButton) {
 			discoverButton.classList.add('success');
 			setTimeout(() => {
 				discoverButton.classList.remove('success');
 			}, 3000);
-		} else if (!data.cancelled) {
-			// Presentation logic: skip error styling for user-initiated cancellations
-			discoverButton.classList.add('error');
-			setTimeout(() => {
-				discoverButton.classList.remove('error');
-			}, 3000);
 		}
+	} else if (!data.cancelled && discoverButton) {
+		// Presentation logic: skip error styling for user-initiated cancellations
+		discoverButton.classList.add('error');
+		setTimeout(() => {
+			discoverButton.classList.remove('error');
+		}, 3000);
 	}
 }
 

@@ -2,10 +2,12 @@
  * Action Buttons Section Styles
  *
  * Layout and composition for ActionButtonsSection.
+ * Supports responsive wrapping on narrow screens.
  */
 
 .action-buttons {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 8px;
 }
 
@@ -19,4 +21,16 @@
 
 .action-buttons.align-center {
 	justify-content: center;
+}
+
+/* Responsive: Compact buttons on narrow screens */
+@media (max-width: 500px) {
+	.action-buttons {
+		gap: 4px;
+	}
+
+	.action-buttons button {
+		padding: 4px 8px;
+		font-size: 12px;
+	}
 }

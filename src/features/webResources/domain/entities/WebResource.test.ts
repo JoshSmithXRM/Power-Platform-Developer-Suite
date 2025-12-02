@@ -182,8 +182,9 @@ describe('WebResource', () => {
 			expect(result).toBe(true);
 		});
 
-		it('should return false for managed text-based resource', () => {
-			// Arrange
+		it('should return true for managed text-based resource (hotfix scenario)', () => {
+			// Arrange - Managed resources are editable for production hotfixes
+			// Dataverse allows this, so we don't block it client-side
 			const resource = createTestWebResource({
 				isManaged: true,
 				webResourceType: WebResourceType.JAVASCRIPT
@@ -193,7 +194,7 @@ describe('WebResource', () => {
 			const result = resource.canEdit();
 
 			// Assert
-			expect(result).toBe(false);
+			expect(result).toBe(true);
 		});
 
 		it('should return false for unmanaged image resource (PNG)', () => {
@@ -224,8 +225,8 @@ describe('WebResource', () => {
 			expect(result).toBe(false);
 		});
 
-		it('should return false for managed image resource', () => {
-			// Arrange
+		it('should return false for managed image resource (binary not editable)', () => {
+			// Arrange - Binary images are not editable regardless of managed state
 			const resource = createTestWebResource({
 				isManaged: true,
 				webResourceType: WebResourceType.PNG
@@ -527,30 +528,51 @@ describe('WebResource', () => {
 			expect(resource.isTextBased()).toBe(true);
 		});
 
-		it('should make all managed resources non-editable regardless of type', () => {
-			// Arrange
-			const allTypes = [
+		it('should allow managed text-based resources to be edited (hotfix support)', () => {
+			// Arrange - Text-based types are editable even when managed
+			// This supports production hotfix scenarios
+			const textBasedTypes = [
 				WebResourceType.HTML,
 				WebResourceType.CSS,
 				WebResourceType.JAVASCRIPT,
 				WebResourceType.XML,
-				WebResourceType.PNG,
-				WebResourceType.JPG,
-				WebResourceType.GIF,
-				WebResourceType.XAP,
 				WebResourceType.XSL,
-				WebResourceType.ICO,
 				WebResourceType.SVG,
 				WebResourceType.RESX
 			];
 
 			// Act & Assert
-			allTypes.forEach(type => {
+			textBasedTypes.forEach(type => {
 				const resource = createTestWebResource({
 					isManaged: true,
 					webResourceType: type
 				});
-				expect(resource.canEdit()).toBe(false);
+				expect(resource.canEdit()).toBe(true);
+			});
+		});
+
+		it('should not allow binary types to be edited regardless of managed state', () => {
+			// Arrange - Binary types are never editable
+			const binaryTypes = [
+				WebResourceType.PNG,
+				WebResourceType.JPG,
+				WebResourceType.GIF,
+				WebResourceType.ICO,
+				WebResourceType.XAP
+			];
+
+			// Act & Assert - test both managed and unmanaged
+			binaryTypes.forEach(type => {
+				const unmanagedResource = createTestWebResource({
+					isManaged: false,
+					webResourceType: type
+				});
+				const managedResource = createTestWebResource({
+					isManaged: true,
+					webResourceType: type
+				});
+				expect(unmanagedResource.canEdit()).toBe(false);
+				expect(managedResource.canEdit()).toBe(false);
 			});
 		});
 

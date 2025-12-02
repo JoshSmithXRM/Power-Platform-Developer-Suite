@@ -14,6 +14,7 @@ describe('ValidateUniqueNameUseCase', () => {
 			getById: jest.fn(),
 			getByName: jest.fn(),
 			getActive: jest.fn(),
+		getDefault: jest.fn(),
 			save: jest.fn(),
 			delete: jest.fn(),
 			isNameUnique: jest.fn(),

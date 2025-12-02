@@ -2,7 +2,6 @@ import type * as vscode from 'vscode';
 import * as vscodeImpl from 'vscode';
 
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
-import type { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 import { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
@@ -28,11 +27,13 @@ import type { HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
+import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
+import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
 
 /**
  * Commands that the Connection References panel can receive from the webview.
  */
-type ConnectionReferencesCommands = 'refresh' | 'openMaker' | 'syncDeploymentSettings' | 'openFlow' | 'environmentChange' | 'solutionChange';
+type ConnectionReferencesCommands = 'refresh' | 'openMaker' | 'syncDeploymentSettings' | 'openFlow' | 'environmentChange' | 'solutionChange' | 'copySuccess';
 
 /**
  * Presentation layer panel for Connection References.
@@ -51,6 +52,14 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	private connectionReferences: ConnectionReference[] = [];
 	private solutionOptions: SolutionOption[] = [];
 	private readonly viewModelMapper: FlowConnectionRelationshipViewModelMapper;
+
+	// Request versioning to prevent stale responses from overwriting fresh data
+	// Incremented on each solution change; responses with outdated version are discarded
+	private requestVersion: number = 0;
+
+	// Cancellation source for in-flight solution data requests
+	// Cancelled when user switches solutions to stop wasted API calls
+	private currentCancellationSource: vscode.CancellationTokenSource | null = null;
 
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
@@ -218,6 +227,9 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 					vscodeImpl.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'DataTableBehavior.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscodeImpl.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'KeyboardSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscodeImpl.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'ConnectionReferencesBehavior.js')
 				).toString()
 			],
@@ -275,6 +287,12 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			}
 		});
 
+		this.coordinator.registerHandler('copySuccess', async (data) => {
+			const payload = data as { count?: number } | undefined;
+			const count = payload?.count ?? 0;
+			await vscodeImpl.window.showInformationMessage(`${count} rows copied to clipboard`);
+		});
+
 		// Note: Panel disposal is handled by EnvironmentScopedPanel base class
 	}
 
@@ -309,16 +327,12 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 
 		// Disable refresh button during initial load (shows spinner)
 		await this.loadingBehavior.setLoading(true);
-		this.showTableLoading();
 
 		try {
-			// PARALLEL LOADING - Don't wait for solutions to load data!
-			const [solutions, data] = await Promise.all([
-				this.loadSolutions(),
-				this.loadData()
-			]);
+			// Load solutions first so user can see/interact with dropdown while data loads
+			const solutions = await this.loadSolutions();
 
-			// Post-load validation: Check if persisted solution still exists
+			// Validate persisted solution still exists
 			let finalSolutionId = this.currentSolutionId;
 			if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
 				if (!solutions.some(s => s.id === this.currentSolutionId)) {
@@ -338,7 +352,40 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 				}
 			}
 
-			// Final render with both solutions and data
+			// IMMEDIATELY render solutions (user can interact while data loads)
+			await this.scaffoldingBehavior.refresh({
+				environments,
+				currentEnvironmentId: this.currentEnvironmentId,
+				solutions,
+				currentSolutionId: finalSolutionId,
+				tableData: []
+			});
+
+			// Show loading state in table AFTER scaffold refresh (refresh replaces HTML, so loading must come after)
+			this.showTableLoading();
+
+			// Set up cancellation for initial data load (can be cancelled by solution change)
+			const myVersion = ++this.requestVersion;
+			if (this.currentCancellationSource) {
+				this.currentCancellationSource.cancel();
+				this.currentCancellationSource.dispose();
+			}
+			this.currentCancellationSource = new vscodeImpl.CancellationTokenSource();
+			const cancellationToken = this.currentCancellationSource.token;
+
+			// NOW load data (user sees solutions dropdown, can change selection while waiting)
+			const data = await this.loadData(cancellationToken);
+
+			// Check if superseded by solution change during load
+			if (this.requestVersion !== myVersion) {
+				this.logger.debug('Initial load superseded by solution change, discarding', {
+					myVersion,
+					currentVersion: this.requestVersion
+				});
+				return;
+			}
+
+			// Final render with data
 			await this.scaffoldingBehavior.refresh({
 				environments,
 				currentEnvironmentId: this.currentEnvironmentId,
@@ -352,19 +399,48 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		}
 	}
 
-	private async render(): Promise<void> {
-		const data = await this.loadData();
-		const config = this.getTableConfig();
+	/**
+	 * Renders connection references data.
+	 *
+	 * @param requestVersion - Optional version to detect stale responses. If provided and
+	 *                         doesn't match current version, the response is discarded.
+	 * @param cancellationToken - Optional token to cancel the operation if user changes solution
+	 */
+	private async render(
+		requestVersion?: number,
+		cancellationToken?: vscode.CancellationToken
+	): Promise<void> {
+		try {
+			const data = await this.loadData(cancellationToken);
 
-		// Data-driven update: Send ViewModels to frontend
-		await this.panel.webview.postMessage({
-			command: 'updateTableData',
-			data: {
-				viewModels: data,
-				columns: config.columns,
-				noDataMessage: config.noDataMessage
+			// Check for stale response: if version was provided and has changed, discard this response
+			if (requestVersion !== undefined && requestVersion !== this.requestVersion) {
+				this.logger.debug('Discarding stale connection references response', {
+					requestVersion,
+					currentVersion: this.requestVersion
+				});
+				return;
 			}
-		});
+
+			const config = this.getTableConfig();
+
+			// Data-driven update: Send ViewModels to frontend
+			await this.panel.webview.postMessage({
+				command: 'updateTableData',
+				data: {
+					viewModels: data,
+					columns: config.columns,
+					noDataMessage: config.noDataMessage
+				}
+			});
+		} catch (error: unknown) {
+			// Silently ignore cancellation - user switched solutions so this response is not needed
+			if (error instanceof OperationCancelledException) {
+				this.logger.debug('Connection references request cancelled - user switched solutions');
+				return;
+			}
+			throw error; // Re-throw non-cancellation errors
+		}
 	}
 
 	private async loadSolutions(): Promise<SolutionOption[]> {
@@ -381,32 +457,37 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		}
 	}
 
-	private async loadData(): Promise<Record<string, unknown>[]> {
+	/**
+	 * Loads connection reference data from the use case.
+	 *
+	 * @param cancellationToken - Optional token to cancel the operation
+	 */
+	private async loadData(cancellationToken?: vscode.CancellationToken): Promise<Record<string, unknown>[]> {
 		if (!this.currentEnvironmentId) {
 			this.logger.warn('Cannot load connection references: No environment selected');
 			return [];
 		}
 
-		this.logger.info('Loading connection references', {
+		this.logger.debug('Loading connection references', {
 			environmentId: this.currentEnvironmentId,
 			solutionId: this.currentSolutionId
 		});
 
-		const cancellationToken: ICancellationToken = {
-			isCancellationRequested: false,
-			onCancellationRequested: (): vscode.Disposable => ({ dispose: (): void => {} })
-		};
+		// Wrap VS Code token in domain adapter if provided
+		const domainToken = cancellationToken
+			? new VsCodeCancellationTokenAdapter(cancellationToken)
+			: undefined;
 
 		try {
 			const result = await this.listConnectionReferencesUseCase.execute(
 				this.currentEnvironmentId,
 				this.currentSolutionId,
-				cancellationToken
+				domainToken // Pass cancellation token to use case
 			);
 
 			this.connectionReferences = result.connectionReferences;
 
-			if (cancellationToken.isCancellationRequested) {
+			if (domainToken?.isCancellationRequested) {
 				return [];
 			}
 
@@ -414,7 +495,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			const viewModels = this.viewModelMapper.toViewModels(sortedRelationships);
 			const enhancedViewModels = enhanceViewModelsWithFlowLinks(viewModels);
 
-			this.logger.info('Connection references loaded successfully', { count: result.relationships.length });
+			this.logger.debug('Connection references loaded successfully', { count: result.relationships.length });
 
 			return enhancedViewModels;
 		} catch (error) {
@@ -423,12 +504,22 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		}
 	}
 
-	private async handleRefresh(): Promise<void> {
+	/**
+	 * Refreshes connection references data.
+	 *
+	 * @param requestVersion - Optional version to detect stale responses. If provided and
+	 *                         doesn't match current version, the response is discarded.
+	 * @param cancellationToken - Optional token to cancel the operation if user changes solution
+	 */
+	private async handleRefresh(
+		requestVersion?: number,
+		cancellationToken?: vscode.CancellationToken
+	): Promise<void> {
 		await this.loadingBehavior.setButtonLoading('refresh', true);
 		this.showTableLoading();
 
 		try {
-			await this.render();
+			await this.render(requestVersion, cancellationToken);
 		} finally {
 			await this.loadingBehavior.setButtonLoading('refresh', false);
 		}
@@ -470,6 +561,20 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	private async handleSolutionChange(solutionId: string): Promise<void> {
 		this.currentSolutionId = solutionId;
 
+		// Increment request version to detect stale responses
+		const myVersion = ++this.requestVersion;
+
+		// Cancel any in-flight request from previous solution change
+		if (this.currentCancellationSource) {
+			this.logger.debug('Cancelling previous solution data request');
+			this.currentCancellationSource.cancel();
+			this.currentCancellationSource.dispose();
+		}
+
+		// Create new cancellation source for this request
+		this.currentCancellationSource = new vscodeImpl.CancellationTokenSource();
+		const cancellationToken = this.currentCancellationSource.token;
+
 		// Always save concrete solution selection to panel state
 		if (this.panelStateRepository) {
 			await this.panelStateRepository.save(
@@ -479,7 +584,8 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		}
 
 		// handleRefresh handles loading state
-		await this.handleRefresh();
+		// Pass version and cancellation token to detect/cancel stale operations
+		await this.handleRefresh(myVersion, cancellationToken);
 	}
 
 	private async handleOpenFlow(flowId: string): Promise<void> {
@@ -497,7 +603,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 
 		const url = this.urlBuilder.buildFlowUrl(environment.powerPlatformEnvironmentId, this.currentSolutionId, flowId);
 		await vscodeImpl.env.openExternal(vscodeImpl.Uri.parse(url));
-		this.logger.info('Opened flow in Maker Portal', { flowId, solutionId: this.currentSolutionId });
+		this.logger.debug('Opened flow in Maker Portal', { flowId, solutionId: this.currentSolutionId });
 	}
 
 	private async handleOpenMaker(): Promise<void> {
@@ -518,7 +624,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			this.currentSolutionId
 		);
 		await vscodeImpl.env.openExternal(vscodeImpl.Uri.parse(url));
-		this.logger.info('Opened connection references in Maker Portal', { environmentId: this.currentEnvironmentId, solutionId: this.currentSolutionId });
+		this.logger.debug('Opened connection references in Maker Portal', { environmentId: this.currentEnvironmentId, solutionId: this.currentSolutionId });
 	}
 
 	private async handleSyncDeploymentSettings(): Promise<void> {
@@ -537,7 +643,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			? `${currentSolution.uniqueName}.deploymentsettings.json`
 			: 'deploymentsettings.json';
 
-		this.logger.info('Syncing deployment settings', {
+		this.logger.debug('Syncing deployment settings', {
 			count: this.connectionReferences.length,
 			filename
 		});
@@ -550,7 +656,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 
 			if (result) {
 				const message = `Synced deployment settings: ${result.added} added, ${result.removed} removed, ${result.preserved} preserved`;
-				this.logger.info(message);
+				this.logger.debug(message);
 				vscodeImpl.window.showInformationMessage(message);
 			}
 		} catch (error) {

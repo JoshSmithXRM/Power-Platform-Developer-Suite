@@ -257,29 +257,25 @@ export class EnvironmentSetupPanelComposed {
 			await this.handleSaveEnvironment(data, true);
 		}, { disableOnExecute: true });
 
-		// Note: disableOnExecute: false because button state is managed by the webview's
-		// handleTestResult function in EnvironmentSetupBehavior.js
 		this.coordinator.registerHandler('testConnection', async (data?: unknown) => {
 			if (!isTestConnectionData(data)) {
 				this.logger.warn('Invalid test connection data');
 				return;
 			}
 			await this.handleTestConnection(data);
-		}, { disableOnExecute: false });
+		}, { disableOnExecute: true });
 
 		this.coordinator.registerHandler('deleteEnvironment', async () => {
 			await this.handleDeleteEnvironment();
 		}, { disableOnExecute: true });
 
-		// Note: disableOnExecute: false because button state is managed by the webview's
-		// handleDiscoverResult function in EnvironmentSetupBehavior.js
 		this.coordinator.registerHandler('discoverEnvironmentId', async (data?: unknown) => {
 			if (!isDiscoverEnvironmentIdData(data)) {
 				this.logger.warn('Invalid discover environment ID data');
 				return;
 			}
 			await this.handleDiscoverEnvironmentId(data);
-		}, { disableOnExecute: false });
+		}, { disableOnExecute: true });
 
 		this.coordinator.registerHandler('validateName', async (data?: unknown) => {
 			if (!isValidateNameData(data)) {

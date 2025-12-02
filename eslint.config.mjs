@@ -176,9 +176,11 @@ export default tseslint.config(
   },
   {
     // Authentication service - complex auth flows are inherently long
+    // MSAL supports 4 auth methods, each with its own flow
     files: ['src/features/environmentSetup/infrastructure/services/MsalAuthenticationService.ts'],
     rules: {
-      'max-lines-per-function': 'off'
+      'max-lines-per-function': 'off',
+      'max-lines': ['warn', { max: 600, skipBlankLines: true, skipComments: true }]
     }
   },
   {
@@ -248,6 +250,116 @@ export default tseslint.config(
     rules: {
       // Allow unused vars in mocks (structural setup)
       '@typescript-eslint/no-unused-vars': 'off'
+    }
+  },
+  // ===========================
+  // PATTERN-SPECIFIC OVERRIDES
+  // These raise limits for patterns that are inherently complex
+  // Goal: 0 warnings for known valid patterns, warnings only for NEW issues
+  // ===========================
+  {
+    // Transpilers/Parsers - inherently complex (parsing requires many branches)
+    files: [
+      'src/**/domain/services/*Transpiler*.ts',
+      'src/**/domain/services/*Lexer*.ts',
+      'src/**/domain/services/*Parser*.ts'
+    ],
+    rules: {
+      'complexity': ['warn', 30]
+    }
+  },
+  {
+    // Mappers with many fields - complexity is linear field assignment, not branching logic
+    files: [
+      'src/**/infrastructure/mappers/*.ts',
+      'src/**/application/mappers/*.ts'
+    ],
+    rules: {
+      'complexity': ['warn', 35]
+    }
+  },
+  {
+    // Domain entities with rich behavior - many properties require complex create() methods
+    files: ['src/**/domain/entities/*.ts'],
+    rules: {
+      'complexity': ['warn', 30]
+    }
+  },
+  {
+    // Repository implementations - API aggregation methods can be complex
+    files: ['src/**/infrastructure/repositories/*.ts'],
+    rules: {
+      'complexity': ['warn', 35],
+      'max-depth': ['warn', 5]
+    }
+  },
+  {
+    // Panel coordinators - many simple command handlers create long files
+    files: [
+      'src/**/presentation/panels/*Panel*.ts',
+      'src/**/presentation/panels/*Composed.ts'
+    ],
+    rules: {
+      'max-lines': ['warn', { max: 900, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['warn', { max: 150, skipBlankLines: true, skipComments: true }],
+      'complexity': ['warn', 20]
+    }
+  },
+  {
+    // Test factories - many optional parameters create high "complexity" that's actually linear
+    files: ['src/shared/testing/factories/*.ts'],
+    rules: {
+      'complexity': 'off'
+    }
+  },
+  {
+    // Serializers - transform complex objects with many fields
+    files: ['src/**/presentation/serializers/*.ts'],
+    rules: {
+      'complexity': ['warn', 25]
+    }
+  },
+  {
+    // Integration test files - comprehensive tests naturally have many statements/lines
+    files: ['src/**/*.integration.test.ts'],
+    rules: {
+      'max-statements': ['warn', 70],
+      'max-lines-per-function': 'off',  // Integration tests are naturally long
+      'max-lines': ['warn', { max: 1200, skipBlankLines: true, skipComments: true }]  // Allow large test suites
+    }
+  },
+  {
+    // Presentation sections - HTML rendering methods are naturally long
+    files: ['src/**/presentation/sections/*.ts', 'src/**/presentation/views/*.ts'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+    rules: {
+      'max-lines-per-function': ['warn', { max: 300, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
+    // Section and serializer test files - comprehensive tests are long
+    files: [
+      'src/**/presentation/sections/*.test.ts',
+      'src/**/presentation/serializers/*.test.ts'
+    ],
+    rules: {
+      'max-lines-per-function': 'off',
+      'max-statements': ['warn', 70]
+    }
+  },
+  {
+    // Presentation behaviors - filter/state management can be complex
+    files: ['src/**/presentation/behaviors/*.ts'],
+    rules: {
+      'complexity': ['warn', 20],
+      'max-depth': ['warn', 5]
+    }
+  },
+  {
+    // Test helper functions in test files - can have many optional params
+    files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+    rules: {
+      'complexity': ['warn', 30]  // Test setup functions have many branches
     }
   }
 );

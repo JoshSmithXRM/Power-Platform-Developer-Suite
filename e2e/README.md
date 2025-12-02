@@ -98,6 +98,7 @@ e2e/
 - Refresh functionality works
 - "Open in Maker" links are correct
 - **Data Explorer**: SQL query execution, results display, record links, no duplicate execution
+- **Environment Switch**: State persistence isolation per environment (queries, filters maintain independence)
 
 ## Log Capture
 
@@ -171,3 +172,20 @@ test('My integration test', async () => {
 - Each `test.describe` block shares one VS Code instance via `beforeAll`/`afterAll`
 - Tests within a describe block share state (panel stays open between tests)
 - Different describe blocks get fresh VS Code instances
+
+## E2E-Driven Bug Fix Pattern
+
+E2E tests are ideal for catching and preventing user workflow bugs. When a bug involves:
+- State not persisting correctly
+- UI not updating after actions
+- Race conditions or timing issues
+- Multi-step user workflows breaking
+
+**Process:**
+1. Write E2E test that captures expected behavior
+2. Run test - verify it FAILS (proves test catches the bug)
+3. Fix the bug
+4. Run test - verify it PASSES
+5. Commit with test for regression protection
+
+**Example:** The `environment-switch-persistence.spec.ts` test was written to verify that switching environments correctly loads the target environment's saved state, not carry over the source environment's state. This caught and now prevents the bug where queries/filters would "bleed" between environments.

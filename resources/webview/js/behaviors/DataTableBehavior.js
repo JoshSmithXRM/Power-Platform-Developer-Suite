@@ -6,11 +6,14 @@
  * - Row striping for visible rows
  * - Record count updates
  * - Column sorting via backend
+ * - Multi-row selection for Ctrl+A (via KeyboardSelectionBehavior)
  *
  * Note: Assumes vscode API is already acquired by messaging.js
  */
 
 (function() {
+	// Multi-selection state for Ctrl+A support
+	let selectedRowIds = new Set();
 	/**
 	 * Applies striping classes to visible table rows.
 	 * Removes existing striping classes first to ensure consistency.
@@ -250,6 +253,98 @@
 			applyRowStriping(table);
 		}
 	});
+
+	// ============================================
+	// Multi-Selection Functions (Ctrl+A support)
+	// ============================================
+
+	/**
+	 * Selects all rows in the table.
+	 * Used by KeyboardSelectionBehavior for Ctrl+A.
+	 * @param {Element} [tableElement] - Optional specific table element to select rows in.
+	 *                                   If not provided, selects first table in document.
+	 */
+	function selectAllRows(tableElement) {
+		let tbody;
+		if (tableElement) {
+			// Use the specific table element provided
+			tbody = tableElement.tagName === 'TBODY'
+				? tableElement
+				: tableElement.querySelector('tbody');
+		} else {
+			// Fallback to first table in document (legacy behavior)
+			tbody = document.querySelector('.data-table tbody, table tbody');
+		}
+
+		if (!tbody) {
+			return;
+		}
+
+		selectedRowIds.clear();
+		const rows = tbody.querySelectorAll('tr');
+		rows.forEach((tr, index) => {
+			// Use data-id if available, fall back to index
+			const id = tr.dataset.id || String(index);
+			selectedRowIds.add(id);
+			tr.classList.add('row-selected');
+		});
+	}
+
+	/**
+	 * Clears all row selections.
+	 * Used by KeyboardSelectionBehavior for Escape key.
+	 */
+	function clearSelection() {
+		selectedRowIds.clear();
+		const rows = document.querySelectorAll('.data-table tbody tr.row-selected, table tbody tr.row-selected');
+		rows.forEach(tr => tr.classList.remove('row-selected'));
+	}
+
+	/**
+	 * Gets the count of currently selected rows.
+	 * @returns {number} Number of selected rows
+	 */
+	function getSelectionCount() {
+		return selectedRowIds.size;
+	}
+
+	/**
+	 * Gets selected rows data as TSV (tab-separated values) for clipboard.
+	 * Extracts data from DOM since non-virtual tables don't have JS data array.
+	 * @returns {string|null} TSV string or null if no selection
+	 */
+	function getSelectedDataAsTsv() {
+		if (selectedRowIds.size === 0) {
+			return null;
+		}
+
+		const table = document.querySelector('.data-table, table');
+		if (!table) {
+			return null;
+		}
+
+		// Get headers from th elements (remove sort indicators)
+		const headers = Array.from(table.querySelectorAll('th'))
+			.map(th => th.textContent.replace(/\s*[▲▼]$/, '').trim());
+
+		// Get selected row data from DOM
+		const rows = Array.from(table.querySelectorAll('tbody tr.row-selected'))
+			.map(tr =>
+				Array.from(tr.querySelectorAll('td'))
+					.map(td => td.textContent.trim())
+					.join('\t')
+			);
+
+		return [headers.join('\t'), ...rows].join('\n');
+	}
+
+	// Expose API globally for KeyboardSelectionBehavior
+	window.DataTableBehavior = {
+		selectAllRows: selectAllRows,
+		clearSelection: clearSelection,
+		getSelectionCount: getSelectionCount,
+		getSelectedDataAsTsv: getSelectedDataAsTsv
+	};
 
 	// Initialize on DOM ready
 	if (document.readyState === 'loading') {

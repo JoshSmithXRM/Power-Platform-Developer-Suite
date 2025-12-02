@@ -68,28 +68,23 @@ describe('ListWebResourcesUseCase', () => {
 	}
 
 	describe('successful execution', () => {
-		it('should list web resources for a solution', async () => {
-			// Arrange
+		it('should list web resources for a solution using component filtering', async () => {
+			// Arrange - unified approach: always uses component IDs
+			const componentIds = ['wr-1', 'wr-2', 'wr-3'];
 			const webResources = [
 				createTestWebResource('wr-1', 'new_script1.js', 'Script 1'),
 				createTestWebResource('wr-2', 'new_script2.js', 'Script 2'),
 				createTestWebResource('wr-3', 'new_styles.css', 'Styles', WebResourceType.CSS)
 			];
 
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(componentIds);
 			mockWebResourceRepository.findAll.mockResolvedValue(webResources);
-			// Mock solution components - all web resources are in the solution
-			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1', 'wr-2', 'wr-3']);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
-			// Assert
+			// Assert - component lookup is always called (unified approach)
 			expect(result).toHaveLength(3);
-			expect(mockWebResourceRepository.findAll).toHaveBeenCalledWith(
-				testEnvironmentId,
-				undefined,
-				undefined
-			);
 			expect(mockSolutionComponentRepository.findComponentIdsBySolution).toHaveBeenCalledWith(
 				testEnvironmentId,
 				DEFAULT_SOLUTION_ID,
@@ -99,53 +94,55 @@ describe('ListWebResourcesUseCase', () => {
 			);
 		});
 
-		it('should handle empty web resources list', async () => {
+		it('should handle empty solution (no components)', async () => {
 			// Arrange
-			mockWebResourceRepository.findAll.mockResolvedValue([]);
 			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue([]);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID);
 
-			// Assert
+			// Assert - returns early, no need to call findAll
 			expect(result).toHaveLength(0);
+			expect(mockWebResourceRepository.findAll).not.toHaveBeenCalled();
 		});
 
-		it('should pass cancellation token to repository', async () => {
+		it('should pass cancellation token to solution component repository', async () => {
 			// Arrange
 			const cancellationToken = createCancellationToken(false);
-			mockWebResourceRepository.findAll.mockResolvedValue([]);
 			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue([]);
 
 			// Act
 			await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, cancellationToken);
 
 			// Assert
-			expect(mockWebResourceRepository.findAll).toHaveBeenCalledWith(
+			expect(mockSolutionComponentRepository.findComponentIdsBySolution).toHaveBeenCalledWith(
 				testEnvironmentId,
+				DEFAULT_SOLUTION_ID,
+				'webresource',
 				undefined,
 				cancellationToken
 			);
 		});
 	});
 
-	describe('successful execution - with solution filter', () => {
-		it('should filter web resources by solution', async () => {
+	describe('solution component filtering', () => {
+		it('should use OData filter for small solutions (<=100 IDs)', async () => {
 			// Arrange
-			const allWebResources = [
+			const solutionComponentIds = ['wr-1', 'wr-3'];
+			// For specific solutions, only matching web resources are returned via OData filter
+			const filteredWebResources = [
 				createTestWebResource('wr-1', 'new_script1.js', 'Script 1'),
-				createTestWebResource('wr-2', 'new_script2.js', 'Script 2'),
 				createTestWebResource('wr-3', 'new_script3.js', 'Script 3')
 			];
-			const solutionComponentIds = ['wr-1', 'wr-3'];
 
-			mockWebResourceRepository.findAll.mockResolvedValue(allWebResources);
 			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(solutionComponentIds);
+			// findAll is called with OData filter for small solutions (<=100 IDs)
+			mockWebResourceRepository.findAll.mockResolvedValue(filteredWebResources);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, testSolutionId);
 
-			// Assert
+			// Assert - only solution's web resources are returned
 			expect(result).toHaveLength(2);
 			expect(result.map(wr => wr.id)).toContain('wr-1');
 			expect(result.map(wr => wr.id)).toContain('wr-3');
@@ -157,22 +154,24 @@ describe('ListWebResourcesUseCase', () => {
 				undefined,
 				undefined
 			);
+			// Verify OData filter is passed to repository
+			expect(mockWebResourceRepository.findAll).toHaveBeenCalledWith(
+				testEnvironmentId,
+				{ filter: expect.stringContaining("webresourceid eq 'wr-1'") },
+				undefined
+			);
 		});
 
-		it('should handle solution with no matching web resources', async () => {
-			// Arrange
-			const allWebResources = [
-				createTestWebResource('wr-1', 'new_script1.js', 'Script 1')
-			];
-
-			mockWebResourceRepository.findAll.mockResolvedValue(allWebResources);
+		it('should return empty array when solution has no web resource components', async () => {
+			// Arrange - solution has no web resource components
 			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue([]);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, testSolutionId);
 
-			// Assert
+			// Assert - returns early, no need to call findAll
 			expect(result).toHaveLength(0);
+			expect(mockWebResourceRepository.findAll).not.toHaveBeenCalled();
 		});
 
 		it('should pass cancellation token to solution component repository', async () => {
@@ -193,6 +192,34 @@ describe('ListWebResourcesUseCase', () => {
 				cancellationToken
 			);
 		});
+
+		it('should fallback to client-side filtering for large solutions (>100 IDs)', async () => {
+			// Arrange - create 101 component IDs to trigger client-side fallback
+			const largeComponentIds = Array.from({ length: 101 }, (_, i) => `wr-${i}`);
+			const allWebResources = [
+				createTestWebResource('wr-0', 'new_script0.js', 'Script 0'),
+				createTestWebResource('wr-50', 'new_script50.js', 'Script 50'),
+				createTestWebResource('wr-999', 'new_other.js', 'Other Script') // Not in solution
+			];
+
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(largeComponentIds);
+			mockWebResourceRepository.findAll.mockResolvedValue(allWebResources);
+
+			// Act
+			const result = await useCase.execute(testEnvironmentId, testSolutionId);
+
+			// Assert - fetches ALL, then filters client-side
+			expect(result).toHaveLength(2); // Only wr-0 and wr-50 are in the component IDs
+			expect(result.map(wr => wr.id)).toContain('wr-0');
+			expect(result.map(wr => wr.id)).toContain('wr-50');
+			expect(result.map(wr => wr.id)).not.toContain('wr-999');
+			// For large solutions, findAll is called WITHOUT filter (client-side filtering)
+			expect(mockWebResourceRepository.findAll).toHaveBeenCalledWith(
+				testEnvironmentId,
+				undefined,
+				undefined
+			);
+		});
 	});
 
 	describe('cancellation handling', () => {
@@ -205,57 +232,64 @@ describe('ListWebResourcesUseCase', () => {
 				.rejects
 				.toThrow(OperationCancelledException);
 
+			// Neither repository should be called
+			expect(mockSolutionComponentRepository.findComponentIdsBySolution).not.toHaveBeenCalled();
 			expect(mockWebResourceRepository.findAll).not.toHaveBeenCalled();
 		});
 
-		it('should throw OperationCancelledException when cancelled after fetch', async () => {
+		it('should throw OperationCancelledException when cancelled after component fetch', async () => {
 			// Arrange
 			let callCount = 0;
 			const cancellationToken: ICancellationToken = {
 				get isCancellationRequested() {
 					callCount++;
+					// Cancel after first check (before component fetch) passes, second check (after) triggers cancel
 					return callCount > 1;
 				},
 				onCancellationRequested: jest.fn()
 			};
 
-			mockWebResourceRepository.findAll.mockResolvedValue([]);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1']);
 
 			// Act & Assert
 			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, cancellationToken))
 				.rejects
 				.toThrow(OperationCancelledException);
 
-			expect(mockWebResourceRepository.findAll).toHaveBeenCalled();
+			expect(mockSolutionComponentRepository.findComponentIdsBySolution).toHaveBeenCalled();
+			expect(mockWebResourceRepository.findAll).not.toHaveBeenCalled();
 		});
 
-		it('should throw OperationCancelledException when cancelled during solution filtering', async () => {
+		it('should throw OperationCancelledException when cancelled after web resource fetch', async () => {
 			// Arrange
 			let callCount = 0;
 			const cancellationToken: ICancellationToken = {
 				get isCancellationRequested() {
 					callCount++;
-					// Cancel after fetch but during filtering
+					// Cancel after two checks pass (before component, after component), third check (after fetch) triggers
 					return callCount > 2;
 				},
 				onCancellationRequested: jest.fn()
 			};
 
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1']);
 			mockWebResourceRepository.findAll.mockResolvedValue([
 				createTestWebResource('wr-1', 'new_script.js', 'Script')
 			]);
-			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1']);
 
 			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId, testSolutionId, cancellationToken))
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, cancellationToken))
 				.rejects
 				.toThrow(OperationCancelledException);
+
+			expect(mockSolutionComponentRepository.findComponentIdsBySolution).toHaveBeenCalled();
+			expect(mockWebResourceRepository.findAll).toHaveBeenCalled();
 		});
 
 		it('should complete successfully when cancellation token is not cancelled', async () => {
 			// Arrange
 			const cancellationToken = createCancellationToken(false);
-			mockWebResourceRepository.findAll.mockResolvedValue([]);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue([]);
 
 			// Act
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, cancellationToken);
@@ -266,9 +300,21 @@ describe('ListWebResourcesUseCase', () => {
 	});
 
 	describe('error handling', () => {
-		it('should propagate repository errors', async () => {
+		it('should propagate solution component repository errors', async () => {
+			// Arrange
+			const error = new Error('Solution component fetch failed');
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockRejectedValue(error);
+
+			// Act & Assert
+			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
+				.rejects
+				.toThrow('Solution component fetch failed');
+		});
+
+		it('should propagate web resource repository errors', async () => {
 			// Arrange
 			const error = new Error('Repository connection failed');
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockResolvedValue(['wr-1']);
 			mockWebResourceRepository.findAll.mockRejectedValue(error);
 
 			// Act & Assert
@@ -277,21 +323,9 @@ describe('ListWebResourcesUseCase', () => {
 				.toThrow('Repository connection failed');
 		});
 
-		it('should propagate solution component repository errors', async () => {
-			// Arrange
-			const error = new Error('Solution component fetch failed');
-			mockWebResourceRepository.findAll.mockResolvedValue([]);
-			mockSolutionComponentRepository.findComponentIdsBySolution.mockRejectedValue(error);
-
-			// Act & Assert
-			await expect(useCase.execute(testEnvironmentId, testSolutionId))
-				.rejects
-				.toThrow('Solution component fetch failed');
-		});
-
 		it('should normalize non-Error objects thrown', async () => {
 			// Arrange
-			mockWebResourceRepository.findAll.mockRejectedValue('String error');
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockRejectedValue('String error');
 
 			// Act & Assert
 			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
@@ -302,7 +336,7 @@ describe('ListWebResourcesUseCase', () => {
 		it('should handle authentication failures', async () => {
 			// Arrange
 			const authError = new Error('Authentication token expired');
-			mockWebResourceRepository.findAll.mockRejectedValue(authError);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockRejectedValue(authError);
 
 			// Act & Assert
 			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
@@ -313,7 +347,7 @@ describe('ListWebResourcesUseCase', () => {
 		it('should handle network timeout errors', async () => {
 			// Arrange
 			const timeoutError = new Error('Network timeout');
-			mockWebResourceRepository.findAll.mockRejectedValue(timeoutError);
+			mockSolutionComponentRepository.findComponentIdsBySolution.mockRejectedValue(timeoutError);
 
 			// Act & Assert
 			await expect(useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID))
@@ -477,7 +511,7 @@ describe('ListWebResourcesUseCase', () => {
 		});
 
 		it('should return entities with proper editability', async () => {
-			// Arrange
+			// Arrange - test editability based on type (not managed status)
 			const webResources = [
 				createTestWebResource('wr-1', 'new_script.js', 'Script', WebResourceType.JAVASCRIPT, false),
 				createTestWebResource('wr-2', 'new_managed.js', 'Managed', WebResourceType.JAVASCRIPT, true),
@@ -490,10 +524,10 @@ describe('ListWebResourcesUseCase', () => {
 			// Act - include all types to test PNG editability
 			const result = await useCase.execute(testEnvironmentId, DEFAULT_SOLUTION_ID, undefined, { textBasedOnly: false });
 
-			// Assert
-			expect(result.find(wr => wr.id === 'wr-1')?.canEdit()).toBe(true);
-			expect(result.find(wr => wr.id === 'wr-2')?.canEdit()).toBe(false);
-			expect(result.find(wr => wr.id === 'wr-3')?.canEdit()).toBe(false);
+			// Assert - text-based types are editable (including managed), binary types are not
+			expect(result.find(wr => wr.id === 'wr-1')?.canEdit()).toBe(true);  // JS - editable
+			expect(result.find(wr => wr.id === 'wr-2')?.canEdit()).toBe(true);  // JS managed - editable (hotfix support)
+			expect(result.find(wr => wr.id === 'wr-3')?.canEdit()).toBe(false); // PNG - not editable (binary)
 		});
 	});
 });

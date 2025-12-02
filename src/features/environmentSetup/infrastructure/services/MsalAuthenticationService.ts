@@ -1,14 +1,17 @@
 import * as http from 'http';
 
+import type * as vscode from 'vscode';
 import * as msal from '@azure/msal-node';
 
+import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import { ErrorSanitizer } from '../../../../shared/utils/ErrorSanitizer';
 import { Environment } from '../../domain/entities/Environment';
 import { IAuthenticationService } from '../../domain/interfaces/IAuthenticationService';
 import { ICancellationToken, IDisposable } from '../../domain/interfaces/ICancellationToken';
 import { AuthenticationMethodType } from '../../domain/valueObjects/AuthenticationMethod';
 import { EnvironmentId } from '../../domain/valueObjects/EnvironmentId';
-import { ILogger } from '../../../../infrastructure/logging/ILogger';
-import { ErrorSanitizer } from '../../../../shared/utils/ErrorSanitizer';
+
+import { VsCodeSecretStorageCachePlugin } from './VsCodeSecretStorageCachePlugin';
 
 /**
  * Authentication service using MSAL (Microsoft Authentication Library)
@@ -28,8 +31,21 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	private static readonly INTERACTIVE_AUTH_TIMEOUT_MS = 90000;
 
 	private clientAppCache: Map<string, msal.PublicClientApplication> = new Map();
+	private cachePluginCache: Map<string, VsCodeSecretStorageCachePlugin> = new Map();
+	private readonly secretStorage: vscode.SecretStorage | undefined;
 
-	constructor(private readonly logger: ILogger) {}
+	constructor(
+		private readonly logger: ILogger,
+		secretStorage?: vscode.SecretStorage
+	) {
+		this.secretStorage = secretStorage;
+
+		if (secretStorage) {
+			this.logger.debug('Token cache persistence enabled via SecretStorage');
+		} else {
+			this.logger.debug('Token cache persistence disabled (in-memory only)');
+		}
+	}
 
 	/**
 	 * Get MSAL authority URL based on tenant ID and auth method.
@@ -62,6 +78,14 @@ export class MsalAuthenticationService implements IAuthenticationService {
 					authority: this.getAuthority(environment)
 				}
 			};
+
+			// Add cache plugin only if SecretStorage is available
+			if (this.secretStorage) {
+				clientConfig.cache = {
+					cachePlugin: this.getOrCreateCachePlugin(cacheKey)
+				};
+			}
+
 			this.clientAppCache.set(cacheKey, new msal.PublicClientApplication(clientConfig));
 		}
 
@@ -71,6 +95,29 @@ export class MsalAuthenticationService implements IAuthenticationService {
 		}
 
 		return clientApp;
+	}
+
+	/**
+	 * Gets or creates a cache plugin for the specified environment.
+	 * Cache plugins are reused to maintain consistent state.
+	 */
+	private getOrCreateCachePlugin(environmentId: string): VsCodeSecretStorageCachePlugin {
+		if (!this.cachePluginCache.has(environmentId)) {
+			if (!this.secretStorage) {
+				throw new Error('SecretStorage not available for cache plugin');
+			}
+			this.cachePluginCache.set(
+				environmentId,
+				new VsCodeSecretStorageCachePlugin(this.secretStorage, environmentId, this.logger)
+			);
+		}
+
+		const plugin = this.cachePluginCache.get(environmentId);
+		if (!plugin) {
+			throw new Error(`Failed to retrieve cache plugin for environment ${environmentId}`);
+		}
+
+		return plugin;
 	}
 
 	/**
@@ -618,6 +665,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	/**
 	 * Clears authentication cache for a specific environment.
 	 * Forces fresh authentication on next token acquisition.
+	 * Clears both in-memory cache and persisted SecretStorage cache.
 	 * @param environmentId - ID of environment to clear cache for
 	 */
 	public clearCacheForEnvironment(environmentId: EnvironmentId): void {
@@ -647,11 +695,19 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				environmentId: cacheKey
 			});
 		}
+
+		// Clear persisted cache from SecretStorage
+		const cachePlugin = this.cachePluginCache.get(cacheKey);
+		if (cachePlugin) {
+			void cachePlugin.clearCache();
+			this.cachePluginCache.delete(cacheKey);
+		}
 	}
 
 	/**
 	 * Clears all authentication caches for all environments.
 	 * Forces fresh authentication for all environments on next token acquisition.
+	 * Clears both in-memory caches and persisted SecretStorage caches.
 	 */
 	public clearAllCache(): void {
 		this.logger.info('Clearing all authentication caches', {
@@ -668,7 +724,13 @@ export class MsalAuthenticationService implements IAuthenticationService {
 			});
 		});
 
+		// Clear all persisted caches from SecretStorage
+		this.cachePluginCache.forEach((cachePlugin) => {
+			void cachePlugin.clearCache();
+		});
+
 		this.clientAppCache.clear();
+		this.cachePluginCache.clear();
 		this.logger.debug('All authentication caches cleared');
 	}
 }

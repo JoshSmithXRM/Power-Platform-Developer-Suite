@@ -48,8 +48,8 @@ export class CoreServicesContainer {
 		// Create event publisher (depends on logger)
 		this.eventPublisher = new VsCodeEventPublisher(this.logger);
 
-		// Create authentication service (depends on logger)
-		this.authService = new MsalAuthenticationService(this.logger);
+		// Create authentication service (depends on logger, secretStorage for token caching)
+		this.authService = new MsalAuthenticationService(this.logger, context.secrets);
 
 		// Create WhoAmI service (depends on auth, logger)
 		this.whoAmIService = new WhoAmIService(this.authService, this.logger);

@@ -10,7 +10,9 @@ This command ensures all release artifacts are properly created before merging t
 - Version bump in package.json
 - CHANGELOG.md updated with release date
 - Release notes file created in docs/releases/
+- Work tracking documents cleaned up
 - All tests pass
+- Coverage thresholds met
 - Compilation succeeds
 
 ---
@@ -54,6 +56,17 @@ Run these checks and STOP if any fail:
    ```
    If fails: Report error, STOP
 
+4. **Run tests with coverage:**
+   ```bash
+   npm test -- --coverage
+   ```
+   If coverage thresholds not met: Report which thresholds failed, STOP
+
+   Current thresholds (from jest.config.js):
+   - Global: 85% statements, 85% lines, 85% functions, 80% branches
+   - Domain: 95% statements/lines/functions, 90% branches
+   - Application: 90% statements/lines/functions, 85% branches
+
 ---
 
 ## STEP 3: VERIFY CHANGELOG
@@ -83,7 +96,20 @@ Read `package.json` and check version field:
 
 ---
 
-## STEP 5: CREATE RELEASE NOTES
+## STEP 5: VERIFY README VERSION BADGE
+
+Check `README.md` for version badge:
+
+1. **Verify badge is dynamic:** Should use `github/package-json/v/JoshSmithXRM/Power-Platform-Developer-Suite`
+2. **If static badge found:** Convert to dynamic format:
+   ```markdown
+   ![version](https://img.shields.io/github/package-json/v/JoshSmithXRM/Power-Platform-Developer-Suite)
+   ```
+3. **Dynamic badge auto-updates** from package.json on each push - no manual update needed
+
+---
+
+## STEP 6: CREATE RELEASE NOTES
 
 Check if `docs/releases/vX.Y.Z.md` exists:
 
@@ -121,9 +147,23 @@ Extract the changes from CHANGELOG.md for this version and populate the template
 
 ---
 
-## STEP 6: COMMIT CHANGES
+## STEP 7: CLEAN UP WORK TRACKING DOCUMENTS
 
-If any files were modified (package.json, CHANGELOG.md, release notes):
+Check for work tracking documents in `docs/work/`:
+
+1. **List files:** `ls docs/work/*.md` (excluding README.md)
+2. **If tracking docs exist for this branch/feature:**
+   - Delete them with `git rm docs/work/[FEATURE]_TODO.md`
+   - These are preserved in git history and no longer needed after release
+3. **If no tracking docs:** Continue to next step
+
+**Note:** Work tracking documents follow the pattern `docs/work/[FEATURE]_TODO.md` as defined in CLAUDE.md.
+
+---
+
+## STEP 8: COMMIT CHANGES
+
+If any files were modified (package.json, CHANGELOG.md, README.md, release notes):
 
 1. Show user what changed
 2. Ask: "Commit these release preparation changes?"
@@ -133,12 +173,14 @@ If any files were modified (package.json, CHANGELOG.md, release notes):
 
    - Update version in package.json
    - Update CHANGELOG.md date
+   - Update README.md version badge
    - Add release notes
+   - Remove work tracking docs (if any)
    ```
 
 ---
 
-## STEP 7: SUMMARY
+## STEP 9: SUMMARY
 
 Show completion summary:
 
@@ -149,6 +191,7 @@ Files updated:
 - package.json (version: X.Y.Z)
 - CHANGELOG.md (date updated)
 - docs/releases/vX.Y.Z.md (created)
+- docs/work/[FEATURE]_TODO.md (removed, if existed)
 
 Next steps:
 1. Push changes: git push
