@@ -10,10 +10,10 @@ import { normalizeError } from '../../../../shared/utils/ErrorUtils';
  * This applies to binary resource types (PNG, JPG, GIF, ICO, XAP).
  * Note: Managed text-based resources ARE editable (supports hotfix scenarios).
  */
-export class ManagedWebResourceError extends Error {
+export class NonEditableWebResourceError extends Error {
 	constructor(webResourceId: string) {
 		super(`Cannot edit web resource (binary type not supported): ${webResourceId}`);
-		this.name = 'ManagedWebResourceError';
+		this.name = 'NonEditableWebResourceError';
 	}
 }
 
@@ -34,7 +34,7 @@ export class UpdateWebResourceUseCase {
 	 * @param webResourceId - Web resource GUID
 	 * @param content - New content as bytes
 	 * @param cancellationToken - Optional token to cancel the operation
-	 * @throws ManagedWebResourceError if web resource is managed
+	 * @throws NonEditableWebResourceError if web resource is a non-editable binary type
 	 * @throws Error if web resource not found
 	 */
 	async execute(
@@ -78,7 +78,7 @@ export class UpdateWebResourceUseCase {
 		}
 
 		if (!webResource.canEdit()) {
-			throw new ManagedWebResourceError(webResourceId);
+			throw new NonEditableWebResourceError(webResourceId);
 		}
 
 		return webResource;

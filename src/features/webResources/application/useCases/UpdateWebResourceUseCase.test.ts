@@ -1,4 +1,4 @@
-import { UpdateWebResourceUseCase, ManagedWebResourceError } from './UpdateWebResourceUseCase';
+import { UpdateWebResourceUseCase, NonEditableWebResourceError } from './UpdateWebResourceUseCase';
 import { IWebResourceRepository } from '../../domain/interfaces/IWebResourceRepository';
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
 import { WebResource } from '../../domain/entities/WebResource';
@@ -184,7 +184,7 @@ describe('UpdateWebResourceUseCase', () => {
 			expect(mockWebResourceRepository.updateContent).toHaveBeenCalled();
 		});
 
-		it('should throw ManagedWebResourceError for non-text-based web resource (image)', async () => {
+		it('should throw NonEditableWebResourceError for non-text-based web resource (image)', async () => {
 			// Arrange - PNG is not text-based, so canEdit() returns false
 			const imageWebResource = createTestWebResource(
 				testWebResourceId,
@@ -198,12 +198,12 @@ describe('UpdateWebResourceUseCase', () => {
 			// Act & Assert
 			await expect(useCase.execute(testEnvironmentId, testWebResourceId, testContent))
 				.rejects
-				.toThrow(ManagedWebResourceError);
+				.toThrow(NonEditableWebResourceError);
 
 			expect(mockWebResourceRepository.updateContent).not.toHaveBeenCalled();
 		});
 
-		it('should throw ManagedWebResourceError for managed binary web resource', async () => {
+		it('should throw NonEditableWebResourceError for managed binary web resource', async () => {
 			// Arrange - Managed binary resources also can't be edited
 			const managedImageWebResource = createTestWebResource(
 				testWebResourceId,
@@ -217,7 +217,7 @@ describe('UpdateWebResourceUseCase', () => {
 			// Act & Assert
 			await expect(useCase.execute(testEnvironmentId, testWebResourceId, testContent))
 				.rejects
-				.toThrow(ManagedWebResourceError);
+				.toThrow(NonEditableWebResourceError);
 
 			expect(mockWebResourceRepository.updateContent).not.toHaveBeenCalled();
 		});
@@ -387,7 +387,7 @@ describe('UpdateWebResourceUseCase', () => {
 				// Act & Assert
 				await expect(useCase.execute(testEnvironmentId, testWebResourceId, testContent))
 					.rejects
-					.toThrow(ManagedWebResourceError);
+					.toThrow(NonEditableWebResourceError);
 
 				expect(mockWebResourceRepository.updateContent).not.toHaveBeenCalled();
 			});
@@ -395,14 +395,14 @@ describe('UpdateWebResourceUseCase', () => {
 	});
 });
 
-describe('ManagedWebResourceError', () => {
+describe('NonEditableWebResourceError', () => {
 	it('should have correct name', () => {
-		const error = new ManagedWebResourceError('test-id');
-		expect(error.name).toBe('ManagedWebResourceError');
+		const error = new NonEditableWebResourceError('test-id');
+		expect(error.name).toBe('NonEditableWebResourceError');
 	});
 
 	it('should include web resource ID in message', () => {
-		const error = new ManagedWebResourceError('test-id');
+		const error = new NonEditableWebResourceError('test-id');
 		expect(error.message).toBe('Cannot edit web resource (binary type not supported): test-id');
 	});
 });

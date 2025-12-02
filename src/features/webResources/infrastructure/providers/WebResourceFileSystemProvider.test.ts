@@ -7,7 +7,7 @@ import {
 } from './WebResourceFileSystemProvider';
 import type { GetWebResourceContentUseCase, WebResourceContentResult } from '../../application/useCases/GetWebResourceContentUseCase';
 import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
-import { ManagedWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
+import { NonEditableWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
 
 // Mock vscode module
@@ -393,14 +393,14 @@ describe('WebResourceFileSystemProvider with write support', () => {
 			expect(result).toEqual(newContent);
 		});
 
-		it('should throw NoPermissions for managed web resource', async () => {
+		it('should throw NoPermissions for non-editable binary web resource', async () => {
 			// Arrange
 			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
 			const content = new Uint8Array([72, 101, 108, 108, 111]);
-			mockUpdateUseCase.execute.mockRejectedValue(new ManagedWebResourceError(testWebResourceId));
+			mockUpdateUseCase.execute.mockRejectedValue(new NonEditableWebResourceError(testWebResourceId));
 
 			// Act & Assert
-			await expect(provider.writeFile(uri, content)).rejects.toThrow('Cannot edit managed web resource');
+			await expect(provider.writeFile(uri, content)).rejects.toThrow('Cannot edit binary web resource');
 		});
 
 		it('should throw Unavailable for other errors', async () => {

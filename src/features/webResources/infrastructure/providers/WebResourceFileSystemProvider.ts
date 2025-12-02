@@ -4,7 +4,7 @@ import type { GetWebResourceContentUseCase } from '../../application/useCases/Ge
 import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
 import type { PublishWebResourceUseCase } from '../../application/useCases/PublishWebResourceUseCase';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
-import { ManagedWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
+import { NonEditableWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
 import { PublishCoordinator } from '../../../../shared/infrastructure/coordination/PublishCoordinator';
 import {
 	isPublishInProgressError,
@@ -240,8 +240,8 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			// Show notification with Publish action (async - don't await)
 			this.showPublishNotification(parsed.environmentId, parsed.webResourceId, parsed.filename);
 		} catch (error) {
-			if (error instanceof ManagedWebResourceError) {
-				throw vscode.FileSystemError.NoPermissions('Cannot edit managed web resource');
+			if (error instanceof NonEditableWebResourceError) {
+				throw vscode.FileSystemError.NoPermissions('Cannot edit binary web resource');
 			}
 			this.logger.error('Failed to save web resource', error);
 			throw vscode.FileSystemError.Unavailable(uri);
