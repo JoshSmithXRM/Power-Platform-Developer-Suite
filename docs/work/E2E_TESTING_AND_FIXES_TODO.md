@@ -966,9 +966,61 @@ Note: `DataTableSectionView.ts` (non-virtual) already had zones - only virtual t
 
 ---
 
+## Session 8 - Code Cleanup (2025-12-01)
+
+### Logging Standards Compliance ✅ COMPLETE
+
+Performed comprehensive code cleanup following `LOGGING_GUIDE.md` and `CODE_QUALITY_GUIDE.md`.
+
+**Violations Fixed:**
+
+#### 1. String Interpolation in Logger Calls (2 fixes)
+Changed from template literals to structured args:
+- `UpdateWebResourceUseCase.ts:89` - `cancelled ${context}` → `{ context }`
+- `PublishWebResourceUseCase.ts:119` - `cancelled ${context}` → `{ context }`
+
+#### 2. Logging Level Corrections (25 fixes)
+Changed `logger.info` → `logger.debug` in presentation layer per guide:
+> Presentation layer: User actions at **debug** level
+
+| File | Changes |
+|------|---------|
+| EnvironmentBehavior.ts | 1 |
+| WebResourcesPanelComposed.ts | 2 |
+| ImportJobViewerPanelComposed.ts | 2 |
+| EnvironmentVariablesPanelComposed.ts | 2 |
+| DataExplorerPanelComposed.ts | 5 |
+| PluginTraceViewerPanelComposed.ts | 1 |
+| PluginTraceExportBehavior.ts | 1 |
+| PluginTraceDeleteBehavior.ts | 3 |
+| PluginTraceDetailPanelBehavior.ts | 1 |
+| PluginTraceAutoRefreshBehavior.ts | 1 |
+| ConnectionReferencesPanelComposed.ts | 6 |
+
+#### 3. Test Updates (2 fixes)
+Updated tests to expect `debug` instead of `info`:
+- `EnvironmentBehavior.test.ts`
+- `PluginTraceExportBehavior.test.ts`
+
+**Clean Areas (No Violations Found):**
+- ✓ Domain layer: Zero logging
+- ✓ console.log in production code: None (only in tests, allowed)
+- ✓ Silent catch blocks: None
+- ✓ Message capitalization: All correct
+- ✓ Trailing periods: None
+- ✓ TODOs without context: None
+- ✓ Commented-out code: None
+- ✓ JSDoc on public APIs: Good coverage
+
+**Verification:**
+- All 7006 tests pass
+- `npm run compile` passes
+
+---
+
 ## Remaining Topics
 
 | # | Topic | Status | Notes |
 |---|-------|--------|-------|
-| 6 | Code Cleanup | ⏳ Pending | Comments/logging review |
-| 7 | Code Review | ⏳ Pending | After cleanup complete |
+| 6 | Code Cleanup | ✅ Complete | Logging standards applied |
+| 7 | Code Review | ⏳ Pending | Ready for review |

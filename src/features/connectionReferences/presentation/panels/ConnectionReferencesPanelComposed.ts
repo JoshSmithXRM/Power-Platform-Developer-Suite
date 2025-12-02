@@ -468,7 +468,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			return [];
 		}
 
-		this.logger.info('Loading connection references', {
+		this.logger.debug('Loading connection references', {
 			environmentId: this.currentEnvironmentId,
 			solutionId: this.currentSolutionId
 		});
@@ -495,7 +495,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			const viewModels = this.viewModelMapper.toViewModels(sortedRelationships);
 			const enhancedViewModels = enhanceViewModelsWithFlowLinks(viewModels);
 
-			this.logger.info('Connection references loaded successfully', { count: result.relationships.length });
+			this.logger.debug('Connection references loaded successfully', { count: result.relationships.length });
 
 			return enhancedViewModels;
 		} catch (error) {
@@ -603,7 +603,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 
 		const url = this.urlBuilder.buildFlowUrl(environment.powerPlatformEnvironmentId, this.currentSolutionId, flowId);
 		await vscodeImpl.env.openExternal(vscodeImpl.Uri.parse(url));
-		this.logger.info('Opened flow in Maker Portal', { flowId, solutionId: this.currentSolutionId });
+		this.logger.debug('Opened flow in Maker Portal', { flowId, solutionId: this.currentSolutionId });
 	}
 
 	private async handleOpenMaker(): Promise<void> {
@@ -624,7 +624,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			this.currentSolutionId
 		);
 		await vscodeImpl.env.openExternal(vscodeImpl.Uri.parse(url));
-		this.logger.info('Opened connection references in Maker Portal', { environmentId: this.currentEnvironmentId, solutionId: this.currentSolutionId });
+		this.logger.debug('Opened connection references in Maker Portal', { environmentId: this.currentEnvironmentId, solutionId: this.currentSolutionId });
 	}
 
 	private async handleSyncDeploymentSettings(): Promise<void> {
@@ -643,7 +643,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			? `${currentSolution.uniqueName}.deploymentsettings.json`
 			: 'deploymentsettings.json';
 
-		this.logger.info('Syncing deployment settings', {
+		this.logger.debug('Syncing deployment settings', {
 			count: this.connectionReferences.length,
 			filename
 		});
@@ -656,7 +656,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 
 			if (result) {
 				const message = `Synced deployment settings: ${result.added} added, ${result.removed} removed, ${result.preserved} preserved`;
-				this.logger.info(message);
+				this.logger.debug(message);
 				vscodeImpl.window.showInformationMessage(message);
 			}
 		} catch (error) {

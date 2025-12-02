@@ -762,7 +762,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 				}
 			}
 
-			this.logger.info('Setting trace level', { level: level.value });
+			this.logger.debug('Setting trace level', { level: level.value });
 
 			await this.setTraceLevelUseCase.execute(this.currentEnvironmentId, level);
 			this.currentTraceLevel = level;

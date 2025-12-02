@@ -498,7 +498,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 				? `${currentSolution.uniqueName}.deploymentsettings.json`
 				: 'deploymentsettings.json';
 
-			this.logger.info('Syncing deployment settings', {
+			this.logger.debug('Syncing deployment settings', {
 				count: environmentVariables.length,
 				filename
 			});
@@ -510,7 +510,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 
 			if (result) {
 				const message = `Synced deployment settings: ${result.added} added, ${result.removed} removed, ${result.preserved} preserved`;
-				this.logger.info(message);
+				this.logger.debug(message);
 				vscode.window.showInformationMessage(message);
 			}
 		} catch (error) {

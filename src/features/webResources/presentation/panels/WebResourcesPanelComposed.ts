@@ -934,7 +934,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		const webResourceId = this.selectedWebResourceId;
 		const displayName = this.selectedWebResourceName ?? webResourceId;
 
-		this.logger.info('Publishing web resource', {
+		this.logger.debug('Publishing web resource', {
 			webResourceId,
 			name: this.selectedWebResourceName
 		});
@@ -963,7 +963,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			return;
 		}
 
-		this.logger.info('Publishing all customizations via PublishAllXml');
+		this.logger.debug('Publishing all customizations via PublishAllXml');
 
 		await this.publishBehavior.executePublish(
 			'publishAll',

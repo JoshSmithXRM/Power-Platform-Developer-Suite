@@ -385,14 +385,14 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 
 	private async handleViewImportLog(importJobId: string): Promise<void> {
 		try {
-			this.logger.info('Opening import log', { importJobId });
+			this.logger.debug('Opening import log', { importJobId });
 
 			const cancellationTokenSource = new vscode.CancellationTokenSource();
 			const cancellationToken = new VsCodeCancellationTokenAdapter(cancellationTokenSource.token);
 
 			await this.openImportLogUseCase.execute(this.currentEnvironmentId, importJobId, cancellationToken);
 
-			this.logger.info('Import log opened successfully', { importJobId });
+			this.logger.debug('Import log opened successfully', { importJobId });
 		} catch (error) {
 			this.logger.error('Failed to open import log', error);
 			vscode.window.showErrorMessage(`Failed to open import log: ${error instanceof Error ? error.message : String(error)}`);

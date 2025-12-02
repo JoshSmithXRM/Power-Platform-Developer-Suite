@@ -76,7 +76,7 @@ export class EnvironmentBehavior implements IEnvironmentBehavior {
 			return;
 		}
 
-		this.logger.info('Switching environment', {
+		this.logger.debug('Switching environment', {
 			from: this.currentEnvironmentId,
 			to: environmentId
 		});

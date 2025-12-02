@@ -534,7 +534,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Update stored SQL
 		this.currentSqlQuery = trimmedSql;
 
-		this.logger.info('Executing SQL query', {
+		this.logger.debug('Executing SQL query', {
 			environmentId: this.currentEnvironmentId,
 			sqlLength: trimmedSql.length,
 			queryId,
@@ -567,7 +567,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Map to ViewModel
 			const viewModel = this.resultMapper.toViewModel(result);
 
-			this.logger.info('SQL query executed successfully', {
+			this.logger.debug('SQL query executed successfully', {
 				rowCount: result.getRowCount(),
 				executionTimeMs: result.executionTimeMs,
 				queryId,
@@ -830,7 +830,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Update stored FetchXML
 		this.currentFetchXml = trimmedFetchXml;
 
-		this.logger.info('Executing FetchXML query', {
+		this.logger.debug('Executing FetchXML query', {
 			environmentId: this.currentEnvironmentId,
 			fetchXmlLength: trimmedFetchXml.length,
 			queryId,
@@ -865,7 +865,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Map to ViewModel
 			const viewModel = this.resultMapper.toViewModel(result);
 
-			this.logger.info('FetchXML query executed successfully', {
+			this.logger.debug('FetchXML query executed successfully', {
 				rowCount: result.getRowCount(),
 				executionTimeMs: result.executionTimeMs,
 				queryId,
@@ -1040,7 +1040,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			return;
 		}
 
-		this.logger.info('Exporting query results to CSV', { rowCount });
+		this.logger.debug('Exporting query results to CSV', { rowCount });
 		this.setButtonLoading('exportCsv', true);
 
 		try {

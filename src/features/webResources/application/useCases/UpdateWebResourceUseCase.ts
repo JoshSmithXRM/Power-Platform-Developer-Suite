@@ -86,7 +86,7 @@ export class UpdateWebResourceUseCase {
 
 	private throwIfCancelled(cancellationToken: ICancellationToken | undefined, context: string): void {
 		if (cancellationToken?.isCancellationRequested) {
-			this.logger.info(`UpdateWebResourceUseCase cancelled ${context}`);
+			this.logger.info('UpdateWebResourceUseCase cancelled', { context });
 			throw new OperationCancelledException();
 		}
 	}
