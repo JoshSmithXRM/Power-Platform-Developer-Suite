@@ -6,6 +6,7 @@
 export interface EnvironmentOption {
 	readonly id: string;
 	readonly name: string;
+	readonly isDefault?: boolean;
 }
 
 export interface EnvironmentSelectorConfig {

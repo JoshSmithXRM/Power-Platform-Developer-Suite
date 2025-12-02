@@ -1,5 +1,6 @@
 import { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
 import { normalizeError } from '../../../../shared/utils/ErrorUtils';
 import { IEntityMetadataRepository } from '../../domain/repositories/IEntityMetadataRepository';
 import { EntityMetadata } from '../../domain/entities/EntityMetadata';
@@ -38,23 +39,28 @@ interface CacheEntry<T> {
 /**
  * Infrastructure implementation of IEntityMetadataRepository using Dataverse Metadata Web API.
  * Fetches entity metadata from Dataverse and maps DTOs to domain entities.
- * Implements 5-minute in-memory caching for entity metadata to improve performance.
+ * Implements in-memory caching for entity metadata to improve performance.
  */
 export class DataverseEntityMetadataRepository implements IEntityMetadataRepository {
-    /**
-     * Cache duration in milliseconds (5 minutes).
-     * Balances performance improvement with data freshness for metadata that rarely changes.
-     */
-    private static readonly CACHE_DURATION_MS = 5 * 60 * 1000;
+    /** Default cache duration in seconds (configurable via metadata.cacheDuration) */
+    private static readonly DEFAULT_CACHE_DURATION_SECONDS = 300; // 5 minutes
 
     private readonly entityCache = new Map<string, CacheEntry<EntityMetadata>>();
+
+    /** Configured cache duration in milliseconds */
+    private readonly cacheDurationMs: number;
 
     constructor(
         private readonly apiService: IDataverseApiService,
         private readonly entityMapper: EntityMetadataMapper,
         private readonly optionSetMapper: OptionSetMetadataMapper,
-        private readonly logger: ILogger
-    ) {}
+        private readonly logger: ILogger,
+        configService?: IConfigurationService
+    ) {
+        const cacheDurationSeconds = configService?.get('metadata.cacheDuration', DataverseEntityMetadataRepository.DEFAULT_CACHE_DURATION_SECONDS)
+            ?? DataverseEntityMetadataRepository.DEFAULT_CACHE_DURATION_SECONDS;
+        this.cacheDurationMs = cacheDurationSeconds * 1000;
+    }
 
     /**
      * Retrieves all entity metadata from Dataverse (without attributes/relationships).
@@ -95,7 +101,7 @@ export class DataverseEntityMetadataRepository implements IEntityMetadataReposit
      * Checks if a cache entry is still valid based on timestamp.
      */
     private isCacheValid(timestamp: number): boolean {
-        return Date.now() - timestamp < DataverseEntityMetadataRepository.CACHE_DURATION_MS;
+        return Date.now() - timestamp < this.cacheDurationMs;
     }
 
     /**

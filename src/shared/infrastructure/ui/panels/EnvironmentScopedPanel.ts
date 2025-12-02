@@ -140,8 +140,12 @@ export interface CreatePanelConfig<TPanel extends EnvironmentScopedPanel<TPanel>
 export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPanel<TPanel>> {
 	/**
 	 * Creates or shows a panel for the specified environment.
-	 * If a panel already exists for the target environment, it is revealed.
-	 * Otherwise, a new panel is created and registered.
+	 *
+	 * Behavior depends on how environment is specified:
+	 * - **Explicit environment (via Pick Environment)**: Always creates a new panel.
+	 *   User made a deliberate choice, so they likely want a new panel even if one exists.
+	 * - **No environment specified (click tool)**: Reveals existing panel for default
+	 *   environment if one exists, otherwise creates new panel.
 	 *
 	 * @param config - Configuration for panel creation
 	 * @param panelsMap - The static Map<string, TPanel> from the concrete panel class
@@ -152,6 +156,7 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 		panelsMap: Map<string, TPanel>
 	): Promise<TPanel> {
 		const column = vscode.ViewColumn.One;
+		const explicitEnvironmentRequested = config.initialEnvironmentId !== undefined;
 
 		// Determine which environment to use
 		const targetEnvironmentId = await this.resolveTargetEnvironment(
@@ -163,9 +168,10 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 			throw new Error('No environments available');
 		}
 
-		// Check if panel already exists for this environment
+		// Only reveal existing panel if user didn't explicitly request an environment
+		// When user picks environment explicitly, they want a new panel
 		const existingPanel = panelsMap.get(targetEnvironmentId);
-		if (existingPanel) {
+		if (!explicitEnvironmentRequested && existingPanel) {
 			existingPanel.reveal(column);
 			return existingPanel;
 		}
@@ -186,8 +192,13 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 		// Create concrete panel instance using factory
 		const newPanel = config.panelFactory(panel, targetEnvironmentId);
 
-		// Register panel in map
-		panelsMap.set(targetEnvironmentId, newPanel);
+		// Only register in map if no existing panel for this environment
+		// When user explicitly requests a duplicate, the new panel is "unmanaged"
+		// but still functional - this allows multiple panels per environment
+		const shouldRegister = !existingPanel;
+		if (shouldRegister) {
+			panelsMap.set(targetEnvironmentId, newPanel);
+		}
 
 		// Register disposal handler
 		const onDisposeCallback = config.onDispose ? (): void => {
@@ -195,14 +206,16 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 				config.onDispose(newPanel);
 			}
 		} : undefined;
-		this.registerDisposal(panel, targetEnvironmentId, panelsMap, onDisposeCallback);
+		this.registerDisposal(panel, targetEnvironmentId, panelsMap, onDisposeCallback, shouldRegister);
 
 		return newPanel;
 	}
 
 	/**
 	 * Resolves the target environment ID.
-	 * Uses initialEnvironmentId if provided, otherwise falls back to first available environment.
+	 * Uses initialEnvironmentId if provided, otherwise falls back to:
+	 * 1. The default environment (marked by user)
+	 * 2. First available environment (if no default set)
 	 */
 	private static async resolveTargetEnvironment(
 		initialEnvironmentId: string | undefined,
@@ -213,7 +226,8 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 		}
 
 		const environments = await getEnvironments();
-		return environments[0]?.id;
+		const defaultEnv = environments.find(env => env.isDefault);
+		return defaultEnv?.id ?? environments[0]?.id;
 	}
 
 	/**
@@ -233,17 +247,21 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 
 	/**
 	 * Registers disposal handler for the panel.
-	 * Removes panel from map when disposed.
+	 * Removes panel from map when disposed (if it was registered).
 	 */
 	private static registerDisposal<TPanel>(
 		panel: vscode.WebviewPanel,
 		environmentId: string,
 		panelsMap: Map<string, TPanel>,
-		onDispose?: () => void
+		onDispose?: () => void,
+		wasRegistered: boolean = true
 	): void {
 		const envId = environmentId; // Capture for closure
 		panel.onDidDispose(() => {
-			panelsMap.delete(envId);
+			// Only remove from map if this panel was registered
+			if (wasRegistered) {
+				panelsMap.delete(envId);
+			}
 			if (onDispose) {
 				onDispose();
 			}

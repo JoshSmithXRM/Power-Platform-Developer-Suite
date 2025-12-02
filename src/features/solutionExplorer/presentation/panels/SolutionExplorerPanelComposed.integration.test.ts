@@ -89,8 +89,8 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 		mockExtensionUri = { fsPath: '/test/extension', path: '/test/extension' } as Uri;
 
 		mockEnvironments = [
-			{ id: 'env1', name: 'Environment 1', url: 'https://env1.crm.dynamics.com' },
-			{ id: 'env2', name: 'Environment 2', url: 'https://env2.crm.dynamics.com' }
+			{ id: 'env1', name: 'Environment 1', url: 'https://env1.crm.dynamics.com', isDefault: true },
+			{ id: 'env2', name: 'Environment 2', url: 'https://env2.crm.dynamics.com', isDefault: false }
 		];
 
 		mockGetEnvironments = jest.fn().mockResolvedValue(mockEnvironments);
@@ -311,10 +311,33 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 			await new Promise(resolve => setImmediate(resolve));
 		});
 
-		it('should return same panel instance for same environment (singleton pattern)', async () => {
-			const panel1 = await createPanelAndWait();
-			const panel2 = await createPanelAndWait();
+		it('should return same panel instance when no explicit environment requested (implicit singleton)', async () => {
+			// Test implicit behavior (clicking a tool without picking environment)
+			const panel1 = await SolutionExplorerPanelComposed.createOrShow(
+				mockExtensionUri,
+				mockGetEnvironments,
+				mockGetEnvironmentById,
+				mockSolutionRepository,
+				mockUrlBuilder,
+				mockViewModelMapper,
+				mockLogger,
+				undefined // No explicit environment - uses default
+			);
+			await new Promise(resolve => setImmediate(resolve));
 
+			const panel2 = await SolutionExplorerPanelComposed.createOrShow(
+				mockExtensionUri,
+				mockGetEnvironments,
+				mockGetEnvironmentById,
+				mockSolutionRepository,
+				mockUrlBuilder,
+				mockViewModelMapper,
+				mockLogger,
+				undefined // No explicit environment - should reveal existing
+			);
+			await new Promise(resolve => setImmediate(resolve));
+
+			// Should return same panel instance - singleton behavior for implicit requests
 			expect(panel1).toBe(panel2);
 			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
 		});
@@ -555,13 +578,14 @@ describe('SolutionExplorerPanelComposed Integration Tests', () => {
 			expect(mockPanel.webview.postMessage).toHaveBeenCalled();
 		});
 
-		it('should handle sequential panel creation for same environment', async () => {
+		it('should create new panel for explicit environment request (even if one exists)', async () => {
+			// createPanelAndWait uses TEST_ENVIRONMENT_ID which is an explicit request
 			const panel1 = await createPanelAndWait();
 			const panel2 = await createPanelAndWait();
 
-			// Second call should return the same panel instance and reuse the webview
-			expect(panel1).toBe(panel2);
-			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
+			// Explicit environment requests always create new panels
+			expect(panel1).not.toBe(panel2);
+			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(2);
 		});
 
 		it('should maintain state consistency during initialization', async () => {

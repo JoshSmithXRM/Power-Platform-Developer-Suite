@@ -7,7 +7,7 @@ import { Environment } from '../../features/environmentSetup/domain/entities/Env
  * Provides common data access patterns for environment selection and API service configuration.
  */
 export class SharedFactories {
-	public readonly getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>;
+	public readonly getEnvironments: () => Promise<Array<{ id: string; name: string; url: string; isDefault: boolean }>>;
 	public readonly getEnvironmentById: (envId: string) => Promise<{ id: string; name: string; powerPlatformEnvironmentId: string | undefined; dataverseUrl: string } | null>;
 	public readonly dataverseApiServiceFactory: {
 		getAccessToken: (envId: string) => Promise<string>;
@@ -27,13 +27,14 @@ export class SharedFactories {
 	 * Creates a factory function for getting all environments.
 	 * Returns simplified environment data for quick picks and panels.
 	 */
-	private createGetEnvironments(): () => Promise<Array<{ id: string; name: string; url: string }>> {
+	private createGetEnvironments(): () => Promise<Array<{ id: string; name: string; url: string; isDefault: boolean }>> {
 		return async () => {
 			const environments = await this.environmentRepository.getAll();
 			return environments.map(env => ({
 				id: env.getId().getValue(),
 				name: env.getName().getValue(),
-				url: env.getDataverseUrl().getValue()
+				url: env.getDataverseUrl().getValue(),
+				isDefault: env.getIsDefault()
 			}));
 		};
 	}

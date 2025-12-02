@@ -789,6 +789,13 @@ function setupFilterPanel() {
 		const toggleCollapse = () => {
 			const isCurrentlyCollapsed = filterBody.classList.contains('collapsed');
 
+			// IMPORTANT: Save current height BEFORE toggling collapsed class
+			// Otherwise CSS :has(.collapsed) rule changes height before we can read it
+			if (filterPanel && !isCurrentlyCollapsed) {
+				const currentHeight = filterPanel.offsetHeight;
+				filterPanel.dataset.savedHeight = currentHeight.toString();
+			}
+
 			// Toggle collapsed state
 			filterBody.classList.toggle('collapsed');
 			if (filterTabNav) {
@@ -812,9 +819,7 @@ function setupFilterPanel() {
 					const savedHeight = filterPanel.dataset.savedHeight || '250';
 					filterPanel.style.height = `${savedHeight}px`;
 				} else {
-					// Collapsing: save current height and remove inline style
-					const currentHeight = filterPanel.offsetHeight;
-					filterPanel.dataset.savedHeight = currentHeight.toString();
+					// Collapsing: remove inline style (height already saved above)
 					filterPanel.style.height = 'auto';
 				}
 			}

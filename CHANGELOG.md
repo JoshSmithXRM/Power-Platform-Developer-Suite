@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2025-12-02
+
+### Added
+
+- **8 User-Configurable Settings** - Fine-tune extension behavior via VS Code settings
+  - `virtualTable.initialPageSize` - Records loaded on first page render (10-500, default: 100)
+  - `virtualTable.maxCachedRecords` - Max records in memory cache (100-100000, default: 10000)
+  - `virtualTable.backgroundPageSize` - Records per background fetch (100-2000, default: 500)
+  - `webResources.cacheTTL` - Web resource content cache duration in seconds (10-600, default: 60)
+  - `metadata.cacheDuration` - Entity metadata cache duration in seconds (60-3600, default: 300)
+  - `api.maxRetries` - Retry attempts for transient API failures (0-10, default: 3)
+  - `pluginTrace.batchDeleteSize` - Records deleted per batch operation (50-1000, default: 100)
+  - `pluginTrace.defaultDeleteOldDays` - Default days for "delete old traces" (1-365, default: 30)
+
+### Fixed
+
+- **Port 3000 Conflict** - Plugin traces no longer spin forever after successful login
+  - Concurrent authentication requests now serialized to prevent EADDRINUSE errors
+  - Multiple panels loading simultaneously share the same auth flow
+
+- **Environment Tab Switching** - Panels now respect user's environment selection
+  - Clicking a tool in sidebar uses the default (starred) environment
+  - "Pick Environment" always creates a new panel for the selected environment
+  - No more panels getting stuck on wrong environment
+
+- **SQL Query Box Disabled State** - Editor re-enables after canceling TOP 100 modal
+  - Backend now sends `queryAborted` message when user cancels
+  - FetchXML unaffected (no row limit modal)
+
+- **Filter Panel Sizing** - Plugin Traces filter menu no longer shrinks to minimum
+  - Height now captured before toggling collapsed state
+  - Fixed CSS race condition that caused incorrect height to be saved
+
 ## [0.2.5] - 2025-12-01
 
 ### Added

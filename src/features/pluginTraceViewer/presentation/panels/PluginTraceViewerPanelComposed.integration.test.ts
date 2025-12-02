@@ -117,8 +117,8 @@ describe('PluginTraceViewerPanelComposed Integration Tests', () => {
 		mockExtensionUri = { fsPath: '/test/extension', path: '/test/extension' } as Uri;
 
 		mockEnvironments = [
-			{ id: 'env1', name: 'Environment 1', url: 'https://env1.crm.dynamics.com' },
-			{ id: 'env2', name: 'Environment 2', url: 'https://env2.crm.dynamics.com' }
+			{ id: 'env1', name: 'Environment 1', url: 'https://env1.crm.dynamics.com', isDefault: true },
+			{ id: 'env2', name: 'Environment 2', url: 'https://env2.crm.dynamics.com', isDefault: false }
 		];
 
 		mockGetEnvironments = jest.fn().mockResolvedValue(mockEnvironments);
@@ -255,10 +255,14 @@ describe('PluginTraceViewerPanelComposed Integration Tests', () => {
 	 * Helper to create panel and wait for async initialization to complete.
 	 * Returns both the panel wrapper and the underlying webview panel mock.
 	 */
-	async function createPanelAndWait(): Promise<{
+	async function createPanelAndWait(environmentId: string | null = TEST_ENVIRONMENT_ID): Promise<{
 		panel: PluginTraceViewerPanelComposed;
 		webviewPanel: jest.Mocked<WebviewPanel>;
 	}> {
+		// Convert null to undefined for the actual call
+		// null means "no explicit environment" (implicit case)
+		// string means explicit environment ID
+		const envIdArg = environmentId === null ? undefined : environmentId;
 		const panel = await PluginTraceViewerPanelComposed.createOrShow(
 			mockExtensionUri,
 			mockGetEnvironments,
@@ -271,7 +275,7 @@ describe('PluginTraceViewerPanelComposed Integration Tests', () => {
 			mockBuildTimelineUseCase,
 			mockViewModelMapper,
 			mockLogger,
-			TEST_ENVIRONMENT_ID,
+			envIdArg,
 			mockPanelStateRepository
 		);
 
@@ -388,12 +392,25 @@ describe('PluginTraceViewerPanelComposed Integration Tests', () => {
 			expect(mockGetPluginTracesUseCase.execute).toHaveBeenCalled();
 		});
 
-		it('should return same panel instance for same environment (singleton pattern)', async () => {
-			const { panel: panel1 } = await createPanelAndWait();
-			const { panel: panel2 } = await createPanelAndWait();
+		it('should return same panel instance when no explicit environment requested (implicit singleton)', async () => {
+			// Test implicit behavior (clicking a tool without picking environment)
+			// Pass null to indicate "no explicit environment" (different from undefined default)
+			const { panel: panel1 } = await createPanelAndWait(null);
+			const { panel: panel2 } = await createPanelAndWait(null);
 
+			// Should return same panel instance - singleton behavior for implicit requests
 			expect(panel1).toBe(panel2);
 			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
+		});
+
+		it('should create new panel when explicit environment requested (even if one exists)', async () => {
+			// Test explicit behavior (Pick Environment command)
+			const { panel: panel1 } = await createPanelAndWait(TEST_ENVIRONMENT_ID);
+			const { panel: panel2 } = await createPanelAndWait(TEST_ENVIRONMENT_ID);
+
+			// Should create different panel instances - explicit requests always create new
+			expect(panel1).not.toBe(panel2);
+			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(2);
 		});
 
 		it('should create separate panel instances for different environments', async () => {
@@ -721,25 +738,32 @@ describe('PluginTraceViewerPanelComposed Integration Tests', () => {
 			expect(webviewPanel.webview.html).toBeDefined();
 		});
 
-		it('should handle concurrent panel creation for same environment', async () => {
-			const promise1 = createPanelAndWait();
-			const promise2 = createPanelAndWait();
+		it('should handle concurrent panel creation for explicit environment (creates multiple)', async () => {
+			// Explicit environment requests always create new panels
+			const promise1 = createPanelAndWait(TEST_ENVIRONMENT_ID);
+			const promise2 = createPanelAndWait(TEST_ENVIRONMENT_ID);
 
 			const [result1, result2] = await Promise.all([promise1, promise2]);
 
-			// Due to race condition in concurrent calls, both create panels
-			// The second panel creation overwrites the first in the singleton map
-			// So result2 is guaranteed to be in the map, but result1 may not be the same instance
-			// Both calls should complete without error
+			// Both calls should complete without error, creating separate panels
 			expect(result1.panel).toBeDefined();
 			expect(result2.panel).toBeDefined();
+			expect(result1.panel).not.toBe(result2.panel); // Explicit requests create new panels
 
-			// At least one webview panel should be created (may be 2 due to race condition)
-			expect(vscode.window.createWebviewPanel).toHaveBeenCalled();
+			// Both should create webview panels
+			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(2);
+		}, 10000);
 
-			// Verify subsequent call returns the final instance (no race condition on sequential call)
-			const { panel: panel3 } = await createPanelAndWait();
-			expect(panel3).toBe(result2.panel); // Should return the last created panel from concurrent race
+		it('should handle sequential panel creation for implicit environment (singleton)', async () => {
+			// Implicit environment requests use singleton pattern
+			// Test sequential calls (not concurrent) to verify singleton behavior
+			// Pass null to indicate "no explicit environment"
+			const { panel: panel1 } = await createPanelAndWait(null);
+			const { panel: panel2 } = await createPanelAndWait(null);
+
+			// Sequential implicit calls should return same panel
+			expect(panel1).toBe(panel2);
+			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
 		}, 10000);
 
 		it('should maintain state consistency during initialization', async () => {

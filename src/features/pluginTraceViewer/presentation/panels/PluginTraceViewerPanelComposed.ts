@@ -89,13 +89,18 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	public static readonly viewType = 'powerPlatformDevSuite.pluginTraceViewer';
 	private static panels = new Map<string, PluginTraceViewerPanelComposed>();
 
-	// Named constants for time-based operations
+	/** Default value for delete old days (configurable via pluginTrace.defaultDeleteOldDays) */
 	private static readonly DEFAULT_DELETE_OLD_DAYS = 30;
+
+	// Named constants for time-based operations
 	private static readonly MILLISECONDS_PER_SECOND = 1000;
 	private static readonly ONE_HOUR_IN_MS = 60 * 60 * 1000;
 	private static readonly TWENTY_FOUR_HOURS_IN_MS = 24 * 60 * 60 * 1000;
 
 	private readonly coordinator: PanelCoordinator<PluginTraceViewerCommands>;
+
+	/** Configured default days for "delete old traces" operation */
+	private readonly defaultDeleteOldDays: number;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
 	private readonly detailSection: PluginTraceDetailSection;
 
@@ -130,6 +135,8 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	) {
 		super();
 		this.currentEnvironmentId = environmentId;
+		this.defaultDeleteOldDays = configService?.get('pluginTrace.defaultDeleteOldDays', PluginTraceViewerPanelComposed.DEFAULT_DELETE_OLD_DAYS)
+			?? PluginTraceViewerPanelComposed.DEFAULT_DELETE_OLD_DAYS;
 		logger.debug('PluginTraceViewerPanel: Initialized with new architecture');
 
 		panel.webview.options = {
@@ -506,7 +513,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		this.coordinator.registerHandler('deleteOld', async () => {
 			await this.deleteBehavior.deleteOld(
 				this.currentEnvironmentId,
-				PluginTraceViewerPanelComposed.DEFAULT_DELETE_OLD_DAYS
+				this.defaultDeleteOldDays
 			);
 		});
 

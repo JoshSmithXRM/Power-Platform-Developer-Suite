@@ -1,3 +1,5 @@
+import type { IConfigurationService } from '../services/IConfigurationService';
+
 /**
  * Immutable configuration for virtual table behavior.
  *
@@ -12,6 +14,9 @@
  * @example
  * // Use defaults (recommended for most cases)
  * const config = VirtualTableConfig.createDefault();
+ *
+ * // From user configuration
+ * const config = VirtualTableConfig.createFromConfig(configService);
  *
  * // Custom configuration - no artificial upper limits
  * const customConfig = VirtualTableConfig.create(50, 100000, 1000, true);
@@ -33,20 +38,44 @@ export class VirtualTableConfig {
 		this.validate();
 	}
 
+	/** Default values matching package.json configuration */
+	private static readonly DEFAULT_INITIAL_PAGE_SIZE = 100;
+	private static readonly DEFAULT_MAX_CACHED_RECORDS = 10000;
+	private static readonly DEFAULT_BACKGROUND_PAGE_SIZE = 500;
+
 	/**
 	 * Creates default configuration.
 	 *
 	 * Defaults optimized for large datasets (100k+ records):
 	 * - initialPageSize: 100 (instant initial render)
-	 * - maxCachedRecords: unlimited (Number.MAX_SAFE_INTEGER)
+	 * - maxCachedRecords: 10000 (reasonable memory limit)
 	 * - backgroundPageSize: 500 (efficient batching)
 	 * - enableBackgroundLoading: true
 	 */
 	public static createDefault(): VirtualTableConfig {
 		return new VirtualTableConfig(
-			100, // initialPageSize
-			Number.MAX_SAFE_INTEGER, // maxCachedRecords - no artificial limit
-			500, // backgroundPageSize
+			VirtualTableConfig.DEFAULT_INITIAL_PAGE_SIZE,
+			VirtualTableConfig.DEFAULT_MAX_CACHED_RECORDS,
+			VirtualTableConfig.DEFAULT_BACKGROUND_PAGE_SIZE,
+			true // enableBackgroundLoading
+		);
+	}
+
+	/**
+	 * Creates configuration from user settings.
+	 *
+	 * Reads from VS Code settings with sensible defaults:
+	 * - virtualTable.initialPageSize
+	 * - virtualTable.maxCachedRecords
+	 * - virtualTable.backgroundPageSize
+	 *
+	 * @param configService - Configuration service for reading user settings
+	 */
+	public static createFromConfig(configService: IConfigurationService): VirtualTableConfig {
+		return new VirtualTableConfig(
+			configService.get('virtualTable.initialPageSize', VirtualTableConfig.DEFAULT_INITIAL_PAGE_SIZE),
+			configService.get('virtualTable.maxCachedRecords', VirtualTableConfig.DEFAULT_MAX_CACHED_RECORDS),
+			configService.get('virtualTable.backgroundPageSize', VirtualTableConfig.DEFAULT_BACKGROUND_PAGE_SIZE),
 			true // enableBackgroundLoading
 		);
 	}

@@ -34,6 +34,13 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	private cachePluginCache: Map<string, VsCodeSecretStorageCachePlugin> = new Map();
 	private readonly secretStorage: vscode.SecretStorage | undefined;
 
+	/**
+	 * Tracks pending interactive authentication requests per environment.
+	 * Prevents concurrent HTTP servers from being started on the same port.
+	 * Key: environment ID, Value: Promise that resolves when auth completes.
+	 */
+	private pendingInteractiveAuth: Map<string, Promise<string>> = new Map();
+
 	constructor(
 		private readonly logger: ILogger,
 		secretStorage?: vscode.SecretStorage
@@ -412,6 +419,9 @@ export class MsalAuthenticationService implements IAuthenticationService {
 	 * Authenticates using interactive browser flow.
 	 * Opens browser window for user authentication, supports MFA.
 	 * Uses local HTTP server on port 3000 to capture OAuth redirect.
+	 *
+	 * Serializes concurrent requests for the same environment to prevent
+	 * EADDRINUSE errors from multiple HTTP servers on port 3000.
 	 */
 	private async authenticateInteractive(
 		environment: Environment,
@@ -427,6 +437,7 @@ export class MsalAuthenticationService implements IAuthenticationService {
 		const clientApp = this.getClientApp(environment);
 
 		try {
+			// First, try silent token acquisition from cache
 			const cachedToken = await this.tryAcquireTokenSilent(
 				clientApp,
 				scopes,
@@ -437,140 +448,202 @@ export class MsalAuthenticationService implements IAuthenticationService {
 				return cachedToken;
 			}
 
-			const vscode = await import('vscode');
+			// No cached token - need interactive auth
+			const environmentId = environment.getId().getValue();
 
-			const authCodePromise = new Promise<string>((resolve, reject) => {
-				// Declared here for cleanup closure scope, assigned in cancellation handler below
-				// eslint-disable-next-line prefer-const
-				let cancelListener: IDisposable | undefined;
-				// Declared here for cleanup closure scope, assigned in timeout setup below
-				// eslint-disable-next-line prefer-const
-				let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-				let isCancelled = false;
+			// Use a loop to handle the race condition properly
+			// Each iteration either returns a cached token or starts a new auth
+			while (true) {
+				// Check if there's already an interactive auth in progress for this environment
+				const existingAuth = this.pendingInteractiveAuth.get(environmentId);
 
-				const cleanup = (): void => {
-					if (timeoutHandle) {
-						clearTimeout(timeoutHandle);
-					}
-					if (cancelListener) {
-						cancelListener.dispose();
-					}
-				};
+				if (existingAuth) {
+					this.logger.debug('Interactive auth already in progress for this environment, waiting for completion');
 
-				const resolveWithCleanup = (code: string): void => {
-					if (isCancelled) {
-						return;
-					}
 					try {
-						cleanup();
-					} finally {
-						resolve(code);
+						// Wait for the existing auth to complete
+						const token = await existingAuth;
+						// The existing auth succeeded, use its token
+						return token;
+					} catch {
+						// The existing auth failed - loop will retry
+						this.logger.debug('Existing interactive auth failed, will retry');
+						continue;
 					}
-				};
+				}
 
-				const rejectWithCleanup = (error: Error): void => {
-					try {
-						cleanup();
-					} finally {
-						reject(error);
-					}
-				};
-
-				const server = http.createServer((req, res) => {
-					const url = new URL(req.url || '', `http://localhost:${MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT}`);
-					const code = url.searchParams.get('code');
-
-					if (code) {
-						res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-						res.end(`
-							<!DOCTYPE html>
-							<html>
-								<head>
-									<meta charset="UTF-8">
-									<title>Authentication Successful</title>
-									<style>
-										body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
-										.card { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
-										.success { color: #4CAF50; font-size: 48px; margin-bottom: 20px; }
-										h1 { margin: 0 0 10px 0; color: #333; }
-										p { color: #666; margin: 0; }
-									</style>
-								</head>
-								<body>
-									<div class="card">
-										<div class="success">✓</div>
-										<h1>Authentication Successful</h1>
-										<p>You can close this window and return to VS Code.</p>
-									</div>
-								</body>
-							</html>
-						`);
-						server.close();
-						resolveWithCleanup(code);
-					} else {
-						res.writeHead(400, { 'Content-Type': 'text/html' });
-						res.end('<html><body><h1>Error: No authorization code received</h1></body></html>');
-						server.close();
-						rejectWithCleanup(new Error('No authorization code in redirect'));
-					}
+				// No existing auth - we'll start one
+				// Create a deferred promise for coordination
+				let resolveAuth!: (token: string) => void;
+				let rejectAuth!: (error: Error) => void;
+				const deferredPromise = new Promise<string>((resolve, reject) => {
+					resolveAuth = resolve;
+					rejectAuth = reject;
 				});
 
-				server.listen(MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT);
+				// Store the promise IMMEDIATELY to prevent other requests from starting auth
+				// This is synchronous, so no race condition here
+				this.pendingInteractiveAuth.set(environmentId, deferredPromise);
 
-				server.on('error', (err: Error) => {
-					server.close();
-					rejectWithCleanup(new Error(`Failed to start authentication server: ${err.message}`));
-				});
-
-				cancelListener = cancellationToken?.onCancellationRequested(() => {
-					isCancelled = true;
-					server.close();
-					rejectWithCleanup(new Error('Authentication cancelled by user'));
-				});
-
-				timeoutHandle = setTimeout(() => {
-					server.close();
-					rejectWithCleanup(new Error('Authentication timeout - no response received within 90 seconds. If you opened the wrong browser, click Cancel and try again.'));
-				}, MsalAuthenticationService.INTERACTIVE_AUTH_TIMEOUT_MS);
-			});
-
-			const authCodeUrlParameters: msal.AuthorizationUrlRequest = {
-				scopes: scopes,
-				redirectUri: `http://localhost:${MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT}`,
-				prompt: 'select_account'
-			};
-
-			const authUrl = await clientApp.getAuthCodeUrl(authCodeUrlParameters);
-
-			this.logger.debug('Opening browser for authentication');
-			vscode.window.showInformationMessage('Opening browser for authentication. You will be asked to select an account.');
-			await vscode.env.openExternal(vscode.Uri.parse(authUrl));
-
-			const code = await authCodePromise;
-			this.logger.debug('Authorization code received, exchanging for token');
-
-			const tokenRequest: msal.AuthorizationCodeRequest = {
-				code: code,
-				scopes: scopes,
-				redirectUri: `http://localhost:${MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT}`
-			};
-
-			const response = await clientApp.acquireTokenByCode(tokenRequest);
-			if (!response) {
-				throw new Error('Failed to acquire token');
+				try {
+					// Now execute the actual auth flow
+					const token = await this.executeInteractiveAuth(scopes, clientApp, cancellationToken);
+					resolveAuth(token);
+					return token;
+				} catch (error) {
+					const errorObj = error instanceof Error ? error : new Error(String(error));
+					rejectAuth(errorObj);
+					throw error;
+				} finally {
+					// Clean up pending auth entry when done (success or failure)
+					this.pendingInteractiveAuth.delete(environmentId);
+				}
 			}
-
-			if (response.account) {
-				const username = response.account.username || response.account.name || 'Unknown';
-				this.logger.debug('Interactive authentication successful', { username });
-				vscode.window.showInformationMessage(`Authenticated as: ${username}`);
-			}
-
-			return response.accessToken;
 		} catch (error: unknown) {
 			this.logger.error('Interactive authentication failed', error);
 			throw this.createAuthenticationError(error, 'Interactive authentication failed');
 		}
+	}
+
+	/**
+	 * Executes the actual interactive authentication flow.
+	 * Extracted from authenticateInteractive to support serialization.
+	 */
+	private async executeInteractiveAuth(
+		scopes: string[],
+		clientApp: msal.PublicClientApplication,
+		cancellationToken?: ICancellationToken
+	): Promise<string> {
+		const vscode = await import('vscode');
+
+		const authCodePromise = new Promise<string>((resolve, reject) => {
+			// Declared here for cleanup closure scope, assigned in cancellation handler below
+			// eslint-disable-next-line prefer-const
+			let cancelListener: IDisposable | undefined;
+			// Declared here for cleanup closure scope, assigned in timeout setup below
+			// eslint-disable-next-line prefer-const
+			let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+			let isCancelled = false;
+
+			const cleanup = (): void => {
+				if (timeoutHandle) {
+					clearTimeout(timeoutHandle);
+				}
+				if (cancelListener) {
+					cancelListener.dispose();
+				}
+			};
+
+			const resolveWithCleanup = (code: string): void => {
+				if (isCancelled) {
+					return;
+				}
+				try {
+					cleanup();
+				} finally {
+					resolve(code);
+				}
+			};
+
+			const rejectWithCleanup = (error: Error): void => {
+				try {
+					cleanup();
+				} finally {
+					reject(error);
+				}
+			};
+
+			const server = http.createServer((req, res) => {
+				const url = new URL(req.url || '', `http://localhost:${MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT}`);
+				const code = url.searchParams.get('code');
+
+				if (code) {
+					res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+					res.end(`
+						<!DOCTYPE html>
+						<html>
+							<head>
+								<meta charset="UTF-8">
+								<title>Authentication Successful</title>
+								<style>
+									body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
+									.card { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
+									.success { color: #4CAF50; font-size: 48px; margin-bottom: 20px; }
+									h1 { margin: 0 0 10px 0; color: #333; }
+									p { color: #666; margin: 0; }
+								</style>
+							</head>
+							<body>
+								<div class="card">
+									<div class="success">✓</div>
+									<h1>Authentication Successful</h1>
+									<p>You can close this window and return to VS Code.</p>
+								</div>
+							</body>
+						</html>
+					`);
+					server.close();
+					resolveWithCleanup(code);
+				} else {
+					res.writeHead(400, { 'Content-Type': 'text/html' });
+					res.end('<html><body><h1>Error: No authorization code received</h1></body></html>');
+					server.close();
+					rejectWithCleanup(new Error('No authorization code in redirect'));
+				}
+			});
+
+			server.listen(MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT);
+
+			server.on('error', (err: Error) => {
+				server.close();
+				rejectWithCleanup(new Error(`Failed to start authentication server: ${err.message}`));
+			});
+
+			cancelListener = cancellationToken?.onCancellationRequested(() => {
+				isCancelled = true;
+				server.close();
+				rejectWithCleanup(new Error('Authentication cancelled by user'));
+			});
+
+			timeoutHandle = setTimeout(() => {
+				server.close();
+				rejectWithCleanup(new Error('Authentication timeout - no response received within 90 seconds. If you opened the wrong browser, click Cancel and try again.'));
+			}, MsalAuthenticationService.INTERACTIVE_AUTH_TIMEOUT_MS);
+		});
+
+		const authCodeUrlParameters: msal.AuthorizationUrlRequest = {
+			scopes: scopes,
+			redirectUri: `http://localhost:${MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT}`,
+			prompt: 'select_account'
+		};
+
+		const authUrl = await clientApp.getAuthCodeUrl(authCodeUrlParameters);
+
+		this.logger.debug('Opening browser for authentication');
+		vscode.window.showInformationMessage('Opening browser for authentication. You will be asked to select an account.');
+		await vscode.env.openExternal(vscode.Uri.parse(authUrl));
+
+		const code = await authCodePromise;
+		this.logger.debug('Authorization code received, exchanging for token');
+
+		const tokenRequest: msal.AuthorizationCodeRequest = {
+			code: code,
+			scopes: scopes,
+			redirectUri: `http://localhost:${MsalAuthenticationService.DEFAULT_OAUTH_REDIRECT_PORT}`
+		};
+
+		const response = await clientApp.acquireTokenByCode(tokenRequest);
+		if (!response) {
+			throw new Error('Failed to acquire token');
+		}
+
+		if (response.account) {
+			const username = response.account.username || response.account.name || 'Unknown';
+			this.logger.debug('Interactive authentication successful', { username });
+			vscode.window.showInformationMessage(`Authenticated as: ${username}`);
+		}
+
+		return response.accessToken;
 	}
 
 	/**
