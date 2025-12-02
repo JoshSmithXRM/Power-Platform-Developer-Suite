@@ -114,8 +114,8 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 		mockExtensionUri = { fsPath: '/test/extension', path: '/test/extension' } as Uri;
 
 		mockEnvironments = [
-			{ id: 'env1', name: 'Environment 1', url: 'https://env1.crm.dynamics.com' },
-			{ id: 'env2', name: 'Environment 2', url: 'https://env2.crm.dynamics.com' }
+			{ id: 'env1', name: 'Environment 1', url: 'https://env1.crm.dynamics.com', isDefault: true },
+			{ id: 'env2', name: 'Environment 2', url: 'https://env2.crm.dynamics.com', isDefault: false }
 		];
 
 		mockSolutions = [
@@ -336,10 +336,39 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 			expect(mockListConnectionReferencesUseCase.execute).toHaveBeenCalled();
 		});
 
-		it('should return same panel instance for same environment (singleton pattern)', async () => {
-			const panel1 = await createPanelAndWait();
-			const panel2 = await createPanelAndWait();
+		it('should return same panel instance when no explicit environment requested (implicit singleton)', async () => {
+			// Test implicit behavior (clicking a tool without picking environment)
+			const panel1 = await ConnectionReferencesPanelComposed.createOrShow(
+				mockExtensionUri,
+				mockGetEnvironments,
+				mockGetEnvironmentById,
+				mockListConnectionReferencesUseCase,
+				mockExportToDeploymentSettingsUseCase,
+				mockSolutionRepository,
+				mockUrlBuilder,
+				mockRelationshipCollectionService,
+				mockLogger,
+				undefined, // No explicit environment - uses default
+				mockPanelStateRepository
+			);
+			await flushPromises();
 
+			const panel2 = await ConnectionReferencesPanelComposed.createOrShow(
+				mockExtensionUri,
+				mockGetEnvironments,
+				mockGetEnvironmentById,
+				mockListConnectionReferencesUseCase,
+				mockExportToDeploymentSettingsUseCase,
+				mockSolutionRepository,
+				mockUrlBuilder,
+				mockRelationshipCollectionService,
+				mockLogger,
+				undefined, // No explicit environment - should reveal existing
+				mockPanelStateRepository
+			);
+			await flushPromises();
+
+			// Should return same panel instance - singleton behavior for implicit requests
 			expect(panel1).toBe(panel2);
 			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
 		});

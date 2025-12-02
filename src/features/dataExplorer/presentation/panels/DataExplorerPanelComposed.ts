@@ -514,7 +514,14 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			}
 
 			if (choice === 'cancel') {
-				// User cancelled
+				// User cancelled - notify webview to re-enable editor
+				try {
+					await this.panel.webview.postMessage({
+						command: 'queryAborted',
+					});
+				} catch {
+					// Panel was disposed during modal interaction
+				}
 				return;
 			}
 			// choice === 'continueAnyway' - proceed with original query

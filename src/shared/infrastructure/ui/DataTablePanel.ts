@@ -17,6 +17,7 @@ export interface EnvironmentOption {
 	readonly id: string;
 	readonly name: string;
 	readonly url: string;
+	readonly isDefault?: boolean;
 }
 
 /**

@@ -108,8 +108,8 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 		mockExtensionUri = { fsPath: '/test/extension', path: '/test/extension' } as Uri;
 
 		mockEnvironments = [
-			{ id: 'env1', name: 'Environment 1', url: 'https://env1.crm.dynamics.com' },
-			{ id: 'env2', name: 'Environment 2', url: 'https://env2.crm.dynamics.com' }
+			{ id: 'env1', name: 'Environment 1', url: 'https://env1.crm.dynamics.com', isDefault: true },
+			{ id: 'env2', name: 'Environment 2', url: 'https://env2.crm.dynamics.com', isDefault: false }
 		];
 
 		mockSolutions = [
@@ -334,10 +334,39 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 			);
 		});
 
-		it('should return same panel instance for same environment (singleton pattern)', async () => {
-			const panel1 = await createPanelAndWait();
-			const panel2 = await createPanelAndWait();
+		it('should return same panel instance when no explicit environment requested (implicit singleton)', async () => {
+			// Test implicit behavior (clicking a tool without picking environment)
+			const panel1 = await EnvironmentVariablesPanelComposed.createOrShow(
+				mockExtensionUri,
+				mockGetEnvironments,
+				mockGetEnvironmentById,
+				mockListEnvVarsUseCase,
+				mockExportToDeploymentSettingsUseCase,
+				mockSolutionRepository,
+				mockUrlBuilder,
+				mockViewModelMapper,
+				mockLogger,
+				undefined, // No explicit environment - uses default
+				mockPanelStateRepository
+			);
+			await new Promise(resolve => setImmediate(resolve));
 
+			const panel2 = await EnvironmentVariablesPanelComposed.createOrShow(
+				mockExtensionUri,
+				mockGetEnvironments,
+				mockGetEnvironmentById,
+				mockListEnvVarsUseCase,
+				mockExportToDeploymentSettingsUseCase,
+				mockSolutionRepository,
+				mockUrlBuilder,
+				mockViewModelMapper,
+				mockLogger,
+				undefined, // No explicit environment - should reveal existing
+				mockPanelStateRepository
+			);
+			await new Promise(resolve => setImmediate(resolve));
+
+			// Should return same panel instance - singleton behavior for implicit requests
 			expect(panel1).toBe(panel2);
 			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
 			expect(mockPanel.reveal).toHaveBeenCalled();
@@ -848,18 +877,17 @@ describe('EnvironmentVariablesPanelComposed Integration Tests', () => {
 			expect(mockViewModelMapper.toViewModel).toHaveBeenCalledTimes(2);
 		});
 
-		it('should handle sequential panel creation for same environment', async () => {
+		it('should create new panel for explicit environment request (even if one exists)', async () => {
 			// Reset singleton map to ensure clean state
 			(EnvironmentVariablesPanelComposed as unknown as { panels: Map<string, unknown> }).panels = new Map();
 
+			// createPanelAndWait uses TEST_ENVIRONMENT_ID which is an explicit request
 			const panel1 = await createPanelAndWait();
 			const panel2 = await createPanelAndWait();
 
-			// Both should return same instance (singleton pattern)
-			expect(panel1).toBe(panel2);
-			// Only one panel should be created, the second call should reveal existing panel
-			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
-			expect(mockPanel.reveal).toHaveBeenCalled();
+			// Explicit environment requests always create new panels
+			expect(panel1).not.toBe(panel2);
+			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(2);
 		});
 	});
 });

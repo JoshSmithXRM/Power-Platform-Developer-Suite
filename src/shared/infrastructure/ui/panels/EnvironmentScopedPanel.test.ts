@@ -112,8 +112,8 @@ describe('EnvironmentScopedPanel', () => {
 		mockExtensionUri = { fsPath: '/test/extension', path: '/test/extension' } as Uri;
 
 		mockEnvironments = [
-			{ id: 'env1', name: 'Environment 1', url: 'https://env1.crm.dynamics.com' },
-			{ id: 'env2', name: 'Environment 2', url: 'https://env2.crm.dynamics.com' }
+			{ id: 'env1', name: 'Environment 1', url: 'https://env1.crm.dynamics.com', isDefault: false },
+			{ id: 'env2', name: 'Environment 2', url: 'https://env2.crm.dynamics.com', isDefault: true }
 		];
 
 		mockGetEnvironments = jest.fn().mockResolvedValue(mockEnvironments);
@@ -168,7 +168,26 @@ describe('EnvironmentScopedPanel', () => {
 				expect(mockGetEnvironments).not.toHaveBeenCalled();
 			});
 
-			it('should fall back to first environment when initialEnvironmentId not provided', async () => {
+			it('should fall back to default environment when initialEnvironmentId not provided', async () => {
+				const panel = await TestPanel.createOrShow(
+					mockExtensionUri,
+					mockGetEnvironments,
+					mockGetEnvironmentById,
+					undefined
+				);
+
+				// env2 is marked as default
+				expect(panel.currentEnvironmentId).toBe('env2');
+				expect(mockGetEnvironments).toHaveBeenCalledTimes(1);
+			});
+
+			it('should fall back to first environment when no default is set', async () => {
+				mockEnvironments = [
+					{ id: 'env1', name: 'Environment 1', url: 'https://env1.crm.dynamics.com', isDefault: false },
+					{ id: 'env2', name: 'Environment 2', url: 'https://env2.crm.dynamics.com', isDefault: false }
+				];
+				mockGetEnvironments.mockResolvedValue(mockEnvironments);
+
 				const panel = await TestPanel.createOrShow(
 					mockExtensionUri,
 					mockGetEnvironments,
@@ -177,7 +196,6 @@ describe('EnvironmentScopedPanel', () => {
 				);
 
 				expect(panel.currentEnvironmentId).toBe('env1');
-				expect(mockGetEnvironments).toHaveBeenCalledTimes(1);
 			});
 
 			it('should throw error when no environments available', async () => {
@@ -222,7 +240,30 @@ describe('EnvironmentScopedPanel', () => {
 				expect(TestPanel.getPanelsMap().get('env1')).toBe(panel);
 			});
 
-			it('should return existing panel when panel exists for environment', async () => {
+			it('should reveal existing panel when no explicit environment requested (implicit case)', async () => {
+				// First create a panel for the default environment (env2)
+				const panel1 = await TestPanel.createOrShow(
+					mockExtensionUri,
+					mockGetEnvironments,
+					mockGetEnvironmentById,
+					undefined  // No explicit environment - uses default (env2)
+				);
+
+				// Second call with no explicit environment should reveal existing
+				const panel2 = await TestPanel.createOrShow(
+					mockExtensionUri,
+					mockGetEnvironments,
+					mockGetEnvironmentById,
+					undefined  // No explicit environment - should reveal existing
+				);
+
+				expect(panel2).toBe(panel1);
+				expect(panel2.revealCallCount).toBe(1);
+				expect(TestPanel.getPanelsMap().size).toBe(1);
+			});
+
+			it('should create new panel when explicit environment requested (even if exists)', async () => {
+				// First create a panel for env1
 				const panel1 = await TestPanel.createOrShow(
 					mockExtensionUri,
 					mockGetEnvironments,
@@ -230,6 +271,7 @@ describe('EnvironmentScopedPanel', () => {
 					'env1'
 				);
 
+				// Second call with EXPLICIT env1 should create new panel (user deliberately chose)
 				const panel2 = await TestPanel.createOrShow(
 					mockExtensionUri,
 					mockGetEnvironments,
@@ -237,9 +279,12 @@ describe('EnvironmentScopedPanel', () => {
 					'env1'
 				);
 
-				expect(panel2).toBe(panel1);
-				expect(panel2.revealCallCount).toBe(1);
+				// Should be different panel instances
+				expect(panel2).not.toBe(panel1);
+				expect(panel2.currentEnvironmentId).toBe('env1');
+				// First panel stays registered, second is unmanaged
 				expect(TestPanel.getPanelsMap().size).toBe(1);
+				expect(TestPanel.getPanelsMap().get('env1')).toBe(panel1);
 			});
 
 			it('should create separate panels for different environments', async () => {
@@ -263,19 +308,20 @@ describe('EnvironmentScopedPanel', () => {
 				expect(TestPanel.getPanelsMap().size).toBe(2);
 			});
 
-			it('should reveal existing panel in ViewColumn.One', async () => {
+			it('should reveal existing panel in ViewColumn.One when implicit', async () => {
+				// Create panel for default environment (env2)
 				const panel1 = await TestPanel.createOrShow(
 					mockExtensionUri,
 					mockGetEnvironments,
 					mockGetEnvironmentById,
-					'env1'
+					undefined
 				);
 
 				await TestPanel.createOrShow(
 					mockExtensionUri,
 					mockGetEnvironments,
 					mockGetEnvironmentById,
-					'env1'
+					undefined  // No explicit environment - should reveal
 				);
 
 				expect(panel1.revealCallCount).toBe(1);
