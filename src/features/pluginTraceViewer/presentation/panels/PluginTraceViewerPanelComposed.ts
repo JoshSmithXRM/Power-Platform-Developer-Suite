@@ -792,6 +792,15 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			this.currentTraceLevel = level;
 
 			this.logger.debug('Trace level loaded', { level: level.value });
+
+			// Update the dropdown in the webview to show current selection
+			await this.panel.webview.postMessage({
+				command: 'updateDropdownState',
+				data: {
+					dropdownId: 'traceLevelDropdown',
+					selectedId: level.value.toString()
+				}
+			});
 		} catch (error) {
 			this.logger.error('Failed to load trace level', error);
 		}

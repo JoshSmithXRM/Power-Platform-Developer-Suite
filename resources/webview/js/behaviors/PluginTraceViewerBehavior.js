@@ -457,6 +457,12 @@ function setupDetailPanelVisibility() {
 		} else if (message.command === 'selectRow' && message.traceId) {
 			// Find and select the row with the matching trace ID
 			selectRowByTraceId(message.traceId);
+		} else if (message.command === 'updateDropdownState' && message.data) {
+			// Update dropdown selection state (e.g., trace level loaded from server)
+			const { dropdownId, selectedId } = message.data;
+			if (dropdownId && selectedId && window.updateDropdownState) {
+				window.updateDropdownState(dropdownId, selectedId);
+			}
 		}
 	});
 }
