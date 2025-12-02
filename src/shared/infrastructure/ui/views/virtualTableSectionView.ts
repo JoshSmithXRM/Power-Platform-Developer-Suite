@@ -82,7 +82,7 @@ export function renderVirtualTableSection(viewData: VirtualTableViewData): strin
  */
 function renderSearchBox(placeholder: string, searchQuery?: string): string {
 	return `
-		<div class="search-container">
+		<div class="search-container" data-selection-zone="search">
 			<input
 				type="text"
 				id="searchInput"
@@ -117,7 +117,7 @@ function renderVirtualTable(
 	// Table uses natural layout - no display:block hacks
 	// Sticky thead stays visible during scroll
 	return `
-		<div class="table-container virtual-table-container">
+		<div class="table-container virtual-table-container" data-selection-zone="table">
 			<div
 				id="virtualScrollWrapper"
 				class="virtual-scroll-wrapper"
