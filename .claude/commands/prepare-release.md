@@ -12,6 +12,7 @@ This command ensures all release artifacts are properly created before merging t
 - Release notes file created in docs/releases/
 - Work tracking documents cleaned up
 - All tests pass
+- Coverage thresholds met
 - Compilation succeeds
 
 ---
@@ -54,6 +55,17 @@ Run these checks and STOP if any fail:
    npm test
    ```
    If fails: Report error, STOP
+
+4. **Run tests with coverage:**
+   ```bash
+   npm test -- --coverage
+   ```
+   If coverage thresholds not met: Report which thresholds failed, STOP
+
+   Current thresholds (from jest.config.js):
+   - Global: 85% statements, 85% lines, 85% functions, 80% branches
+   - Domain: 95% statements/lines/functions, 90% branches
+   - Application: 90% statements/lines/functions, 85% branches
 
 ---
 

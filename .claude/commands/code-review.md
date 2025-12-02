@@ -18,7 +18,8 @@ If `$ARGUMENTS` not provided, ask for scope:
 Before invoking code-guardian, verify:
 1. `npm run compile` - Must pass
 2. `npm test` - Must pass
-3. Manual testing with F5 - Ask user to confirm
+3. `npm test -- --coverage` - Coverage thresholds must be met
+4. Manual testing with F5 - Ask user to confirm
 
 Stop if any prerequisite fails.
 
@@ -32,12 +33,12 @@ Stop if any prerequisite fails.
 
    Scope: [description]
    Changed files: [list]
-   Prerequisites: compile ✓, tests ✓, manual testing ✓
+   Prerequisites: compile ✓, tests ✓, coverage ✓, manual testing ✓
 
    Review for:
    - Clean Architecture (rich domain, layer separation, dependency direction)
    - Type safety (no any, explicit returns, null handling)
-   - Test coverage (domain 100%, use cases 90%)
+   - Test coverage (global 85%, domain 95%, application 90%)
    - Code quality (logging at boundaries, no console.log)
 
    Decision: APPROVE or CHANGES REQUESTED
