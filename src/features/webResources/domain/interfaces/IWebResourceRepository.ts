@@ -138,4 +138,19 @@ export interface IWebResourceRepository {
 		environmentId: string,
 		cancellationToken?: ICancellationToken
 	): Promise<void>;
+
+	/**
+	 * Gets the current modifiedOn timestamp for a web resource.
+	 * Lightweight query for conflict detection (no content fetched).
+	 *
+	 * @param environmentId - Environment ID
+	 * @param webResourceId - Web resource GUID
+	 * @param cancellationToken - Optional token to cancel the operation
+	 * @returns Current modifiedOn timestamp or null if not found
+	 */
+	getModifiedOn(
+		environmentId: string,
+		webResourceId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<Date | null>;
 }

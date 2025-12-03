@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import type { GetWebResourceContentUseCase } from '../../application/useCases/GetWebResourceContentUseCase';
 import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
 import type { PublishWebResourceUseCase } from '../../application/useCases/PublishWebResourceUseCase';
+import type { IWebResourceRepository } from '../../domain/interfaces/IWebResourceRepository';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
 import { NonEditableWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
@@ -78,6 +79,17 @@ export interface WebResourceSavedEvent {
 	readonly webResourceId: string;
 }
 
+/**
+ * Cached web resource data including server timestamp for conflict detection.
+ */
+interface CachedWebResource {
+	content: Uint8Array;
+	/** Local cache timestamp (for TTL expiration) */
+	timestamp: number;
+	/** Server's modifiedOn timestamp (for conflict detection) */
+	serverModifiedOn: Date;
+}
+
 export class WebResourceFileSystemProvider implements vscode.FileSystemProvider {
 	private readonly _onDidChangeFile = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
 	readonly onDidChangeFile = this._onDidChangeFile.event;
@@ -86,8 +98,8 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	private readonly _onDidSaveWebResource = new vscode.EventEmitter<WebResourceSavedEvent>();
 	readonly onDidSaveWebResource = this._onDidSaveWebResource.event;
 
-	/** Cache for web resource content to avoid repeated API calls */
-	private readonly contentCache = new Map<string, { content: Uint8Array; timestamp: number }>();
+	/** Cache for web resource content including server timestamp */
+	private readonly contentCache = new Map<string, CachedWebResource>();
 
 	/** Default cache TTL in seconds (configurable via webResources.cacheTTL) */
 	private static readonly DEFAULT_CACHE_TTL_SECONDS = 60;
@@ -100,7 +112,8 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		private readonly updateWebResourceUseCase: UpdateWebResourceUseCase | null,
 		private readonly publishWebResourceUseCase: PublishWebResourceUseCase | null,
 		private readonly logger: ILogger,
-		configService?: IConfigurationService
+		configService?: IConfigurationService,
+		private readonly webResourceRepository?: IWebResourceRepository
 	) {
 		const cacheTtlSeconds = configService?.get('webResources.cacheTTL', WebResourceFileSystemProvider.DEFAULT_CACHE_TTL_SECONDS)
 			?? WebResourceFileSystemProvider.DEFAULT_CACHE_TTL_SECONDS;
@@ -177,10 +190,11 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 				parsed.webResourceId
 			);
 
-			// Cache the content
+			// Cache the content with server's modifiedOn for conflict detection
 			this.contentCache.set(cacheKey, {
 				content: result.content,
-				timestamp: Date.now()
+				timestamp: Date.now(),
+				serverModifiedOn: result.modifiedOn
 			});
 
 			this.logger.info('Web resource content loaded', {
@@ -216,6 +230,31 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			return;
 		}
 
+		// Conflict detection: check if server version has changed since we opened the file
+		if (cached !== undefined && this.webResourceRepository !== undefined) {
+			const conflictResolution = await this.checkForConflict(
+				parsed.environmentId,
+				parsed.webResourceId,
+				cached.serverModifiedOn,
+				parsed.filename,
+				uri
+			);
+
+			if (conflictResolution === 'cancel') {
+				this.logger.info('WebResourceFileSystemProvider writeFile cancelled by user (conflict)', {
+					webResourceId: parsed.webResourceId
+				});
+				return;
+			}
+
+			if (conflictResolution === 'reload') {
+				// Reload from server - invalidate cache and revert buffer
+				await this.reloadFromServer(uri, parsed.environmentId, parsed.webResourceId, cacheKey);
+				return;
+			}
+			// conflictResolution === 'overwrite' or 'no-conflict' - proceed with save
+		}
+
 		this.logger.debug('WebResourceFileSystemProvider writeFile', {
 			uri: uri.toString(),
 			environmentId: parsed.environmentId,
@@ -230,9 +269,8 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 				content
 			);
 
-			// Update cache with new content
-			const cacheKey = `${parsed.environmentId}:${parsed.webResourceId}`;
-			this.contentCache.set(cacheKey, { content, timestamp: Date.now() });
+			// Update cache with new content and fetch fresh modifiedOn from server
+			await this.refreshCacheAfterSave(parsed.environmentId, parsed.webResourceId, cacheKey, content);
 
 			// Fire change event for VS Code
 			this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
@@ -283,6 +321,150 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	clearCache(): void {
 		this.contentCache.clear();
 		this.logger.debug('WebResourceFileSystemProvider cache cleared');
+	}
+
+	/**
+	 * Checks if the server version has changed since the file was opened.
+	 * If a conflict is detected, shows a modal dialog with resolution options.
+	 *
+	 * @returns 'overwrite' | 'reload' | 'cancel' | 'no-conflict'
+	 */
+	private async checkForConflict(
+		environmentId: string,
+		webResourceId: string,
+		cachedModifiedOn: Date,
+		filename: string,
+		_uri: vscode.Uri
+	): Promise<'overwrite' | 'reload' | 'cancel' | 'no-conflict'> {
+		if (this.webResourceRepository === undefined) {
+			return 'no-conflict';
+		}
+
+		try {
+			const currentModifiedOn = await this.webResourceRepository.getModifiedOn(
+				environmentId,
+				webResourceId
+			);
+
+			if (currentModifiedOn === null) {
+				// Resource was deleted - let the save proceed and fail at the API level
+				return 'no-conflict';
+			}
+
+			// Compare timestamps (using getTime() for precise comparison)
+			if (currentModifiedOn.getTime() === cachedModifiedOn.getTime()) {
+				return 'no-conflict';
+			}
+
+			this.logger.info('Conflict detected', {
+				webResourceId,
+				cachedModifiedOn: cachedModifiedOn.toISOString(),
+				currentModifiedOn: currentModifiedOn.toISOString()
+			});
+
+			// Show conflict resolution modal
+			const selection = await vscode.window.showWarningMessage(
+				`"${filename}" has been modified on the server since you opened it. Your changes will overwrite the server version.`,
+				{ modal: true },
+				'Overwrite',
+				'Reload from Server'
+			);
+
+			if (selection === 'Overwrite') {
+				return 'overwrite';
+			} else if (selection === 'Reload from Server') {
+				return 'reload';
+			} else {
+				return 'cancel';
+			}
+		} catch (error) {
+			this.logger.error('Failed to check for conflict', error);
+			// If we can't check for conflicts, proceed with save
+			return 'no-conflict';
+		}
+	}
+
+	/**
+	 * Reloads content from server and updates the editor buffer.
+	 */
+	private async reloadFromServer(
+		uri: vscode.Uri,
+		environmentId: string,
+		webResourceId: string,
+		cacheKey: string
+	): Promise<void> {
+		try {
+			// Invalidate cache to force fresh fetch
+			this.contentCache.delete(cacheKey);
+
+			// Fetch fresh content
+			const result = await this.getWebResourceContentUseCase.execute(
+				environmentId,
+				webResourceId
+			);
+
+			// Update cache with fresh content
+			this.contentCache.set(cacheKey, {
+				content: result.content,
+				timestamp: Date.now(),
+				serverModifiedOn: result.modifiedOn
+			});
+
+			// Close and reopen the document to refresh the buffer
+			// This is necessary because VS Code's FileSystemProvider doesn't have
+			// a direct way to update the editor buffer
+			const document = vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
+			if (document) {
+				// Fire change event to notify VS Code the file has changed
+				this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
+
+				// Revert the document to pick up the new content
+				await vscode.commands.executeCommand('workbench.action.files.revert');
+			}
+
+			this.logger.info('Web resource reloaded from server', { webResourceId });
+			void vscode.window.showInformationMessage(`Reloaded "${uri.path.split('/').pop()}" from server.`);
+		} catch (error) {
+			this.logger.error('Failed to reload from server', error);
+			void vscode.window.showErrorMessage('Failed to reload from server. Please try again.');
+		}
+	}
+
+	/**
+	 * Refreshes the cache after a successful save by fetching the new modifiedOn from server.
+	 */
+	private async refreshCacheAfterSave(
+		environmentId: string,
+		webResourceId: string,
+		cacheKey: string,
+		content: Uint8Array
+	): Promise<void> {
+		if (this.webResourceRepository !== undefined) {
+			try {
+				const newModifiedOn = await this.webResourceRepository.getModifiedOn(
+					environmentId,
+					webResourceId
+				);
+
+				if (newModifiedOn !== null) {
+					this.contentCache.set(cacheKey, {
+						content,
+						timestamp: Date.now(),
+						serverModifiedOn: newModifiedOn
+					});
+					return;
+				}
+			} catch (error) {
+				this.logger.debug('Failed to fetch modifiedOn after save, using current time', { error });
+			}
+		}
+
+		// Fallback: use current time if we couldn't fetch from server
+		this.contentCache.set(cacheKey, {
+			content,
+			timestamp: Date.now(),
+			serverModifiedOn: new Date()
+		});
 	}
 
 	/**

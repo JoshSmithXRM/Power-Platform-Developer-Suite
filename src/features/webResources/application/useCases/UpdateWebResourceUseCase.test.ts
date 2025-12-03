@@ -25,7 +25,8 @@ describe('UpdateWebResourceUseCase', () => {
 			getCount: jest.fn(),
 			publish: jest.fn(),
 			publishMultiple: jest.fn(),
-			publishAll: jest.fn()
+			publishAll: jest.fn(),
+			getModifiedOn: jest.fn()
 		};
 
 		useCase = new UpdateWebResourceUseCase(
