@@ -528,17 +528,29 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			});
 
 			// Refresh the editor buffer with the new content
-			// This is necessary because VS Code's FileSystemProvider doesn't have
-			// a direct way to update the editor buffer
+			// VS Code's FileSystemProvider revert doesn't work reliably for virtual documents.
+			// Instead, we directly replace the editor content using a WorkspaceEdit.
 			const document = vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
 			if (document) {
-				// Fire change event to notify VS Code the file has changed
-				this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
-
-				// Show the document first (make it active) then revert it
-				// workbench.action.files.revert only works on the active editor
+				// Show the document first (make it active)
 				await vscode.window.showTextDocument(document, { preview: false });
-				await vscode.commands.executeCommand('workbench.action.files.revert');
+
+				// Replace entire document content with fresh server content
+				const newContent = new TextDecoder().decode(result.content);
+				const fullRange = new vscode.Range(
+					document.positionAt(0),
+					document.positionAt(document.getText().length)
+				);
+
+				const edit = new vscode.WorkspaceEdit();
+				edit.replace(uri, fullRange, newContent);
+				await vscode.workspace.applyEdit(edit);
+
+				// Save to clear dirty state (content now matches server)
+				await document.save();
+
+				// Fire change event to update any listeners
+				this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
 			}
 
 			this.logger.info('Web resource reloaded from server', { webResourceId });
