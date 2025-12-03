@@ -146,10 +146,6 @@ This document tracks remaining work to **fully complete** three features:
 
 ## Deferred (Not This Branch)
 
-### Visual Query Builder
-- Entity picker, column selector, filter builder UI
-- **Why deferred:** SQL/FetchXML editors provide power-user experience; visual builder is nice-to-have
-
 ### Local Folder Sync (Web Resources)
 - Map local folder to solution's web resources
 - Two-way sync with file watching
@@ -180,4 +176,107 @@ Before merging this branch:
 
 ---
 
-**Last Updated:** 2025-12-02
+## Session Progress: 2025-12-03
+
+### Completed This Session
+
+| Item | Description | Status |
+|------|-------------|--------|
+| Connection Registry | Created `WebResourceConnectionRegistry` singleton to map environmentId → resources | ✅ Done |
+| FileSystemProvider refactor | Refactored to use registry instead of constructor-injected use cases | ✅ Done |
+| stat() optimization | Fixed stat() to NOT call readFile() - prevents redundant API calls | ✅ Done |
+| VS Code caching workaround | Added waitForPendingFetch + notifyFileChanged + revert pattern | ✅ Done |
+| HTTP cache headers | Added `Cache-Control: no-cache` and `cache: 'no-store'` to ALL fetch() calls (4 files) | ✅ Done |
+| Root cause diagnosis | Identified that Dataverse OData returns PUBLISHED content, not draft | ✅ Done |
+
+### Files Modified This Session
+
+- `src/features/webResources/infrastructure/providers/WebResourceFileSystemProvider.ts`
+- `src/features/webResources/infrastructure/providers/WebResourceConnectionRegistry.ts` (NEW)
+- `src/features/webResources/presentation/panels/WebResourcesPanelComposed.ts`
+- `src/features/webResources/presentation/initialization/initializeWebResources.ts`
+- `src/shared/infrastructure/services/DataverseApiService.ts` (HTTP cache headers)
+- `src/features/environmentSetup/infrastructure/services/WhoAmIService.ts` (HTTP cache headers)
+- `src/features/environmentSetup/infrastructure/services/PowerPlatformApiService.ts` (HTTP cache headers)
+
+---
+
+## CRITICAL BUGS - Must Fix Before Release
+
+### BUG 1: HTTP Caching in API Requests
+
+**Severity:** CRITICAL
+**Status:** ✅ FIXED
+
+Admin/developer tools MUST NOT show stale data.
+
+| File | Status |
+|------|--------|
+| `DataverseApiService.ts` (main request method) | ✅ FIXED |
+| `DataverseApiService.ts` (batch DELETE method) | ✅ FIXED |
+| `WhoAmIService.ts` | ✅ FIXED |
+| `PowerPlatformApiService.ts` | ✅ FIXED |
+
+All fetch() calls now include:
+```typescript
+headers: {
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  'Pragma': 'no-cache'
+},
+cache: 'no-store'
+```
+
+---
+
+### BUG 2: Dataverse Returns Published Content, Not Draft
+
+**Severity:** CRITICAL
+**Status:** ROOT CAUSE IDENTIFIED - NEEDS RESEARCH
+
+**Problem:** The OData API `webresourceset.content` returns the PUBLISHED version, not the latest saved draft.
+
+When you edit a web resource in Maker and save (without publishing):
+- `modifiedOn` timestamp updates ✓
+- `content` column returns OLD PUBLISHED version ✗
+- Maker portal shows correct draft version ✓
+
+**Impact:** Users edit a file, save, close, reopen → see old content. Extremely confusing.
+
+**Current workaround:** Users must publish after every save.
+
+**Required investigation:**
+1. Research Dataverse API for unpublished/draft content
+2. Investigate what API the Maker portal uses (browser DevTools)
+3. Check if there's a `contentunpublished` column or similar
+4. Consider using Solution XML export to get true draft state
+5. Check if `RetrieveUnpublishedMultiple` or similar API exists
+
+---
+
+### BUG 3: Unit Tests Need Updating
+
+**Severity:** MEDIUM
+**Status:** TODO
+
+Three tests failing due to caching behavior changes:
+- `WebResourceFileSystemProvider.test.ts` - "should cache content for subsequent reads" (expects 1 API call, gets 2)
+- `WebResourceFileSystemProvider.test.ts` - "should return file stat for valid web resource" (expects size=5, gets size=0)
+- `WebResourceFileSystemProvider.test.ts` - "should update cache after successful save" (expects 1 API call, gets 2)
+
+These tests assumed TTL caching which was removed. The stat() test expects readFile to be called (old behavior), but stat() now returns placeholder values. Need to update tests to reflect new behavior where every readFile() fetches fresh content from server.
+
+---
+
+## Decision Log
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2025-12-02 | Defer local folder sync | Bundle with Deployment Settings / ALM features |
+| 2025-12-02 | Include Saved Queries | Core value: SQL → FetchXML → Personal View in Dynamics |
+| 2025-12-02 | Include Visual Query Builder | Important for accessibility - not all users comfortable with SQL |
+| 2025-12-03 | Remove TTL caching from FileSystemProvider | Admin tools must always show fresh data |
+| 2025-12-03 | Use environmentId (not connectionId) in URI | Simplified approach - environmentId already unique per connection |
+
+---
+
+**Last Updated:** 2025-12-03

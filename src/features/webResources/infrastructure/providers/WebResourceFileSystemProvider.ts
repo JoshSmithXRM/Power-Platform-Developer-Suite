@@ -1,11 +1,6 @@
 import * as vscode from 'vscode';
 
-import type { GetWebResourceContentUseCase } from '../../application/useCases/GetWebResourceContentUseCase';
-import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
-import type { PublishWebResourceUseCase } from '../../application/useCases/PublishWebResourceUseCase';
-import type { IWebResourceRepository } from '../../domain/interfaces/IWebResourceRepository';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
-import type { IConfigurationService } from '../../../../shared/domain/services/IConfigurationService';
 import { NonEditableWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
 import { PublishCoordinator } from '../../../../shared/infrastructure/coordination/PublishCoordinator';
 import {
@@ -13,9 +8,16 @@ import {
 	getPublishInProgressMessage
 } from '../../../../shared/infrastructure/errors/PublishInProgressError';
 
+import { WebResourceConnectionRegistry } from './WebResourceConnectionRegistry';
+
 /**
  * URI scheme for web resources.
- * Format: ppds-webresource://environmentId/webResourceId/filename.ext
+ * Format: ppds-webresource:///environmentId/webResourceId/filename.ext
+ *
+ * @remarks
+ * The environmentId uniquely identifies the connection (URL + auth method).
+ * Different environments open as separate editor tabs.
+ * Same environment + same web resource = same editor tab.
  */
 export const WEB_RESOURCE_SCHEME = 'ppds-webresource';
 
@@ -30,18 +32,17 @@ export function parseWebResourceUri(uri: vscode.Uri): { environmentId: string; w
 		return null;
 	}
 
-	// authority = environmentId
-	// path = /webResourceId/filename.ext
-	const environmentId = uri.authority;
+	// environmentId is in the path for VS Code document identity
+	// path = /environmentId/webResourceId/filename.ext
 	const pathParts = uri.path.split('/').filter(p => p.length > 0);
 
-	if (pathParts.length < 2) {
+	if (pathParts.length < 3) {
 		return null;
 	}
 
-	// pathParts[0] is guaranteed to exist since we checked length >= 2 above
-	const webResourceId = pathParts[0] as string;
-	const filename = pathParts.slice(1).join('/');
+	const environmentId = pathParts[0] as string;
+	const webResourceId = pathParts[1] as string;
+	const filename = pathParts.slice(2).join('/');
 
 	return { environmentId, webResourceId, filename };
 }
@@ -49,7 +50,11 @@ export function parseWebResourceUri(uri: vscode.Uri): { environmentId: string; w
 /**
  * Creates a web resource URI.
  *
- * @param environmentId - Environment GUID
+ * environmentId is placed in the path because VS Code uses
+ * scheme+path for document identity. This ensures different environments
+ * open as separate editor tabs.
+ *
+ * @param environmentId - Environment ID
  * @param webResourceId - Web resource GUID
  * @param filename - Display filename with extension
  * @returns VS Code URI for the web resource
@@ -59,7 +64,8 @@ export function createWebResourceUri(
 	webResourceId: string,
 	filename: string
 ): vscode.Uri {
-	return vscode.Uri.parse(`${WEB_RESOURCE_SCHEME}://${environmentId}/${webResourceId}/${filename}`);
+	// Use empty authority and put environmentId in path
+	return vscode.Uri.parse(`${WEB_RESOURCE_SCHEME}:///${environmentId}/${webResourceId}/${filename}`);
 }
 
 /**
@@ -69,7 +75,7 @@ export function createWebResourceUri(
  * downloading files to disk. Content is fetched on-demand from Dataverse
  * and changes are saved back automatically.
  *
- * URI format: ppds-webresource://environmentId/webResourceId/filename.ext
+ * URI format: ppds-webresource:///environmentId/webResourceId/filename.ext
  */
 /**
  * Event data emitted when a web resource is successfully saved.
@@ -80,14 +86,21 @@ export interface WebResourceSavedEvent {
 }
 
 /**
- * Cached web resource data including server timestamp for conflict detection.
+ * Tracks server state for conflict detection during saves.
  */
-interface CachedWebResource {
-	content: Uint8Array;
-	/** Local cache timestamp (for TTL expiration) */
-	timestamp: number;
-	/** Server's modifiedOn timestamp (for conflict detection) */
+interface WebResourceServerState {
+	/** Server's modifiedOn timestamp when content was last loaded/saved */
 	serverModifiedOn: Date;
+	/** Content for comparison during writeFile (to detect no-change saves) */
+	lastKnownContent: Uint8Array;
+}
+
+/**
+ * Result of a content fetch operation.
+ */
+interface FetchResult {
+	content: Uint8Array;
+	modifiedOn: Date;
 }
 
 export class WebResourceFileSystemProvider implements vscode.FileSystemProvider {
@@ -98,27 +111,22 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	private readonly _onDidSaveWebResource = new vscode.EventEmitter<WebResourceSavedEvent>();
 	readonly onDidSaveWebResource = this._onDidSaveWebResource.event;
 
-	/** Cache for web resource content including server timestamp */
-	private readonly contentCache = new Map<string, CachedWebResource>();
+	/** Server state for conflict detection. Key: environmentId:webResourceId */
+	private readonly serverState = new Map<string, WebResourceServerState>();
 
-	/** Default cache TTL in seconds (configurable via webResources.cacheTTL) */
-	private static readonly DEFAULT_CACHE_TTL_SECONDS = 60;
+	/** Pending fetch requests to dedupe concurrent calls. Key: environmentId:webResourceId */
+	private readonly pendingFetches = new Map<string, Promise<FetchResult>>();
 
-	/** Configured cache TTL in milliseconds */
-	private readonly cacheTtlMs: number;
-
+	/**
+	 * Creates a FileSystemProvider.
+	 *
+	 * @param registry - Registry mapping environmentIds to their resources
+	 * @param logger - Logger for debugging
+	 */
 	constructor(
-		private readonly getWebResourceContentUseCase: GetWebResourceContentUseCase,
-		private readonly updateWebResourceUseCase: UpdateWebResourceUseCase | null,
-		private readonly publishWebResourceUseCase: PublishWebResourceUseCase | null,
-		private readonly logger: ILogger,
-		configService?: IConfigurationService,
-		private readonly webResourceRepository?: IWebResourceRepository
-	) {
-		const cacheTtlSeconds = configService?.get('webResources.cacheTTL', WebResourceFileSystemProvider.DEFAULT_CACHE_TTL_SECONDS)
-			?? WebResourceFileSystemProvider.DEFAULT_CACHE_TTL_SECONDS;
-		this.cacheTtlMs = cacheTtlSeconds * 1000;
-	}
+		private readonly registry: WebResourceConnectionRegistry,
+		private readonly logger: ILogger
+	) {}
 
 	watch(): vscode.Disposable {
 		// Read-only: no file watching needed
@@ -131,24 +139,46 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			throw vscode.FileSystemError.FileNotFound(uri);
 		}
 
-		this.logger.debug('WebResourceFileSystemProvider stat', {
-			uri: uri.toString(),
+		const cacheKey = `${parsed.environmentId}:${parsed.webResourceId}`;
+
+		// Check if we have cached state from a previous readFile
+		const state = this.serverState.get(cacheKey);
+		if (state !== undefined) {
+			this.logger.debug('WebResourceFileSystemProvider stat (cached)', {
+				environmentId: parsed.environmentId,
+				webResourceId: parsed.webResourceId,
+				size: state.lastKnownContent.length
+			});
+			return {
+				type: vscode.FileType.File,
+				ctime: 0,
+				mtime: state.serverModifiedOn.getTime(),
+				size: state.lastKnownContent.length
+			};
+		}
+
+		// No cached state - verify the environment is registered, then return placeholder
+		// VS Code will call readFile() next to get actual content
+		const resources = this.registry.get(parsed.environmentId);
+		if (resources === undefined) {
+			this.logger.error('WebResourceFileSystemProvider stat: Unknown environmentId', {
+				environmentId: parsed.environmentId
+			});
+			throw vscode.FileSystemError.FileNotFound(uri);
+		}
+
+		this.logger.debug('WebResourceFileSystemProvider stat (no cache)', {
 			environmentId: parsed.environmentId,
 			webResourceId: parsed.webResourceId
 		});
 
-		// Try to get content to determine size
-		try {
-			const content = await this.readFile(uri);
-			return {
-				type: vscode.FileType.File,
-				ctime: Date.now(),
-				mtime: Date.now(),
-				size: content.length
-			};
-		} catch {
-			throw vscode.FileSystemError.FileNotFound(uri);
-		}
+		// Return placeholder values - readFile will fetch actual content
+		return {
+			type: vscode.FileType.File,
+			ctime: 0,
+			mtime: Date.now(),
+			size: 0
+		};
 	}
 
 	readDirectory(): [string, vscode.FileType][] {
@@ -168,14 +198,23 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 
 		const cacheKey = `${parsed.environmentId}:${parsed.webResourceId}`;
 
-		// Check cache
-		const cached = this.contentCache.get(cacheKey);
-		if (cached && Date.now() - cached.timestamp < this.cacheTtlMs) {
-			this.logger.debug('WebResourceFileSystemProvider readFile (cached)', {
-				webResourceId: parsed.webResourceId,
-				size: cached.content.length
+		// Check if there's already a fetch in progress for this resource (dedupe concurrent calls)
+		const pendingFetch = this.pendingFetches.get(cacheKey);
+		if (pendingFetch !== undefined) {
+			this.logger.debug('WebResourceFileSystemProvider readFile (pending)', {
+				webResourceId: parsed.webResourceId
 			});
-			return cached.content;
+			const result = await pendingFetch;
+			return result.content;
+		}
+
+		// Look up environment resources from registry
+		const resources = this.registry.get(parsed.environmentId);
+		if (resources === undefined) {
+			this.logger.error('WebResourceFileSystemProvider: Unknown environmentId', {
+				environmentId: parsed.environmentId
+			});
+			throw vscode.FileSystemError.FileNotFound(uri);
 		}
 
 		this.logger.debug('WebResourceFileSystemProvider readFile', {
@@ -184,28 +223,42 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			webResourceId: parsed.webResourceId
 		});
 
-		try {
-			const result = await this.getWebResourceContentUseCase.execute(
-				parsed.environmentId,
-				parsed.webResourceId
-			);
+		// Create fetch promise and store it to dedupe concurrent calls
+		const fetchPromise = resources.getWebResourceContentUseCase.execute(
+			parsed.environmentId,
+			parsed.webResourceId
+		).then(result => ({
+			content: result.content,
+			modifiedOn: result.modifiedOn
+		}));
 
-			// Cache the content with server's modifiedOn for conflict detection
-			this.contentCache.set(cacheKey, {
-				content: result.content,
-				timestamp: Date.now(),
-				serverModifiedOn: result.modifiedOn
+		this.pendingFetches.set(cacheKey, fetchPromise);
+
+		try {
+			const result = await fetchPromise;
+
+			// Store server state for conflict detection during saves
+			this.serverState.set(cacheKey, {
+				serverModifiedOn: result.modifiedOn,
+				lastKnownContent: result.content
 			});
 
+			// Log content preview for debugging cache issues
+			const contentPreview = new TextDecoder().decode(result.content.slice(0, 100));
 			this.logger.info('Web resource content loaded', {
 				webResourceId: parsed.webResourceId,
-				size: result.content.length
+				size: result.content.length,
+				modifiedOn: result.modifiedOn.toISOString(),
+				contentPreview: contentPreview.substring(0, 50)
 			});
 
 			return result.content;
 		} catch (error) {
 			this.logger.error('Failed to read web resource', error);
 			throw vscode.FileSystemError.FileNotFound(uri);
+		} finally {
+			// Clear pending fetch after completion
+			this.pendingFetches.delete(cacheKey);
 		}
 	}
 
@@ -215,14 +268,23 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			throw vscode.FileSystemError.FileNotFound(uri);
 		}
 
-		if (this.updateWebResourceUseCase === null) {
+		// Look up environment resources from registry
+		const resources = this.registry.get(parsed.environmentId);
+		if (resources === undefined) {
+			this.logger.error('WebResourceFileSystemProvider writeFile: Unknown environmentId', {
+				environmentId: parsed.environmentId
+			});
+			throw vscode.FileSystemError.FileNotFound(uri);
+		}
+
+		if (resources.updateWebResourceUseCase === null) {
 			throw vscode.FileSystemError.NoPermissions('Web resource editing is not available');
 		}
 
 		// Check if content has actually changed (prevents unnecessary writes from auto-save)
 		const cacheKey = `${parsed.environmentId}:${parsed.webResourceId}`;
-		const cached = this.contentCache.get(cacheKey);
-		if (cached !== undefined && this.contentEquals(cached.content, content)) {
+		const state = this.serverState.get(cacheKey);
+		if (state !== undefined && this.contentEquals(state.lastKnownContent, content)) {
 			this.logger.debug('WebResourceFileSystemProvider writeFile skipped - no changes', {
 				uri: uri.toString(),
 				webResourceId: parsed.webResourceId
@@ -231,13 +293,14 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		}
 
 		// Conflict detection: check if server version has changed since we opened the file
-		if (cached !== undefined && this.webResourceRepository !== undefined) {
+		if (state !== undefined && resources.webResourceRepository !== undefined) {
 			const conflictResolution = await this.checkForConflict(
 				parsed.environmentId,
 				parsed.webResourceId,
-				cached.serverModifiedOn,
+				state.serverModifiedOn,
 				parsed.filename,
-				uri
+				uri,
+				resources.webResourceRepository
 			);
 
 			if (conflictResolution === 'cancel') {
@@ -263,14 +326,19 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		});
 
 		try {
-			await this.updateWebResourceUseCase.execute(
+			await resources.updateWebResourceUseCase.execute(
 				parsed.environmentId,
 				parsed.webResourceId,
 				content
 			);
 
 			// Update cache with new content and fetch fresh modifiedOn from server
-			await this.refreshCacheAfterSave(parsed.environmentId, parsed.webResourceId, cacheKey, content);
+			await this.refreshCacheAfterSave(
+				parsed.environmentId,
+				parsed.webResourceId,
+				cacheKey,
+				content
+			);
 
 			// Fire change event for VS Code
 			this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
@@ -287,7 +355,11 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			});
 
 			// Show notification with Publish action (async - don't await)
-			this.showPublishNotification(parsed.environmentId, parsed.webResourceId, parsed.filename);
+			this.showPublishNotification(
+				parsed.environmentId,
+				parsed.webResourceId,
+				parsed.filename
+			);
 		} catch (error) {
 			if (error instanceof NonEditableWebResourceError) {
 				throw vscode.FileSystemError.NoPermissions('Cannot edit binary web resource');
@@ -308,25 +380,60 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	/**
 	 * Invalidates cached content for a specific web resource.
 	 * Call this when a web resource is modified to ensure fresh content on next read.
+	 *
+	 * @param environmentId - The environment ID
+	 * @param webResourceId - Web resource GUID
 	 */
 	invalidateCache(environmentId: string, webResourceId: string): void {
 		const cacheKey = `${environmentId}:${webResourceId}`;
-		this.contentCache.delete(cacheKey);
+		this.serverState.delete(cacheKey);
 		this.logger.debug('WebResourceFileSystemProvider cache invalidated', { environmentId, webResourceId });
 	}
 
 	/**
-	 * Clears all cached content.
+	 * Clears all cached state.
 	 */
 	clearCache(): void {
-		this.contentCache.clear();
+		this.serverState.clear();
 		this.logger.debug('WebResourceFileSystemProvider cache cleared');
+	}
+
+	/**
+	 * Notifies VS Code that a file has changed, forcing it to re-read on next open.
+	 * Call this BEFORE opening a document to ensure VS Code fetches fresh content.
+	 *
+	 * @param uri - The file URI to invalidate
+	 */
+	notifyFileChanged(uri: vscode.Uri): void {
+		this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
+		this.logger.debug('WebResourceFileSystemProvider notified file changed', { uri: uri.toString() });
+	}
+
+	/**
+	 * Waits for any pending fetch for this resource to complete.
+	 *
+	 * @param environmentId - Environment ID
+	 * @param webResourceId - Web resource GUID
+	 */
+	async waitForPendingFetch(environmentId: string, webResourceId: string): Promise<void> {
+		const cacheKey = `${environmentId}:${webResourceId}`;
+		const pending = this.pendingFetches.get(cacheKey);
+		if (pending !== undefined) {
+			this.logger.debug('Waiting for pending fetch', { webResourceId });
+			await pending;
+		}
 	}
 
 	/**
 	 * Checks if the server version has changed since the file was opened.
 	 * If a conflict is detected, shows a modal dialog with resolution options.
 	 *
+	 * @param environmentId - Environment GUID
+	 * @param webResourceId - Web resource GUID
+	 * @param cachedModifiedOn - Timestamp when file was opened/last saved
+	 * @param filename - Display filename for the conflict dialog
+	 * @param _uri - VS Code URI (unused but kept for signature consistency)
+	 * @param webResourceRepository - Repository to check current server timestamp
 	 * @returns 'overwrite' | 'reload' | 'cancel' | 'no-conflict'
 	 */
 	private async checkForConflict(
@@ -334,14 +441,11 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		webResourceId: string,
 		cachedModifiedOn: Date,
 		filename: string,
-		_uri: vscode.Uri
+		_uri: vscode.Uri,
+		webResourceRepository: import('../../domain/interfaces/IWebResourceRepository').IWebResourceRepository
 	): Promise<'overwrite' | 'reload' | 'cancel' | 'no-conflict'> {
-		if (this.webResourceRepository === undefined) {
-			return 'no-conflict';
-		}
-
 		try {
-			const currentModifiedOn = await this.webResourceRepository.getModifiedOn(
+			const currentModifiedOn = await webResourceRepository.getModifiedOn(
 				environmentId,
 				webResourceId
 			);
@@ -386,6 +490,11 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 
 	/**
 	 * Reloads content from server and updates the editor buffer.
+	 *
+	 * @param uri - VS Code URI of the web resource
+	 * @param environmentId - Environment ID
+	 * @param webResourceId - Web resource GUID
+	 * @param cacheKey - Cache key (environmentId:webResourceId)
 	 */
 	private async reloadFromServer(
 		uri: vscode.Uri,
@@ -393,24 +502,32 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		webResourceId: string,
 		cacheKey: string
 	): Promise<void> {
+		const resources = this.registry.get(environmentId);
+		if (resources === undefined) {
+			this.logger.error('WebResourceFileSystemProvider reloadFromServer: Unknown environmentId', {
+				environmentId
+			});
+			void vscode.window.showErrorMessage('Failed to reload: environment not found.');
+			return;
+		}
+
 		try {
-			// Invalidate cache to force fresh fetch
-			this.contentCache.delete(cacheKey);
+			// Invalidate server state
+			this.serverState.delete(cacheKey);
 
 			// Fetch fresh content
-			const result = await this.getWebResourceContentUseCase.execute(
+			const result = await resources.getWebResourceContentUseCase.execute(
 				environmentId,
 				webResourceId
 			);
 
-			// Update cache with fresh content
-			this.contentCache.set(cacheKey, {
-				content: result.content,
-				timestamp: Date.now(),
-				serverModifiedOn: result.modifiedOn
+			// Update server state with fresh data
+			this.serverState.set(cacheKey, {
+				serverModifiedOn: result.modifiedOn,
+				lastKnownContent: result.content
 			});
 
-			// Close and reopen the document to refresh the buffer
+			// Refresh the editor buffer with the new content
 			// This is necessary because VS Code's FileSystemProvider doesn't have
 			// a direct way to update the editor buffer
 			const document = vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
@@ -418,7 +535,9 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 				// Fire change event to notify VS Code the file has changed
 				this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
 
-				// Revert the document to pick up the new content
+				// Show the document first (make it active) then revert it
+				// workbench.action.files.revert only works on the active editor
+				await vscode.window.showTextDocument(document, { preview: false });
 				await vscode.commands.executeCommand('workbench.action.files.revert');
 			}
 
@@ -431,7 +550,12 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	/**
-	 * Refreshes the cache after a successful save by fetching the new modifiedOn from server.
+	 * Refreshes server state after a successful save by fetching the new modifiedOn from server.
+	 *
+	 * @param environmentId - Environment ID
+	 * @param webResourceId - Web resource GUID
+	 * @param cacheKey - Cache key (environmentId:webResourceId)
+	 * @param content - The saved content
 	 */
 	private async refreshCacheAfterSave(
 		environmentId: string,
@@ -439,18 +563,20 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		cacheKey: string,
 		content: Uint8Array
 	): Promise<void> {
-		if (this.webResourceRepository !== undefined) {
+		const resources = this.registry.get(environmentId);
+		const webResourceRepository = resources?.webResourceRepository;
+
+		if (webResourceRepository !== undefined) {
 			try {
-				const newModifiedOn = await this.webResourceRepository.getModifiedOn(
+				const newModifiedOn = await webResourceRepository.getModifiedOn(
 					environmentId,
 					webResourceId
 				);
 
 				if (newModifiedOn !== null) {
-					this.contentCache.set(cacheKey, {
-						content,
-						timestamp: Date.now(),
-						serverModifiedOn: newModifiedOn
+					this.serverState.set(cacheKey, {
+						serverModifiedOn: newModifiedOn,
+						lastKnownContent: content
 					});
 					return;
 				}
@@ -460,10 +586,9 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		}
 
 		// Fallback: use current time if we couldn't fetch from server
-		this.contentCache.set(cacheKey, {
-			content,
-			timestamp: Date.now(),
-			serverModifiedOn: new Date()
+		this.serverState.set(cacheKey, {
+			serverModifiedOn: new Date(),
+			lastKnownContent: content
 		});
 	}
 
@@ -487,18 +612,23 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	 * Shows a notification after save with a Publish action button.
 	 * When clicked, publishes the web resource to make changes visible.
 	 * Coordinates with PublishCoordinator to prevent concurrent publishes.
+	 *
+	 * @param environmentId - Environment ID
+	 * @param webResourceId - Web resource GUID
+	 * @param filename - Display filename for the notification
 	 */
 	private showPublishNotification(
 		environmentId: string,
 		webResourceId: string,
 		filename: string
 	): void {
-		if (this.publishWebResourceUseCase === null) {
+		const resources = this.registry.get(environmentId);
+		if (!resources?.publishWebResourceUseCase) {
 			return;
 		}
 
 		// Capture reference for use in async callback
-		const publishUseCase = this.publishWebResourceUseCase;
+		const publishUseCase = resources.publishWebResourceUseCase;
 
 		// Use void to explicitly ignore the promise (fire-and-forget pattern)
 		void vscode.window.showInformationMessage(

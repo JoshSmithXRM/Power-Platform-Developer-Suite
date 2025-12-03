@@ -9,6 +9,7 @@ import type { GetWebResourceContentUseCase, WebResourceContentResult } from '../
 import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
 import { NonEditableWebResourceError } from '../../application/useCases/UpdateWebResourceUseCase';
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
+import { WebResourceConnectionRegistry } from './WebResourceConnectionRegistry';
 
 // Mock vscode module
 jest.mock('vscode', () => ({
@@ -28,11 +29,31 @@ jest.mock('vscode', () => ({
 	},
 	Uri: {
 		parse: jest.fn((str: string) => {
-			const url = new URL(str);
+			// Parse URI format: scheme:///path or scheme://authority/path
+			const match = str.match(/^([^:]+):\/\/\/?(.*)$/);
+			if (match === null || match[1] === undefined || match[2] === undefined) {
+				return { scheme: '', authority: '', path: '', toString: () => str };
+			}
+			const scheme = match[1];
+			const rest = match[2];
+			// For triple-slash URIs (scheme:///path), authority is empty
+			// For double-slash URIs (scheme://authority/path), first segment is authority
+			const hasTripleSlash = str.includes(':///');
+			let authority = '';
+			let path = '/' + rest;
+			if (!hasTripleSlash && rest.includes('/')) {
+				const firstSlash = rest.indexOf('/');
+				authority = rest.substring(0, firstSlash);
+				path = rest.substring(firstSlash);
+			} else if (!hasTripleSlash && rest.length > 0) {
+				// scheme://authority (no path)
+				authority = rest;
+				path = '';
+			}
 			return {
-				scheme: url.protocol.replace(':', ''),
-				authority: url.hostname,
-				path: url.pathname,
+				scheme,
+				authority,
+				path,
 				toString: () => str
 			};
 		})
@@ -58,25 +79,42 @@ jest.mock('vscode', () => ({
 describe('WebResourceFileSystemProvider', () => {
 	let provider: WebResourceFileSystemProvider;
 	let mockUseCase: jest.Mocked<GetWebResourceContentUseCase>;
+	let mockRegistry: WebResourceConnectionRegistry;
 
+	// Test identifiers
 	const testEnvironmentId = 'env-00000000-0000-0000-0000-000000000001';
 	const testWebResourceId = 'wr-00000000-0000-0000-0000-000000000002';
 	const testFilename = 'new_script.js';
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		WebResourceConnectionRegistry.resetInstance();
 
 		mockUseCase = {
 			execute: jest.fn()
 		} as unknown as jest.Mocked<GetWebResourceContentUseCase>;
 
-		provider = new WebResourceFileSystemProvider(mockUseCase, null, null, new NullLogger());
+		// Create registry and register the environment resources
+		mockRegistry = WebResourceConnectionRegistry.getInstance(new NullLogger());
+		mockRegistry.register(testEnvironmentId, {
+			getWebResourceContentUseCase: mockUseCase,
+			updateWebResourceUseCase: null,
+			publishWebResourceUseCase: null,
+			webResourceRepository: undefined
+		});
+
+		// Create provider with registry
+		provider = new WebResourceFileSystemProvider(mockRegistry, new NullLogger());
+	});
+
+	afterEach(() => {
+		WebResourceConnectionRegistry.resetInstance();
 	});
 
 	describe('parseWebResourceUri', () => {
 		it('should parse valid web resource URI', () => {
-			// Arrange
-			const uri = vscode.Uri.parse(`${WEB_RESOURCE_SCHEME}://${testEnvironmentId}/${testWebResourceId}/${testFilename}`);
+			// Arrange - URI uses environmentId in path for VS Code document identity
+			const uri = vscode.Uri.parse(`${WEB_RESOURCE_SCHEME}:///${testEnvironmentId}/${testWebResourceId}/${testFilename}`);
 
 			// Act
 			const result = parseWebResourceUri(uri);
@@ -91,7 +129,7 @@ describe('WebResourceFileSystemProvider', () => {
 		it('should parse URI with nested path', () => {
 			// Arrange
 			const nestedFilename = 'scripts/utils/helper.js';
-			const uri = vscode.Uri.parse(`${WEB_RESOURCE_SCHEME}://${testEnvironmentId}/${testWebResourceId}/${nestedFilename}`);
+			const uri = vscode.Uri.parse(`${WEB_RESOURCE_SCHEME}:///${testEnvironmentId}/${testWebResourceId}/${nestedFilename}`);
 
 			// Act
 			const result = parseWebResourceUri(uri);
@@ -103,7 +141,7 @@ describe('WebResourceFileSystemProvider', () => {
 
 		it('should return null for non-web-resource scheme', () => {
 			// Arrange
-			const uri = vscode.Uri.parse(`file://${testEnvironmentId}/${testWebResourceId}/${testFilename}`);
+			const uri = vscode.Uri.parse(`file:///${testEnvironmentId}/${testWebResourceId}/${testFilename}`);
 
 			// Act
 			const result = parseWebResourceUri(uri);
@@ -113,8 +151,8 @@ describe('WebResourceFileSystemProvider', () => {
 		});
 
 		it('should return null for URI with insufficient path parts', () => {
-			// Arrange
-			const uri = vscode.Uri.parse(`${WEB_RESOURCE_SCHEME}://${testEnvironmentId}/${testWebResourceId}`);
+			// Arrange - only 2 path parts (environmentId, webResourceId) - missing filename
+			const uri = vscode.Uri.parse(`${WEB_RESOURCE_SCHEME}:///${testEnvironmentId}/${testWebResourceId}`);
 
 			// Act
 			const result = parseWebResourceUri(uri);
@@ -125,14 +163,14 @@ describe('WebResourceFileSystemProvider', () => {
 	});
 
 	describe('createWebResourceUri', () => {
-		it('should create valid web resource URI', () => {
-			// Act
+		it('should create valid web resource URI with environmentId in path', () => {
+			// Act - URI uses environmentId in path for VS Code document identity
 			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
 
 			// Assert
 			expect(uri.scheme).toBe(WEB_RESOURCE_SCHEME);
-			expect(uri.authority).toBe(testEnvironmentId);
-			expect(uri.path).toBe(`/${testWebResourceId}/${testFilename}`);
+			expect(uri.authority).toBe(''); // Empty authority for triple-slash URI
+			expect(uri.path).toBe(`/${testEnvironmentId}/${testWebResourceId}/${testFilename}`);
 		});
 	});
 
@@ -181,7 +219,7 @@ describe('WebResourceFileSystemProvider', () => {
 		});
 
 		it('should throw FileNotFound for invalid URI', async () => {
-			// Arrange
+			// Arrange - invalid scheme
 			const uri = vscode.Uri.parse(`file://${testEnvironmentId}/${testWebResourceId}`);
 
 			// Act & Assert
@@ -221,7 +259,7 @@ describe('WebResourceFileSystemProvider', () => {
 		});
 
 		it('should throw FileNotFound for invalid URI', async () => {
-			// Arrange
+			// Arrange - invalid scheme
 			const uri = vscode.Uri.parse(`file://${testEnvironmentId}/${testWebResourceId}`);
 
 			// Act & Assert
@@ -292,7 +330,7 @@ describe('WebResourceFileSystemProvider', () => {
 			// First read to populate cache
 			await provider.readFile(uri);
 
-			// Act - Invalidate cache
+			// Act - Invalidate cache (uses environmentId)
 			provider.invalidateCache(testEnvironmentId, testWebResourceId);
 
 			// Second read should call use case again
@@ -343,6 +381,7 @@ describe('WebResourceFileSystemProvider with write support', () => {
 	let provider: WebResourceFileSystemProvider;
 	let mockGetUseCase: jest.Mocked<GetWebResourceContentUseCase>;
 	let mockUpdateUseCase: jest.Mocked<UpdateWebResourceUseCase>;
+	let mockRegistry: WebResourceConnectionRegistry;
 
 	const testEnvironmentId = 'env-00000000-0000-0000-0000-000000000001';
 	const testWebResourceId = 'wr-00000000-0000-0000-0000-000000000002';
@@ -350,6 +389,7 @@ describe('WebResourceFileSystemProvider with write support', () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		WebResourceConnectionRegistry.resetInstance();
 
 		mockGetUseCase = {
 			execute: jest.fn()
@@ -359,7 +399,20 @@ describe('WebResourceFileSystemProvider with write support', () => {
 			execute: jest.fn()
 		} as unknown as jest.Mocked<UpdateWebResourceUseCase>;
 
-		provider = new WebResourceFileSystemProvider(mockGetUseCase, mockUpdateUseCase, null, new NullLogger());
+		// Create registry and register environment resources with write support
+		mockRegistry = WebResourceConnectionRegistry.getInstance(new NullLogger());
+		mockRegistry.register(testEnvironmentId, {
+			getWebResourceContentUseCase: mockGetUseCase,
+			updateWebResourceUseCase: mockUpdateUseCase,
+			publishWebResourceUseCase: null,
+			webResourceRepository: undefined
+		});
+
+		provider = new WebResourceFileSystemProvider(mockRegistry, new NullLogger());
+	});
+
+	afterEach(() => {
+		WebResourceConnectionRegistry.resetInstance();
 	});
 
 	describe('writeFile', () => {
@@ -431,7 +484,7 @@ describe('WebResourceFileSystemProvider with write support', () => {
 		});
 
 		it('should throw FileNotFound for invalid URI', async () => {
-			// Arrange
+			// Arrange - invalid scheme
 			const uri = vscode.Uri.parse(`file://${testEnvironmentId}/${testWebResourceId}`);
 			const content = new Uint8Array([72, 101, 108, 108, 111]);
 
@@ -446,6 +499,7 @@ describe('WebResourceFileSystemProvider with conflict detection', () => {
 	let mockGetUseCase: jest.Mocked<GetWebResourceContentUseCase>;
 	let mockUpdateUseCase: jest.Mocked<UpdateWebResourceUseCase>;
 	let mockRepository: jest.Mocked<{ getModifiedOn: jest.Mock }>;
+	let mockRegistry: WebResourceConnectionRegistry;
 
 	const testEnvironmentId = 'env-00000000-0000-0000-0000-000000000001';
 	const testWebResourceId = 'wr-00000000-0000-0000-0000-000000000002';
@@ -454,6 +508,7 @@ describe('WebResourceFileSystemProvider with conflict detection', () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		WebResourceConnectionRegistry.resetInstance();
 
 		mockGetUseCase = {
 			execute: jest.fn()
@@ -467,15 +522,20 @@ describe('WebResourceFileSystemProvider with conflict detection', () => {
 			getModifiedOn: jest.fn()
 		};
 
-		// Create provider with repository for conflict detection
-		provider = new WebResourceFileSystemProvider(
-			mockGetUseCase,
-			mockUpdateUseCase,
-			null,
-			new NullLogger(),
-			undefined,
-			mockRepository as unknown as jest.Mocked<import('../../domain/interfaces/IWebResourceRepository').IWebResourceRepository>
-		);
+		// Create registry and register environment resources with repository for conflict detection
+		mockRegistry = WebResourceConnectionRegistry.getInstance(new NullLogger());
+		mockRegistry.register(testEnvironmentId, {
+			getWebResourceContentUseCase: mockGetUseCase,
+			updateWebResourceUseCase: mockUpdateUseCase,
+			publishWebResourceUseCase: null,
+			webResourceRepository: mockRepository as unknown as jest.Mocked<import('../../domain/interfaces/IWebResourceRepository').IWebResourceRepository>
+		});
+
+		provider = new WebResourceFileSystemProvider(mockRegistry, new NullLogger());
+	});
+
+	afterEach(() => {
+		WebResourceConnectionRegistry.resetInstance();
 	});
 
 	describe('conflict detection', () => {

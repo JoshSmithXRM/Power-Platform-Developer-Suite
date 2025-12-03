@@ -63,8 +63,12 @@ export class PowerPlatformApiService implements IPowerPlatformApiService {
 			{
 				headers: {
 					'Authorization': `Bearer ${accessToken}`,
-					'Accept': 'application/json'
-				}
+					'Accept': 'application/json',
+					// Prevent HTTP caching - admin tools must always get fresh data
+					'Cache-Control': 'no-cache, no-store, must-revalidate',
+					'Pragma': 'no-cache'
+				},
+				cache: 'no-store'
 			}
 		);
 
