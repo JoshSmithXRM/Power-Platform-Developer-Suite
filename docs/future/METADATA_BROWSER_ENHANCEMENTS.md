@@ -1,6 +1,25 @@
 # Metadata Browser Enhancements
 
-Future enhancements for the Metadata Browser panel (MVP implemented).
+Future enhancements for the Metadata Browser panel.
+
+---
+
+## Implemented (v0.1.0 - v0.2.0)
+
+**Metadata Browser Core** is fully implemented:
+- ✅ Browse entities with hierarchical navigation (System/Custom)
+- ✅ View attributes with complete metadata (type, required level, constraints)
+- ✅ View relationships (One-to-Many, Many-to-Many)
+- ✅ View entity keys (alternate keys)
+- ✅ View security privileges
+- ✅ Global choice sets (OptionSets) with values
+- ✅ Smart 5-minute caching
+- ✅ Export metadata to JSON
+- ✅ Open in Maker functionality
+- ✅ Parallel metadata queries for performance
+- ✅ Search within entity/attribute lists
+
+**Implementation**: `src/features/metadataBrowser/`
 
 ---
 
@@ -163,5 +182,4 @@ Create new entities, attributes, relationships from within the Metadata Browser.
 
 ---
 
-**Last Updated**: 2025-12-01
-**Source**: Extracted from METADATA_BROWSER_REQUIREMENTS.md "Out of Scope" section
+**Last Updated**: 2025-12-02
