@@ -37,12 +37,14 @@ export interface IWebResourceRepository {
 	): Promise<WebResource | null>;
 
 	/**
-	 * Gets the content of a web resource (base64 encoded).
+	 * Gets the unpublished content of a web resource (base64 encoded).
+	 * Returns the latest saved content, even if not yet published.
+	 * This ensures developers see their most recent changes when editing.
 	 *
 	 * @param environmentId - Environment ID
 	 * @param webResourceId - Web resource GUID
 	 * @param cancellationToken - Optional token to cancel the operation
-	 * @returns Base64 encoded content string
+	 * @returns Base64 encoded content string (unpublished version)
 	 */
 	getContent(
 		environmentId: string,

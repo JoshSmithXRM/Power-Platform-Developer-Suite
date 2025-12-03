@@ -202,9 +202,13 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 		webResourceId: string,
 		cancellationToken?: ICancellationToken
 	): Promise<string> {
-		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})?$select=content`;
+		// Use RetrieveUnpublished bound function to get unpublished content.
+		// This ensures developers see their latest changes (before publish).
+		// Standard query returns published content; RetrieveUnpublished returns unpublished.
+		// Note: modifiedon timestamp is the same for both (always unpublished modified time).
+		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})/Microsoft.Dynamics.CRM.RetrieveUnpublished?$select=content`;
 
-		this.logger.debug('Fetching web resource content', { environmentId, webResourceId });
+		this.logger.debug('Fetching unpublished web resource content', { environmentId, webResourceId });
 
 		CancellationHelper.throwIfCancelled(cancellationToken);
 
@@ -217,7 +221,7 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 
 			CancellationHelper.throwIfCancelled(cancellationToken);
 
-			this.logger.debug('Fetched web resource content', {
+			this.logger.debug('Fetched unpublished web resource content', {
 				webResourceId,
 				contentLength: response.content?.length ?? 0
 			});

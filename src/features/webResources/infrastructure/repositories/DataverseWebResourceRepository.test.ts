@@ -325,7 +325,7 @@ describe('DataverseWebResourceRepository', () => {
 
 			expect(mockApiService.get).toHaveBeenCalledWith(
 				'env-123',
-				'/api/data/v9.2/webresourceset(wr-123)?$select=content',
+				'/api/data/v9.2/webresourceset(wr-123)/Microsoft.Dynamics.CRM.RetrieveUnpublished?$select=content',
 				undefined
 			);
 			expect(result).toBe('Y29uc29sZS5sb2coIkhlbGxvIik7');
