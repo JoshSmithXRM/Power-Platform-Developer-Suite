@@ -4,124 +4,135 @@ Features for querying, manipulating, and managing Dataverse data.
 
 ---
 
-## High Priority
+## Implemented
 
-### Data Explorer (Ad-hoc Advanced Find)
-**Status**: In Development
-**Target Version**: v0.3.0
-**Priority**: High
-**Estimated Effort**: 32-40 hours
-**Value**: Query data without leaving VSCode, save and reuse queries
+### Data Explorer (SQL/FetchXML Query Execution)
+**Status**: ✅ Implemented (v0.2.2 - v0.2.6)
+**Version**: v0.2.2 (MVP), v0.2.4 (FetchXML mode), v0.2.6 (settings)
 
-**Description**:
-Interactive query builder for Dataverse data with live results and saved queries.
+**What's Implemented**:
+- ✅ SQL query editor with syntax highlighting
+- ✅ SQL → FetchXML transpilation with live preview
+- ✅ FetchXML direct editing mode (bidirectional preview)
+- ✅ FetchXML → SQL transpilation with warnings for unsupported features
+- ✅ Query execution against Dataverse
+- ✅ Results displayed in sortable data table
+- ✅ Clickable record links (lookup fields and primary keys)
+- ✅ Copy record URL button on hover
+- ✅ Export results to CSV
+- ✅ Keyboard shortcut (Ctrl+Enter)
+- ✅ Query mode persistence per environment
+- ✅ Row limit warning modal (TOP 100 prompt)
+- ✅ Zone-based Ctrl+A selection in results table
 
-**Core Features**:
-- Entity picker with search
-- Column selector (multi-select)
-- Filter builder (conditions, groups, AND/OR)
-- Sort configuration
-- Live data table with results
-- Pagination for large result sets
-
-**Query Persistence**:
-- Save as UserQuery (Personal View) in Dataverse
-- Load existing personal views
-- Portable across devices/users with same permissions
-- Available in Dynamics UI as well
-
-**Advanced Features**:
-- FetchXML view/edit mode
-- Export to CSV/Excel
-- Quick filters on result columns
-- Column resizing/reordering
-
-**Technical Considerations**:
-- UserQuery entity for saved queries (systemuser-owned)
-- FetchXML generation from UI selections
-- Handle large result sets (virtual scrolling?)
-- Respect user's security privileges
-
-**Success Criteria**:
-- Faster than Advanced Find in browser
-- Queries saved and reusable
-- Works with any entity user has access to
-
----
-
-### SQL to FetchXML (SQL4CDS-style)
-**Status**: Partially Implemented (basic SQL parsing done)
-**Target Version**: v0.4.0 (aggregates, JOINs)
-**Priority**: High
-**Estimated Effort**: 24-32 hours (remaining: aggregates, JOINs ~16-28h)
-**Value**: Query Dataverse using familiar SQL syntax
-
-**Description**:
-Write SQL queries, convert to FetchXML, execute against Dataverse. Inspired by XRM Toolbox SQL4CDS.
-
-**Core Features**:
-- SQL query editor with syntax highlighting
-- SQL → FetchXML conversion
-- Execute query and display results
-- View generated FetchXML
-- Query history
-
-**SQL Support**:
+**SQL Support** (Implemented):
 - SELECT with column list or *
 - FROM with table (entity) name
 - WHERE with conditions (=, <>, <, >, LIKE, IN, IS NULL)
-- JOIN for related entities (lookup traversal)
 - ORDER BY
 - TOP / LIMIT for pagination
-- Aggregate functions (COUNT, SUM, AVG, MIN, MAX)
-- GROUP BY
+
+**Implementation**: `src/features/dataExplorer/`
+
+---
+
+## High Priority
+
+### Data Explorer - IntelliSense
+**Status**: Planned
+**Target Version**: v0.3.0
+**Priority**: High
+**Estimated Effort**: 12-18 hours
+**Value**: Autocomplete for entity and attribute names while typing SQL
+
+**Description**:
+Add VS Code native IntelliSense for SQL queries - entity names after FROM, attribute names after SELECT/WHERE.
+
+**Core Features**:
+- Entity name completion (after FROM/JOIN)
+- Attribute name completion (after SELECT/WHERE/ORDER BY)
+- SQL keyword completion
+- Metadata caching for performance
+
+**Technical Design**: `docs/future/DATA_EXPLORER_INTELLISENSE_DESIGN.md` (V2 - revised)
+
+**Success Criteria**:
+- Typing "FROM acc" suggests "account"
+- Typing "SELECT na" suggests "name" for the current entity
+- Completions work in any .sql file when Data Explorer has an active environment
+
+---
+
+### Data Explorer - SQL Aggregates & JOINs
+**Status**: Planned
+**Target Version**: v0.3.0
+**Priority**: High
+**Estimated Effort**: 16-24 hours
+**Value**: Full SQL4CDS-style query support
+
+**Description**:
+Add aggregate functions and JOIN support to SQL transpiler.
+
+**Aggregate Support**:
+- COUNT, SUM, AVG, MIN, MAX functions
+- GROUP BY clause
+- HAVING clause (stretch)
+
+**JOIN Support**:
+- INNER JOIN for related entities
+- Lookup traversal via JOIN syntax
 
 **Example Queries**:
 ```sql
-SELECT name, revenue, createdon
-FROM account
-WHERE statecode = 0
-ORDER BY revenue DESC
+SELECT statecode, COUNT(*) as count
+FROM contact
+GROUP BY statecode
 
 SELECT a.name, c.fullname
 FROM account a
 JOIN contact c ON a.primarycontactid = c.contactid
 WHERE a.revenue > 1000000
-
-SELECT statecode, COUNT(*) as count
-FROM contact
-GROUP BY statecode
 ```
 
-**Integration with Data Explorer**:
-- Switch between SQL mode and visual query builder
-- SQL generates FetchXML, visual builder can read it back
-- Same result display and export capabilities
+**Success Criteria**:
+- Common aggregate queries work
+- Basic JOINs translate to FetchXML link-entity
+- Clear error messages for unsupported syntax
+
+### Data Explorer - Saved Queries (UserQuery)
+**Status**: Planned
+**Target Version**: v0.3.0
+**Priority**: High
+**Estimated Effort**: 6-10 hours
+**Value**: Save SQL queries as Personal Views visible in both VS Code AND Dynamics Advanced Find
+
+**Description**:
+Save the current query as a UserQuery (Personal View) in Dataverse. This bridges the VS Code experience with Dynamics - queries created in our tool appear as Advanced Find views in the browser.
+
+**Core Features**:
+- Save current query as UserQuery (Personal View)
+- Load existing personal views into the editor
+- Portable across devices/users with same permissions
+- Available in Dynamics UI Advanced Find
 
 **Technical Considerations**:
-- SQL parser (could use existing library or build simple one)
-- Map SQL constructs to FetchXML equivalents
-- Handle Dataverse-specific quirks (option sets, lookups, polymorphic lookups)
-- Error messages for unsupported SQL features
-- Consider referencing MarkMpn's SQL4CDS for parsing patterns
-
-**Limitations to Document**:
-- Not full T-SQL - subset that maps to FetchXML
-- No INSERT/UPDATE/DELETE (read-only, or separate feature)
-- Some complex JOINs may not translate
+- UserQuery entity for saved queries (systemuser-owned)
+- FetchXML storage format (already generated by transpiler)
+- Need to add layoutxml for column configuration
+- Query name and description input
 
 **Success Criteria**:
-- Common queries work as expected
-- Clear error messages for unsupported syntax
-- Faster than writing FetchXML by hand
-- Seamless integration with Data Explorer
+- User saves SQL query, it appears in Dynamics Advanced Find
+- User loads existing Personal View, can edit and re-save
 
 ---
 
+## Medium Priority
+
 ### Record Cloning (Cross-Environment)
-**Status**: Planned
+**Status**: Deferred
 **Target Version**: v1.1+
-**Priority**: High
+**Priority**: Medium
 **Estimated Effort**: 16-24 hours
 **Value**: Copy records between environments for testing/data migration
 
@@ -139,20 +150,11 @@ Query records in source environment and clone to target environment.
 - Requires two authenticated connections
 - Handle lookup field remapping
 - Skip system fields (createdon, modifiedon, etc.)
-- Handle duplicate detection rules
-- Transaction/rollback for batch failures
-
-**Success Criteria**:
-- Reliable cross-environment data copy
-- Clear handling of lookup remapping
-- Progress visibility for large batches
 
 ---
 
-## Medium Priority
-
 ### Bulk Data Operations
-**Status**: Planned
+**Status**: Deferred
 **Target Version**: v1.1+
 **Priority**: Medium
 **Estimated Effort**: 16-24 hours
@@ -166,19 +168,12 @@ Bulk update or delete records with preview and confirmation.
 - Bulk update: set field values across records
 - Bulk delete: remove matching records
 - Preview affected records before execution
-- Progress tracking and cancellation
 
 **Safety Features**:
 - Record count confirmation
 - Preview first N records
 - Dry-run mode
-- Audit trail of operations
-
-**Success Criteria**:
-- Safer than direct API calls
-- Clear preview before destructive operations
-- Handles large batches efficiently
 
 ---
 
-**Last Updated**: 2025-11-30
+**Last Updated**: 2025-12-02
