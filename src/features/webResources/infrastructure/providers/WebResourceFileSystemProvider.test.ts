@@ -41,7 +41,18 @@ jest.mock('vscode', () => ({
 		event: jest.fn(),
 		fire: jest.fn()
 	})),
-	Disposable: jest.fn().mockImplementation((callback) => ({ dispose: callback }))
+	Disposable: jest.fn().mockImplementation((callback) => ({ dispose: callback })),
+	window: {
+		showWarningMessage: jest.fn(),
+		showInformationMessage: jest.fn(),
+		showErrorMessage: jest.fn()
+	},
+	workspace: {
+		textDocuments: []
+	},
+	commands: {
+		executeCommand: jest.fn()
+	}
 }));
 
 describe('WebResourceFileSystemProvider', () => {
@@ -134,7 +145,8 @@ describe('WebResourceFileSystemProvider', () => {
 				content: testContent,
 				fileExtension: '.js',
 				displayName: 'Script',
-				name: 'new_script.js'
+				name: 'new_script.js',
+				modifiedOn: new Date('2024-01-15T10:30:00Z')
 			};
 			mockUseCase.execute.mockResolvedValue(mockResult);
 
@@ -154,7 +166,8 @@ describe('WebResourceFileSystemProvider', () => {
 				content: testContent,
 				fileExtension: '.js',
 				displayName: 'Script',
-				name: 'new_script.js'
+				name: 'new_script.js',
+				modifiedOn: new Date('2024-01-15T10:30:00Z')
 			};
 			mockUseCase.execute.mockResolvedValue(mockResult);
 
@@ -194,7 +207,8 @@ describe('WebResourceFileSystemProvider', () => {
 				content: testContent,
 				fileExtension: '.js',
 				displayName: 'Script',
-				name: 'new_script.js'
+				name: 'new_script.js',
+				modifiedOn: new Date('2024-01-15T10:30:00Z')
 			};
 			mockUseCase.execute.mockResolvedValue(mockResult);
 
@@ -270,7 +284,8 @@ describe('WebResourceFileSystemProvider', () => {
 				content: testContent,
 				fileExtension: '.js',
 				displayName: 'Script',
-				name: 'new_script.js'
+				name: 'new_script.js',
+				modifiedOn: new Date('2024-01-15T10:30:00Z')
 			};
 			mockUseCase.execute.mockResolvedValue(mockResult);
 
@@ -296,7 +311,8 @@ describe('WebResourceFileSystemProvider', () => {
 				content: testContent,
 				fileExtension: '.js',
 				displayName: 'Script',
-				name: 'new_script.js'
+				name: 'new_script.js',
+				modifiedOn: new Date('2024-01-15T10:30:00Z')
 			};
 			mockUseCase.execute.mockResolvedValue(mockResult);
 
@@ -373,7 +389,8 @@ describe('WebResourceFileSystemProvider with write support', () => {
 				content: originalContent,
 				fileExtension: '.js',
 				displayName: 'Script',
-				name: 'new_script.js'
+				name: 'new_script.js',
+				modifiedOn: new Date('2024-01-15T10:30:00Z')
 			};
 			mockGetUseCase.execute.mockResolvedValue(mockResult);
 			mockUpdateUseCase.execute.mockResolvedValue();
@@ -420,6 +437,207 @@ describe('WebResourceFileSystemProvider with write support', () => {
 
 			// Act & Assert
 			await expect(provider.writeFile(uri, content)).rejects.toThrow();
+		});
+	});
+});
+
+describe('WebResourceFileSystemProvider with conflict detection', () => {
+	let provider: WebResourceFileSystemProvider;
+	let mockGetUseCase: jest.Mocked<GetWebResourceContentUseCase>;
+	let mockUpdateUseCase: jest.Mocked<UpdateWebResourceUseCase>;
+	let mockRepository: jest.Mocked<{ getModifiedOn: jest.Mock }>;
+
+	const testEnvironmentId = 'env-00000000-0000-0000-0000-000000000001';
+	const testWebResourceId = 'wr-00000000-0000-0000-0000-000000000002';
+	const testFilename = 'new_script.js';
+	const originalModifiedOn = new Date('2024-01-15T10:30:00Z');
+
+	beforeEach(() => {
+		jest.clearAllMocks();
+
+		mockGetUseCase = {
+			execute: jest.fn()
+		} as unknown as jest.Mocked<GetWebResourceContentUseCase>;
+
+		mockUpdateUseCase = {
+			execute: jest.fn()
+		} as unknown as jest.Mocked<UpdateWebResourceUseCase>;
+
+		mockRepository = {
+			getModifiedOn: jest.fn()
+		};
+
+		// Create provider with repository for conflict detection
+		provider = new WebResourceFileSystemProvider(
+			mockGetUseCase,
+			mockUpdateUseCase,
+			null,
+			new NullLogger(),
+			undefined,
+			mockRepository as unknown as jest.Mocked<import('../../domain/interfaces/IWebResourceRepository').IWebResourceRepository>
+		);
+	});
+
+	describe('conflict detection', () => {
+		it('should proceed with save when no conflict (same modifiedOn)', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const originalContent = new Uint8Array([79, 108, 100]); // "Old"
+			const newContent = new Uint8Array([78, 101, 119]); // "New"
+
+			const mockResult: WebResourceContentResult = {
+				content: originalContent,
+				fileExtension: '.js',
+				displayName: 'Script',
+				name: 'new_script.js',
+				modifiedOn: originalModifiedOn
+			};
+			mockGetUseCase.execute.mockResolvedValue(mockResult);
+			mockUpdateUseCase.execute.mockResolvedValue();
+			mockRepository.getModifiedOn.mockResolvedValue(originalModifiedOn); // Same timestamp
+
+			// First read to populate cache
+			await provider.readFile(uri);
+
+			// Act - Write new content (should not trigger conflict modal)
+			await provider.writeFile(uri, newContent);
+
+			// Assert - Save should proceed
+			expect(mockUpdateUseCase.execute).toHaveBeenCalledWith(
+				testEnvironmentId,
+				testWebResourceId,
+				newContent
+			);
+		});
+
+		it('should check for conflict when server has newer version', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const originalContent = new Uint8Array([79, 108, 100]); // "Old"
+			const newContent = new Uint8Array([78, 101, 119]); // "New"
+			const serverModifiedOn = new Date('2024-01-15T12:00:00Z'); // Newer than cached
+
+			const mockResult: WebResourceContentResult = {
+				content: originalContent,
+				fileExtension: '.js',
+				displayName: 'Script',
+				name: 'new_script.js',
+				modifiedOn: originalModifiedOn
+			};
+			mockGetUseCase.execute.mockResolvedValue(mockResult);
+			mockUpdateUseCase.execute.mockResolvedValue();
+			mockRepository.getModifiedOn.mockResolvedValue(serverModifiedOn);
+
+			// Mock vscode.window.showWarningMessage
+			const showWarningMessage = vscode.window.showWarningMessage as jest.Mock;
+			showWarningMessage.mockResolvedValue('Overwrite');
+
+			// First read to populate cache
+			await provider.readFile(uri);
+
+			// Act - Write new content (should trigger conflict modal)
+			await provider.writeFile(uri, newContent);
+
+			// Assert
+			expect(mockRepository.getModifiedOn).toHaveBeenCalledWith(
+				testEnvironmentId,
+				testWebResourceId
+			);
+			expect(showWarningMessage).toHaveBeenCalledWith(
+				expect.stringContaining('has been modified on the server'),
+				expect.objectContaining({ modal: true }),
+				'Overwrite',
+				'Reload from Server'
+			);
+			expect(mockUpdateUseCase.execute).toHaveBeenCalled();
+		});
+
+		it('should cancel save when user cancels conflict dialog', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const originalContent = new Uint8Array([79, 108, 100]);
+			const newContent = new Uint8Array([78, 101, 119]);
+			const serverModifiedOn = new Date('2024-01-15T12:00:00Z');
+
+			const mockResult: WebResourceContentResult = {
+				content: originalContent,
+				fileExtension: '.js',
+				displayName: 'Script',
+				name: 'new_script.js',
+				modifiedOn: originalModifiedOn
+			};
+			mockGetUseCase.execute.mockResolvedValue(mockResult);
+			mockRepository.getModifiedOn.mockResolvedValue(serverModifiedOn);
+
+			// Mock user clicking cancel (undefined means Escape or X button)
+			const showWarningMessage = vscode.window.showWarningMessage as jest.Mock;
+			showWarningMessage.mockResolvedValue(undefined);
+
+			// First read to populate cache
+			await provider.readFile(uri);
+
+			// Act
+			await provider.writeFile(uri, newContent);
+
+			// Assert - Save should NOT be called
+			expect(mockUpdateUseCase.execute).not.toHaveBeenCalled();
+		});
+
+		it('should skip conflict check when content unchanged', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const originalContent = new Uint8Array([79, 108, 100]);
+
+			const mockResult: WebResourceContentResult = {
+				content: originalContent,
+				fileExtension: '.js',
+				displayName: 'Script',
+				name: 'new_script.js',
+				modifiedOn: originalModifiedOn
+			};
+			mockGetUseCase.execute.mockResolvedValue(mockResult);
+
+			// First read to populate cache
+			await provider.readFile(uri);
+
+			// Act - Write same content (should skip conflict check and save)
+			await provider.writeFile(uri, originalContent);
+
+			// Assert - No conflict check, no save (content unchanged)
+			expect(mockRepository.getModifiedOn).not.toHaveBeenCalled();
+			expect(mockUpdateUseCase.execute).not.toHaveBeenCalled();
+		});
+
+		it('should proceed with save when conflict check fails', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const originalContent = new Uint8Array([79, 108, 100]);
+			const newContent = new Uint8Array([78, 101, 119]);
+
+			const mockResult: WebResourceContentResult = {
+				content: originalContent,
+				fileExtension: '.js',
+				displayName: 'Script',
+				name: 'new_script.js',
+				modifiedOn: originalModifiedOn
+			};
+			mockGetUseCase.execute.mockResolvedValue(mockResult);
+			mockUpdateUseCase.execute.mockResolvedValue();
+			// Conflict check fails (network error, etc.)
+			mockRepository.getModifiedOn.mockRejectedValue(new Error('Network error'));
+
+			// First read to populate cache
+			await provider.readFile(uri);
+
+			// Act - Write new content (should proceed despite conflict check failure)
+			await provider.writeFile(uri, newContent);
+
+			// Assert - Save should proceed
+			expect(mockUpdateUseCase.execute).toHaveBeenCalledWith(
+				testEnvironmentId,
+				testWebResourceId,
+				newContent
+			);
 		});
 	});
 });

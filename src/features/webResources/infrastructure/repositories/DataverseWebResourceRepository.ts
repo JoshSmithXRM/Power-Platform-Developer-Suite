@@ -478,6 +478,47 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 		}
 	}
 
+	/**
+	 * Gets the current modifiedOn timestamp for a web resource.
+	 * Lightweight query for conflict detection - only fetches modifiedon field.
+	 */
+	async getModifiedOn(
+		environmentId: string,
+		webResourceId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<Date | null> {
+		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})?$select=modifiedon`;
+
+		this.logger.debug('Fetching web resource modifiedOn', { environmentId, webResourceId });
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			const response = await this.apiService.get<{ modifiedon: string }>(
+				environmentId,
+				endpoint,
+				cancellationToken
+			);
+
+			CancellationHelper.throwIfCancelled(cancellationToken);
+
+			const modifiedOn = new Date(response.modifiedon);
+
+			this.logger.debug('Fetched web resource modifiedOn', { webResourceId, modifiedOn: modifiedOn.toISOString() });
+
+			return modifiedOn;
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			// 404 means not found - return null
+			if (normalizedError.message.includes('404') || normalizedError.message.includes('Not Found')) {
+				this.logger.debug('Web resource not found', { webResourceId });
+				return null;
+			}
+			this.logger.error('Failed to fetch web resource modifiedOn', normalizedError);
+			throw normalizedError;
+		}
+	}
+
 	private mapToEntity(dto: DataverseWebResourceDto): WebResource {
 		return new WebResource(
 			dto.webresourceid,

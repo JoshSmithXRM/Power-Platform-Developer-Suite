@@ -41,11 +41,33 @@ This document tracks remaining work to **fully complete** three features:
 ### Remaining Work (This Branch)
 | # | Task | Effort | Status |
 |---|------|--------|--------|
-| 1 | Conflict detection (warn if modified by another user) | 3-4h | Planned |
+| 1 | Conflict detection (warn if modified by another user) | 3-4h | **Done** |
+| 1b | **BUG FIX**: Connection-based document identity (see below) | 4-6h | **Next** |
 | 2 | JavaScript syntax validation before upload | 2-3h | Planned |
 | 3 | Retry logic for transient failures | 1-2h | Planned |
 
-**Total: ~6-9 hours**
+**Total: ~10-15 hours** (increased due to bug fix)
+
+#### Bug: FileSystemProvider Uses Wrong Connection
+
+**Problem:** The FileSystemProvider is a singleton created with the first panel's connection. If a user opens a second panel with a different connection (e.g., Service Principal vs Interactive User), file operations still use the first connection's credentials.
+
+**Current URI:** `ppds-webresource://environmentId/webResourceId/filename.ext`
+
+**Expected Behavior:**
+- Same connection + same web resource = same editor
+- Different connection + same web resource = different editors (even if same environment)
+
+**Fix Required:**
+1. Change URI scheme to use `connectionId` instead of `environmentId`
+2. Create a connection registry that FileSystemProvider can query
+3. FileSystemProvider parses connection ID from URI, looks up correct credentials
+4. Update cache key to `connectionId:webResourceId`
+
+**Why This Matters:**
+- Different connections may have different permissions
+- Audit logs should show correct identity
+- User explicitly chose different credentials for a reason
 
 ---
 

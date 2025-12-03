@@ -72,7 +72,9 @@ export async function initializeWebResources(
 			getWebResourceContentUseCase,
 			updateWebResourceUseCase,
 			publishWebResourceUseCase,
-			logger
+			logger,
+			undefined, // configService - optional
+			webResourceRepository // for conflict detection
 		);
 
 		context.subscriptions.push(
