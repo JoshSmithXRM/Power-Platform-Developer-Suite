@@ -32,6 +32,9 @@ import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 import { createWebResourceUri, WebResourceFileSystemProvider } from '../../infrastructure/providers/WebResourceFileSystemProvider';
+import type { WebResourceConnectionRegistry, EnvironmentResources } from '../../infrastructure/providers/WebResourceConnectionRegistry';
+import type { GetWebResourceContentUseCase } from '../../application/useCases/GetWebResourceContentUseCase';
+import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
 import { PublishBehavior } from '../../../../shared/infrastructure/ui/behaviors/PublishBehavior';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
@@ -88,6 +91,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	// Cancelled when user switches solutions to stop wasted API calls
 	private currentCancellationSource: vscode.CancellationTokenSource | null = null;
 
+	// Resources for FileSystemProvider registration (kept for re-registration on environment change)
+	private readonly environmentResources: EnvironmentResources;
+
 	private constructor(
 		private readonly panel: vscode.WebviewPanel,
 		private readonly extensionUri: vscode.Uri,
@@ -102,11 +108,28 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		private readonly logger: ILogger,
 		environmentId: string,
 		private readonly panelStateRepository: IPanelStateRepository | undefined,
-		private readonly fileSystemProvider: WebResourceFileSystemProvider | undefined
+		private readonly fileSystemProvider: WebResourceFileSystemProvider | undefined,
+		private readonly connectionRegistry: WebResourceConnectionRegistry | undefined,
+		getWebResourceContentUseCase: GetWebResourceContentUseCase,
+		updateWebResourceUseCase: UpdateWebResourceUseCase
 	) {
 		super();
 		this.currentEnvironmentId = environmentId;
-		logger.debug('WebResourcesPanel: Initialized with virtual table architecture');
+
+		// Create environment resources for FileSystemProvider registration
+		this.environmentResources = {
+			getWebResourceContentUseCase,
+			updateWebResourceUseCase,
+			publishWebResourceUseCase,
+			webResourceRepository
+		};
+
+		// Register resources with registry if we have a valid environment
+		if (this.connectionRegistry && environmentId) {
+			this.connectionRegistry.register(environmentId, this.environmentResources);
+		}
+
+		logger.debug('WebResourcesPanel: Initialized with virtual table architecture', { environmentId });
 
 		// Virtual table config - no artificial limits. Primary data display uses
 		// listWebResourcesUseCase with OData pagination (unlimited records).
@@ -148,6 +171,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.registerCommandHandlers();
 
 		// Subscribe to FileSystemProvider save events for auto-refresh
+		// Only process events for this panel's current environment
 		if (this.fileSystemProvider) {
 			this.saveSubscription = this.fileSystemProvider.onDidSaveWebResource((event) => {
 				void this.handleWebResourceSaved(event.environmentId, event.webResourceId);
@@ -199,7 +223,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	 * Cancels any background loading and clears caches.
 	 */
 	public dispose(): void {
-		this.logger.debug('WebResourcesPanel: Disposing');
+		this.logger.debug('WebResourcesPanel: Disposing', { environmentId: this.currentEnvironmentId });
 
 		// Cancel any in-flight solution data request
 		if (this.currentCancellationSource) {
@@ -223,6 +247,10 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		// Dispose behaviors
 		this.publishBehavior.dispose();
 
+		// Note: We don't unregister from the connection registry on dispose
+		// because another panel might be using the same environment's resources.
+		// The registry is designed to be shared across panels.
+
 		this.logger.debug('WebResourcesPanel: Disposed successfully');
 	}
 
@@ -239,8 +267,16 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		logger: ILogger,
 		initialEnvironmentId?: string,
 		panelStateRepository?: IPanelStateRepository,
-		fileSystemProvider?: WebResourceFileSystemProvider
+		fileSystemProvider?: WebResourceFileSystemProvider,
+		connectionRegistry?: WebResourceConnectionRegistry,
+		getWebResourceContentUseCase?: GetWebResourceContentUseCase,
+		updateWebResourceUseCase?: UpdateWebResourceUseCase
 	): Promise<WebResourcesPanelComposed> {
+		// These use cases must be provided for the panel to function properly
+		if (getWebResourceContentUseCase === undefined || updateWebResourceUseCase === undefined) {
+			throw new Error('WebResourcesPanelComposed requires getWebResourceContentUseCase and updateWebResourceUseCase');
+		}
+
 		return EnvironmentScopedPanel.createOrShowPanel({
 			viewType: WebResourcesPanelComposed.viewType,
 			titlePrefix: 'Web Resources',
@@ -262,7 +298,10 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				logger,
 				envId,
 				panelStateRepository,
-				fileSystemProvider
+				fileSystemProvider,
+				connectionRegistry,
+				getWebResourceContentUseCase,
+				updateWebResourceUseCase
 			),
 			webviewOptions: {
 				enableScripts: true,
@@ -674,6 +713,13 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		const oldEnvironmentId = this.currentEnvironmentId;
 		this.currentEnvironmentId = environmentId;
 
+		// Register resources for the new environment in the registry
+		// This ensures FileSystemProvider can find credentials when opening web resources
+		if (this.connectionRegistry && environmentId) {
+			this.connectionRegistry.register(environmentId, this.environmentResources);
+			this.logger.debug('Registered environment resources in registry', { environmentId });
+		}
+
 		// Clear cache - new environment means fresh data
 		this.clearCache();
 
@@ -876,12 +922,27 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	 * @param typeCode - Web resource type code (determines file extension)
 	 */
 	private async handleOpenWebResource(webResourceId: string, name: string, _typeCode: number): Promise<void> {
-		this.logger.debug('Opening web resource in editor', { webResourceId, name });
+		// Require environment selection before opening web resources
+		if (!this.currentEnvironmentId) {
+			vscode.window.showWarningMessage('Please select an environment first.');
+			return;
+		}
+
+		this.logger.debug('Opening web resource in editor', { webResourceId, name, environmentId: this.currentEnvironmentId });
 
 		try {
+			// Get friendly environment name for the filename suffix
+			const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+			const envName = environment?.name ?? this.currentEnvironmentId;
+			// Sanitize environment name for filename safety (remove invalid characters)
+			const sanitizedEnvName = envName.replace(/[<>:"/\\|?*]/g, '_').trim();
+
 			// Web resource name already includes the file extension (e.g., "new_script.js")
-			// No need to append extension based on type code
-			const filename = name;
+			// Append environment name to help user identify which environment the file is from
+			const nameParts = name.split('.');
+			const ext = nameParts.length > 1 ? `.${nameParts.pop()}` : '';
+			const baseName = nameParts.join('.');
+			const filename = `${baseName} [${sanitizedEnvName}]${ext}`;
 
 			const uri = createWebResourceUri(
 				this.currentEnvironmentId,
@@ -889,10 +950,31 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				filename
 			);
 
-			const document = await vscode.workspace.openTextDocument(uri);
-			await vscode.window.showTextDocument(document, { preview: true });
+			// Invalidate our internal cache to ensure fresh fetch
+			if (this.fileSystemProvider) {
+				this.fileSystemProvider.invalidateCache(this.currentEnvironmentId, webResourceId);
+			}
 
-			this.logger.info('Opened web resource in editor', { webResourceId, filename });
+			// Open the document - VS Code may return cached content immediately
+			const document = await vscode.workspace.openTextDocument(uri);
+			await vscode.window.showTextDocument(document, { preview: false });
+
+			// VS Code returns cached documents immediately without waiting for our readFile().
+			// Our readFile() IS called but runs in background. Wait for it to complete.
+			if (this.fileSystemProvider) {
+				await this.fileSystemProvider.waitForPendingFetch(this.currentEnvironmentId, webResourceId);
+			}
+
+			// Now that our readFile() has fresh content from server, tell VS Code to reload.
+			// Fire change event to signal the file changed, then revert to force reload.
+			if (this.fileSystemProvider) {
+				this.fileSystemProvider.notifyFileChanged(uri);
+			}
+
+			this.logger.debug('Reverting to show fresh content');
+			await vscode.commands.executeCommand('workbench.action.files.revert');
+
+			this.logger.info('Opened web resource in editor', { webResourceId, filename, environmentId: this.currentEnvironmentId });
 		} catch (error) {
 			this.logger.error('Failed to open web resource', error);
 			const message = error instanceof Error ? error.message : 'Unknown error';
@@ -1042,14 +1124,17 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	/**
 	 * Handles web resource save events from FileSystemProvider.
 	 * Fetches the updated web resource and refreshes the table row.
+	 *
+	 * @param environmentId - Environment ID from the save event
+	 * @param webResourceId - Web resource GUID that was saved
 	 */
 	private async handleWebResourceSaved(environmentId: string, webResourceId: string): Promise<void> {
-		// Only process events for the current environment
+		// Only process events for this panel's current environment
 		if (environmentId !== this.currentEnvironmentId) {
 			return;
 		}
 
-		this.logger.debug('WebResourcesPanel: Handling save event', { webResourceId });
+		this.logger.debug('WebResourcesPanel: Handling save event', { webResourceId, environmentId });
 
 		try {
 			// Fetch the updated web resource from the server

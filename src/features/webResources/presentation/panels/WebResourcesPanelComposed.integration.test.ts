@@ -10,6 +10,8 @@ import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import type { ListWebResourcesUseCase } from '../../application/useCases/ListWebResourcesUseCase';
 import type { PublishWebResourceUseCase } from '../../application/useCases/PublishWebResourceUseCase';
+import type { GetWebResourceContentUseCase } from '../../application/useCases/GetWebResourceContentUseCase';
+import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
 import type { IWebResourceRepository } from '../../domain/interfaces/IWebResourceRepository';
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
@@ -114,6 +116,8 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 	let mockGetEnvironmentById: jest.Mock<Promise<EnvironmentInfo | null>>;
 	let mockListWebResourcesUseCase: jest.Mocked<ListWebResourcesUseCase>;
 	let mockPublishWebResourceUseCase: jest.Mocked<PublishWebResourceUseCase>;
+	let mockGetWebResourceContentUseCase: jest.Mocked<GetWebResourceContentUseCase>;
+	let mockUpdateWebResourceUseCase: jest.Mocked<UpdateWebResourceUseCase>;
 	let mockWebResourceRepository: jest.Mocked<IWebResourceRepository>;
 	let mockSolutionRepository: jest.Mocked<ISolutionRepository>;
 	let mockUrlBuilder: jest.Mocked<IMakerUrlBuilder>;
@@ -183,6 +187,14 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 		mockPublishWebResourceUseCase = {
 			execute: jest.fn().mockResolvedValue({ success: true })
 		} as unknown as jest.Mocked<PublishWebResourceUseCase>;
+
+		mockGetWebResourceContentUseCase = {
+			execute: jest.fn().mockResolvedValue({ content: '', base64Content: '' })
+		} as unknown as jest.Mocked<GetWebResourceContentUseCase>;
+
+		mockUpdateWebResourceUseCase = {
+			execute: jest.fn().mockResolvedValue({ success: true })
+		} as unknown as jest.Mocked<UpdateWebResourceUseCase>;
 
 		mockWebResourceRepository = {
 			findAll: jest.fn().mockResolvedValue([]),
@@ -284,7 +296,10 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			mockLogger,
 			TEST_ENVIRONMENT_ID,
 			mockPanelStateRepository,
-			undefined // No FileSystemProvider for tests
+			undefined, // No FileSystemProvider for tests
+			undefined, // No connectionRegistry for tests
+			mockGetWebResourceContentUseCase,
+			mockUpdateWebResourceUseCase
 		);
 
 		// Wait for async initialization
@@ -490,7 +505,10 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 				mockLogger,
 				TEST_ENVIRONMENT_ID,
 				mockPanelStateRepository,
-				undefined
+				undefined, // No FileSystemProvider for tests
+				undefined, // No connectionRegistry for tests
+				mockGetWebResourceContentUseCase,
+				mockUpdateWebResourceUseCase
 			);
 
 			// Wait a tick for initialization to start

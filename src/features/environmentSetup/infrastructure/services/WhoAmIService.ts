@@ -92,9 +92,13 @@ export class WhoAmIService implements IWhoAmIService {
 						'Authorization': `Bearer ${token}`,
 						'Accept': 'application/json',
 						'OData-MaxVersion': '4.0',
-						'OData-Version': '4.0'
+						'OData-Version': '4.0',
+						// Prevent HTTP caching - admin tools must always get fresh data
+						'Cache-Control': 'no-cache, no-store, must-revalidate',
+						'Pragma': 'no-cache'
 					},
-					signal: controller.signal
+					signal: controller.signal,
+					cache: 'no-store'
 				});
 
 				if (!response.ok) {

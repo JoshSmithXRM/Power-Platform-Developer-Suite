@@ -2,12 +2,16 @@ import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { WebResourceFileSystemProvider as WebResourceFileSystemProviderType } from '../../infrastructure/providers/WebResourceFileSystemProvider';
+import type { WebResourceConnectionRegistry as WebResourceConnectionRegistryType } from '../../infrastructure/providers/WebResourceConnectionRegistry';
 
 /** Tracks whether the FileSystemProvider has been registered (once per extension lifecycle) */
 let fileSystemProviderRegistered = false;
 
 /** Singleton instance of the FileSystemProvider (shared across all panel instances) */
 let fileSystemProviderInstance: WebResourceFileSystemProviderType | null = null;
+
+/** Singleton instance of the ConnectionRegistry */
+let connectionRegistryInstance: WebResourceConnectionRegistryType | null = null;
 
 /**
  * Lazy-loads and initializes Web Resources panel.
@@ -34,6 +38,7 @@ export async function initializeWebResources(
 	const { MakerUrlBuilder } = await import('../../../../shared/infrastructure/services/MakerUrlBuilder.js');
 	const { WebResourceViewModelMapper } = await import('../mappers/WebResourceViewModelMapper.js');
 	const { WebResourceFileSystemProvider, WEB_RESOURCE_SCHEME } = await import('../../infrastructure/providers/WebResourceFileSystemProvider.js');
+	const { WebResourceConnectionRegistry } = await import('../../infrastructure/providers/WebResourceConnectionRegistry.js');
 
 	const { getAccessToken, getDataverseUrl } = dataverseApiServiceFactory;
 	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
@@ -66,15 +71,13 @@ export async function initializeWebResources(
 		logger
 	);
 
-	// Register FileSystemProvider once per extension lifecycle
+	// Initialize ConnectionRegistry and FileSystemProvider once per extension lifecycle
 	if (!fileSystemProviderRegistered) {
+		connectionRegistryInstance = WebResourceConnectionRegistry.getInstance(logger);
+
 		fileSystemProviderInstance = new WebResourceFileSystemProvider(
-			getWebResourceContentUseCase,
-			updateWebResourceUseCase,
-			publishWebResourceUseCase,
-			logger,
-			undefined, // configService - optional
-			webResourceRepository // for conflict detection
+			connectionRegistryInstance,
+			logger
 		);
 
 		context.subscriptions.push(
@@ -87,6 +90,26 @@ export async function initializeWebResources(
 
 		fileSystemProviderRegistered = true;
 		logger.info('WebResourceFileSystemProvider registered', { scheme: WEB_RESOURCE_SCHEME });
+	} else {
+		// Get existing registry instance for subsequent panels
+		connectionRegistryInstance = WebResourceConnectionRegistry.getInstance(logger);
+	}
+
+	// Ensure registry is available (should always be set after first initialization)
+	if (connectionRegistryInstance === null) {
+		throw new Error('WebResourceConnectionRegistry not initialized - this should never happen');
+	}
+
+	// Register this panel's resources in the registry by environmentId
+	// Only register if we have a valid environmentId - panel will re-register when environment is selected
+	if (initialEnvironmentId) {
+		connectionRegistryInstance.register(initialEnvironmentId, {
+			getWebResourceContentUseCase,
+			updateWebResourceUseCase,
+			publishWebResourceUseCase,
+			webResourceRepository
+		});
+		logger.debug('Registered environment resources', { environmentId: initialEnvironmentId });
 	}
 
 	await WebResourcesPanelComposed.createOrShow(
@@ -102,6 +125,10 @@ export async function initializeWebResources(
 		logger,
 		initialEnvironmentId,
 		panelStateRepository,
-		fileSystemProviderInstance ?? undefined
+		fileSystemProviderInstance ?? undefined,
+		connectionRegistryInstance ?? undefined,
+		// Pass the use cases so panel can re-register when environment changes
+		getWebResourceContentUseCase,
+		updateWebResourceUseCase
 	);
 }
