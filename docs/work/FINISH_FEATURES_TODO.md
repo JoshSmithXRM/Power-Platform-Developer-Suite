@@ -180,6 +180,7 @@ Before merging this branch:
 | Non-modal notifications | Changed modals to non-modal so users can scroll diff while deciding | ✅ Done |
 | Syntax highlighting | Added `setTextDocumentLanguage` to enable JS/CSS/HTML highlighting for custom URI scheme | ✅ Done |
 | Created By / Modified By columns | Added user metadata columns to web resources table (parallel session) | ✅ Done |
+| **BUG FIX: Solution refresh on env change** | Solution dropdown wasn't updating when switching environments | ✅ Done |
 
 ### Files Modified This Session
 
@@ -241,7 +242,32 @@ cache: 'no-store'
 
 ---
 
-### BUG 3: Unit Tests Need Updating
+### BUG 3: Solution Dropdown Not Refreshing on Environment Switch
+
+**Severity:** HIGH
+**Status:** ✅ FIXED
+
+**Problem:** When switching environments, the solution dropdown in panels retained solutions from the previous environment instead of loading solutions for the new environment.
+
+**Root Cause:** Two issues found:
+1. **Web Resources & Environment Variables:** Panels sent `updateSolutionSelector` message to webview, but `messaging.js` had NO handler for this message - it was silently ignored
+2. **Connection References:** Panel didn't even call `loadSolutions()` on environment change
+
+**Solution:**
+1. Added `updateSolutionSelector` message handler in `resources/webview/js/messaging.js`
+2. Fixed `ConnectionReferencesPanelComposed.handleEnvironmentChange()` to load solutions and send update message
+
+**Files Fixed:**
+- `resources/webview/js/messaging.js` - Added message handler
+- `src/features/connectionReferences/presentation/panels/ConnectionReferencesPanelComposed.ts` - Fixed env change
+
+**Regression Tests Added:**
+- `WebResourcesPanelComposed.integration.test.ts` - 2 new tests
+- `ConnectionReferencesPanelComposed.integration.test.ts` - 1 new test
+
+---
+
+### BUG 4: Unit Tests Need Updating
 
 **Severity:** MEDIUM
 **Status:** ⚠️ PRE-EXISTING (Not blocking this work)

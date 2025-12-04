@@ -526,9 +526,10 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	}
 
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
+		this.logger.debug('Environment changed', { environmentId });
+
 		const oldEnvironmentId = this.currentEnvironmentId;
 		this.currentEnvironmentId = environmentId;
-		this.currentSolutionId = DEFAULT_SOLUTION_ID;
 
 		// Re-register panel in map for new environment
 		this.reregisterPanel(ConnectionReferencesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
@@ -536,26 +537,63 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		const environment = await this.getEnvironmentById(environmentId);
 		this.panel.title = `Connection References - ${environment?.name || 'Unknown'}`;
 
-		// Load saved solution selection for new environment
+		// Load persisted state for the NEW environment (Option A: Fresh Start)
+		await this.loadPersistedStateForEnvironment(environmentId);
+
+		// Load solutions for the NEW environment
+		this.solutionOptions = await this.loadSolutions();
+
+		// Post-load validation: Check if persisted solution still exists
+		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+			if (!this.solutionOptions.some(s => s.id === this.currentSolutionId)) {
+				this.logger.warn('Persisted solution no longer exists, falling back to default', {
+					invalidSolutionId: this.currentSolutionId
+				});
+				this.currentSolutionId = DEFAULT_SOLUTION_ID;
+			}
+		}
+
+		// Update solution selector in UI
+		await this.panel.webview.postMessage({
+			command: 'updateSolutionSelector',
+			data: {
+				solutions: this.solutionOptions,
+				currentSolutionId: this.currentSolutionId
+			}
+		});
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
+	}
+
+	/**
+	 * Loads persisted state for a specific environment.
+	 * Called during environment switch to restore the target environment's saved state.
+	 */
+	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
+		// Reset to defaults first
+		this.currentSolutionId = DEFAULT_SOLUTION_ID;
+
 		if (this.panelStateRepository) {
 			try {
 				const state = await this.panelStateRepository.load({
 					panelType: 'connectionReferences',
-					environmentId: this.currentEnvironmentId
+					environmentId
 				});
 				if (state && typeof state === 'object' && 'selectedSolutionId' in state) {
 					const savedId = state.selectedSolutionId as string | undefined;
 					if (savedId) {
 						this.currentSolutionId = savedId;
+						this.logger.debug('Loaded persisted solution for environment', {
+							environmentId,
+							solutionId: this.currentSolutionId
+						});
 					}
 				}
 			} catch (error) {
-				this.logger.warn('Failed to load panel state for new environment', error);
+				this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
 			}
 		}
-
-		// handleRefresh handles loading state
-		await this.handleRefresh();
 	}
 
 	private async handleSolutionChange(solutionId: string): Promise<void> {
