@@ -163,6 +163,9 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	/** Temporary storage for content being saved, used for conflict diff display. Key: environmentId:webResourceId */
 	private readonly pendingSaveContent = new Map<string, Uint8Array>();
 
+	/** Pre-fetched content for immediate delivery when document opens. Key: environmentId:webResourceId */
+	private readonly preFetchedContent = new Map<string, FetchResult>();
+
 	/**
 	 * Creates a FileSystemProvider.
 	 *
@@ -450,6 +453,24 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	): Promise<Uint8Array> {
 		const cacheKey = `${parsed.environmentId}:${parsed.webResourceId}`;
 
+		// Check for pre-fetched content (used by reloadFromServer for instant delivery)
+		const preFetched = this.preFetchedContent.get(cacheKey);
+		if (preFetched !== undefined) {
+			this.preFetchedContent.delete(cacheKey);
+			this.logger.debug('WebResourceFileSystemProvider readFile (pre-fetched)', {
+				webResourceId: parsed.webResourceId,
+				size: preFetched.content.length
+			});
+
+			// Update server state for conflict detection
+			this.serverState.set(cacheKey, {
+				serverModifiedOn: preFetched.modifiedOn,
+				lastKnownContent: preFetched.content
+			});
+
+			return preFetched.content;
+		}
+
 		// Check if there's already a fetch in progress for this resource (dedupe concurrent calls)
 		const pendingFetch = this.pendingFetches.get(cacheKey);
 		if (pendingFetch !== undefined) {
@@ -479,6 +500,18 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 
 		try {
 			const result = await fetchPromise;
+
+			// Detect external changes: content changed since our last read
+			const existingState = this.serverState.get(cacheKey);
+			if (existingState !== undefined && !this.contentEquals(existingState.lastKnownContent, result.content)) {
+				this.logger.info('Content refreshed from server (external change detected)', {
+					webResourceId: parsed.webResourceId,
+					previousSize: existingState.lastKnownContent.length,
+					newSize: result.content.length,
+					previousModifiedOn: existingState.serverModifiedOn.toISOString(),
+					newModifiedOn: result.modifiedOn.toISOString()
+				});
+			}
 
 			// Store server state for conflict detection during saves
 			this.serverState.set(cacheKey, {
@@ -796,6 +829,9 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	/**
 	 * Reloads content from server and updates the editor buffer.
 	 *
+	 * Pre-fetches content before opening the document to avoid showing
+	 * stale/empty content while the async fetch completes.
+	 *
 	 * @param uri - VS Code URI of the web resource
 	 * @param environmentId - Environment ID
 	 * @param webResourceId - Web resource GUID
@@ -808,14 +844,35 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		cacheKey: string
 	): Promise<void> {
 		try {
-			// Clear cached state so readFile() fetches fresh content from server
-			this.serverState.delete(cacheKey);
-
 			// Parse the original URI to get the filename
 			const parsed = parseWebResourceUri(uri);
 			if (parsed === null) {
 				throw new Error('Invalid web resource URI');
 			}
+
+			// Get resources for this environment
+			const resources = this.registry.get(environmentId);
+			if (resources === undefined) {
+				throw new Error('Environment not registered');
+			}
+
+			// PRE-FETCH content before opening document.
+			// This ensures content is immediately available when VS Code calls readFile(),
+			// avoiding the race condition where openTextDocument returns before fetch completes.
+			this.logger.debug('Pre-fetching content for reload', { webResourceId });
+			const fetchResult = await resources.getWebResourceContentUseCase.execute(
+				environmentId,
+				webResourceId
+			);
+
+			// Store pre-fetched content for immediate delivery in readFile()
+			this.preFetchedContent.set(cacheKey, {
+				content: fetchResult.content,
+				modifiedOn: fetchResult.modifiedOn
+			});
+
+			// Clear old cached state (will be replaced by pre-fetched content)
+			this.serverState.delete(cacheKey);
 
 			// Create a fresh URI without any mode (defaults to unpublished).
 			// This ensures we always load unpublished content, regardless of
@@ -830,13 +887,15 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			// Close the current document
 			await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
 
-			// Open fresh document with unpublished content
+			// Open fresh document - readFile() will use pre-fetched content instantly
 			const document = await vscode.workspace.openTextDocument(unpublishedUri);
 			await vscode.window.showTextDocument(document, { preview: false });
 
 			this.logger.info('Web resource reloaded from server', { webResourceId });
 			void vscode.window.showInformationMessage(`Reloaded "${parsed.filename}" from server.`);
 		} catch (error) {
+			// Clean up pre-fetched content on error
+			this.preFetchedContent.delete(cacheKey);
 			this.logger.error('Failed to reload from server', error);
 			void vscode.window.showErrorMessage('Failed to reload from server. Please try again.');
 		}
