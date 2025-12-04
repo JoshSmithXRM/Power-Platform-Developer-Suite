@@ -44,10 +44,11 @@ This document tracks remaining work to **fully complete** three features:
 | 1 | Conflict detection (warn if modified by another user) | 3-4h | **Done** |
 | 1a | Version selection UX (open with unpublished changes) | 2-3h | **Done** |
 | 1b | Version selection UX (save conflict with Compare First) | 2-3h | **Done** |
-| 2 | JavaScript syntax validation before upload | 2-3h | Planned |
-| 3 | Retry logic for transient failures | 1-2h | Planned |
+| 2 | ~~JavaScript syntax validation before upload~~ | ~~2-3h~~ | **Covered by VS Code** |
+| 2a | Syntax highlighting for custom URI scheme | 0.5h | **Done** |
+| 3 | ~~Retry logic for transient failures~~ | ~~1-2h~~ | **Already in DataverseApiService** |
 
-**Total: ~6-8 hours remaining** (JS validation + retry logic)
+**✅ Web Resources feature is COMPLETE**
 
 #### ~~Bug: FileSystemProvider Uses Wrong Connection~~ ✅ FIXED
 
@@ -75,10 +76,10 @@ The registry maps `environmentId` → resources, and FileSystemProvider queries 
 ### Remaining Work (This Branch)
 | # | Task | Effort | Status |
 |---|------|--------|--------|
-| 4 | Solution-aware filtering (show only solution entities) | 4-6h | Planned |
-| 5 | CSV export for attributes and relationships | 3-4h | Planned |
+| 4 | ~~Solution-aware filtering~~ | ~~4-6h~~ | **Moved to Solution Explorer** |
+| 5 | ~~CSV/Excel export~~ | ~~3-4h~~ | **Deferred** (clipboard copy sufficient) |
 
-**Total: ~7-10 hours**
+**✅ Metadata Browser feature is COMPLETE**
 
 ---
 
@@ -120,12 +121,12 @@ The registry maps `environmentId` → resources, and FileSystemProvider queries 
 
 ---
 
-## Grand Total: ~50-68 hours remaining
+## Grand Total: ~40-55 hours remaining
 
 | Feature | Effort | Status |
 |---------|--------|--------|
-| Web Resources | 3-5h | Most done, JS validation + retry remaining |
-| Metadata Browser | 7-10h | Planned |
+| Web Resources | 0h | ✅ **COMPLETE** |
+| Metadata Browser | 0h | ✅ **COMPLETE** |
 | Data Explorer | 40-55h | Planned |
 
 ---
@@ -187,6 +188,8 @@ Before merging this branch:
 | Version selection UX (Process 2) | Save conflict: "Compare First/Overwrite/Discard" modal → diff → non-modal resolution | ✅ Done |
 | New URI content modes | Added 'server-current' and 'local-pending' modes for conflict diff display | ✅ Done |
 | Non-modal notifications | Changed modals to non-modal so users can scroll diff while deciding | ✅ Done |
+| Syntax highlighting | Added `setTextDocumentLanguage` to enable JS/CSS/HTML highlighting for custom URI scheme | ✅ Done |
+| Created By / Modified By columns | Added user metadata columns to web resources table (parallel session) | ✅ Done |
 
 ### Files Modified This Session
 
@@ -272,7 +275,10 @@ These tests assumed TTL caching which was removed. The stat() test expects readF
 | 2025-12-03 | Remove TTL caching from FileSystemProvider | Admin tools must always show fresh data |
 | 2025-12-03 | Use environmentId (not connectionId) in URI | Simplified approach - environmentId already unique per connection |
 | 2025-12-03 | Non-modal notifications for diff views | Allows user to scroll and examine diff while buttons remain visible |
+| 2025-12-03 | Move solution filtering to Solution Explorer | Metadata Browser is for ALL metadata; solution-scoped entity viewing belongs in Solution Explorer |
+| 2025-12-03 | Defer Excel export | Heavy bundle size (~500KB-1.5MB); clipboard copy works for now |
+| 2025-12-03 | Mark Web Resources & Metadata Browser complete | Only Data Explorer remains for v0.3.0 |
 
 ---
 
-**Last Updated:** 2025-12-03 (Version Selection UX complete)
+**Last Updated:** 2025-12-03 (Web Resources & Metadata Browser complete)

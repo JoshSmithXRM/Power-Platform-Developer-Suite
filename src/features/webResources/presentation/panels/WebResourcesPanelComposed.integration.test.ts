@@ -253,7 +253,9 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			WebResourceType.HTML, // Text-based type
 			false, // isManaged
 			now, // createdOn
-			now  // modifiedOn
+			now, // modifiedOn
+			'Test User', // createdBy
+			'Test User' // modifiedBy
 		);
 	}
 

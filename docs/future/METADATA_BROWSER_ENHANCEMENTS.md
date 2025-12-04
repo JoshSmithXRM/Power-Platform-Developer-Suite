@@ -25,47 +25,6 @@ Future enhancements for the Metadata Browser panel.
 
 ## Medium Priority
 
-### Solution-Aware Filtering
-**Status**: Planned
-**Priority**: Medium
-**Estimated Effort**: 4-6 hours
-**Value**: Show only entities/components within a specific solution
-
-**Description**:
-Filter the entity/choice tree to show only components that belong to a selected solution, similar to how other panels filter by solution.
-
-**Core Features**:
-- Solution dropdown selector (reuse existing pattern)
-- Filter tree to solution components only
-- Option to show all entities (current behavior)
-
-**Technical Considerations**:
-- Query solution components to get entity list
-- May need to cache solution component mappings
-
----
-
-### Metadata Export to JSON/CSV
-**Status**: Planned
-**Priority**: Medium
-**Estimated Effort**: 4-6 hours
-**Value**: Export entity schemas for documentation or comparison
-
-**Description**:
-Export entity metadata (attributes, relationships, keys) to JSON or CSV format for documentation, auditing, or offline analysis.
-
-**Core Features**:
-- Export current entity metadata to JSON
-- Export attribute list to CSV
-- Export relationships to CSV
-- Bulk export all entities in solution
-
-**Technical Considerations**:
-- Reuse existing CSV export infrastructure from Data Explorer
-- JSON export is straightforward (serialize domain entities)
-
----
-
 ### Metadata Comparison Between Environments
 **Status**: Planned
 **Priority**: Medium
@@ -176,10 +135,22 @@ Create new entities, attributes, relationships from within the Metadata Browser.
 
 ---
 
-## Archive (Considered & Rejected)
+## Archive (Considered & Deferred)
 
-*None yet.*
+### Solution-Aware Filtering
+**Status**: Moved to Solution Explorer
+**Decision Date**: 2025-12-03
+**Reason**: Metadata Browser is intended to browse ALL metadata in an environment regardless of solution. Solution-scoped entity viewing belongs in Solution Explorer panel where users can drill into solution components.
+
+### CSV/Excel Export
+**Status**: Deferred
+**Decision Date**: 2025-12-03
+**Reason**:
+- Clipboard copy to Excel works (few extra clicks)
+- Excel export requires heavy dependencies (~500KB-1.5MB for xlsx libraries)
+- Bundle size impact not justified for documentation use case
+- If strong user demand emerges, consider "Zip of CSVs" approach (no heavy deps)
 
 ---
 
-**Last Updated**: 2025-12-02
+**Last Updated**: 2025-12-03

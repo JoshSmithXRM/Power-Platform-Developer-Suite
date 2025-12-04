@@ -569,7 +569,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				{ key: 'type', label: 'Type' },
 				{ key: 'managed', label: 'Managed' },
 				{ key: 'createdOn', label: 'Created On', type: 'datetime' },
-				{ key: 'modifiedOn', label: 'Modified On', type: 'datetime' }
+				{ key: 'createdBy', label: 'Created By' },
+				{ key: 'modifiedOn', label: 'Modified On', type: 'datetime' },
+				{ key: 'modifiedBy', label: 'Modified By' }
 			],
 			searchPlaceholder: '🔍 Search web resources...',
 			noDataMessage: 'No web resources found.',
