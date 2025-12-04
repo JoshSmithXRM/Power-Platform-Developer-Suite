@@ -1059,6 +1059,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		if (selection === 'Edit Unpublished') {
 			this.logger.info('User chose to edit unpublished version', { webResourceId });
 			await this.openWebResourceDirectly(webResourceId, filename, 'unpublished');
+
+			// Offer to publish since we know there are unpublished changes
+			this.offerToPublishUnpublishedChanges(webResourceId, filename);
 		} else if (selection === 'Edit Published') {
 			this.logger.info('User chose to edit published version', { webResourceId });
 			await this.openWebResourceDirectly(webResourceId, filename, 'published');
@@ -1180,6 +1183,34 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			async () => this.publishWebResourceUseCase.executeAll(this.currentEnvironmentId),
 			'All customizations published successfully'
 		);
+	}
+
+	/**
+	 * Offers to publish unpublished changes when user opens the unpublished version.
+	 * Shows a non-modal notification so user can continue working while deciding.
+	 *
+	 * @param webResourceId - Web resource GUID
+	 * @param filename - Display filename
+	 */
+	private offerToPublishUnpublishedChanges(webResourceId: string, filename: string): void {
+		// Fire and forget - don't await, let user continue working
+		void vscode.window
+			.showInformationMessage(
+				`"${filename}" has unpublished changes. Would you like to publish them now?`,
+				'Publish',
+				'Not Now'
+			)
+			.then(async (choice) => {
+				if (choice === 'Publish') {
+					this.logger.info('User chose to publish unpublished changes', { webResourceId });
+					await this.publishBehavior.executePublish(
+						'publish',
+						async () =>
+							this.publishWebResourceUseCase.execute(this.currentEnvironmentId, webResourceId),
+						`Published: ${filename}`
+					);
+				}
+			});
 	}
 
 	/**

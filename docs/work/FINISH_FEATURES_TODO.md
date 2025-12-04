@@ -301,30 +301,86 @@ These tests assumed TTL caching which was removed. The stat() test expects readF
 
 ## Active Bug Fix: Save Conflict "Use Server Version" Flow
 
-### Status: IN PROGRESS
+### Status: ✅ FIXED
 
 ### Problem
-When user chooses "Use Server Version" during a save conflict, VS Code shows stale/empty content briefly (~1 second), then loads correct content. Multiple unnecessary readFile calls occur.
+When user chooses "Use Server Version" during a save conflict, VS Code showed stale/empty content briefly (~1 second), then loaded correct content. Multiple unnecessary readFile calls occurred.
 
 ### Root Cause
-`reloadFromServer()` calls `openTextDocument()` which returns immediately, but our `readFile()` runs asynchronously. VS Code shows placeholder before fetch completes.
+`reloadFromServer()` called `openTextDocument()` which returns immediately, but our `readFile()` runs asynchronously. VS Code showed placeholder content before fetch completed.
 
-### Changes Made This Session
-1. Removed `waitForPendingFetch + notifyFileChanged + revert` pattern (was solving wrong problem)
-2. Simplified `reloadFromServer()` to close/reopen with fresh unpublished URI
-3. Fixed bug where revert loaded `?mode=published` instead of unpublished
-4. Removed unused `waitForPendingFetch()` and `notifyFileChanged()` methods
+### Solution: Pre-Fetch Pattern
+Pre-fetch the content BEFORE opening the document, eliminating the race condition:
 
-### Files Modified (uncommitted)
-- `WebResourceFileSystemProvider.ts` - simplified reloadFromServer
-- `WebResourceFileSystemProvider.test.ts` - updated test mocks
-- `WebResourcesPanelComposed.ts` - removed waitForPendingFetch calls
+1. Added `preFetchedContent` Map to store pre-fetched content keyed by `cacheKey`
+2. Modified `reloadFromServer()` to:
+   - Fetch content first using `getWebResourceContentUseCase.execute()`
+   - Store it in `preFetchedContent`
+   - Then close editor and open fresh document
+3. Modified `readUnpublishedContent()` to:
+   - Check for pre-fetched content at start
+   - Return it immediately if available (then clear cache)
+   - Update `serverState` for conflict detection
+   - Otherwise proceed with normal fetch
 
-### What Still Needs Investigation
-1. Why VS Code shows stale content before readFile completes
-2. Why multiple readFile calls occur for single open
-3. Consider awaiting readFile completion before showing success
+This ensures content is immediately available when VS Code calls `readFile()`, eliminating the flicker.
+
+### Files Modified
+- `WebResourceFileSystemProvider.ts:167` - Added `preFetchedContent` Map
+- `WebResourceFileSystemProvider.ts:456-472` - Check for pre-fetched content in `readUnpublishedContent()`
+- `WebResourceFileSystemProvider.ts:828-890` - Pre-fetch in `reloadFromServer()`
+
+### Tests
+All 6 conflict detection tests pass, including "should reload from server when user chooses reload option on conflict".
 
 ---
 
-**Last Updated:** 2025-12-03 (Save conflict "Use Server Version" bug in progress)
+## Expected Behavior: VS Code "Content is Newer" Dialog
+
+### Scenario
+1. Open web resource in VS Code
+2. Someone else saves changes on server
+3. Click back to VS Code → auto-refresh shows new content
+4. Make local changes
+5. Save → VS Code shows: "The content of the file is newer"
+
+### Why This Happens
+VS Code's built-in FileSystemProvider protection remembers the mtime from when the document was first opened. When saving, it compares current mtime (from `stat()`) against the original. If mtime increased, VS Code shows this dialog.
+
+This is VS Code's behavior, not our conflict detection.
+
+### Resolution
+Click **"Overwrite"** to save. This is safe because:
+- User already SAW the server changes via auto-refresh
+- User is working on the latest content
+- The "conflict" is a false positive from VS Code's perspective
+
+### Why We Don't "Fix" This
+1. **Not blocking** - User can proceed with "Overwrite"
+2. **Safe default** - Better to ask than silently overwrite
+3. **Rare scenario** - Only happens with external change + auto-refresh + local edit
+4. **Risk of regression** - Trying to work around VS Code's protection could cause worse issues
+
+---
+
+## Enhancements Added (This Session)
+
+### 1. Defensive Logging for External Changes
+When auto-refresh detects content changed since last read:
+```
+Content refreshed from server (external change detected)
+- previousSize, newSize, previousModifiedOn, newModifiedOn
+```
+**File:** `WebResourceFileSystemProvider.ts:504-513`
+
+### 2. Publish Prompt for Unpublished Changes
+When user opens file with unpublished changes and chooses "Edit Unpublished":
+```
+"filename.js" has unpublished changes. Would you like to publish them now?
+[Publish] [Not Now]
+```
+**File:** `WebResourcesPanelComposed.ts:1063, 1188-1214`
+
+---
+
+**Last Updated:** 2025-12-03 (All Web Resources enhancements complete)
