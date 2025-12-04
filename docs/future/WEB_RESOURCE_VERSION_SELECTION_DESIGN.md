@@ -1,6 +1,6 @@
 # Web Resource Version Selection - UX Design
 
-**Status:** Design Complete, Ready for Implementation
+**Status:** Implementation Complete
 **Branch:** `feature/finish-data-explorer-web-resources-metadata`
 **Date:** 2025-12-03
 
@@ -204,17 +204,17 @@ We currently store `modifiedOn` timestamp but not the original content. This mea
 - [x] "Overwrite" / "Reload from Server" modal (basic)
 - [x] `reloadFromServer()` using WorkspaceEdit
 
-### What's Missing (Process 1)
+### What's Implemented (Process 1)
 
-- [ ] Proper diff view on open (currently uses merge editor)
-- [ ] Action buttons after viewing diff
-- [ ] Clean transition from diff to edit mode
+- [x] Proper diff view on open (using vscode.diff)
+- [x] Action buttons after viewing diff ("Edit Unpublished" / "Edit Published" / "Cancel")
+- [x] Clean transition from diff to edit mode (close diff, open chosen version)
 
-### What's Missing (Process 2)
+### What's Implemented (Process 2)
 
-- [ ] "Compare First" option in conflict modal
-- [ ] Diff view showing server vs local changes
-- [ ] Action buttons after viewing comparison
+- [x] "Compare First" option in conflict modal
+- [x] Diff view showing server vs local changes (using temporary URI modes)
+- [x] Action buttons after viewing comparison ("Save My Version" / "Use Server Version")
 
 ---
 
@@ -235,21 +235,21 @@ This would enable proper 3-way merge for complex conflicts where both sides have
 
 ### Process 1
 
-- [ ] Opening a web resource with unpublished changes shows diff view
-- [ ] Diff shows: Published (left) vs Unpublished (right)
-- [ ] User sees clear prompt with "Edit Unpublished" / "Edit Published" / "Cancel"
-- [ ] Selecting a version closes diff and opens that version for editing
-- [ ] No changes saved until user explicitly saves
-- [ ] Cancel closes diff without opening anything
+- [x] Opening a web resource with unpublished changes shows diff view
+- [x] Diff shows: Published (left) vs Unpublished (right)
+- [x] User sees clear prompt with "Edit Unpublished" / "Edit Published" / "Cancel"
+- [x] Selecting a version closes diff and opens that version for editing
+- [x] No changes saved until user explicitly saves
+- [x] Cancel closes diff without opening anything
 
 ### Process 2
 
-- [ ] Saving when server modified shows modal with "Overwrite" / "Compare First" / "Discard"
-- [ ] "Overwrite" saves local changes immediately
-- [ ] "Discard" reloads server version (existing behavior)
-- [ ] "Compare First" shows diff: Server (left) vs Local (right)
-- [ ] After compare, user can choose "Save My Version" or "Use Server Version"
-- [ ] Chosen action executes correctly
+- [x] Saving when server modified shows modal with "Overwrite" / "Compare First" / "Discard My Work"
+- [x] "Overwrite" saves local changes immediately
+- [x] "Discard My Work" reloads server version (existing behavior)
+- [x] "Compare First" shows diff: Server (left) vs Local (right)
+- [x] After compare, user can choose "Save My Version" or "Use Server Version"
+- [x] Chosen action executes correctly
 
 ---
 

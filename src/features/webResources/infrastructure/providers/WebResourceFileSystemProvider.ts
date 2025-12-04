@@ -26,8 +26,10 @@ export const WEB_RESOURCE_SCHEME = 'ppds-webresource';
  * - 'unpublished': Latest saved changes (default, editable)
  * - 'published': Currently published version (for diff views)
  * - 'conflict': Shows both versions with conflict markers for version selection
+ * - 'server-current': Fresh unpublished content from server (bypasses cache, for conflict diff)
+ * - 'local-pending': Content the user is trying to save (for conflict diff)
  */
-export type WebResourceContentMode = 'unpublished' | 'published' | 'conflict';
+export type WebResourceContentMode = 'unpublished' | 'published' | 'conflict' | 'server-current' | 'local-pending';
 
 /**
  * Parsed web resource URI components.
@@ -71,6 +73,10 @@ export function parseWebResourceUri(uri: vscode.Uri): ParsedWebResourceUri | nul
 		mode = 'published';
 	} else if (modeParam === 'conflict') {
 		mode = 'conflict';
+	} else if (modeParam === 'server-current') {
+		mode = 'server-current';
+	} else if (modeParam === 'local-pending') {
+		mode = 'local-pending';
 	}
 
 	return { environmentId, webResourceId, filename, mode };
@@ -97,12 +103,10 @@ export function createWebResourceUri(
 ): vscode.Uri {
 	// Use empty authority and put environmentId in path
 	const baseUri = `${WEB_RESOURCE_SCHEME}:///${environmentId}/${webResourceId}/${filename}`;
-	// Add mode query param only if specified
+	// Add mode query param only if specified (unpublished is default, no query needed)
 	let query = '';
-	if (mode === 'published') {
-		query = '?mode=published';
-	} else if (mode === 'conflict') {
-		query = '?mode=conflict';
+	if (mode !== undefined && mode !== 'unpublished') {
+		query = `?mode=${mode}`;
 	}
 	return vscode.Uri.parse(`${baseUri}${query}`);
 }
@@ -155,6 +159,9 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 
 	/** Pending fetch requests to dedupe concurrent calls. Key: environmentId:webResourceId */
 	private readonly pendingFetches = new Map<string, Promise<FetchResult>>();
+
+	/** Temporary storage for content being saved, used for conflict diff display. Key: environmentId:webResourceId */
+	private readonly pendingSaveContent = new Map<string, Uint8Array>();
 
 	/**
 	 * Creates a FileSystemProvider.
@@ -252,6 +259,16 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		// Conflict mode: generate content with conflict markers for version selection
 		if (parsed.mode === 'conflict') {
 			return this.readConflictContent(parsed, resources);
+		}
+
+		// Server-current mode: fetch fresh unpublished content (bypasses cache, for conflict diff)
+		if (parsed.mode === 'server-current') {
+			return this.readServerCurrentContent(parsed, resources);
+		}
+
+		// Local-pending mode: return stored pending save content (for conflict diff)
+		if (parsed.mode === 'local-pending') {
+			return this.readLocalPendingContent(parsed);
 		}
 
 		// Unpublished mode (default): fetch unpublished content with caching for conflict detection
@@ -361,6 +378,68 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	/**
+	 * Reads fresh unpublished content directly from server (bypasses cache).
+	 * Used for save conflict diff to show what's currently on the server.
+	 */
+	private async readServerCurrentContent(
+		parsed: ParsedWebResourceUri,
+		resources: EnvironmentResources
+	): Promise<Uint8Array> {
+		this.logger.debug('WebResourceFileSystemProvider readFile (server-current mode)', {
+			environmentId: parsed.environmentId,
+			webResourceId: parsed.webResourceId
+		});
+
+		if (resources.webResourceRepository === undefined) {
+			this.logger.error('WebResourceFileSystemProvider: Repository not available for server-current content');
+			throw vscode.FileSystemError.Unavailable('Repository not available');
+		}
+
+		try {
+			// Always fetch fresh from server (don't use cache)
+			const base64Content = await resources.webResourceRepository.getContent(
+				parsed.environmentId,
+				parsed.webResourceId
+			);
+
+			const content = Buffer.from(base64Content, 'base64');
+
+			this.logger.info('Server-current content loaded', {
+				webResourceId: parsed.webResourceId,
+				size: content.length
+			});
+
+			return new Uint8Array(content);
+		} catch (error) {
+			this.logger.error('Failed to read server-current content', error);
+			throw vscode.FileSystemError.FileNotFound();
+		}
+	}
+
+	/**
+	 * Returns stored pending save content for conflict diff display.
+	 * This is the content the user is trying to save.
+	 */
+	private readLocalPendingContent(parsed: ParsedWebResourceUri): Uint8Array {
+		const cacheKey = `${parsed.environmentId}:${parsed.webResourceId}`;
+		const content = this.pendingSaveContent.get(cacheKey);
+
+		if (content === undefined) {
+			this.logger.error('WebResourceFileSystemProvider: No pending save content found', {
+				webResourceId: parsed.webResourceId
+			});
+			throw vscode.FileSystemError.FileNotFound();
+		}
+
+		this.logger.debug('WebResourceFileSystemProvider readFile (local-pending mode)', {
+			webResourceId: parsed.webResourceId,
+			size: content.length
+		});
+
+		return content;
+	}
+
+	/**
 	 * Reads unpublished content via use case.
 	 * Updates conflict detection state for saves.
 	 */
@@ -463,7 +542,7 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 				parsed.webResourceId,
 				state.serverModifiedOn,
 				parsed.filename,
-				uri,
+				content,
 				resources.webResourceRepository
 			);
 
@@ -596,7 +675,7 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	 * @param webResourceId - Web resource GUID
 	 * @param cachedModifiedOn - Timestamp when file was opened/last saved
 	 * @param filename - Display filename for the conflict dialog
-	 * @param _uri - VS Code URI (unused but kept for signature consistency)
+	 * @param localContent - Content the user is trying to save (for diff display)
 	 * @param webResourceRepository - Repository to check current server timestamp
 	 * @returns 'overwrite' | 'reload' | 'cancel' | 'no-conflict'
 	 */
@@ -605,7 +684,7 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		webResourceId: string,
 		cachedModifiedOn: Date,
 		filename: string,
-		_uri: vscode.Uri,
+		localContent: Uint8Array,
 		webResourceRepository: import('../../domain/interfaces/IWebResourceRepository').IWebResourceRepository
 	): Promise<'overwrite' | 'reload' | 'cancel' | 'no-conflict'> {
 		try {
@@ -630,18 +709,27 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 				currentModifiedOn: currentModifiedOn.toISOString()
 			});
 
-			// Show conflict resolution modal
+			// Show conflict resolution modal with Compare First option
 			const selection = await vscode.window.showWarningMessage(
-				`"${filename}" has been modified on the server since you opened it. Your changes will overwrite the server version.`,
+				`"${filename}" has been modified on the server since you opened it.`,
 				{ modal: true },
+				'Compare First',
 				'Overwrite',
-				'Reload from Server'
+				'Discard My Work'
 			);
 
 			if (selection === 'Overwrite') {
 				return 'overwrite';
-			} else if (selection === 'Reload from Server') {
+			} else if (selection === 'Discard My Work') {
 				return 'reload';
+			} else if (selection === 'Compare First') {
+				// Show diff view and let user decide
+				return this.showConflictDiffAndResolve(
+					environmentId,
+					webResourceId,
+					filename,
+					localContent
+				);
 			} else {
 				return 'cancel';
 			}
@@ -649,6 +737,85 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			this.logger.error('Failed to check for conflict', error);
 			// If we can't check for conflicts, proceed with save
 			return 'no-conflict';
+		}
+	}
+
+	/**
+	 * Shows diff view for save conflict and lets user choose resolution.
+	 *
+	 * Flow:
+	 * 1. Store local content temporarily for diff display
+	 * 2. Show diff: Server version (left) vs Local changes (right)
+	 * 3. Show resolution modal: "Save My Version" / "Use Server Version"
+	 * 4. Clean up and return chosen action
+	 *
+	 * @param environmentId - Environment GUID
+	 * @param webResourceId - Web resource GUID
+	 * @param filename - Display filename
+	 * @param localContent - Content the user is trying to save
+	 * @returns 'overwrite' | 'reload' | 'cancel'
+	 */
+	private async showConflictDiffAndResolve(
+		environmentId: string,
+		webResourceId: string,
+		filename: string,
+		localContent: Uint8Array
+	): Promise<'overwrite' | 'reload' | 'cancel'> {
+		const cacheKey = `${environmentId}:${webResourceId}`;
+
+		try {
+			// Store local content temporarily for diff display
+			this.pendingSaveContent.set(cacheKey, localContent);
+
+			// Create URIs for diff view
+			const serverUri = createWebResourceUri(
+				environmentId,
+				webResourceId,
+				filename,
+				'server-current'
+			);
+
+			const localUri = createWebResourceUri(
+				environmentId,
+				webResourceId,
+				filename,
+				'local-pending'
+			);
+
+			// Show diff: Server version (left) vs Local changes (right)
+			await vscode.commands.executeCommand(
+				'vscode.diff',
+				serverUri,
+				localUri,
+				`${filename}: Server Version ↔ Your Changes`
+			);
+
+			this.logger.debug('Conflict diff view opened', { webResourceId });
+
+			// Show non-modal notification so user can scroll the diff while deciding
+			const resolution = await vscode.window.showInformationMessage(
+				'Choose which version to keep:',
+				'Save My Version',
+				'Use Server Version',
+				'Cancel'
+			);
+
+			// Close the diff view
+			await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+
+			if (resolution === 'Save My Version') {
+				this.logger.info('User chose to save their version after compare', { webResourceId });
+				return 'overwrite';
+			} else if (resolution === 'Use Server Version') {
+				this.logger.info('User chose to use server version after compare', { webResourceId });
+				return 'reload';
+			} else {
+				this.logger.info('User cancelled conflict resolution after compare', { webResourceId });
+				return 'cancel';
+			}
+		} finally {
+			// Always clean up temporary content
+			this.pendingSaveContent.delete(cacheKey);
 		}
 	}
 
