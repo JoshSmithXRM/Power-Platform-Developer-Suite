@@ -856,46 +856,59 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 				throw new Error('Environment not registered');
 			}
 
-			// PRE-FETCH content before opening document.
-			// This ensures content is immediately available when VS Code calls readFile(),
-			// avoiding the race condition where openTextDocument returns before fetch completes.
-			this.logger.debug('Pre-fetching content for reload', { webResourceId });
+			// Note: The diff view (if any) is already closed by showConflictDiffAndResolve
+			// before this method is called. We don't close anything here to avoid
+			// prompting the user to save the dirty document they want to discard.
+
+			// Fetch server content
+			this.logger.debug('Fetching server content for reload', { webResourceId });
 			const fetchResult = await resources.getWebResourceContentUseCase.execute(
 				environmentId,
 				webResourceId
 			);
 
-			// Store pre-fetched content for immediate delivery in readFile()
-			this.preFetchedContent.set(cacheKey, {
-				content: fetchResult.content,
-				modifiedOn: fetchResult.modifiedOn
+			// Open and focus the document
+			const document = await vscode.workspace.openTextDocument(uri);
+			await vscode.window.showTextDocument(document, { preview: false });
+
+			// Use WorkspaceEdit to directly replace document content.
+			// This is necessary because VS Code doesn't call readFile after revert for
+			// FileSystemProvider virtual documents - it keeps the dirty content in memory.
+			const serverContentString = new TextDecoder().decode(fetchResult.content);
+			const edit = new vscode.WorkspaceEdit();
+			const fullRange = new vscode.Range(
+				document.positionAt(0),
+				document.positionAt(document.getText().length)
+			);
+			edit.replace(uri, fullRange, serverContentString);
+			await vscode.workspace.applyEdit(edit);
+
+			// Get the document's actual content after VS Code applies the edit.
+			// VS Code may normalize line endings or encoding, so we store what VS Code
+			// has (not the original server bytes) to ensure contentEquals matches on save.
+			const normalizedContent = new TextEncoder().encode(document.getText());
+
+			// Update server state for conflict detection on future saves
+			this.serverState.set(cacheKey, {
+				serverModifiedOn: fetchResult.modifiedOn,
+				lastKnownContent: normalizedContent
 			});
 
-			// Clear old cached state (will be replaced by pre-fetched content)
-			this.serverState.delete(cacheKey);
+			// Save the document to clear the dirty flag.
+			// We use setImmediate to defer the save until after the current writeFile completes.
+			// This avoids a deadlock: we're inside writeFile → reloadFromServer → save → writeFile.
+			// The deferred save will trigger writeFile, which detects content matches
+			// lastKnownContent and skips the actual API call - marking document as clean.
+			setImmediate(() => {
+				void document.save();
+			});
 
-			// Create a fresh URI without any mode (defaults to unpublished).
-			// This ensures we always load unpublished content, regardless of
-			// what mode the document was originally opened in.
-			const unpublishedUri = createWebResourceUri(
-				environmentId,
-				webResourceId,
-				parsed.filename
-				// No mode = unpublished (default)
-			);
-
-			// Close the current document
-			await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-
-			// Open fresh document - readFile() will use pre-fetched content instantly
-			const document = await vscode.workspace.openTextDocument(unpublishedUri);
-			await vscode.window.showTextDocument(document, { preview: false });
+			// Fire change event to notify any listeners
+			this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
 
 			this.logger.info('Web resource reloaded from server', { webResourceId });
 			void vscode.window.showInformationMessage(`Reloaded "${parsed.filename}" from server.`);
 		} catch (error) {
-			// Clean up pre-fetched content on error
-			this.preFetchedContent.delete(cacheKey);
 			this.logger.error('Failed to reload from server', error);
 			void vscode.window.showErrorMessage('Failed to reload from server. Please try again.');
 		}
