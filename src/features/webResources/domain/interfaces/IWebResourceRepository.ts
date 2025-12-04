@@ -53,6 +53,22 @@ export interface IWebResourceRepository {
 	): Promise<string>;
 
 	/**
+	 * Gets the published content of a web resource (base64 encoded).
+	 * Returns the currently published content visible to end users.
+	 * Used to compare with unpublished content to detect pending changes.
+	 *
+	 * @param environmentId - Environment ID
+	 * @param webResourceId - Web resource GUID
+	 * @param cancellationToken - Optional token to cancel the operation
+	 * @returns Base64 encoded content string (published version)
+	 */
+	getPublishedContent(
+		environmentId: string,
+		webResourceId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<string>;
+
+	/**
 	 * Updates the content of a web resource.
 	 *
 	 * @param environmentId - Environment ID

@@ -916,6 +916,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 	/**
 	 * Opens a web resource in VS Code editor.
+	 * Compares published vs unpublished content and shows diff if different.
 	 *
 	 * @param webResourceId - Web resource GUID
 	 * @param name - Web resource name (used for filename)
@@ -944,42 +945,149 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			const baseName = nameParts.join('.');
 			const filename = `${baseName} [${sanitizedEnvName}]${ext}`;
 
-			const uri = createWebResourceUri(
-				this.currentEnvironmentId,
-				webResourceId,
-				filename
-			);
+			// Check for unpublished changes before opening
+			const hasUnpublishedChanges = await this.checkForUnpublishedChanges(webResourceId);
 
-			// Invalidate our internal cache to ensure fresh fetch
-			if (this.fileSystemProvider) {
-				this.fileSystemProvider.invalidateCache(this.currentEnvironmentId, webResourceId);
+			if (hasUnpublishedChanges) {
+				// Show diff view: published (left) vs unpublished (right)
+				await this.showPublishedVsUnpublishedDiff(webResourceId, filename);
+				return;
 			}
 
-			// Open the document - VS Code may return cached content immediately
-			const document = await vscode.workspace.openTextDocument(uri);
-			await vscode.window.showTextDocument(document, { preview: false });
-
-			// VS Code returns cached documents immediately without waiting for our readFile().
-			// Our readFile() IS called but runs in background. Wait for it to complete.
-			if (this.fileSystemProvider) {
-				await this.fileSystemProvider.waitForPendingFetch(this.currentEnvironmentId, webResourceId);
-			}
-
-			// Now that our readFile() has fresh content from server, tell VS Code to reload.
-			// Fire change event to signal the file changed, then revert to force reload.
-			if (this.fileSystemProvider) {
-				this.fileSystemProvider.notifyFileChanged(uri);
-			}
-
-			this.logger.debug('Reverting to show fresh content');
-			await vscode.commands.executeCommand('workbench.action.files.revert');
-
-			this.logger.info('Opened web resource in editor', { webResourceId, filename, environmentId: this.currentEnvironmentId });
+			// No unpublished changes - open normally
+			await this.openWebResourceDirectly(webResourceId, filename);
 		} catch (error) {
 			this.logger.error('Failed to open web resource', error);
 			const message = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to open web resource: ${message}`);
 		}
+	}
+
+	/**
+	 * Checks if a web resource has unpublished changes.
+	 * Compares published vs unpublished content.
+	 *
+	 * @returns true if content differs, false if same
+	 */
+	private async checkForUnpublishedChanges(webResourceId: string): Promise<boolean> {
+		const repository = this.environmentResources.webResourceRepository;
+		if (repository === undefined) {
+			this.logger.debug('Repository not available, skipping unpublished check');
+			return false;
+		}
+
+		try {
+			// Fetch both versions in parallel
+			const [publishedContent, unpublishedContent] = await Promise.all([
+				repository.getPublishedContent(this.currentEnvironmentId, webResourceId),
+				repository.getContent(this.currentEnvironmentId, webResourceId)
+			]);
+
+			const hasChanges = publishedContent !== unpublishedContent;
+
+			this.logger.debug('Checked for unpublished changes', {
+				webResourceId,
+				hasChanges,
+				publishedLength: publishedContent.length,
+				unpublishedLength: unpublishedContent.length
+			});
+
+			return hasChanges;
+		} catch (error) {
+			// If check fails, proceed without diff (don't block opening)
+			this.logger.warn('Failed to check for unpublished changes, proceeding without diff', error);
+			return false;
+		}
+	}
+
+	/**
+	 * Opens VS Code's merge editor to let user choose between published and unpublished versions.
+	 * Uses the native merge editor UI for a familiar experience.
+	 */
+	private async showPublishedVsUnpublishedDiff(webResourceId: string, filename: string): Promise<void> {
+		this.logger.info('Unpublished changes detected, opening merge editor', { webResourceId, filename });
+
+		const publishedUri = createWebResourceUri(
+			this.currentEnvironmentId,
+			webResourceId,
+			filename,
+			'published'
+		);
+
+		const unpublishedUri = createWebResourceUri(
+			this.currentEnvironmentId,
+			webResourceId,
+			filename
+		);
+
+		// Open VS Code's native merge editor
+		await vscode.commands.executeCommand('_open.mergeEditor', {
+			base: publishedUri,
+			input1: {
+				uri: publishedUri,
+				title: 'Published (Live)',
+				description: 'Currently published version visible to users'
+			},
+			input2: {
+				uri: unpublishedUri,
+				title: 'Unpublished (Pending)',
+				description: 'Your saved changes waiting to be published'
+			},
+			output: unpublishedUri
+		});
+
+		this.logger.info('Merge editor opened for version selection', { webResourceId, filename });
+	}
+
+	/**
+	 * Opens a web resource directly in the editor.
+	 *
+	 * @param webResourceId - Web resource GUID
+	 * @param filename - Display filename
+	 * @param mode - 'unpublished' (default) or 'published'
+	 */
+	private async openWebResourceDirectly(
+		webResourceId: string,
+		filename: string,
+		mode?: 'published' | 'unpublished'
+	): Promise<void> {
+		const uri = createWebResourceUri(
+			this.currentEnvironmentId,
+			webResourceId,
+			filename,
+			mode
+		);
+
+		// Invalidate our internal cache to ensure fresh fetch
+		if (this.fileSystemProvider) {
+			this.fileSystemProvider.invalidateCache(this.currentEnvironmentId, webResourceId);
+		}
+
+		// Open the document - VS Code may return cached content immediately
+		const document = await vscode.workspace.openTextDocument(uri);
+		await vscode.window.showTextDocument(document, { preview: false });
+
+		// VS Code returns cached documents immediately without waiting for our readFile().
+		// Our readFile() IS called but runs in background. Wait for it to complete.
+		if (this.fileSystemProvider) {
+			await this.fileSystemProvider.waitForPendingFetch(this.currentEnvironmentId, webResourceId);
+		}
+
+		// Now that our readFile() has fresh content from server, tell VS Code to reload.
+		// Fire change event to signal the file changed, then revert to force reload.
+		if (this.fileSystemProvider) {
+			this.fileSystemProvider.notifyFileChanged(uri);
+		}
+
+		this.logger.debug('Reverting to show fresh content');
+		await vscode.commands.executeCommand('workbench.action.files.revert');
+
+		this.logger.info('Opened web resource in editor', {
+			webResourceId,
+			filename,
+			mode: mode ?? 'unpublished',
+			environmentId: this.currentEnvironmentId
+		});
 	}
 
 	/**

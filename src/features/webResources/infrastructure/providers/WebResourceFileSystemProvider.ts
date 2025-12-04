@@ -8,7 +8,7 @@ import {
 	getPublishInProgressMessage
 } from '../../../../shared/infrastructure/errors/PublishInProgressError';
 
-import { WebResourceConnectionRegistry } from './WebResourceConnectionRegistry';
+import { WebResourceConnectionRegistry, EnvironmentResources } from './WebResourceConnectionRegistry';
 
 /**
  * URI scheme for web resources.
@@ -22,12 +22,31 @@ import { WebResourceConnectionRegistry } from './WebResourceConnectionRegistry';
 export const WEB_RESOURCE_SCHEME = 'ppds-webresource';
 
 /**
+ * Content mode for web resource URIs.
+ * - 'unpublished': Latest saved changes (default, editable)
+ * - 'published': Currently published version (for diff views)
+ * - 'conflict': Shows both versions with conflict markers for version selection
+ */
+export type WebResourceContentMode = 'unpublished' | 'published' | 'conflict';
+
+/**
+ * Parsed web resource URI components.
+ */
+export interface ParsedWebResourceUri {
+	environmentId: string;
+	webResourceId: string;
+	filename: string;
+	/** Content mode - 'unpublished' (default), 'published', or 'conflict' */
+	mode: WebResourceContentMode;
+}
+
+/**
  * Parses a web resource URI into its components.
  *
  * @param uri - VS Code URI with ppds-webresource scheme
  * @returns Parsed components or null if invalid
  */
-export function parseWebResourceUri(uri: vscode.Uri): { environmentId: string; webResourceId: string; filename: string } | null {
+export function parseWebResourceUri(uri: vscode.Uri): ParsedWebResourceUri | null {
 	if (uri.scheme !== WEB_RESOURCE_SCHEME) {
 		return null;
 	}
@@ -44,7 +63,17 @@ export function parseWebResourceUri(uri: vscode.Uri): { environmentId: string; w
 	const webResourceId = pathParts[1] as string;
 	const filename = pathParts.slice(2).join('/');
 
-	return { environmentId, webResourceId, filename };
+	// Parse mode from query string (e.g., ?mode=published or ?mode=conflict)
+	const queryParams = new URLSearchParams(uri.query);
+	const modeParam = queryParams.get('mode');
+	let mode: WebResourceContentMode = 'unpublished';
+	if (modeParam === 'published') {
+		mode = 'published';
+	} else if (modeParam === 'conflict') {
+		mode = 'conflict';
+	}
+
+	return { environmentId, webResourceId, filename, mode };
 }
 
 /**
@@ -57,15 +86,25 @@ export function parseWebResourceUri(uri: vscode.Uri): { environmentId: string; w
  * @param environmentId - Environment ID
  * @param webResourceId - Web resource GUID
  * @param filename - Display filename with extension
+ * @param mode - Optional content mode ('published' for diff views)
  * @returns VS Code URI for the web resource
  */
 export function createWebResourceUri(
 	environmentId: string,
 	webResourceId: string,
-	filename: string
+	filename: string,
+	mode?: WebResourceContentMode
 ): vscode.Uri {
 	// Use empty authority and put environmentId in path
-	return vscode.Uri.parse(`${WEB_RESOURCE_SCHEME}:///${environmentId}/${webResourceId}/${filename}`);
+	const baseUri = `${WEB_RESOURCE_SCHEME}:///${environmentId}/${webResourceId}/${filename}`;
+	// Add mode query param only if specified
+	let query = '';
+	if (mode === 'published') {
+		query = '?mode=published';
+	} else if (mode === 'conflict') {
+		query = '?mode=conflict';
+	}
+	return vscode.Uri.parse(`${baseUri}${query}`);
 }
 
 /**
@@ -196,6 +235,140 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			throw vscode.FileSystemError.FileNotFound(uri);
 		}
 
+		// Look up environment resources from registry
+		const resources = this.registry.get(parsed.environmentId);
+		if (resources === undefined) {
+			this.logger.error('WebResourceFileSystemProvider: Unknown environmentId', {
+				environmentId: parsed.environmentId
+			});
+			throw vscode.FileSystemError.FileNotFound(uri);
+		}
+
+		// Published mode: fetch published content directly (read-only, for diff views)
+		if (parsed.mode === 'published') {
+			return this.readPublishedContent(parsed, resources);
+		}
+
+		// Conflict mode: generate content with conflict markers for version selection
+		if (parsed.mode === 'conflict') {
+			return this.readConflictContent(parsed, resources);
+		}
+
+		// Unpublished mode (default): fetch unpublished content with caching for conflict detection
+		return this.readUnpublishedContent(uri, parsed, resources);
+	}
+
+	/**
+	 * Reads published content directly from repository.
+	 * Used for diff views - read-only, no conflict detection state.
+	 */
+	private async readPublishedContent(
+		parsed: ParsedWebResourceUri,
+		resources: EnvironmentResources
+	): Promise<Uint8Array> {
+		this.logger.debug('WebResourceFileSystemProvider readFile (published mode)', {
+			environmentId: parsed.environmentId,
+			webResourceId: parsed.webResourceId
+		});
+
+		if (resources.webResourceRepository === undefined) {
+			this.logger.error('WebResourceFileSystemProvider: Repository not available for published content');
+			throw vscode.FileSystemError.Unavailable('Repository not available');
+		}
+
+		try {
+			const base64Content = await resources.webResourceRepository.getPublishedContent(
+				parsed.environmentId,
+				parsed.webResourceId
+			);
+
+			const content = Buffer.from(base64Content, 'base64');
+
+			this.logger.info('Published web resource content loaded', {
+				webResourceId: parsed.webResourceId,
+				size: content.length
+			});
+
+			return new Uint8Array(content);
+		} catch (error) {
+			this.logger.error('Failed to read published web resource', error);
+			throw vscode.FileSystemError.FileNotFound();
+		}
+	}
+
+	/**
+	 * Reads content with conflict markers for version selection.
+	 * VS Code will show inline "Accept Current | Accept Incoming" buttons.
+	 *
+	 * Conflict markers format:
+	 * <<<<<<< Published (Live)
+	 * ...published content...
+	 * =======
+	 * ...unpublished content...
+	 * >>>>>>> Unpublished (Your Changes)
+	 */
+	private async readConflictContent(
+		parsed: ParsedWebResourceUri,
+		resources: EnvironmentResources
+	): Promise<Uint8Array> {
+		this.logger.debug('WebResourceFileSystemProvider readFile (conflict mode)', {
+			environmentId: parsed.environmentId,
+			webResourceId: parsed.webResourceId
+		});
+
+		if (resources.webResourceRepository === undefined) {
+			this.logger.error('WebResourceFileSystemProvider: Repository not available for conflict content');
+			throw vscode.FileSystemError.Unavailable('Repository not available');
+		}
+
+		try {
+			// Fetch both versions in parallel
+			const [publishedBase64, unpublishedBase64] = await Promise.all([
+				resources.webResourceRepository.getPublishedContent(
+					parsed.environmentId,
+					parsed.webResourceId
+				),
+				resources.webResourceRepository.getContent(
+					parsed.environmentId,
+					parsed.webResourceId
+				)
+			]);
+
+			const publishedContent = Buffer.from(publishedBase64, 'base64').toString('utf-8');
+			const unpublishedContent = Buffer.from(unpublishedBase64, 'base64').toString('utf-8');
+
+			// Generate content with conflict markers
+			// VS Code will detect these and show inline "Accept Current | Accept Incoming" buttons
+			const conflictContent = [
+				'<<<<<<< Published (Live)',
+				publishedContent,
+				'=======',
+				unpublishedContent,
+				'>>>>>>> Unpublished (Your Changes)'
+			].join('\n');
+
+			this.logger.info('Conflict content generated for version selection', {
+				webResourceId: parsed.webResourceId,
+				publishedSize: publishedContent.length,
+				unpublishedSize: unpublishedContent.length
+			});
+
+			return new Uint8Array(Buffer.from(conflictContent, 'utf-8'));
+		} catch (error) {
+			this.logger.error('Failed to generate conflict content', error);
+			throw vscode.FileSystemError.FileNotFound();
+		}
+	}
+
+	/**
+	 * Reads unpublished content via use case.
+	 * Updates conflict detection state for saves.
+	 */
+	private async readUnpublishedContent(
+		uri: vscode.Uri,
+		parsed: ParsedWebResourceUri,
+		resources: EnvironmentResources
+	): Promise<Uint8Array> {
 		const cacheKey = `${parsed.environmentId}:${parsed.webResourceId}`;
 
 		// Check if there's already a fetch in progress for this resource (dedupe concurrent calls)
@@ -206,15 +379,6 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 			});
 			const result = await pendingFetch;
 			return result.content;
-		}
-
-		// Look up environment resources from registry
-		const resources = this.registry.get(parsed.environmentId);
-		if (resources === undefined) {
-			this.logger.error('WebResourceFileSystemProvider: Unknown environmentId', {
-				environmentId: parsed.environmentId
-			});
-			throw vscode.FileSystemError.FileNotFound(uri);
 		}
 
 		this.logger.debug('WebResourceFileSystemProvider readFile', {
