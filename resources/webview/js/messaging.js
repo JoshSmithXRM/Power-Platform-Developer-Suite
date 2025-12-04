@@ -244,6 +244,7 @@
 			const data = message.data || {};
 			const solutions = data.solutions || [];
 			const currentSolutionId = data.currentSolutionId;
+			const disabled = data.disabled === true;
 
 			// Clear existing options
 			solutionSelect.innerHTML = '';
@@ -259,9 +260,13 @@
 				solutionSelect.appendChild(option);
 			});
 
+			// Enable or disable the selector
+			solutionSelect.disabled = disabled;
+
 			console.debug('Solution selector updated', {
 				count: solutions.length,
-				currentSolutionId: currentSolutionId
+				currentSolutionId: currentSolutionId,
+				disabled: disabled
 			});
 		}
 	});
