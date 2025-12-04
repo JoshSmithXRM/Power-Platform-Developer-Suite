@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Web Resources - Conflict Detection** - Prevents accidental overwrites
+  - Detects when server content is newer than your locally opened version
+  - "Compare First" shows side-by-side diff before deciding
+  - "Overwrite" forces save, "Discard" abandons local changes
+
+- **Web Resources - Unpublished Changes Detection** - See draft changes before editing
+  - Automatically detects when a file has unpublished changes on open
+  - Shows diff between published and unpublished versions
+  - Choose which version to edit (published baseline or current draft)
+  - Option to publish unpublished changes immediately
+
+- **Web Resources - Created By / Modified By Columns** - Track authorship in the table
+  - See who created each web resource
+  - See who last modified each web resource
+
+### Fixed
+
+- **Environment Switch Loading State** - Panels now show loading immediately when switching environments
+  - Data table clears stale data and shows "Switching environment..." instantly
+  - Solution dropdown shows "Loading solutions..." placeholder while fetching
+  - Previously: stale data from prior environment remained visible during load
+
+- **Solution Dropdown Environment Switching** - Dropdown now updates when switching environments
+  - Previously retained solutions from prior environment
+  - Affects: Web Resources, Environment Variables, Connection References panels
+
+- **Web Resources Syntax Highlighting** - Files now have proper syntax highlighting
+  - JavaScript, CSS, HTML, and XML files opened via custom URI scheme now highlight correctly
+
 ## [0.2.6] - 2025-12-02
 
 ### Added
