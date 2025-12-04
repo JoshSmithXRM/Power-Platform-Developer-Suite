@@ -180,6 +180,8 @@ Before merging this branch:
 | Syntax highlighting | Added `setTextDocumentLanguage` to enable JS/CSS/HTML highlighting for custom URI scheme | ✅ Done |
 | Created By / Modified By columns | Added user metadata columns to web resources table (parallel session) | ✅ Done |
 | **BUG FIX: Solution refresh on env change** | Solution dropdown wasn't updating when switching environments | ✅ Done |
+| **UX: Immediate loading on env switch** | Clear stale data and show "Switching environment..." immediately | ✅ Done |
+| **UX: Solution dropdown loading state** | Show "Loading solutions..." placeholder, disable dropdown during load | ✅ Done |
 
 ### Files Modified This Session
 

@@ -528,6 +528,16 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 			message: 'Switching environment...'
 		});
 
+		// Show loading placeholder in solution selector to prevent stale selection
+		await this.panel.webview.postMessage({
+			command: 'updateSolutionSelector',
+			data: {
+				solutions: [{ id: '', name: 'Loading solutions...', uniqueName: '' }],
+				currentSolutionId: '',
+				disabled: true
+			}
+		});
+
 		const oldEnvironmentId = this.currentEnvironmentId;
 		this.currentEnvironmentId = environmentId;
 
