@@ -522,6 +522,12 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
+		// Immediately show loading state to clear stale data from previous environment
+		await this.panel.webview.postMessage({
+			command: 'showLoading',
+			message: 'Switching environment...'
+		});
+
 		const oldEnvironmentId = this.currentEnvironmentId;
 		this.currentEnvironmentId = environmentId;
 
