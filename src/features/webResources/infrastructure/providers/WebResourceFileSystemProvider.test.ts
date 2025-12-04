@@ -776,15 +776,193 @@ describe('WebResourceFileSystemProvider with conflict detection', () => {
 			// 2. Save should NOT be called (user chose reload)
 			expect(mockUpdateUseCase.execute).not.toHaveBeenCalled();
 
-			// 3. Current editor was closed and fresh document opened
-			expect(vscode.commands.executeCommand).toHaveBeenCalledWith('workbench.action.closeActiveEditor');
+			// 3. Document opened, focused, and content replaced via WorkspaceEdit
+			// Note: No closeActiveEditor - the diff (if any) is already closed by showConflictDiffAndResolve
 			expect(vscode.workspace.openTextDocument).toHaveBeenCalled();
 			expect(vscode.window.showTextDocument).toHaveBeenCalled();
+			expect(vscode.workspace.applyEdit).toHaveBeenCalled();
 
 			// 4. Success message was shown
 			expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
 				expect.stringContaining('Reloaded')
 			);
+		});
+
+		it('should reload from server and fire change event when user chooses "Use Server Version" after compare', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const originalContent = new Uint8Array([79, 108, 100]); // "Old"
+			const localChanges = new Uint8Array([76, 111, 99, 97, 108]); // "Local"
+			const serverContent = new Uint8Array([83, 101, 114, 118, 101, 114]); // "Server"
+			const serverModifiedOn = new Date('2024-01-15T12:00:00Z'); // Newer than cached
+
+			// Initial read returns original content
+			const mockInitialResult: WebResourceContentResult = {
+				content: originalContent,
+				fileExtension: '.js',
+				displayName: 'Script',
+				name: 'new_script.js',
+				modifiedOn: originalModifiedOn
+			};
+
+			// Reload returns server content
+			const mockServerResult: WebResourceContentResult = {
+				content: serverContent,
+				fileExtension: '.js',
+				displayName: 'Script',
+				name: 'new_script.js',
+				modifiedOn: serverModifiedOn
+			};
+
+			// First call returns original, second call (pre-fetch for reload) returns server content
+			mockGetUseCase.execute
+				.mockResolvedValueOnce(mockInitialResult)
+				.mockResolvedValueOnce(mockServerResult);
+			mockRepository.getModifiedOn.mockResolvedValue(serverModifiedOn);
+
+			// Mock user clicking "Compare First" then "Use Server Version"
+			const showWarningMessage = vscode.window.showWarningMessage as jest.Mock;
+			showWarningMessage.mockResolvedValue('Compare First');
+
+			const showInformationMessage = vscode.window.showInformationMessage as jest.Mock;
+			// First call (from showConflictDiffAndResolve): "Use Server Version"
+			// Subsequent calls: success messages
+			showInformationMessage
+				.mockResolvedValueOnce('Use Server Version')
+				.mockResolvedValue(undefined);
+
+			// Mock document for reload
+			const mockDocument = {
+				uri: { toString: () => uri.toString() },
+				getText: () => 'Old',
+				positionAt: (offset: number) => ({ line: 0, character: offset }),
+				save: jest.fn().mockResolvedValue(true)
+			};
+			(vscode.workspace as unknown as { textDocuments: unknown[] }).textDocuments = [mockDocument];
+			(vscode.window.showTextDocument as jest.Mock).mockResolvedValue({});
+			(vscode.workspace.openTextDocument as jest.Mock).mockResolvedValue(mockDocument);
+
+			// First read to populate cache
+			await provider.readFile(uri);
+
+			// Track EventEmitter fire calls - need to access the private _onDidChangeFile
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const onDidChangeFileFire = (provider as any)._onDidChangeFile.fire as jest.Mock;
+			onDidChangeFileFire.mockClear();
+
+			// Act - Try to write local changes (should trigger conflict → compare → reload)
+			await provider.writeFile(uri, localChanges);
+
+			// Assert
+			// 1. "Compare First" was selected from conflict dialog
+			expect(showWarningMessage).toHaveBeenCalledWith(
+				expect.stringContaining('has been modified on the server'),
+				expect.objectContaining({ modal: true }),
+				'Compare First',
+				'Overwrite',
+				'Discard My Work'
+			);
+
+			// 2. Diff command was executed
+			expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+				'vscode.diff',
+				expect.anything(), // server-current URI
+				expect.anything(), // local-pending URI
+				expect.stringContaining('Server Version')
+			);
+
+			// 3. "Use Server Version" prompt was shown
+			expect(showInformationMessage).toHaveBeenCalledWith(
+				'Choose which version to keep:',
+				'Save My Version',
+				'Use Server Version',
+				'Cancel'
+			);
+
+			// 4. Save should NOT be called (user chose to use server version)
+			expect(mockUpdateUseCase.execute).not.toHaveBeenCalled();
+
+			// 5. WorkspaceEdit should be used to replace document content (not revert)
+			expect(vscode.workspace.applyEdit).toHaveBeenCalled();
+
+			// 6. onDidChangeFile should be fired to notify listeners
+			expect(onDidChangeFileFire).toHaveBeenCalledWith([
+				expect.objectContaining({
+					type: vscode.FileChangeType.Changed,
+					uri: expect.anything()
+				})
+			]);
+		});
+
+		it('should use WorkspaceEdit to replace document content when reloading from server', async () => {
+			// Arrange
+			const uri = createWebResourceUri(testEnvironmentId, testWebResourceId, testFilename);
+			const originalContent = new Uint8Array([79, 108, 100]); // "Old"
+			const localChanges = new Uint8Array([76, 111, 99, 97, 108]); // "Local"
+			const serverContent = new Uint8Array([83, 101, 114, 118, 101, 114]); // "Server"
+			const serverModifiedOn = new Date('2024-01-15T12:00:00Z'); // Newer than cached
+
+			// Initial read returns original content
+			const mockInitialResult: WebResourceContentResult = {
+				content: originalContent,
+				fileExtension: '.js',
+				displayName: 'Script',
+				name: 'new_script.js',
+				modifiedOn: originalModifiedOn
+			};
+
+			// Reload returns server content
+			const mockServerResult: WebResourceContentResult = {
+				content: serverContent,
+				fileExtension: '.js',
+				displayName: 'Script',
+				name: 'new_script.js',
+				modifiedOn: serverModifiedOn
+			};
+
+			// First call returns original, second call (pre-fetch for reload) returns server content
+			mockGetUseCase.execute
+				.mockResolvedValueOnce(mockInitialResult)
+				.mockResolvedValueOnce(mockServerResult);
+			mockRepository.getModifiedOn.mockResolvedValue(serverModifiedOn);
+
+			// Mock user clicking "Compare First" then "Use Server Version"
+			const showWarningMessage = vscode.window.showWarningMessage as jest.Mock;
+			showWarningMessage.mockResolvedValue('Compare First');
+
+			const showInformationMessage = vscode.window.showInformationMessage as jest.Mock;
+			showInformationMessage
+				.mockResolvedValueOnce('Use Server Version')
+				.mockResolvedValue(undefined);
+
+			// Mock document with getText() that returns current content
+			const mockDocument = {
+				uri,
+				getText: jest.fn().mockReturnValue('Local changes content'),
+				positionAt: jest.fn().mockImplementation((offset: number) => ({ line: 0, character: offset })),
+				save: jest.fn().mockResolvedValue(true)
+			};
+			(vscode.workspace.openTextDocument as jest.Mock).mockResolvedValue(mockDocument);
+			(vscode.window.showTextDocument as jest.Mock).mockResolvedValue({});
+
+			// Mock applyEdit to succeed
+			const applyEditMock = vscode.workspace.applyEdit as jest.Mock;
+			applyEditMock.mockClear();
+			applyEditMock.mockResolvedValue(true);
+
+			// First read to populate cache
+			await provider.readFile(uri);
+
+			// Act - Try to write local changes (should trigger conflict → compare → reload with WorkspaceEdit)
+			await provider.writeFile(uri, localChanges);
+
+			// Assert - CRITICAL: WorkspaceEdit should be used to replace document content
+			// This is the fix for the bug where VS Code doesn't call readFile after revert
+			expect(applyEditMock).toHaveBeenCalled();
+
+			// Verify the edit replaces content with server content
+			const workspaceEditConstructor = vscode.WorkspaceEdit as jest.Mock;
+			expect(workspaceEditConstructor).toHaveBeenCalled();
 		});
 	});
 });
