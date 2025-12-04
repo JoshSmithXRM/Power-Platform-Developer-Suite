@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Panel Disposal Cancellation** - Closing panels now stops in-flight API requests
+  - Previously: API requests continued after panel closure, wasting server resources
+  - Previously: "Webview is disposed" errors appeared when async operations completed
+  - Now: SafeWebviewPanel wrapper tracks disposal and provides safe messaging
+  - Now: Two-level cancellation stops paginated fetches immediately
+    - Level 1: Panel closes → all operations cancelled
+    - Level 2: User changes solution/environment → previous operation cancelled
+
 - **Environment Switch Loading State** - Panels now show loading immediately when switching environments
   - Data table clears stale data and shows "Switching environment..." instantly
   - Solution dropdown shows "Loading solutions..." placeholder while fetching
