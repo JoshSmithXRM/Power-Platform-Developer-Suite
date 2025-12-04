@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 
 import type { EnvironmentOption } from '../DataTablePanel';
 
+import { SafeWebviewPanel } from './SafeWebviewPanel';
+
 /**
  * Environment information interface for panel creation.
  */
@@ -15,10 +17,10 @@ export interface EnvironmentInfo {
 
 /**
  * Factory function type for creating panel instances.
- * Concrete panels implement this to create their specific panel type.
+ * Receives SafeWebviewPanel which provides safe messaging and disposal tracking.
  */
 export type PanelFactory<TPanel> = (
-	panel: vscode.WebviewPanel,
+	panel: SafeWebviewPanel,
 	environmentId: string
 ) => TPanel;
 
@@ -111,17 +113,21 @@ export interface CreatePanelConfig<TPanel extends EnvironmentScopedPanel<TPanel>
  *   }
  *
  *   private constructor(
- *     private readonly panel: vscode.WebviewPanel,
+ *     private readonly panel: SafeWebviewPanel, // Safe panel with disposal protection
  *     private readonly extensionUri: vscode.Uri,
  *     ...useCases,
  *     private currentEnvironmentId: string
  *   ) {
  *     super();
- *     panel.onDidDispose(() => this.dispose()); // Optional if additional cleanup needed
  *   }
  *
  *   protected reveal(column: vscode.ViewColumn): void {
  *     this.panel.reveal(column);
+ *   }
+ *
+ *   private async updateUI(): void {
+ *     // Safe posting - never throws, even if panel is disposed
+ *     await this.panel.postMessage({ command: 'update', data: ... });
  *   }
  *
  *   private handleEnvironmentChange(newEnvId: string): void {
@@ -129,10 +135,6 @@ export interface CreatePanelConfig<TPanel extends EnvironmentScopedPanel<TPanel>
  *     this.currentEnvironmentId = newEnvId;
  *     this.reregisterPanel(MyPanel.panels, oldEnvId, newEnvId);
  *     // Refresh panel with new environment data...
- *   }
- *
- *   private dispose(): void {
- *     // Optional: only if you have timers, intervals, or other resources to clean up
  *   }
  * }
  * ```
@@ -182,15 +184,18 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 
 		// Create VS Code webview panel with standard options
 		const webviewOptions = this.buildWebviewOptions(config.extensionUri, config.webviewOptions);
-		const panel = vscode.window.createWebviewPanel(
+		const rawPanel = vscode.window.createWebviewPanel(
 			config.viewType,
 			`${config.titlePrefix} - ${environmentName}`,
 			column,
 			webviewOptions
 		);
 
-		// Create concrete panel instance using factory
-		const newPanel = config.panelFactory(panel, targetEnvironmentId);
+		// Wrap in SafeWebviewPanel for safe messaging and disposal tracking
+		const safePanel = new SafeWebviewPanel(rawPanel);
+
+		// Create concrete panel instance using factory with safe panel
+		const newPanel = config.panelFactory(safePanel, targetEnvironmentId);
 
 		// Only register in map if no existing panel for this environment
 		// When user explicitly requests a duplicate, the new panel is "unmanaged"
@@ -206,7 +211,7 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 				config.onDispose(newPanel);
 			}
 		} : undefined;
-		this.registerDisposal(panel, targetEnvironmentId, panelsMap, onDisposeCallback, shouldRegister);
+		this.registerDisposal(safePanel, targetEnvironmentId, panelsMap, onDisposeCallback, shouldRegister);
 
 		return newPanel;
 	}
@@ -250,7 +255,7 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 	 * Removes panel from map when disposed (if it was registered).
 	 */
 	private static registerDisposal<TPanel>(
-		panel: vscode.WebviewPanel,
+		panel: SafeWebviewPanel,
 		environmentId: string,
 		panelsMap: Map<string, TPanel>,
 		onDispose?: () => void,

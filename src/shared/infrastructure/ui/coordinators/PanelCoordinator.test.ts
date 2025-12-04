@@ -1,7 +1,8 @@
-import type { WebviewPanel, Uri } from 'vscode';
+import type { Uri } from 'vscode';
 
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
 import type { IPanelBehavior } from '../behaviors/IPanelBehavior';
+import type { SafeWebviewPanel } from '../panels/SafeWebviewPanel';
 
 import { PanelCoordinator } from './PanelCoordinator';
 
@@ -12,35 +13,45 @@ jest.mock('vscode', () => ({
 	},
 }), { virtual: true });
 
-// Mock panel with only the properties needed for testing
-interface MockWebviewPanel {
+// Mock SafeWebviewPanel with only the properties needed for testing
+interface MockSafeWebviewPanel {
 	viewType: string;
+	disposed: boolean;
+	abortSignal: AbortSignal;
 	webview: {
 		onDidReceiveMessage: jest.Mock;
 		postMessage: jest.Mock;
 	};
+	onDidReceiveMessage: jest.Mock;
 	onDidDispose: jest.Mock;
+	postMessage: jest.Mock;
 	reveal: jest.Mock;
 }
 
-function createMockPanel(): MockWebviewPanel {
+function createMockPanel(): MockSafeWebviewPanel {
 	return {
 		viewType: 'test.panel',
+		disposed: false,
+		abortSignal: new AbortController().signal,
 		webview: {
 			onDidReceiveMessage: jest.fn((_callback) => {
 				return { dispose: jest.fn() };
 			}),
-			postMessage: jest.fn(),
+			postMessage: jest.fn().mockResolvedValue(true),
 		},
+		onDidReceiveMessage: jest.fn((_callback) => {
+			return { dispose: jest.fn() };
+		}),
 		onDidDispose: jest.fn((_callback) => {
 			return { dispose: jest.fn() };
 		}),
+		postMessage: jest.fn().mockResolvedValue(true),
 		reveal: jest.fn(),
 	};
 }
 
 describe('PanelCoordinator', () => {
-	let mockPanel: MockWebviewPanel;
+	let mockPanel: MockSafeWebviewPanel;
 	let mockExtensionUri: Pick<Uri, 'fsPath'>;
 	let logger: NullLogger;
 
@@ -53,8 +64,8 @@ describe('PanelCoordinator', () => {
 	// Helper to safely cast mocks to their expected types
 	function createConfig(behaviors: IPanelBehavior[] = []) {
 		return {
-			// Safely cast to WebviewPanel interface - only uses properties that are mocked
-			panel: mockPanel as unknown as WebviewPanel,
+			// Safely cast to SafeWebviewPanel interface - only uses properties that are mocked
+			panel: mockPanel as unknown as SafeWebviewPanel,
 			// Safely cast to Uri interface - only uses fsPath property
 			extensionUri: mockExtensionUri as Uri,
 			behaviors,
@@ -82,7 +93,7 @@ describe('PanelCoordinator', () => {
 		it('should register webview message handler', () => {
 			new PanelCoordinator(createConfig([]));
 
-			expect(mockPanel.webview.onDidReceiveMessage).toHaveBeenCalledTimes(1);
+			expect(mockPanel.onDidReceiveMessage).toHaveBeenCalledTimes(1);
 		});
 
 		it('should initialize successfully when multiple behaviors are provided', () => {
@@ -248,15 +259,15 @@ describe('PanelCoordinator', () => {
 
 			await coordinator.handleMessage({ command: 'refresh' });
 
-			// Should send setButtonState messages
-			expect(mockPanel.webview.postMessage).toHaveBeenCalledTimes(2);
-			expect(mockPanel.webview.postMessage).toHaveBeenNthCalledWith(1, {
+			// Should send setButtonState messages via SafeWebviewPanel.postMessage
+			expect(mockPanel.postMessage).toHaveBeenCalledTimes(2);
+			expect(mockPanel.postMessage).toHaveBeenNthCalledWith(1, {
 				command: 'setButtonState',
 				buttonId: 'refresh',
 				disabled: true,
 				showSpinner: true,
 			});
-			expect(mockPanel.webview.postMessage).toHaveBeenNthCalledWith(2, {
+			expect(mockPanel.postMessage).toHaveBeenNthCalledWith(2, {
 				command: 'setButtonState',
 				buttonId: 'refresh',
 				disabled: false,
@@ -274,8 +285,8 @@ describe('PanelCoordinator', () => {
 			await coordinator.handleMessage({ command: 'refresh' });
 
 			// Should still send both messages (restore in finally block)
-			expect(mockPanel.webview.postMessage).toHaveBeenCalledTimes(2);
-			expect(mockPanel.webview.postMessage).toHaveBeenNthCalledWith(2, {
+			expect(mockPanel.postMessage).toHaveBeenCalledTimes(2);
+			expect(mockPanel.postMessage).toHaveBeenNthCalledWith(2, {
 				command: 'setButtonState',
 				buttonId: 'refresh',
 				disabled: false,
@@ -292,7 +303,7 @@ describe('PanelCoordinator', () => {
 			await coordinator.handleMessage({ command: 'refresh' });
 
 			// Should NOT send any setButtonState messages
-			expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
+			expect(mockPanel.postMessage).not.toHaveBeenCalled();
 		});
 	});
 
@@ -320,7 +331,7 @@ describe('PanelCoordinator', () => {
 
 			// Verify dispose was called (checked via onDidDispose and onDidReceiveMessage mocks)
 			expect(mockPanel.onDidDispose).toHaveBeenCalled();
-			expect(mockPanel.webview.onDidReceiveMessage).toHaveBeenCalled();
+			expect(mockPanel.onDidReceiveMessage).toHaveBeenCalled();
 		});
 
 		it('should handle behavior dispose errors gracefully', () => {

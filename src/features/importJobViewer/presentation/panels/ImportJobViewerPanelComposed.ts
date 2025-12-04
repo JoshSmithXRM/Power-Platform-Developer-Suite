@@ -21,6 +21,7 @@ import type { OpenImportLogUseCase } from '../../application/useCases/OpenImport
 import type { ImportJobViewModelMapper } from '../../application/mappers/ImportJobViewModelMapper';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 
 /**
@@ -45,7 +46,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 	private cacheManager: VirtualTableCacheManager<ImportJob>;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
@@ -186,7 +187,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 				.map(job => this.viewModelMapper.toViewModel(job));
 
 			// Send updated data to webview (fire-and-forget, errors logged)
-			this.panel.webview.postMessage({
+			this.panel.postMessage({
 				command: 'updateVirtualTable',
 				data: {
 					rows: updatedViewModels,
@@ -264,7 +265,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -360,7 +361,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 			});
 
 			// Send data to frontend with pagination state
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateVirtualTable',
 				data: {
 					rows: viewModels,
@@ -428,7 +429,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 			const updatedViewModels = cachedRecords
 				.map(job => this.viewModelMapper.toViewModel(job));
 
-			this.panel.webview.postMessage({
+			this.panel.postMessage({
 				command: 'updateVirtualTable',
 				data: {
 					rows: updatedViewModels,
@@ -463,7 +464,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 	 * Provides visual feedback during environment switches.
 	 */
 	private showTableLoading(): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'updateVirtualTable',
 			data: {
 				rows: [],

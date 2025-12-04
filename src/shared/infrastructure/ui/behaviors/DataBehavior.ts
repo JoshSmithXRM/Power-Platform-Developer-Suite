@@ -4,6 +4,7 @@ import type { DataTableConfig } from '../DataTablePanel';
 import { VsCodeCancellationTokenAdapter } from '../../adapters/VsCodeCancellationTokenAdapter';
 import { OperationCancelledException } from '../../../domain/errors/OperationCancelledException';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { ISafePanel } from '../panels/ISafePanel';
 
 import { IDataLoader } from './IDataLoader';
 import { IDataBehavior } from './IDataBehavior';
@@ -16,7 +17,7 @@ export class DataBehavior implements IDataBehavior {
 	private cancellationTokenSource: vscode.CancellationTokenSource | null = null;
 
 	constructor(
-		private readonly webview: vscode.Webview,
+		private readonly panel: ISafePanel,
 		private readonly config: DataTableConfig,
 		private readonly dataLoader: IDataLoader,
 		private readonly logger: ILogger
@@ -62,7 +63,7 @@ export class DataBehavior implements IDataBehavior {
 	 * handler in the webview.
 	 */
 	public sendData(data: Record<string, unknown>[]): void {
-		this.webview.postMessage({
+		void this.panel.postMessage({
 			command: this.config.dataCommand,
 			data
 		});
@@ -74,7 +75,7 @@ export class DataBehavior implements IDataBehavior {
 	 * Sends a loading/loaded command to show or hide the loading indicator.
 	 */
 	public setLoading(isLoading: boolean): void {
-		this.webview.postMessage({ command: isLoading ? 'loading' : 'loaded' });
+		void this.panel.postMessage({ command: isLoading ? 'loading' : 'loaded' });
 	}
 
 	/**
@@ -86,7 +87,7 @@ export class DataBehavior implements IDataBehavior {
 	public handleError(error: unknown): void {
 		const errorMessage = error instanceof Error ? error.message : String(error);
 
-		this.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'error',
 			error: errorMessage
 		});

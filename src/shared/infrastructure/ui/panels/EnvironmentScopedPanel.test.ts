@@ -325,7 +325,8 @@ describe('EnvironmentScopedPanel', () => {
 				);
 
 				expect(panel1.revealCallCount).toBe(1);
-				expect(mockPanel.reveal).toHaveBeenCalledWith(ViewColumn.One);
+				// SafeWebviewPanel.reveal passes both viewColumn and preserveFocus (undefined)
+				expect(mockPanel.reveal).toHaveBeenCalledWith(ViewColumn.One, undefined);
 			});
 		});
 
@@ -467,7 +468,9 @@ describe('EnvironmentScopedPanel', () => {
 					'env1'
 				);
 
-				expect(mockPanel.onDidDispose).toHaveBeenCalledTimes(1);
+				// Called twice: once by SafeWebviewPanel (for tracking disposal state)
+				// and once by EnvironmentScopedPanel (for cleanup)
+				expect(mockPanel.onDidDispose).toHaveBeenCalledTimes(2);
 				expect(mockPanel.onDidDispose).toHaveBeenCalledWith(expect.any(Function));
 			});
 

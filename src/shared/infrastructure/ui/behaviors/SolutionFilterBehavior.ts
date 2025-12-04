@@ -1,9 +1,8 @@
-import * as vscode from 'vscode';
-
 import type { IPanelStateRepository, PanelState } from '../IPanelStateRepository';
 import type { SolutionOption } from '../DataTablePanel';
 import { DEFAULT_SOLUTION_ID } from '../../../domain/constants/SolutionConstants';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { ISafePanel } from '../panels/ISafePanel';
 
 import { ISolutionFilterBehavior } from './ISolutionFilterBehavior';
 import { IEnvironmentBehavior } from './IEnvironmentBehavior';
@@ -17,7 +16,7 @@ export class SolutionFilterBehavior implements ISolutionFilterBehavior {
 	private solutionFilterOptions: SolutionOption[] = [];
 
 	constructor(
-		private readonly webview: vscode.Webview,
+		private readonly panel: ISafePanel,
 		private readonly panelType: string,
 		private readonly environmentBehavior: IEnvironmentBehavior,
 		private readonly loadSolutions: () => Promise<SolutionOption[]>,
@@ -136,11 +135,11 @@ export class SolutionFilterBehavior implements ISolutionFilterBehavior {
 	 * Sends solution filter data to the webview.
 	 */
 	private sendSolutionFilterToWebview(): void {
-		this.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'solutionFilterOptionsData',
 			data: this.solutionFilterOptions
 		});
-		this.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'setCurrentSolution',
 			solutionId: this.currentSolutionId
 		});

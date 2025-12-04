@@ -1,7 +1,6 @@
-import * as vscode from 'vscode';
-
 import type { EnvironmentOption } from '../DataTablePanel';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { ISafePanel } from '../panels/ISafePanel';
 
 import { IEnvironmentBehavior } from './IEnvironmentBehavior';
 
@@ -20,7 +19,7 @@ export class EnvironmentBehavior implements IEnvironmentBehavior {
 	private environments: EnvironmentOption[] = [];
 
 	constructor(
-		private readonly webview: vscode.Webview,
+		private readonly panel: ISafePanel,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentDetails | null>,
 		private readonly onEnvironmentChanged: (envId: string) => Promise<void>,
@@ -38,13 +37,13 @@ export class EnvironmentBehavior implements IEnvironmentBehavior {
 	public async initialize(): Promise<void> {
 		// Load environments list
 		this.environments = await this.getEnvironments();
-		this.webview.postMessage({ command: 'environmentsData', data: this.environments });
+		void this.panel.postMessage({ command: 'environmentsData', data: this.environments });
 
 		// Set initial environment
 		this.currentEnvironmentId = this.initialEnvironmentId || this.environments[0]?.id || null;
 
 		if (this.currentEnvironmentId) {
-			this.webview.postMessage({
+			void this.panel.postMessage({
 				command: 'setCurrentEnvironment',
 				environmentId: this.currentEnvironmentId
 			});
@@ -107,7 +106,7 @@ export class EnvironmentBehavior implements IEnvironmentBehavior {
 			const environment = await this.getEnvironmentById(environmentId);
 			const hasPowerPlatformEnvId = !!environment?.powerPlatformEnvironmentId;
 
-			this.webview.postMessage({
+			void this.panel.postMessage({
 				command: 'setMakerButtonState',
 				enabled: hasPowerPlatformEnvId
 			});

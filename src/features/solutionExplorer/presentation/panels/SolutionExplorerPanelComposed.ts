@@ -19,6 +19,7 @@ import type { Solution } from '../../domain/entities/Solution';
 import { SolutionDataProviderAdapter } from '../../infrastructure/adapters/SolutionDataProviderAdapter';
 import type { SolutionViewModelMapper } from '../../application/mappers/SolutionViewModelMapper';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 
 /**
@@ -43,7 +44,7 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 	private cacheManager: VirtualTableCacheManager<Solution>;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
@@ -183,7 +184,7 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 				.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName));
 
 			// Send updated data to webview (fire-and-forget, errors logged)
-			this.panel.webview.postMessage({
+			this.panel.postMessage({
 				command: 'updateVirtualTable',
 				data: {
 					rows: updatedViewModels,
@@ -261,7 +262,7 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -361,7 +362,7 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 			});
 
 			// Send data to frontend with pagination state
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateVirtualTable',
 				data: {
 					rows: viewModels,
@@ -438,7 +439,7 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 	 * Provides visual feedback during environment switches.
 	 */
 	private showTableLoading(): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels: [],

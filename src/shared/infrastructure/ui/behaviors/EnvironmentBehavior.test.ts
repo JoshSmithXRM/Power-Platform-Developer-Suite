@@ -1,17 +1,18 @@
-import type { Webview } from 'vscode';
-
 import type { EnvironmentOption } from '../DataTablePanel';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { ISafePanel } from '../panels/ISafePanel';
 
 import { EnvironmentBehavior, EnvironmentDetails } from './EnvironmentBehavior';
 
-// Mock webview with only the methods needed for testing
-interface MockWebview {
+// Mock ISafePanel with only the methods needed for testing
+interface MockSafePanel {
 	postMessage: jest.Mock;
+	disposed: boolean;
+	abortSignal: AbortSignal;
 }
 
 describe('EnvironmentBehavior', () => {
-	let webviewMock: MockWebview;
+	let panelMock: MockSafePanel;
 	let getEnvironmentsMock: jest.Mock<Promise<EnvironmentOption[]>>;
 	let getEnvironmentByIdMock: jest.Mock<Promise<EnvironmentDetails | null>>;
 	let onEnvironmentChangedMock: jest.Mock<Promise<void>>;
@@ -27,8 +28,10 @@ describe('EnvironmentBehavior', () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
 
-		webviewMock = {
-			postMessage: jest.fn()
+		panelMock = {
+			postMessage: jest.fn().mockResolvedValue(true),
+			disposed: false,
+			abortSignal: new AbortController().signal
 		};
 
 		getEnvironmentsMock = jest.fn().mockResolvedValue(mockEnvironments);
@@ -52,7 +55,7 @@ describe('EnvironmentBehavior', () => {
 		it('should load and send environments to webview', async () => {
 			behavior = new EnvironmentBehavior(
 				// Safely cast to Webview interface - only uses postMessage which is mocked
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -62,7 +65,7 @@ describe('EnvironmentBehavior', () => {
 			await behavior.initialize();
 
 			expect(getEnvironmentsMock).toHaveBeenCalled();
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'environmentsData',
 				data: mockEnvironments
 			});
@@ -71,7 +74,7 @@ describe('EnvironmentBehavior', () => {
 		it('should set first environment as current when no initial environment provided', async () => {
 			behavior = new EnvironmentBehavior(
 				// Safely cast to Webview interface - only uses postMessage which is mocked
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -81,7 +84,7 @@ describe('EnvironmentBehavior', () => {
 			await behavior.initialize();
 
 			expect(behavior.getCurrentEnvironmentId()).toBe('env-1');
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'setCurrentEnvironment',
 				environmentId: 'env-1'
 			});
@@ -90,7 +93,7 @@ describe('EnvironmentBehavior', () => {
 		it('should use initial environment ID if provided', async () => {
 			behavior = new EnvironmentBehavior(
 				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -101,7 +104,7 @@ describe('EnvironmentBehavior', () => {
 			await behavior.initialize();
 
 			expect(behavior.getCurrentEnvironmentId()).toBe('env-2');
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'setCurrentEnvironment',
 				environmentId: 'env-2'
 			});
@@ -110,7 +113,7 @@ describe('EnvironmentBehavior', () => {
 		it('should update Maker button state for initial environment', async () => {
 			behavior = new EnvironmentBehavior(
 				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -120,7 +123,7 @@ describe('EnvironmentBehavior', () => {
 			await behavior.initialize();
 
 			expect(getEnvironmentByIdMock).toHaveBeenCalledWith('env-1');
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'setMakerButtonState',
 				enabled: true
 			});
@@ -135,7 +138,7 @@ describe('EnvironmentBehavior', () => {
 
 			behavior = new EnvironmentBehavior(
 				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -144,7 +147,7 @@ describe('EnvironmentBehavior', () => {
 
 			await behavior.initialize();
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'setMakerButtonState',
 				enabled: false
 			});
@@ -155,7 +158,7 @@ describe('EnvironmentBehavior', () => {
 
 			behavior = new EnvironmentBehavior(
 				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -173,7 +176,7 @@ describe('EnvironmentBehavior', () => {
 
 			behavior = new EnvironmentBehavior(
 				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -193,7 +196,7 @@ describe('EnvironmentBehavior', () => {
 		it('should return current environment ID', async () => {
 			behavior = new EnvironmentBehavior(
 				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -211,7 +214,7 @@ describe('EnvironmentBehavior', () => {
 
 			behavior = new EnvironmentBehavior(
 				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -226,7 +229,7 @@ describe('EnvironmentBehavior', () => {
 		beforeEach(async () => {
 			behavior = new EnvironmentBehavior(
 				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -263,7 +266,7 @@ describe('EnvironmentBehavior', () => {
 			await behavior.switchEnvironment('env-2');
 
 			expect(getEnvironmentByIdMock).toHaveBeenCalledWith('env-2');
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'setMakerButtonState',
 				enabled: true
 			});
@@ -308,7 +311,7 @@ describe('EnvironmentBehavior', () => {
 		it('should not throw when disposing', () => {
 			behavior = new EnvironmentBehavior(
 				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -323,7 +326,7 @@ describe('EnvironmentBehavior', () => {
 		beforeEach(() => {
 			behavior = new EnvironmentBehavior(
 				// Cast is safe: MockWebview implements all Webview methods used by EnvironmentBehavior
-			webviewMock as unknown as Webview,
+			panelMock as unknown as ISafePanel,
 				getEnvironmentsMock,
 				getEnvironmentByIdMock,
 				onEnvironmentChangedMock,
@@ -340,7 +343,7 @@ describe('EnvironmentBehavior', () => {
 
 			await behavior.initialize();
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'setMakerButtonState',
 				enabled: true
 			});
@@ -355,7 +358,7 @@ describe('EnvironmentBehavior', () => {
 
 			await behavior.initialize();
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'setMakerButtonState',
 				enabled: false
 			});
@@ -366,7 +369,7 @@ describe('EnvironmentBehavior', () => {
 
 			await behavior.initialize();
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'setMakerButtonState',
 				enabled: false
 			});

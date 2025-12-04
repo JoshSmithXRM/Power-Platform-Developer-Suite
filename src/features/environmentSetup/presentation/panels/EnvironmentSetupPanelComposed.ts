@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
+import { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
 import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
 import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
@@ -58,7 +59,7 @@ export class EnvironmentSetupPanelComposed {
 	private currentEnvironmentId?: string;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly loadEnvironmentByIdUseCase: LoadEnvironmentByIdUseCase,
 		private readonly saveEnvironmentUseCase: SaveEnvironmentUseCase,
@@ -134,7 +135,7 @@ export class EnvironmentSetupPanelComposed {
 			return existingPanel;
 		}
 
-		const panel = vscode.window.createWebviewPanel(
+		const rawPanel = vscode.window.createWebviewPanel(
 			'environmentSetup',
 			environmentId ? 'Edit Environment' : 'New Environment',
 			column,
@@ -146,8 +147,11 @@ export class EnvironmentSetupPanelComposed {
 			}
 		);
 
+		// Wrap in SafeWebviewPanel for safe messaging and disposal tracking
+		const safePanel = new SafeWebviewPanel(rawPanel);
+
 		const newPanel = new EnvironmentSetupPanelComposed(
-			panel,
+			safePanel,
 			extensionUri,
 			loadEnvironmentByIdUseCase,
 			saveEnvironmentUseCase,
@@ -225,7 +229,7 @@ export class EnvironmentSetupPanelComposed {
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -298,7 +302,7 @@ export class EnvironmentSetupPanelComposed {
 
 		const viewModel = await this.loadEnvironmentByIdUseCase.execute({ environmentId: this.currentEnvironmentId });
 
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'environment-loaded',
 			data: viewModel
 		});
@@ -341,7 +345,7 @@ export class EnvironmentSetupPanelComposed {
 				errorCount: result.errors.length
 			});
 
-			this.panel.webview.postMessage({
+			void this.panel.postMessage({
 				command: 'environment-saved',
 				data: {
 					success: false,
@@ -376,7 +380,7 @@ export class EnvironmentSetupPanelComposed {
 			}
 		}
 
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'environment-saved',
 			data: {
 				success: true,
@@ -432,7 +436,7 @@ export class EnvironmentSetupPanelComposed {
 				vscode.window.showErrorMessage(`Connection test failed: ${result.errorMessage}`);
 			}
 
-			this.panel.webview.postMessage({
+			void this.panel.postMessage({
 				command: 'test-connection-result',
 				data: result
 			});
@@ -444,7 +448,7 @@ export class EnvironmentSetupPanelComposed {
 	 * Helper to ensure button state is always reset.
 	 */
 	private sendDiscoverResult(data: { success: boolean; environmentId?: string; cancelled?: boolean }): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'discover-environment-id-result',
 			data
 		});
@@ -651,7 +655,7 @@ export class EnvironmentSetupPanelComposed {
 
 		const result = await this.validateUniqueNameUseCase.execute(request);
 
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'name-validation-result',
 			data: result
 		});
