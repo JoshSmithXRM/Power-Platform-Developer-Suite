@@ -42,32 +42,18 @@ This document tracks remaining work to **fully complete** three features:
 | # | Task | Effort | Status |
 |---|------|--------|--------|
 | 1 | Conflict detection (warn if modified by another user) | 3-4h | **Done** |
-| 1b | **BUG FIX**: Connection-based document identity (see below) | 4-6h | **Next** |
+| 1a | Version selection UX (open with unpublished changes) | 2-3h | **Done** |
+| 1b | Version selection UX (save conflict with Compare First) | 2-3h | **Done** |
 | 2 | JavaScript syntax validation before upload | 2-3h | Planned |
 | 3 | Retry logic for transient failures | 1-2h | Planned |
 
-**Total: ~10-15 hours** (increased due to bug fix)
+**Total: ~6-8 hours remaining** (JS validation + retry logic)
 
-#### Bug: FileSystemProvider Uses Wrong Connection
+#### ~~Bug: FileSystemProvider Uses Wrong Connection~~ ✅ FIXED
 
-**Problem:** The FileSystemProvider is a singleton created with the first panel's connection. If a user opens a second panel with a different connection (e.g., Service Principal vs Interactive User), file operations still use the first connection's credentials.
+**Status:** Fixed with `WebResourceConnectionRegistry` - see Session Progress above.
 
-**Current URI:** `ppds-webresource://environmentId/webResourceId/filename.ext`
-
-**Expected Behavior:**
-- Same connection + same web resource = same editor
-- Different connection + same web resource = different editors (even if same environment)
-
-**Fix Required:**
-1. Change URI scheme to use `connectionId` instead of `environmentId`
-2. Create a connection registry that FileSystemProvider can query
-3. FileSystemProvider parses connection ID from URI, looks up correct credentials
-4. Update cache key to `connectionId:webResourceId`
-
-**Why This Matters:**
-- Different connections may have different permissions
-- Audit logs should show correct identity
-- User explicitly chose different credentials for a reason
+The registry maps `environmentId` → resources, and FileSystemProvider queries it for each operation.
 
 ---
 
@@ -134,13 +120,13 @@ This document tracks remaining work to **fully complete** three features:
 
 ---
 
-## Grand Total: ~53-74 hours
+## Grand Total: ~50-68 hours remaining
 
-| Feature | Effort |
-|---------|--------|
-| Web Resources | 6-9h |
-| Metadata Browser | 7-10h |
-| Data Explorer | 40-55h |
+| Feature | Effort | Status |
+|---------|--------|--------|
+| Web Resources | 3-5h | Most done, JS validation + retry remaining |
+| Metadata Browser | 7-10h | Planned |
+| Data Explorer | 40-55h | Planned |
 
 ---
 
@@ -192,21 +178,27 @@ Before merging this branch:
 | Fix reload from server | Fixed "Reload from Server" to properly update editor using WorkspaceEdit | ✅ Done |
 | Test coverage | Added test for "Reload from Server" conflict resolution flow | ✅ Done |
 
-### In Progress
+### Completed (continued)
 
 | Item | Description | Status |
 |------|-------------|--------|
 | Published vs Unpublished diff | On file open, compare published/unpublished and show diff if different | ✅ Done |
+| Version selection UX (Process 1) | Diff view + non-modal "Edit Unpublished/Edit Published/Cancel" → opens chosen version | ✅ Done |
+| Version selection UX (Process 2) | Save conflict: "Compare First/Overwrite/Discard" modal → diff → non-modal resolution | ✅ Done |
+| New URI content modes | Added 'server-current' and 'local-pending' modes for conflict diff display | ✅ Done |
+| Non-modal notifications | Changed modals to non-modal so users can scroll diff while deciding | ✅ Done |
 
 ### Files Modified This Session
 
 - `src/features/webResources/infrastructure/providers/WebResourceFileSystemProvider.ts`
+- `src/features/webResources/infrastructure/providers/WebResourceFileSystemProvider.test.ts`
 - `src/features/webResources/infrastructure/providers/WebResourceConnectionRegistry.ts` (NEW)
 - `src/features/webResources/presentation/panels/WebResourcesPanelComposed.ts`
 - `src/features/webResources/presentation/initialization/initializeWebResources.ts`
 - `src/shared/infrastructure/services/DataverseApiService.ts` (HTTP cache headers)
 - `src/features/environmentSetup/infrastructure/services/WhoAmIService.ts` (HTTP cache headers)
 - `src/features/environmentSetup/infrastructure/services/PowerPlatformApiService.ts` (HTTP cache headers)
+- `docs/future/WEB_RESOURCE_VERSION_SELECTION_DESIGN.md` (implementation complete)
 
 ---
 
@@ -279,7 +271,8 @@ These tests assumed TTL caching which was removed. The stat() test expects readF
 | 2025-12-02 | Include Visual Query Builder | Important for accessibility - not all users comfortable with SQL |
 | 2025-12-03 | Remove TTL caching from FileSystemProvider | Admin tools must always show fresh data |
 | 2025-12-03 | Use environmentId (not connectionId) in URI | Simplified approach - environmentId already unique per connection |
+| 2025-12-03 | Non-modal notifications for diff views | Allows user to scroll and examine diff while buttons remain visible |
 
 ---
 
-**Last Updated:** 2025-12-03
+**Last Updated:** 2025-12-03 (Version Selection UX complete)

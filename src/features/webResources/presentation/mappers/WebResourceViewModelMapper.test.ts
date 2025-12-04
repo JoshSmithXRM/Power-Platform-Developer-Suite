@@ -320,7 +320,7 @@ describe('WebResourceViewModelMapper', () => {
 			expect(viewModel.nameLink!.commandData).toEqual({
 				id: 'wr-123',
 				name: 'new_script.js',
-				'type-code': '3'
+				'file-extension': '.js'
 			});
 			expect(viewModel.nameLink!.className).toBe('clickable-link');
 		});
