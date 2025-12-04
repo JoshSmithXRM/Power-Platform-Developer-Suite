@@ -512,9 +512,10 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		// Open web resource in editor
 		this.coordinator.registerHandler('openWebResource', async (data) => {
-			const payload = data as { id?: string; name?: string; typeCode?: string } | undefined;
-			if (payload?.id && payload?.name && payload?.typeCode) {
-				await this.handleOpenWebResource(payload.id, payload.name, parseInt(payload.typeCode, 10));
+			// kebab-case 'file-extension' in HTML becomes camelCase 'fileExtension' via messaging.js kebabToCamel
+			const payload = data as { id?: string; name?: string; fileExtension?: string } | undefined;
+			if (payload?.id && payload?.name && payload?.fileExtension) {
+				await this.handleOpenWebResource(payload.id, payload.name, payload.fileExtension);
 			}
 		});
 
@@ -920,9 +921,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	 *
 	 * @param webResourceId - Web resource GUID
 	 * @param name - Web resource name (used for filename)
-	 * @param typeCode - Web resource type code (determines file extension)
+	 * @param fileExtension - File extension (e.g., '.js', '.html') for syntax highlighting
 	 */
-	private async handleOpenWebResource(webResourceId: string, name: string, _typeCode: number): Promise<void> {
+	private async handleOpenWebResource(webResourceId: string, name: string, fileExtension: string): Promise<void> {
 		// Require environment selection before opening web resources
 		if (!this.currentEnvironmentId) {
 			vscode.window.showWarningMessage('Please select an environment first.');
@@ -938,10 +939,11 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			// Sanitize environment name for filename safety (remove invalid characters)
 			const sanitizedEnvName = envName.replace(/[<>:"/\\|?*]/g, '_').trim();
 
-			// Web resource name already includes the file extension (e.g., "new_script.js")
-			// Append environment name to help user identify which environment the file is from
+			// Check if name already has an extension, otherwise use type-based extension
+			// (Web resource names may or may not include extensions)
 			const nameParts = name.split('.');
-			const ext = nameParts.length > 1 ? `.${nameParts.pop()}` : '';
+			const nameHasExtension = nameParts.length > 1;
+			const ext = nameHasExtension ? `.${nameParts.pop()}` : fileExtension;
 			const baseName = nameParts.join('.');
 			const filename = `${baseName} [${sanitizedEnvName}]${ext}`;
 
@@ -1091,6 +1093,12 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		// Open the document - VS Code may return cached content immediately
 		const document = await vscode.workspace.openTextDocument(uri);
 		await vscode.window.showTextDocument(document, { preview: false });
+
+		// Set language mode based on file extension (VS Code doesn't auto-detect for custom schemes)
+		const languageId = this.getLanguageIdFromFilename(filename);
+		if (languageId !== null && document.languageId !== languageId) {
+			await vscode.languages.setTextDocumentLanguage(document, languageId);
+		}
 
 		// VS Code returns cached documents immediately without waiting for our readFile().
 		// Our readFile() IS called but runs in background. Wait for it to complete.
@@ -1329,5 +1337,33 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			isFullyLoaded: state.isFullyCached(),
 			totalCount: state.getTotalRecordCount()
 		});
+	}
+
+	/**
+	 * Maps file extension to VS Code language ID for syntax highlighting.
+	 * Returns null if extension is not recognized.
+	 */
+	private getLanguageIdFromFilename(filename: string): string | null {
+		const ext = filename.toLowerCase().split('.').pop();
+		if (ext === undefined) {
+			return null;
+		}
+
+		const languageMap: Record<string, string> = {
+			'js': 'javascript',
+			'ts': 'typescript',
+			'css': 'css',
+			'html': 'html',
+			'htm': 'html',
+			'xml': 'xml',
+			'xsl': 'xml',
+			'xslt': 'xml',
+			'svg': 'xml',
+			'resx': 'xml',
+			'json': 'json',
+			'xap': 'plaintext'
+		};
+
+		return languageMap[ext] ?? null;
 	}
 }
