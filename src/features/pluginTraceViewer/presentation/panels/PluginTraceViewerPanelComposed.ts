@@ -44,6 +44,7 @@ import type { FilterCriteriaViewModel } from '../../application/viewModels/Filte
 import { FilterField } from '../../application/types';
 import { FILTER_ENUM_OPTIONS } from '../constants/FilterFieldConfiguration';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 import { PluginTraceExportBehavior } from '../behaviors/PluginTraceExportBehavior';
 import { PluginTraceDeleteBehavior } from '../behaviors/PluginTraceDeleteBehavior';
@@ -117,7 +118,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	private currentTraceLevel: TraceLevel | null = null;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
@@ -338,7 +339,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		const filterMapper = new FilterCriteriaMapper(this.configService);
 		const domainFilter = filterMapper.toDomain(loadedFilterCriteria);
 		const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateODataPreview',
 			data: { query: odataQuery }
 		});
@@ -444,7 +445,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -628,7 +629,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			const config = this.getTableConfig();
 
 			// Data-driven update: Send ViewModels to frontend
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateTableData',
 				data: {
 					viewModels,
@@ -728,7 +729,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		const filterCriteria = this.filterManagementBehavior.getFilterCriteria();
 		const reconstructedQuickFilterIds = this.filterManagementBehavior.getReconstructedQuickFilterIds();
 
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateFilterState',
 			data: {
 				filterCriteria,
@@ -742,7 +743,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		const filterMapper = new FilterCriteriaMapper(this.configService);
 		const domainFilter = filterMapper.toDomain(loadedFilterCriteria);
 		const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateODataPreview',
 			data: { query: odataQuery }
 		});
@@ -777,7 +778,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			await vscode.window.showInformationMessage(`Trace level set to: ${TraceLevelFormatter.getDisplayName(level)}`);
 
 			// Data-driven update: Send dropdown state change to frontend
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateDropdownState',
 				data: {
 					dropdownId: 'traceLevelDropdown',
@@ -801,7 +802,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			this.logger.debug('Trace level loaded', { level: level.value });
 
 			// Update the dropdown in the webview to show current selection
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateDropdownState',
 				data: {
 					dropdownId: 'traceLevelDropdown',
@@ -936,7 +937,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	 * Provides visual feedback during environment switches.
 	 */
 	private showTableLoading(): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels: [],

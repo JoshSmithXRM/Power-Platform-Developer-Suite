@@ -21,6 +21,7 @@ import type { ISolutionRepository } from '../../../solutionExplorer/domain/inter
 import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/solutionFilterView';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
@@ -56,7 +57,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	private currentCancellationSource: vscode.CancellationTokenSource | null = null;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
@@ -307,7 +308,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -440,7 +441,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 			const config = this.getTableConfig();
 
 			// Data-driven update: Send ViewModels to frontend
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateTableData',
 				data: {
 					viewModels,
@@ -523,13 +524,13 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		this.logger.debug('Environment changed', { environmentId });
 
 		// Immediately show loading state to clear stale data from previous environment
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'showLoading',
 			message: 'Switching environment...'
 		});
 
 		// Show loading placeholder in solution selector to prevent stale selection
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateSolutionSelector',
 			data: {
 				solutions: [{ id: '', name: 'Loading solutions...', uniqueName: '' }],
@@ -565,7 +566,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 		}
 
 		// Update solution selector in UI
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateSolutionSelector',
 			data: {
 				solutions: this.solutionOptions,
@@ -647,7 +648,7 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 	 * Provides visual feedback during environment/solution switches.
 	 */
 	private showTableLoading(): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels: [],

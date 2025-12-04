@@ -2,6 +2,7 @@ import type * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IPanelBehavior } from '../behaviors/IPanelBehavior';
+import type { SafeWebviewPanel } from '../panels/SafeWebviewPanel';
 import type { WebviewMessage } from '../types/WebviewMessage';
 import { isWebviewMessage } from '../types/WebviewMessage';
 
@@ -51,7 +52,7 @@ export interface CommandHandlerOptions {
 export class PanelCoordinator<TCommands extends string = string>
 	implements IPanelCoordinator<TCommands>
 {
-	private readonly panel: vscode.WebviewPanel;
+	private readonly panel: SafeWebviewPanel;
 	private readonly extensionUri: vscode.Uri;
 	private readonly behaviors: ReadonlyArray<IPanelBehavior>;
 	private readonly logger: ILogger;
@@ -81,10 +82,10 @@ export class PanelCoordinator<TCommands extends string = string>
 
 		// Register webview message handler
 		this.disposables.push(
-			this.panel.webview.onDidReceiveMessage(
-				async (message: unknown) => {
+			this.panel.onDidReceiveMessage(
+				(message: unknown) => {
 					if (isWebviewMessage(message)) {
-						await this.handleMessage(message);
+						void this.handleMessage(message);
 					} else {
 						logger.warn(
 							'Invalid message received from webview',
@@ -207,7 +208,7 @@ export class PanelCoordinator<TCommands extends string = string>
 	 * @param isLoading - True to disable and show spinner, false to enable
 	 */
 	private setButtonLoading(buttonId: string, isLoading: boolean): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'setButtonState',
 			buttonId,
 			disabled: isLoading,

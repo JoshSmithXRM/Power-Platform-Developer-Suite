@@ -721,4 +721,152 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			expect(lastUpdateCall.data.currentSolutionId).toBe(DEFAULT_SOLUTION_ID);
 		});
 	});
+
+	describe('Disposed Panel Bug: postMessage After Disposal', () => {
+		/**
+		 * This test demonstrates the bug where closing a panel during an async operation
+		 * results in "Failed to load web resources: Webview is disposed" error.
+		 *
+		 * Root cause: When panel.dispose() is called, in-flight async operations continue
+		 * running. When they complete and try to call panel.webview.postMessage(), it throws
+		 * because the webview is disposed. The error is not caught, causing an error message.
+		 *
+		 * This bug affects ALL panels in the codebase, not just WebResourcesPanel.
+		 */
+		it('should demonstrate that postMessage is called after panel disposal (BUG)', async () => {
+			// Track postMessage calls and disposal state
+			let panelDisposed = false;
+			const postMessageCallsAfterDispose: unknown[] = [];
+
+			// Setup: Use case takes time to complete
+			let resolveUseCase: ((value: WebResource[]) => void) | null = null;
+			mockListWebResourcesUseCase.execute.mockImplementation(() => {
+				return new Promise<WebResource[]>((resolve) => {
+					resolveUseCase = resolve;
+				});
+			});
+
+			// Track postMessage calls and detect calls after disposal
+			// Note: We don't throw here - we just track the calls to prove the bug
+			// In real VS Code, the webview would throw, but for testing we just track
+			const postMessageMock = mockPanel.webview.postMessage as jest.Mock;
+			postMessageMock.mockImplementation(async (message: unknown) => {
+				if (panelDisposed) {
+					postMessageCallsAfterDispose.push(message);
+					// Don't throw - just track the call to prove it happens
+					// The real bug causes VS Code to throw "Webview is disposed"
+				}
+				return true;
+			});
+
+			// Create panel - this triggers async loading
+			const panelPromise = WebResourcesPanelComposed.createOrShow(
+				mockExtensionUri,
+				mockGetEnvironments,
+				mockGetEnvironmentById,
+				mockListWebResourcesUseCase,
+				mockPublishWebResourceUseCase,
+				mockWebResourceRepository,
+				mockSolutionRepository,
+				mockUrlBuilder,
+				mockViewModelMapper,
+				mockLogger,
+				TEST_ENVIRONMENT_ID,
+				mockPanelStateRepository,
+				undefined,
+				undefined,
+				mockGetWebResourceContentUseCase,
+				mockUpdateWebResourceUseCase
+			);
+
+			// Wait for panel creation but loading is still in progress
+			await panelPromise;
+			await flushPromises();
+
+			// Simulate user closing the panel while loading
+			panelDisposed = true;
+			if (_disposableCallback) {
+				_disposableCallback();
+			}
+
+			// Now resolve the use case (simulates slow API finally responding)
+			const resources = [createMockWebResource('test-1', 'test_resource', 'Test Resource')];
+			resolveUseCase!(resources);
+
+			// Wait for async operation to complete and try to post
+			await flushPromises();
+			await delay(10);
+			await flushPromises();
+
+			// BUG DEMONSTRATION: postMessage was attempted after disposal
+			// This is the root cause of "Failed to load web resources: Webview is disposed"
+			//
+			// With the current code, postMessage IS called after disposal
+			// When we fix this bug, this test will need to be updated to expect 0 calls
+			expect(postMessageCallsAfterDispose.length).toBeGreaterThan(0);
+		});
+
+		it('should handle refresh race with disposal gracefully', async () => {
+			// Track errors that would be shown to user
+			const errorsSpy = jest.spyOn(vscode.window, 'showErrorMessage');
+			let panelDisposed = false;
+			const postMessageCallsAfterDispose: unknown[] = [];
+
+			// Setup: Fast initial load, then slow refresh
+			let refreshResolve: ((value: WebResource[]) => void) | null = null;
+			let callCount = 0;
+			mockListWebResourcesUseCase.execute.mockImplementation(() => {
+				callCount++;
+				if (callCount === 1) {
+					// First call (init) - resolve immediately
+					return Promise.resolve([]);
+				}
+				// Refresh call - wait for manual resolution
+				return new Promise<WebResource[]>((resolve) => {
+					refreshResolve = resolve;
+				});
+			});
+
+			// Track postMessage calls after disposal (without throwing)
+			const postMessageMock = mockPanel.webview.postMessage as jest.Mock;
+			postMessageMock.mockImplementation(async (message: unknown) => {
+				if (panelDisposed) {
+					postMessageCallsAfterDispose.push(message);
+				}
+				return true;
+			});
+
+			// Create panel and wait for initialization
+			await createPanelAndWait();
+
+			// Get message handler and trigger refresh
+			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
+			const refreshPromise = messageHandler({ command: 'refresh' });
+
+			// Wait a bit for refresh to start
+			await delay(5);
+
+			// Simulate user closing panel during refresh
+			panelDisposed = true;
+			if (_disposableCallback) {
+				_disposableCallback();
+			}
+
+			// Now resolve the refresh (API returns after panel closed)
+			const resources = [createMockWebResource('test-1', 'test_resource', 'Test Resource')];
+			refreshResolve!(resources);
+
+			// Wait for async to complete
+			await refreshPromise;
+			await flushPromises();
+
+			// Verify postMessage was attempted after disposal (documents the bug)
+			// In real VS Code, this would throw "Webview is disposed"
+			expect(postMessageCallsAfterDispose.length).toBeGreaterThan(0);
+
+			// Currently no error shown because mock doesn't throw
+			// But in real VS Code the user sees: "Failed to load web resources: Webview is disposed"
+			expect(errorsSpy).toHaveBeenCalledTimes(0);
+		});
+	});
 });

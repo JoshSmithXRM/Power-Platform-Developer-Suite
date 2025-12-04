@@ -30,6 +30,7 @@ import type { ISolutionRepository } from '../../../solutionExplorer/domain/inter
 import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/solutionFilterView';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 import { createWebResourceUri, WebResourceFileSystemProvider } from '../../infrastructure/providers/WebResourceFileSystemProvider';
 import type { WebResourceConnectionRegistry, EnvironmentResources } from '../../infrastructure/providers/WebResourceConnectionRegistry';
@@ -38,7 +39,10 @@ import type { UpdateWebResourceUseCase } from '../../application/useCases/Update
 import { PublishBehavior } from '../../../../shared/infrastructure/ui/behaviors/PublishBehavior';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
+import { AbortSignalCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/AbortSignalCancellationTokenAdapter';
+import { CompositeCancellationToken } from '../../../../shared/infrastructure/adapters/CompositeCancellationToken';
 import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
+import type { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 
 /**
  * Commands supported by Web Resources panel.
@@ -91,11 +95,15 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	// Cancelled when user switches solutions to stop wasted API calls
 	private currentCancellationSource: vscode.CancellationTokenSource | null = null;
 
+	// Panel-level cancellation token - aborted when panel is disposed
+	// Used to stop ALL operations when user closes the panel
+	private readonly panelCancellationToken: ICancellationToken;
+
 	// Resources for FileSystemProvider registration (kept for re-registration on environment change)
 	private readonly environmentResources: EnvironmentResources;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
@@ -115,6 +123,10 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	) {
 		super();
 		this.currentEnvironmentId = environmentId;
+
+		// Create panel-level cancellation token from SafeWebviewPanel's abortSignal
+		// This token is cancelled when the panel is disposed, stopping all in-flight operations
+		this.panelCancellationToken = new AbortSignalCancellationTokenAdapter(panel.abortSignal);
 
 		// Create environment resources for FileSystemProvider registration
 		this.environmentResources = {
@@ -468,7 +480,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -636,15 +648,20 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			solutionId: this.currentSolutionId
 		});
 
-		// Wrap VS Code token in domain adapter if provided
+		// Create composite cancellation token:
+		// - Panel-level: cancelled when panel is disposed (stops ALL operations)
+		// - Operation-level: cancelled when user changes solution (stops THIS operation)
 		const domainToken = cancellationToken
-			? new VsCodeCancellationTokenAdapter(cancellationToken)
-			: undefined;
+			? new CompositeCancellationToken(
+				this.panelCancellationToken,
+				new VsCodeCancellationTokenAdapter(cancellationToken)
+			)
+			: this.panelCancellationToken;
 
 		const webResources = await this.listWebResourcesUseCase.execute(
 			this.currentEnvironmentId,
 			this.currentSolutionId,
-			domainToken, // Pass cancellation token to use case
+			domainToken, // Pass composite cancellation token to use case
 			{ textBasedOnly: false } // Always fetch ALL types
 		);
 
@@ -714,13 +731,13 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.logger.debug('Environment changed', { environmentId });
 
 		// Immediately show loading state to clear stale data from previous environment
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'showLoading',
 			message: 'Switching environment...'
 		});
 
 		// Show loading placeholder in solution selector to prevent stale selection
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateSolutionSelector',
 			data: {
 				solutions: [{ id: '', name: 'Loading solutions...', uniqueName: '' }],
@@ -769,7 +786,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		}
 
 		// Update solution selector in UI
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateSolutionSelector',
 			data: {
 				solutions: this.solutionOptions,
@@ -884,7 +901,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				fromCache: !forceRefresh && this.dataCache.has(this.getCacheKey(this.currentSolutionId))
 			});
 
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateVirtualTable',
 				data: {
 					rows: viewModels,
@@ -917,7 +934,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	 * Provides visual feedback during environment/solution switches.
 	 */
 	private showTableLoading(): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'updateVirtualTable',
 			data: {
 				rows: [],
@@ -1138,7 +1155,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.selectedWebResourceName = name;
 
 		// Enable/disable the Publish button
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'setButtonState',
 			buttonId: 'publish',
 			disabled: webResourceId === null
@@ -1239,7 +1256,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.logger.debug('Toggle show all types', { showTextBasedOnly: this.showTextBasedOnly });
 
 		// Update button label
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'setButtonLabel',
 			buttonId: 'toggleShowAll',
 			label: newLabel
@@ -1266,7 +1283,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			const viewModels = this.viewModelMapper.toViewModels(result.results);
 
 			// Send results back to webview
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'serverSearchResults',
 				data: {
 					viewModels,
@@ -1284,7 +1301,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		} catch (error) {
 			this.logger.error('Server search failed', error);
 			// Send error back to webview so it can show appropriate message
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'serverSearchResults',
 				data: {
 					viewModels: [],
@@ -1351,7 +1368,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		const viewModels = this.viewModelMapper.toViewModels(records);
 
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels,

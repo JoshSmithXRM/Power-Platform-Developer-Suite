@@ -1,23 +1,22 @@
-import type * as vscode from 'vscode';
-
 import { LoadingStateBehavior } from './LoadingStateBehavior';
 import { NullLogger } from '../../../../infrastructure/logging/NullLogger';
+import type { ISafePanel } from '../panels/ISafePanel';
 
 describe('LoadingStateBehavior', () => {
-	let mockPanel: vscode.WebviewPanel;
+	let mockPanel: ISafePanel;
 	let postedMessages: unknown[];
 	let behavior: LoadingStateBehavior;
 
 	beforeEach(() => {
 		postedMessages = [];
 		mockPanel = {
-			webview: {
-				postMessage: jest.fn().mockImplementation((message) => {
-					postedMessages.push(message);
-					return Promise.resolve(true);
-				})
-			}
-		} as unknown as vscode.WebviewPanel;
+			disposed: false,
+			abortSignal: new AbortController().signal,
+			postMessage: jest.fn().mockImplementation((message) => {
+				postedMessages.push(message);
+				return Promise.resolve(true);
+			})
+		} as unknown as ISafePanel;
 	});
 
 	describe('setLoading', () => {

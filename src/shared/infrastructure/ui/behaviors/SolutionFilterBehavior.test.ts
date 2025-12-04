@@ -1,24 +1,29 @@
-import type { Webview } from 'vscode';
-
 import type { IPanelStateRepository, PanelState } from '../IPanelStateRepository';
 import type { SolutionOption } from '../DataTablePanel';
 import { DEFAULT_SOLUTION_ID } from '../../../domain/constants/SolutionConstants';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { ISafePanel } from '../panels/ISafePanel';
 
 import { SolutionFilterBehavior } from './SolutionFilterBehavior';
 import { IEnvironmentBehavior } from './IEnvironmentBehavior';
 
-// Mock webview with only the methods needed for testing
-interface MockWebview {
+// Mock ISafePanel with only the methods needed for testing
+interface MockSafePanel {
 	postMessage: jest.Mock;
+	disposed: boolean;
+	abortSignal: AbortSignal;
 }
 
-function createMockWebview(): MockWebview {
-	return { postMessage: jest.fn() };
+function createMockSafePanel(): MockSafePanel {
+	return {
+		postMessage: jest.fn().mockResolvedValue(true),
+		disposed: false,
+		abortSignal: new AbortController().signal
+	};
 }
 
 describe('SolutionFilterBehavior', () => {
-	let webviewMock: MockWebview;
+	let panelMock: MockSafePanel;
 	let environmentBehaviorMock: jest.Mocked<IEnvironmentBehavior>;
 	let loadSolutionsMock: jest.Mock<Promise<SolutionOption[]>>;
 	let panelStateRepositoryMock: jest.Mocked<IPanelStateRepository>;
@@ -35,7 +40,7 @@ describe('SolutionFilterBehavior', () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
 
-		webviewMock = createMockWebview();
+		panelMock = createMockSafePanel();
 
 		environmentBehaviorMock = {
 			getCurrentEnvironmentId: jest.fn().mockReturnValue('env-1'),
@@ -68,7 +73,7 @@ describe('SolutionFilterBehavior', () => {
 		beforeEach(() => {
 			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
-				webviewMock as unknown as Webview,
+				panelMock as unknown as ISafePanel,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -88,7 +93,7 @@ describe('SolutionFilterBehavior', () => {
 		it('should send solution options to webview', async () => {
 			await behavior.initialize();
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'solutionFilterOptionsData',
 				data: mockSolutions
 			});
@@ -100,7 +105,7 @@ describe('SolutionFilterBehavior', () => {
 			await behavior.initialize();
 
 			expect(behavior.getCurrentSolutionId()).toBe(DEFAULT_SOLUTION_ID);
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'setCurrentSolution',
 				solutionId: DEFAULT_SOLUTION_ID
 			});
@@ -116,7 +121,7 @@ describe('SolutionFilterBehavior', () => {
 			await behavior.initialize();
 
 			expect(behavior.getCurrentSolutionId()).toBe('sol-1');
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'setCurrentSolution',
 				solutionId: 'sol-1'
 			});
@@ -145,7 +150,7 @@ describe('SolutionFilterBehavior', () => {
 		it('should use default solution ID when no state repository', async () => {
 			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
-				webviewMock as unknown as Webview,
+				panelMock as unknown as ISafePanel,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -178,7 +183,7 @@ describe('SolutionFilterBehavior', () => {
 		it('should do nothing when filter is disabled', async () => {
 			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
-				webviewMock as unknown as Webview,
+				panelMock as unknown as ISafePanel,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -191,7 +196,7 @@ describe('SolutionFilterBehavior', () => {
 			await behavior.initialize();
 
 			expect(loadSolutionsMock).not.toHaveBeenCalled();
-			expect(webviewMock.postMessage).not.toHaveBeenCalled();
+			expect(panelMock.postMessage).not.toHaveBeenCalled();
 			expect(panelStateRepositoryMock.load).not.toHaveBeenCalled();
 		});
 	});
@@ -200,7 +205,7 @@ describe('SolutionFilterBehavior', () => {
 		beforeEach(() => {
 			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
-				webviewMock as unknown as Webview,
+				panelMock as unknown as ISafePanel,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -232,7 +237,7 @@ describe('SolutionFilterBehavior', () => {
 		beforeEach(async () => {
 			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
-				webviewMock as unknown as Webview,
+				panelMock as unknown as ISafePanel,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -312,7 +317,7 @@ describe('SolutionFilterBehavior', () => {
 		it('should not persist when no state repository', async () => {
 			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
-				webviewMock as unknown as Webview,
+				panelMock as unknown as ISafePanel,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -341,7 +346,7 @@ describe('SolutionFilterBehavior', () => {
 		it('should not throw when disposing', () => {
 			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
-				webviewMock as unknown as Webview,
+				panelMock as unknown as ISafePanel,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,
@@ -359,7 +364,7 @@ describe('SolutionFilterBehavior', () => {
 		beforeEach(() => {
 			// Safely cast to Webview interface - only uses postMessage which is mocked
 			behavior = new SolutionFilterBehavior(
-				webviewMock as unknown as Webview,
+				panelMock as unknown as ISafePanel,
 				'test-panel',
 				environmentBehaviorMock,
 				loadSolutionsMock,

@@ -18,6 +18,7 @@ import {
 	EnvironmentScopedPanel,
 	type EnvironmentInfo,
 } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import type { ExecuteSqlQueryUseCase } from '../../application/useCases/ExecuteSqlQueryUseCase';
 import type { ExecuteFetchXmlQueryUseCase } from '../../application/useCases/ExecuteFetchXmlQueryUseCase';
@@ -81,7 +82,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		null;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (
@@ -325,7 +326,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -502,7 +503,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				// Update the SQL editor in the webview with the modified query
 				// Check panel is still alive before posting (could be disposed during modal)
 				try {
-					await this.panel.webview.postMessage({
+					await this.panel.postMessage({
 						command: 'updateSqlEditor',
 						data: { sql: modifiedSql },
 					});
@@ -516,7 +517,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			if (choice === 'cancel') {
 				// User cancelled - notify webview to re-enable editor
 				try {
-					await this.panel.webview.postMessage({
+					await this.panel.postMessage({
 						command: 'queryAborted',
 					});
 				} catch {
@@ -549,7 +550,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 		// Show loading state
 		this.setButtonLoading('executeQuery', true);
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'setLoadingState',
 			data: { isLoading: true },
 		});
@@ -581,13 +582,13 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			});
 
 			// Send results to webview
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'queryResultsUpdated',
 				data: viewModel,
 			});
 
 			// Update FetchXML preview
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'fetchXmlPreviewUpdated',
 				data: { fetchXml: this.currentFetchXml },
 			});
@@ -599,7 +600,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Ignore aborted queries
 			if (error instanceof Error && error.name === 'AbortError') {
 				this.logger.debug('Query was aborted', { queryId });
-				await this.panel.webview.postMessage({
+				await this.panel.postMessage({
 					command: 'queryAborted',
 				});
 				return;
@@ -620,7 +621,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				errorMessage = errorViewModel.message;
 
 				// Send parse error with position to webview
-				await this.panel.webview.postMessage({
+				await this.panel.postMessage({
 					command: 'queryError',
 					data: errorViewModel,
 				});
@@ -632,7 +633,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 						error instanceof Error ? error : new Error(errorMessage)
 					);
 
-				await this.panel.webview.postMessage({
+				await this.panel.postMessage({
 					command: 'queryError',
 					data: errorViewModel,
 				});
@@ -643,7 +644,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Only reset loading state if this is still the current query
 			if (queryId === this.querySequence) {
 				this.setButtonLoading('executeQuery', false);
-				await this.panel.webview.postMessage({
+				await this.panel.postMessage({
 					command: 'setLoadingState',
 					data: { isLoading: false },
 				});
@@ -657,7 +658,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private async updateFetchXmlPreview(): Promise<void> {
 		if (this.currentSqlQuery.trim() === '') {
 			this.currentFetchXml = '';
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'fetchXmlPreviewUpdated',
 				data: { fetchXml: '' },
 			});
@@ -673,19 +674,19 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			this.currentFetchXml = result.fetchXml;
 
 			// Send to webview
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'fetchXmlPreviewUpdated',
 				data: { fetchXml: result.fetchXml },
 			});
 
 			// Clear any previous error
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'clearError',
 			});
 		} else {
 			// Show parse error in preview mode (don't show VS Code error message)
 			const errorViewModel = this.errorMapper.toViewModel(result.error);
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'parseErrorPreview',
 				data: errorViewModel,
 			});
@@ -715,7 +716,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 			// Clear previous results
 			this.currentResult = null;
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'clearResults',
 			});
 
@@ -770,7 +771,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		}
 
 		// Update webview with loaded state
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'queryModeChanged',
 			data: {
 				mode: this.currentQueryMode,
@@ -794,10 +795,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		this.currentQueryMode = mode;
 
 		// Clear any previous errors
-		await this.panel.webview.postMessage({ command: 'clearError' });
+		await this.panel.postMessage({ command: 'clearError' });
 
 		// Send mode change to webview to update UI
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'queryModeChanged',
 			data: {
 				mode,
@@ -845,7 +846,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 		// Show loading state
 		this.setButtonLoading('executeQuery', true);
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'setLoadingState',
 			data: { isLoading: true },
 		});
@@ -879,7 +880,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			});
 
 			// Send results to webview
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'queryResultsUpdated',
 				data: viewModel,
 			});
@@ -891,7 +892,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Ignore aborted queries
 			if (error instanceof Error && error.name === 'AbortError') {
 				this.logger.debug('Query was aborted', { queryId });
-				await this.panel.webview.postMessage({
+				await this.panel.postMessage({
 					command: 'queryAborted',
 				});
 				return;
@@ -912,7 +913,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			let errorMessage: string;
 			if (error instanceof FetchXmlValidationError) {
 				errorMessage = error.message;
-				await this.panel.webview.postMessage({
+				await this.panel.postMessage({
 					command: 'queryError',
 					data: {
 						message: error.getFormattedErrors(),
@@ -929,7 +930,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 						error instanceof Error ? error : new Error(errorMessage)
 					);
 
-				await this.panel.webview.postMessage({
+				await this.panel.postMessage({
 					command: 'queryError',
 					data: errorViewModel,
 				});
@@ -940,7 +941,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Only reset loading state if this is still the current query
 			if (queryId === this.querySequence) {
 				this.setButtonLoading('executeQuery', false);
-				await this.panel.webview.postMessage({
+				await this.panel.postMessage({
 					command: 'setLoadingState',
 					data: { isLoading: false },
 				});
@@ -955,7 +956,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		if (this.currentFetchXml.trim() === '') {
 			this.currentSqlQuery = '';
 			this.currentTranspilationWarnings = [];
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'sqlPreviewUpdated',
 				data: { sql: '', warnings: [] },
 			});
@@ -970,18 +971,18 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			this.currentTranspilationWarnings = result.warnings;
 
 			// Send to webview
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'sqlPreviewUpdated',
 				data: { sql: result.sql, warnings: result.warnings },
 			});
 
 			// Clear any previous error
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'clearError',
 			});
 		} else {
 			// Show validation error in preview mode
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'parseErrorPreview',
 				data: { message: result.error },
 			});
@@ -1105,7 +1106,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			this.pendingModalResolver = resolve;
 
 			// Send modal configuration to webview
-			this.panel.webview.postMessage({
+			void this.panel.postMessage({
 				command: 'showWarningModal',
 				data: {
 					message:
@@ -1121,7 +1122,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 	private setButtonLoading(buttonId: string, isLoading: boolean): void {
 		this.logger.debug('Setting button loading state', { buttonId, isLoading });
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'setButtonState',
 			buttonId,
 			disabled: isLoading,
