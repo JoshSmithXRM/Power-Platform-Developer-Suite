@@ -614,8 +614,9 @@ describe('WebResourceFileSystemProvider with conflict detection', () => {
 			expect(showWarningMessage).toHaveBeenCalledWith(
 				expect.stringContaining('has been modified on the server'),
 				expect.objectContaining({ modal: true }),
+				'Compare First',
 				'Overwrite',
-				'Reload from Server'
+				'Discard My Work'
 			);
 			expect(mockUpdateUseCase.execute).toHaveBeenCalled();
 		});
@@ -740,9 +741,9 @@ describe('WebResourceFileSystemProvider with conflict detection', () => {
 				.mockResolvedValueOnce(mockServerResult);
 			mockRepository.getModifiedOn.mockResolvedValue(serverModifiedOn);
 
-			// Mock user clicking "Reload from Server"
+			// Mock user clicking "Discard My Work"
 			const showWarningMessage = vscode.window.showWarningMessage as jest.Mock;
-			showWarningMessage.mockResolvedValue('Reload from Server');
+			showWarningMessage.mockResolvedValue('Discard My Work');
 
 			// Mock document for reload
 			const mockDocument = {
@@ -766,8 +767,9 @@ describe('WebResourceFileSystemProvider with conflict detection', () => {
 			expect(showWarningMessage).toHaveBeenCalledWith(
 				expect.stringContaining('has been modified on the server'),
 				expect.objectContaining({ modal: true }),
+				'Compare First',
 				'Overwrite',
-				'Reload from Server'
+				'Discard My Work'
 			);
 
 			// 2. Save should NOT be called (user chose reload)

@@ -1001,12 +1001,16 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	}
 
 	/**
-	 * Shows diff between published and unpublished versions.
-	 * Published (left, read-only) vs Unpublished (right, editable).
-	 * User can see differences and edit the unpublished version directly.
+	 * Shows diff between published and unpublished versions with version selection.
+	 * User views the diff, then chooses which version to edit.
+	 *
+	 * Flow:
+	 * 1. Show diff view (Published left, Unpublished right)
+	 * 2. Show modal: "Edit Unpublished" / "Edit Published" / "Cancel"
+	 * 3. Close diff, open chosen version as normal editable file
 	 */
 	private async showPublishedVsUnpublishedDiff(webResourceId: string, filename: string): Promise<void> {
-		this.logger.info('Unpublished changes detected, showing diff view', { webResourceId, filename });
+		this.logger.info('Unpublished changes detected, showing diff for version selection', { webResourceId, filename });
 
 		// Create URIs for both versions
 		const publishedUri = createWebResourceUri(
@@ -1027,20 +1031,37 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			this.fileSystemProvider.invalidateCache(this.currentEnvironmentId, webResourceId);
 		}
 
-		// Open diff view: published (left, read-only) vs unpublished (right, editable)
+		// Open diff view: published (left) vs unpublished (right) - for viewing only
 		await vscode.commands.executeCommand(
 			'vscode.diff',
 			publishedUri,
 			unpublishedUri,
-			`${filename}: Published ↔ Unpublished (Your Changes)`
+			`${filename}: Published ↔ Unpublished`
 		);
 
-		this.logger.info('Diff view opened', { webResourceId, filename });
+		this.logger.debug('Diff view opened, showing version selection notification', { webResourceId });
 
-		// Show notification explaining the situation
-		void vscode.window.showInformationMessage(
-			'Left: Published (live). Right: Your unpublished changes. Edit the right side and save when ready.'
+		// Show non-modal notification so user can scroll the diff while deciding
+		const selection = await vscode.window.showInformationMessage(
+			'This file has unpublished changes. Which version do you want to edit?',
+			'Edit Unpublished',
+			'Edit Published',
+			'Cancel'
 		);
+
+		// Close the diff view
+		await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+
+		if (selection === 'Edit Unpublished') {
+			this.logger.info('User chose to edit unpublished version', { webResourceId });
+			await this.openWebResourceDirectly(webResourceId, filename, 'unpublished');
+		} else if (selection === 'Edit Published') {
+			this.logger.info('User chose to edit published version', { webResourceId });
+			await this.openWebResourceDirectly(webResourceId, filename, 'published');
+		} else {
+			// User clicked Cancel or dismissed the notification - diff is already closed
+			this.logger.info('User cancelled version selection', { webResourceId });
+		}
 	}
 
 	/**
