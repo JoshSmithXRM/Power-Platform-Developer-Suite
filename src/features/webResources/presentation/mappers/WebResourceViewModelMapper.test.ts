@@ -18,6 +18,8 @@ describe('WebResourceViewModelMapper', () => {
 		isManaged?: boolean;
 		createdOn?: Date;
 		modifiedOn?: Date;
+		createdBy?: string;
+		modifiedBy?: string;
 	} = {}): WebResource {
 		return new WebResource(
 			overrides.id ?? 'test-id-123',
@@ -26,7 +28,9 @@ describe('WebResourceViewModelMapper', () => {
 			overrides.type ?? WebResourceType.JAVASCRIPT,
 			overrides.isManaged ?? false,
 			overrides.createdOn ?? new Date('2024-01-01T08:00:00Z'),
-			overrides.modifiedOn ?? new Date('2024-01-15T10:30:00Z')
+			overrides.modifiedOn ?? new Date('2024-01-15T10:30:00Z'),
+			overrides.createdBy ?? 'Test User',
+			overrides.modifiedBy ?? 'Test User'
 		);
 	}
 

@@ -33,7 +33,12 @@ describe('DataverseWebResourceRepository', () => {
 						displayname: 'My Script',
 						webresourcetype: 3, // JavaScript
 						ismanaged: false,
-						modifiedon: '2024-01-15T10:00:00Z'
+						createdon: '2024-01-01T08:00:00Z',
+						modifiedon: '2024-01-15T10:00:00Z',
+						_createdby_value: 'user-1',
+						createdby: { fullname: 'John Doe' },
+						_modifiedby_value: 'user-2',
+						modifiedby: { fullname: 'Jane Smith' }
 					}
 				]
 			};
@@ -66,7 +71,12 @@ describe('DataverseWebResourceRepository', () => {
 						displayname: null,
 						webresourcetype: 2, // CSS
 						ismanaged: false,
-						modifiedon: '2024-01-15T10:00:00Z'
+						createdon: '2024-01-01T08:00:00Z',
+						modifiedon: '2024-01-15T10:00:00Z',
+						_createdby_value: 'user-1',
+						createdby: { fullname: 'Test User' },
+						_modifiedby_value: 'user-1',
+						modifiedby: { fullname: 'Test User' }
 					}
 				]
 			};
@@ -88,7 +98,12 @@ describe('DataverseWebResourceRepository', () => {
 						displayname: 'Script 1',
 						webresourcetype: 3,
 						ismanaged: false,
-						modifiedon: '2024-01-15T10:00:00Z'
+						createdon: '2024-01-01T08:00:00Z',
+						modifiedon: '2024-01-15T10:00:00Z',
+						_createdby_value: 'user-1',
+						createdby: { fullname: 'Test User' },
+						_modifiedby_value: 'user-1',
+						modifiedby: { fullname: 'Test User' }
 					}
 				],
 				'@odata.nextLink': 'https://org.crm.dynamics.com/api/data/v9.2/webresourceset?$skiptoken=abc'
@@ -102,7 +117,12 @@ describe('DataverseWebResourceRepository', () => {
 						displayname: 'Script 2',
 						webresourcetype: 3,
 						ismanaged: false,
-						modifiedon: '2024-01-15T11:00:00Z'
+						createdon: '2024-01-01T08:00:00Z',
+						modifiedon: '2024-01-15T11:00:00Z',
+						_createdby_value: 'user-1',
+						createdby: { fullname: 'Test User' },
+						_modifiedby_value: 'user-1',
+						modifiedby: { fullname: 'Test User' }
 					}
 				]
 			};
@@ -128,7 +148,12 @@ describe('DataverseWebResourceRepository', () => {
 						displayname: 'Script',
 						webresourcetype: 3,
 						ismanaged: false,
-						modifiedon: '2024-01-15T10:00:00Z'
+						createdon: '2024-01-01T08:00:00Z',
+						modifiedon: '2024-01-15T10:00:00Z',
+						_createdby_value: 'user-1',
+						createdby: { fullname: 'Test User' },
+						_modifiedby_value: 'user-1',
+						modifiedby: { fullname: 'Test User' }
 					}
 				],
 				'@odata.nextLink':
@@ -179,7 +204,12 @@ describe('DataverseWebResourceRepository', () => {
 						displayname: 'Script',
 						webresourcetype: 3,
 						ismanaged: false,
-						modifiedon: '2024-01-15T10:00:00Z'
+						createdon: '2024-01-01T08:00:00Z',
+						modifiedon: '2024-01-15T10:00:00Z',
+						_createdby_value: 'user-1',
+						createdby: { fullname: 'Test User' },
+						_modifiedby_value: 'user-1',
+						modifiedby: { fullname: 'Test User' }
 					}
 				],
 				'@odata.nextLink': 'https://org.crm.dynamics.com/api/data/v9.2/webresourceset?$skiptoken=abc'
@@ -198,20 +228,22 @@ describe('DataverseWebResourceRepository', () => {
 		});
 
 		it('should map all web resource types correctly', async () => {
+			// Default user fields for all test resources
+			const userFields = { createdon: '2024-01-01T08:00:00Z', modifiedon: '2024-01-15T10:00:00Z', _createdby_value: 'user-1', createdby: { fullname: 'Test User' }, _modifiedby_value: 'user-1', modifiedby: { fullname: 'Test User' } };
 			const mockResponse = {
 				value: [
-					{ webresourceid: 'wr-1', name: 'new_page.html', displayname: null, webresourcetype: 1, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' },
-					{ webresourceid: 'wr-2', name: 'new_styles.css', displayname: null, webresourcetype: 2, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' },
-					{ webresourceid: 'wr-3', name: 'new_script.js', displayname: null, webresourcetype: 3, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' },
-					{ webresourceid: 'wr-4', name: 'new_data.xml', displayname: null, webresourcetype: 4, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' },
-					{ webresourceid: 'wr-5', name: 'new_image.png', displayname: null, webresourcetype: 5, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' },
-					{ webresourceid: 'wr-6', name: 'new_image.jpg', displayname: null, webresourcetype: 6, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' },
-					{ webresourceid: 'wr-7', name: 'new_image.gif', displayname: null, webresourcetype: 7, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' },
-					{ webresourceid: 'wr-8', name: 'new_app.xap', displayname: null, webresourcetype: 8, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' },
-					{ webresourceid: 'wr-9', name: 'new_transform.xsl', displayname: null, webresourcetype: 9, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' },
-					{ webresourceid: 'wr-10', name: 'new_icon.ico', displayname: null, webresourcetype: 10, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' },
-					{ webresourceid: 'wr-11', name: 'new_vector.svg', displayname: null, webresourcetype: 11, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' },
-					{ webresourceid: 'wr-12', name: 'new_strings.resx', displayname: null, webresourcetype: 12, ismanaged: false, modifiedon: '2024-01-15T10:00:00Z' }
+					{ webresourceid: 'wr-1', name: 'new_page.html', displayname: null, webresourcetype: 1, ismanaged: false, ...userFields },
+					{ webresourceid: 'wr-2', name: 'new_styles.css', displayname: null, webresourcetype: 2, ismanaged: false, ...userFields },
+					{ webresourceid: 'wr-3', name: 'new_script.js', displayname: null, webresourcetype: 3, ismanaged: false, ...userFields },
+					{ webresourceid: 'wr-4', name: 'new_data.xml', displayname: null, webresourcetype: 4, ismanaged: false, ...userFields },
+					{ webresourceid: 'wr-5', name: 'new_image.png', displayname: null, webresourcetype: 5, ismanaged: false, ...userFields },
+					{ webresourceid: 'wr-6', name: 'new_image.jpg', displayname: null, webresourcetype: 6, ismanaged: false, ...userFields },
+					{ webresourceid: 'wr-7', name: 'new_image.gif', displayname: null, webresourcetype: 7, ismanaged: false, ...userFields },
+					{ webresourceid: 'wr-8', name: 'new_app.xap', displayname: null, webresourcetype: 8, ismanaged: false, ...userFields },
+					{ webresourceid: 'wr-9', name: 'new_transform.xsl', displayname: null, webresourcetype: 9, ismanaged: false, ...userFields },
+					{ webresourceid: 'wr-10', name: 'new_icon.ico', displayname: null, webresourcetype: 10, ismanaged: false, ...userFields },
+					{ webresourceid: 'wr-11', name: 'new_vector.svg', displayname: null, webresourcetype: 11, ismanaged: false, ...userFields },
+					{ webresourceid: 'wr-12', name: 'new_strings.resx', displayname: null, webresourcetype: 12, ismanaged: false, ...userFields }
 				]
 			};
 
@@ -262,7 +294,12 @@ describe('DataverseWebResourceRepository', () => {
 				displayname: 'My Script',
 				webresourcetype: 3,
 				ismanaged: false,
-				modifiedon: '2024-01-15T10:00:00Z'
+				createdon: '2024-01-01T08:00:00Z',
+				modifiedon: '2024-01-15T10:00:00Z',
+				_createdby_value: 'user-1',
+				createdby: { fullname: 'Test User' },
+				_modifiedby_value: 'user-1',
+				modifiedby: { fullname: 'Test User' }
 			};
 
 			mockApiService.get.mockResolvedValue(mockResponse);
@@ -277,6 +314,53 @@ describe('DataverseWebResourceRepository', () => {
 			assertDefined(result);
 			expect(result.id).toBe('wr-123');
 			expect(result.name.getValue()).toBe('new_script.js');
+		});
+
+		it('should map createdBy and modifiedBy from expanded user lookups', async () => {
+			const mockResponse = {
+				webresourceid: 'wr-123',
+				name: 'new_script.js',
+				displayname: 'My Script',
+				webresourcetype: 3,
+				ismanaged: false,
+				createdon: '2024-01-01T08:00:00Z',
+				modifiedon: '2024-01-15T10:00:00Z',
+				_createdby_value: 'user-creator-guid',
+				createdby: { fullname: 'John Creator' },
+				_modifiedby_value: 'user-modifier-guid',
+				modifiedby: { fullname: 'Jane Modifier' }
+			};
+
+			mockApiService.get.mockResolvedValue(mockResponse);
+
+			const result = await repository.findById('env-123', 'wr-123');
+
+			assertDefined(result);
+			expect(result.createdBy).toBe('John Creator');
+			expect(result.modifiedBy).toBe('Jane Modifier');
+		});
+
+		it('should use Unknown fallback when createdby/modifiedby lookups are missing', async () => {
+			const mockResponse = {
+				webresourceid: 'wr-123',
+				name: 'new_script.js',
+				displayname: 'My Script',
+				webresourcetype: 3,
+				ismanaged: false,
+				createdon: '2024-01-01T08:00:00Z',
+				modifiedon: '2024-01-15T10:00:00Z',
+				_createdby_value: 'user-1',
+				_modifiedby_value: 'user-1'
+				// Note: createdby and modifiedby expanded objects are missing
+			};
+
+			mockApiService.get.mockResolvedValue(mockResponse);
+
+			const result = await repository.findById('env-123', 'wr-123');
+
+			assertDefined(result);
+			expect(result.createdBy).toBe('Unknown');
+			expect(result.modifiedBy).toBe('Unknown');
 		});
 
 		it('should return null when web resource not found (404)', async () => {

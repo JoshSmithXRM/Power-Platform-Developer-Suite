@@ -51,6 +51,18 @@ interface DataverseWebResourceDto {
 	createdon: string;
 	/** modifiedon field - Last modification timestamp */
 	modifiedon: string;
+	/** _createdby_value field - Creator user GUID */
+	_createdby_value: string;
+	/** createdby expanded navigation - Creator user entity */
+	createdby?: {
+		fullname: string;
+	};
+	/** _modifiedby_value field - Last modifier user GUID */
+	_modifiedby_value: string;
+	/** modifiedby expanded navigation - Last modifier user entity */
+	modifiedby?: {
+		fullname: string;
+	};
 }
 
 /**
@@ -75,8 +87,11 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 				'webresourcetype',
 				'ismanaged',
 				'createdon',
-				'modifiedon'
+				'modifiedon',
+				'_createdby_value',
+				'_modifiedby_value'
 			],
+			expand: 'createdby($select=fullname),modifiedby($select=fullname)',
 			orderBy: 'name'
 		};
 
@@ -165,7 +180,7 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 		webResourceId: string,
 		cancellationToken?: ICancellationToken
 	): Promise<WebResource | null> {
-		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})?$select=webresourceid,name,displayname,webresourcetype,ismanaged,modifiedon`;
+		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})?$select=webresourceid,name,displayname,webresourcetype,ismanaged,createdon,modifiedon,_createdby_value,_modifiedby_value&$expand=createdby($select=fullname),modifiedby($select=fullname)`;
 
 		this.logger.debug('Fetching web resource by ID', { environmentId, webResourceId });
 
@@ -318,7 +333,8 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 
 		// Build query with pagination and count
 		const queryParts: string[] = [
-			'$select=webresourceid,name,displayname,webresourcetype,ismanaged,modifiedon',
+			'$select=webresourceid,name,displayname,webresourcetype,ismanaged,createdon,modifiedon,_createdby_value,_modifiedby_value',
+			'$expand=createdby($select=fullname),modifiedby($select=fullname)',
 			'$count=true',
 			`$top=${pageSize}`,
 			`$skip=${skip}`,
@@ -566,7 +582,9 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 			WebResourceType.fromCode(dto.webresourcetype),
 			dto.ismanaged,
 			new Date(dto.createdon),
-			new Date(dto.modifiedon)
+			new Date(dto.modifiedon),
+			dto.createdby?.fullname ?? 'Unknown',
+			dto.modifiedby?.fullname ?? 'Unknown'
 		);
 	}
 }

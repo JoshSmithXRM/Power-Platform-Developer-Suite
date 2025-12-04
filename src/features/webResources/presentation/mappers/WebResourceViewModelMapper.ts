@@ -34,6 +34,8 @@ export class WebResourceViewModelMapper {
 			createdOnSortValue: webResource.createdOn.getTime(),
 			modifiedOn: DateFormatter.formatDate(webResource.modifiedOn),
 			modifiedOnSortValue: webResource.modifiedOn.getTime(),
+			createdBy: webResource.createdBy,
+			modifiedBy: webResource.modifiedBy,
 			managed: webResource.isManaged ? 'Yes' : 'No',
 			isManaged: webResource.isManaged,
 			isEditable: canEdit

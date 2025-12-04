@@ -64,23 +64,38 @@ Port of Microsoft's Plugin Registration Tool (PRT) functionality to VSCode. Regi
 ## Medium Priority
 
 ### Web Resources - Enhanced UX
+**Status**: ✅ Implemented (v0.3.0)
+**Priority**: Medium
+
+**What's Implemented**:
+- ✅ Conflict detection (warn if modified by another user since open)
+- ✅ Version selection UX (diff view with "Compare First" option)
+- ✅ Syntax highlighting for custom URI scheme (JS, CSS, HTML, etc.)
+- ✅ Created By / Modified By columns
+- ✅ Retry logic (already in shared DataverseApiService)
+- ✅ JS validation (covered by VS Code's built-in diagnostics with syntax highlighting)
+
+---
+
+### Solution Explorer - Entity Browsing
 **Status**: Planned
-**Target Version**: v0.3.0
+**Target Version**: v0.4.0+
 **Priority**: Medium
 **Estimated Effort**: 4-6 hours
-**Value**: Better conflict handling and validation
+**Value**: View entities/tables belonging to a specific solution
 
 **Description**:
-Polish the web resources editing experience with conflict detection and validation.
+Expand Solution Explorer to show entities (tables) that belong to the selected solution, with drill-down to view their metadata.
 
 **Core Features**:
-- Conflict detection (warn if modified by another user since open)
-- JavaScript syntax validation before upload
-- Retry logic for transient failures
+- Show entities as children of solution node
+- Click entity to view attributes, relationships, keys (like Metadata Browser)
+- Filter to show only solution-owned vs all entities in solution
 
 **Technical Considerations**:
-- Use optimistic locking with `modifiedon` timestamp for conflict detection
-- JavaScript parsing can use VS Code's built-in diagnostics
+- Query solution components (type = Entity)
+- Reuse Metadata Browser's entity detail views
+- Consider lazy loading for large solutions
 
 ---
 
@@ -120,4 +135,4 @@ Map local folder to solution's web resources for two-way sync. Enables version c
 
 ---
 
-**Last Updated**: 2025-12-02
+**Last Updated**: 2025-12-03

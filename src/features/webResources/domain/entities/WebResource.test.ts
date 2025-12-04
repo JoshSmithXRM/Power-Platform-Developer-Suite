@@ -13,6 +13,8 @@ describe('WebResource', () => {
 		isManaged: boolean;
 		createdOn: Date;
 		modifiedOn: Date;
+		createdBy: string;
+		modifiedBy: string;
 	}> = {}): WebResource {
 		return new WebResource(
 			overrides.id ?? 'test-id-123',
@@ -21,7 +23,9 @@ describe('WebResource', () => {
 			overrides.webResourceType ?? WebResourceType.JAVASCRIPT,
 			overrides.isManaged ?? false,
 			overrides.createdOn ?? new Date('2024-01-01T08:00:00Z'),
-			overrides.modifiedOn ?? new Date('2024-01-15T10:30:00Z')
+			overrides.modifiedOn ?? new Date('2024-01-15T10:30:00Z'),
+			overrides.createdBy ?? 'Test User',
+			overrides.modifiedBy ?? 'Test User'
 		);
 	}
 
@@ -37,6 +41,8 @@ describe('WebResource', () => {
 			const isManaged = false;
 			const createdOn = new Date('2024-01-01T08:00:00Z');
 			const modifiedOn = new Date('2024-01-15T10:30:00Z');
+			const createdBy = 'John Doe';
+			const modifiedBy = 'Jane Smith';
 
 			// Act
 			const resource = new WebResource(
@@ -46,7 +52,9 @@ describe('WebResource', () => {
 				type,
 				isManaged,
 				createdOn,
-				modifiedOn
+				modifiedOn,
+				createdBy,
+				modifiedBy
 			);
 
 			// Assert
@@ -57,6 +65,8 @@ describe('WebResource', () => {
 			expect(resource.isManaged).toBe(isManaged);
 			expect(resource.createdOn).toBe(createdOn);
 			expect(resource.modifiedOn).toBe(modifiedOn);
+			expect(resource.createdBy).toBe(createdBy);
+			expect(resource.modifiedBy).toBe(modifiedBy);
 		});
 
 		it('should create managed WebResource', () => {
