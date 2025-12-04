@@ -153,16 +153,6 @@ Before merging this branch:
 
 ---
 
-## Decision Log
-
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2025-12-02 | Defer visual query builder | SQL/FetchXML editors provide power-user experience |
-| 2025-12-02 | Defer local folder sync | Bundle with Deployment Settings / ALM features |
-| 2025-12-02 | Include Saved Queries | Core value: SQL → FetchXML → Personal View in Dynamics |
-
----
-
 ## Session Progress: 2025-12-03
 
 ### Completed This Session
@@ -173,7 +163,7 @@ Before merging this branch:
 | FileSystemProvider refactor | Refactored to use registry instead of constructor-injected use cases | ✅ Done |
 | stat() optimization | Fixed stat() to NOT call readFile() - prevents redundant API calls | ✅ Done |
 | VS Code caching workaround | Added waitForPendingFetch + notifyFileChanged + revert pattern | ✅ Done |
-| HTTP cache headers | Added `Cache-Control: no-cache` and `cache: 'no-store'` to ALL fetch() calls (4 files) | ✅ Done |
+| HTTP cache headers | Added defensive cache prevention to all API services (not the root cause fix, but appropriate for admin tools) | ✅ Done |
 | Root cause diagnosis | Identified that Dataverse OData returns PUBLISHED content, not draft | ✅ Done |
 | Fetch unpublished content | Changed `getContent()` to use `RetrieveUnpublished` bound function | ✅ Done |
 | Fix reload from server | Fixed "Reload from Server" to properly update editor using WorkspaceEdit | ✅ Done |
@@ -207,19 +197,21 @@ Before merging this branch:
 
 ## CRITICAL BUGS - Must Fix Before Release
 
-### BUG 1: HTTP Caching in API Requests
+### BUG 1: Defensive HTTP Cache Prevention (Added)
 
-**Severity:** CRITICAL
-**Status:** ✅ FIXED
+**Severity:** Low (defensive measure, not a bug fix)
+**Status:** ✅ ADDED
 
-Admin/developer tools MUST NOT show stale data.
+Added cache prevention headers to all API calls as a defensive measure for admin tool reliability.
+
+**Important context:** The original "stale content" symptom was NOT caused by HTTP caching - it was caused by Dataverse returning published content instead of unpublished (see BUG 2). However, cache prevention is still appropriate for admin tools where stale data could cause overwrites.
 
 | File | Status |
 |------|--------|
-| `DataverseApiService.ts` (main request method) | ✅ FIXED |
-| `DataverseApiService.ts` (batch DELETE method) | ✅ FIXED |
-| `WhoAmIService.ts` | ✅ FIXED |
-| `PowerPlatformApiService.ts` | ✅ FIXED |
+| `DataverseApiService.ts` (main request method) | ✅ Added |
+| `DataverseApiService.ts` (batch DELETE method) | ✅ Added |
+| `WhoAmIService.ts` | ✅ Added |
+| `PowerPlatformApiService.ts` | ✅ Added |
 
 All fetch() calls now include:
 ```typescript
@@ -232,12 +224,12 @@ cache: 'no-store'
 
 ---
 
-### BUG 2: Dataverse Returns Published Content, Not Draft
+### BUG 2: Dataverse Returns Published Content, Not Draft (ROOT CAUSE)
 
 **Severity:** CRITICAL
 **Status:** ✅ FIXED
 
-**Problem:** The OData API `webresourceset.content` returns the PUBLISHED version, not the latest saved draft.
+**Problem:** The OData API `webresourceset.content` returns the PUBLISHED version, not the latest saved draft. This was the actual root cause of the "stale content" symptom.
 
 **Solution:** Use `RetrieveUnpublished` bound function instead of standard OData query.
 - Published: `GET /api/data/v9.2/webresourceset(id)?$select=content`
@@ -278,6 +270,7 @@ These tests assumed TTL caching which was removed. The stat() test expects readF
 | 2025-12-03 | Move solution filtering to Solution Explorer | Metadata Browser is for ALL metadata; solution-scoped entity viewing belongs in Solution Explorer |
 | 2025-12-03 | Defer Excel export | Heavy bundle size (~500KB-1.5MB); clipboard copy works for now |
 | 2025-12-03 | Mark Web Resources & Metadata Browser complete | Only Data Explorer remains for v0.3.0 |
+| 2025-12-03 | Keep HTTP cache prevention as defensive measure | Original "stale content" issue was published vs unpublished (RetrieveUnpublished), but cache prevention is still appropriate for admin tools |
 
 ---
 

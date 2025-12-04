@@ -183,7 +183,8 @@ export class DataverseApiService implements IDataverseApiService {
           'Content-Type': `multipart/mixed; boundary=${batchBoundary}`,
           'OData-MaxVersion': '4.0',
           'OData-Version': '4.0',
-          // Prevent HTTP caching - admin tools must always get fresh data
+          // Defensive cache prevention for admin tool reliability.
+          // Admin tools must show current state; stale data could cause overwrites.
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache'
         },
@@ -307,7 +308,8 @@ export class DataverseApiService implements IDataverseApiService {
       'OData-Version': '4.0',
       // Request all OData annotations (formatted values, lookup entity types, etc.)
       'Prefer': 'odata.include-annotations="*"',
-      // Prevent HTTP caching - always get fresh data from server
+      // Defensive cache prevention for admin tool reliability.
+      // Admin tools must show current state; stale data could cause overwrites.
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache'
     };
@@ -315,7 +317,6 @@ export class DataverseApiService implements IDataverseApiService {
     const fetchOptions: RequestInit = {
       method,
       headers,
-      // Disable fetch API caching
       cache: 'no-store'
     };
 
