@@ -1,6 +1,6 @@
 # Technical Debt Inventory
 
-**Total Items:** 7 (6 items resolved/reclassified earlier, 1 low-priority item added, 1 accepted tradeoff added)
+**Total Items:** 8 (6 items resolved/reclassified earlier, 2 low-priority items, 1 accepted tradeoff added)
 
 ---
 
@@ -11,7 +11,7 @@
 | **Accepted Tradeoffs** | 5 | Keep indefinitely (conscious decisions) |
 | **Will Not Implement** | 1 | Rejected (over-engineering) |
 | **Scheduled** | 0 | Fix in next 1-2 sprints (all items resolved) |
-| **Low Priority** | 1 | Fix when naturally touching code |
+| **Low Priority** | 2 | Fix when naturally touching code |
 
 ---
 
@@ -84,13 +84,14 @@ Items with clear triggers or timelines for fixing.
 
 ---
 
-## 🔵 Low Priority (1 item)
+## 🔵 Low Priority (2 items)
 
 Fix when it becomes a problem or when naturally touching the code.
 
 | Item | Type | Effort | Trigger |
 |------|------|--------|---------|
 | [Notification Service Abstraction](low-priority/notification-service-abstraction.md) | Refactoring (consistency enforcement) | 4-6 hours | When refactoring 10+ notification callsites |
+| [FileSystemProvider Complexity](low-priority/filesystemprovider-complexity.md) | Refactoring (separation of concerns) | 4-6 hours | When adding new content modes or conflict features |
 
 **Previously resolved items:**
 
@@ -109,14 +110,14 @@ Fix when it becomes a problem or when naturally touching the code.
 Accepted Tradeoffs: █████  5 items (71%)
 Will Not Implement: █      1 item  (14%)
 Scheduled:          -      0 items (0%)
-Low Priority:       █      1 item  (14%)
+Low Priority:       ██     2 items (25%)
 ```
 
 ### Decision Quality
 
 | Metric | Value | Assessment |
 |--------|-------|------------|
-| **Items with zero bugs** | 7/7 (100%) | ✅ Excellent - all decisions validated |
+| **Items with zero bugs** | 8/8 (100%) | ✅ Excellent - all decisions validated |
 | **Patterns promoted to architecture docs** | 2 items | ✅ Industry standards (static factories, OData) |
 | **Rejected over-engineering** | 1 item | ✅ Good judgment (avoided cargo cult patterns) |
 | **Items resolved in last review** | 4 items | ✅ Proactive (DateTimeFilter, split guide, shared DTO, ESLint rule) |
@@ -124,7 +125,7 @@ Low Priority:       █      1 item  (14%)
 | **ESLint rule quality** | Prefix matching (future-proof) | ✅ Improved (12 suppressions eliminated) |
 | **Notification consistency** | 99% (1/95 fixed) | ✅ Excellent (abstraction deferred, not urgent) |
 
-**Overall Health:** 🟢 Excellent (7 items total: 5 accepted, 1 rejected over-engineering, 1 low-priority future improvement)
+**Overall Health:** 🟢 Excellent (8 items total: 5 accepted, 1 rejected over-engineering, 2 low-priority future improvements)
 
 ---
 
@@ -177,7 +178,8 @@ docs/technical-debt/
 │   └── (empty - all items resolved)
 │
 └── low-priority/                                # Opportunistic fix
-    └── notification-service-abstraction.md      # 95+ callsites, defer until refactoring
+    ├── notification-service-abstraction.md      # 95+ callsites, defer until refactoring
+    └── filesystemprovider-complexity.md         # ~800 lines, extract when adding features
 
 Reclassified as architectural patterns (moved to docs/architecture/):
 - static-factory-methods.md → STATIC_FACTORY_PATTERN.md
