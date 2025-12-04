@@ -300,4 +300,32 @@ These tests assumed TTL caching which was removed. The stat() test expects readF
 
 ---
 
-**Last Updated:** 2025-12-03 (Web Resources & Metadata Browser complete)
+## Active Bug Fix: Save Conflict "Use Server Version" Flow
+
+### Status: IN PROGRESS
+
+### Problem
+When user chooses "Use Server Version" during a save conflict, VS Code shows stale/empty content briefly (~1 second), then loads correct content. Multiple unnecessary readFile calls occur.
+
+### Root Cause
+`reloadFromServer()` calls `openTextDocument()` which returns immediately, but our `readFile()` runs asynchronously. VS Code shows placeholder before fetch completes.
+
+### Changes Made This Session
+1. Removed `waitForPendingFetch + notifyFileChanged + revert` pattern (was solving wrong problem)
+2. Simplified `reloadFromServer()` to close/reopen with fresh unpublished URI
+3. Fixed bug where revert loaded `?mode=published` instead of unpublished
+4. Removed unused `waitForPendingFetch()` and `notifyFileChanged()` methods
+
+### Files Modified (uncommitted)
+- `WebResourceFileSystemProvider.ts` - simplified reloadFromServer
+- `WebResourceFileSystemProvider.test.ts` - updated test mocks
+- `WebResourcesPanelComposed.ts` - removed waitForPendingFetch calls
+
+### What Still Needs Investigation
+1. Why VS Code shows stale content before readFile completes
+2. Why multiple readFile calls occur for single open
+3. Consider awaiting readFile completion before showing success
+
+---
+
+**Last Updated:** 2025-12-03 (Save conflict "Use Server Version" bug in progress)

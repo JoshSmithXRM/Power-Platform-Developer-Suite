@@ -1092,7 +1092,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			this.fileSystemProvider.invalidateCache(this.currentEnvironmentId, webResourceId);
 		}
 
-		// Open the document - VS Code may return cached content immediately
+		// Open the document
 		const document = await vscode.workspace.openTextDocument(uri);
 		await vscode.window.showTextDocument(document, { preview: false });
 
@@ -1101,21 +1101,6 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		if (languageId !== null && document.languageId !== languageId) {
 			await vscode.languages.setTextDocumentLanguage(document, languageId);
 		}
-
-		// VS Code returns cached documents immediately without waiting for our readFile().
-		// Our readFile() IS called but runs in background. Wait for it to complete.
-		if (this.fileSystemProvider) {
-			await this.fileSystemProvider.waitForPendingFetch(this.currentEnvironmentId, webResourceId);
-		}
-
-		// Now that our readFile() has fresh content from server, tell VS Code to reload.
-		// Fire change event to signal the file changed, then revert to force reload.
-		if (this.fileSystemProvider) {
-			this.fileSystemProvider.notifyFileChanged(uri);
-		}
-
-		this.logger.debug('Reverting to show fresh content');
-		await vscode.commands.executeCommand('workbench.action.files.revert');
 
 		this.logger.info('Opened web resource in editor', {
 			webResourceId,

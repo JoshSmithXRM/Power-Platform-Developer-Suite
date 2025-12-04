@@ -642,32 +642,6 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	/**
-	 * Notifies VS Code that a file has changed, forcing it to re-read on next open.
-	 * Call this BEFORE opening a document to ensure VS Code fetches fresh content.
-	 *
-	 * @param uri - The file URI to invalidate
-	 */
-	notifyFileChanged(uri: vscode.Uri): void {
-		this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
-		this.logger.debug('WebResourceFileSystemProvider notified file changed', { uri: uri.toString() });
-	}
-
-	/**
-	 * Waits for any pending fetch for this resource to complete.
-	 *
-	 * @param environmentId - Environment ID
-	 * @param webResourceId - Web resource GUID
-	 */
-	async waitForPendingFetch(environmentId: string, webResourceId: string): Promise<void> {
-		const cacheKey = `${environmentId}:${webResourceId}`;
-		const pending = this.pendingFetches.get(cacheKey);
-		if (pending !== undefined) {
-			this.logger.debug('Waiting for pending fetch', { webResourceId });
-			await pending;
-		}
-	}
-
-	/**
 	 * Checks if the server version has changed since the file was opened.
 	 * If a conflict is detected, shows a modal dialog with resolution options.
 	 *
@@ -833,59 +807,35 @@ export class WebResourceFileSystemProvider implements vscode.FileSystemProvider 
 		webResourceId: string,
 		cacheKey: string
 	): Promise<void> {
-		const resources = this.registry.get(environmentId);
-		if (resources === undefined) {
-			this.logger.error('WebResourceFileSystemProvider reloadFromServer: Unknown environmentId', {
-				environmentId
-			});
-			void vscode.window.showErrorMessage('Failed to reload: environment not found.');
-			return;
-		}
-
 		try {
-			// Invalidate server state
+			// Clear cached state so readFile() fetches fresh content from server
 			this.serverState.delete(cacheKey);
 
-			// Fetch fresh content
-			const result = await resources.getWebResourceContentUseCase.execute(
-				environmentId,
-				webResourceId
-			);
-
-			// Update server state with fresh data
-			this.serverState.set(cacheKey, {
-				serverModifiedOn: result.modifiedOn,
-				lastKnownContent: result.content
-			});
-
-			// Refresh the editor buffer with the new content
-			// VS Code's FileSystemProvider revert doesn't work reliably for virtual documents.
-			// Instead, we directly replace the editor content using a WorkspaceEdit.
-			const document = vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
-			if (document) {
-				// Show the document first (make it active)
-				await vscode.window.showTextDocument(document, { preview: false });
-
-				// Replace entire document content with fresh server content
-				const newContent = new TextDecoder().decode(result.content);
-				const fullRange = new vscode.Range(
-					document.positionAt(0),
-					document.positionAt(document.getText().length)
-				);
-
-				const edit = new vscode.WorkspaceEdit();
-				edit.replace(uri, fullRange, newContent);
-				await vscode.workspace.applyEdit(edit);
-
-				// Save to clear dirty state (content now matches server)
-				await document.save();
-
-				// Fire change event to update any listeners
-				this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
+			// Parse the original URI to get the filename
+			const parsed = parseWebResourceUri(uri);
+			if (parsed === null) {
+				throw new Error('Invalid web resource URI');
 			}
 
+			// Create a fresh URI without any mode (defaults to unpublished).
+			// This ensures we always load unpublished content, regardless of
+			// what mode the document was originally opened in.
+			const unpublishedUri = createWebResourceUri(
+				environmentId,
+				webResourceId,
+				parsed.filename
+				// No mode = unpublished (default)
+			);
+
+			// Close the current document
+			await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+
+			// Open fresh document with unpublished content
+			const document = await vscode.workspace.openTextDocument(unpublishedUri);
+			await vscode.window.showTextDocument(document, { preview: false });
+
 			this.logger.info('Web resource reloaded from server', { webResourceId });
-			void vscode.window.showInformationMessage(`Reloaded "${uri.path.split('/').pop()}" from server.`);
+			void vscode.window.showInformationMessage(`Reloaded "${parsed.filename}" from server.`);
 		} catch (error) {
 			this.logger.error('Failed to reload from server', error);
 			void vscode.window.showErrorMessage('Failed to reload from server. Please try again.');

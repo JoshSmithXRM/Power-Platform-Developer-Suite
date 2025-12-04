@@ -71,7 +71,8 @@ jest.mock('vscode', () => ({
 	},
 	workspace: {
 		textDocuments: [],
-		applyEdit: jest.fn()
+		applyEdit: jest.fn(),
+		openTextDocument: jest.fn()
 	},
 	commands: {
 		executeCommand: jest.fn()
@@ -754,7 +755,7 @@ describe('WebResourceFileSystemProvider with conflict detection', () => {
 			};
 			(vscode.workspace as unknown as { textDocuments: unknown[] }).textDocuments = [mockDocument];
 			(vscode.window.showTextDocument as jest.Mock).mockResolvedValue({});
-			(vscode.workspace.applyEdit as jest.Mock).mockResolvedValue(true);
+			(vscode.workspace.openTextDocument as jest.Mock).mockResolvedValue(mockDocument);
 
 			// First read to populate cache
 			await provider.readFile(uri);
@@ -775,17 +776,12 @@ describe('WebResourceFileSystemProvider with conflict detection', () => {
 			// 2. Save should NOT be called (user chose reload)
 			expect(mockUpdateUseCase.execute).not.toHaveBeenCalled();
 
-			// 3. Server content was fetched (reload)
-			expect(mockGetUseCase.execute).toHaveBeenCalledTimes(2);
-
-			// 4. Editor was shown and edit was applied
+			// 3. Current editor was closed and fresh document opened
+			expect(vscode.commands.executeCommand).toHaveBeenCalledWith('workbench.action.closeActiveEditor');
+			expect(vscode.workspace.openTextDocument).toHaveBeenCalled();
 			expect(vscode.window.showTextDocument).toHaveBeenCalled();
-			expect(vscode.workspace.applyEdit).toHaveBeenCalled();
 
-			// 5. Document was saved to clear dirty state
-			expect(mockDocument.save).toHaveBeenCalled();
-
-			// 6. Success message was shown
+			// 4. Success message was shown
 			expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
 				expect.stringContaining('Reloaded')
 			);
