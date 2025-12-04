@@ -1001,12 +1001,14 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	}
 
 	/**
-	 * Opens VS Code's merge editor to let user choose between published and unpublished versions.
-	 * Uses the native merge editor UI for a familiar experience.
+	 * Shows diff between published and unpublished versions.
+	 * Published (left, read-only) vs Unpublished (right, editable).
+	 * User can see differences and edit the unpublished version directly.
 	 */
 	private async showPublishedVsUnpublishedDiff(webResourceId: string, filename: string): Promise<void> {
-		this.logger.info('Unpublished changes detected, opening merge editor', { webResourceId, filename });
+		this.logger.info('Unpublished changes detected, showing diff view', { webResourceId, filename });
 
+		// Create URIs for both versions
 		const publishedUri = createWebResourceUri(
 			this.currentEnvironmentId,
 			webResourceId,
@@ -1020,23 +1022,25 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			filename
 		);
 
-		// Open VS Code's native merge editor
-		await vscode.commands.executeCommand('_open.mergeEditor', {
-			base: publishedUri,
-			input1: {
-				uri: publishedUri,
-				title: 'Published (Live)',
-				description: 'Currently published version visible to users'
-			},
-			input2: {
-				uri: unpublishedUri,
-				title: 'Unpublished (Pending)',
-				description: 'Your saved changes waiting to be published'
-			},
-			output: unpublishedUri
-		});
+		// Invalidate cache to ensure fresh content
+		if (this.fileSystemProvider) {
+			this.fileSystemProvider.invalidateCache(this.currentEnvironmentId, webResourceId);
+		}
 
-		this.logger.info('Merge editor opened for version selection', { webResourceId, filename });
+		// Open diff view: published (left, read-only) vs unpublished (right, editable)
+		await vscode.commands.executeCommand(
+			'vscode.diff',
+			publishedUri,
+			unpublishedUri,
+			`${filename}: Published ↔ Unpublished (Your Changes)`
+		);
+
+		this.logger.info('Diff view opened', { webResourceId, filename });
+
+		// Show notification explaining the situation
+		void vscode.window.showInformationMessage(
+			'Left: Published (live). Right: Your unpublished changes. Edit the right side and save when ready.'
+		);
 	}
 
 	/**
