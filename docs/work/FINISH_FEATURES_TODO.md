@@ -162,11 +162,10 @@ Before merging this branch:
 | Connection Registry | Created `WebResourceConnectionRegistry` singleton to map environmentId → resources | ✅ Done |
 | FileSystemProvider refactor | Refactored to use registry instead of constructor-injected use cases | ✅ Done |
 | stat() optimization | Fixed stat() to NOT call readFile() - prevents redundant API calls | ✅ Done |
-| VS Code caching workaround | Added waitForPendingFetch + notifyFileChanged + revert pattern | ✅ Done |
 | HTTP cache headers | Added defensive cache prevention to all API services (not the root cause fix, but appropriate for admin tools) | ✅ Done |
 | Root cause diagnosis | Identified that Dataverse OData returns PUBLISHED content, not draft | ✅ Done |
 | Fetch unpublished content | Changed `getContent()` to use `RetrieveUnpublished` bound function | ✅ Done |
-| Fix reload from server | Fixed "Reload from Server" to properly update editor using WorkspaceEdit | ✅ Done |
+| Fix reload from server | Simplified to close/reopen with fresh unpublished URI | ✅ Done |
 | Test coverage | Added test for "Reload from Server" conflict resolution flow | ✅ Done |
 
 ### Completed (continued)
