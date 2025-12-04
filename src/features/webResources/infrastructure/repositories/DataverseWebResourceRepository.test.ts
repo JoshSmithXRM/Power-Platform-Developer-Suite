@@ -369,6 +369,63 @@ describe('DataverseWebResourceRepository', () => {
 		});
 	});
 
+	describe('getPublishedContent', () => {
+		it('should fetch published web resource content using standard OData query', async () => {
+			const mockResponse = {
+				webresourceid: 'wr-123',
+				content: 'Y29uc29sZS5sb2coIlB1Ymxpc2hlZCIp' // base64 for console.log("Published")
+			};
+
+			mockApiService.get.mockResolvedValue(mockResponse);
+
+			const result = await repository.getPublishedContent('env-123', 'wr-123');
+
+			expect(mockApiService.get).toHaveBeenCalledWith(
+				'env-123',
+				'/api/data/v9.2/webresourceset(wr-123)?$select=content',
+				undefined
+			);
+			expect(result).toBe('Y29uc29sZS5sb2coIlB1Ymxpc2hlZCIp');
+		});
+
+		it('should return empty string when content is null', async () => {
+			const mockResponse = {
+				webresourceid: 'wr-123',
+				content: null
+			};
+
+			mockApiService.get.mockResolvedValue(mockResponse);
+
+			const result = await repository.getPublishedContent('env-123', 'wr-123');
+
+			expect(result).toBe('');
+		});
+
+		it('should handle API errors', async () => {
+			const apiError = new Error('Failed to fetch published content');
+			mockApiService.get.mockRejectedValue(apiError);
+
+			await expect(repository.getPublishedContent('env-123', 'wr-123')).rejects.toThrow(
+				'Failed to fetch published content'
+			);
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				'Failed to fetch published web resource content',
+				expect.any(Error)
+			);
+		});
+
+		it('should handle cancellation', async () => {
+			const cancellationToken: ICancellationToken = {
+				isCancellationRequested: true,
+				onCancellationRequested: jest.fn()
+			};
+
+			await expect(
+				repository.getPublishedContent('env-123', 'wr-123', cancellationToken)
+			).rejects.toThrow(OperationCancelledException);
+		});
+	});
+
 	describe('updateContent', () => {
 		it('should update web resource content via PATCH', async () => {
 			mockApiService.patch.mockResolvedValue(undefined);

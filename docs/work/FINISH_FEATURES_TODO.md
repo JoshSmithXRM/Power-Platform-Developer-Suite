@@ -188,6 +188,15 @@ Before merging this branch:
 | VS Code caching workaround | Added waitForPendingFetch + notifyFileChanged + revert pattern | ✅ Done |
 | HTTP cache headers | Added `Cache-Control: no-cache` and `cache: 'no-store'` to ALL fetch() calls (4 files) | ✅ Done |
 | Root cause diagnosis | Identified that Dataverse OData returns PUBLISHED content, not draft | ✅ Done |
+| Fetch unpublished content | Changed `getContent()` to use `RetrieveUnpublished` bound function | ✅ Done |
+| Fix reload from server | Fixed "Reload from Server" to properly update editor using WorkspaceEdit | ✅ Done |
+| Test coverage | Added test for "Reload from Server" conflict resolution flow | ✅ Done |
+
+### In Progress
+
+| Item | Description | Status |
+|------|-------------|--------|
+| Published vs Unpublished diff | On file open, compare published/unpublished and show diff if different | ✅ Done |
 
 ### Files Modified This Session
 
@@ -231,39 +240,33 @@ cache: 'no-store'
 ### BUG 2: Dataverse Returns Published Content, Not Draft
 
 **Severity:** CRITICAL
-**Status:** ROOT CAUSE IDENTIFIED - NEEDS RESEARCH
+**Status:** ✅ FIXED
 
 **Problem:** The OData API `webresourceset.content` returns the PUBLISHED version, not the latest saved draft.
 
-When you edit a web resource in Maker and save (without publishing):
-- `modifiedOn` timestamp updates ✓
-- `content` column returns OLD PUBLISHED version ✗
-- Maker portal shows correct draft version ✓
+**Solution:** Use `RetrieveUnpublished` bound function instead of standard OData query.
+- Published: `GET /api/data/v9.2/webresourceset(id)?$select=content`
+- Unpublished: `GET /api/data/v9.2/webresourceset(id)/Microsoft.Dynamics.CRM.RetrieveUnpublished?$select=content`
 
-**Impact:** Users edit a file, save, close, reopen → see old content. Extremely confusing.
+**Key insight:** The `modifiedon` timestamp is always the unpublished modified time regardless of which endpoint you use. This means conflict detection still works correctly.
 
-**Current workaround:** Users must publish after every save.
-
-**Required investigation:**
-1. Research Dataverse API for unpublished/draft content
-2. Investigate what API the Maker portal uses (browser DevTools)
-3. Check if there's a `contentunpublished` column or similar
-4. Consider using Solution XML export to get true draft state
-5. Check if `RetrieveUnpublishedMultiple` or similar API exists
+**Commit:** `fix(web-resources): fetch unpublished content and fix reload from server`
 
 ---
 
 ### BUG 3: Unit Tests Need Updating
 
 **Severity:** MEDIUM
-**Status:** TODO
+**Status:** ⚠️ PRE-EXISTING (Not blocking this work)
 
-Three tests failing due to caching behavior changes:
+Three tests failing due to caching behavior changes (existed before this session):
 - `WebResourceFileSystemProvider.test.ts` - "should cache content for subsequent reads" (expects 1 API call, gets 2)
 - `WebResourceFileSystemProvider.test.ts` - "should return file stat for valid web resource" (expects size=5, gets size=0)
 - `WebResourceFileSystemProvider.test.ts` - "should update cache after successful save" (expects 1 API call, gets 2)
 
 These tests assumed TTL caching which was removed. The stat() test expects readFile to be called (old behavior), but stat() now returns placeholder values. Need to update tests to reflect new behavior where every readFile() fetches fresh content from server.
+
+**Added this session:** Test for "Reload from Server" conflict resolution flow (passing).
 
 ---
 

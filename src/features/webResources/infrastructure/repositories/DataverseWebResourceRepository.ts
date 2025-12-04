@@ -234,6 +234,41 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 		}
 	}
 
+	async getPublishedContent(
+		environmentId: string,
+		webResourceId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<string> {
+		// Standard OData query returns published content (what end users see).
+		// Used to compare with unpublished content to detect pending changes.
+		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})?$select=content`;
+
+		this.logger.debug('Fetching published web resource content', { environmentId, webResourceId });
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			const response = await this.apiService.get<DataverseWebResourceContentResponse>(
+				environmentId,
+				endpoint,
+				cancellationToken
+			);
+
+			CancellationHelper.throwIfCancelled(cancellationToken);
+
+			this.logger.debug('Fetched published web resource content', {
+				webResourceId,
+				contentLength: response.content?.length ?? 0
+			});
+
+			return response.content ?? '';
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to fetch published web resource content', normalizedError);
+			throw normalizedError;
+		}
+	}
+
 	async updateContent(
 		environmentId: string,
 		webResourceId: string,

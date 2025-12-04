@@ -23,3 +23,11 @@ export {
 	createMockSolutionComponentRepository,
 	createMockDomainEventPublisher
 } from './repositorySetup';
+
+// Async clock setup (for timer-sensitive tests)
+export {
+	installAsyncClock,
+	withAsyncClock,
+	type AsyncClock,
+	type AsyncClockOptions
+} from './asyncClockSetup';
