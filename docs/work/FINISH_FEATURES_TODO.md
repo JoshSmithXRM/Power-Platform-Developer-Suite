@@ -86,9 +86,9 @@ The registry maps `environmentId` → resources, and FileSystemProvider queries 
 ## 3. Data Explorer
 
 ### Implemented (v0.2.2 - v0.2.6)
-- [x] SQL query editor with syntax highlighting
+- [x] SQL query editor with syntax highlighting (webview textarea)
 - [x] SQL to FetchXML transpilation with live preview
-- [x] FetchXML direct editing mode (bidirectional preview)
+- [x] FetchXML direct editing mode (bidirectional SQL ↔ FetchXML)
 - [x] FetchXML → SQL transpilation with warnings for unsupported features
 - [x] Query execution against Dataverse via FetchXML
 - [x] Results displayed in sortable data table
@@ -101,33 +101,82 @@ The registry maps `environmentId` → resources, and FileSystemProvider queries 
 - [x] Row limit warning modal (TOP 100 prompt)
 - [x] Zone-based Ctrl+A selection in results table
 
-### Remaining Work (This Branch)
+### Remaining Work (This Branch) - 5 Phases
+
+**Full Requirements:** `docs/work/DATA_EXPLORER_V03_REQUIREMENTS.md`
+
+#### Phase 1: IntelliSense + Native VS Code Editor (12-18h)
 | # | Task | Effort | Status |
 |---|------|--------|--------|
-| 6 | IntelliSense context service (track active environment) | 2-3h | Planned |
-| 7 | Entity name completion (after FROM/JOIN) | 4-6h | Planned |
-| 8 | Attribute name completion (after SELECT/WHERE/ORDER BY) | 4-6h | Planned |
-| 9 | SQL keyword completion | 1-2h | Planned |
-| 10 | Metadata caching for completions | 2-3h | Planned |
-| 11 | SQL aggregate functions (COUNT, SUM, AVG, MIN, MAX) | 8-12h | Planned |
-| 12 | SQL GROUP BY support | 4-6h | Planned |
-| 13 | SQL JOIN support for related entities | 8-12h | Planned |
-| 14 | Save query as UserQuery (Personal View) in Dataverse | 4-6h | Planned |
-| 15 | Load existing personal views | 2-3h | Planned |
+| 1.1 | IntelliSenseContextService (track active environment) | 2-3h | Planned |
+| 1.2 | Entity name completion (after FROM/JOIN) | 4-6h | Planned |
+| 1.3 | Attribute name completion (after SELECT/WHERE/ORDER BY) | 4-6h | Planned |
+| 1.4 | SQL keyword completion | 1-2h | Planned |
+| 1.5 | Metadata caching for completions | 2-3h | Planned |
+| 1.6 | SqlEditorService + Panel integration (New Query, Open File) | 2-3h | Planned |
 
 **Technical Design:** `docs/future/DATA_EXPLORER_INTELLISENSE_DESIGN.md` (V2)
+**Note:** FetchXML mode stays in panel (unchanged). SQL moves to native VS Code editor.
 
-**Total: ~40-55 hours**
+#### Phase 2: Query History - Dual Scope (6-8h)
+| # | Task | Effort | Status |
+|---|------|--------|--------|
+| 2.1 | Environment-specific history (last 50 per env) | 2-3h | Planned |
+| 2.2 | Cross-environment history (last 100 global) | 2-3h | Planned |
+| 2.3 | History UI (dropdown + "View All" modal) | 2-3h | Planned |
+
+**Key feature:** Run query in Dev → Switch to Prod → Find in global history → Execute
+
+#### Phase 3: Aggregates & JOINs (16-24h)
+| # | Task | Effort | Status |
+|---|------|--------|--------|
+| 3.1 | Aggregate functions (COUNT, SUM, AVG, MIN, MAX) | 4-6h | Planned |
+| 3.2 | GROUP BY / HAVING support | 4-6h | Planned |
+| 3.3 | FetchXML aggregate transpilation | 2-3h | Planned |
+| 3.4 | JOIN syntax + link-entity transpilation | 6-8h | Planned |
+| 3.5 | Alias resolution (a.name when FROM account a) | 2-3h | Planned |
+
+#### Phase 4: INSERT/UPDATE/DELETE (12-16h)
+| # | Task | Effort | Status |
+|---|------|--------|--------|
+| 4.1 | INSERT statement parsing + POST execution | 4-5h | Planned |
+| 4.2 | UPDATE with preview + confirmation (batches of 100) | 4-5h | Planned |
+| 4.3 | DELETE with preview + confirmation (batches of 100) | 3-4h | Planned |
+| 4.4 | Safety features (require WHERE, confirmation dialogs) | 2-3h | Planned |
+
+**Note:** No client-side required field validation - let Dataverse reject.
+
+#### Phase 5: Visual Query Builder + Saved Queries (16-24h) - May Defer
+| # | Task | Effort | Status |
+|---|------|--------|--------|
+| 5.1 | Visual Query Builder UI (entity, columns, filters, sort) | 8-12h | Planned |
+| 5.2 | Three-way sync (SQL ↔ FetchXML ↔ Visual Builder) | 4-6h | Planned |
+| 5.3 | Save as Personal View (UserQuery) | 2-3h | Planned |
+| 5.4 | Load existing Personal Views | 2-3h | Planned |
+
+**Note:** Visual Query Builder is THIRD mode alongside existing SQL and FetchXML.
+
+### Total: 62-90 hours
+
+| Phase | Feature | Effort | Priority |
+|-------|---------|--------|----------|
+| 1 | IntelliSense + Native Editor | 12-18h | P0 |
+| 2 | Query History (dual scope) | 6-8h | P0 |
+| 3 | Aggregates & JOINs | 16-24h | P1 |
+| 4 | INSERT/UPDATE/DELETE | 12-16h | P1 |
+| 5 | Visual Query Builder + Saved Queries | 16-24h | P2 (may defer) |
 
 ---
 
-## Grand Total: ~40-55 hours remaining
+## Grand Total: 62-90 hours remaining
 
 | Feature | Effort | Status |
 |---------|--------|--------|
 | Web Resources | 0h | ✅ **COMPLETE** |
 | Metadata Browser | 0h | ✅ **COMPLETE** |
-| Data Explorer | 40-55h | Planned |
+| Data Explorer | 62-90h | Planned (5 phases) |
+
+**Note:** Scope expanded on 2025-12-04 to include Query History, INSERT/UPDATE/DELETE, and Visual Query Builder. See `docs/work/DATA_EXPLORER_V03_REQUIREMENTS.md` for full requirements.
 
 ---
 
@@ -298,6 +347,13 @@ These tests assumed TTL caching which was removed. The stat() test expects readF
 | 2025-12-03 | Defer Excel export | Heavy bundle size (~500KB-1.5MB); clipboard copy works for now |
 | 2025-12-03 | Mark Web Resources & Metadata Browser complete | Only Data Explorer remains for v0.3.0 |
 | 2025-12-03 | Keep HTTP cache prevention as defensive measure | Original "stale content" issue was published vs unpublished (RetrieveUnpublished), but cache prevention is still appropriate for admin tools |
+| 2025-12-04 | Query History UI: Hybrid (dropdown + modal) | Quick dropdown for recent (80% use case), modal for full search/filter |
+| 2025-12-04 | History storage: ID + name | ID for execution, name for display; update name on access; show "(deleted)" for removed envs |
+| 2025-12-04 | No INSERT validation | Dataverse API accepts partial data without all required fields; let server reject |
+| 2025-12-04 | Batch size: 100 records | Progressive batches with progress feedback; user can cancel; reasonable failure scope |
+| 2025-12-04 | Personal Views only (no System Views) | No special permissions needed; System Views require Solution context - defer to future |
+| 2025-12-04 | Visual Query Builder is THIRD mode | Alongside existing SQL and FetchXML modes; three-way sync between all |
+| 2025-12-04 | SQL4CDS as reference only | Clean room approach - understand patterns, design our own implementation, no code copying |
 
 ---
 
@@ -385,4 +441,23 @@ When user opens file with unpublished changes and chooses "Edit Unpublished":
 
 ---
 
-**Last Updated:** 2025-12-03 (All Web Resources enhancements complete)
+## Session Progress: 2025-12-04
+
+### Completed This Session
+
+| Item | Description | Status |
+|------|-------------|--------|
+| Requirements document | Created `docs/work/DATA_EXPLORER_V03_REQUIREMENTS.md` with full scope | ✅ Done |
+| Scope expansion | Added Query History, INSERT/UPDATE/DELETE, Visual Query Builder | ✅ Done |
+| Design decisions | 5 key decisions documented and incorporated | ✅ Done |
+| Architecture clarification | Documented existing SQL ↔ FetchXML bidirectional modes | ✅ Done |
+| Phase breakdown | 5 phases defined with effort estimates | ✅ Done |
+
+### Next Steps
+
+1. **Update IntelliSense design doc** - Review and update `DATA_EXPLORER_INTELLISENSE_DESIGN.md` (V2)
+2. **Begin Phase 1 implementation** - IntelliSense + Native VS Code Editor
+
+---
+
+**Last Updated:** 2025-12-04 (Data Explorer requirements complete, ready for Phase 1 design)
