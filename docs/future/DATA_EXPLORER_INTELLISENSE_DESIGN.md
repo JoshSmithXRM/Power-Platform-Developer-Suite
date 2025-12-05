@@ -1,4 +1,4 @@
-# Data Explorer IntelliSense - Technical Design (V2)
+# Data Explorer IntelliSense - Technical Design (V2.1)
 
 ## Revision History
 
@@ -6,6 +6,7 @@
 |---------|------|---------|
 | V1 | 2024-01-XX | Initial design using virtual documents |
 | V2 | 2024-01-XX | Revised to fix read-only document issue, support loading files from disk |
+| V2.1 | 2025-12-04 | Added panel-editor integration, Ctrl+Enter keybinding, two-mode architecture clarification, future phase considerations |
 
 ## Changes from V1
 
@@ -28,6 +29,49 @@
 | **Environment context** | Embedded in URI | Separate `IntelliSenseContextService` |
 | **Load from disk** | Not supported | Native file open dialog |
 | **Multiple editors** | Problematic | Works naturally |
+
+### V2.1 Additions
+
+**Panel-Editor Integration:**
+- Document change listener updates FetchXML preview in panel (debounced)
+- Ctrl+Enter keybinding executes query from VS Code editor
+- Panel tracks "active" SQL editor for execution
+
+**Two-Mode Architecture:**
+- SQL Mode: VS Code editor (IntelliSense) + panel shows FetchXML preview (read-only)
+- FetchXML Mode: Panel textarea (unchanged) + panel shows SQL preview (read-only)
+- Users can toggle between modes in the panel
+
+**Future Phase Awareness:**
+- Keywords include INSERT, UPDATE, DELETE for Phase 4
+- Architecture supports alias tracking for Phase 3 (JOINs)
+
+---
+
+## Current Panel Architecture (Existing)
+
+The Data Explorer panel currently has **two query modes**:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Environment: [Contoso Dev ▼]                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ [SQL Mode]  [FetchXML Mode]                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  SQL Mode:     SQL textarea ←→ FetchXML preview (bidirectional) │
+│  FetchXML Mode: FetchXML textarea ←→ SQL preview (bidirectional)│
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ [Execute Query]  [Export CSV]                                   │
+├─────────────────────────────────────────────────────────────────┤
+│ Results Table                                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**After Phase 1 (this design):**
+- **SQL Mode changes:** SQL editing moves to VS Code editor, panel shows FetchXML preview (read-only)
+- **FetchXML Mode unchanged:** Stays in panel with SQL preview
 
 ---
 
@@ -104,31 +148,125 @@ Instead of embedding environment in the URI (V1 approach), treat them as separat
 
 ### User Experience
 
+**SQL Mode (with VS Code Editor + IntelliSense):**
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  query.sql                                        [x]  │
 ├─────────────────────────────────────────────────────────┤
 │  SELECT na|                                             │
 │         ┌──────────────────────┐                       │
-│         │ name          String │  <- Attribute suggestions
-│         │ numberofemployees    │     from active environment
+│         │ name          String │  <- IntelliSense      │
+│         │ numberofemployees    │     from active env   │
 │         │ new_customfield      │                       │
 │         └──────────────────────┘                       │
 │  FROM account                                           │
 │  WHERE statecode = 0                                    │
+│                                                         │
+│  [Ctrl+Enter to Execute]                                │
 └─────────────────────────────────────────────────────────┘
+
 ┌─────────────────────────────────────────────────────────┐
 │  Data Explorer - Contoso Dev                      [x]  │
 ├─────────────────────────────────────────────────────────┤
 │  Environment: [Contoso Dev ▼]  [New Query] [Open File] │
 ├─────────────────────────────────────────────────────────┤
-│  [Execute Query]                [FetchXML Preview ▼]   │
+│  [SQL Mode]  [FetchXML Mode]                            │
+├─────────────────────────────────────────────────────────┤
+│  FetchXML Preview (read-only, synced from VS Code):    │
+│  ┌───────────────────────────────────────────────────┐ │
+│  │ <fetch>                                           │ │
+│  │   <entity name="account">                         │ │
+│  │     <attribute name="name"/>                      │ │
+│  │     <filter>...</filter>                          │ │
+│  │   </entity>                                       │ │
+│  │ </fetch>                                          │ │
+│  └───────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────┤
+│  [Execute Query]  [Export CSV]                          │
 ├─────────────────────────────────────────────────────────┤
 │  │ name          │ statecode │ revenue    │            │
 │  │ Contoso Ltd   │ Active    │ 1,000,000  │            │
 │  │ Fabrikam Inc  │ Active    │ 500,000    │            │
 └─────────────────────────────────────────────────────────┘
 ```
+
+**FetchXML Mode (unchanged, stays in panel):**
+```
+┌─────────────────────────────────────────────────────────┐
+│  Data Explorer - Contoso Dev                      [x]  │
+├─────────────────────────────────────────────────────────┤
+│  [SQL Mode]  [FetchXML Mode] ◄─ selected                │
+├─────────────────────────────────────────────────────────┤
+│  FetchXML Editor (editable textarea):                   │
+│  ┌───────────────────────────────────────────────────┐ │
+│  │ <fetch>                                           │ │
+│  │   <entity name="account">...</entity>             │ │
+│  │ </fetch>                                          │ │
+│  └───────────────────────────────────────────────────┘ │
+│  SQL Preview (read-only):                               │
+│  ┌───────────────────────────────────────────────────┐ │
+│  │ SELECT name FROM account                          │ │
+│  └───────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────┤
+│  [Execute Query]  [Export CSV]                          │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Panel-Editor Communication (NEW in V2.1)
+
+When SQL Mode is active, the panel needs to sync with the VS Code editor:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  VS Code Editor (query.sql)                             │
+│  - User types SQL with IntelliSense                     │
+└─────────────────────────────────────────────────────────┘
+                             │
+                             │ onDidChangeTextDocument
+                             │ (debounced 300ms)
+                             ▼
+┌─────────────────────────────────────────────────────────┐
+│  SqlEditorWatcher (presentation service)                │
+│  - Watches SQL document changes                         │
+│  - Debounces updates                                    │
+│  - Notifies panel of SQL changes                        │
+└─────────────────────────────────────────────────────────┘
+                             │
+                             │ postMessage({ type: 'sqlChanged', sql })
+                             ▼
+┌─────────────────────────────────────────────────────────┐
+│  Data Explorer Panel (webview)                          │
+│  - Receives SQL from extension                          │
+│  - Transpiles to FetchXML                               │
+│  - Updates FetchXML preview                             │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Ctrl+Enter Keybinding
+
+Register keybinding for executing queries from VS Code editor:
+
+```json
+{
+    "key": "ctrl+enter",
+    "command": "ppds.dataExplorer.executeQueryFromEditor",
+    "when": "editorLangId == sql && ppds.dataExplorerPanelVisible"
+}
+```
+
+The command:
+1. Gets SQL from active editor
+2. Sends to panel for execution (via command or direct call)
+3. Shows results in panel
+
+### Active Editor Tracking
+
+When multiple SQL files are open:
+- **For FetchXML preview:** Use the most recently focused SQL editor
+- **For execution:** Use the active editor if it's SQL, else the most recent SQL editor
+- **Panel stores:** `lastActiveSqlEditorUri` to track association
 
 ---
 
@@ -236,7 +374,8 @@ src/features/dataExplorer/presentation/
 ├── providers/
 │   └── DataverseCompletionProvider.ts    # VS Code completion provider
 ├── services/
-│   └── SqlEditorService.ts               # Opens/manages SQL editors
+│   ├── SqlEditorService.ts               # Opens/manages SQL editors
+│   └── SqlEditorWatcher.ts               # Watches editor changes, notifies panel (NEW)
 └── panels/
     └── DataExplorerPanelComposed.ts      # Updated with Open File support
 ```
@@ -434,10 +573,16 @@ export type SqlCompletionContext =
  * - At statement start or after semicolon: suggest keywords
  */
 export class SqlContextDetector {
+    // Keywords include INSERT, UPDATE, DELETE for Phase 4 support
     private static readonly KEYWORDS = [
+        // SELECT query keywords
         'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'ORDER', 'BY',
         'TOP', 'LIMIT', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'OUTER',
-        'ON', 'AS', 'ASC', 'DESC', 'IS', 'NULL', 'NOT', 'IN', 'LIKE'
+        'ON', 'AS', 'ASC', 'DESC', 'IS', 'NULL', 'NOT', 'IN', 'LIKE',
+        // Aggregate keywords (Phase 3)
+        'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'GROUP', 'HAVING', 'DISTINCT',
+        // Data modification keywords (Phase 4)
+        'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE'
     ];
 
     /**
@@ -1328,6 +1473,119 @@ export class SqlEditorService implements vscode.Disposable {
 }
 ```
 
+#### 4.3 SqlEditorWatcher (NEW in V2.1)
+
+```typescript
+// src/features/dataExplorer/presentation/services/SqlEditorWatcher.ts
+
+import * as vscode from 'vscode';
+import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+
+/**
+ * Watches SQL editor changes and notifies the panel.
+ *
+ * Responsibilities:
+ * - Track the most recently focused SQL editor
+ * - Debounce document changes to avoid excessive updates
+ * - Notify panel when SQL content changes (for FetchXML preview)
+ */
+export class SqlEditorWatcher implements vscode.Disposable {
+    private static readonly DEBOUNCE_MS = 300;
+
+    private readonly disposables: vscode.Disposable[] = [];
+    private lastActiveSqlUri: vscode.Uri | null = null;
+    private debounceTimer: NodeJS.Timeout | null = null;
+    private readonly listeners: Array<(sql: string) => void> = [];
+
+    constructor(
+        private readonly logger: ILogger
+    ) {
+        // Track when SQL editors gain focus
+        this.disposables.push(
+            vscode.window.onDidChangeActiveTextEditor((editor) => {
+                if (editor && editor.document.languageId === 'sql') {
+                    this.lastActiveSqlUri = editor.document.uri;
+                    this.notifyListeners(editor.document.getText());
+                }
+            })
+        );
+
+        // Watch for document changes
+        this.disposables.push(
+            vscode.workspace.onDidChangeTextDocument((event) => {
+                if (event.document.languageId === 'sql') {
+                    this.debouncedNotify(event.document.getText());
+                }
+            })
+        );
+    }
+
+    /**
+     * Registers a listener for SQL content changes.
+     * Used by the panel to update FetchXML preview.
+     */
+    public onSqlChanged(listener: (sql: string) => void): () => void {
+        this.listeners.push(listener);
+        return () => {
+            const index = this.listeners.indexOf(listener);
+            if (index >= 0) {
+                this.listeners.splice(index, 1);
+            }
+        };
+    }
+
+    /**
+     * Gets the URI of the last active SQL editor.
+     */
+    public getLastActiveSqlUri(): vscode.Uri | null {
+        return this.lastActiveSqlUri;
+    }
+
+    /**
+     * Gets SQL content from the last active SQL editor.
+     */
+    public getLastActiveSqlContent(): string | null {
+        if (!this.lastActiveSqlUri) {
+            return null;
+        }
+
+        for (const doc of vscode.workspace.textDocuments) {
+            if (doc.uri.toString() === this.lastActiveSqlUri.toString()) {
+                return doc.getText();
+            }
+        }
+
+        return null;
+    }
+
+    private debouncedNotify(sql: string): void {
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+        }
+
+        this.debounceTimer = setTimeout(() => {
+            this.notifyListeners(sql);
+        }, SqlEditorWatcher.DEBOUNCE_MS);
+    }
+
+    private notifyListeners(sql: string): void {
+        for (const listener of this.listeners) {
+            listener(sql);
+        }
+    }
+
+    public dispose(): void {
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+        }
+        for (const disposable of this.disposables) {
+            disposable.dispose();
+        }
+        this.disposables.length = 0;
+    }
+}
+```
+
 ---
 
 ## Registration and Initialization
@@ -1346,6 +1604,7 @@ import { GetEntitySuggestionsUseCase } from './application/useCases/GetEntitySug
 import { GetAttributeSuggestionsUseCase } from './application/useCases/GetAttributeSuggestionsUseCase';
 import { DataverseCompletionProvider } from './presentation/providers/DataverseCompletionProvider';
 import { SqlEditorService } from './presentation/services/SqlEditorService';
+import { SqlEditorWatcher } from './presentation/services/SqlEditorWatcher';
 
 export function registerDataExplorerIntelliSense(
     context: vscode.ExtensionContext,
@@ -1354,6 +1613,7 @@ export function registerDataExplorerIntelliSense(
 ): {
     contextService: IntelliSenseContextService;
     editorService: SqlEditorService;
+    editorWatcher: SqlEditorWatcher;
 } {
     // 1. Create application services
     const contextService = new IntelliSenseContextService();
@@ -1382,15 +1642,34 @@ export function registerDataExplorerIntelliSense(
         )
     );
 
-    // 5. Create editor service
+    // 5. Create editor service and watcher
     const editorService = new SqlEditorService(logger);
+    const editorWatcher = new SqlEditorWatcher(logger);
     context.subscriptions.push(editorService);
+    context.subscriptions.push(editorWatcher);
     context.subscriptions.push({ dispose: () => metadataCache.dispose() });
+
+    // 6. Register Ctrl+Enter command for executing queries from editor
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ppds.dataExplorer.executeQueryFromEditor', () => {
+            // This command is called by the keybinding
+            // The panel will be notified via a separate mechanism (command or event)
+            const sql = editorWatcher.getLastActiveSqlContent()
+                ?? editorService.getActiveSqlContent();
+            if (sql) {
+                // Execute the command that the panel listens for
+                vscode.commands.executeCommand('ppds.dataExplorer.executeQuery', sql);
+            }
+        })
+    );
+
+    // 7. Set context for keybinding "when" clause
+    vscode.commands.executeCommand('setContext', 'ppds.dataExplorerPanelVisible', false);
 
     logger.info('Data Explorer IntelliSense registered');
 
     // Return services for panel integration
-    return { contextService, editorService };
+    return { contextService, editorService, editorWatcher };
 }
 ```
 
@@ -1400,13 +1679,41 @@ export function registerDataExplorerIntelliSense(
 // In DataExplorerPanelComposed.ts
 
 export class DataExplorerPanelComposed {
+    private unsubscribeSqlWatcher: (() => void) | null = null;
+
     constructor(
         // ... existing parameters
         private readonly intelliSenseContext: IntelliSenseContextService,
-        private readonly editorService: SqlEditorService
+        private readonly editorService: SqlEditorService,
+        private readonly editorWatcher: SqlEditorWatcher  // NEW in V2.1
     ) {
         // Update IntelliSense context when environment changes
         this.intelliSenseContext.setActiveEnvironment(this.currentEnvironmentId);
+
+        // Subscribe to SQL editor changes for FetchXML preview updates
+        this.unsubscribeSqlWatcher = this.editorWatcher.onSqlChanged((sql) => {
+            if (this.queryMode === 'sql') {
+                // Update FetchXML preview when SQL changes in VS Code editor
+                this.updateFetchXmlPreview(sql);
+            }
+        });
+    }
+
+    private updateFetchXmlPreview(sql: string): void {
+        // Transpile SQL to FetchXML and send to webview
+        try {
+            const fetchXml = this.sqlToFetchXml(sql);  // existing transpiler
+            this.webview.postMessage({
+                type: 'updateFetchXmlPreview',
+                fetchXml
+            });
+        } catch (error) {
+            // Show transpilation error in preview
+            this.webview.postMessage({
+                type: 'updateFetchXmlPreview',
+                error: error.message
+            });
+        }
     }
 
     private async handleEnvironmentChange(environmentId: string): Promise<void> {
@@ -1419,17 +1726,31 @@ export class DataExplorerPanelComposed {
     }
 
     private async handleNewQuery(): Promise<void> {
+        // Switch to SQL mode and open VS Code editor
+        this.queryMode = 'sql';
         await this.editorService.openNewQuery();
+
+        // Update panel visibility context for Ctrl+Enter keybinding
+        vscode.commands.executeCommand('setContext', 'ppds.dataExplorerPanelVisible', true);
     }
 
     private async handleOpenFile(): Promise<void> {
         const editor = await this.editorService.openFileFromDisk();
         if (editor) {
-            // If it's an XML file, could parse as FetchXML
             if (editor.document.languageId === 'xml') {
-                // Future: offer to execute as FetchXML or convert to SQL
+                // FetchXML file - could parse and show SQL preview
+                this.queryMode = 'fetchxml';
+            } else {
+                this.queryMode = 'sql';
             }
         }
+    }
+
+    public dispose(): void {
+        if (this.unsubscribeSqlWatcher) {
+            this.unsubscribeSqlWatcher();
+        }
+        // ... rest of disposal
     }
 
     private async handleExecuteQuery(): Promise<void> {
@@ -1634,10 +1955,41 @@ vscode.languages.registerHoverProvider(
 
 ---
 
+## Future Phase Considerations
+
+This Phase 1 design lays the foundation for subsequent phases:
+
+### Phase 2: Query History
+- `SqlEditorWatcher` already tracks SQL changes - can hook into for history recording
+- After execution, store SQL + results metadata in globalState
+- History dropdown/modal integrates into panel toolbar
+
+### Phase 3: Aggregates & JOINs
+- `SqlContextDetector` already includes aggregate keywords (COUNT, SUM, etc.)
+- Will need to extend context detection for:
+  - Alias tracking: `FROM account a` → `a.name` completions
+  - Multiple entity contexts for JOINs
+- Transpiler needs aggregate/link-entity FetchXML generation
+
+### Phase 4: INSERT/UPDATE/DELETE
+- Keywords already in `SqlContextDetector`
+- Will need new context types:
+  - `{ kind: 'insert_entity' }` - after INSERT INTO
+  - `{ kind: 'insert_column' }` - in column list
+  - `{ kind: 'update_column' }` - after SET
+- Execution pathway bypasses FetchXML - uses direct Web API calls
+
+### Phase 5: Visual Query Builder
+- Panel gets a third mode tab: SQL | FetchXML | Visual
+- `SqlEditorWatcher` pattern extends to three-way sync
+- Visual builder parses current FetchXML and renders UI
+- UI changes generate FetchXML → transpile to SQL
+
+---
+
 ## Summary
 
-V2 design improvements over V1:
-
+### V2 design improvements over V1:
 1. **Editable documents** - Uses untitled documents or real files instead of read-only virtual documents
 2. **Works with any SQL file** - Completion provider registered for `sql` language, not custom URI scheme
 3. **Decoupled environment context** - `IntelliSenseContextService` bridges panel and completion provider
@@ -1645,4 +1997,10 @@ V2 design improvements over V1:
 5. **Simpler editor management** - `SqlEditorService` is stateless, works with VS Code's natural editor lifecycle
 6. **Future-proof** - Architecture supports FetchXML files, validation, hover, etc.
 
-The core domain and application layers remain largely unchanged from V1. The key changes are in the presentation layer's approach to document management and context tracking.
+### V2.1 additions:
+7. **Panel-editor sync** - `SqlEditorWatcher` keeps FetchXML preview updated as user types in VS Code
+8. **Ctrl+Enter execution** - Keybinding registered with proper "when" clause for SQL files
+9. **Two-mode architecture** - Clear separation: SQL Mode (VS Code editor) vs FetchXML Mode (panel textarea)
+10. **Future phase keywords** - INSERT, UPDATE, DELETE, aggregates already in keyword list
+
+The core domain and application layers remain largely unchanged from V1. The key changes are in the presentation layer's approach to document management, context tracking, and editor-panel communication.
