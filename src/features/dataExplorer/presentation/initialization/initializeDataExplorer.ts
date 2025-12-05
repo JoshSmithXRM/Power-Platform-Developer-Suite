@@ -3,9 +3,16 @@ import * as vscode from 'vscode';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { VSCodePanelStateRepository } from '../../../../shared/infrastructure/ui/VSCodePanelStateRepository';
 
+import { registerDataExplorerIntelliSense } from './registerDataExplorerIntelliSense';
+
 /**
- * Lazy-loads and initializes Data Explorer panel.
+ * Lazy-loads and initializes Data Explorer panel with IntelliSense support.
  * Dynamic imports reduce initial extension activation time by deferring feature-specific code until needed.
+ *
+ * This function:
+ * - Registers IntelliSense components (completion provider for all SQL files)
+ * - Creates the Data Explorer panel
+ * - Wires up IntelliSense context service to panel's environment changes
  */
 export async function initializeDataExplorer(
 	context: vscode.ExtensionContext,
@@ -50,6 +57,13 @@ export async function initializeDataExplorer(
 		logger
 	);
 
+	// Register IntelliSense components (singleton - only registers once)
+	const intelliSenseServices = registerDataExplorerIntelliSense(
+		context,
+		dataverseApiService,
+		logger
+	);
+
 	const queryRepository = new DataverseDataExplorerQueryRepository(
 		dataverseApiService,
 		logger
@@ -70,6 +84,7 @@ export async function initializeDataExplorer(
 		resultMapper,
 		panelStateRepository,
 		logger,
+		intelliSenseServices,
 		initialEnvironmentId
 	);
 }

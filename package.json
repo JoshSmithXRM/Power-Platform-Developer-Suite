@@ -228,6 +228,19 @@
                 "command": "power-platform-dev-suite.webResourcesPickEnvironment",
                 "title": "Web Resources: Choose Environment",
                 "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.executeQueryFromEditor",
+                "title": "Execute Query from Editor",
+                "category": "Power Platform Developer Suite"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "power-platform-dev-suite.executeQueryFromEditor",
+                "key": "ctrl+enter",
+                "mac": "cmd+enter",
+                "when": "editorLangId == sql && ppds.dataExplorerPanelVisible"
             }
         ],
         "viewsContainers": {
