@@ -102,8 +102,50 @@ describe('SqlContextDetector', () => {
 		});
 	});
 
+	describe('detectContext - partial attribute typing (region detection)', () => {
+		it('should detect attribute context when typing partial name in SELECT with FROM after cursor', () => {
+			// User typed full query, then went back to edit column list
+			// SQL: "SELECT na FROM account" with cursor at position 9 (after "na")
+			const context = detector.detectContext('SELECT na FROM account', 9);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+
+		it('should detect attribute context when replacing * with partial attribute name', () => {
+			// User replaced * with partial typing: "SELECT n FROM account"
+			const context = detector.detectContext('SELECT n FROM account', 8);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+
+		it('should detect attribute context when typing after comma with partial name', () => {
+			// User adding second column: "SELECT name, acc FROM account"
+			const context = detector.detectContext('SELECT name, acc FROM account', 16);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+
+		it('should detect attribute context when typing partial name in WHERE', () => {
+			const context = detector.detectContext('SELECT * FROM account WHERE na', 30);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+
+		it('should detect attribute context when typing partial name after AND', () => {
+			const context = detector.detectContext("SELECT * FROM account WHERE name = 'test' AND stat", 50);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+
+		it('should detect attribute context when typing partial name in ORDER BY', () => {
+			const context = detector.detectContext('SELECT * FROM account ORDER BY na', 33);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+
+		it('should detect attribute context when typing after comma in ORDER BY', () => {
+			const context = detector.detectContext('SELECT * FROM account ORDER BY name, cr', 39);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+	});
+
 	describe('detectContext - none context', () => {
-		it('should return none for mid-word typing', () => {
+		it('should return none for mid-word typing without FROM clause', () => {
+			// No FROM clause - can't know which entity's attributes to suggest
 			const context = detector.detectContext('SELECT na', 9);
 			expect(context.kind).toBe('none');
 		});
