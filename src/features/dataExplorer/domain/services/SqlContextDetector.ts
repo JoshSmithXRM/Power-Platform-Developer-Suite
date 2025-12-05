@@ -115,41 +115,109 @@ export class SqlContextDetector {
 
 	/**
 	 * Checks if cursor is positioned where attributes should be suggested.
+	 * Uses REGION detection rather than exact position matching.
 	 */
 	private isAfterAttributeKeyword(textBeforeCursor: string, fullSql: string): boolean {
-		const upperText = textBeforeCursor.toUpperCase();
+		const upperTextBefore = textBeforeCursor.toUpperCase();
+		const upperFullSql = fullSql.toUpperCase();
 
 		// Must have FROM clause to know the entity
 		if (!/\bFROM\s+\w+/i.test(fullSql)) {
 			return false;
 		}
 
-		// After SELECT (before FROM)
-		if (/\bSELECT\s+$/i.test(upperText)) {
+		// Region 1: SELECT column list (between SELECT and FROM)
+		if (this.isInSelectColumnList(upperTextBefore, upperFullSql)) {
 			return true;
 		}
 
-		// After comma in SELECT list (before FROM)
-		if (/\bSELECT\s+.+,\s*$/i.test(textBeforeCursor) && !upperText.includes('FROM')) {
+		// Region 2: WHERE clause (after WHERE/AND/OR, before operator)
+		if (this.isInWhereClause(upperTextBefore)) {
 			return true;
 		}
 
-		// After WHERE, AND, OR (comparison context) - note: use original text for trailing whitespace check
-		if (/\b(WHERE|AND|OR)\s+$/i.test(textBeforeCursor)) {
-			return true;
-		}
-
-		// After ORDER BY
-		if (/\bORDER\s+BY\s+$/i.test(textBeforeCursor)) {
-			return true;
-		}
-
-		// After comma in ORDER BY
-		if (/\bORDER\s+BY\s+.+,\s*$/i.test(textBeforeCursor)) {
+		// Region 3: ORDER BY clause
+		if (this.isInOrderByClause(upperTextBefore)) {
 			return true;
 		}
 
 		return false;
+	}
+
+	/**
+	 * Checks if cursor is in the SELECT column list (between SELECT and FROM).
+	 */
+	private isInSelectColumnList(upperTextBefore: string, upperFullSql: string): boolean {
+		// Must have SELECT before cursor
+		const selectIndex = upperTextBefore.lastIndexOf('SELECT');
+		if (selectIndex === -1) {
+			return false;
+		}
+
+		// Check if FROM appears AFTER cursor position in the full SQL
+		// This handles: "SELECT na|me FROM account" - cursor before FROM
+		const fromIndexInFull = upperFullSql.indexOf('FROM', selectIndex);
+		if (fromIndexInFull === -1) {
+			return false;
+		}
+
+		// Cursor is in SELECT list if FROM hasn't appeared yet in textBeforeCursor
+		const fromIndexBefore = upperTextBefore.indexOf('FROM', selectIndex);
+		if (fromIndexBefore === -1) {
+			// No FROM before cursor - we're in SELECT column list
+			// Make sure we're past "SELECT " (at least 7 chars after SELECT)
+			return upperTextBefore.length > selectIndex + 6;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Checks if cursor is in a WHERE clause attribute position.
+	 * This is after WHERE/AND/OR and before an operator (=, <, >, etc.)
+	 */
+	private isInWhereClause(upperTextBefore: string): boolean {
+		// Find the last WHERE, AND, or OR
+		const whereMatch = upperTextBefore.match(/\b(WHERE|AND|OR)\s+(\w*)$/i);
+		if (whereMatch) {
+			// We're right after WHERE/AND/OR, possibly with partial attribute typed
+			return true;
+		}
+
+		// Also check if we're typing after WHERE/AND/OR with some content
+		// Pattern: WHERE/AND/OR followed by word characters (partial attribute)
+		const contextMatch = upperTextBefore.match(/\b(WHERE|AND|OR)\s+\w*$/i);
+		if (contextMatch) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Checks if cursor is in an ORDER BY clause.
+	 */
+	private isInOrderByClause(upperTextBefore: string): boolean {
+		// Find ORDER BY
+		const orderByIndex = upperTextBefore.lastIndexOf('ORDER BY');
+		if (orderByIndex === -1) {
+			return false;
+		}
+
+		const afterOrderBy = upperTextBefore.substring(orderByIndex + 8); // "ORDER BY".length = 8
+
+		// Check if we're in a position to type an attribute:
+		// - Right after ORDER BY: "ORDER BY |"
+		// - After comma: "ORDER BY name, |"
+		// - Typing partial: "ORDER BY na|" or "ORDER BY name, ac|"
+
+		// Not in attribute position if we just completed a sort direction
+		if (/\b(ASC|DESC)\s*$/i.test(afterOrderBy)) {
+			return false;
+		}
+
+		// We're in ORDER BY and haven't hit a terminal point
+		return true;
 	}
 
 	/**
