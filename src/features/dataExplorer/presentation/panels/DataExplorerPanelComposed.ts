@@ -31,6 +31,7 @@ import { QueryEditorSection } from '../sections/QueryEditorSection';
 import type { QueryMode, TranspilationWarning } from '../views/queryEditorView';
 import { DataverseRecordUrlService } from '../../../../shared/infrastructure/services/DataverseRecordUrlService';
 import { CsvExportService, type TabularData } from '../../../../shared/infrastructure/services/CsvExportService';
+import type { DataExplorerIntelliSenseServices } from '../initialization/registerDataExplorerIntelliSense';
 
 /**
  * Commands supported by Data Explorer panel.
@@ -38,6 +39,8 @@ import { CsvExportService, type TabularData } from '../../../../shared/infrastru
 type DataExplorerCommands =
 	| 'executeQuery'
 	| 'exportCsv'
+	| 'newQuery'
+	| 'openFile'
 	| 'environmentChange'
 	| 'updateSqlQuery'
 	| 'updateFetchXmlQuery'
@@ -80,6 +83,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	/** Resolver for pending warning modal response. */
 	private pendingModalResolver: ((action: WarningModalAction) => void) | null =
 		null;
+	/** Unsubscribe function for SqlEditorWatcher listener. */
+	private unsubscribeSqlWatcher: (() => void) | null = null;
+	/** Unsubscribe function for query execution request listener. */
+	private unsubscribeQueryExecution: (() => void) | null = null;
 
 	private constructor(
 		private readonly panel: SafeWebviewPanel,
@@ -93,6 +100,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		private readonly resultMapper: QueryResultViewModelMapper,
 		private readonly panelStateRepository: IPanelStateRepository,
 		private readonly logger: ILogger,
+		private readonly intelliSenseServices: DataExplorerIntelliSenseServices,
 		environmentId: string
 	) {
 		super();
@@ -114,12 +122,48 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 		this.registerCommandHandlers();
 
-		// Cleanup pending modal resolver on panel dispose to avoid memory leaks
+		// Set initial environment for IntelliSense context
+		this.intelliSenseServices.contextService.setActiveEnvironment(environmentId);
+
+		// Subscribe to SQL editor changes for FetchXML preview sync (when in SQL mode)
+		this.unsubscribeSqlWatcher = this.intelliSenseServices.editorWatcher.onSqlChanged(
+			(sql) => {
+				if (this.currentQueryMode === 'sql') {
+					// Update FetchXML preview when SQL changes in VS Code editor
+					this.currentSqlQuery = sql;
+					void this.updateFetchXmlPreview();
+				}
+			}
+		);
+
+		// Subscribe to query execution requests (Ctrl+Enter from VS Code editor)
+		this.unsubscribeQueryExecution =
+			this.intelliSenseServices.contextService.onExecuteQueryRequest((sql) => {
+				this.logger.debug('Executing query from VS Code editor', { sqlLength: sql.length });
+				// Switch to SQL mode if not already
+				if (this.currentQueryMode !== 'sql') {
+					void this.handleSwitchQueryMode('sql');
+				}
+				// Execute the SQL query
+				void this.handleExecuteSqlQuery(sql);
+			});
+
+		// Cleanup on panel dispose
 		panel.onDidDispose(() => {
 			if (this.pendingModalResolver) {
 				this.pendingModalResolver('cancel');
 				this.pendingModalResolver = null;
 			}
+			if (this.unsubscribeSqlWatcher) {
+				this.unsubscribeSqlWatcher();
+				this.unsubscribeSqlWatcher = null;
+			}
+			if (this.unsubscribeQueryExecution) {
+				this.unsubscribeQueryExecution();
+				this.unsubscribeQueryExecution = null;
+			}
+			// Clear active environment when panel closes
+			this.intelliSenseServices.contextService.setActiveEnvironment(null);
 		});
 
 		void this.initializeAndLoadData();
@@ -138,6 +182,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		resultMapper: QueryResultViewModelMapper,
 		panelStateRepository: IPanelStateRepository,
 		logger: ILogger,
+		intelliSenseServices: DataExplorerIntelliSenseServices,
 		initialEnvironmentId?: string
 	): Promise<DataExplorerPanelComposed> {
 		return EnvironmentScopedPanel.createOrShowPanel(
@@ -159,6 +204,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 						resultMapper,
 						panelStateRepository,
 						logger,
+						intelliSenseServices,
 						envId
 					),
 				webviewOptions: {
@@ -228,6 +274,8 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		const actionButtons = new ActionButtonsSection(
 			{
 				buttons: [
+					{ id: 'newQuery', label: 'New Query' },
+					{ id: 'openFile', label: 'Open File' },
 					{ id: 'executeQuery', label: 'Execute Query', customHandler: true },
 					{ id: 'exportCsv', label: 'Export CSV' },
 				],
@@ -356,6 +404,16 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				const sql = (data as { sql?: string })?.sql ?? this.currentSqlQuery;
 				await this.handleExecuteSqlQuery(sql);
 			}
+		});
+
+		// New Query - opens a new SQL editor with IntelliSense
+		this.coordinator.registerHandler('newQuery', async () => {
+			await this.handleNewQuery();
+		});
+
+		// Open File - opens file picker for SQL/FetchXML files
+		this.coordinator.registerHandler('openFile', async () => {
+			await this.handleOpenFile();
 		});
 
 		// Environment change
@@ -701,6 +759,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		try {
 			const oldEnvironmentId = this.currentEnvironmentId;
 			this.currentEnvironmentId = environmentId;
+
+			// Update IntelliSense context for the new environment
+			// This ensures completions use metadata from the correct environment
+			this.intelliSenseServices.contextService.setActiveEnvironment(environmentId);
 
 			// Re-register panel in map for new environment
 			this.reregisterPanel(
@@ -1147,5 +1209,58 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 		// Fallback: just prepend (shouldn't happen with valid SQL)
 		return `SELECT TOP ${limit} ${sql}`;
+	}
+
+	/**
+	 * Opens a new SQL query editor with IntelliSense support.
+	 * The editor will provide Dataverse entity/attribute completions
+	 * for the currently selected environment.
+	 */
+	private async handleNewQuery(): Promise<void> {
+		this.logger.debug('Opening new SQL query editor');
+
+		try {
+			// Open a new untitled SQL document
+			await this.intelliSenseServices.editorService.openNewQuery();
+
+			// Set context for Ctrl+Enter keybinding
+			await vscode.commands.executeCommand(
+				'setContext',
+				'ppds.dataExplorerPanelVisible',
+				true
+			);
+		} catch (error) {
+			this.logger.error('Failed to open new SQL query editor', error);
+			await vscode.window.showErrorMessage('Failed to open SQL editor');
+		}
+	}
+
+	/**
+	 * Opens a file picker to load an existing SQL or FetchXML file.
+	 * SQL files will get IntelliSense support for the current environment.
+	 */
+	private async handleOpenFile(): Promise<void> {
+		this.logger.debug('Opening file picker for SQL/FetchXML files');
+
+		try {
+			const editor = await this.intelliSenseServices.editorService.openFileFromDisk();
+
+			if (editor !== undefined) {
+				// Set context for Ctrl+Enter keybinding
+				await vscode.commands.executeCommand(
+					'setContext',
+					'ppds.dataExplorerPanelVisible',
+					true
+				);
+
+				// If it's an XML file, it might be FetchXML
+				if (editor.document.languageId === 'xml') {
+					this.logger.debug('Opened XML file - may be FetchXML');
+				}
+			}
+		} catch (error) {
+			this.logger.error('Failed to open file', error);
+			await vscode.window.showErrorMessage('Failed to open file');
+		}
 	}
 }

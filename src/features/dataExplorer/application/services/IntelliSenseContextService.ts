@@ -11,6 +11,7 @@
 export class IntelliSenseContextService {
 	private activeEnvironmentId: string | null = null;
 	private readonly environmentChangeListeners: Array<(envId: string | null) => void> = [];
+	private readonly executeQueryListeners: Array<(sql: string) => void> = [];
 
 	/**
 	 * Sets the active environment for IntelliSense.
@@ -58,6 +59,35 @@ export class IntelliSenseContextService {
 			const index = this.environmentChangeListeners.indexOf(listener);
 			if (index >= 0) {
 				this.environmentChangeListeners.splice(index, 1);
+			}
+		};
+	}
+
+	/**
+	 * Requests query execution from the VS Code editor.
+	 * Called when user presses Ctrl+Enter in a SQL file.
+	 *
+	 * @param sql - The SQL query to execute
+	 */
+	public requestQueryExecution(sql: string): void {
+		for (const listener of this.executeQueryListeners) {
+			listener(sql);
+		}
+	}
+
+	/**
+	 * Registers a listener for query execution requests.
+	 * The Data Explorer panel subscribes to receive queries from the VS Code editor.
+	 *
+	 * @param listener - Callback when query execution is requested
+	 * @returns Unsubscribe function
+	 */
+	public onExecuteQueryRequest(listener: (sql: string) => void): () => void {
+		this.executeQueryListeners.push(listener);
+		return (): void => {
+			const index = this.executeQueryListeners.indexOf(listener);
+			if (index >= 0) {
+				this.executeQueryListeners.splice(index, 1);
 			}
 		};
 	}

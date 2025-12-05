@@ -113,16 +113,19 @@ The registry maps `environmentId` → resources, and FileSystemProvider queries 
 | 1.3 | Attribute name completion (after SELECT/WHERE/ORDER BY) | 4-6h | **Done** |
 | 1.4 | SQL keyword completion | 1-2h | **Done** |
 | 1.5 | Metadata caching for completions | 2-3h | **Done** |
-| 1.6 | SqlEditorService + Panel integration (New Query, Open File) | 2-3h | **In Progress** |
-| 1.7 | Extension registration + wiring | 1-2h | Planned |
+| 1.6 | SqlEditorService + Panel integration (New Query, Open File) | 2-3h | **Done** |
+| 1.7 | Extension registration + wiring | 1-2h | **Done** |
 
 **Technical Design:** `docs/future/DATA_EXPLORER_INTELLISENSE_DESIGN.md` (V2)
 **Note:** FetchXML mode stays in panel (unchanged). SQL moves to native VS Code editor.
 
-**Phase 1 Progress (2025-12-04):**
-- Core components implemented: Domain, Application, Infrastructure, Presentation layers
+**✅ Phase 1 Complete (2025-12-04):**
+- All core components implemented: Domain, Application, Infrastructure, Presentation layers
+- Completion provider registered for ALL SQL files
+- Panel integration complete: New Query, Open File buttons, environment wiring
+- Ctrl+Enter keybinding for query execution from VS Code editor
+- SqlEditorWatcher syncs FetchXML preview with external SQL editor
 - All 494 Data Explorer tests pass
-- Remaining: Register completion provider, wire up panel integration, add Ctrl+Enter keybinding
 
 #### Phase 2: Query History - Dual Scope (6-8h)
 | # | Task | Effort | Status |
@@ -459,11 +462,32 @@ When user opens file with unpublished changes and chooses "Edit Unpublished":
 | Architecture clarification | Documented existing SQL ↔ FetchXML bidirectional modes | ✅ Done |
 | Phase breakdown | 5 phases defined with effort estimates | ✅ Done |
 
+### Session Progress: 2025-12-04 (continued)
+
+| Item | Description | Status |
+|------|-------------|--------|
+| Extension registration | Created `registerDataExplorerIntelliSense.ts` - singleton pattern for IntelliSense | ✅ Done |
+| Completion provider | Registered for ALL SQL files with trigger characters (space, comma, period) | ✅ Done |
+| Panel integration | Updated `DataExplorerPanelComposed` to accept and wire IntelliSense services | ✅ Done |
+| New Query button | Opens untitled SQL file with IntelliSense active | ✅ Done |
+| Open File button | Opens file picker for SQL/FetchXML files | ✅ Done |
+| Environment wiring | `IntelliSenseContextService.setActiveEnvironment()` called on env change | ✅ Done |
+| Ctrl+Enter keybinding | Command registered, executes query from VS Code SQL editor | ✅ Done |
+| SqlEditorWatcher sync | FetchXML preview updates when SQL changes in external editor | ✅ Done |
+
+### Files Modified This Session (2025-12-04 continued)
+
+- `src/features/dataExplorer/presentation/initialization/registerDataExplorerIntelliSense.ts` (NEW)
+- `src/features/dataExplorer/presentation/initialization/initializeDataExplorer.ts`
+- `src/features/dataExplorer/presentation/panels/DataExplorerPanelComposed.ts`
+- `src/features/dataExplorer/application/services/IntelliSenseContextService.ts`
+- `package.json` (command + keybinding)
+
 ### Next Steps
 
-1. **Update IntelliSense design doc** - Review and update `DATA_EXPLORER_INTELLISENSE_DESIGN.md` (V2)
-2. **Begin Phase 1 implementation** - IntelliSense + Native VS Code Editor
+1. **Manual testing** - Test IntelliSense in VS Code with F5, verify completions work
+2. **Begin Phase 2 implementation** - Query History (dual scope)
 
 ---
 
-**Last Updated:** 2025-12-04 (Data Explorer requirements complete, ready for Phase 1 design)
+**Last Updated:** 2025-12-04 (Phase 1 IntelliSense + Native Editor complete)
