@@ -108,15 +108,21 @@ The registry maps `environmentId` → resources, and FileSystemProvider queries 
 #### Phase 1: IntelliSense + Native VS Code Editor (12-18h)
 | # | Task | Effort | Status |
 |---|------|--------|--------|
-| 1.1 | IntelliSenseContextService (track active environment) | 2-3h | Planned |
-| 1.2 | Entity name completion (after FROM/JOIN) | 4-6h | Planned |
-| 1.3 | Attribute name completion (after SELECT/WHERE/ORDER BY) | 4-6h | Planned |
-| 1.4 | SQL keyword completion | 1-2h | Planned |
-| 1.5 | Metadata caching for completions | 2-3h | Planned |
-| 1.6 | SqlEditorService + Panel integration (New Query, Open File) | 2-3h | Planned |
+| 1.1 | IntelliSenseContextService (track active environment) | 2-3h | **Done** |
+| 1.2 | Entity name completion (after FROM/JOIN) | 4-6h | **Done** |
+| 1.3 | Attribute name completion (after SELECT/WHERE/ORDER BY) | 4-6h | **Done** |
+| 1.4 | SQL keyword completion | 1-2h | **Done** |
+| 1.5 | Metadata caching for completions | 2-3h | **Done** |
+| 1.6 | SqlEditorService + Panel integration (New Query, Open File) | 2-3h | **In Progress** |
+| 1.7 | Extension registration + wiring | 1-2h | Planned |
 
 **Technical Design:** `docs/future/DATA_EXPLORER_INTELLISENSE_DESIGN.md` (V2)
 **Note:** FetchXML mode stays in panel (unchanged). SQL moves to native VS Code editor.
+
+**Phase 1 Progress (2025-12-04):**
+- Core components implemented: Domain, Application, Infrastructure, Presentation layers
+- All 494 Data Explorer tests pass
+- Remaining: Register completion provider, wire up panel integration, add Ctrl+Enter keybinding
 
 #### Phase 2: Query History - Dual Scope (6-8h)
 | # | Task | Effort | Status |

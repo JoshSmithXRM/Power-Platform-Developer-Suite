@@ -42,7 +42,7 @@ export class CompositeCancellationToken implements ICancellationToken {
 		);
 
 		return {
-			dispose: () => {
+			dispose: (): void => {
 				disposables.forEach(d => d.dispose());
 			}
 		};
