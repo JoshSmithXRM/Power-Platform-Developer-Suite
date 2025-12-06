@@ -67,10 +67,22 @@
         "onCommand:power-platform-dev-suite.importJobViewer",
         "onCommand:power-platform-dev-suite.connectionReferences",
         "onCommand:power-platform-dev-suite.environmentVariables",
-        "onCommand:power-platform-dev-suite.webResources"
+        "onCommand:power-platform-dev-suite.webResources",
+        "onNotebook:dataverse-sql"
     ],
     "main": "./dist/extension.js",
     "contributes": {
+        "notebooks": [
+            {
+                "type": "dataverse-sql",
+                "displayName": "Dataverse SQL Notebook",
+                "selector": [
+                    {
+                        "filenamePattern": "*.dataverse-sql"
+                    }
+                ]
+            }
+        ],
         "commands": [
             {
                 "command": "power-platform-dev-suite.openSettings",
@@ -233,6 +245,12 @@
                 "command": "power-platform-dev-suite.executeQueryFromEditor",
                 "title": "Execute Query from Editor",
                 "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.newDataverseSqlNotebook",
+                "title": "New Dataverse SQL Notebook",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(notebook)"
             }
         ],
         "keybindings": [
