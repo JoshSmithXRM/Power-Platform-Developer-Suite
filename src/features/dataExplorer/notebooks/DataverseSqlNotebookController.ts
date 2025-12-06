@@ -307,7 +307,7 @@ export class DataverseSqlNotebookController {
 
 	/**
 	 * Renders query results as an HTML table.
-	 * Uses VS Code CSS variables for theme-aware styling.
+	 * Matches the Data Explorer panel's table styling for consistency.
 	 */
 	private renderResultsHtml(viewModel: QueryResultViewModel): string {
 		const rowCount = viewModel.rows.length;
@@ -315,103 +315,164 @@ export class DataverseSqlNotebookController {
 
 		// Build header
 		const headerCells = viewModel.columns
-			.map((col) => `<th class="header-cell">${this.escapeHtml(col.header)}</th>`)
-			.join('');
-
-		// Build rows
-		const bodyRows = viewModel.rows
-			.map((row, rowIndex) => {
-				const rowLookups = viewModel.rowLookups[rowIndex];
-				const cells = viewModel.columns
-					.map((col) => this.renderCell(row, rowLookups, col.name, viewModel.entityLogicalName))
-					.join('');
-				return `<tr class="data-row">${cells}</tr>`;
+			.map((col, idx) => {
+				const isLast = idx === viewModel.columns.length - 1;
+				return `<th class="header-cell${isLast ? ' last' : ''}">${this.escapeHtml(col.header)}</th>`;
 			})
 			.join('');
 
-		// Add summary header
-		const summary = `<div class="summary">
-			<span class="row-count">${rowCount} row${rowCount !== 1 ? 's' : ''}</span>
-			<span class="execution-time">Executed in ${executionTime}ms</span>
-			${viewModel.hasMoreRecords ? '<span class="more-records">More records available (use TOP to limit)</span>' : ''}
+		// Build rows with alternating colors
+		const bodyRows = viewModel.rows
+			.map((row, rowIndex) => {
+				const rowLookups = viewModel.rowLookups[rowIndex];
+				const rowClass = rowIndex % 2 === 0 ? 'row-even' : 'row-odd';
+				const cells = viewModel.columns
+					.map((col) => this.renderCell(row, rowLookups, col.name, viewModel.entityLogicalName))
+					.join('');
+				return `<tr class="data-row ${rowClass}">${cells}</tr>`;
+			})
+			.join('');
+
+		// Status bar matching Data Explorer panel
+		const statusBar = `<div class="status-bar">
+			<span class="results-count">${rowCount} row${rowCount !== 1 ? 's' : ''}</span>
+			<span class="execution-time">${executionTime}ms</span>
+			${viewModel.hasMoreRecords ? '<span class="more-records">More records available</span>' : ''}
 		</div>`;
 
 		return `
 			<style>
+				/* Container */
 				.results-container {
-					font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+					font-family: var(--vscode-font-family);
 					color: var(--vscode-foreground);
-					background-color: var(--vscode-editor-background);
+					background: var(--vscode-editor-background);
 				}
-				.summary {
-					margin-bottom: 12px;
-					font-size: 12px;
-					color: var(--vscode-descriptionForeground);
+
+				/* Table wrapper for horizontal scroll */
+				.table-wrapper {
+					overflow-x: auto;
 				}
-				.row-count {
-					font-weight: 600;
-				}
-				.execution-time {
-					margin-left: 16px;
-				}
-				.more-records {
-					margin-left: 16px;
-					color: var(--vscode-editorWarning-foreground);
-				}
+
+				/* Table - matches datatable.css */
 				.results-table {
-					border-collapse: collapse;
 					width: 100%;
-					font-size: 13px;
+					border-collapse: collapse;
+					table-layout: fixed;
 				}
+
+				/* Header - blue background like Data Explorer */
 				.header-cell {
 					padding: 8px 12px;
 					text-align: left;
-					border-bottom: 2px solid var(--vscode-panel-border);
-					background-color: var(--vscode-editor-lineHighlightBackground);
-					color: var(--vscode-foreground);
 					font-weight: 600;
+					background: var(--vscode-button-background);
+					color: var(--vscode-button-foreground);
+					border-bottom: 2px solid var(--vscode-panel-border);
+					border-right: 1px solid rgba(255, 255, 255, 0.1);
+					white-space: nowrap;
+					position: sticky;
+					top: 0;
+					z-index: 10;
 				}
+
+				.header-cell.last {
+					border-right: none;
+				}
+
+				/* Data rows */
 				.data-row {
 					border-bottom: 1px solid var(--vscode-panel-border);
 				}
-				.data-row:hover {
-					background-color: var(--vscode-list-hoverBackground);
+
+				/* Alternating row colors */
+				.data-row.row-even {
+					background: var(--vscode-list-inactiveSelectionBackground);
 				}
+
+				.data-row.row-odd {
+					background: transparent;
+				}
+
+				.data-row:hover {
+					background: var(--vscode-list-hoverBackground);
+				}
+
+				/* Data cells - matches datatable.css */
 				.data-cell {
 					padding: 8px 12px;
-					vertical-align: top;
+					white-space: nowrap;
+					overflow: hidden;
+					text-overflow: ellipsis;
+					height: 36px;
+					max-height: 36px;
+					vertical-align: middle;
 					color: var(--vscode-foreground);
 				}
+
+				/* Link cells - matches data-explorer.css */
 				.link-cell a {
 					color: var(--vscode-textLink-foreground);
 					text-decoration: none;
+					cursor: pointer;
 				}
+
 				.link-cell a:hover {
 					color: var(--vscode-textLink-activeForeground);
 					text-decoration: underline;
 				}
+
+				/* GUID cells */
 				.guid-cell {
-					font-family: var(--vscode-editor-font-family, monospace);
+					font-family: var(--vscode-editor-font-family);
 					font-size: 11px;
 				}
+
+				/* Status bar - matches data-explorer.css .results-status-bar */
+				.status-bar {
+					display: flex;
+					align-items: center;
+					gap: 20px;
+					padding: 10px 16px;
+					background: var(--vscode-editorWidget-background);
+					border-top: 1px solid var(--vscode-panel-border);
+					font-size: 12px;
+					color: var(--vscode-descriptionForeground);
+					margin-top: 0;
+				}
+
+				.results-count {
+					font-weight: 500;
+				}
+
+				.execution-time {
+					font-family: var(--vscode-editor-font-family);
+				}
+
+				.more-records {
+					color: var(--vscode-editorWarning-foreground);
+				}
+
+				/* Empty state */
 				.no-results {
-					padding: 20px;
+					padding: 40px 20px;
 					text-align: center;
 					color: var(--vscode-descriptionForeground);
+					font-style: italic;
 				}
 			</style>
 			<div class="results-container">
-				${summary}
-				<div style="overflow-x: auto;">
+				<div class="table-wrapper">
 					<table class="results-table">
 						<thead>
 							<tr>${headerCells}</tr>
 						</thead>
 						<tbody>
-							${bodyRows || '<tr><td colspan="' + viewModel.columns.length + '" class="no-results">No results</td></tr>'}
+							${bodyRows || '<tr><td colspan="' + viewModel.columns.length + '" class="no-results">No results returned</td></tr>'}
 						</tbody>
 					</table>
 				</div>
+				${statusBar}
 			</div>
 		`;
 	}
