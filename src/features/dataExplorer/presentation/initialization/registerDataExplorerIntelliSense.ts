@@ -24,8 +24,43 @@ export interface DataExplorerIntelliSenseServices {
 	editorWatcher: SqlEditorWatcher;
 }
 
-/** Singleton instance of IntelliSense services. */
-let registeredServices: DataExplorerIntelliSenseServices | null = null;
+/**
+ * Registry for IntelliSense services.
+ * Uses class-based singleton pattern for better testability and extension reloading.
+ */
+class IntelliSenseServicesRegistry {
+	private services: DataExplorerIntelliSenseServices | null = null;
+
+	public getServices(): DataExplorerIntelliSenseServices | null {
+		return this.services;
+	}
+
+	public setServices(services: DataExplorerIntelliSenseServices): void {
+		this.services = services;
+	}
+
+	public hasServices(): boolean {
+		return this.services !== null;
+	}
+
+	/**
+	 * Resets the registry. Used for testing and extension reloading.
+	 */
+	public reset(): void {
+		this.services = null;
+	}
+}
+
+/** Singleton registry instance */
+const registry = new IntelliSenseServicesRegistry();
+
+/**
+ * Resets the IntelliSense services registry.
+ * Call this in test setup/teardown to ensure clean state.
+ */
+export function resetIntelliSenseServicesForTesting(): void {
+	registry.reset();
+}
 
 /**
  * Registers Data Explorer IntelliSense components.
@@ -50,17 +85,20 @@ export function registerDataExplorerIntelliSense(
 	logger: ILogger
 ): DataExplorerIntelliSenseServices {
 	// Return existing services if already registered (singleton pattern)
-	if (registeredServices !== null) {
+	const existingServices = registry.getServices();
+	if (existingServices !== null) {
 		logger.debug('IntelliSense services already registered, returning existing instance');
-		return registeredServices;
+		return existingServices;
 	}
 
 	logger.info('Registering Data Explorer IntelliSense');
 
 	// 1. Create application services
+	// Context service still used for panel-opened SQL files
 	const contextService = new IntelliSenseContextService();
 	const repository = new DataverseIntelliSenseMetadataRepository(apiService);
-	const metadataCache = new IntelliSenseMetadataCache(repository, contextService);
+	// Cache is shared across all environments - keyed by environmentId
+	const metadataCache = new IntelliSenseMetadataCache(repository);
 
 	// 2. Create domain services and use cases
 	const contextDetector = new SqlContextDetector();
@@ -127,12 +165,13 @@ export function registerDataExplorerIntelliSense(
 
 	logger.info('Data Explorer IntelliSense registered successfully');
 
-	// Store singleton and return
-	registeredServices = {
+	// Store in registry and return
+	const services: DataExplorerIntelliSenseServices = {
 		contextService,
 		editorService,
 		editorWatcher,
 	};
+	registry.setServices(services);
 
-	return registeredServices;
+	return services;
 }

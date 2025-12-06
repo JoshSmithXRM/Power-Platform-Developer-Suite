@@ -19,35 +19,29 @@ describe('AttributeSuggestion', () => {
 			expect(suggestion.attributeType).toBe('Picklist');
 			expect(suggestion.isCustomAttribute).toBe(true);
 		});
-	});
 
-	describe('getDisplayLabel', () => {
-		it('should return the logical name', () => {
-			const suggestion = AttributeSuggestion.create('name', 'Account Name', 'String', false);
-
-			expect(suggestion.getDisplayLabel()).toBe('name');
-		});
-	});
-
-	describe('getDetail', () => {
-		it('should return display name with type in parentheses', () => {
-			const suggestion = AttributeSuggestion.create('name', 'Account Name', 'String', false);
-
-			expect(suggestion.getDetail()).toBe('Account Name (String)');
-		});
-
-		it('should format lookup type correctly', () => {
+		it('should create a lookup attribute suggestion', () => {
 			const suggestion = AttributeSuggestion.create('primarycontactid', 'Primary Contact', 'Lookup', false);
 
-			expect(suggestion.getDetail()).toBe('Primary Contact (Lookup)');
+			expect(suggestion.logicalName).toBe('primarycontactid');
+			expect(suggestion.displayName).toBe('Primary Contact');
+			expect(suggestion.attributeType).toBe('Lookup');
+			expect(suggestion.isCustomAttribute).toBe(false);
 		});
 	});
 
-	describe('getInsertText', () => {
-		it('should return the logical name', () => {
+	describe('immutability', () => {
+		it('should expose readonly properties', () => {
 			const suggestion = AttributeSuggestion.create('name', 'Account Name', 'String', false);
 
-			expect(suggestion.getInsertText()).toBe('name');
+			// Properties should be accessible
+			expect(suggestion.logicalName).toBe('name');
+			expect(suggestion.displayName).toBe('Account Name');
+			expect(suggestion.attributeType).toBe('String');
+			expect(suggestion.isCustomAttribute).toBe(false);
+
+			// TypeScript prevents assignment at compile time
+			// This test documents the intent for runtime behavior
 		});
 	});
 });

@@ -4,7 +4,8 @@
  * Represents an entity suggestion for IntelliSense autocomplete.
  * Immutable value object containing metadata needed for SQL completion.
  *
- * Display formatting (e.g., completion labels) belongs in presentation layer.
+ * Display formatting belongs in presentation layer mappers.
+ * @see EntitySuggestionCompletionMapper
  */
 export class EntitySuggestion {
 	private constructor(
@@ -25,33 +26,5 @@ export class EntitySuggestion {
 		isCustomEntity: boolean
 	): EntitySuggestion {
 		return new EntitySuggestion(logicalName, displayName, isCustomEntity);
-	}
-
-	/**
-	 * Returns the label for autocomplete display.
-	 */
-	public getDisplayLabel(): string {
-		return this.logicalName;
-	}
-
-	/**
-	 * Returns detail text (shown to the right in autocomplete).
-	 */
-	public getDetail(): string {
-		return this.displayName;
-	}
-
-	/**
-	 * Returns the text to insert on selection.
-	 */
-	public getInsertText(): string {
-		return this.logicalName;
-	}
-
-	/**
-	 * Returns documentation for the autocomplete item.
-	 */
-	public getDocumentation(): string {
-		return this.isCustomEntity ? 'Custom Entity' : 'System Entity';
 	}
 }

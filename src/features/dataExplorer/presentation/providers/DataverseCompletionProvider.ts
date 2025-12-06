@@ -4,14 +4,18 @@ import type { SqlContextDetector } from '../../domain/services/SqlContextDetecto
 import type { GetEntitySuggestionsUseCase } from '../../application/useCases/GetEntitySuggestionsUseCase';
 import type { GetAttributeSuggestionsUseCase } from '../../application/useCases/GetAttributeSuggestionsUseCase';
 import type { IntelliSenseContextService } from '../../application/services/IntelliSenseContextService';
+import { EntitySuggestionCompletionMapper } from '../mappers/EntitySuggestionCompletionMapper';
+import { AttributeSuggestionCompletionMapper } from '../mappers/AttributeSuggestionCompletionMapper';
 
 /**
  * VS Code Completion Provider for Dataverse SQL queries.
  *
- * Provides context-aware completions for ANY SQL file when an
- * environment is active in the Data Explorer panel.
+ * Provides context-aware completions for SQL in both:
+ * - Regular SQL files (environment from Data Explorer panel)
+ * - Notebook cells (environment from notebook metadata)
  *
- * Works with all SQL files and gets environment from IntelliSenseContextService.
+ * The metadata cache is shared by environment ID, so multiple notebooks/panels
+ * using the same environment share cached entity/attribute data.
  */
 export class DataverseCompletionProvider implements vscode.CompletionItemProvider {
 	constructor(
@@ -21,21 +25,60 @@ export class DataverseCompletionProvider implements vscode.CompletionItemProvide
 		private readonly getAttributeSuggestions: GetAttributeSuggestionsUseCase
 	) {}
 
+	// =========================================================================
+	// Document-Aware Environment Resolution
+	// =========================================================================
+
+	/**
+	 * Resolves the environment ID based on the document type.
+	 *
+	 * - Notebook cells: Read from notebook metadata
+	 * - Regular SQL files: Read from panel's context service
+	 *
+	 * This allows notebooks and panels to use different environments
+	 * while sharing cached metadata when environments match.
+	 */
+	private resolveEnvironmentId(document: vscode.TextDocument): string | null {
+		// Check if this is a notebook cell
+		if (document.uri.scheme === 'vscode-notebook-cell') {
+			return this.getNotebookEnvironment(document);
+		}
+
+		// Regular SQL file - use panel's context service
+		return this.contextService.getActiveEnvironment();
+	}
+
+	/**
+	 * Gets the environment ID from the notebook that contains this cell.
+	 */
+	private getNotebookEnvironment(document: vscode.TextDocument): string | null {
+		// Find the notebook containing this cell
+		for (const notebook of vscode.workspace.notebookDocuments) {
+			const containsCell = notebook.getCells().some(
+				cell => cell.document.uri.toString() === document.uri.toString()
+			);
+
+			if (containsCell) {
+				// Return environment from notebook metadata
+				const metadata = notebook.metadata;
+				const envId = metadata?.['environmentId'];
+				if (typeof envId === 'string' && envId.length > 0) {
+					return envId;
+				}
+				return null;
+			}
+		}
+
+		return null;
+	}
+
 	public async provideCompletionItems(
 		document: vscode.TextDocument,
 		position: vscode.Position,
 		token: vscode.CancellationToken,
 		_context: vscode.CompletionContext
 	): Promise<vscode.CompletionItem[] | null> {
-		// Only provide completions if we have an active environment
-		const environmentId = this.contextService.getActiveEnvironment();
-		if (environmentId === null) {
-			// No environment selected - don't provide Dataverse completions
-			// This allows other SQL completion providers to work
-			return null;
-		}
-
-		// Check for cancellation
+		// Check for cancellation early
 		if (token.isCancellationRequested) {
 			return null;
 		}
@@ -46,6 +89,18 @@ export class DataverseCompletionProvider implements vscode.CompletionItemProvide
 		const currentWord = wordRange !== undefined ? document.getText(wordRange) : '';
 
 		const context = this.contextDetector.detectContext(text, offset);
+
+		// Keywords don't require environment - always provide them
+		if (context.kind === 'keyword') {
+			return this.getKeywordCompletions(context.suggestedKeywords, currentWord);
+		}
+
+		// Entity and attribute completions require an environment
+		const environmentId = this.resolveEnvironmentId(document);
+		if (environmentId === null) {
+			// No environment - can't provide entity/attribute completions
+			return null;
+		}
 
 		switch (context.kind) {
 			case 'entity':
@@ -58,9 +113,6 @@ export class DataverseCompletionProvider implements vscode.CompletionItemProvide
 					currentWord,
 					token
 				);
-
-			case 'keyword':
-				return this.getKeywordCompletions(currentWord);
 
 			default:
 				return null;
@@ -78,17 +130,7 @@ export class DataverseCompletionProvider implements vscode.CompletionItemProvide
 			return [];
 		}
 
-		return suggestions.map((entity, index) => {
-			const item = new vscode.CompletionItem(
-				entity.getDisplayLabel(),
-				vscode.CompletionItemKind.Class
-			);
-			item.detail = entity.getDetail();
-			item.documentation = new vscode.MarkdownString(entity.getDocumentation());
-			item.insertText = entity.getInsertText();
-			item.sortText = index.toString().padStart(5, '0');
-			return item;
-		});
+		return EntitySuggestionCompletionMapper.toCompletionItems(suggestions);
 	}
 
 	private async getAttributeCompletions(
@@ -107,41 +149,25 @@ export class DataverseCompletionProvider implements vscode.CompletionItemProvide
 			return [];
 		}
 
-		return suggestions.map((attr, index) => {
-			const item = new vscode.CompletionItem(
-				attr.getDisplayLabel(),
-				this.getCompletionKindForType(attr.attributeType)
-			);
-			item.detail = attr.getDetail();
-			item.insertText = attr.getInsertText();
-			item.sortText = index.toString().padStart(5, '0');
-			return item;
-		});
+		return AttributeSuggestionCompletionMapper.toCompletionItems(suggestions);
 	}
 
-	private getKeywordCompletions(prefix: string): vscode.CompletionItem[] {
-		const keywords = this.contextDetector.getKeywords();
+	/**
+	 * Creates completion items for the suggested keywords.
+	 * Keywords are filtered by prefix to support typing partial keywords.
+	 */
+	private getKeywordCompletions(
+		suggestedKeywords: readonly string[],
+		prefix: string
+	): vscode.CompletionItem[] {
 		const lowerPrefix = prefix.toLowerCase();
 
-		return keywords
+		return suggestedKeywords
 			.filter(kw => kw.toLowerCase().startsWith(lowerPrefix))
 			.map((keyword, index) => {
 				const item = new vscode.CompletionItem(keyword, vscode.CompletionItemKind.Keyword);
 				item.sortText = index.toString().padStart(5, '0');
 				return item;
 			});
-	}
-
-	private getCompletionKindForType(attributeType: string): vscode.CompletionItemKind {
-		switch (attributeType) {
-			case 'Lookup':
-				return vscode.CompletionItemKind.Reference;
-			case 'Picklist':
-				return vscode.CompletionItemKind.Enum;
-			case 'Boolean':
-				return vscode.CompletionItemKind.Value;
-			default:
-				return vscode.CompletionItemKind.Field;
-		}
 	}
 }

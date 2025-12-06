@@ -418,12 +418,6 @@ export class DataverseSqlNotebookController {
 					text-decoration: underline;
 				}
 
-				/* GUID cells */
-				.guid-cell {
-					font-family: var(--vscode-editor-font-family);
-					font-size: 11px;
-				}
-
 				/* Status bar - matches data-explorer.css .results-status-bar */
 				.status-bar {
 					display: flex;
@@ -480,7 +474,7 @@ export class DataverseSqlNotebookController {
 		row: QueryRowViewModel,
 		lookups: RowLookupsViewModel | undefined,
 		columnName: string,
-		entityLogicalName: string | null
+		_entityLogicalName: string | null
 	): string {
 		const value = row[columnName] ?? '';
 
@@ -492,11 +486,6 @@ export class DataverseSqlNotebookController {
 					${this.escapeHtml(value)}
 				</a>
 			</td>`;
-		}
-
-		// Check if this is the primary key column
-		if (entityLogicalName && columnName === `${entityLogicalName}id`) {
-			return `<td class="data-cell guid-cell">${this.escapeHtml(value)}</td>`;
 		}
 
 		return `<td class="data-cell">${this.escapeHtml(value)}</td>`;

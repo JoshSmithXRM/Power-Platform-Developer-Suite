@@ -21,7 +21,8 @@ export type AttributeTypeHint =
  * Represents an attribute suggestion for IntelliSense autocomplete.
  * Immutable value object containing metadata needed for SQL completion.
  *
- * Display formatting (e.g., completion labels) belongs in presentation layer.
+ * Display formatting belongs in presentation layer mappers.
+ * @see AttributeSuggestionCompletionMapper
  */
 export class AttributeSuggestion {
 	private constructor(
@@ -50,26 +51,5 @@ export class AttributeSuggestion {
 			attributeType,
 			isCustomAttribute
 		);
-	}
-
-	/**
-	 * Returns the label for autocomplete display.
-	 */
-	public getDisplayLabel(): string {
-		return this.logicalName;
-	}
-
-	/**
-	 * Returns detail text showing type.
-	 */
-	public getDetail(): string {
-		return `${this.displayName} (${this.attributeType})`;
-	}
-
-	/**
-	 * Returns the text to insert on selection.
-	 */
-	public getInsertText(): string {
-		return this.logicalName;
 	}
 }

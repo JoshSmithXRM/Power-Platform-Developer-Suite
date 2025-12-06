@@ -13,10 +13,10 @@ describe('SqlContextDetector', () => {
 			expect(context.kind).toBe('entity');
 		});
 
-		it('should return none when typing partial entity name after FROM', () => {
+		it('should detect entity context when typing partial entity name after FROM', () => {
 			const context = detector.detectContext('SELECT * FROM acc', 17);
-			// Once user starts typing entity name, context is 'none' - VS Code will use the word for filtering
-			expect(context.kind).toBe('none');
+			// Entity context so VS Code can filter entity suggestions by typed prefix
+			expect(context.kind).toBe('entity');
 		});
 
 		it('should detect entity context after JOIN', () => {
@@ -96,9 +96,13 @@ describe('SqlContextDetector', () => {
 		it('should detect keyword context after entity name and space', () => {
 			// After 'FROM account ' with trailing space - cursor at position 22
 			const context = detector.detectContext('SELECT * FROM account ', 22);
-			// Note: current implementation returns 'none' for this case
-			// This could be enhanced in future to suggest WHERE, ORDER BY, etc.
-			expect(context.kind).toBe('none');
+			// Now suggests WHERE, ORDER BY, JOIN, etc.
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('WHERE');
+				expect(context.suggestedKeywords).toContain('ORDER BY');
+				expect(context.suggestedKeywords).toContain('JOIN');
+			}
 		});
 	});
 
@@ -144,10 +148,15 @@ describe('SqlContextDetector', () => {
 	});
 
 	describe('detectContext - none context', () => {
-		it('should return none for mid-word typing without FROM clause', () => {
-			// No FROM clause - can't know which entity's attributes to suggest
+		it('should return keyword context when typing in SELECT without FROM', () => {
+			// No FROM clause - returns keyword context (DISTINCT, TOP, FROM, etc.)
+			// VS Code will filter by prefix - since "na" doesn't match any, user sees nothing
 			const context = detector.detectContext('SELECT na', 9);
-			expect(context.kind).toBe('none');
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('FROM');
+				expect(context.suggestedKeywords).toContain('DISTINCT');
+			}
 		});
 
 		it('should return none when in string literal', () => {
@@ -165,8 +174,7 @@ describe('SqlContextDetector', () => {
 			expect(keywords).toContain('WHERE');
 			expect(keywords).toContain('AND');
 			expect(keywords).toContain('OR');
-			expect(keywords).toContain('ORDER');
-			expect(keywords).toContain('BY');
+			expect(keywords).toContain('ORDER BY');
 			expect(keywords).toContain('JOIN');
 		});
 
@@ -178,7 +186,7 @@ describe('SqlContextDetector', () => {
 			expect(keywords).toContain('AVG');
 			expect(keywords).toContain('MIN');
 			expect(keywords).toContain('MAX');
-			expect(keywords).toContain('GROUP');
+			expect(keywords).toContain('GROUP BY');
 			expect(keywords).toContain('HAVING');
 		});
 
@@ -191,6 +199,68 @@ describe('SqlContextDetector', () => {
 			expect(keywords).toContain('UPDATE');
 			expect(keywords).toContain('SET');
 			expect(keywords).toContain('DELETE');
+		});
+	});
+
+	describe('detectContext - context-aware keyword suggestions', () => {
+		it('should suggest statement keywords at start of document', () => {
+			const context = detector.detectContext('', 0);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('SELECT');
+				expect(context.suggestedKeywords).toContain('INSERT');
+				expect(context.suggestedKeywords).toContain('UPDATE');
+				expect(context.suggestedKeywords).toContain('DELETE');
+				expect(context.suggestedKeywords).not.toContain('WHERE');
+			}
+		});
+
+		it('should suggest statement keywords when typing partial SELECT', () => {
+			const context = detector.detectContext('SEL', 3);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('SELECT');
+			}
+		});
+
+		it('should suggest SELECT column keywords before FROM', () => {
+			const context = detector.detectContext('SELECT ', 7);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('DISTINCT');
+				expect(context.suggestedKeywords).toContain('TOP');
+				expect(context.suggestedKeywords).toContain('FROM');
+			}
+		});
+
+		it('should suggest clause keywords after FROM entity', () => {
+			const context = detector.detectContext('SELECT * FROM account ', 22);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('WHERE');
+				expect(context.suggestedKeywords).toContain('ORDER BY');
+				expect(context.suggestedKeywords).toContain('JOIN');
+				expect(context.suggestedKeywords).not.toContain('SELECT');
+			}
+		});
+
+		it('should suggest AND/OR/ORDER BY after complete WHERE condition', () => {
+			const context = detector.detectContext("SELECT * FROM account WHERE name = 'test' ", 42);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('AND');
+				expect(context.suggestedKeywords).toContain('OR');
+				expect(context.suggestedKeywords).toContain('ORDER BY');
+			}
+		});
+
+		it('should suggest ASC/DESC after ORDER BY attribute', () => {
+			const context = detector.detectContext('SELECT * FROM account ORDER BY name ', 36);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('ASC');
+				expect(context.suggestedKeywords).toContain('DESC');
+			}
 		});
 	});
 });
