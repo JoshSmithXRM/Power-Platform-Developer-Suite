@@ -178,3 +178,60 @@ async function createNewDataverseNotebook(logger: ILogger): Promise<void> {
 		);
 	}
 }
+
+/**
+ * Options for opening a query in a notebook.
+ */
+export interface OpenQueryInNotebookOptions {
+	/** SQL query to pre-populate in the notebook */
+	sql: string;
+	/** Environment ID to use for execution */
+	environmentId: string;
+	/** Environment name for display */
+	environmentName: string;
+}
+
+/**
+ * Opens a SQL query in a new Dataverse SQL notebook.
+ * Called from Data Explorer panel "Open in Notebook" action.
+ *
+ * @param options - Query and environment to pre-populate
+ */
+export async function openQueryInNotebook(
+	options: OpenQueryInNotebookOptions
+): Promise<void> {
+	const { sql, environmentId, environmentName } = options;
+
+	try {
+		// Create notebook with pre-populated content and environment metadata
+		const notebookData = new vscode.NotebookData([
+			new vscode.NotebookCellData(
+				vscode.NotebookCellKind.Markup,
+				`# Dataverse SQL Notebook\n\n**Environment:** ${environmentName}`,
+				'markdown'
+			),
+			new vscode.NotebookCellData(
+				vscode.NotebookCellKind.Code,
+				sql.trim() || '-- Write your SQL query here\nSELECT TOP 10 * FROM account',
+				'sql'
+			),
+		]);
+
+		// Set environment in metadata so it's used on execution
+		notebookData.metadata = {
+			environmentId,
+			environmentName,
+		};
+
+		const notebook = await vscode.workspace.openNotebookDocument(
+			'dataverse-sql',
+			notebookData
+		);
+
+		await vscode.window.showNotebookDocument(notebook);
+	} catch (error) {
+		vscode.window.showErrorMessage(
+			`Failed to open query in notebook: ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+}

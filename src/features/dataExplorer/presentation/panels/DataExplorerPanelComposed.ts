@@ -32,6 +32,7 @@ import type { QueryMode, TranspilationWarning } from '../views/queryEditorView';
 import { DataverseRecordUrlService } from '../../../../shared/infrastructure/services/DataverseRecordUrlService';
 import { CsvExportService, type TabularData } from '../../../../shared/infrastructure/services/CsvExportService';
 import type { DataExplorerIntelliSenseServices } from '../initialization/registerDataExplorerIntelliSense';
+import { openQueryInNotebook } from '../../notebooks/registerNotebooks';
 
 /**
  * Commands supported by Data Explorer panel.
@@ -41,6 +42,7 @@ type DataExplorerCommands =
 	| 'exportCsv'
 	| 'newQuery'
 	| 'openFile'
+	| 'openInNotebook'
 	| 'environmentChange'
 	| 'updateSqlQuery'
 	| 'updateFetchXmlQuery'
@@ -276,6 +278,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				buttons: [
 					{ id: 'newQuery', label: 'New Query' },
 					{ id: 'openFile', label: 'Open File' },
+					{ id: 'openInNotebook', label: 'Open in Notebook' },
 					{ id: 'executeQuery', label: 'Execute Query', customHandler: true },
 					{ id: 'exportCsv', label: 'Export CSV' },
 				],
@@ -414,6 +417,11 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Open File - opens file picker for SQL/FetchXML files
 		this.coordinator.registerHandler('openFile', async () => {
 			await this.handleOpenFile();
+		});
+
+		// Open current query in a notebook
+		this.coordinator.registerHandler('openInNotebook', async () => {
+			await this.handleOpenInNotebook();
 		});
 
 		// Environment change
@@ -1261,6 +1269,34 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		} catch (error) {
 			this.logger.error('Failed to open file', error);
 			await vscode.window.showErrorMessage('Failed to open file');
+		}
+	}
+
+	/**
+	 * Opens the current SQL query in a new Dataverse SQL Notebook.
+	 * The notebook inherits the currently selected environment.
+	 */
+	private async handleOpenInNotebook(): Promise<void> {
+		this.logger.debug('Opening current query in notebook');
+
+		try {
+			// Get environment name for display
+			const environmentInfo = await this.getEnvironmentById(this.currentEnvironmentId);
+			const environmentName = environmentInfo?.name ?? 'Unknown Environment';
+
+			await openQueryInNotebook({
+				sql: this.currentSqlQuery,
+				environmentId: this.currentEnvironmentId,
+				environmentName,
+			});
+
+			this.logger.info('Opened query in notebook', {
+				environmentId: this.currentEnvironmentId,
+				sqlLength: this.currentSqlQuery.length,
+			});
+		} catch (error) {
+			this.logger.error('Failed to open query in notebook', error);
+			await vscode.window.showErrorMessage('Failed to open query in notebook');
 		}
 	}
 }
