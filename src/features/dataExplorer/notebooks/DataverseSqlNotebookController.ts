@@ -354,11 +354,11 @@ export class DataverseSqlNotebookController {
 					overflow-x: auto;
 				}
 
-				/* Table - matches datatable.css */
+				/* Table - auto layout for content-sized columns */
 				.results-table {
-					width: 100%;
+					width: max-content;
+					min-width: 100%;
 					border-collapse: collapse;
-					table-layout: fixed;
 				}
 
 				/* Header - blue background like Data Explorer */
@@ -398,14 +398,10 @@ export class DataverseSqlNotebookController {
 					background: var(--vscode-list-hoverBackground);
 				}
 
-				/* Data cells - matches datatable.css */
+				/* Data cells - auto-size to content */
 				.data-cell {
 					padding: 8px 12px;
 					white-space: nowrap;
-					overflow: hidden;
-					text-overflow: ellipsis;
-					height: 36px;
-					max-height: 36px;
 					vertical-align: middle;
 					color: var(--vscode-foreground);
 				}
