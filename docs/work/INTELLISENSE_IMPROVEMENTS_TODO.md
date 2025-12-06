@@ -27,14 +27,15 @@
 - [x] Fix module-level singleton (move to proper DI)
 - [x] Move presentation logic from value objects to mappers
 
-### Phase 2: Notebook Improvements (Next Priority)
-- [x] Fix notebook data table links (lookup fields should be clickable) - COMPLETED 2025-12-06
-- [ ] Combined SQL/FetchXML notebook support (single notebook type)
-  - [ ] Update controller supportedLanguages to ['sql', 'xml']
-  - [ ] Detect cell language in executeHandler
-  - [ ] Route SQL cells through SQL→FetchXML→Execute path
-  - [ ] Route XML cells directly to FetchXML execution
-  - [ ] Serializer already handles cell language
+### Phase 2: Notebook Improvements (Next Priority) - COMPLETED 2025-12-06
+- [x] Fix notebook data table links (lookup fields should be clickable)
+- [x] Combined SQL/FetchXML notebook support (single notebook type)
+  - [x] Update controller supportedLanguages to ['sql', 'xml']
+  - [x] Detect cell language in executeHandler
+  - [x] Route SQL cells through SQL→FetchXML→Execute path
+  - [x] Route XML cells directly to FetchXML execution
+  - [x] Serializer handles cell language (sql, xml, markdown)
+- [x] Renamed notebook extension to .ppdsnb (Power Platform Developer Suite Notebook)
 
 ### Phase 3: FetchXML IntelliSense
 - [ ] FetchXML context detector (XML-aware, element/attribute detection)
@@ -328,3 +329,41 @@ https://{dataverseUrl}/main.aspx?pagetype=entityrecord&etn={entityType}&id={reco
 - `src/features/dataExplorer/presentation/providers/DataverseCompletionProvider.ts` - Fixed type safety
 
 **Test Results:** All 501 Data Explorer tests pass
+
+### Session 2 - Continued: FetchXML Notebook Support
+
+**Goal:** Allow notebooks to contain both SQL and FetchXML cells.
+
+**Changes Made:**
+1. **DataverseSqlNotebookController**
+   - Updated `supportedLanguages` from `['sql']` to `['sql', 'xml']`
+   - Added `ExecuteFetchXmlQueryUseCase` constructor parameter
+   - Updated `executeCell()` to detect language and route:
+     - XML cells → `ExecuteFetchXmlQueryUseCase` (direct execution)
+     - SQL cells → `ExecuteSqlQueryUseCase` (transpile then execute)
+   - Added `looksLikeFetchXml()` helper for content-based detection
+   - Added `FetchXmlValidationError` handling in `formatError()`
+
+2. **DataverseSqlNotebookSerializer**
+   - Updated cell kind type to include `'xml'`
+   - `parseNotebookData()` now maps 'xml' kind to 'xml' language
+   - `serializeCell()` preserves cell language (sql/xml/markdown)
+
+3. **registerNotebooks.ts**
+   - Added lazy import of `ExecuteFetchXmlQueryUseCase`
+   - Created and injected `executeFetchXmlUseCase` to controller
+
+**Detection Logic:**
+```
+if (cell.languageId === 'xml' || content.startsWith('<fetch'))
+  → Execute as FetchXML
+else
+  → Execute as SQL (transpile first)
+```
+
+**Files Changed:**
+- `src/features/dataExplorer/notebooks/DataverseSqlNotebookController.ts`
+- `src/features/dataExplorer/notebooks/DataverseSqlNotebookSerializer.ts`
+- `src/features/dataExplorer/notebooks/registerNotebooks.ts`
+
+**Test Results:** Build successful, all lint checks pass

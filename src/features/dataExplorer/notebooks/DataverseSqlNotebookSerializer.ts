@@ -15,7 +15,7 @@ interface NotebookMetadata {
 }
 
 interface NotebookCellData {
-	kind: 'sql' | 'markdown';
+	kind: 'sql' | 'fetchxml' | 'markdown';
 	source: string;
 }
 
@@ -102,7 +102,18 @@ export class DataverseSqlNotebookSerializer implements vscode.NotebookSerializer
 					? vscode.NotebookCellKind.Markup
 					: vscode.NotebookCellKind.Code;
 
-			const language = cellData.kind === 'markdown' ? 'markdown' : 'sql';
+			// Map cell kind to VS Code language ID
+			let language: string;
+			switch (cellData.kind) {
+				case 'markdown':
+					language = 'markdown';
+					break;
+				case 'fetchxml':
+					language = 'fetchxml';
+					break;
+				default:
+					language = 'sql';
+			}
 
 			return new vscode.NotebookCellData(kind, cellData.source, language);
 		});
@@ -144,8 +155,18 @@ export class DataverseSqlNotebookSerializer implements vscode.NotebookSerializer
 	 * Serializes a single cell to storage format.
 	 */
 	private serializeCell(cell: vscode.NotebookCellData): NotebookCellData {
+		// Map VS Code cell to storage format
+		let kind: NotebookCellData['kind'];
+		if (cell.kind === vscode.NotebookCellKind.Markup) {
+			kind = 'markdown';
+		} else if (cell.languageId === 'fetchxml' || cell.languageId === 'xml') {
+			kind = 'fetchxml';
+		} else {
+			kind = 'sql';
+		}
+
 		return {
-			kind: cell.kind === vscode.NotebookCellKind.Markup ? 'markdown' : 'sql',
+			kind,
 			source: cell.value,
 		};
 	}

@@ -59,6 +59,9 @@ export async function registerDataverseSqlNotebooks(
 	const { ExecuteSqlQueryUseCase } = await import(
 		'../application/useCases/ExecuteSqlQueryUseCase.js'
 	);
+	const { ExecuteFetchXmlQueryUseCase } = await import(
+		'../application/useCases/ExecuteFetchXmlQueryUseCase.js'
+	);
 
 	// Create API service and repository
 	const { getAccessToken, getDataverseUrl } = dataverseApiServiceFactory;
@@ -73,8 +76,9 @@ export async function registerDataverseSqlNotebooks(
 		logger
 	);
 
-	// Create use case and mapper
+	// Create use cases and mapper
 	const executeSqlUseCase = new ExecuteSqlQueryUseCase(queryRepository, logger);
+	const executeFetchXmlUseCase = new ExecuteFetchXmlQueryUseCase(queryRepository, logger);
 	const resultMapper = new QueryResultViewModelMapper();
 
 	// Register notebook serializer
@@ -88,6 +92,7 @@ export async function registerDataverseSqlNotebooks(
 	const controller = new DataverseSqlNotebookController(
 		getEnvironments,
 		executeSqlUseCase,
+		executeFetchXmlUseCase,
 		resultMapper,
 		logger
 	);

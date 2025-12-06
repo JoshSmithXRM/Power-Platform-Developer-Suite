@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../infrastructure/logging/ILogger';
+import type { ExecuteFetchXmlQueryUseCase } from '../application/useCases/ExecuteFetchXmlQueryUseCase';
 import type { ExecuteSqlQueryUseCase } from '../application/useCases/ExecuteSqlQueryUseCase';
 import type { QueryResultViewModelMapper } from '../application/mappers/QueryResultViewModelMapper';
 import type { QueryResultViewModel, QueryRowViewModel, RowLookupsViewModel } from '../application/viewModels/QueryResultViewModel';
+import { FetchXmlValidationError } from '../domain/errors/FetchXmlValidationError';
 import { SqlParseError } from '../domain/errors/SqlParseError';
 
 /**
@@ -16,7 +18,11 @@ interface EnvironmentInfo {
 }
 
 /**
- * Controller for executing Dataverse SQL notebook cells.
+ * Controller for executing Power Platform Developer Suite notebook cells.
+ *
+ * Supports both SQL and FetchXML cells:
+ * - SQL cells are transpiled to FetchXML before execution
+ * - FetchXML cells are executed directly
  *
  * Handles:
  * - Cell execution against selected Dataverse environment
@@ -38,6 +44,7 @@ export class DataverseSqlNotebookController {
 	constructor(
 		private readonly getEnvironments: () => Promise<EnvironmentInfo[]>,
 		private readonly executeSqlUseCase: ExecuteSqlQueryUseCase,
+		private readonly executeFetchXmlUseCase: ExecuteFetchXmlQueryUseCase,
 		private readonly resultMapper: QueryResultViewModelMapper,
 		private readonly logger: ILogger
 	) {
@@ -50,7 +57,7 @@ export class DataverseSqlNotebookController {
 			this.label
 		);
 
-		this.controller.supportedLanguages = ['sql'];
+		this.controller.supportedLanguages = ['sql', 'fetchxml'];
 		this.controller.supportsExecutionOrder = true;
 		this.controller.executeHandler = this.executeHandler.bind(this);
 
@@ -218,7 +225,7 @@ export class DataverseSqlNotebookController {
 	}
 
 	/**
-	 * Executes a single notebook cell.
+	 * Executes a single notebook cell (SQL or FetchXML).
 	 */
 	private async executeCell(cell: vscode.NotebookCell): Promise<void> {
 		const execution = this.controller.createNotebookCellExecution(cell);
@@ -243,8 +250,8 @@ export class DataverseSqlNotebookController {
 				}
 			}
 
-			const sql = cell.document.getText().trim();
-			if (!sql) {
+			const cellContent = cell.document.getText().trim();
+			if (!cellContent) {
 				execution.replaceOutput([
 					new vscode.NotebookCellOutput([
 						vscode.NotebookCellOutputItem.text('Empty query', 'text/plain'),
@@ -254,16 +261,21 @@ export class DataverseSqlNotebookController {
 				return;
 			}
 
+			// Detect cell language and execute accordingly
+			const language = cell.document.languageId;
+			const isFetchXml = language === 'fetchxml' || language === 'xml' || this.looksLikeFetchXml(cellContent);
+
 			this.logger.info('Executing notebook cell', {
 				environmentId: this.selectedEnvironmentId,
-				sqlLength: sql.length,
+				language,
+				isFetchXml,
+				contentLength: cellContent.length,
 			});
 
-			// Execute the SQL query
-			const result = await this.executeSqlUseCase.execute(
-				this.selectedEnvironmentId,
-				sql
-			);
+			// Execute based on language
+			const result = isFetchXml
+				? await this.executeFetchXmlUseCase.execute(this.selectedEnvironmentId, cellContent)
+				: await this.executeSqlUseCase.execute(this.selectedEnvironmentId, cellContent);
 
 			// Map to view model
 			const viewModel = this.resultMapper.toViewModel(result);
@@ -299,6 +311,15 @@ export class DataverseSqlNotebookController {
 
 			execution.end(false, Date.now());
 		}
+	}
+
+	/**
+	 * Checks if content looks like FetchXML (starts with <fetch or <?xml).
+	 * Used as fallback when language detection is ambiguous.
+	 */
+	private looksLikeFetchXml(content: string): boolean {
+		const trimmed = content.trimStart().toLowerCase();
+		return trimmed.startsWith('<fetch') || trimmed.startsWith('<?xml');
 	}
 
 	/**
@@ -579,6 +600,10 @@ export class DataverseSqlNotebookController {
 	private formatError(error: unknown): string {
 		if (error instanceof SqlParseError) {
 			return `SQL Parse Error at line ${error.line}, column ${error.column}:\n${error.message}\n\nContext: ${error.getErrorContext()}`;
+		}
+
+		if (error instanceof FetchXmlValidationError) {
+			return `FetchXML Error: ${error.message}`;
 		}
 
 		if (error instanceof Error) {

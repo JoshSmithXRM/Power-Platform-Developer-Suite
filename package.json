@@ -83,6 +83,20 @@
                 ]
             }
         ],
+        "languages": [
+            {
+                "id": "fetchxml",
+                "aliases": ["FetchXML", "fetchxml"],
+                "extensions": [".fetchxml"]
+            }
+        ],
+        "grammars": [
+            {
+                "language": "fetchxml",
+                "scopeName": "text.xml.fetchxml",
+                "path": "./syntaxes/fetchxml.tmLanguage.json"
+            }
+        ],
         "commands": [
             {
                 "command": "power-platform-dev-suite.openSettings",
