@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 /**
- * JSON format for .dataverse-sql notebook files.
+ * JSON format for .ppdsnb notebook files.
  */
 interface NotebookData {
 	metadata: NotebookMetadata;
@@ -11,6 +11,7 @@ interface NotebookData {
 interface NotebookMetadata {
 	environmentId?: string | undefined;
 	environmentName?: string | undefined;
+	environmentUrl?: string | undefined;
 }
 
 interface NotebookCellData {
@@ -19,7 +20,7 @@ interface NotebookCellData {
 }
 
 /**
- * Serializer for .dataverse-sql notebook files.
+ * Serializer for .ppdsnb (Power Platform Developer Suite Notebook) files.
  *
  * Handles reading and writing notebook data in a custom JSON format.
  * Stores environment selection in notebook metadata for persistence.
@@ -121,6 +122,7 @@ export class DataverseSqlNotebookSerializer implements vscode.NotebookSerializer
 		notebookData.metadata = {
 			environmentId: data.metadata.environmentId,
 			environmentName: data.metadata.environmentName,
+			environmentUrl: data.metadata.environmentUrl,
 		};
 
 		return notebookData;
@@ -134,6 +136,7 @@ export class DataverseSqlNotebookSerializer implements vscode.NotebookSerializer
 		return {
 			environmentId: metadata?.environmentId,
 			environmentName: metadata?.environmentName,
+			environmentUrl: metadata?.environmentUrl,
 		};
 	}
 

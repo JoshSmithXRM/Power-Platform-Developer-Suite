@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
+
 import type { ILogger } from '../../../infrastructure/logging/ILogger';
-import { DataverseSqlNotebookSerializer } from './DataverseSqlNotebookSerializer';
-import { DataverseSqlNotebookController } from './DataverseSqlNotebookController';
-import type { ExecuteSqlQueryUseCase } from '../application/useCases/ExecuteSqlQueryUseCase';
 import { QueryResultViewModelMapper } from '../application/mappers/QueryResultViewModelMapper';
+
+import { DataverseSqlNotebookController } from './DataverseSqlNotebookController';
+import { DataverseSqlNotebookSerializer } from './DataverseSqlNotebookSerializer';
 
 /**
  * Environment info for notebook environment picker.
@@ -30,7 +31,7 @@ interface NotebookDependencies {
  * Registers Dataverse SQL Notebook support.
  *
  * This function:
- * - Registers the notebook serializer for .dataverse-sql files
+ * - Registers the notebook serializer for .ppdsnb files
  * - Creates the notebook controller for cell execution
  * - Registers environment selection command
  * - Registers new notebook command
@@ -79,7 +80,7 @@ export async function registerDataverseSqlNotebooks(
 	// Register notebook serializer
 	const serializer = new DataverseSqlNotebookSerializer();
 	const serializerDisposable = vscode.workspace.registerNotebookSerializer(
-		'dataverse-sql',
+		'ppdsnb',
 		serializer
 	);
 
@@ -94,7 +95,7 @@ export async function registerDataverseSqlNotebooks(
 	// Register environment selection command
 	const selectEnvCommand = vscode.commands.registerCommand(
 		'power-platform-dev-suite.selectNotebookEnvironment',
-		() => controller.selectEnvironment()
+		async () => controller.selectEnvironment()
 	);
 
 	// Register new notebook command
@@ -119,8 +120,8 @@ export async function registerDataverseSqlNotebooks(
 				uri: notebook.uri.toString(),
 				type: notebook.notebookType,
 			});
-			if (notebook.notebookType === 'dataverse-sql') {
-				logger.info('Dataverse SQL notebook opened');
+			if (notebook.notebookType === 'ppdsnb') {
+				logger.info('PPDSNB notebook opened');
 				controller.loadEnvironmentFromNotebook(notebook);
 				// Show status bar and prompt for environment
 				controller.updateStatusBarVisibility(vscode.window.activeNotebookEditor);
@@ -152,11 +153,11 @@ async function createNewDataverseNotebook(logger: ILogger): Promise<void> {
 	try {
 		// Create untitled notebook document
 		const notebook = await vscode.workspace.openNotebookDocument(
-			'dataverse-sql',
+			'ppdsnb',
 			new vscode.NotebookData([
 				new vscode.NotebookCellData(
 					vscode.NotebookCellKind.Markup,
-					'# Dataverse SQL Notebook\n\nSelect an environment using the status bar picker, then write SQL queries in the cells below.',
+					'# Power Platform Developer Suite Notebook\n\nSelect an environment using the status bar picker, then write SQL queries in the cells below.',
 					'markdown'
 				),
 				new vscode.NotebookCellData(
@@ -189,6 +190,8 @@ export interface OpenQueryInNotebookOptions {
 	environmentId: string;
 	/** Environment name for display */
 	environmentName: string;
+	/** Dataverse URL for clickable record links (optional for backwards compatibility) */
+	environmentUrl?: string;
 }
 
 /**
@@ -200,14 +203,14 @@ export interface OpenQueryInNotebookOptions {
 export async function openQueryInNotebook(
 	options: OpenQueryInNotebookOptions
 ): Promise<void> {
-	const { sql, environmentId, environmentName } = options;
+	const { sql, environmentId, environmentName, environmentUrl } = options;
 
 	try {
 		// Create notebook with pre-populated content and environment metadata
 		const notebookData = new vscode.NotebookData([
 			new vscode.NotebookCellData(
 				vscode.NotebookCellKind.Markup,
-				`# Dataverse SQL Notebook\n\n**Environment:** ${environmentName}`,
+				`# Power Platform Developer Suite Notebook\n\n**Environment:** ${environmentName}`,
 				'markdown'
 			),
 			new vscode.NotebookCellData(
@@ -217,14 +220,15 @@ export async function openQueryInNotebook(
 			),
 		]);
 
-		// Set environment in metadata so it's used on execution
+		// Set environment in metadata for execution and clickable record links
 		notebookData.metadata = {
 			environmentId,
 			environmentName,
+			environmentUrl,
 		};
 
 		const notebook = await vscode.workspace.openNotebookDocument(
-			'dataverse-sql',
+			'ppdsnb',
 			notebookData
 		);
 

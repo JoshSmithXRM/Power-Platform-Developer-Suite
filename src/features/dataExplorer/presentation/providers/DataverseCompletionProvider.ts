@@ -60,8 +60,8 @@ export class DataverseCompletionProvider implements vscode.CompletionItemProvide
 
 			if (containsCell) {
 				// Return environment from notebook metadata
-				const metadata = notebook.metadata;
-				const envId = metadata?.['environmentId'];
+				const metadata = notebook.metadata as { environmentId?: unknown } | undefined;
+				const envId = metadata?.environmentId;
 				if (typeof envId === 'string' && envId.length > 0) {
 					return envId;
 				}

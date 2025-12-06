@@ -1280,15 +1280,17 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		this.logger.debug('Opening current query in notebook');
 
 		try {
-			// Get environment name for display
+			// Get environment info for display and record links
 			const environmentInfo = await this.getEnvironmentById(this.currentEnvironmentId);
 			const environmentName = environmentInfo?.name ?? 'Unknown Environment';
 
-			await openQueryInNotebook({
+			const options = {
 				sql: this.currentSqlQuery,
 				environmentId: this.currentEnvironmentId,
 				environmentName,
-			});
+				...(environmentInfo?.dataverseUrl && { environmentUrl: environmentInfo.dataverseUrl }),
+			};
+			await openQueryInNotebook(options);
 
 			this.logger.info('Opened query in notebook', {
 				environmentId: this.currentEnvironmentId,

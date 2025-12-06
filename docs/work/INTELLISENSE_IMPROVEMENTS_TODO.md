@@ -27,19 +27,38 @@
 - [x] Fix module-level singleton (move to proper DI)
 - [x] Move presentation logic from value objects to mappers
 
-### FetchXML IntelliSense (Post SQL Fixes)
-- [ ] FetchXML context detector (element/attribute detection)
-- [ ] FetchXML completion provider
+### Phase 2: Notebook Improvements (Next Priority)
+- [x] Fix notebook data table links (lookup fields should be clickable) - COMPLETED 2025-12-06
+- [ ] Combined SQL/FetchXML notebook support (single notebook type)
+  - [ ] Update controller supportedLanguages to ['sql', 'xml']
+  - [ ] Detect cell language in executeHandler
+  - [ ] Route SQL cells through SQL→FetchXML→Execute path
+  - [ ] Route XML cells directly to FetchXML execution
+  - [ ] Serializer already handles cell language
+
+### Phase 3: FetchXML IntelliSense
+- [ ] FetchXML context detector (XML-aware, element/attribute detection)
+- [ ] FetchXML completion provider (register for language: 'xml')
 - [ ] Entity name suggestions (in `<entity name="">`)
 - [ ] Attribute name suggestions (in `<attribute name="">`)
 - [ ] Operator suggestions (in `<condition operator="">`)
-- [ ] Element suggestions (valid child elements)
+- [ ] Element suggestions (valid child elements based on parent)
 
-### Notebook Improvements (Post FetchXML IntelliSense)
-- [ ] FetchXML notebooks (`.dataverse-fetchxml` extension)
-- [ ] FetchXML file editor (like SQL file editor)
-- [ ] Fix notebook data table links (lookup links not clickable)
-- [ ] Document-scoped IntelliSense context (notebook environment isolation)
+### Phase 4: Additional Query Support
+- [ ] Implement FetchXML aggregate queries (COUNT, SUM, AVG, MIN, MAX)
+- [ ] Implement GROUP BY support
+- [ ] Research what other query types FetchXML supports
+- [ ] Update SQL transpiler to support new query types
+
+### Phase 5: SQL Keyword Cleanup (After FetchXML support complete)
+- [ ] Only suggest keywords that are actually usable in Dataverse SQL
+- [ ] Review keyword lists - remove unsupported keywords
+- [ ] Verify suggestions match Dataverse SQL dialect (constrained by FetchXML)
+
+### Phase 6: FetchXML File Editor
+- [ ] Add "New FetchXML Query" button to panel
+- [ ] Add "Open FetchXML File" support
+- [ ] FetchXML → SQL preview in panel
 
 **Success Criteria:**
 - [x] Typing `|` at document start shows SELECT, INSERT, UPDATE, DELETE
@@ -119,9 +138,9 @@
 - [ ] Add "Open FetchXML File" support
 - [ ] FetchXML → SQL preview in panel
 
-#### 3.3 Fix Notebook Data Table Links
-- [ ] Implement webview message handling for lookup clicks
-- [ ] Navigate to record in browser or panel
+#### 3.3 Fix Notebook Data Table Links - COMPLETED 2025-12-06
+- [x] Store environment URL in notebook metadata
+- [x] Build direct record URLs in HTML output (opens in browser on click)
 
 #### 3.4 Document-Scoped IntelliSense Context
 - [ ] Refactor `IntelliSenseContextService` for document-scoped environments
@@ -271,5 +290,41 @@
 **Files Changed:**
 - `src/features/dataExplorer/presentation/providers/DataverseCompletionProvider.ts` - Added document-aware env resolution
 - `src/features/dataExplorer/application/services/IntelliSenseMetadataCache.ts` - Multi-env cache support
+
+**Test Results:** All 501 Data Explorer tests pass
+
+### Session 2 (2025-12-06) - Notebook Clickable Links Fix
+
+**Problem:** Lookup fields in notebook data tables were rendered as styled links but clicking them did nothing (`onclick="return false;"`).
+
+**Root Cause:** Unlike webview panels that can use `vscode.postMessage()`, notebook cell outputs don't have built-in message passing. The notebook controller didn't have access to the Dataverse URL to build actual record links.
+
+**Solution:** Store the Dataverse URL in notebook metadata and build direct record URLs in the HTML output.
+
+**Changes Made:**
+1. **DataverseSqlNotebookController** - Added `selectedEnvironmentUrl` field
+   - `selectEnvironment()` now stores URL in metadata along with ID/name
+   - `loadEnvironmentFromNotebook()` now loads URL from metadata
+   - `renderResultsHtml()` accepts `environmentUrl` parameter
+   - `renderCell()` builds actual `href` URLs using `buildRecordUrl()` helper
+   - New `buildRecordUrl()` method generates Dataverse record URLs
+
+2. **registerNotebooks.ts** - Updated `OpenQueryInNotebookOptions`
+   - Added optional `environmentUrl` field for backwards compatibility
+   - `openQueryInNotebook()` stores URL in metadata
+
+3. **DataExplorerPanelComposed** - Updated notebook integration
+   - `handleOpenInNotebook()` passes `environmentInfo.dataverseUrl` to notebook
+
+**URL Format:**
+```
+https://{dataverseUrl}/main.aspx?pagetype=entityrecord&etn={entityType}&id={recordId}
+```
+
+**Files Changed:**
+- `src/features/dataExplorer/notebooks/DataverseSqlNotebookController.ts` - Core fix
+- `src/features/dataExplorer/notebooks/registerNotebooks.ts` - Updated options interface
+- `src/features/dataExplorer/presentation/panels/DataExplorerPanelComposed.ts` - Pass URL
+- `src/features/dataExplorer/presentation/providers/DataverseCompletionProvider.ts` - Fixed type safety
 
 **Test Results:** All 501 Data Explorer tests pass

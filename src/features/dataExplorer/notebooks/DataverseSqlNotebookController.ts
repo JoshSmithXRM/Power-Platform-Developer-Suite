@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+
 import type { ILogger } from '../../../infrastructure/logging/ILogger';
 import type { ExecuteSqlQueryUseCase } from '../application/useCases/ExecuteSqlQueryUseCase';
 import type { QueryResultViewModelMapper } from '../application/mappers/QueryResultViewModelMapper';
@@ -24,13 +25,14 @@ interface EnvironmentInfo {
  * - Error handling and display
  */
 export class DataverseSqlNotebookController {
-	private readonly controllerId = 'dataverse-sql-controller';
-	private readonly notebookType = 'dataverse-sql';
-	private readonly label = 'Dataverse SQL';
+	private readonly controllerId = 'ppdsnb-controller';
+	private readonly notebookType = 'ppdsnb';
+	private readonly label = 'Power Platform Developer Suite';
 
 	private readonly controller: vscode.NotebookController;
 	private selectedEnvironmentId: string | undefined;
 	private selectedEnvironmentName: string | undefined;
+	private selectedEnvironmentUrl: string | undefined;
 	private statusBarItem: vscode.StatusBarItem;
 
 	constructor(
@@ -60,15 +62,15 @@ export class DataverseSqlNotebookController {
 		this.statusBarItem.command = 'power-platform-dev-suite.selectNotebookEnvironment';
 		this.updateStatusBar();
 
-		// Check all open notebooks and show status bar if any are dataverse-sql
+		// Check all open notebooks and show status bar if any are ppdsnb
 		this.checkOpenNotebooks();
 	}
 
 	/**
-	 * Checks all open notebook documents and shows status bar if any are dataverse-sql.
+	 * Checks all open notebook documents and shows status bar if any are ppdsnb.
 	 */
 	private checkOpenNotebooks(): void {
-		this.logger.debug('Checking for open dataverse-sql notebooks', {
+		this.logger.debug('Checking for open ppdsnb notebooks', {
 			notebookCount: vscode.workspace.notebookDocuments.length,
 			activeEditor: vscode.window.activeNotebookEditor?.notebook.notebookType,
 		});
@@ -80,7 +82,7 @@ export class DataverseSqlNotebookController {
 				type: notebook.notebookType,
 			});
 			if (notebook.notebookType === this.notebookType) {
-				this.logger.info('Found open dataverse-sql notebook', { uri: notebook.uri.toString() });
+				this.logger.info('Found open ppdsnb notebook', { uri: notebook.uri.toString() });
 				this.loadEnvironmentFromNotebook(notebook);
 				this.statusBarItem.show();
 				this.promptForEnvironmentIfNeeded();
@@ -91,7 +93,7 @@ export class DataverseSqlNotebookController {
 		// Also check active notebook editor
 		const activeEditor = vscode.window.activeNotebookEditor;
 		if (activeEditor && activeEditor.notebook.notebookType === this.notebookType) {
-			this.logger.info('Active editor is dataverse-sql notebook');
+			this.logger.info('Active editor is ppdsnb notebook');
 			this.loadEnvironmentFromNotebook(activeEditor.notebook);
 			this.statusBarItem.show();
 			this.promptForEnvironmentIfNeeded();
@@ -147,6 +149,7 @@ export class DataverseSqlNotebookController {
 		if (selected) {
 			this.selectedEnvironmentId = selected.id;
 			this.selectedEnvironmentName = selected.label;
+			this.selectedEnvironmentUrl = selected.description;
 			this.updateStatusBar();
 
 			// Update notebook metadata with selected environment
@@ -158,6 +161,7 @@ export class DataverseSqlNotebookController {
 						...activeEditor.notebook.metadata,
 						environmentId: this.selectedEnvironmentId,
 						environmentName: this.selectedEnvironmentName,
+						environmentUrl: this.selectedEnvironmentUrl,
 					}),
 				]);
 				await vscode.workspace.applyEdit(edit);
@@ -169,10 +173,15 @@ export class DataverseSqlNotebookController {
 	 * Loads environment from notebook metadata when notebook opens.
 	 */
 	public loadEnvironmentFromNotebook(notebook: vscode.NotebookDocument): void {
-		const metadata = notebook.metadata as { environmentId?: string; environmentName?: string } | undefined;
+		const metadata = notebook.metadata as {
+			environmentId?: string;
+			environmentName?: string;
+			environmentUrl?: string;
+		} | undefined;
 		if (metadata?.environmentId) {
 			this.selectedEnvironmentId = metadata.environmentId;
 			this.selectedEnvironmentName = metadata.environmentName;
+			this.selectedEnvironmentUrl = metadata.environmentUrl;
 			this.updateStatusBar();
 		}
 	}
@@ -189,7 +198,7 @@ export class DataverseSqlNotebookController {
 		if (editor && editor.notebook.notebookType === this.notebookType) {
 			this.loadEnvironmentFromNotebook(editor.notebook);
 			this.statusBarItem.show();
-			this.logger.info('Status bar shown for dataverse-sql notebook');
+			this.logger.info('Status bar shown for ppdsnb notebook');
 		} else {
 			this.statusBarItem.hide();
 		}
@@ -259,8 +268,8 @@ export class DataverseSqlNotebookController {
 			// Map to view model
 			const viewModel = this.resultMapper.toViewModel(result);
 
-			// Render as HTML table
-			const html = this.renderResultsHtml(viewModel);
+			// Render as HTML table with clickable record links
+			const html = this.renderResultsHtml(viewModel, this.selectedEnvironmentUrl);
 
 			execution.replaceOutput([
 				new vscode.NotebookCellOutput([
@@ -308,8 +317,14 @@ export class DataverseSqlNotebookController {
 	/**
 	 * Renders query results as an HTML table.
 	 * Matches the Data Explorer panel's table styling for consistency.
+	 *
+	 * @param viewModel - Query results to render
+	 * @param environmentUrl - Dataverse URL for building record links
 	 */
-	private renderResultsHtml(viewModel: QueryResultViewModel): string {
+	private renderResultsHtml(
+		viewModel: QueryResultViewModel,
+		environmentUrl: string | undefined
+	): string {
 		const rowCount = viewModel.rows.length;
 		const executionTime = viewModel.executionTimeMs;
 
@@ -321,13 +336,25 @@ export class DataverseSqlNotebookController {
 			})
 			.join('');
 
+		// Determine primary key column (entityname + "id")
+		const primaryKeyColumn = viewModel.entityLogicalName
+			? `${viewModel.entityLogicalName}id`
+			: null;
+
 		// Build rows with alternating colors
 		const bodyRows = viewModel.rows
 			.map((row, rowIndex) => {
 				const rowLookups = viewModel.rowLookups[rowIndex];
 				const rowClass = rowIndex % 2 === 0 ? 'row-even' : 'row-odd';
 				const cells = viewModel.columns
-					.map((col) => this.renderCell(row, rowLookups, col.name, viewModel.entityLogicalName))
+					.map((col) => this.renderCell(
+						row,
+						rowLookups,
+						col.name,
+						environmentUrl,
+						primaryKeyColumn,
+						viewModel.entityLogicalName
+					))
 					.join('');
 				return `<tr class="data-row ${rowClass}">${cells}</tr>`;
 			})
@@ -468,27 +495,70 @@ export class DataverseSqlNotebookController {
 	}
 
 	/**
-	 * Renders a single table cell, with link if it's a lookup.
+	 * Renders a single table cell, with clickable link if it's a lookup or primary key.
+	 *
+	 * @param row - Row data
+	 * @param lookups - Lookup metadata for the row
+	 * @param columnName - Column to render
+	 * @param environmentUrl - Dataverse URL for building record links
+	 * @param primaryKeyColumn - Primary key column name (e.g., "accountid")
+	 * @param entityLogicalName - Entity logical name for primary key links
 	 */
 	private renderCell(
 		row: QueryRowViewModel,
 		lookups: RowLookupsViewModel | undefined,
 		columnName: string,
-		_entityLogicalName: string | null
+		environmentUrl: string | undefined,
+		primaryKeyColumn: string | null,
+		entityLogicalName: string | null
 	): string {
 		const value = row[columnName] ?? '';
 
-		// Check if this is a lookup field
-		if (lookups && lookups[columnName]) {
-			const lookup = lookups[columnName];
+		// Check if this is a lookup field with a valid environment URL
+		const lookup = lookups?.[columnName];
+		if (lookup && environmentUrl) {
+			const recordUrl = this.buildRecordUrl(environmentUrl, lookup.entityType, lookup.id);
 			return `<td class="data-cell link-cell">
-				<a href="#" onclick="return false;" title="Open ${lookup.entityType} record">
+				<a href="${recordUrl}" title="Open ${lookup.entityType} record in browser">
+					${this.escapeHtml(value)}
+				</a>
+			</td>`;
+		}
+
+		// Check if this is the primary key column (e.g., accountid for account entity)
+		if (
+			primaryKeyColumn &&
+			entityLogicalName &&
+			environmentUrl &&
+			columnName.toLowerCase() === primaryKeyColumn.toLowerCase() &&
+			value &&
+			this.isGuid(value)
+		) {
+			const recordUrl = this.buildRecordUrl(environmentUrl, entityLogicalName, value);
+			return `<td class="data-cell link-cell">
+				<a href="${recordUrl}" title="Open ${entityLogicalName} record in browser">
 					${this.escapeHtml(value)}
 				</a>
 			</td>`;
 		}
 
 		return `<td class="data-cell">${this.escapeHtml(value)}</td>`;
+	}
+
+	/**
+	 * Checks if a string is a valid GUID format.
+	 */
+	private isGuid(value: string): boolean {
+		const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+		return guidRegex.test(value);
+	}
+
+	/**
+	 * Builds a Dataverse record URL.
+	 */
+	private buildRecordUrl(dataverseUrl: string, entityLogicalName: string, recordId: string): string {
+		const baseUrl = dataverseUrl.replace(/\/+$/, '');
+		return `${baseUrl}/main.aspx?pagetype=entityrecord&etn=${encodeURIComponent(entityLogicalName)}&id=${encodeURIComponent(recordId)}`;
 	}
 
 	/**

@@ -68,17 +68,17 @@
         "onCommand:power-platform-dev-suite.connectionReferences",
         "onCommand:power-platform-dev-suite.environmentVariables",
         "onCommand:power-platform-dev-suite.webResources",
-        "onNotebook:dataverse-sql"
+        "onNotebook:ppdsnb"
     ],
     "main": "./dist/extension.js",
     "contributes": {
         "notebooks": [
             {
-                "type": "dataverse-sql",
-                "displayName": "Dataverse SQL Notebook",
+                "type": "ppdsnb",
+                "displayName": "Power Platform Developer Suite Notebook",
                 "selector": [
                     {
-                        "filenamePattern": "*.dataverse-sql"
+                        "filenamePattern": "*.ppdsnb"
                     }
                 ]
             }
