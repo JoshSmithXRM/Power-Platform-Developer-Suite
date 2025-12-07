@@ -318,11 +318,12 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 
 		// Single scaffold render with all persisted state included
 		// No second render needed - handleRefresh() uses data-driven updateTableData
-		// Note: Don't pass isLoading:true - openMaker should stay enabled
+		// isLoading: true renders spinner in table (button state managed by LoadingStateBehavior)
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			tableData: [],
+			isLoading: true,
 			state: {
 				traceLevel: this.currentTraceLevel?.value,
 				autoRefreshInterval: this.autoRefreshBehavior.getInterval(),

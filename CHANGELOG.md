@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Panel Loading State Race Condition** - Panels now show loading spinner immediately instead of "No data found" flash
+  - All 6 data table panels affected: Import Jobs, Solutions, Web Resources, Environment Variables, Connection References, Plugin Traces
+  - Root cause: Race condition where webview JavaScript overwrote loading row before data arrived
+  - Fix: HTML-embedded loading state via `isLoading` flag in scaffold refresh
+  - Virtual tables: Added `data-loading` attribute to prevent VirtualTableRenderer from overwriting loading row
+  - Solution selector: Now renders "Loading..." placeholder so postMessage can populate it later
+
 - **Panel Disposal Cancellation** - Closing panels now stops in-flight API requests
   - Previously: API requests continued after panel closure, wasting server resources
   - Previously: "Webview is disposed" errors appeared when async operations completed

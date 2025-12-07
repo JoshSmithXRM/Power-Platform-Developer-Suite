@@ -17,6 +17,9 @@ export interface SolutionOption {
  * The Default Solution (which exists in every Dataverse environment) acts as the
  * "show all" option since it contains all unmanaged customizations.
  *
+ * IMPORTANT: Always renders the container element even when solutions is empty,
+ * so that updateSolutionSelector postMessage can populate it later.
+ *
  * @param solutions - Available solutions from the API (should include Default Solution)
  * @param currentSolutionId - Currently selected solution ID (defaults to Default Solution)
  * @param label - Label text for the filter
@@ -27,14 +30,12 @@ export function renderSolutionFilter(
 	currentSolutionId: string | undefined,
 	label: string
 ): string {
-	if (solutions.length === 0) {
-		return '';
-	}
-
-	const options = solutions.map(solution => {
-		const selected = solution.id === currentSolutionId ? ' selected' : '';
-		return `<option value="${escapeHtml(solution.id)}"${selected}>${escapeHtml(solution.name)}</option>`;
-	}).join('');
+	const options = solutions.length === 0
+		? '<option disabled>Loading...</option>'
+		: solutions.map(solution => {
+			const selected = solution.id === currentSolutionId ? ' selected' : '';
+			return `<option value="${escapeHtml(solution.id)}"${selected}>${escapeHtml(solution.name)}</option>`;
+		}).join('');
 
 	return `
 		<div class="solution-filter">

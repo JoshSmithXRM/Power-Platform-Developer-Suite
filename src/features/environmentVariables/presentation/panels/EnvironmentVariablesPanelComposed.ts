@@ -156,21 +156,19 @@ export class EnvironmentVariablesPanelComposed extends EnvironmentScopedPanel<En
 			}
 		}
 
-		// Initial render - openMaker stays enabled (only needs environmentId)
+		// Initial render with loading state - prevents "No data" flash
+		// isLoading: true renders spinner in HTML immediately (no race condition)
 		const environments = await this.getEnvironments();
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			solutions: [],
 			currentSolutionId: this.currentSolutionId,
-			tableData: []
+			tableData: [],
+			isLoading: true
 		});
 
-		// Show loading state IMMEDIATELY after scaffold (before loading solutions)
-		// This prevents "No data" flash while solutions are loading
-		this.showTableLoading();
-
-		// Disable refresh button during initial load (shows spinner)
+		// Disable refresh button during initial load
 		await this.loadingBehavior.setLoading(true);
 
 		try {
