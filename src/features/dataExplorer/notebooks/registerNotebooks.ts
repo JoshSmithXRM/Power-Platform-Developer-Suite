@@ -170,19 +170,24 @@ export async function registerDataverseNotebooks(
  */
 async function createNewDataverseNotebook(logger: ILogger): Promise<void> {
 	try {
-		// Create untitled notebook document
+		// Create untitled notebook document with both SQL and FetchXML examples
 		const notebook = await vscode.workspace.openNotebookDocument(
 			'ppdsnb',
 			new vscode.NotebookData([
 				new vscode.NotebookCellData(
 					vscode.NotebookCellKind.Markup,
-					'# Power Platform Developer Suite Notebook\n\nSelect an environment using the status bar picker, then write SQL or FetchXML queries in the cells below.',
+					'# Dataverse Notebook\n\nSelect an environment using the status bar picker, then write SQL or FetchXML queries in the cells below.\n\n**Tip:** Use the toggle button in the cell toolbar to convert between SQL and FetchXML.',
 					'markdown'
 				),
 				new vscode.NotebookCellData(
 					vscode.NotebookCellKind.Code,
-					'-- Query your Dataverse data\nSELECT TOP 10\n    accountid,\n    name,\n    createdon\nFROM account\nORDER BY createdon DESC',
+					'-- SQL Example: Query your Dataverse data\nSELECT TOP 10\n    accountid,\n    name,\n    createdon\nFROM account\nORDER BY createdon DESC',
 					'sql'
+				),
+				new vscode.NotebookCellData(
+					vscode.NotebookCellKind.Code,
+					'<!-- FetchXML Example: Same query in FetchXML format -->\n<fetch top="10">\n  <entity name="account">\n    <attribute name="accountid" />\n    <attribute name="name" />\n    <attribute name="createdon" />\n    <order attribute="createdon" descending="true" />\n  </entity>\n</fetch>',
+					'fetchxml'
 				),
 			])
 		);

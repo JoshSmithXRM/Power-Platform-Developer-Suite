@@ -75,7 +75,7 @@
         "notebooks": [
             {
                 "type": "ppdsnb",
-                "displayName": "Power Platform Developer Suite Notebook",
+                "displayName": "Dataverse Notebook",
                 "selector": [
                     {
                         "filenamePattern": "*.ppdsnb"
@@ -262,7 +262,7 @@
             },
             {
                 "command": "power-platform-dev-suite.newDataverseNotebook",
-                "title": "New Dataverse Notebook",
+                "title": "New Notebook",
                 "category": "Power Platform Developer Suite",
                 "icon": "$(notebook)"
             },
