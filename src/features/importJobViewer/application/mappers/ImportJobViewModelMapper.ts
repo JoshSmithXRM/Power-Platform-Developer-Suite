@@ -3,7 +3,7 @@ import { ImportJobViewModel } from '../viewModels/ImportJobViewModel';
 import { ImportJobCollectionService } from '../../domain/services/ImportJobCollectionService';
 import { DateFormatter } from '../../../../shared/infrastructure/ui/utils/DateFormatter';
 import { ImportJobStatusFormatter } from '../../../../shared/infrastructure/ui/utils/ImportJobStatusFormatter';
-import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
+import type { CellLink } from '../../../../shared/infrastructure/ui/types/CellLink';
 
 /**
  * Maps ImportJob domain entities to ImportJobViewModel presentation objects.
@@ -17,15 +17,20 @@ export class ImportJobViewModelMapper {
 	 * @returns ImportJobViewModel presentation object
 	 */
 	toViewModel(job: ImportJob): ImportJobViewModel {
-		const escapedName = escapeHtml(job.solutionName);
-		const escapedId = escapeHtml(job.id);
 		const statusLabel = ImportJobStatusFormatter.formatStatusLabel(job.statusCode);
+
+		// Structured link data for VirtualTableRenderer (creates data-id attribute)
+		const solutionNameLink: CellLink = {
+			command: 'viewImportJob',
+			commandData: { id: job.id },
+			className: 'job-link'
+		};
 
 		return {
 			id: job.id,
 			name: job.name,
 			solutionName: job.solutionName,
-			solutionNameHtml: `<a href="#" class="job-link" data-command="viewImportJob" data-import-job-id="${escapedId}" title="${escapedName}">${escapedName}</a>`,
+			solutionNameLink,
 			createdBy: job.createdBy,
 			createdOn: DateFormatter.formatDate(job.createdOn),
 			completedOn: DateFormatter.formatDate(job.completedOn),

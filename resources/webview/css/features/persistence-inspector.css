@@ -86,7 +86,6 @@
 	align-items: center;
 	cursor: pointer;
 	padding: 2px 0;
-	user-select: none;
 }
 
 .tree-header:hover {
@@ -104,6 +103,7 @@
 	font-size: 9px;
 	order: 2;
 	margin-left: 4px;
+	user-select: none; /* Prevent text selection on toggle icon only */
 }
 
 /* Make down arrow bigger - target when children are expanded (not collapsed) */

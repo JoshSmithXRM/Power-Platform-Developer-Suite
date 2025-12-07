@@ -5,7 +5,9 @@
 
 window.createBehavior({
 	initialize() {
-		// DataTableBehavior handles search and sorting
+		// Wire up click handlers for job links using event delegation
+		// (handles dynamically added rows from virtual table updates)
+		wireJobLinkClicks();
 	},
 	handleMessage(message) {
 		// Handle data-driven updates
@@ -14,6 +16,26 @@ window.createBehavior({
 		}
 	}
 });
+
+/**
+ * Wires up click handlers for import job links.
+ * Uses event delegation on document body to handle dynamically added rows.
+ */
+function wireJobLinkClicks() {
+	document.body.addEventListener('click', (event) => {
+		const link = event.target.closest('.job-link');
+		if (link) {
+			event.preventDefault();
+			const importJobId = link.getAttribute('data-id');
+			if (importJobId) {
+				window.vscode.postMessage({
+					command: 'viewImportJob',
+					data: { importJobId }
+				});
+			}
+		}
+	});
+}
 
 /**
  * Updates table data without full page refresh.

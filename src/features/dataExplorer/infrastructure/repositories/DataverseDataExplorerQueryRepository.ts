@@ -185,10 +185,20 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 		if (firstRecord === undefined) {
 			return QueryResult.empty(fetchXml, executionTimeMs);
 		}
+
+		// Build lookup alias mapping for lookup columns
+		// Maps original attribute name -> alias (e.g., "parentcustomerid" -> "AccountRef")
+		const lookupAliasMap = this.buildLookupAliasMap(fetchXml);
+
+		// Build primary key column mapping
+		// Maps column key -> entity type for primary key columns (e.g., "accountID" -> "account")
+		const entityName = this.extractEntityNameFromFetchXml(fetchXml);
+		const primaryKeyMap = this.buildPrimaryKeyMap(fetchXml, entityName);
+
 		const columns = this.extractColumnsFromFetchXmlAndResponse(fetchXml, records);
 
-		// Map records to rows
-		const rows = records.map((record) => this.mapRecordToRow(record));
+		// Map records to rows, passing the lookup and primary key mappings
+		const rows = records.map((record) => this.mapRecordToRow(record, lookupAliasMap, primaryKeyMap));
 
 		return new QueryResult(
 			columns,
@@ -202,13 +212,85 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 	}
 
 	/**
+	 * Extracts the entity logical name from FetchXML.
+	 */
+	private extractEntityNameFromFetchXml(fetchXml: string): string | null {
+		const entityMatch = /<entity\s+[^>]*name\s*=\s*["']([^"']+)["']/i.exec(fetchXml);
+		return entityMatch?.[1] ?? null;
+	}
+
+	/**
+	 * Builds a mapping of column keys that are primary key references.
+	 * Primary key pattern: {entityname}id (e.g., accountid for entity account)
+	 * Maps actual response key -> entity type for creating clickable links.
+	 */
+	private buildPrimaryKeyMap(fetchXml: string, entityName: string | null): Map<string, string> {
+		const primaryKeyMap = new Map<string, string>();
+
+		if (!entityName) {
+			return primaryKeyMap;
+		}
+
+		const primaryKeyAttr = `${entityName}id`.toLowerCase();
+		const attributes = this.extractAttributesFromFetchXml(fetchXml);
+
+		for (const attr of attributes) {
+			// Check if this attribute is the primary key
+			if (attr.name.toLowerCase() === primaryKeyAttr) {
+				// The response key (alias or attribute name) should map to the entity type
+				primaryKeyMap.set(attr.responseKey.toLowerCase(), entityName);
+				// Also add the original attribute name in case of case variations
+				primaryKeyMap.set(attr.name.toLowerCase(), entityName);
+			}
+		}
+
+		return primaryKeyMap;
+	}
+
+	/**
+	 * Builds a mapping from response keys to their canonical cell keys (aliases).
+	 *
+	 * For each FetchXML attribute:
+	 * - Maps attr.name.toLowerCase() -> alias (for when Dataverse returns original name)
+	 * - Maps attr.alias.toLowerCase() -> alias (for when Dataverse returns alias directly)
+	 *
+	 * This handles cases like: accountid AS accountID, accountid AS AccountKey
+	 * - Response "accountid" -> "accountID" (Dataverse ignores alias case when similar)
+	 * - Response "AccountKey" -> "AccountKey" (Dataverse uses alias when different)
+	 */
+	private buildLookupAliasMap(fetchXml: string): Map<string, string> {
+		const aliasMap = new Map<string, string>();
+		const attributes = this.extractAttributesFromFetchXml(fetchXml);
+
+		for (const attr of attributes) {
+			const canonicalKey = attr.alias ?? attr.name;
+
+			// Map from alias (case-insensitive) to canonical key
+			// This handles when Dataverse returns the alias directly
+			aliasMap.set(canonicalKey.toLowerCase(), canonicalKey);
+
+			// Also map from original attribute name if different from alias
+			// BUT only if there's no existing mapping (don't overwrite)
+			// This handles when Dataverse returns original name instead of alias
+			if (attr.alias !== null && !aliasMap.has(attr.name.toLowerCase())) {
+				aliasMap.set(attr.name.toLowerCase(), attr.alias);
+			}
+		}
+
+		return aliasMap;
+	}
+
+	/**
 	 * Extracts columns from FetchXML and merges with response data.
 	 *
 	 * FetchXML attributes are authoritative (ensures sparse data doesn't hide columns).
 	 * Response data provides type information and additional columns for all-attributes.
 	 *
-	 * IMPORTANT: When FetchXML uses aliases, Dataverse returns data keyed by the alias,
-	 * not the attribute name. We must use the alias as the column key.
+	 * IMPORTANT: When FetchXML uses aliases, Dataverse may return data with:
+	 * - The alias as-is (when alias is genuinely different from attribute name)
+	 * - The original attribute name in lowercase (when alias case-insensitively matches attribute)
+	 *
+	 * We must match expected aliases to actual response keys case-insensitively.
 	 */
 	private extractColumnsFromFetchXmlAndResponse(
 		fetchXml: string,
@@ -226,25 +308,91 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 			return this.extractColumnsFromRecord(firstRecord);
 		}
 
+		// Build a case-insensitive map of actual response keys
+		const actualResponseKeys = this.buildActualResponseKeyMap(records);
+
 		// Build columns from FetchXML attributes (authoritative list)
 		const columns: QueryResultColumn[] = [];
 		const seenColumns = new Set<string>();
 
 		// First, add all FetchXML-specified attributes
-		// Use the responseKey (alias if present, otherwise attribute name) as the column name
+		// Match expected responseKey to actual response key (case-insensitive)
 		for (const attr of fetchXmlAttributes) {
-			if (seenColumns.has(attr.responseKey)) {
+			// Find the actual key in the response that matches our expected key
+			const actualKey = this.findActualResponseKey(attr, actualResponseKeys);
+
+			if (seenColumns.has(actualKey)) {
 				continue;
 			}
-			seenColumns.add(attr.responseKey);
+			seenColumns.add(actualKey);
 
-			// Try to infer data type from response data using the response key
-			const dataType = this.inferDataTypeFromRecords(attr.responseKey, records);
-			// Use responseKey as both name and displayName (alias provides better display name)
-			columns.push(new QueryResultColumn(attr.responseKey, attr.responseKey, dataType));
+			// Try to infer data type from response data using the actual key
+			const dataType = this.inferDataTypeFromRecords(actualKey, records);
+			// Use actualKey as logicalName so getValue() matches the cells map
+			columns.push(new QueryResultColumn(actualKey, attr.responseKey, dataType));
 		}
 
 		return columns;
+	}
+
+	/**
+	 * Builds a case-insensitive map of response keys from records.
+	 * Key: lowercase key, Value: actual key as returned by Dataverse
+	 */
+	private buildActualResponseKeyMap(records: DataverseRecord[]): Map<string, string> {
+		const keyMap = new Map<string, string>();
+
+		for (const record of records) {
+			for (const key of Object.keys(record)) {
+				// Skip OData annotations
+				if (key.startsWith('@') || key.includes('@')) {
+					continue;
+				}
+				// Skip lookup ID keys (they're handled separately)
+				if (key.startsWith('_') && key.endsWith('_value')) {
+					continue;
+				}
+				const lowerKey = key.toLowerCase();
+				if (!keyMap.has(lowerKey)) {
+					keyMap.set(lowerKey, key);
+				}
+			}
+		}
+
+		return keyMap;
+	}
+
+	/**
+	 * Finds the actual response key for a FetchXML attribute.
+	 *
+	 * IMPORTANT: When an attribute has an alias, we MUST use the alias as the column key
+	 * because mapRecordToRow() stores lookup values under the alias. This ensures
+	 * row.getValue(column.logicalName) finds the correct cell.
+	 */
+	private findActualResponseKey(
+		attr: FetchXmlAttribute,
+		actualKeys: Map<string, string>
+	): string {
+		// If attribute has an alias, always use the alias as the column key
+		// This ensures consistency with how mapRecordToRow() stores lookup values
+		if (attr.alias !== null) {
+			return attr.alias;
+		}
+
+		// For non-aliased attributes, try to find the actual response key
+		const exactMatch = actualKeys.get(attr.responseKey.toLowerCase());
+		if (exactMatch !== undefined) {
+			return exactMatch;
+		}
+
+		// Try matching by original attribute name (Dataverse may use different case)
+		const attrNameMatch = actualKeys.get(attr.name.toLowerCase());
+		if (attrNameMatch !== undefined) {
+			return attrNameMatch;
+		}
+
+		// No match found - return expected responseKey
+		return attr.responseKey;
 	}
 
 	/**
@@ -542,8 +690,16 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 	/**
 	 * Maps a Dataverse record to a QueryResultRow.
 	 * Handles link-entity columns which may have different key formats.
+	 *
+	 * @param record - The Dataverse record to map
+	 * @param aliasMap - Mapping from original attribute names to aliases (for ALL columns)
+	 * @param primaryKeyMap - Mapping from column keys to entity types for primary key columns
 	 */
-	private mapRecordToRow(record: DataverseRecord): QueryResultRow {
+	private mapRecordToRow(
+		record: DataverseRecord,
+		aliasMap: Map<string, string> = new Map(),
+		primaryKeyMap: Map<string, string> = new Map()
+	): QueryResultRow {
 		const cells = new Map<string, QueryCellValue>();
 
 		for (const [key, value] of Object.entries(record)) {
@@ -564,35 +720,104 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 				continue; // Processed with main column
 			}
 
-			// Handle lookup values
+			// Handle lookup values (_xxx_value pattern)
 			if (key.startsWith('_') && key.endsWith('_value')) {
 				const lookupName = key.slice(1, -6);
 				const lookupValue = this.extractLookupValue(record, key, lookupName);
-				cells.set(lookupName, lookupValue);
+
+				// Use alias if one exists, otherwise use original lookup name
+				const alias = aliasMap.get(lookupName.toLowerCase());
+				const cellKey = alias ?? lookupName;
+				cells.set(cellKey, lookupValue);
 				continue;
 			}
 
 			// Normalize key name (convert _x002e_ back to . for link-entity columns)
 			const normalizedKey = this.normalizeRecordKey(key);
 
-			// Check for formatted value
+			// Determine the cell key: use alias if this attribute has one
+			// This ensures consistency with column.logicalName (which uses alias)
+			const cellKey = aliasMap.get(normalizedKey.toLowerCase()) ?? normalizedKey;
+
+			// IMPORTANT: Don't overwrite a lookup value with a plain value
+			// When Dataverse returns both _createdby_value (lookup pattern) and CREATEDBY (alias),
+			// we want to preserve the lookup value which has entityType and id for clickable links.
+			// This can happen when an alias is used for a lookup column.
+			const existingValue = cells.get(cellKey);
+			if (existingValue !== undefined && this.isLookupValue(existingValue)) {
+				// A lookup value already exists at this key - don't overwrite
+				continue;
+			}
+
+			// Check if this is a primary key column (should be rendered as clickable link)
+			const entityType = primaryKeyMap.get(key.toLowerCase());
+			if (entityType && typeof value === 'string' && this.isGuid(value)) {
+				// Create a lookup value for the primary key
+				const lookupValue: QueryLookupValue = {
+					id: value,
+					name: undefined, // Primary key doesn't have a display name
+					entityType,
+				};
+				cells.set(cellKey, lookupValue);
+				continue;
+			}
+
+			// Check if this is a lookup column by looking for lookuplogicalname annotation
+			// When an alias is used, Dataverse returns the alias as the key with annotations
+			// e.g., "CreatedByAlias@Microsoft.Dynamics.CRM.lookuplogicalname": "systemuser"
+			const lookupTypeKey = `${key}@Microsoft.Dynamics.CRM.lookuplogicalname`;
+			if (lookupTypeKey in record) {
+				const entityType = record[lookupTypeKey] as string;
+				const formattedKey = `${key}@OData.Community.Display.V1.FormattedValue`;
+				const displayName = formattedKey in record ? String(record[formattedKey]) : undefined;
+
+				const lookupValue: QueryLookupValue = {
+					id: String(value),
+					name: displayName,
+					entityType,
+				};
+				cells.set(cellKey, lookupValue);
+				continue;
+			}
+
+			// Check for formatted value (non-lookup)
 			const formattedKey = `${key}@OData.Community.Display.V1.FormattedValue`;
 			if (formattedKey in record) {
 				const formattedValue: QueryFormattedValue = {
 					value: value as string | number | boolean | null,
 					formattedValue: String(record[formattedKey]),
 				};
-				cells.set(normalizedKey, formattedValue);
+				cells.set(cellKey, formattedValue);
 			} else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
 				// Parse date strings
-				cells.set(normalizedKey, new Date(value));
+				cells.set(cellKey, new Date(value));
 			} else {
 				// Cast to QueryCellValue - value is one of: string, number, boolean, null
-				cells.set(normalizedKey, value as QueryCellValue);
+				cells.set(cellKey, value as QueryCellValue);
 			}
 		}
 
 		return new QueryResultRow(cells);
+	}
+
+	/**
+	 * Checks if a string is a valid GUID format.
+	 */
+	private isGuid(value: string): boolean {
+		return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+	}
+
+	/**
+	 * Type guard to check if a cell value is a lookup value (has entityType and id).
+	 * Used to prevent overwriting lookup values with plain values.
+	 */
+	private isLookupValue(value: QueryCellValue): value is QueryLookupValue {
+		return (
+			value !== null &&
+			typeof value === 'object' &&
+			'id' in value &&
+			'entityType' in value
+		);
 	}
 
 	/**

@@ -189,5 +189,47 @@ describe('QueryResultViewModelMapper', () => {
 			// Falls back to ID when name is missing (e.g., owninguser system field)
 			expect(viewModel.rows[0]!['primarycontactid']).toBe('123');
 		});
+
+		it('should populate rowLookups for lookup columns', () => {
+			const lookupValue: QueryLookupValue = {
+				id: '123',
+				name: 'John Smith',
+				entityType: 'contact',
+			};
+			const result = createResultWithValue('primarycontactid', lookupValue);
+			const viewModel = mapper.toViewModel(result);
+
+			// rowLookups should have the lookup info keyed by column name
+			expect(viewModel.rowLookups).toHaveLength(1);
+			expect(viewModel.rowLookups[0]).toBeDefined();
+			expect(viewModel.rowLookups[0]!['primarycontactid']).toEqual({
+				entityType: 'contact',
+				id: '123',
+			});
+		});
+
+		it('should populate rowLookups for aliased lookup columns', () => {
+			// Simulate an aliased column: column.logicalName = 'CREATEDBY'
+			// The lookup value is stored under this key
+			const lookupValue: QueryLookupValue = {
+				id: '456',
+				name: 'Jane Doe',
+				entityType: 'systemuser',
+			};
+			// Create result with aliased column name
+			const result = createResultWithValue('CREATEDBY', lookupValue);
+			const viewModel = mapper.toViewModel(result);
+
+			// rowLookups should have the lookup info keyed by the column's logicalName
+			expect(viewModel.rowLookups).toHaveLength(1);
+			expect(viewModel.rowLookups[0]).toBeDefined();
+			expect(viewModel.rowLookups[0]!['CREATEDBY']).toEqual({
+				entityType: 'systemuser',
+				id: '456',
+			});
+
+			// The column.name in ViewModel should also be 'CREATEDBY'
+			expect(viewModel.columns[0]!.name).toBe('CREATEDBY');
+		});
 	});
 });

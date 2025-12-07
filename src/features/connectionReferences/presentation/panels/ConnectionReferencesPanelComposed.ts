@@ -326,6 +326,10 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			tableData: []
 		});
 
+		// Show loading state IMMEDIATELY after scaffold (before loading solutions)
+		// This prevents "No data" flash while solutions are loading
+		this.showTableLoading();
+
 		// Disable refresh button during initial load (shows spinner)
 		await this.loadingBehavior.setLoading(true);
 
@@ -353,17 +357,14 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 				}
 			}
 
-			// IMMEDIATELY render solutions (user can interact while data loads)
-			await this.scaffoldingBehavior.refresh({
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				solutions,
-				currentSolutionId: finalSolutionId,
-				tableData: []
+			// Update solutions dropdown via message (avoids full HTML refresh that causes "No data" flash)
+			await this.panel.postMessage({
+				command: 'updateSolutionSelector',
+				data: {
+					solutions,
+					currentSolutionId: finalSolutionId
+				}
 			});
-
-			// Show loading state in table AFTER scaffold refresh (refresh replaces HTML, so loading must come after)
-			this.showTableLoading();
 
 			// Set up cancellation for initial data load (can be cancelled by solution change)
 			const myVersion = ++this.requestVersion;
@@ -386,13 +387,16 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 				return;
 			}
 
-			// Final render with data
-			await this.scaffoldingBehavior.refresh({
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				solutions,
-				currentSolutionId: finalSolutionId,
-				tableData: data
+			// Send data to frontend via message (scaffoldingBehavior.refresh regenerates HTML
+			// which resets the table state; we need to use postMessage instead)
+			const config = this.getTableConfig();
+			await this.panel.postMessage({
+				command: 'updateTableData',
+				data: {
+					viewModels: data,
+					columns: config.columns,
+					noDataMessage: config.noDataMessage
+				}
 			});
 		} finally {
 			// Re-enable buttons after load completes

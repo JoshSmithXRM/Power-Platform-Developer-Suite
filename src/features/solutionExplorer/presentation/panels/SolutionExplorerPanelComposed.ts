@@ -159,17 +159,19 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 				totalCount: cacheState.getTotalRecordCount()
 			});
 
-			// Re-render with actual data and pagination state
-			await this.scaffoldingBehavior.refresh({
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				tableData: viewModels,
-				pagination: {
-					cachedCount: cacheState.getCachedRecordCount(),
-					totalCount: cacheState.getTotalRecordCount(),
-					isLoading: cacheState.getIsLoading(),
-					currentPage: cacheState.getCurrentPage(),
-					isFullyCached: cacheState.isFullyCached()
+			// Send data to frontend via message (scaffoldingBehavior.refresh regenerates HTML
+			// which resets the table state; we need to use postMessage instead)
+			await this.panel.postMessage({
+				command: 'updateVirtualTable',
+				data: {
+					rows: viewModels,
+					pagination: {
+						cachedCount: cacheState.getCachedRecordCount(),
+						totalCount: cacheState.getTotalRecordCount(),
+						isLoading: cacheState.getIsLoading(),
+						currentPage: cacheState.getCurrentPage(),
+						isFullyCached: cacheState.isFullyCached()
+					}
 				}
 			});
 		} finally {
