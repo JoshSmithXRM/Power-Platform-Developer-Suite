@@ -6,63 +6,90 @@
 
 ## 🚀 Quick Reference
 
-**Testing Strategy**: **Inverted Testing Pyramid**
-- Heavy testing at domain/application layers
-- Light testing at infrastructure layer
-- Minimal testing at presentation layer
+**Testing Strategy**: **Stabilization-First Testing**
+- Explore and iterate freely (no tests during exploration)
+- Write tests AFTER F5 validation confirms design
+- Tests lock in behavior, prevent regression
+- Tests required before PR (not before F5)
 
-**Coverage Targets**:
-- Domain Layer: **95-100%** (business logic critical)
-- Application Layer: **85-95%** (orchestration verification)
-- Infrastructure Layer: **70-85%** (complex transformations only)
-- Presentation Layer: **<50%** (manual testing preferred)
+**Coverage Guidelines** (not blocking requirements):
+- Domain Layer: **80%+** (business rules, after stabilization)
+- Application Layer: **70%+** (complex orchestration only)
+- Infrastructure Layer: **As needed** (complex transformations only)
+- Presentation Layer: **F5 is the test** (skip unit tests)
 
 **Key Principles**:
-- ✅ Write tests AFTER implementation, BEFORE review
+- ✅ Write tests AFTER F5 validation, BEFORE review/PR
 - ✅ Tests document expected behavior
 - ✅ Tests prevent regression
 - ✅ Test business logic, not implementation details
+- ✅ Trust your experience during exploration - formalize with tests after
 
 ---
 
-## 📊 Coverage Thresholds
+## 📊 Coverage Guidelines
 
-Jest is configured with the following coverage thresholds:
+Coverage is a guideline, not a gate. Focus on testing **valuable logic**, not hitting numbers.
 
-```javascript
-// jest.config.js
-coverageThreshold: {
-  global: {
-    branches: 80,
-    functions: 85,
-    lines: 85,
-    statements: 85
-  },
-  './src/**/domain/**/*.ts': {
-    branches: 90,
-    functions: 95,
-    lines: 95,
-    statements: 95
-  },
-  './src/**/application/**/*.ts': {
-    branches: 85,
-    functions: 90,
-    lines: 90,
-    statements: 90
-  }
-}
-```
+**Target coverage by layer:**
+
+| Layer | Target | What to Test |
+|-------|--------|--------------|
+| Domain | 80%+ | Business rules, validation, state machines |
+| Application | 70%+ | Complex orchestration, error handling |
+| Infrastructure | As needed | Complex transformations only |
+| Presentation | 0% | F5 manual testing is more effective |
 
 **Run coverage**:
 ```bash
 npm run test:coverage
 ```
 
+**Philosophy**: High coverage on code that matters > 100% coverage on everything.
+
+---
+
+## 🔄 When to Write Tests
+
+**The key insight**: Tests lock in behavior. Don't lock in behavior you're still exploring.
+
+### Exploration Phase (No Tests Required)
+During implementation and F5 iteration:
+- Focus on getting to F5 fast
+- Pivot freely without rewriting tests
+- Only write tests for logic you're uncertain about
+
+**Optional tests during exploration:**
+- Complex validation with many edge cases
+- State machines / status transitions
+- Math or date calculations
+
+### Stabilization Phase (Tests Required)
+After F5 validation confirms the design:
+- Write tests for domain business rules
+- Write tests for complex orchestration
+- Tests become regression protection
+- Required before code review / PR
+
+**Test priority (what to test first):**
+1. **Domain business rules** - validation, calculations, state machines
+2. **Complex use cases** - anything that broke during F5 iteration
+3. **Mappers with transformations** - non-trivial data shaping
+4. **Skip** - simple pass-through, getters, VS Code wrappers
+
+### Regression Phase (Ongoing)
+When bugs are found:
+- Write test that reproduces the bug
+- Fix bug (test passes)
+- Commit both together
+
+This is test-driven bug fixing - you're already doing this. It works.
+
 ---
 
 ## 🎯 What to Test (By Layer)
 
-### Domain Layer (100% coverage target)
+### Domain Layer (80%+ coverage target)
 
 **ALWAYS test**:
 - ✅ Entity behavior methods
@@ -159,7 +186,7 @@ describe('Progress', () => {
 
 ---
 
-### Application Layer (90% coverage target)
+### Application Layer (70%+ coverage target)
 
 **ALWAYS test**:
 - ✅ Use case orchestration flow
@@ -290,7 +317,7 @@ describe('ImportJobViewModelMapper', () => {
 
 ---
 
-### Infrastructure Layer (70% coverage target)
+### Infrastructure Layer (as needed)
 
 **Test when**:
 - ✅ Complex query building
@@ -358,7 +385,7 @@ describe('DataverseApiImportJobRepository', () => {
 
 ---
 
-### Presentation Layer (<50% coverage target)
+### Presentation Layer (F5 is the test)
 
 **Test when**:
 - ✅ Complex view rendering logic
@@ -843,12 +870,12 @@ npm test -- --testNamePattern="should load jobs"
 
 ## 🎯 Coverage Best Practices
 
-### 1. Aim for High Domain Coverage
+### 1. Test What Matters
 ```
-Domain Layer:    95-100% ← Critical
-Application:     85-95%  ← Important
-Infrastructure:  70-85%  ← Selective
-Presentation:    <50%    ← Manual
+Domain Layer:    80%+ ← Business rules, validation
+Application:     70%+ ← Complex orchestration only
+Infrastructure:  As needed ← Complex transformations
+Presentation:    F5  ← Manual testing preferred
 ```
 
 ### 2. Track Coverage Trends

@@ -8,15 +8,15 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 
 | Workflow | When to Use | Phases |
 |----------|-------------|--------|
-| **Full Feature** | New features, 3+ files | All 9 phases |
-| **Simple Feature** | 1-2 files, clear pattern | Discovery → Implementation → Testing → Review |
-| **Bug Fix** | Standard bugs | Discovery → Test → Fix → Review |
+| **Full Feature** | New features, 3+ files | All 10 phases |
+| **Simple Feature** | 1-2 files, clear pattern | Discovery → Implementation → F5 → Tests → Review |
+| **Bug Fix** | Standard bugs | Discovery → Fix → Test → Review |
 | **Hotfix** | Urgent/critical bugs | Streamlined 5-step |
 | **Refactoring** | Pattern migrations, cleanup | Tests → Refactor → Tests → Review |
 
 ---
 
-## Full Feature Development (9 Phases)
+## Full Feature Development (10 Phases)
 
 ### Phase 1: Discovery (ALWAYS - Before Any Implementation)
 
@@ -85,17 +85,17 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 ```
 □ Create tracking doc: docs/work/[FEATURE]_TODO.md
 □ Use template: .claude/templates/TASK_TRACKING_TEMPLATE.md
-□ Break work into checkboxes by layer:
+□ Break work into checkboxes by phase:
   - [ ] Domain implementation
-  - [ ] Domain unit tests
   - [ ] Application implementation
-  - [ ] Application unit tests
   - [ ] Infrastructure implementation
   - [ ] Presentation implementation
+  - [ ] F5 validation (iterate until "feels right")
+  - [ ] Domain/Application tests (after stabilization)
   - [ ] Integration tests (if panel/cross-layer)
   - [ ] E2E tests (if UI changes)
   - [ ] Code review
-  - [ ] Manual testing (F5)
+  - [ ] PR created
 □ Commit tracking doc
 ```
 
@@ -107,12 +107,12 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 
 **Order:** Domain → Application → Infrastructure → Presentation
 
+**This is EXPLORATION mode** - focus on getting to F5 fast, not test coverage.
+
 **Per layer:**
 ```
 □ Implement layer code
-□ Write unit tests for layer
 □ npm run compile
-□ npm test
 □ Update tracking doc (check boxes)
 □ Commit: "feat([feature]): implement [layer] layer"
 ```
@@ -123,45 +123,90 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 - **Infrastructure:** Implements domain interfaces, API calls
 - **Presentation:** Uses use cases, maps to ViewModels, no business logic
 
-**Coverage targets:**
-- Domain: 100%
-- Application: 90%
-- Infrastructure: As needed (complex logic only)
+**Tests during exploration (optional):**
+- Complex domain logic you're uncertain about
+- Validation with many edge cases
+- State machines / status transitions
+
+**Skip tests for:** Simple entities, mappers, pass-through code (test after stabilization)
 
 ---
 
-### Phase 6: Testing (After All Layers Implemented)
+### Phase 6: Manual Testing & Iteration (F5 Validation)
 
-**Purpose:** Verify implementation before review.
+**Purpose:** Validate the feature feels right before investing in tests.
 
 ```
-□ Unit tests pass: npm test (should pass from Phase 5)
+□ F5 - Launch Extension Development Host
+□ Test all user workflows manually
+□ Iterate on UX/behavior until satisfied
+□ Note any bugs found (track in TODO doc)
+□ Exit criteria: "This feels right"
+```
+
+**This is where your 15 years of experience matters.** Trust your judgment. Pivot freely. No tests to rewrite.
+
+---
+
+### Phase 7: Stabilization & Tests (REQUIRED Before Review)
+
+**Purpose:** Lock in behavior with tests after design is validated.
+
+**Prerequisites:**
+- F5 validation complete
+- No more UX/behavior pivots expected
+- Ready to formalize
+
+```
+□ Write domain tests (business rules, validation, state transitions)
+□ Write application tests (complex orchestration only)
+□ npm test passes
 □ Integration tests: Write if panel or cross-layer interactions
 □ E2E tests: npm run e2e:smoke (if UI changes)
 □ Update tracking doc
-□ Commit tests if not already committed with layers
+□ Commit tests
 ```
+
+**Test priority (what to test first):**
+1. **Domain business rules** - validation, calculations, state machines
+2. **Complex use case logic** - anything that broke during F5 iteration
+3. **Mappers with transformations** - non-trivial data shaping
+4. **Skip:** Simple pass-through, getters, VS Code wrappers
+
+**Coverage guidelines (not blocking requirements):**
+- Domain: 80%+ on business logic
+- Application: 70%+ on complex orchestration
+- Infrastructure: Only complex transformations
+- Presentation: F5 is the test
+
+**What NOT to test:**
+| Skip Testing | Reason |
+|--------------|--------|
+| Simple getters/setters | TypeScript validates |
+| Pass-through repositories | No logic to test |
+| Panels | F5 is more effective |
+| VS Code API wrappers | Hard to mock, low value |
 
 **E2E test guidance:**
 | Bug/Feature Type | Unit Test | E2E Test |
 |------------------|-----------|----------|
 | Domain logic | ✅ Always | ❌ No |
-| Use case | ✅ Always | ❌ No |
-| Panel rendering | ✅ If possible | ✅ Yes |
+| Use case | ✅ If complex | ❌ No |
+| Panel rendering | ❌ Skip | ✅ Yes |
 | User workflow | ❌ Hard to unit test | ✅ Yes |
 | Race condition/timing | ❌ Hard to unit test | ✅ Yes |
 
 ---
 
-### Phase 7: Code Review (MANDATORY Before PR)
+### Phase 8: Code Review (MANDATORY Before PR)
 
 **Purpose:** Catch issues before merge.
 
 **Prerequisites (must pass):**
 ```
 □ npm run compile passes
-□ npm test passes
-□ Manual testing (F5) complete
+□ npm test passes (tests written in Phase 7)
+□ F5 validation complete (Phase 6)
 □ Bugs found during testing fixed (tracked in TODO doc)
 □ No any types or console.log
 □ Domain entities have behavior methods
@@ -177,7 +222,7 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 
 ---
 
-### Phase 8: Final Commit & PR
+### Phase 9: Final Commit & PR
 
 **Purpose:** Merge to main via pull request.
 
@@ -215,7 +260,7 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 
 ---
 
-### Phase 9: Cleanup (After Merge)
+### Phase 10: Cleanup (After Merge)
 
 **Purpose:** Remove transient artifacts, preserve patterns and future ideas.
 
@@ -245,10 +290,11 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 
 Skip formal design and requirements. Use:
 1. **Discovery** - Still explore existing patterns
-2. **Implementation** - Implement with tests
-3. **Testing** - Verify
-4. **Review** - `/code-review`
-5. **Commit** - Direct to branch or PR
+2. **Implementation** - Implement (no tests yet)
+3. **F5 Validation** - Test manually until satisfied
+4. **Tests** - Write tests for non-trivial logic
+5. **Review** - `/code-review`
+6. **Commit** - Direct to branch or PR
 
 ---
 
