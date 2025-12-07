@@ -109,6 +109,23 @@ function createMockPanel(viewType: string, title: string): MockWebviewPanel {
 	return panel;
 }
 
+/**
+ * Helper to flush all pending promises in the event loop.
+ * PanelCoordinator uses `void this.handleMessage()` which runs async handlers
+ * without awaiting. This helper ensures all microtasks complete before assertions.
+ */
+function flushPromises(): Promise<void> {
+	return new Promise((resolve) => {
+		setImmediate(() => {
+			setImmediate(() => {
+				setImmediate(() => {
+					resolve();
+				});
+			});
+		});
+	});
+}
+
 describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 	let mockExtensionUri: Uri;
 	let logger: ILogger;
@@ -369,7 +386,8 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'revealSecret', data: { key: secretKey } });
+				messageHandler({ command: 'revealSecret', data: { key: secretKey } });
+				await flushPromises();
 			}
 
 			expect(mockRevealSecretUseCase.execute).toHaveBeenCalledWith(secretKey, true);
@@ -397,13 +415,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 			);
 
 			// Wait for initialization
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
+			await flushPromises();
 
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'revealSecret', data: { key: secretKey } });
+				messageHandler({ command: 'revealSecret', data: { key: secretKey } });
+				await flushPromises();
 			}
 
 			expect(showWarningMessageMock).toHaveBeenCalledWith('Unable to reveal secret: Secret not found');
@@ -455,13 +472,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 			);
 
 			// Wait for initialization
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
+			await flushPromises();
 
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearEntry', data: { key: keyToClear } });
+				messageHandler({ command: 'clearEntry', data: { key: keyToClear } });
+				await flushPromises();
 			}
 
 			expect(showWarningMessageMock).toHaveBeenCalledWith(
@@ -489,9 +505,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 				logger
 			);
 
+			await flushPromises();
+
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearEntry', data: { key: keyToClear } });
+				messageHandler({ command: 'clearEntry', data: { key: keyToClear } });
+				await flushPromises();
 			}
 
 			expect(mockClearStorageEntryUseCase.execute).not.toHaveBeenCalled();
@@ -514,13 +533,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 			);
 
 			// Wait for initialization
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
+			await flushPromises();
 
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearEntry', data: { key: keyToClear } });
+				messageHandler({ command: 'clearEntry', data: { key: keyToClear } });
+				await flushPromises();
 			}
 
 			expect(showErrorMessageMock).toHaveBeenCalledWith('Failed to clear: Cannot clear protected key');
@@ -538,9 +556,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 				logger
 			);
 
+			await flushPromises();
+
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearEntry', data: { invalidField: 'test' } });
+				messageHandler({ command: 'clearEntry', data: { invalidField: 'test' } });
+				await flushPromises();
 			}
 
 			expect(showWarningMessageMock).not.toHaveBeenCalled();
@@ -574,13 +595,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 			);
 
 			// Wait for initialization
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
+			await flushPromises();
 
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearProperty', data: { key: keyToClear, path: pathToClear } });
+				messageHandler({ command: 'clearProperty', data: { key: keyToClear, path: pathToClear } });
+				await flushPromises();
 			}
 
 			expect(showWarningMessageMock).toHaveBeenCalledWith(
@@ -606,9 +626,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 				logger
 			);
 
+			await flushPromises();
+
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearProperty', data: { key: 'key', path: 'path' } });
+				messageHandler({ command: 'clearProperty', data: { key: 'key', path: 'path' } });
+				await flushPromises();
 			}
 
 			expect(mockClearStoragePropertyUseCase.execute).not.toHaveBeenCalled();
@@ -630,13 +653,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 			);
 
 			// Wait for initialization
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
+			await flushPromises();
 
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearProperty', data: { key: 'key', path: 'path' } });
+				messageHandler({ command: 'clearProperty', data: { key: 'key', path: 'path' } });
+				await flushPromises();
 			}
 
 			expect(showErrorMessageMock).toHaveBeenCalledWith('Failed to clear property: Property not found');
@@ -654,9 +676,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 				logger
 			);
 
+			await flushPromises();
+
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearProperty', data: { key: 'key' } }); // missing path
+				messageHandler({ command: 'clearProperty', data: { key: 'key' } }); // missing path
+				await flushPromises();
 			}
 
 			expect(showWarningMessageMock).not.toHaveBeenCalled();
@@ -697,9 +722,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 				logger
 			);
 
+			await flushPromises();
+
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearAll' });
+				messageHandler({ command: 'clearAll' });
+				await flushPromises();
 			}
 
 			expect(mockGetClearAllConfirmationMessageUseCase.execute).toHaveBeenCalled();
@@ -728,9 +756,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 				logger
 			);
 
+			await flushPromises();
+
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearAll' });
+				messageHandler({ command: 'clearAll' });
+				await flushPromises();
 			}
 
 			expect(mockClearAllStorageUseCase.execute).not.toHaveBeenCalled();
@@ -771,9 +802,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 				logger
 			);
 
+			await flushPromises();
+
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearAll' });
+				messageHandler({ command: 'clearAll' });
+				await flushPromises();
 			}
 
 			expect(showWarningMessageMock).toHaveBeenCalledWith('Cleared 8 entries with 2 errors');
@@ -796,9 +830,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 				logger
 			);
 
+			await flushPromises();
+
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearAll' });
+				messageHandler({ command: 'clearAll' });
+				await flushPromises();
 			}
 
 			expect(showErrorMessageMock).toHaveBeenCalledWith('Failed to clear all: Storage unavailable');
@@ -918,9 +955,7 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 			);
 
 			// Wait for async initialization to complete
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
+			await flushPromises();
 
 			expect(mockInspectStorageUseCase.execute).toHaveBeenCalled();
 			expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
@@ -966,13 +1001,12 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 			);
 
 			// Wait for initialization
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
+			await flushPromises();
 
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'clearEntry', data: { key: keyToClear } });
+				messageHandler({ command: 'clearEntry', data: { key: keyToClear } });
+				await flushPromises();
 			}
 
 			expect(mockClearStorageEntryUseCase.execute).toHaveBeenCalledWith(keyToClear);
@@ -1005,17 +1039,14 @@ describe('PersistenceInspectorPanelComposed - Integration Tests', () => {
 			);
 
 			// Wait for initialization
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
-			await new Promise(resolve => setImmediate(resolve));
+			await flushPromises();
 
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
 				// Simulate concurrent commands
-				const promise1 = messageHandler({ command: 'refresh' });
-				const promise2 = messageHandler({ command: 'revealSecret', data: { key: 'secret1' } });
-
-				await Promise.all([promise1, promise2]);
+				messageHandler({ command: 'refresh' });
+				messageHandler({ command: 'revealSecret', data: { key: 'secret1' } });
+				await flushPromises();
 			}
 
 			expect(mockInspectStorageUseCase.execute).toHaveBeenCalled();

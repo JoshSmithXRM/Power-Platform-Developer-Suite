@@ -114,6 +114,23 @@ function createMockPanel(viewType: string, title: string): MockWebviewPanel {
 	return panel;
 }
 
+/**
+ * Helper to flush all pending promises in the event loop.
+ * PanelCoordinator uses `void this.handleMessage()` which runs async handlers
+ * without awaiting. This helper ensures all microtasks complete before assertions.
+ */
+function flushPromises(): Promise<void> {
+	return new Promise((resolve) => {
+		setImmediate(() => {
+			setImmediate(() => {
+				setImmediate(() => {
+					resolve();
+				});
+			});
+		});
+	});
+}
+
 describe('EnvironmentSetupPanelComposed - Integration Tests', () => {
 	let mockExtensionUri: Uri;
 	let logger: NullLogger;
@@ -569,11 +586,12 @@ describe('EnvironmentSetupPanelComposed - Integration Tests', () => {
 			);
 
 			// Wait for initialization
-			await new Promise(resolve => setTimeout(resolve, 10));
+			await flushPromises();
 
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'deleteEnvironment' });
+				messageHandler({ command: 'deleteEnvironment' });
+				await flushPromises();
 			}
 
 			expect(showWarningMessageMock).toHaveBeenCalledWith(
@@ -618,11 +636,12 @@ describe('EnvironmentSetupPanelComposed - Integration Tests', () => {
 			);
 
 			// Wait for initialization
-			await new Promise(resolve => setTimeout(resolve, 10));
+			await flushPromises();
 
 			const messageHandler = mockPanel.getMessageHandler?.();
 			if (messageHandler) {
-				await messageHandler({ command: 'deleteEnvironment' });
+				messageHandler({ command: 'deleteEnvironment' });
+				await flushPromises();
 			}
 
 			expect(mockDeleteEnvironmentUseCase.execute).not.toHaveBeenCalled();

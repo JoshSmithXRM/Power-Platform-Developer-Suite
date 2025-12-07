@@ -349,7 +349,7 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			// Trigger rapid solution changes:
 			// 1. First: Switch to slow solution (100ms)
 			// 2. Second: Switch to fast solution (10ms) - should win!
-			const slowPromise = messageHandler({
+			messageHandler({
 				command: 'solutionChange',
 				data: { solutionId: SLOW_SOLUTION_ID }
 			});
@@ -357,13 +357,14 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			// Small delay to ensure first request is in flight
 			await delay(5);
 
-			const fastPromise = messageHandler({
+			messageHandler({
 				command: 'solutionChange',
 				data: { solutionId: FAST_SOLUTION_ID }
 			});
 
-			// Wait for both to complete
-			await Promise.all([slowPromise, fastPromise]);
+			// Wait for both mock delays to complete (slow=100ms, fast=10ms)
+			// PanelCoordinator uses void, so we must wait for the actual mock delays
+			await delay(150);
 			await flushPromises();
 
 			// Find the final updateVirtualTable message
@@ -427,19 +428,21 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
 
 			// Fire both changes quickly
-			const slowPromise = messageHandler({
+			messageHandler({
 				command: 'solutionChange',
 				data: { solutionId: SLOW_SOLUTION_ID }
 			});
 
 			await delay(2);
 
-			const fastPromise = messageHandler({
+			messageHandler({
 				command: 'solutionChange',
 				data: { solutionId: FAST_SOLUTION_ID }
 			});
 
-			await Promise.all([slowPromise, fastPromise]);
+			// Wait for both mock delays to complete (slow=50ms, fast=5ms)
+			// PanelCoordinator uses void, so we must wait for the actual mock delays
+			await delay(100);
 			await flushPromises();
 
 			// The stale data ('stale_data_marker') should either:
