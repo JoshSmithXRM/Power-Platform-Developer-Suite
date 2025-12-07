@@ -868,4 +868,162 @@ describe('SqlToFetchXmlTranspiler', () => {
 			expect(fetchXml).toContain('link-type="inner"');
 		});
 	});
+
+	describe('DISTINCT keyword', () => {
+		it('should add distinct attribute to fetch element', () => {
+			const fetchXml = transpile('SELECT DISTINCT name FROM account');
+
+			expect(fetchXml).toContain('<fetch distinct="true">');
+		});
+
+		it('should not add distinct when not specified', () => {
+			const fetchXml = transpile('SELECT name FROM account');
+
+			expect(fetchXml).not.toContain('distinct=');
+		});
+
+		it('should combine distinct with top', () => {
+			const fetchXml = transpile('SELECT DISTINCT TOP 10 name FROM account');
+
+			expect(fetchXml).toContain('top="10"');
+			expect(fetchXml).toContain('distinct="true"');
+		});
+	});
+
+	describe('aggregate functions', () => {
+		it('should add aggregate attribute to fetch element when COUNT(*) used', () => {
+			const fetchXml = transpile('SELECT COUNT(*) FROM account');
+
+			expect(fetchXml).toContain('<fetch aggregate="true">');
+		});
+
+		it('should transpile COUNT(*) using entity primary key', () => {
+			const fetchXml = transpile('SELECT COUNT(*) FROM account');
+
+			// COUNT(*) uses the entity's primary key column (accountid) in FetchXML
+			expect(fetchXml).toContain('name="accountid"');
+			expect(fetchXml).toContain('aggregate="count"');
+			expect(fetchXml).toContain('alias="count_1"');
+		});
+
+		it('should transpile COUNT(column) as countcolumn aggregate', () => {
+			const fetchXml = transpile('SELECT COUNT(name) FROM account');
+
+			expect(fetchXml).toContain('name="name"');
+			expect(fetchXml).toContain('aggregate="countcolumn"');
+		});
+
+		it('should transpile COUNT(DISTINCT column) with distinct attribute', () => {
+			const fetchXml = transpile('SELECT COUNT(DISTINCT statecode) FROM account');
+
+			expect(fetchXml).toContain('name="statecode"');
+			expect(fetchXml).toContain('aggregate="countcolumn"');
+			expect(fetchXml).toContain('distinct="true"');
+		});
+
+		it('should transpile SUM aggregate', () => {
+			const fetchXml = transpile('SELECT SUM(revenue) FROM opportunity');
+
+			expect(fetchXml).toContain('<fetch aggregate="true">');
+			expect(fetchXml).toContain('name="revenue"');
+			expect(fetchXml).toContain('aggregate="sum"');
+		});
+
+		it('should transpile AVG aggregate', () => {
+			const fetchXml = transpile('SELECT AVG(revenue) FROM opportunity');
+
+			expect(fetchXml).toContain('aggregate="avg"');
+		});
+
+		it('should transpile MIN aggregate', () => {
+			const fetchXml = transpile('SELECT MIN(createdon) FROM account');
+
+			expect(fetchXml).toContain('aggregate="min"');
+		});
+
+		it('should transpile MAX aggregate', () => {
+			const fetchXml = transpile('SELECT MAX(createdon) FROM account');
+
+			expect(fetchXml).toContain('aggregate="max"');
+		});
+
+		it('should use provided alias for aggregate', () => {
+			const fetchXml = transpile('SELECT COUNT(*) AS total FROM account');
+
+			expect(fetchXml).toContain('alias="total"');
+			expect(fetchXml).not.toContain('alias="count_1"');
+		});
+
+		it('should transpile mixed regular and aggregate columns', () => {
+			const fetchXml = transpile('SELECT statecode, COUNT(*) AS total FROM account');
+
+			expect(fetchXml).toContain('<attribute name="statecode" />');
+			expect(fetchXml).toMatch(/aggregate="count".*alias="total"/);
+		});
+	});
+
+	describe('GROUP BY clause', () => {
+		it('should add groupby attribute to columns in GROUP BY', () => {
+			const fetchXml = transpile('SELECT statecode, COUNT(*) FROM account GROUP BY statecode');
+
+			expect(fetchXml).toContain('name="statecode"');
+			expect(fetchXml).toContain('groupby="true"');
+		});
+
+		it('should handle multiple GROUP BY columns', () => {
+			const fetchXml = transpile(
+				'SELECT statecode, statuscode, COUNT(*) FROM account GROUP BY statecode, statuscode'
+			);
+
+			// Both groupby columns should have groupby="true"
+			expect(fetchXml).toMatch(/name="statecode".*groupby="true"/);
+			expect(fetchXml).toMatch(/name="statuscode".*groupby="true"/);
+		});
+
+		it('should combine GROUP BY with aggregate', () => {
+			const fetchXml = transpile(
+				'SELECT statecode, SUM(revenue) AS total FROM opportunity GROUP BY statecode'
+			);
+
+			expect(fetchXml).toContain('<fetch aggregate="true">');
+			expect(fetchXml).toContain('groupby="true"');
+			expect(fetchXml).toContain('aggregate="sum"');
+		});
+
+		it('should add GROUP BY column not in SELECT list', () => {
+			// GROUP BY column that's not explicitly selected
+			const fetchXml = transpile('SELECT COUNT(*) FROM account GROUP BY statecode');
+
+			expect(fetchXml).toContain('name="statecode"');
+			expect(fetchXml).toContain('groupby="true"');
+		});
+	});
+
+	describe('complex aggregate queries', () => {
+		it('should transpile full aggregate query with WHERE and ORDER BY', () => {
+			const fetchXml = transpile(`
+				SELECT statecode, COUNT(*) AS cnt
+				FROM account
+				WHERE revenue > 1000
+				GROUP BY statecode
+				ORDER BY cnt DESC
+			`);
+
+			expect(fetchXml).toContain('<fetch aggregate="true">');
+			expect(fetchXml).toContain('groupby="true"');
+			expect(fetchXml).toContain('aggregate="count"');
+			expect(fetchXml).toContain('alias="cnt"');
+			expect(fetchXml).toContain('<filter>');
+			expect(fetchXml).toContain('<order');
+		});
+
+		it('should handle multiple aggregates in same query', () => {
+			const fetchXml = transpile('SELECT COUNT(*) AS cnt, SUM(revenue) AS total FROM opportunity');
+
+			expect(fetchXml).toContain('aggregate="count"');
+			expect(fetchXml).toContain('aggregate="sum"');
+			expect(fetchXml).toContain('alias="cnt"');
+			expect(fetchXml).toContain('alias="total"');
+		});
+	});
 });

@@ -26,6 +26,11 @@ export type SqlSortDirection = 'ASC' | 'DESC';
 export type SqlJoinType = 'INNER' | 'LEFT' | 'RIGHT';
 
 /**
+ * Aggregate function types.
+ */
+export type SqlAggregateFunction = 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX';
+
+/**
  * Column reference in SELECT clause.
  * Can be: column, table.column, *, or table.*
  */
@@ -44,6 +49,42 @@ export class SqlColumnRef {
 		return this.columnName;
 	}
 }
+
+/**
+ * Aggregate column expression in SELECT clause.
+ * Examples: COUNT(*), COUNT(name), COUNT(DISTINCT name), SUM(revenue)
+ */
+export class SqlAggregateColumn {
+	constructor(
+		public readonly func: SqlAggregateFunction,
+		public readonly column: SqlColumnRef | null, // null for COUNT(*)
+		public readonly isDistinct: boolean,
+		public readonly alias: string | null
+	) {}
+
+	/**
+	 * Checks if this is COUNT(*) - counts all rows.
+	 */
+	public isCountAll(): boolean {
+		return this.func === 'COUNT' && this.column === null;
+	}
+
+	/**
+	 * Gets the column name for FetchXML transpilation.
+	 * For COUNT(*), returns null. For others, returns the column name.
+	 */
+	public getColumnName(): string | null {
+		if (this.column === null) {
+			return null;
+		}
+		return this.column.columnName;
+	}
+}
+
+/**
+ * Represents either a regular column or an aggregate column in SELECT clause.
+ */
+export type SqlSelectColumn = SqlColumnRef | SqlAggregateColumn;
 
 /**
  * Table reference in FROM clause.
@@ -169,12 +210,14 @@ export class SqlJoin {
  */
 export class SqlSelectStatement {
 	constructor(
-		public readonly columns: readonly SqlColumnRef[],
+		public readonly columns: readonly SqlSelectColumn[],
 		public readonly from: SqlTableRef,
 		public readonly joins: readonly SqlJoin[],
 		public readonly where: SqlCondition | null,
 		public readonly orderBy: readonly SqlOrderByItem[],
-		public readonly top: number | null
+		public readonly top: number | null,
+		public readonly distinct: boolean = false,
+		public readonly groupBy: readonly SqlColumnRef[] = []
 	) {}
 
 	/**
@@ -192,9 +235,31 @@ export class SqlSelectStatement {
 		return (
 			this.columns.length === 1 &&
 			firstColumn !== undefined &&
+			firstColumn instanceof SqlColumnRef &&
 			firstColumn.isWildcard &&
 			firstColumn.tableName === null
 		);
+	}
+
+	/**
+	 * Checks if this query contains aggregate functions.
+	 */
+	public hasAggregates(): boolean {
+		return this.columns.some((col) => col instanceof SqlAggregateColumn);
+	}
+
+	/**
+	 * Gets only the regular (non-aggregate) columns.
+	 */
+	public getRegularColumns(): readonly SqlColumnRef[] {
+		return this.columns.filter((col): col is SqlColumnRef => col instanceof SqlColumnRef);
+	}
+
+	/**
+	 * Gets only the aggregate columns.
+	 */
+	public getAggregateColumns(): readonly SqlAggregateColumn[] {
+		return this.columns.filter((col): col is SqlAggregateColumn => col instanceof SqlAggregateColumn);
 	}
 
 	/**

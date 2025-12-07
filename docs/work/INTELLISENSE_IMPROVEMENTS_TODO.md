@@ -45,28 +45,30 @@
 - [x] Operator suggestions (in `<condition operator="">`)
 - [x] Element suggestions (valid child elements based on parent)
 
-### Phase 4: Aggregate & DISTINCT Support (Standard SQL)
+### Phase 4: Aggregate & DISTINCT Support (Standard SQL) - COMPLETED 2025-12-06
 **Goal:** Add SQL features that have direct FetchXML equivalents.
 
 **SQL Parser Changes:**
-- [ ] DISTINCT keyword: `SELECT DISTINCT name FROM account`
-- [ ] COUNT(*): `SELECT COUNT(*) FROM account`
-- [ ] COUNT(column): `SELECT COUNT(name) FROM account`
-- [ ] COUNT(DISTINCT column): `SELECT COUNT(DISTINCT statecode) FROM account`
-- [ ] SUM(column): `SELECT SUM(revenue) FROM opportunity`
-- [ ] AVG(column): `SELECT AVG(revenue) FROM opportunity`
-- [ ] MIN(column): `SELECT MIN(createdon) FROM account`
-- [ ] MAX(column): `SELECT MAX(createdon) FROM account`
-- [ ] GROUP BY: `SELECT statecode, COUNT(*) FROM account GROUP BY statecode`
-- [ ] Column aliases for aggregates: `COUNT(*) AS total`
+- [x] DISTINCT keyword: `SELECT DISTINCT name FROM account`
+- [x] COUNT(*): `SELECT COUNT(*) FROM account`
+- [x] COUNT(column): `SELECT COUNT(name) FROM account`
+- [x] COUNT(DISTINCT column): `SELECT COUNT(DISTINCT statecode) FROM account`
+- [x] SUM(column): `SELECT SUM(revenue) FROM opportunity`
+- [x] AVG(column): `SELECT AVG(revenue) FROM opportunity`
+- [x] MIN(column): `SELECT MIN(createdon) FROM account`
+- [x] MAX(column): `SELECT MAX(createdon) FROM account`
+- [x] GROUP BY: `SELECT statecode, COUNT(*) FROM account GROUP BY statecode`
+- [x] Column aliases for aggregates: `COUNT(*) AS total`
 
 **Transpiler Changes:**
-- [ ] DISTINCT → `<fetch distinct="true">`
-- [ ] COUNT(*) → `<attribute name="..." aggregate="count" alias="...">`
-- [ ] COUNT(column) → `<attribute name="..." aggregate="countcolumn" alias="...">`
-- [ ] SUM/AVG/MIN/MAX → `<attribute name="..." aggregate="sum/avg/min/max" alias="...">`
-- [ ] GROUP BY → `<attribute name="..." groupby="true">`
-- [ ] Set `<fetch aggregate="true">` when aggregates present
+- [x] DISTINCT → `<fetch distinct="true">`
+- [x] COUNT(*) → `<attribute name="*" aggregate="count" alias="...">`
+- [x] COUNT(column) → `<attribute name="..." aggregate="countcolumn" alias="...">`
+- [x] SUM/AVG/MIN/MAX → `<attribute name="..." aggregate="sum/avg/min/max" alias="...">`
+- [x] GROUP BY → `<attribute name="..." groupby="true">`
+- [x] Set `<fetch aggregate="true">` when aggregates present
+
+**Tests Added:** 39 new unit tests (20 parser + 19 transpiler)
 
 **FetchXML Reference:**
 - https://learn.microsoft.com/en-us/power-apps/developer/data-platform/fetchxml/aggregate-data
@@ -192,40 +194,40 @@
 - [x] Reads environment from notebook metadata for cells
 - [x] Panel and notebook environments work independently
 
-### Phase 4: Aggregate & DISTINCT Support
+### Phase 4: Aggregate & DISTINCT Support - COMPLETED 2025-12-06
 
 #### 4.1 AST Extensions
-- [ ] Add `SqlAggregateFunction` type: `'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX'`
-- [ ] Add `SqlAggregateColumn` class with function, column, distinct flag, alias
-- [ ] Add `distinct` field to `SqlSelectStatement`
-- [ ] Add `groupBy` field to `SqlSelectStatement` (array of `SqlColumnRef`)
-- [ ] Update `SqlColumnRef` to handle `COUNT(*)` case
-- [ ] `npm run compile` passes
+- [x] Add `SqlAggregateFunction` type: `'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX'`
+- [x] Add `SqlAggregateColumn` class with function, column, distinct flag, alias
+- [x] Add `distinct` field to `SqlSelectStatement`
+- [x] Add `groupBy` field to `SqlSelectStatement` (array of `SqlColumnRef`)
+- [x] Add `SqlSelectColumn` union type for regular and aggregate columns
+- [x] `npm run compile` passes
 
-#### 4.2 Lexer Updates
-- [ ] Add tokens: DISTINCT, COUNT, SUM, AVG, MIN, MAX, GROUP, BY
-- [ ] Handle function call syntax: `COUNT(`, `SUM(`, etc.
-- [ ] `npm run compile` passes
+#### 4.2 Token Updates
+- [x] Add tokens: DISTINCT, COUNT, SUM, AVG, MIN, MAX, GROUP
+- [x] BY already existed for ORDER BY
+- [x] `npm run compile` passes
 
 #### 4.3 Parser Updates
-- [ ] Parse `SELECT DISTINCT` keyword
-- [ ] Parse aggregate functions: `COUNT(*)`, `COUNT(column)`, `COUNT(DISTINCT column)`
-- [ ] Parse `SUM(column)`, `AVG(column)`, `MIN(column)`, `MAX(column)`
-- [ ] Parse `GROUP BY column1, column2`
-- [ ] Parse aliases for aggregates: `COUNT(*) AS total`
-- [ ] Unit tests for all new syntax
-- [ ] `npm run compile` passes
+- [x] Parse `SELECT DISTINCT` keyword
+- [x] Parse aggregate functions: `COUNT(*)`, `COUNT(column)`, `COUNT(DISTINCT column)`
+- [x] Parse `SUM(column)`, `AVG(column)`, `MIN(column)`, `MAX(column)`
+- [x] Parse `GROUP BY column1, column2`
+- [x] Parse aliases for aggregates: `COUNT(*) AS total`
+- [x] 20 unit tests for all new syntax
+- [x] `npm run compile` passes
 
 #### 4.4 Transpiler Updates
-- [ ] Add `distinct="true"` to fetch element when DISTINCT
-- [ ] Add `aggregate="true"` to fetch element when aggregates present
-- [ ] Transpile `COUNT(*)` → `<attribute name="..." aggregate="count" alias="...">`
-- [ ] Transpile `COUNT(column)` → `<attribute name="column" aggregate="countcolumn" alias="...">`
-- [ ] Transpile `SUM/AVG/MIN/MAX` → appropriate aggregate attribute
-- [ ] Transpile `GROUP BY` → `<attribute name="..." groupby="true">`
-- [ ] Generate required aliases for aggregate columns
-- [ ] Unit tests for all transpilation
-- [ ] `npm run compile` passes
+- [x] Add `distinct="true"` to fetch element when DISTINCT
+- [x] Add `aggregate="true"` to fetch element when aggregates present
+- [x] Transpile `COUNT(*)` → `<attribute name="*" aggregate="count" alias="...">`
+- [x] Transpile `COUNT(column)` → `<attribute name="column" aggregate="countcolumn" alias="...">`
+- [x] Transpile `SUM/AVG/MIN/MAX` → appropriate aggregate attribute
+- [x] Transpile `GROUP BY` → `<attribute name="..." groupby="true">`
+- [x] Generate required aliases for aggregate columns
+- [x] 19 unit tests for all transpilation
+- [x] `npm run compile` passes
 
 #### 4.5 Integration Testing
 - [ ] Test aggregate queries execute correctly against Dataverse

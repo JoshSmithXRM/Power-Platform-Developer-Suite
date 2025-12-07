@@ -230,6 +230,7 @@ export class SqlLexer {
 
 	/**
 	 * Reads an identifier or keyword.
+	 * Preserves original casing in token value (important for aliases).
 	 */
 	private readIdentifierOrKeyword(): SqlToken {
 		const startPosition = this.position;
@@ -240,12 +241,13 @@ export class SqlLexer {
 			this.advance();
 		}
 
-		// Check if it's a keyword
+		// Check if it's a keyword (case-insensitive)
 		const upperValue = value.toUpperCase();
 		const keywordType = KEYWORD_MAP.get(upperValue);
 
 		if (keywordType) {
-			return new SqlToken(keywordType, upperValue, startPosition);
+			// Preserve original casing in value - important when keyword is used as alias
+			return new SqlToken(keywordType, value, startPosition);
 		}
 
 		return new SqlToken('IDENTIFIER', value, startPosition);

@@ -1,5 +1,7 @@
 import { SqlParseError } from '../errors/SqlParseError';
 import {
+	SqlAggregateColumn,
+	SqlAggregateFunction,
 	SqlColumnRef,
 	SqlComparisonCondition,
 	SqlComparisonOperator,
@@ -12,6 +14,7 @@ import {
 	SqlLogicalCondition,
 	SqlNullCondition,
 	SqlOrderByItem,
+	SqlSelectColumn,
 	SqlSelectStatement,
 	SqlSortDirection,
 	SqlTableRef,
@@ -28,7 +31,11 @@ import { SqlLexer } from './SqlLexer';
  *
  * Supported SQL:
  * - SELECT columns FROM table
+ * - SELECT DISTINCT columns FROM table
  * - SELECT TOP n columns FROM table
+ * - Aggregate functions: COUNT(*), COUNT(column), SUM, AVG, MIN, MAX
+ * - COUNT(DISTINCT column)
+ * - GROUP BY column1, column2
  * - WHERE with comparison, LIKE, IS NULL, IN operators
  * - AND/OR logical operators with parentheses
  * - ORDER BY column ASC/DESC
@@ -37,8 +44,7 @@ import { SqlLexer } from './SqlLexer';
  * Not Supported (for now):
  * - Subqueries
  * - UNION/INTERSECT/EXCEPT
- * - GROUP BY, HAVING, aggregates
- * - DISTINCT
+ * - HAVING clause
  */
 export class SqlParser {
 	private tokens: SqlToken[] = [];
@@ -65,6 +71,9 @@ export class SqlParser {
 	private parseSelectStatement(): SqlSelectStatement {
 		this.expect('SELECT');
 
+		// Optional DISTINCT keyword
+		const distinct = this.match('DISTINCT');
+
 		// Optional TOP clause
 		let top: number | null = null;
 		if (this.match('TOP')) {
@@ -72,8 +81,8 @@ export class SqlParser {
 			top = parseInt(topToken.value, 10);
 		}
 
-		// SELECT columns
-		const columns = this.parseColumnList();
+		// SELECT columns (may include aggregates)
+		const columns = this.parseSelectColumnList();
 
 		// FROM clause
 		this.expect('FROM');
@@ -89,6 +98,15 @@ export class SqlParser {
 		let where: SqlCondition | null = null;
 		if (this.match('WHERE')) {
 			where = this.parseCondition();
+		}
+
+		// Optional GROUP BY clause
+		const groupBy: SqlColumnRef[] = [];
+		if (this.match('GROUP')) {
+			this.expect('BY');
+			do {
+				groupBy.push(this.parseColumnRef());
+			} while (this.match('COMMA'));
 		}
 
 		// Optional ORDER BY clause
@@ -119,22 +137,81 @@ export class SqlParser {
 			joins,
 			where,
 			orderBy,
-			top
+			top,
+			distinct,
+			groupBy
 		);
 	}
 
 	/**
-	 * Parses SELECT column list.
+	 * Parses SELECT column list (may include aggregates).
 	 * Tolerates trailing commas for better UX.
 	 */
-	private parseColumnList(): SqlColumnRef[] {
-		const columns: SqlColumnRef[] = [];
+	private parseSelectColumnList(): SqlSelectColumn[] {
+		const columns: SqlSelectColumn[] = [];
 
 		do {
-			columns.push(this.parseColumnRef());
+			columns.push(this.parseSelectColumn());
 		} while (this.match('COMMA') && !this.isAtClauseKeyword());
 
 		return columns;
+	}
+
+	/**
+	 * Parses a single SELECT column (regular column or aggregate function).
+	 */
+	private parseSelectColumn(): SqlSelectColumn {
+		// Check for aggregate functions
+		if (this.isAggregateFunction()) {
+			return this.parseAggregateColumn();
+		}
+
+		// Regular column reference
+		return this.parseColumnRef();
+	}
+
+	/**
+	 * Checks if current token is an aggregate function.
+	 */
+	private isAggregateFunction(): boolean {
+		return (
+			this.check('COUNT') ||
+			this.check('SUM') ||
+			this.check('AVG') ||
+			this.check('MIN') ||
+			this.check('MAX')
+		);
+	}
+
+	/**
+	 * Parses an aggregate function: COUNT(*), COUNT(column), SUM(column), etc.
+	 */
+	private parseAggregateColumn(): SqlAggregateColumn {
+		const funcToken = this.advance();
+		const func = funcToken.type as SqlAggregateFunction;
+
+		this.expect('LPAREN');
+
+		let column: SqlColumnRef | null = null;
+		let isDistinct = false;
+
+		if (func === 'COUNT' && this.match('STAR')) {
+			// COUNT(*)
+			column = null;
+		} else {
+			// Check for DISTINCT inside aggregate: COUNT(DISTINCT column)
+			isDistinct = this.match('DISTINCT');
+
+			// Parse column reference
+			column = this.parseColumnRef();
+		}
+
+		this.expect('RPAREN');
+
+		// Parse optional alias
+		const alias = this.parseOptionalAlias();
+
+		return new SqlAggregateColumn(func, column, isDistinct, alias);
 	}
 
 	/**
@@ -145,6 +222,7 @@ export class SqlParser {
 		return (
 			this.check('FROM') ||
 			this.check('WHERE') ||
+			this.check('GROUP') ||
 			this.check('ORDER') ||
 			this.check('LIMIT') ||
 			this.check('JOIN') ||
@@ -183,12 +261,19 @@ export class SqlParser {
 
 	/**
 	 * Parses optional AS alias or just alias.
+	 * Aliases can be identifiers or even keywords (e.g., "COUNT(*) AS count").
 	 */
 	private parseOptionalAlias(): string | null {
 		if (this.match('AS')) {
-			return this.expect('IDENTIFIER').value;
+			// After AS, accept identifier or keyword as alias
+			const token = this.peek();
+			if (token.is('IDENTIFIER') || token.isKeyword()) {
+				return this.advance().value;
+			}
+			throw this.error(`Expected alias after AS, found ${token.type}`);
 		}
-		// Check for alias without AS keyword
+		// Check for alias without AS keyword - must be an identifier (not keyword)
+		// to avoid ambiguity like "SELECT name count FROM" being parsed as "name AS count"
 		if (this.check('IDENTIFIER') && !this.checkKeyword()) {
 			return this.advance().value;
 		}
