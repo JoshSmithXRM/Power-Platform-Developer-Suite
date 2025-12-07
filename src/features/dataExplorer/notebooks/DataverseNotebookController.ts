@@ -139,9 +139,9 @@ export class DataverseNotebookController {
 	 * Registers a listener to auto-switch cell language based on content.
 	 *
 	 * Detection logic:
-	 * - First non-whitespace character is '<' → FetchXML
-	 * - First non-whitespace character is anything else → SQL
-	 * - Only triggers when content is below threshold (new/fresh cells)
+	 * - For typing in fresh cells: First non-whitespace character is '<' → FetchXML
+	 * - For paste operations: First character of pasted content determines language
+	 * - Triggers for fresh cells (small content) or any paste operation
 	 */
 	private registerAutoSwitchListener(): void {
 		this.textChangeListener = vscode.workspace.onDidChangeTextDocument((event) => {
@@ -159,16 +159,38 @@ export class DataverseNotebookController {
 				return;
 			}
 
-			// Only auto-switch for minimal content (fresh cells)
 			const content = event.document.getText();
 			const trimmedContent = content.trim();
 
-			if (trimmedContent.length === 0 || trimmedContent.length > AUTO_SWITCH_THRESHOLD) {
+			if (trimmedContent.length === 0) {
+				return;
+			}
+
+			// Check if this is a paste operation
+			const pasteInfo = this.detectPasteOperation(event);
+
+			// Decide which content to analyze for language detection
+			let contentToAnalyze: string;
+			let isPaste = false;
+
+			if (pasteInfo !== null) {
+				// For paste operations, analyze the pasted content
+				contentToAnalyze = pasteInfo.pastedText.trim();
+				isPaste = true;
+			} else {
+				// For typing, only auto-switch for minimal content (fresh cells)
+				if (trimmedContent.length > AUTO_SWITCH_THRESHOLD) {
+					return;
+				}
+				contentToAnalyze = trimmedContent;
+			}
+
+			if (contentToAnalyze.length === 0) {
 				return;
 			}
 
 			const currentLanguage = event.document.languageId;
-			const firstChar = trimmedContent.charAt(0);
+			const firstChar = contentToAnalyze.charAt(0);
 			const shouldBeFetchXml = firstChar === '<';
 
 			// Switch to FetchXML if content starts with '<' and not already fetchxml
@@ -176,7 +198,8 @@ export class DataverseNotebookController {
 				this.logger.debug('Auto-switching cell to FetchXML', {
 					firstChar,
 					currentLanguage,
-					contentLength: trimmedContent.length,
+					contentLength: contentToAnalyze.length,
+					isPaste,
 				});
 				void vscode.languages.setTextDocumentLanguage(event.document, 'fetchxml');
 			}
@@ -185,11 +208,45 @@ export class DataverseNotebookController {
 				this.logger.debug('Auto-switching cell to SQL', {
 					firstChar,
 					currentLanguage,
-					contentLength: trimmedContent.length,
+					contentLength: contentToAnalyze.length,
+					isPaste,
 				});
 				void vscode.languages.setTextDocumentLanguage(event.document, 'sql');
 			}
 		});
+	}
+
+	/**
+	 * Detects if this document change is a paste operation.
+	 * Returns the pasted text if it's a paste, null otherwise.
+	 *
+	 * Detection: A paste is identified by a single content change that inserts
+	 * substantial content (more than a few characters at once).
+	 */
+	private detectPasteOperation(
+		event: vscode.TextDocumentChangeEvent
+	): { pastedText: string } | null {
+		if (event.contentChanges.length !== 1) {
+			return null;
+		}
+
+		const change = event.contentChanges[0];
+		if (change === undefined) {
+			return null;
+		}
+
+		// A paste is detected when:
+		// 1. We're inserting substantial content (not just a few characters of typing)
+		// 2. The content contains meaningful text (not just whitespace)
+		const pastedText = change.text;
+		const isSubstantialInsert = pastedText.length > AUTO_SWITCH_THRESHOLD;
+		const hasNonWhitespace = pastedText.trim().length > 0;
+
+		if (isSubstantialInsert && hasNonWhitespace) {
+			return { pastedText };
+		}
+
+		return null;
 	}
 
 	/**

@@ -35,6 +35,12 @@ interface ParsedAttribute {
 	name: string;
 	alias?: string | undefined;
 	tableAlias?: string | undefined;
+	/** Aggregate function: count, countcolumn, sum, avg, min, max */
+	aggregate?: string | undefined;
+	/** Whether this column is used for GROUP BY */
+	groupby?: boolean | undefined;
+	/** Whether DISTINCT is applied to this aggregate */
+	distinct?: boolean | undefined;
 }
 
 /**
@@ -101,11 +107,13 @@ export class FetchXmlToSqlTranspiler {
 				};
 			}
 
-			// Check for unsupported features
+			// Check for unsupported features (paging only now - we support aggregates)
 			this.checkUnsupportedFeatures(trimmed, warnings);
 
-			// Parse fetch element
+			// Parse fetch element attributes
 			const top = this.extractAttribute(trimmed, 'fetch', 'top');
+			const distinctStr = this.extractAttribute(trimmed, 'fetch', 'distinct');
+			const distinct = distinctStr?.toLowerCase() === 'true';
 
 			// Parse entity
 			const entityName = this.extractAttribute(trimmed, 'entity', 'name');
@@ -137,6 +145,7 @@ export class FetchXmlToSqlTranspiler {
 			const sql = this.buildSql({
 				entityName,
 				top,
+				distinct,
 				hasAllAttributes,
 				attributes,
 				linkEntities,
@@ -166,25 +175,7 @@ export class FetchXmlToSqlTranspiler {
 		fetchXml: string,
 		warnings: TranspilationWarning[]
 	): void {
-		// Check for aggregate queries
-		if (this.hasAttribute(fetchXml, 'fetch', 'aggregate')) {
-			warnings.push({
-				message:
-					'Aggregate queries are not supported. Results may be incomplete.',
-				feature: 'aggregate',
-			});
-		}
-
-		// Check for distinct
-		if (this.hasAttribute(fetchXml, 'fetch', 'distinct')) {
-			warnings.push({
-				message:
-					'DISTINCT is not yet supported in SQL output. Query will return all rows.',
-				feature: 'distinct',
-			});
-		}
-
-		// Check for paging
+		// Check for paging - this is genuinely unsupported
 		if (
 			this.hasAttribute(fetchXml, 'fetch', 'page') ||
 			this.hasAttribute(fetchXml, 'fetch', 'paging-cookie')
@@ -196,7 +187,7 @@ export class FetchXmlToSqlTranspiler {
 			});
 		}
 
-		// Check for count
+		// Check for count attribute on fetch - will be converted to TOP
 		if (this.hasAttribute(fetchXml, 'fetch', 'count')) {
 			warnings.push({
 				message: 'Count attribute will be converted to TOP.',
@@ -204,22 +195,7 @@ export class FetchXmlToSqlTranspiler {
 			});
 		}
 
-		// Check for aggregate attributes
-		if (/<attribute[^>]+aggregate\s*=/i.test(fetchXml)) {
-			warnings.push({
-				message:
-					'Aggregate functions (SUM, COUNT, etc.) are not yet supported.',
-				feature: 'aggregate-functions',
-			});
-		}
-
-		// Check for groupby
-		if (/<attribute[^>]+groupby\s*=/i.test(fetchXml)) {
-			warnings.push({
-				message: 'GROUP BY is not yet supported.',
-				feature: 'groupby',
-			});
-		}
+		// Note: aggregate, distinct, groupby, and aggregate functions are now supported
 	}
 
 	/**
@@ -288,9 +264,18 @@ export class FetchXmlToSqlTranspiler {
 			const attrString = match[1] ?? '';
 			const name = this.extractAttrValue(attrString, 'name');
 			const alias = this.extractAttrValue(attrString, 'alias');
+			const aggregate = this.extractAttrValue(attrString, 'aggregate');
+			const groupbyStr = this.extractAttrValue(attrString, 'groupby');
+			const distinctStr = this.extractAttrValue(attrString, 'distinct');
 
 			if (name) {
-				attributes.push({ name, alias });
+				attributes.push({
+					name,
+					alias,
+					aggregate,
+					groupby: groupbyStr?.toLowerCase() === 'true',
+					distinct: distinctStr?.toLowerCase() === 'true',
+				});
 			}
 		}
 
@@ -511,6 +496,7 @@ export class FetchXmlToSqlTranspiler {
 	private buildSql(params: {
 		entityName: string;
 		top?: string | undefined;
+		distinct?: boolean | undefined;
 		hasAllAttributes: boolean;
 		attributes: ParsedAttribute[];
 		linkEntities: ParsedLinkEntity[];
@@ -519,13 +505,18 @@ export class FetchXmlToSqlTranspiler {
 	}): string {
 		const parts: string[] = [];
 
-		// SELECT clause
-		parts.push('SELECT');
+		// SELECT clause with optional DISTINCT
+		if (params.distinct) {
+			parts.push('SELECT DISTINCT');
+		} else {
+			parts.push('SELECT');
+		}
+
 		if (params.top) {
 			parts.push(`TOP ${params.top}`);
 		}
 
-		// Columns
+		// Columns (may include aggregate functions)
 		const columns = this.buildColumnList(params);
 		parts.push(columns);
 
@@ -549,6 +540,13 @@ export class FetchXmlToSqlTranspiler {
 			}
 		}
 
+		// GROUP BY clause - include columns marked with groupby=true
+		const groupByColumns = params.attributes.filter((attr) => attr.groupby);
+		if (groupByColumns.length > 0) {
+			const groupByList = groupByColumns.map((attr) => attr.name).join(', ');
+			parts.push(`GROUP BY ${groupByList}`);
+		}
+
 		// ORDER BY clause
 		if (params.orders.length > 0) {
 			const orderClauses = params.orders.map(
@@ -562,6 +560,7 @@ export class FetchXmlToSqlTranspiler {
 
 	/**
 	 * Builds the column list for SELECT.
+	 * Handles regular columns and aggregate functions.
 	 */
 	private buildColumnList(params: {
 		hasAllAttributes: boolean;
@@ -579,11 +578,8 @@ export class FetchXmlToSqlTranspiler {
 			columns.push('*');
 		} else {
 			for (const attr of params.attributes) {
-				if (attr.alias) {
-					columns.push(`${attr.name} AS ${attr.alias}`);
-				} else {
-					columns.push(attr.name);
-				}
+				const columnExpr = this.buildColumnExpression(attr);
+				columns.push(columnExpr);
 			}
 		}
 
@@ -605,6 +601,64 @@ export class FetchXmlToSqlTranspiler {
 		}
 
 		return columns.length > 0 ? columns.join(', ') : '*';
+	}
+
+	/**
+	 * Builds a single column expression, wrapping in aggregate function if needed.
+	 */
+	private buildColumnExpression(attr: ParsedAttribute): string {
+		let expr: string;
+
+		if (attr.aggregate) {
+			// Build aggregate function expression
+			expr = this.buildAggregateExpression(attr);
+		} else {
+			// Regular column reference
+			expr = attr.name;
+		}
+
+		// Add alias if present
+		if (attr.alias) {
+			return `${expr} AS ${attr.alias}`;
+		}
+
+		return expr;
+	}
+
+	/**
+	 * Builds an aggregate function expression.
+	 * Maps FetchXML aggregate types to SQL aggregate functions.
+	 */
+	private buildAggregateExpression(attr: ParsedAttribute): string {
+		const aggType = attr.aggregate?.toLowerCase();
+		const distinctKeyword = attr.distinct ? 'DISTINCT ' : '';
+
+		switch (aggType) {
+			case 'count':
+				// In FetchXML, aggregate="count" is used for COUNT(*)
+				// The column name is just a placeholder (usually the primary key)
+				return 'COUNT(*)';
+
+			case 'countcolumn':
+				// COUNT(column) - counts non-null values
+				return `COUNT(${distinctKeyword}${attr.name})`;
+
+			case 'sum':
+				return `SUM(${distinctKeyword}${attr.name})`;
+
+			case 'avg':
+				return `AVG(${distinctKeyword}${attr.name})`;
+
+			case 'min':
+				return `MIN(${attr.name})`;
+
+			case 'max':
+				return `MAX(${attr.name})`;
+
+			default:
+				// Unknown aggregate, just use the column name
+				return attr.name;
+		}
 	}
 
 	/**

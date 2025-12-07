@@ -2,6 +2,9 @@ import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../infrastructure/logging/ILogger';
 import { QueryResultViewModelMapper } from '../application/mappers/QueryResultViewModelMapper';
+import { FetchXmlToSqlTranspiler } from '../domain/services/FetchXmlToSqlTranspiler';
+import { SqlParser } from '../domain/services/SqlParser';
+import { SqlToFetchXmlTranspiler } from '../domain/services/SqlToFetchXmlTranspiler';
 
 import { DataverseNotebookController } from './DataverseNotebookController';
 import { DataverseNotebookSerializer } from './DataverseNotebookSerializer';
@@ -112,6 +115,14 @@ export async function registerDataverseNotebooks(
 		}
 	);
 
+	// Register toggle cell language command
+	const toggleLanguageCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.toggleNotebookCellLanguage',
+		async () => {
+			await toggleCellLanguage(logger);
+		}
+	);
+
 	// Handle notebook editor changes (show/hide status bar)
 	const editorChangeDisposable = vscode.window.onDidChangeActiveNotebookEditor(
 		(editor) => {
@@ -147,6 +158,7 @@ export async function registerDataverseNotebooks(
 		...controller.getDisposables(),
 		selectEnvCommand,
 		newNotebookCommand,
+		toggleLanguageCommand,
 		editorChangeDisposable,
 		notebookOpenDisposable,
 	];
@@ -252,6 +264,112 @@ export async function openQueryInNotebook(
 	} catch (error) {
 		vscode.window.showErrorMessage(
 			`Failed to open query in notebook: ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+}
+
+/**
+ * Toggles the active cell's language between SQL and FetchXML.
+ * Also converts the query content when toggling.
+ * Called from the cell toolbar button.
+ */
+async function toggleCellLanguage(logger: ILogger): Promise<void> {
+	const editor = vscode.window.activeNotebookEditor;
+	if (editor?.notebook.notebookType !== 'ppdsnb') {
+		return;
+	}
+
+	// Get the active cell
+	const selections = editor.selections;
+	const firstSelection = selections[0];
+	if (firstSelection === undefined) {
+		return;
+	}
+
+	// Use the first selected cell
+	const cellIndex = firstSelection.start;
+	const cell = editor.notebook.cellAt(cellIndex);
+
+	if (cell.kind !== vscode.NotebookCellKind.Code) {
+		return;
+	}
+
+	const currentLanguage = cell.document.languageId;
+	const currentContent = cell.document.getText();
+	const trimmedContent = currentContent.trim();
+
+	// Skip conversion for empty cells
+	if (trimmedContent === '') {
+		const newLanguage = currentLanguage === 'fetchxml' ? 'sql' : 'fetchxml';
+		await vscode.languages.setTextDocumentLanguage(cell.document, newLanguage);
+		return;
+	}
+
+	try {
+		let convertedContent: string;
+		let newLanguage: string;
+
+		if (currentLanguage === 'fetchxml' || trimmedContent.startsWith('<')) {
+			// FetchXML → SQL
+			const transpiler = new FetchXmlToSqlTranspiler();
+			const result = transpiler.transpile(trimmedContent);
+
+			if (!result.success) {
+				vscode.window.showWarningMessage(
+					`Could not convert FetchXML to SQL: ${result.error ?? 'Unknown error'}`
+				);
+				// Still switch language even if conversion fails
+				await vscode.languages.setTextDocumentLanguage(cell.document, 'sql');
+				return;
+			}
+
+			convertedContent = result.sql;
+			newLanguage = 'sql';
+
+			// Show warnings if any
+			if (result.warnings.length > 0) {
+				const warningMessages = result.warnings.map((w) => w.message).join('; ');
+				vscode.window.showWarningMessage(`Conversion warnings: ${warningMessages}`);
+			}
+		} else {
+			// SQL → FetchXML
+			const parser = new SqlParser();
+			const transpiler = new SqlToFetchXmlTranspiler();
+
+			try {
+				const ast = parser.parse(trimmedContent);
+				convertedContent = transpiler.transpile(ast);
+				newLanguage = 'fetchxml';
+			} catch (parseError) {
+				const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+				vscode.window.showWarningMessage(`Could not convert SQL to FetchXML: ${errorMessage}`);
+				// Still switch language even if conversion fails
+				await vscode.languages.setTextDocumentLanguage(cell.document, 'fetchxml');
+				return;
+			}
+		}
+
+		// Apply the conversion using WorkspaceEdit
+		const edit = new vscode.WorkspaceEdit();
+		const fullRange = new vscode.Range(
+			cell.document.positionAt(0),
+			cell.document.positionAt(cell.document.getText().length)
+		);
+		edit.replace(cell.document.uri, fullRange, convertedContent);
+		await vscode.workspace.applyEdit(edit);
+
+		// Change the language
+		await vscode.languages.setTextDocumentLanguage(cell.document, newLanguage);
+
+		logger.debug('Toggled and converted cell', {
+			from: currentLanguage,
+			to: newLanguage,
+			cellIndex,
+		});
+	} catch (error) {
+		logger.error('Failed to toggle cell language', error);
+		vscode.window.showErrorMessage(
+			`Failed to toggle language: ${error instanceof Error ? error.message : String(error)}`
 		);
 	}
 }

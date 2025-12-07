@@ -265,6 +265,12 @@
                 "title": "New Dataverse Notebook",
                 "category": "Power Platform Developer Suite",
                 "icon": "$(notebook)"
+            },
+            {
+                "command": "power-platform-dev-suite.toggleNotebookCellLanguage",
+                "title": "Toggle SQL/FetchXML",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(arrow-swap)"
             }
         ],
         "keybindings": [
@@ -435,6 +441,13 @@
                     "command": "power-platform-dev-suite.webResourcesPickEnvironment",
                     "when": "webviewId == 'powerPlatformDevSuite.webResources'",
                     "group": "1_environment@1"
+                }
+            ],
+            "notebook/cell/title": [
+                {
+                    "command": "power-platform-dev-suite.toggleNotebookCellLanguage",
+                    "when": "notebookType == 'ppdsnb'",
+                    "group": "inline"
                 }
             ]
         },

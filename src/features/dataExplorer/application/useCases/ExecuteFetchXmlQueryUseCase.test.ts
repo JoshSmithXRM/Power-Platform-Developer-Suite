@@ -217,20 +217,21 @@ describe('ExecuteFetchXmlQueryUseCase', () => {
 		});
 
 		it('should include warnings for unsupported features', () => {
-			const aggregateFetchXml = `
-				<fetch aggregate="true">
+			// Test with paging, which is an unsupported feature that generates warnings
+			const pagingFetchXml = `
+				<fetch page="2" paging-cookie="abc123">
 					<entity name="account">
 						<attribute name="name" />
 					</entity>
 				</fetch>
 			`;
 
-			const result = useCase.transpileToSql(aggregateFetchXml);
+			const result = useCase.transpileToSql(pagingFetchXml);
 
 			expect(result.success).toBe(true);
 			if (result.success) {
 				expect(result.warnings.length).toBeGreaterThan(0);
-				expect(result.warnings.some(w => w.feature === 'aggregate')).toBe(true);
+				expect(result.warnings.some(w => w.feature === 'paging')).toBe(true);
 			}
 		});
 

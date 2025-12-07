@@ -400,11 +400,129 @@ describe('FetchXmlToSqlTranspiler', () => {
 			});
 		});
 
-		describe('warnings for unsupported features', () => {
-			it('should warn about aggregate queries', () => {
+		describe('aggregate functions', () => {
+			it('should transpile COUNT(*)', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="accountid" aggregate="count" alias="cnt" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('COUNT(*)');
+				expect(result.sql).toContain('AS cnt');
+			});
+
+			it('should transpile SUM', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="revenue" aggregate="sum" alias="total" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('SUM(revenue)');
+				expect(result.sql).toContain('AS total');
+			});
+
+			it('should transpile AVG', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="revenue" aggregate="avg" alias="average" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('AVG(revenue)');
+				expect(result.sql).toContain('AS average');
+			});
+
+			it('should transpile MIN and MAX', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="revenue" aggregate="min" alias="minrev" />
+							<attribute name="revenue" aggregate="max" alias="maxrev" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('MIN(revenue)');
+				expect(result.sql).toContain('MAX(revenue)');
+			});
+
+			it('should transpile COUNT(column) with countcolumn', () => {
 				const fetchXml = `
 					<fetch aggregate="true">
 						<entity name="contact">
+							<attribute name="emailaddress1" aggregate="countcolumn" alias="emailcount" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('COUNT(emailaddress1)');
+				expect(result.sql).toContain('AS emailcount');
+			});
+
+			it('should transpile COUNT(*) and SUM together', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="accountid" aggregate="count" alias="cnt" />
+							<attribute name="revenue" aggregate="sum" alias="total" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('COUNT(*)');
+				expect(result.sql).toContain('SUM(revenue)');
+				expect(result.sql).toContain('AS cnt');
+				expect(result.sql).toContain('AS total');
+			});
+
+			it('should transpile COUNT(DISTINCT column)', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="contact">
+							<attribute name="parentcustomerid" aggregate="countcolumn" distinct="true" alias="uniqueaccounts" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('COUNT(DISTINCT parentcustomerid)');
+			});
+		});
+
+		describe('GROUP BY clause', () => {
+			it('should transpile GROUP BY with aggregates', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="contact">
+							<attribute name="statecode" groupby="true" alias="state" />
 							<attribute name="contactid" aggregate="count" alias="count" />
 						</entity>
 					</fetch>
@@ -412,10 +530,32 @@ describe('FetchXmlToSqlTranspiler', () => {
 
 				const result = transpiler.transpile(fetchXml);
 
-				expect(result.warnings.some((w) => w.feature === 'aggregate')).toBe(true);
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('statecode AS state');
+				expect(result.sql).toContain('COUNT(*)');
+				expect(result.sql).toContain('GROUP BY statecode');
 			});
 
-			it('should warn about distinct', () => {
+			it('should transpile multiple GROUP BY columns', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="statecode" groupby="true" />
+							<attribute name="industrycode" groupby="true" />
+							<attribute name="accountid" aggregate="count" alias="cnt" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('GROUP BY statecode, industrycode');
+			});
+		});
+
+		describe('DISTINCT clause', () => {
+			it('should transpile DISTINCT', () => {
 				const fetchXml = `
 					<fetch distinct="true">
 						<entity name="contact">
@@ -426,9 +566,12 @@ describe('FetchXmlToSqlTranspiler', () => {
 
 				const result = transpiler.transpile(fetchXml);
 
-				expect(result.warnings.some((w) => w.feature === 'distinct')).toBe(true);
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('SELECT DISTINCT');
 			});
+		});
 
+		describe('warnings for unsupported features', () => {
 			it('should warn about paging', () => {
 				const fetchXml = `
 					<fetch page="2" paging-cookie="cookie">
@@ -441,35 +584,6 @@ describe('FetchXmlToSqlTranspiler', () => {
 				const result = transpiler.transpile(fetchXml);
 
 				expect(result.warnings.some((w) => w.feature === 'paging')).toBe(true);
-			});
-
-			it('should warn about aggregate functions', () => {
-				const fetchXml = `
-					<fetch>
-						<entity name="account">
-							<attribute name="revenue" aggregate="sum" alias="totalrevenue" />
-						</entity>
-					</fetch>
-				`;
-
-				const result = transpiler.transpile(fetchXml);
-
-				expect(result.warnings.some((w) => w.feature === 'aggregate-functions')).toBe(true);
-			});
-
-			it('should warn about groupby', () => {
-				const fetchXml = `
-					<fetch aggregate="true">
-						<entity name="contact">
-							<attribute name="statecode" groupby="true" alias="state" />
-							<attribute name="contactid" aggregate="count" alias="count" />
-						</entity>
-					</fetch>
-				`;
-
-				const result = transpiler.transpile(fetchXml);
-
-				expect(result.warnings.some((w) => w.feature === 'groupby')).toBe(true);
 			});
 
 			it('should warn about count attribute', () => {
