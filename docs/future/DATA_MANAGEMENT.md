@@ -7,23 +7,23 @@ Features for querying, manipulating, and managing Dataverse data.
 ## Implemented
 
 ### Data Explorer (SQL/FetchXML Query Execution)
-**Status**: ✅ Implemented (v0.2.2 - v0.2.6)
+**Status**: Implemented (v0.2.2 - v0.2.6)
 **Version**: v0.2.2 (MVP), v0.2.4 (FetchXML mode), v0.2.6 (settings)
 
 **What's Implemented**:
-- ✅ SQL query editor with syntax highlighting
-- ✅ SQL → FetchXML transpilation with live preview
-- ✅ FetchXML direct editing mode (bidirectional preview)
-- ✅ FetchXML → SQL transpilation with warnings for unsupported features
-- ✅ Query execution against Dataverse
-- ✅ Results displayed in sortable data table
-- ✅ Clickable record links (lookup fields and primary keys)
-- ✅ Copy record URL button on hover
-- ✅ Export results to CSV
-- ✅ Keyboard shortcut (Ctrl+Enter)
-- ✅ Query mode persistence per environment
-- ✅ Row limit warning modal (TOP 100 prompt)
-- ✅ Zone-based Ctrl+A selection in results table
+- SQL query editor with syntax highlighting
+- SQL → FetchXML transpilation with live preview
+- FetchXML direct editing mode (bidirectional preview)
+- FetchXML → SQL transpilation with warnings for unsupported features
+- Query execution against Dataverse
+- Results displayed in sortable data table
+- Clickable record links (lookup fields and primary keys)
+- Copy record URL button on hover
+- Export results to CSV
+- Keyboard shortcut (Ctrl+Enter)
+- Query mode persistence per environment
+- Row limit warning modal (TOP 100 prompt)
+- Zone-based Ctrl+A selection in results table
 
 **SQL Support** (Implemented):
 - SELECT with column list or *
@@ -36,51 +36,57 @@ Features for querying, manipulating, and managing Dataverse data.
 
 ---
 
-## High Priority
-
 ### Data Explorer - IntelliSense
-**Status**: Planned
-**Target Version**: v0.3.0
-**Priority**: High
-**Estimated Effort**: 12-18 hours
-**Value**: Autocomplete for entity and attribute names while typing SQL
+**Status**: Implemented (v0.3.0)
+**Completed**: 2025-12-06
 
-**Description**:
-Add VS Code native IntelliSense for SQL queries - entity names after FROM, attribute names after SELECT/WHERE.
-
-**Core Features**:
+**What's Implemented**:
+- Native VS Code SQL editor integration (New Query, Open File buttons)
 - Entity name completion (after FROM/JOIN)
 - Attribute name completion (after SELECT/WHERE/ORDER BY)
-- SQL keyword completion
-- Metadata caching for performance
+- Context-aware SQL keyword completion
+- String literal detection (no suggestions inside quotes)
+- Metadata caching for performance (per environment)
+- Ctrl+Enter keybinding for query execution from VS Code editor
+- FetchXML IntelliSense (element, attribute, operator suggestions)
+- Document-scoped environment resolution (notebooks vs panel)
 
-**Technical Design**: `docs/future/DATA_EXPLORER_INTELLISENSE_DESIGN.md` (V2 - revised)
-
-**Success Criteria**:
-- Typing "FROM acc" suggests "account"
-- Typing "SELECT na" suggests "name" for the current entity
-- Completions work in any .sql file when Data Explorer has an active environment
+**Implementation**: `src/features/dataExplorer/presentation/providers/`
 
 ---
 
-### Data Explorer - SQL Aggregates & JOINs
-**Status**: Planned
-**Target Version**: v0.3.0
-**Priority**: High
-**Estimated Effort**: 16-24 hours
-**Value**: Full SQL4CDS-style query support
+### Data Explorer - Notebooks
+**Status**: Implemented (v0.3.0)
+**Completed**: 2025-12-06
 
-**Description**:
-Add aggregate functions and JOIN support to SQL transpiler.
+**What's Implemented**:
+- Combined SQL/FetchXML notebook support (.ppdsnb extension)
+- SQL cells transpile → execute as FetchXML
+- FetchXML cells execute directly
+- Clickable record links in notebook output (open in browser)
+- Environment stored in notebook metadata
+- IntelliSense works in notebook cells (reads environment from metadata)
+
+**Implementation**: `src/features/dataExplorer/notebooks/`
+
+---
+
+### Data Explorer - Aggregates & Basic JOINs
+**Status**: Implemented (v0.3.0)
+**Completed**: 2025-12-06
 
 **Aggregate Support**:
-- COUNT, SUM, AVG, MIN, MAX functions
-- GROUP BY clause
-- HAVING clause (stretch)
+- DISTINCT keyword
+- COUNT(*), COUNT(column), COUNT(DISTINCT column)
+- SUM, AVG, MIN, MAX functions
+- GROUP BY clause (single and multiple columns)
+- Column aliases for aggregates
 
 **JOIN Support**:
-- INNER JOIN for related entities
-- Lookup traversal via JOIN syntax
+- INNER JOIN → FetchXML `<link-entity link-type="inner">`
+- LEFT JOIN → FetchXML `<link-entity link-type="outer">`
+- Table aliases (`FROM account a`)
+- Qualified column references (`a.name`)
 
 **Example Queries**:
 ```sql
@@ -90,40 +96,127 @@ GROUP BY statecode
 
 SELECT a.name, c.fullname
 FROM account a
-JOIN contact c ON a.primarycontactid = c.contactid
+INNER JOIN contact c ON a.primarycontactid = c.contactid
 WHERE a.revenue > 1000000
 ```
 
-**Success Criteria**:
-- Common aggregate queries work
-- Basic JOINs translate to FetchXML link-entity
-- Clear error messages for unsupported syntax
+**Implementation**: `src/features/dataExplorer/domain/sql/`
 
-### Data Explorer - Saved Queries (UserQuery)
+---
+
+## In Progress
+
+### Data Explorer - Visual Query Builder + Saved Queries
+**Status**: In Progress
+**Target Version**: v0.3.0
+**Priority**: High
+**Estimated Effort**: 16-24 hours
+**Tracking**: `docs/work/DATA_EXPLORER_VISUAL_BUILDER_TODO.md`
+
+**Description**:
+Transform the Data Explorer panel from a code-based query editor to a Visual Query Builder (like Advanced Find), while keeping notebooks as the primary code editing experience.
+
+**Core Features**:
+- Visual Query Builder UI (entity, columns, filters, sort)
+- FetchXML parser (populate builder from existing FetchXML)
+- Save as Personal View (UserQuery) in Dataverse
+- Load existing Personal Views
+- Three-way sync: SQL ↔ FetchXML ↔ Visual Builder
+
+**Value**:
+- Not all users are comfortable writing SQL
+- Queries created in VS Code appear as Advanced Find views in Dynamics
+- Bridges VS Code experience with Dynamics UI
+
+---
+
+## High Priority
+
+### Data Explorer - Query History
 **Status**: Planned
 **Target Version**: v0.3.0
 **Priority**: High
-**Estimated Effort**: 6-10 hours
-**Value**: Save SQL queries as Personal Views visible in both VS Code AND Dynamics Advanced Find
+**Estimated Effort**: 6-8 hours
+**Value**: Quick access to previous queries, dev→prod workflow
 
 **Description**:
-Save the current query as a UserQuery (Personal View) in Dataverse. This bridges the VS Code experience with Dynamics - queries created in our tool appear as Advanced Find views in the browser.
+Remember queries run in each environment and enable cross-environment query reuse.
 
 **Core Features**:
-- Save current query as UserQuery (Personal View)
-- Load existing personal views into the editor
-- Portable across devices/users with same permissions
-- Available in Dynamics UI Advanced Find
-
-**Technical Considerations**:
-- UserQuery entity for saved queries (systemuser-owned)
-- FetchXML storage format (already generated by transpiler)
-- Need to add layoutxml for column configuration
-- Query name and description input
+- Environment-specific history (last 50 per env)
+- Cross-environment history (last 100 global)
+- History dropdown + "View All" modal UI
+- Persist using VS Code globalState
 
 **Success Criteria**:
-- User saves SQL query, it appears in Dynamics Advanced Find
-- User loads existing Personal View, can edit and re-save
+- Run query in Dev → Switch to Prod → Find in global history → Execute
+- Search history for "account" finds all queries with "account"
+- History persists across VS Code restarts
+
+---
+
+### Data Explorer - INSERT/UPDATE/DELETE
+**Status**: Planned
+**Target Version**: v0.3.0
+**Priority**: High
+**Estimated Effort**: 12-16 hours
+**Value**: Full CRUD operations from SQL
+
+**Description**:
+Support data modification statements with safety features.
+
+**Core Features**:
+- INSERT INTO entity (columns) VALUES (values)
+- UPDATE entity SET column = value WHERE condition
+- DELETE FROM entity WHERE condition
+- Preview affected records before execution
+- Confirmation dialogs with record counts
+- Batch operations (100 records per batch)
+
+**Safety Features**:
+- Require WHERE clause for UPDATE/DELETE
+- Preview mode before executing
+- Extra confirmation for >100 records
+
+---
+
+## Deferred (Future Versions)
+
+### Advanced Aggregates
+**Status**: Deferred
+**Target Version**: v1.0+
+**Reason**: Requires custom SQL syntax or has no direct SQL equivalent
+
+**Features**:
+- HAVING clause: `SELECT statecode, COUNT(*) FROM account GROUP BY statecode HAVING COUNT(*) > 10`
+- Date grouping: `GROUP BY YEAR(createdon)` → FetchXML `dategrouping="year"`
+  - Supported in FetchXML: day, week, month, quarter, year, fiscal-period, fiscal-year
+- User timezone control for date grouping
+
+**Technical Notes**:
+- HAVING requires post-processing or FetchXML filter workarounds
+- Date grouping requires custom SQL syntax (non-standard)
+
+---
+
+### Advanced JOIN Types
+**Status**: Deferred
+**Target Version**: v1.0+
+**Reason**: FetchXML supports join types without standard SQL equivalents
+
+| FetchXML link-type | SQL Equivalent | Status |
+|--------------------|----------------|--------|
+| `inner` | INNER JOIN | Implemented |
+| `outer` | LEFT JOIN | Implemented |
+| `exists` | EXISTS subquery | No standard SQL |
+| `in` | IN subquery | No standard SQL |
+| `any` / `not any` | None | No SQL equivalent |
+| `all` / `not all` | None | No SQL equivalent |
+| `matchfirstrowusingcrossapply` | CROSS APPLY | Not standard SQL |
+
+**Options for future**:
+- Add FetchXML-specific syntax: `JOIN entity USING EXISTS`
+- Or leave as FetchXML-only features (use FetchXML mode directly)
 
 ---
 
@@ -176,4 +269,4 @@ Bulk update or delete records with preview and confirmation.
 
 ---
 
-**Last Updated**: 2025-12-02
+**Last Updated**: 2025-12-07

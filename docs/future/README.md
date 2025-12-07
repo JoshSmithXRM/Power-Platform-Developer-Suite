@@ -13,7 +13,7 @@ Track features and improvements that are planned but not actively being worked o
 
 | File | Description | Status |
 |------|-------------|--------|
-| [DATA_MANAGEMENT.md](DATA_MANAGEMENT.md) | Data Explorer (✅ MVP), IntelliSense, Aggregates/JOINs | IntelliSense next |
+| [DATA_MANAGEMENT.md](DATA_MANAGEMENT.md) | Data Explorer (✅ IntelliSense, ✅ Aggregates/JOINs), Visual Builder | Visual Builder in progress |
 | [DEVELOPMENT_TOOLS.md](DEVELOPMENT_TOOLS.md) | Web Resources (✅ Complete), Plugin Registration | Plugin Reg planned |
 | [ALM_DEVOPS.md](ALM_DEVOPS.md) | Deployment promotion, Solution Diff | Planned |
 | [ADMINISTRATION.md](ADMINISTRATION.md) | Connection Manager, Async Jobs, Workflows | Planned |
@@ -27,7 +27,7 @@ Detailed technical designs for complex features that require significant plannin
 
 | File | Description | Status |
 |------|-------------|--------|
-| [DATA_EXPLORER_INTELLISENSE_DESIGN.md](DATA_EXPLORER_INTELLISENSE_DESIGN.md) | SQL/FetchXML IntelliSense | Ready to implement |
+| [DATA_EXPLORER_INTELLISENSE_DESIGN.md](DATA_EXPLORER_INTELLISENSE_DESIGN.md) | SQL/FetchXML IntelliSense | Implemented (v0.3.0) |
 | [FILTER_PANEL_IMPROVEMENTS_DESIGN.md](FILTER_PANEL_IMPROVEMENTS_DESIGN.md) | Plugin Trace filter enhancements | Deferred |
 | [WEBVIEW_TYPESCRIPT_MIGRATION_DESIGN.md](WEBVIEW_TYPESCRIPT_MIGRATION_DESIGN.md) | TypeScript webview behaviors | Deferred |
 
@@ -93,4 +93,4 @@ Items moved here from feature files with rejection reason.
 
 ---
 
-**Last Reviewed**: 2025-12-02
+**Last Reviewed**: 2025-12-07
