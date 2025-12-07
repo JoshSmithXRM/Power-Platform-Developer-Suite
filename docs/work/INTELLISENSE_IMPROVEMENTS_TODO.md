@@ -37,13 +37,13 @@
   - [x] Serializer handles cell language (sql, xml, markdown)
 - [x] Renamed notebook extension to .ppdsnb (Power Platform Developer Suite Notebook)
 
-### Phase 3: FetchXML IntelliSense
-- [ ] FetchXML context detector (XML-aware, element/attribute detection)
-- [ ] FetchXML completion provider (register for language: 'xml')
-- [ ] Entity name suggestions (in `<entity name="">`)
-- [ ] Attribute name suggestions (in `<attribute name="">`)
-- [ ] Operator suggestions (in `<condition operator="">`)
-- [ ] Element suggestions (valid child elements based on parent)
+### Phase 3: FetchXML IntelliSense - COMPLETED 2025-12-06
+- [x] FetchXML context detector (XML-aware, element/attribute detection)
+- [x] FetchXML completion provider (register for language: 'fetchxml')
+- [x] Entity name suggestions (in `<entity name="">`)
+- [x] Attribute name suggestions (in `<attribute name="">`)
+- [x] Operator suggestions (in `<condition operator="">`)
+- [x] Element suggestions (valid child elements based on parent)
 
 ### Phase 4: Additional Query Support
 - [ ] Implement FetchXML aggregate queries (COUNT, SUM, AVG, MIN, MAX)
@@ -102,29 +102,29 @@
 - [x] Update tests
 - [x] `npm run compile` passes
 
-### Phase 2: FetchXML IntelliSense (After Phase 1)
+### Phase 2: FetchXML IntelliSense (After Phase 1) - COMPLETED 2025-12-06
 
 #### 2.1 Domain Layer
-- [ ] Create `FetchXmlContextDetector` domain service
-- [ ] Create `FetchXmlElementSuggestion` value object
-- [ ] Create `OperatorSuggestion` value object
-- [ ] Define valid element hierarchy (fetch → entity → attribute, etc.)
-- [ ] Unit tests
-- [ ] `npm run compile` passes
+- [x] Create `FetchXmlContextDetector` domain service
+- [x] Create `FetchXmlElementSuggestion` value object
+- [x] Create `OperatorSuggestion` value object
+- [x] Define valid element hierarchy (fetch → entity → attribute, etc.)
+- [x] Unit tests (41 tests)
+- [x] `npm run compile` passes
 
 #### 2.2 Application Layer
-- [ ] Create `GetFetchXmlElementSuggestionsUseCase`
-- [ ] Create `GetOperatorSuggestionsUseCase`
-- [ ] Reuse existing `GetEntitySuggestionsUseCase`
-- [ ] Reuse existing `GetAttributeSuggestionsUseCase`
-- [ ] `npm run compile` passes
+- [x] Create `GetFetchXmlElementSuggestionsUseCase`
+- [x] Create `GetOperatorSuggestionsUseCase`
+- [x] Reuse existing `GetEntitySuggestionsUseCase`
+- [x] Reuse existing `GetAttributeSuggestionsUseCase`
+- [x] `npm run compile` passes
 
 #### 2.3 Presentation Layer
-- [ ] Create `FetchXmlCompletionProvider`
-- [ ] Register for XML files with content-based activation
-- [ ] Create element/operator mappers
-- [ ] Wire into registration
-- [ ] `npm run compile` passes
+- [x] Create `FetchXmlCompletionProvider`
+- [x] Register for 'fetchxml' language
+- [x] Create element/operator mappers
+- [x] Wire into registration
+- [x] `npm run compile` passes
 
 ### Phase 3: Notebook & Editor Improvements (After Phase 2)
 
@@ -367,3 +367,70 @@ else
 - `src/features/dataExplorer/notebooks/registerNotebooks.ts`
 
 **Test Results:** Build successful, all lint checks pass
+
+### Session 3 (2025-12-06) - FetchXML IntelliSense
+
+**Goal:** Implement context-aware IntelliSense for FetchXML queries.
+
+**Changes Made:**
+
+1. **Domain Layer**
+   - `FetchXmlContextDetector` - Parses XML and detects cursor context:
+     - `element` - After `<`, suggests valid child elements
+     - `attribute-name` - Inside element tag, suggests valid attributes
+     - `attribute-value` - Inside `="..."`, suggests values based on context
+   - `FetchXmlElementSuggestion` - Value object for element suggestions
+   - `OperatorSuggestion` - Value object for condition operators (70+ operators)
+   - 41 unit tests covering all context detection scenarios
+
+2. **Application Layer**
+   - `GetFetchXmlElementSuggestionsUseCase` - Returns element suggestions filtered by prefix
+   - `GetOperatorSuggestionsUseCase` - Returns operator suggestions filtered by prefix
+   - Reuses existing entity/attribute use cases for metadata-based suggestions
+
+3. **Presentation Layer**
+   - `FetchXmlCompletionProvider` - VS Code completion provider for 'fetchxml' language
+     - Element suggestions with smart snippets (container vs leaf elements)
+     - Attribute name suggestions with `="$1"` snippets
+     - Attribute value suggestions:
+       - Entity names from metadata
+       - Attribute names for current entity context
+       - Operators, filter types, link types, boolean values
+   - `FetchXmlElementSuggestionCompletionMapper` - Maps domain to VS Code
+   - `OperatorSuggestionCompletionMapper` - Maps domain to VS Code
+
+4. **Registration**
+   - Updated `registerDataExplorerIntelliSense.ts` to register FetchXML provider
+   - Trigger characters: `<` (element), ` ` (attribute), `"` (value)
+
+**Context-Aware Suggestions:**
+
+| Context | Suggestions |
+|---------|-------------|
+| `<fetch><` | entity |
+| `<entity name="` | Entity names from metadata |
+| `<attribute name="` | Attribute names for current entity |
+| `<condition operator="` | eq, ne, like, null, today, etc. (70+ operators) |
+| `<filter type="` | and, or |
+| `<link-entity link-type="` | inner, outer, exists, etc. |
+
+**Files Created:**
+- `src/features/dataExplorer/domain/services/FetchXmlContextDetector.ts`
+- `src/features/dataExplorer/domain/services/FetchXmlContextDetector.test.ts`
+- `src/features/dataExplorer/domain/valueObjects/FetchXmlElementSuggestion.ts`
+- `src/features/dataExplorer/domain/valueObjects/OperatorSuggestion.ts`
+- `src/features/dataExplorer/application/useCases/GetFetchXmlElementSuggestionsUseCase.ts`
+- `src/features/dataExplorer/application/useCases/GetOperatorSuggestionsUseCase.ts`
+- `src/features/dataExplorer/presentation/providers/FetchXmlCompletionProvider.ts`
+- `src/features/dataExplorer/presentation/mappers/FetchXmlElementSuggestionCompletionMapper.ts`
+- `src/features/dataExplorer/presentation/mappers/OperatorSuggestionCompletionMapper.ts`
+
+**Files Modified:**
+- `src/features/dataExplorer/presentation/initialization/registerDataExplorerIntelliSense.ts`
+
+**Test Results:** 542 Data Explorer tests pass (41 new FetchXML tests)
+
+**Next Steps:**
+- Manual testing with F5 to verify IntelliSense in `.fetchxml` files and notebooks
+- Phase 4: Aggregate query support (COUNT, SUM, etc.)
+- Phase 5: SQL keyword cleanup (remove unsupported keywords)

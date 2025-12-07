@@ -6,9 +6,13 @@ import { IntelliSenseContextService } from '../../application/services/IntelliSe
 import { IntelliSenseMetadataCache } from '../../application/services/IntelliSenseMetadataCache';
 import { DataverseIntelliSenseMetadataRepository } from '../../infrastructure/repositories/DataverseIntelliSenseMetadataRepository';
 import { SqlContextDetector } from '../../domain/services/SqlContextDetector';
+import { FetchXmlContextDetector } from '../../domain/services/FetchXmlContextDetector';
 import { GetEntitySuggestionsUseCase } from '../../application/useCases/GetEntitySuggestionsUseCase';
 import { GetAttributeSuggestionsUseCase } from '../../application/useCases/GetAttributeSuggestionsUseCase';
+import { GetFetchXmlElementSuggestionsUseCase } from '../../application/useCases/GetFetchXmlElementSuggestionsUseCase';
+import { GetOperatorSuggestionsUseCase } from '../../application/useCases/GetOperatorSuggestionsUseCase';
 import { DataverseCompletionProvider } from '../providers/DataverseCompletionProvider';
+import { FetchXmlCompletionProvider } from '../providers/FetchXmlCompletionProvider';
 import { SqlEditorService } from '../services/SqlEditorService';
 import { SqlEditorWatcher } from '../services/SqlEditorWatcher';
 
@@ -101,36 +105,60 @@ export function registerDataExplorerIntelliSense(
 	const metadataCache = new IntelliSenseMetadataCache(repository);
 
 	// 2. Create domain services and use cases
-	const contextDetector = new SqlContextDetector();
+	const sqlContextDetector = new SqlContextDetector();
+	const fetchXmlContextDetector = new FetchXmlContextDetector();
 	const getEntitySuggestions = new GetEntitySuggestionsUseCase(metadataCache, logger);
 	const getAttributeSuggestions = new GetAttributeSuggestionsUseCase(metadataCache, logger);
+	const getElementSuggestions = new GetFetchXmlElementSuggestionsUseCase(logger);
+	const getOperatorSuggestions = new GetOperatorSuggestionsUseCase(logger);
 
-	// 3. Create completion provider
-	const completionProvider = new DataverseCompletionProvider(
+	// 3. Create SQL completion provider
+	const sqlCompletionProvider = new DataverseCompletionProvider(
 		contextService,
-		contextDetector,
+		sqlContextDetector,
 		getEntitySuggestions,
 		getAttributeSuggestions
 	);
 
-	// 4. Register completion provider for ALL SQL files
+	// 4. Create FetchXML completion provider
+	const fetchXmlCompletionProvider = new FetchXmlCompletionProvider(
+		contextService,
+		fetchXmlContextDetector,
+		getEntitySuggestions,
+		getAttributeSuggestions,
+		getElementSuggestions,
+		getOperatorSuggestions
+	);
+
+	// 5. Register SQL completion provider
 	// Trigger characters: space (after keywords), comma (in column lists), period (for future alias.column)
-	const completionProviderDisposable = vscode.languages.registerCompletionItemProvider(
+	const sqlProviderDisposable = vscode.languages.registerCompletionItemProvider(
 		{ language: 'sql' },
-		completionProvider,
+		sqlCompletionProvider,
 		' ',
 		',',
 		'.'
 	);
-	context.subscriptions.push(completionProviderDisposable);
+	context.subscriptions.push(sqlProviderDisposable);
 
-	// 5. Create editor service and watcher
+	// 6. Register FetchXML completion provider
+	// Trigger characters: < (element start), space (attribute), " (attribute value)
+	const fetchXmlProviderDisposable = vscode.languages.registerCompletionItemProvider(
+		{ language: 'fetchxml' },
+		fetchXmlCompletionProvider,
+		'<',
+		' ',
+		'"'
+	);
+	context.subscriptions.push(fetchXmlProviderDisposable);
+
+	// 7. Create editor service and watcher
 	const editorService = new SqlEditorService(logger);
 	const editorWatcher = new SqlEditorWatcher(logger);
 	context.subscriptions.push(editorService);
 	context.subscriptions.push(editorWatcher);
 
-	// 6. Register Ctrl+Enter command for executing queries from editor
+	// 8. Register Ctrl+Enter command for executing queries from editor
 	const executeQueryCommand = vscode.commands.registerCommand(
 		'power-platform-dev-suite.executeQueryFromEditor',
 		() => {
@@ -160,7 +188,7 @@ export function registerDataExplorerIntelliSense(
 	);
 	context.subscriptions.push(executeQueryCommand);
 
-	// 7. Register cache disposal
+	// 9. Register cache disposal
 	context.subscriptions.push({ dispose: () => metadataCache.dispose() });
 
 	logger.info('Data Explorer IntelliSense registered successfully');
