@@ -21,6 +21,7 @@ module.exports = (env, argv) => {
 			ImportJobViewerBehavior: './resources/webview/js/behaviors/ImportJobViewerBehavior.js',
 			EnvironmentVariablesBehavior: './resources/webview/js/behaviors/EnvironmentVariablesBehavior.js',
 			DataExplorerBehavior: './resources/webview/js/behaviors/DataExplorerBehavior.js',
+			VisualQueryBuilderBehavior: './resources/webview/js/behaviors/VisualQueryBuilderBehavior.js',
 			TableRenderer: './resources/webview/js/renderers/TableRenderer.js',
 			DetailPanelRenderer: './resources/webview/js/renderers/DetailPanelRenderer.js',
 			VirtualTableRenderer: './resources/webview/js/renderers/VirtualTableRenderer.js'

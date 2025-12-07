@@ -24,15 +24,15 @@ import type { ExecuteSqlQueryUseCase } from '../../application/useCases/ExecuteS
 import type { ExecuteFetchXmlQueryUseCase } from '../../application/useCases/ExecuteFetchXmlQueryUseCase';
 import type { QueryResultViewModelMapper } from '../../application/mappers/QueryResultViewModelMapper';
 import { SqlParseErrorViewModelMapper } from '../../application/mappers/SqlParseErrorViewModelMapper';
-import { SqlParseError } from '../../domain/errors/SqlParseError';
 import { FetchXmlValidationError } from '../../domain/errors/FetchXmlValidationError';
 import type { QueryResult } from '../../domain/entities/QueryResult';
-import { QueryEditorSection } from '../sections/QueryEditorSection';
-import type { QueryMode, TranspilationWarning } from '../views/queryEditorView';
+import { VisualQueryBuilderSection } from '../sections/VisualQueryBuilderSection';
+import type { EntityOption } from '../views/visualQueryBuilderView';
 import { DataverseRecordUrlService } from '../../../../shared/infrastructure/services/DataverseRecordUrlService';
 import { CsvExportService, type TabularData } from '../../../../shared/infrastructure/services/CsvExportService';
 import type { DataExplorerIntelliSenseServices } from '../initialization/registerDataExplorerIntelliSense';
 import { openQueryInNotebook } from '../../notebooks/registerNotebooks';
+import { VisualQuery, FetchXmlGenerator, FetchXmlToSqlTranspiler } from '../../application/types';
 
 /**
  * Commands supported by Data Explorer panel.
@@ -40,17 +40,14 @@ import { openQueryInNotebook } from '../../notebooks/registerNotebooks';
 type DataExplorerCommands =
 	| 'executeQuery'
 	| 'exportCsv'
-	| 'newQuery'
-	| 'openFile'
 	| 'openInNotebook'
 	| 'environmentChange'
-	| 'updateSqlQuery'
-	| 'updateFetchXmlQuery'
-	| 'switchQueryMode'
+	| 'selectEntity'
 	| 'openRecord'
 	| 'copyRecordUrl'
 	| 'warningModalResponse'
-	| 'copySuccess';
+	| 'copySuccess'
+	| 'webviewReady';
 
 /**
  * Type-safe actions for the row limit warning modal.
@@ -71,11 +68,12 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private readonly errorMapper: SqlParseErrorViewModelMapper;
 	private readonly recordUrlService: DataverseRecordUrlService;
 	private readonly csvExportService: CsvExportService;
+	private readonly fetchXmlGenerator: FetchXmlGenerator;
+	private readonly fetchXmlToSqlTranspiler: FetchXmlToSqlTranspiler;
 	private currentEnvironmentId: string;
-	private currentSqlQuery: string = '';
-	private currentFetchXml: string = '';
-	private currentQueryMode: QueryMode = 'sql';
-	private currentTranspilationWarnings: readonly TranspilationWarning[] = [];
+	private currentVisualQuery: VisualQuery | null = null;
+	private currentEntities: readonly EntityOption[] = [];
+	private isLoadingEntities: boolean = false;
 	private currentResult: QueryResult | null = null;
 
 	/** Monotonic counter for query execution to discard stale results. */
@@ -85,10 +83,6 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	/** Resolver for pending warning modal response. */
 	private pendingModalResolver: ((action: WarningModalAction) => void) | null =
 		null;
-	/** Unsubscribe function for SqlEditorWatcher listener. */
-	private unsubscribeSqlWatcher: (() => void) | null = null;
-	/** Unsubscribe function for query execution request listener. */
-	private unsubscribeQueryExecution: (() => void) | null = null;
 
 	private constructor(
 		private readonly panel: SafeWebviewPanel,
@@ -110,7 +104,9 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		this.errorMapper = new SqlParseErrorViewModelMapper();
 		this.recordUrlService = new DataverseRecordUrlService();
 		this.csvExportService = new CsvExportService(logger);
-		logger.debug('DataExplorerPanel: Initialized with new architecture');
+		this.fetchXmlGenerator = new FetchXmlGenerator();
+		this.fetchXmlToSqlTranspiler = new FetchXmlToSqlTranspiler();
+		logger.debug('DataExplorerPanel: Initialized with visual query builder');
 
 		// Configure webview
 		panel.webview.options = {
@@ -127,42 +123,11 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Set initial environment for IntelliSense context
 		this.intelliSenseServices.contextService.setActiveEnvironment(environmentId);
 
-		// Subscribe to SQL editor changes for FetchXML preview sync (when in SQL mode)
-		this.unsubscribeSqlWatcher = this.intelliSenseServices.editorWatcher.onSqlChanged(
-			(sql) => {
-				if (this.currentQueryMode === 'sql') {
-					// Update FetchXML preview when SQL changes in VS Code editor
-					this.currentSqlQuery = sql;
-					void this.updateFetchXmlPreview();
-				}
-			}
-		);
-
-		// Subscribe to query execution requests (Ctrl+Enter from VS Code editor)
-		this.unsubscribeQueryExecution =
-			this.intelliSenseServices.contextService.onExecuteQueryRequest((sql) => {
-				this.logger.debug('Executing query from VS Code editor', { sqlLength: sql.length });
-				// Switch to SQL mode if not already
-				if (this.currentQueryMode !== 'sql') {
-					void this.handleSwitchQueryMode('sql');
-				}
-				// Execute the SQL query
-				void this.handleExecuteSqlQuery(sql);
-			});
-
 		// Cleanup on panel dispose
 		panel.onDidDispose(() => {
 			if (this.pendingModalResolver) {
 				this.pendingModalResolver('cancel');
 				this.pendingModalResolver = null;
-			}
-			if (this.unsubscribeSqlWatcher) {
-				this.unsubscribeSqlWatcher();
-				this.unsubscribeSqlWatcher = null;
-			}
-			if (this.unsubscribeQueryExecution) {
-				this.unsubscribeQueryExecution();
-				this.unsubscribeQueryExecution = null;
 			}
 			// Clear active environment when panel closes
 			this.intelliSenseServices.contextService.setActiveEnvironment(null);
@@ -224,43 +189,117 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Load environments first so they appear on initial render
 		const environments = await this.getEnvironments();
 
-		// Load persisted state (SQL query and mode)
+		// Load persisted state (selected entity)
 		try {
 			const state = await this.panelStateRepository.load({
 				panelType: DataExplorerPanelComposed.viewType,
 				environmentId: this.currentEnvironmentId,
 			});
-			const savedSql = state?.['sqlQuery'];
-			if (savedSql && typeof savedSql === 'string') {
-				this.currentSqlQuery = savedSql;
-				this.logger.debug('Loaded persisted SQL query', {
+			const savedEntity = state?.['selectedEntity'];
+			if (savedEntity && typeof savedEntity === 'string') {
+				this.currentVisualQuery = new VisualQuery(savedEntity);
+				this.logger.debug('Loaded persisted entity selection', {
 					environmentId: this.currentEnvironmentId,
-					sqlLength: this.currentSqlQuery.length,
+					entity: savedEntity,
 				});
-			}
-			const savedFetchXml = state?.['fetchXmlQuery'];
-			if (savedFetchXml && typeof savedFetchXml === 'string') {
-				this.currentFetchXml = savedFetchXml;
-			}
-			const savedMode = state?.['queryMode'];
-			if (savedMode === 'sql' || savedMode === 'fetchxml') {
-				this.currentQueryMode = savedMode;
 			}
 		} catch (error) {
 			this.logger.warn('Failed to load persisted query state', error);
 		}
 
 		// Initialize coordinator with environments
+		this.isLoadingEntities = true;
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
-			customData: {
-				sql: this.currentSqlQuery,
-				fetchXml: this.currentFetchXml,
-				queryMode: this.currentQueryMode,
-				transpilationWarnings: this.currentTranspilationWarnings,
-			},
+			customData: this.buildCustomData(),
 		});
+
+		// Don't load entities here - wait for webviewReady signal
+		// This prevents race conditions where entities are sent before JS is ready
+	}
+
+	/**
+	 * Builds customData for the visual query builder section.
+	 */
+	private buildCustomData(): Record<string, unknown> {
+		const fetchXml = this.currentVisualQuery
+			? this.fetchXmlGenerator.generate(this.currentVisualQuery)
+			: '';
+		const sql = this.generateSqlFromVisualQuery();
+
+		return {
+			entities: this.currentEntities,
+			selectedEntity: this.currentVisualQuery?.entityName ?? null,
+			isLoadingEntities: this.isLoadingEntities,
+			generatedFetchXml: fetchXml,
+			generatedSql: sql,
+		};
+	}
+
+	/**
+	 * Generates SQL from the current visual query.
+	 */
+	private generateSqlFromVisualQuery(): string {
+		if (!this.currentVisualQuery) {
+			return '';
+		}
+
+		const fetchXml = this.fetchXmlGenerator.generate(this.currentVisualQuery);
+		const result = this.fetchXmlToSqlTranspiler.transpile(fetchXml);
+		return result.success ? result.sql : '';
+	}
+
+	/**
+	 * Loads entities for the current environment.
+	 */
+	private async loadEntitiesForEnvironment(): Promise<void> {
+		this.isLoadingEntities = true;
+		await this.panel.postMessage({
+			command: 'setLoadingEntities',
+			data: { isLoading: true },
+		});
+
+		try {
+			const entitySuggestions = await this.intelliSenseServices.metadataCache.getEntitySuggestions(
+				this.currentEnvironmentId
+			);
+
+			// Map to EntityOption format and sort by display name
+			this.currentEntities = entitySuggestions
+				.map((e) => ({
+					logicalName: e.logicalName,
+					displayName: e.displayName,
+					isCustomEntity: e.isCustomEntity,
+				}))
+				.sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+			this.logger.debug('Loaded entities for environment', {
+				environmentId: this.currentEnvironmentId,
+				entityCount: this.currentEntities.length,
+			});
+
+			// Send entities to webview
+			await this.panel.postMessage({
+				command: 'entitiesLoaded',
+				data: {
+					entities: this.currentEntities,
+					selectedEntity: this.currentVisualQuery?.entityName ?? null,
+				},
+			});
+		} catch (error) {
+			this.logger.error('Failed to load entities', error);
+			await this.panel.postMessage({
+				command: 'showError',
+				data: { message: 'Failed to load entities. Please try again.' },
+			});
+		} finally {
+			this.isLoadingEntities = false;
+			await this.panel.postMessage({
+				command: 'setLoadingEntities',
+				data: { isLoading: false },
+			});
+		}
 	}
 
 	private createCoordinator(): {
@@ -268,18 +307,14 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		scaffoldingBehavior: HtmlScaffoldingBehavior;
 	} {
 		const environmentSelector = new EnvironmentSelectorSection();
-		const queryEditorSection = new QueryEditorSection();
+		const visualQueryBuilderSection = new VisualQueryBuilderSection();
 
 		// Note: Button IDs must match command names registered in registerCommandHandlers()
-		// customHandler: true prevents messaging.js from attaching a generic click handler,
-		// since DataExplorerBehavior.js attaches its own handler that sends SQL data
 		const actionButtons = new ActionButtonsSection(
 			{
 				buttons: [
-					{ id: 'newQuery', label: 'New Query' },
-					{ id: 'openFile', label: 'Open File' },
+					{ id: 'executeQuery', label: 'Execute Query' },
 					{ id: 'openInNotebook', label: 'Open in Notebook' },
-					{ id: 'executeQuery', label: 'Execute Query', customHandler: true },
 					{ id: 'exportCsv', label: 'Export CSV' },
 				],
 			},
@@ -287,7 +322,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		);
 
 		const compositionBehavior = new SectionCompositionBehavior(
-			[actionButtons, environmentSelector, queryEditorSection],
+			[actionButtons, environmentSelector, visualQueryBuilderSection],
 			PanelLayout.SingleColumn
 		);
 
@@ -355,7 +390,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 							this.extensionUri,
 							'dist',
 							'webview',
-							'DataExplorerBehavior.js'
+							'VisualQueryBuilderBehavior.js'
 						)
 					)
 					.toString(),
@@ -395,28 +430,9 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private registerCommandHandlers(): void {
 		this.logger.debug('Registering Data Explorer command handlers');
 
-		// Execute query (handles both SQL and FetchXML modes)
-		this.coordinator.registerHandler('executeQuery', async (data) => {
-			if (this.currentQueryMode === 'fetchxml') {
-				// In FetchXML mode, execute FetchXML directly
-				const fetchXml =
-					(data as { fetchXml?: string })?.fetchXml ?? this.currentFetchXml;
-				await this.handleExecuteFetchXmlQuery(fetchXml);
-			} else {
-				// In SQL mode, transpile and execute
-				const sql = (data as { sql?: string })?.sql ?? this.currentSqlQuery;
-				await this.handleExecuteSqlQuery(sql);
-			}
-		});
-
-		// New Query - opens a new SQL editor with IntelliSense
-		this.coordinator.registerHandler('newQuery', async () => {
-			await this.handleNewQuery();
-		});
-
-		// Open File - opens file picker for SQL/FetchXML files
-		this.coordinator.registerHandler('openFile', async () => {
-			await this.handleOpenFile();
+		// Execute query using the current visual query
+		this.coordinator.registerHandler('executeQuery', async () => {
+			await this.handleExecuteVisualQuery();
 		});
 
 		// Open current query in a notebook
@@ -432,17 +448,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			}
 		});
 
-		// Update SQL query (for FetchXML preview)
-		this.coordinator.registerHandler('updateSqlQuery', async (data) => {
-			const sql = (data as { sql?: string })?.sql;
-			if (sql !== undefined) {
-				this.currentSqlQuery = sql;
-				this.logger.trace('SQL query updated for preview', { sqlLength: sql.length });
-				await this.updateFetchXmlPreview();
-
-				// Persist SQL to state (already debounced by webview)
-				void this.saveQueryStateToStorage();
-			}
+		// Select entity from picker
+		this.coordinator.registerHandler('selectEntity', async (data) => {
+			const entityLogicalName = (data as { entityLogicalName?: string | null })?.entityLogicalName;
+			await this.handleSelectEntity(entityLogicalName ?? null);
 		});
 
 		// Open record in browser
@@ -485,39 +494,91 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			}
 		});
 
-		// Switch query mode (SQL ↔ FetchXML)
-		this.coordinator.registerHandler('switchQueryMode', async (data) => {
-			const mode = (data as { mode?: QueryMode })?.mode;
-			if (mode === 'sql' || mode === 'fetchxml') {
-				await this.handleSwitchQueryMode(mode);
-			}
-		});
-
-		// Update FetchXML query (for SQL preview in FetchXML mode)
-		this.coordinator.registerHandler('updateFetchXmlQuery', async (data) => {
-			const fetchXml = (data as { fetchXml?: string })?.fetchXml;
-			if (fetchXml !== undefined) {
-				this.currentFetchXml = fetchXml;
-				this.logger.trace('FetchXML query updated for preview', {
-					fetchXmlLength: fetchXml.length,
-				});
-				await this.updateSqlPreview();
-
-				// Persist FetchXML to state (already debounced by webview)
-				void this.saveQueryStateToStorage();
-			}
-		});
-
 		// Copy success notification from KeyboardSelectionBehavior
 		this.coordinator.registerHandler('copySuccess', async (data) => {
 			const payload = data as { count?: number } | undefined;
 			const count = payload?.count ?? 0;
 			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
 		});
+
+		// Webview ready - send entities to webview
+		this.coordinator.registerHandler('webviewReady', async () => {
+			this.logger.debug('Webview ready, sending entities');
+			await this.sendEntitiesToWebview();
+		});
 	}
 
 	/**
-	 * Persists current query state (SQL, FetchXML, mode) to panel state.
+	 * Sends the current entities to the webview.
+	 * Called when webview signals it's ready.
+	 */
+	private async sendEntitiesToWebview(): Promise<void> {
+		// Always load entities - this is the single entry point for entity loading
+		await this.loadEntitiesForEnvironment();
+
+		// Also send preview if entity is selected
+		if (this.currentVisualQuery) {
+			await this.updateQueryPreview();
+		}
+	}
+
+	/**
+	 * Handles entity selection from the picker.
+	 */
+	private async handleSelectEntity(entityLogicalName: string | null): Promise<void> {
+		this.logger.debug('Entity selected', { entityLogicalName });
+
+		// Ignore empty selections (placeholder or loading state)
+		if (entityLogicalName === null || entityLogicalName === '') {
+			// Only clear if we had a previous selection
+			if (this.currentVisualQuery !== null) {
+				this.currentVisualQuery = null;
+				await this.updateQueryPreview();
+			}
+			return;
+		}
+
+		// Create new visual query for the selected entity
+		this.currentVisualQuery = new VisualQuery(entityLogicalName);
+		this.logger.debug('Created VisualQuery', { entityName: this.currentVisualQuery.entityName });
+
+		// Update query preview
+		await this.updateQueryPreview();
+
+		// Persist selection
+		void this.saveQueryStateToStorage();
+	}
+
+	/**
+	 * Updates the query preview in the webview.
+	 */
+	private async updateQueryPreview(): Promise<void> {
+		const fetchXml = this.currentVisualQuery
+			? this.fetchXmlGenerator.generate(this.currentVisualQuery)
+			: '';
+		const sql = this.generateSqlFromVisualQuery();
+
+		await this.panel.postMessage({
+			command: 'queryPreviewUpdated',
+			data: { fetchXml, sql },
+		});
+	}
+
+	/**
+	 * Executes the current visual query.
+	 */
+	private async handleExecuteVisualQuery(): Promise<void> {
+		if (!this.currentVisualQuery) {
+			vscode.window.showWarningMessage('Please select an entity first');
+			return;
+		}
+
+		const fetchXml = this.fetchXmlGenerator.generate(this.currentVisualQuery);
+		await this.handleExecuteFetchXmlQuery(fetchXml);
+	}
+
+	/**
+	 * Persists current query state (selected entity) to panel state.
 	 */
 	private async saveQueryStateToStorage(): Promise<void> {
 		try {
@@ -533,229 +594,12 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				},
 				{
 					...existingState,
-					sqlQuery: this.currentSqlQuery,
-					fetchXmlQuery: this.currentFetchXml,
-					queryMode: this.currentQueryMode,
+					selectedEntity: this.currentVisualQuery?.entityName ?? null,
 					lastUpdated: new Date().toISOString(),
 				}
 			);
 		} catch (error) {
 			this.logger.warn('Failed to persist query state', error);
-		}
-	}
-
-	/**
-	 * Executes a SQL query (SQL mode).
-	 * Uses query token pattern to prevent stale results from overwriting newer ones.
-	 * @param sql - The SQL query to execute
-	 */
-	private async handleExecuteSqlQuery(sql: string): Promise<void> {
-		const trimmedSql = sql.trim();
-		if (trimmedSql === '') {
-			this.logger.warn('Execute query called with empty SQL');
-			vscode.window.showWarningMessage('Please enter a SQL query');
-			return;
-		}
-
-		// Check for row limit and warn user about potentially large result sets
-		const transpileResult = this.executeSqlUseCase.transpileToFetchXml(trimmedSql);
-		if (transpileResult.success && !transpileResult.hasRowLimit) {
-			// Show warning modal in webview (testable, accessible)
-			const choice = await this.showRowLimitWarningModal();
-
-			if (choice === 'addTop100') {
-				// Modify SQL to add TOP 100
-				const modifiedSql = this.addTopClause(trimmedSql, 100);
-				// Update the SQL editor in the webview with the modified query
-				// Check panel is still alive before posting (could be disposed during modal)
-				try {
-					await this.panel.postMessage({
-						command: 'updateSqlEditor',
-						data: { sql: modifiedSql },
-					});
-				} catch {
-					// Panel was disposed during modal interaction
-					return;
-				}
-				return this.handleExecuteSqlQuery(modifiedSql);
-			}
-
-			if (choice === 'cancel') {
-				// User cancelled - notify webview to re-enable editor
-				try {
-					await this.panel.postMessage({
-						command: 'queryAborted',
-					});
-				} catch {
-					// Panel was disposed during modal interaction
-				}
-				return;
-			}
-			// choice === 'continueAnyway' - proceed with original query
-		}
-
-		// Abort any in-flight query
-		if (this.currentAbortController) {
-			this.currentAbortController.abort();
-			this.logger.debug('Aborted previous query');
-		}
-
-		// Create new query token
-		const queryId = ++this.querySequence;
-		this.currentAbortController = new AbortController();
-		const signal = this.currentAbortController.signal;
-
-		// Update stored SQL
-		this.currentSqlQuery = trimmedSql;
-
-		this.logger.debug('Executing SQL query', {
-			environmentId: this.currentEnvironmentId,
-			sqlLength: trimmedSql.length,
-			queryId,
-		});
-
-		// Show loading state
-		this.setButtonLoading('executeQuery', true);
-		await this.panel.postMessage({
-			command: 'setLoadingState',
-			data: { isLoading: true },
-		});
-
-		try {
-			// Execute query via use case
-			const result = await this.executeSqlUseCase.execute(
-				this.currentEnvironmentId,
-				trimmedSql,
-				signal
-			);
-
-			// Discard stale results
-			if (queryId !== this.querySequence) {
-				this.logger.debug('Discarding stale query result', { queryId, currentSequence: this.querySequence });
-				return;
-			}
-
-			this.currentResult = result;
-			this.currentFetchXml = result.executedFetchXml;
-
-			// Map to ViewModel
-			const viewModel = this.resultMapper.toViewModel(result);
-
-			this.logger.debug('SQL query executed successfully', {
-				rowCount: result.getRowCount(),
-				executionTimeMs: result.executionTimeMs,
-				queryId,
-			});
-
-			// Send results to webview
-			await this.panel.postMessage({
-				command: 'queryResultsUpdated',
-				data: viewModel,
-			});
-
-			// Update FetchXML preview
-			await this.panel.postMessage({
-				command: 'fetchXmlPreviewUpdated',
-				data: { fetchXml: this.currentFetchXml },
-			});
-
-			vscode.window.showInformationMessage(
-				`Query executed: ${result.getRowCount()} rows in ${result.executionTimeMs}ms`
-			);
-		} catch (error: unknown) {
-			// Ignore aborted queries
-			if (error instanceof Error && error.name === 'AbortError') {
-				this.logger.debug('Query was aborted', { queryId });
-				await this.panel.postMessage({
-					command: 'queryAborted',
-				});
-				return;
-			}
-
-			// Discard stale errors
-			if (queryId !== this.querySequence) {
-				this.logger.debug('Discarding stale query error', { queryId, currentSequence: this.querySequence });
-				return;
-			}
-
-			this.logger.error('SQL query execution failed', error);
-
-			// Map error to ViewModel
-			let errorMessage: string;
-			if (error instanceof SqlParseError) {
-				const errorViewModel = this.errorMapper.toViewModel(error);
-				errorMessage = errorViewModel.message;
-
-				// Send parse error with position to webview
-				await this.panel.postMessage({
-					command: 'queryError',
-					data: errorViewModel,
-				});
-			} else {
-				errorMessage =
-					error instanceof Error ? error.message : 'Unknown error';
-				const errorViewModel =
-					this.errorMapper.genericErrorToViewModel(
-						error instanceof Error ? error : new Error(errorMessage)
-					);
-
-				await this.panel.postMessage({
-					command: 'queryError',
-					data: errorViewModel,
-				});
-			}
-
-			vscode.window.showErrorMessage(`Query failed: ${errorMessage}`);
-		} finally {
-			// Only reset loading state if this is still the current query
-			if (queryId === this.querySequence) {
-				this.setButtonLoading('executeQuery', false);
-				await this.panel.postMessage({
-					command: 'setLoadingState',
-					data: { isLoading: false },
-				});
-			}
-		}
-	}
-
-	/**
-	 * Updates FetchXML preview when SQL query changes.
-	 */
-	private async updateFetchXmlPreview(): Promise<void> {
-		if (this.currentSqlQuery.trim() === '') {
-			this.currentFetchXml = '';
-			await this.panel.postMessage({
-				command: 'fetchXmlPreviewUpdated',
-				data: { fetchXml: '' },
-			});
-			return;
-		}
-
-		// Use use case method for transpilation
-		const result = this.executeSqlUseCase.transpileToFetchXml(
-			this.currentSqlQuery
-		);
-
-		if (result.success) {
-			this.currentFetchXml = result.fetchXml;
-
-			// Send to webview
-			await this.panel.postMessage({
-				command: 'fetchXmlPreviewUpdated',
-				data: { fetchXml: result.fetchXml },
-			});
-
-			// Clear any previous error
-			await this.panel.postMessage({
-				command: 'clearError',
-			});
-		} else {
-			// Show parse error in preview mode (don't show VS Code error message)
-			const errorViewModel = this.errorMapper.toViewModel(result.error);
-			await this.panel.postMessage({
-				command: 'parseErrorPreview',
-				data: errorViewModel,
-			});
 		}
 	}
 
@@ -769,7 +613,6 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			this.currentEnvironmentId = environmentId;
 
 			// Update IntelliSense context for the new environment
-			// This ensures completions use metadata from the correct environment
 			this.intelliSenseServices.contextService.setActiveEnvironment(environmentId);
 
 			// Re-register panel in map for new environment
@@ -784,15 +627,18 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				this.panel.title = `Data Explorer - ${environment.name}`;
 			}
 
-			// Clear previous results
+			// Clear previous results and reset visual query
 			this.currentResult = null;
+			this.currentVisualQuery = null;
 			await this.panel.postMessage({
 				command: 'clearResults',
 			});
 
-			// Load persisted state for the NEW environment (Option A: Fresh Start)
-			// This ensures each environment maintains its own independent query state
+			// Load persisted state for the NEW environment
 			await this.loadPersistedStateForEnvironment(environmentId);
+
+			// Reload entities for the new environment
+			await this.loadEntitiesForEnvironment();
 		} finally {
 			this.setButtonLoading('executeQuery', false);
 		}
@@ -800,14 +646,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 	/**
 	 * Loads persisted query state for a specific environment and updates the UI.
-	 * Called during environment switch to restore the target environment's saved state.
 	 */
 	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
 		// Reset to defaults first
-		this.currentSqlQuery = '';
-		this.currentFetchXml = '';
-		this.currentQueryMode = 'sql';
-		this.currentTranspilationWarnings = [];
+		this.currentVisualQuery = null;
 
 		try {
 			const state = await this.panelStateRepository.load({
@@ -816,81 +658,33 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			});
 
 			if (state) {
-				const savedSql = state['sqlQuery'];
-				if (savedSql && typeof savedSql === 'string') {
-					this.currentSqlQuery = savedSql;
+				const savedEntity = state['selectedEntity'];
+				if (savedEntity && typeof savedEntity === 'string') {
+					this.currentVisualQuery = new VisualQuery(savedEntity);
+					this.logger.debug('Loaded persisted entity for environment', {
+						environmentId,
+						entity: savedEntity,
+					});
 				}
-				const savedFetchXml = state['fetchXmlQuery'];
-				if (savedFetchXml && typeof savedFetchXml === 'string') {
-					this.currentFetchXml = savedFetchXml;
-				}
-				const savedMode = state['queryMode'];
-				if (savedMode === 'sql' || savedMode === 'fetchxml') {
-					this.currentQueryMode = savedMode;
-				}
-
-				this.logger.debug('Loaded persisted state for environment', {
-					environmentId,
-					hasSql: this.currentSqlQuery.length > 0,
-					hasFetchXml: this.currentFetchXml.length > 0,
-					queryMode: this.currentQueryMode,
-				});
 			}
 		} catch (error) {
 			this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
 		}
 
-		// Update webview with loaded state
-		await this.panel.postMessage({
-			command: 'queryModeChanged',
-			data: {
-				mode: this.currentQueryMode,
-				sql: this.currentSqlQuery,
-				fetchXml: this.currentFetchXml,
-				transpilationWarnings: this.currentTranspilationWarnings,
-			},
-		});
+		// Update query preview with loaded state
+		await this.updateQueryPreview();
 	}
 
 	/**
-	 * Handles switching between SQL and FetchXML query modes.
-	 * Refreshes the panel to render the appropriate editor.
-	 */
-	private async handleSwitchQueryMode(mode: QueryMode): Promise<void> {
-		if (this.currentQueryMode === mode) {
-			return;
-		}
-
-		this.logger.debug('Switching query mode', { from: this.currentQueryMode, to: mode });
-		this.currentQueryMode = mode;
-
-		// Clear any previous errors
-		await this.panel.postMessage({ command: 'clearError' });
-
-		// Send mode change to webview to update UI
-		await this.panel.postMessage({
-			command: 'queryModeChanged',
-			data: {
-				mode,
-				sql: this.currentSqlQuery,
-				fetchXml: this.currentFetchXml,
-				transpilationWarnings: this.currentTranspilationWarnings,
-			},
-		});
-
-		// Persist mode to state
-		void this.saveQueryStateToStorage();
-	}
-
-	/**
-	 * Executes a FetchXML query directly (FetchXML mode).
+	 * Executes a FetchXML query.
+	 * Uses query token pattern to prevent stale results from overwriting newer ones.
 	 * @param fetchXml - The FetchXML query to execute
 	 */
 	private async handleExecuteFetchXmlQuery(fetchXml: string): Promise<void> {
 		const trimmedFetchXml = fetchXml.trim();
 		if (trimmedFetchXml === '') {
 			this.logger.warn('Execute query called with empty FetchXML');
-			vscode.window.showWarningMessage('Please enter a FetchXML query');
+			vscode.window.showWarningMessage('Please select an entity first');
 			return;
 		}
 
@@ -904,9 +698,6 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		const queryId = ++this.querySequence;
 		this.currentAbortController = new AbortController();
 		const signal = this.currentAbortController.signal;
-
-		// Update stored FetchXML
-		this.currentFetchXml = trimmedFetchXml;
 
 		this.logger.debug('Executing FetchXML query', {
 			environmentId: this.currentEnvironmentId,
@@ -1020,46 +811,6 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	}
 
 	/**
-	 * Updates SQL preview when FetchXML query changes (FetchXML mode).
-	 */
-	private async updateSqlPreview(): Promise<void> {
-		if (this.currentFetchXml.trim() === '') {
-			this.currentSqlQuery = '';
-			this.currentTranspilationWarnings = [];
-			await this.panel.postMessage({
-				command: 'sqlPreviewUpdated',
-				data: { sql: '', warnings: [] },
-			});
-			return;
-		}
-
-		// Use FetchXML use case method for transpilation
-		const result = this.executeFetchXmlUseCase.transpileToSql(this.currentFetchXml);
-
-		if (result.success) {
-			this.currentSqlQuery = result.sql;
-			this.currentTranspilationWarnings = result.warnings;
-
-			// Send to webview
-			await this.panel.postMessage({
-				command: 'sqlPreviewUpdated',
-				data: { sql: result.sql, warnings: result.warnings },
-			});
-
-			// Clear any previous error
-			await this.panel.postMessage({
-				command: 'clearError',
-			});
-		} else {
-			// Show validation error in preview mode
-			await this.panel.postMessage({
-				command: 'parseErrorPreview',
-				data: { message: result.error },
-			});
-		}
-	}
-
-	/**
 	 * Opens a Dataverse record in the browser.
 	 * @param entityType - The entity logical name (e.g., "contact", "account")
 	 * @param recordId - The record GUID
@@ -1162,34 +913,6 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		}
 	}
 
-	/**
-	 * Shows an in-webview warning modal for queries without row limits.
-	 * Waits for user response: 'addTop100', 'continueAnyway', or 'cancel'.
-	 *
-	 * Modal is rendered in webview (not VS Code native) for E2E testability.
-	 *
-	 * @returns User's choice action
-	 */
-	private async showRowLimitWarningModal(): Promise<WarningModalAction> {
-		return new Promise((resolve) => {
-			// Store resolver to be called when webview responds
-			this.pendingModalResolver = resolve;
-
-			// Send modal configuration to webview
-			void this.panel.postMessage({
-				command: 'showWarningModal',
-				data: {
-					message:
-						'This query has no row limit and may return up to 5000 records. Large result sets may take longer to load.',
-					primaryLabel: 'Add TOP 100',
-					primaryAction: 'addTop100',
-					secondaryLabel: 'Continue Anyway',
-					secondaryAction: 'continueAnyway',
-				},
-			});
-		});
-	}
-
 	private setButtonLoading(buttonId: string, isLoading: boolean): void {
 		this.logger.debug('Setting button loading state', { buttonId, isLoading });
 		void this.panel.postMessage({
@@ -1201,82 +924,15 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	}
 
 	/**
-	 * Adds a TOP clause to a SQL SELECT statement.
-	 * Inserts "TOP n" after "SELECT" keyword.
-	 */
-	private addTopClause(sql: string, limit: number): string {
-		// Case-insensitive regex to find SELECT and insert TOP after it
-		const selectRegex = /^(\s*SELECT\s+)/i;
-		const match = sql.match(selectRegex);
-		const selectPart = match?.[1];
-
-		if (selectPart) {
-			const afterSelect = sql.substring(selectPart.length);
-			return `${selectPart}TOP ${limit} ${afterSelect}`;
-		}
-
-		// Fallback: just prepend (shouldn't happen with valid SQL)
-		return `SELECT TOP ${limit} ${sql}`;
-	}
-
-	/**
-	 * Opens a new SQL query editor with IntelliSense support.
-	 * The editor will provide Dataverse entity/attribute completions
-	 * for the currently selected environment.
-	 */
-	private async handleNewQuery(): Promise<void> {
-		this.logger.debug('Opening new SQL query editor');
-
-		try {
-			// Open a new untitled SQL document
-			await this.intelliSenseServices.editorService.openNewQuery();
-
-			// Set context for Ctrl+Enter keybinding
-			await vscode.commands.executeCommand(
-				'setContext',
-				'ppds.dataExplorerPanelVisible',
-				true
-			);
-		} catch (error) {
-			this.logger.error('Failed to open new SQL query editor', error);
-			await vscode.window.showErrorMessage('Failed to open SQL editor');
-		}
-	}
-
-	/**
-	 * Opens a file picker to load an existing SQL or FetchXML file.
-	 * SQL files will get IntelliSense support for the current environment.
-	 */
-	private async handleOpenFile(): Promise<void> {
-		this.logger.debug('Opening file picker for SQL/FetchXML files');
-
-		try {
-			const editor = await this.intelliSenseServices.editorService.openFileFromDisk();
-
-			if (editor !== undefined) {
-				// Set context for Ctrl+Enter keybinding
-				await vscode.commands.executeCommand(
-					'setContext',
-					'ppds.dataExplorerPanelVisible',
-					true
-				);
-
-				// If it's an XML file, it might be FetchXML
-				if (editor.document.languageId === 'xml') {
-					this.logger.debug('Opened XML file - may be FetchXML');
-				}
-			}
-		} catch (error) {
-			this.logger.error('Failed to open file', error);
-			await vscode.window.showErrorMessage('Failed to open file');
-		}
-	}
-
-	/**
-	 * Opens the current SQL query in a new Dataverse SQL Notebook.
+	 * Opens the current query in a new Dataverse SQL Notebook.
 	 * The notebook inherits the currently selected environment.
 	 */
 	private async handleOpenInNotebook(): Promise<void> {
+		if (!this.currentVisualQuery) {
+			vscode.window.showWarningMessage('Please select an entity first');
+			return;
+		}
+
 		this.logger.debug('Opening current query in notebook');
 
 		try {
@@ -1284,8 +940,11 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			const environmentInfo = await this.getEnvironmentById(this.currentEnvironmentId);
 			const environmentName = environmentInfo?.name ?? 'Unknown Environment';
 
+			// Generate SQL from visual query
+			const sql = this.generateSqlFromVisualQuery();
+
 			const options = {
-				sql: this.currentSqlQuery,
+				sql,
 				environmentId: this.currentEnvironmentId,
 				environmentName,
 				...(environmentInfo?.dataverseUrl && { environmentUrl: environmentInfo.dataverseUrl }),
@@ -1294,7 +953,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 			this.logger.info('Opened query in notebook', {
 				environmentId: this.currentEnvironmentId,
-				sqlLength: this.currentSqlQuery.length,
+				sqlLength: sql.length,
 			});
 		} catch (error) {
 			this.logger.error('Failed to open query in notebook', error);

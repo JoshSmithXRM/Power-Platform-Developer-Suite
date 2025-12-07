@@ -22,6 +22,8 @@ import { SqlEditorWatcher } from '../services/SqlEditorWatcher';
 export interface DataExplorerIntelliSenseServices {
 	/** Context service to update active environment. */
 	contextService: IntelliSenseContextService;
+	/** Metadata cache for entity/attribute suggestions. */
+	metadataCache: IntelliSenseMetadataCache;
 	/** Service for opening SQL editors. */
 	editorService: SqlEditorService;
 	/** Watcher for SQL editor content changes. */
@@ -196,6 +198,7 @@ export function registerDataExplorerIntelliSense(
 	// Store in registry and return
 	const services: DataExplorerIntelliSenseServices = {
 		contextService,
+		metadataCache,
 		editorService,
 		editorWatcher,
 	};
