@@ -86,9 +86,9 @@ export class SqlToFetchXmlTranspiler {
 			this.transpileCondition(statement.where, lines, '    ');
 		}
 
-		// Order (ORDER BY)
+		// Order (ORDER BY) - pass columns to detect aliases in aggregate queries
 		for (const orderItem of statement.orderBy) {
-			this.transpileOrderBy(orderItem, lines);
+			this.transpileOrderBy(orderItem, statement.columns, hasAggregates, lines);
 		}
 
 		lines.push('  </entity>');
@@ -546,12 +546,60 @@ export class SqlToFetchXmlTranspiler {
 
 	/**
 	 * Transpiles an ORDER BY item.
+	 * In aggregate queries, uses 'alias' attribute when ORDER BY matches a column alias.
 	 */
-	private transpileOrderBy(orderItem: SqlOrderByItem, lines: string[]): void {
+	private transpileOrderBy(
+		orderItem: SqlOrderByItem,
+		columns: readonly SqlSelectColumn[],
+		isAggregateQuery: boolean,
+		lines: string[]
+	): void {
 		const descending = orderItem.direction === 'DESC' ? 'true' : 'false';
+		const orderColumnName = orderItem.column.columnName.toLowerCase();
+
+		// In aggregate queries, check if ORDER BY column matches an alias
+		if (isAggregateQuery) {
+			const matchingAlias = this.findMatchingAlias(orderColumnName, columns);
+			if (matchingAlias) {
+				lines.push(
+					`    <order alias="${matchingAlias}" descending="${descending}" />`
+				);
+				this.outputTrailingComment(orderItem, lines, '    ');
+				return;
+			}
+		}
+
+		// Default: use attribute (for non-aggregate queries or when no alias match)
 		const attr = this.normalizeAttributeName(orderItem.column.columnName);
 		lines.push(`    <order attribute="${attr}" descending="${descending}" />`);
 		this.outputTrailingComment(orderItem, lines, '    ');
+	}
+
+	/**
+	 * Finds a matching alias from columns for the given column name.
+	 * Returns the original alias (case-preserved) if found, null otherwise.
+	 */
+	private findMatchingAlias(
+		columnName: string,
+		columns: readonly SqlSelectColumn[]
+	): string | null {
+		for (const column of columns) {
+			if ('func' in column) {
+				// SqlAggregateColumn
+				if (
+					column.alias &&
+					column.alias.toLowerCase() === columnName
+				) {
+					return column.alias;
+				}
+			} else {
+				// SqlColumnRef
+				if (column.alias && column.alias.toLowerCase() === columnName) {
+					return column.alias;
+				}
+			}
+		}
+		return null;
 	}
 
 	/**

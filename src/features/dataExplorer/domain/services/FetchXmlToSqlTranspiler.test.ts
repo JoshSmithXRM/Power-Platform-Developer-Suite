@@ -573,6 +573,61 @@ describe('FetchXmlToSqlTranspiler', () => {
 			});
 		});
 
+		describe('ORDER BY with alias in aggregate queries', () => {
+			it('should transpile order with alias in aggregate query', () => {
+				const fetchXml = `
+					<fetch aggregate='true'>
+						<entity name='account'>
+							<attribute name='numberofemployees' alias='Total' aggregate='sum' />
+							<attribute name='address1_city' alias='City' groupby='true' />
+							<order alias='City' />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('ORDER BY City ASC');
+			});
+
+			it('should transpile order with alias descending in aggregate query', () => {
+				const fetchXml = `
+					<fetch aggregate='true'>
+						<entity name='account'>
+							<attribute name='numberofemployees' alias='Total' aggregate='sum' />
+							<attribute name='address1_city' alias='City' groupby='true' />
+							<order alias='Total' descending='true' />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('ORDER BY Total DESC');
+			});
+
+			it('should transpile multiple orders with aliases in aggregate query', () => {
+				const fetchXml = `
+					<fetch aggregate='true'>
+						<entity name='account'>
+							<attribute name='address1_city' alias='City' groupby='true' />
+							<attribute name='numberofemployees' alias='TotalEmployees' aggregate='sum' />
+							<order alias='City' />
+							<order alias='TotalEmployees' descending='true' />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('ORDER BY City ASC');
+				expect(result.sql).toContain('TotalEmployees DESC');
+			});
+		});
+
 		describe('warnings for unsupported features', () => {
 			it('should warn about paging', () => {
 				const fetchXml = `

@@ -45,13 +45,14 @@ const VALID_ELEMENTS = new Set([
 
 /**
  * Required attributes for specific elements.
+ * Note: 'order' is handled separately due to context-dependent requirements
+ * (uses 'attribute' in regular queries, 'alias' in aggregate queries).
  */
 const REQUIRED_ATTRIBUTES: Record<string, string[]> = {
 	entity: ['name'],
 	attribute: ['name'],
 	condition: ['attribute', 'operator'],
 	'link-entity': ['name', 'from', 'to'],
-	order: ['attribute'],
 };
 
 /**
@@ -76,14 +77,17 @@ export class FetchXmlValidator {
 			};
 		}
 
-		// Check basic XML structure
-		const structureErrors = this.validateXmlStructure(trimmed);
+		// Strip XML comments for validation (but keep original for line numbers)
+		const withoutComments = this.stripXmlComments(trimmed);
+
+		// Check basic XML structure (on comment-stripped version)
+		const structureErrors = this.validateXmlStructure(withoutComments);
 		if (structureErrors.length > 0) {
 			return { isValid: false, errors: structureErrors };
 		}
 
-		// Extract and validate root element
-		const rootMatch = trimmed.match(/^<(\w+)[\s>]/);
+		// Extract and validate root element (skip leading whitespace after comment removal)
+		const rootMatch = withoutComments.trim().match(/^<(\w+)[\s>]/);
 		if (!rootMatch || rootMatch[1]?.toLowerCase() !== 'fetch') {
 			const foundTag = rootMatch ? rootMatch[1] : 'unknown';
 			errors.push({
@@ -94,22 +98,96 @@ export class FetchXmlValidator {
 		}
 
 		// Check for <entity> element
-		if (!this.hasElement(trimmed, 'entity')) {
+		if (!this.hasElement(withoutComments, 'entity')) {
 			errors.push({
 				message: 'FetchXML must have at least one <entity> element',
 			});
 		}
 
 		// Validate all elements
-		this.validateElements(trimmed, errors);
+		this.validateElements(withoutComments, errors);
 
 		// Validate required attributes
-		this.validateRequiredAttributes(trimmed, errors);
+		this.validateRequiredAttributes(withoutComments, errors);
+
+		// Validate order elements (context-dependent on aggregate mode)
+		this.validateOrderElements(withoutComments, errors);
 
 		return {
 			isValid: errors.length === 0,
 			errors,
 		};
+	}
+
+	/**
+	 * Strips XML comments from the input string.
+	 * Handles single-line and multi-line comments.
+	 */
+	private stripXmlComments(xml: string): string {
+		// XML comment pattern: <!-- ... -->
+		// Use non-greedy match and handle multi-line with [\s\S]
+		return xml.replace(/<!--[\s\S]*?-->/g, '');
+	}
+
+	/**
+	 * Checks if this is an aggregate query (fetch has aggregate='true').
+	 */
+	private isAggregateQuery(xml: string): boolean {
+		const fetchPattern = /<fetch[^>]*>/i;
+		const fetchMatch = xml.match(fetchPattern);
+		if (!fetchMatch) {
+			return false;
+		}
+
+		const fetchTag = fetchMatch[0];
+		return /aggregate\s*=\s*['"]true['"]/i.test(fetchTag);
+	}
+
+	/**
+	 * Validates order elements based on query context.
+	 * - Regular queries: order requires 'attribute'
+	 * - Aggregate queries: order requires 'alias', cannot have 'attribute'
+	 */
+	private validateOrderElements(
+		xml: string,
+		errors: FetchXmlValidationError[]
+	): void {
+		const isAggregate = this.isAggregateQuery(xml);
+		const orderPattern = /<order([^>]*?)(\/?>)/gi;
+		let match;
+
+		while ((match = orderPattern.exec(xml)) !== null) {
+			const attributeString = match[1] ?? '';
+			const lineNumber = this.getLineNumber(xml, match.index);
+
+			const hasAttribute = /\battribute\s*=\s*["']/i.test(attributeString);
+			const hasAlias = /\balias\s*=\s*["']/i.test(attributeString);
+
+			if (isAggregate) {
+				// Aggregate query: must use alias, cannot use attribute
+				if (hasAttribute) {
+					errors.push({
+						message:
+							'<order> element in aggregate query must use "alias" not "attribute"',
+						line: lineNumber,
+					});
+				} else if (!hasAlias) {
+					errors.push({
+						message:
+							'<order> element in aggregate query must have an "alias" attribute',
+						line: lineNumber,
+					});
+				}
+			} else {
+				// Regular query: must use attribute
+				if (!hasAttribute) {
+					errors.push({
+						message: '<order> element must have an "attribute" attribute',
+						line: lineNumber,
+					});
+				}
+			}
+		}
 	}
 
 	/**

@@ -1025,6 +1025,44 @@ describe('SqlToFetchXmlTranspiler', () => {
 			expect(fetchXml).toContain('alias="cnt"');
 			expect(fetchXml).toContain('alias="total"');
 		});
+
+		it('should use alias attribute for ORDER BY in aggregate queries', () => {
+			const fetchXml = transpile(`
+				SELECT address1_city AS City, SUM(numberofemployees) AS Total
+				FROM account
+				GROUP BY address1_city
+				ORDER BY City ASC
+			`);
+
+			expect(fetchXml).toContain('<fetch aggregate="true">');
+			// ORDER BY should use alias, not attribute, in aggregate queries
+			expect(fetchXml).toContain('<order alias="City"');
+			expect(fetchXml).not.toContain('<order attribute="City"');
+		});
+
+		it('should use alias attribute for ORDER BY aggregate column', () => {
+			const fetchXml = transpile(`
+				SELECT address1_city AS City, SUM(numberofemployees) AS Total
+				FROM account
+				GROUP BY address1_city
+				ORDER BY Total DESC
+			`);
+
+			expect(fetchXml).toContain('<order alias="Total"');
+			expect(fetchXml).toContain('descending="true"');
+		});
+
+		it('should handle multiple ORDER BY with aliases in aggregate query', () => {
+			const fetchXml = transpile(`
+				SELECT address1_city AS City, SUM(numberofemployees) AS TotalEmployees
+				FROM account
+				GROUP BY address1_city
+				ORDER BY City ASC, TotalEmployees DESC
+			`);
+
+			expect(fetchXml).toContain('<order alias="City"');
+			expect(fetchXml).toContain('<order alias="TotalEmployees"');
+		});
 	});
 
 	describe('comment preservation', () => {

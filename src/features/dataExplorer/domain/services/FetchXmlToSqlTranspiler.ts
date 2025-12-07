@@ -99,7 +99,10 @@ interface ParsedComment {
  * Parsed order from FetchXML.
  */
 interface ParsedOrder {
-	attribute: string;
+	/** Attribute name for non-aggregate queries */
+	attribute?: string | undefined;
+	/** Alias for aggregate queries (ORDER BY alias instead of attribute) */
+	alias?: string | undefined;
 	descending: boolean;
 	/** End position in XML for comment association */
 	endPosition?: number | undefined;
@@ -552,6 +555,7 @@ export class FetchXmlToSqlTranspiler {
 	/**
 	 * Parses order elements.
 	 * Captures end positions for comment association.
+	 * Supports both 'attribute' (regular queries) and 'alias' (aggregate queries).
 	 */
 	private parseOrders(xml: string): ParsedOrder[] {
 		const orders: ParsedOrder[] = [];
@@ -561,13 +565,16 @@ export class FetchXmlToSqlTranspiler {
 		while ((match = orderPattern.exec(xml)) !== null) {
 			const attrString = match[1] ?? '';
 			const attribute = this.extractAttrValue(attrString, 'attribute');
+			const alias = this.extractAttrValue(attrString, 'alias');
 			const descendingStr = this.extractAttrValue(attrString, 'descending');
 
-			if (attribute) {
+			// Accept order if it has either attribute or alias
+			if (attribute || alias) {
 				// Calculate end position
 				const endPosition = match.index + match[0].length;
 				orders.push({
 					attribute,
+					alias,
 					descending: descendingStr?.toLowerCase() === 'true',
 					endPosition,
 				});
@@ -851,6 +858,7 @@ export class FetchXmlToSqlTranspiler {
 
 	/**
 	 * Builds multi-line ORDER BY clause with inline comments.
+	 * Uses alias for aggregate queries, attribute for regular queries.
 	 */
 	private buildMultilineOrderByClause(orders: ParsedOrder[]): string[] {
 		const lines: string[] = [];
@@ -861,14 +869,16 @@ export class FetchXmlToSqlTranspiler {
 
 			const direction = order.descending ? 'DESC' : 'ASC';
 			const isLast = i === orders.length - 1;
+			// Use alias for aggregate queries, attribute for regular queries
+			const orderColumn = order.alias ?? order.attribute;
 
 			let line: string;
 			if (i === 0) {
 				// First order starts with ORDER BY
-				line = `ORDER BY ${order.attribute} ${direction}${isLast ? '' : ','}`;
+				line = `ORDER BY ${orderColumn} ${direction}${isLast ? '' : ','}`;
 			} else {
 				// Subsequent orders with indentation
-				line = `  ${order.attribute} ${direction}${isLast ? '' : ','}`;
+				line = `  ${orderColumn} ${direction}${isLast ? '' : ','}`;
 			}
 
 			// Add trailing comment if present
