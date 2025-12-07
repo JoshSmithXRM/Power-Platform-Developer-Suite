@@ -311,6 +311,7 @@ async function toggleCellLanguage(logger: ILogger): Promise<void> {
 
 		if (currentLanguage === 'fetchxml' || trimmedContent.startsWith('<')) {
 			// FetchXML → SQL
+			// Comments are now handled natively by the transpiler
 			const transpiler = new FetchXmlToSqlTranspiler();
 			const result = transpiler.transpile(trimmedContent);
 
@@ -333,6 +334,7 @@ async function toggleCellLanguage(logger: ILogger): Promise<void> {
 			}
 		} else {
 			// SQL → FetchXML
+			// Comments are now handled natively by the parser and transpiler
 			const parser = new SqlParser();
 			const transpiler = new SqlToFetchXmlTranspiler();
 

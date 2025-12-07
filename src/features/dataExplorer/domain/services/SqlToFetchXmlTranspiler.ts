@@ -44,6 +44,12 @@ export class SqlToFetchXmlTranspiler {
 		this.currentEntityName = this.normalizeEntityName(statement.from.tableName);
 
 		const lines: string[] = [];
+
+		// Output leading comments first
+		for (const comment of statement.leadingComments) {
+			lines.push(`<!-- ${this.escapeXmlComment(comment)} -->`);
+		}
+
 		const hasAggregates = statement.hasAggregates();
 
 		// <fetch> element with optional attributes
@@ -129,6 +135,11 @@ export class SqlToFetchXmlTranspiler {
 			if (!isInSelect) {
 				// Add GROUP BY column that's not in SELECT
 				lines.push(`    <attribute name="${attrName}" groupby="true" />`);
+				this.outputTrailingComment(groupByCol, lines, '    ');
+			} else {
+				// Column is in SELECT, but comment might be on GROUP BY column
+				// Output it after the SELECT column's comment (if any)
+				this.outputTrailingComment(groupByCol, lines, '    ');
 			}
 		}
 	}
@@ -145,9 +156,11 @@ export class SqlToFetchXmlTranspiler {
 		if (column.isWildcard && column.tableName === null) {
 			// SELECT *
 			lines.push('    <all-attributes />');
+			this.outputTrailingComment(column, lines, '    ');
 		} else if (column.isWildcard && this.isMainEntityColumn(column.tableName, mainEntity)) {
 			// SELECT c.* where c is main entity alias
 			lines.push('    <all-attributes />');
+			this.outputTrailingComment(column, lines, '    ');
 		} else if (!column.isWildcard) {
 			// Include column if it belongs to the main entity
 			if (this.isMainEntityColumn(column.tableName, mainEntity)) {
@@ -163,6 +176,7 @@ export class SqlToFetchXmlTranspiler {
 				}
 
 				lines.push(`    <attribute ${attrs.join(' ')} />`);
+				this.outputTrailingComment(column, lines, '    ');
 			}
 		}
 		// Columns from link-entities would need to be added inside the link-entity element
@@ -207,6 +221,7 @@ export class SqlToFetchXmlTranspiler {
 		attrs.push(`alias="${alias}"`);
 
 		lines.push(`    <attribute ${attrs.join(' ')} />`);
+		this.outputTrailingComment(column, lines, '    ');
 	}
 
 	/**
@@ -377,6 +392,7 @@ export class SqlToFetchXmlTranspiler {
 				`${indent}</filter>`
 			);
 		}
+		this.outputTrailingComment(condition, lines, indent);
 	}
 
 	/**
@@ -413,6 +429,7 @@ export class SqlToFetchXmlTranspiler {
 			`${indent}  <condition attribute="${attr}" operator="${operator}" value="${this.escapeXml(value)}" />`,
 			`${indent}</filter>`
 		);
+		this.outputTrailingComment(condition, lines, indent);
 	}
 
 	/**
@@ -427,6 +444,7 @@ export class SqlToFetchXmlTranspiler {
 			`${indent}  <condition attribute="${attr}" operator="${operator}" />`,
 			`${indent}</filter>`
 		);
+		this.outputTrailingComment(condition, lines, indent);
 	}
 
 	/**
@@ -445,6 +463,7 @@ export class SqlToFetchXmlTranspiler {
 
 		lines.push(`${indent}  </condition>`);
 		lines.push(`${indent}</filter>`);
+		this.outputTrailingComment(condition, lines, indent);
 	}
 
 	/**
@@ -532,6 +551,7 @@ export class SqlToFetchXmlTranspiler {
 		const descending = orderItem.direction === 'DESC' ? 'true' : 'false';
 		const attr = this.normalizeAttributeName(orderItem.column.columnName);
 		lines.push(`    <order attribute="${attr}" descending="${descending}" />`);
+		this.outputTrailingComment(orderItem, lines, '    ');
 	}
 
 	/**
@@ -595,5 +615,26 @@ export class SqlToFetchXmlTranspiler {
 	 */
 	private normalizeEntityName(name: string): string {
 		return name.toLowerCase();
+	}
+
+	/**
+	 * Escapes text for use in XML comments.
+	 * XML comments cannot contain -- so we replace it.
+	 */
+	private escapeXmlComment(text: string): string {
+		return text.replace(/--/g, '- -');
+	}
+
+	/**
+	 * Outputs an XML comment if the node has a trailing comment.
+	 */
+	private outputTrailingComment(
+		node: { trailingComment?: string } | null | undefined,
+		lines: string[],
+		indent: string = ''
+	): void {
+		if (node?.trailingComment) {
+			lines.push(`${indent}<!-- ${this.escapeXmlComment(node.trailingComment)} -->`);
+		}
 	}
 }

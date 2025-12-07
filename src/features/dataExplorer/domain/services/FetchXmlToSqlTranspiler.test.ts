@@ -396,7 +396,9 @@ describe('FetchXmlToSqlTranspiler', () => {
 				const result = transpiler.transpile(fetchXml);
 
 				expect(result.success).toBe(true);
-				expect(result.sql).toContain('ORDER BY lastname ASC, firstname ASC');
+				// Multi-line format: each ORDER BY column on its own line
+				expect(result.sql).toContain('ORDER BY lastname ASC,');
+				expect(result.sql).toContain('firstname ASC');
 			});
 		});
 
@@ -821,7 +823,9 @@ describe('FetchXmlToSqlTranspiler', () => {
 				const result = transpiler.transpile(fetchXml);
 
 				expect(result.success).toBe(true);
-				expect(result.sql).toContain('*, acc.name');
+				// Multi-line format: columns on separate lines
+				expect(result.sql).toContain('*,');
+				expect(result.sql).toContain('acc.name');
 			});
 		});
 
@@ -1065,6 +1069,84 @@ describe('FetchXmlToSqlTranspiler', () => {
 			});
 		});
 
+		describe('comment preservation', () => {
+			it('should preserve leading XML comments as SQL comments', () => {
+				const fetchXml = `<!-- Account summary query -->
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<attribute name="revenue" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// Leading comment should appear before SELECT
+				expect(result.sql).toContain('-- Account summary query');
+				expect(result.sql).toMatch(/-- Account summary query\nSELECT/);
+			});
+
+			it('should preserve multiple leading XML comments each on their own line', () => {
+				const fetchXml = `
+					<!-- First comment -->
+					<!-- Second comment -->
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('-- First comment');
+				expect(result.sql).toContain('-- Second comment');
+				expect(result.sql).toMatch(/-- First comment\n-- Second comment\n/);
+			});
+
+			it('should preserve inline comments with their associated elements', () => {
+				const fetchXml = `<!-- Account summary query -->
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<attribute name="revenue" />
+							<filter>
+								<condition attribute="statecode" operator="eq" value="0" />
+							</filter>
+							<!-- active only -->
+						</entity>
+					</fetch>`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// Leading comment at top
+				expect(result.sql).toContain('-- Account summary query');
+				// Inline comment after WHERE clause
+				expect(result.sql).toContain('-- active only');
+				// Comment should be on the same line as the condition it follows
+				expect(result.sql).toMatch(/statecode = 0 -- active only/);
+			});
+
+			it('should not comment out the SELECT statement', () => {
+				const fetchXml = `<!-- Query comment -->
+					<fetch><entity name="account"><all-attributes /></entity></fetch>`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// SELECT should NOT be on the same line as the comment
+				expect(result.sql).not.toMatch(/-- .* SELECT/);
+				// SQL should start with comment, then have SELECT on next line
+				const lines = result.sql.split('\n');
+				expect(lines[0]).toMatch(/^-- /);
+				expect(lines[1]).toMatch(/^SELECT/);
+			});
+		});
+
 		describe('branch coverage edge cases', () => {
 			it('should handle begins-with without value', () => {
 				const fetchXml = `
@@ -1282,8 +1364,10 @@ describe('FetchXmlToSqlTranspiler', () => {
 				const result = transpiler.transpile(fetchXml);
 
 				expect(result.success).toBe(true);
-				// Empty column list should result in SELECT *
-				expect(result.sql).toContain('SELECT *');
+				// Empty column list should result in SELECT with * on next line
+				expect(result.sql).toContain('SELECT');
+				expect(result.sql).toContain('*');
+				expect(result.sql).toContain('FROM contact');
 			});
 		});
 	});

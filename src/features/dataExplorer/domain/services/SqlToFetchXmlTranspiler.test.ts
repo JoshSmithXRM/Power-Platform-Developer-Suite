@@ -1026,4 +1026,78 @@ describe('SqlToFetchXmlTranspiler', () => {
 			expect(fetchXml).toContain('alias="total"');
 		});
 	});
+
+	describe('comment preservation', () => {
+		it('should preserve leading comments as XML comments', () => {
+			const fetchXml = transpile(`
+				-- Account summary query
+				SELECT name, revenue FROM account
+			`);
+
+			expect(fetchXml).toContain('<!-- Account summary query -->');
+			// Comment should appear before <fetch>
+			expect(fetchXml.indexOf('<!-- Account summary query -->')).toBeLessThan(
+				fetchXml.indexOf('<fetch>')
+			);
+		});
+
+		it('should preserve trailing comment on condition', () => {
+			const fetchXml = transpile(
+				'SELECT name FROM account WHERE statecode = 0 -- active only'
+			);
+
+			expect(fetchXml).toContain('<!-- active only -->');
+		});
+
+		it('should preserve trailing comments on multiple columns', () => {
+			const fetchXml = transpile(`SELECT name, -- account name
+				revenue, -- annual revenue
+				accountid -- primary key
+				FROM account`);
+
+			expect(fetchXml).toContain('<!-- account name -->');
+			expect(fetchXml).toContain('<!-- annual revenue -->');
+			expect(fetchXml).toContain('<!-- primary key -->');
+		});
+
+		it('should preserve trailing comment on ORDER BY item', () => {
+			const fetchXml = transpile(
+				'SELECT name FROM account ORDER BY revenue DESC -- highest first'
+			);
+
+			expect(fetchXml).toContain('<!-- highest first -->');
+		});
+
+		it('should preserve trailing comment on GROUP BY column', () => {
+			const fetchXml = transpile(
+				'SELECT statecode, COUNT(*) FROM account GROUP BY statecode -- group by status'
+			);
+
+			expect(fetchXml).toContain('<!-- group by status -->');
+		});
+
+		it('should preserve trailing comment on LIKE condition', () => {
+			const fetchXml = transpile(
+				"SELECT * FROM account WHERE name LIKE '%Corp%' -- match corporation names"
+			);
+
+			expect(fetchXml).toContain('<!-- match corporation names -->');
+		});
+
+		it('should preserve trailing comment on IS NULL condition', () => {
+			const fetchXml = transpile(
+				'SELECT * FROM account WHERE deleteddate IS NULL -- not deleted'
+			);
+
+			expect(fetchXml).toContain('<!-- not deleted -->');
+		});
+
+		it('should preserve trailing comment on IN condition', () => {
+			const fetchXml = transpile(
+				'SELECT * FROM account WHERE statecode IN (0, 1) -- active states'
+			);
+
+			expect(fetchXml).toContain('<!-- active states -->');
+		});
+	});
 });

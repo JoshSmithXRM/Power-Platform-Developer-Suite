@@ -35,6 +35,9 @@ export type SqlAggregateFunction = 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX';
  * Can be: column, table.column, *, or table.*
  */
 export class SqlColumnRef {
+	/** Optional trailing comment (e.g., "-- account name" after "name,") */
+	public trailingComment?: string;
+
 	constructor(
 		public readonly tableName: string | null,
 		public readonly columnName: string,
@@ -55,6 +58,9 @@ export class SqlColumnRef {
  * Examples: COUNT(*), COUNT(name), COUNT(DISTINCT name), SUM(revenue)
  */
 export class SqlAggregateColumn {
+	/** Optional trailing comment */
+	public trailingComment?: string;
+
 	constructor(
 		public readonly func: SqlAggregateFunction,
 		public readonly column: SqlColumnRef | null, // null for COUNT(*)
@@ -90,6 +96,9 @@ export type SqlSelectColumn = SqlColumnRef | SqlAggregateColumn;
  * Table reference in FROM clause.
  */
 export class SqlTableRef {
+	/** Optional trailing comment */
+	public trailingComment?: string;
+
 	constructor(
 		public readonly tableName: string,
 		public readonly alias: string | null
@@ -125,6 +134,8 @@ export type SqlCondition =
  */
 export class SqlComparisonCondition {
 	public readonly kind = 'comparison' as const;
+	/** Optional trailing comment */
+	public trailingComment?: string;
 
 	constructor(
 		public readonly column: SqlColumnRef,
@@ -138,6 +149,8 @@ export class SqlComparisonCondition {
  */
 export class SqlLikeCondition {
 	public readonly kind = 'like' as const;
+	/** Optional trailing comment */
+	public trailingComment?: string;
 
 	constructor(
 		public readonly column: SqlColumnRef,
@@ -151,6 +164,8 @@ export class SqlLikeCondition {
  */
 export class SqlNullCondition {
 	public readonly kind = 'null' as const;
+	/** Optional trailing comment */
+	public trailingComment?: string;
 
 	constructor(
 		public readonly column: SqlColumnRef,
@@ -163,6 +178,8 @@ export class SqlNullCondition {
  */
 export class SqlInCondition {
 	public readonly kind = 'in' as const;
+	/** Optional trailing comment */
+	public trailingComment?: string;
 
 	constructor(
 		public readonly column: SqlColumnRef,
@@ -176,6 +193,8 @@ export class SqlInCondition {
  */
 export class SqlLogicalCondition {
 	public readonly kind = 'logical' as const;
+	/** Optional trailing comment */
+	public trailingComment?: string;
 
 	constructor(
 		public readonly operator: SqlLogicalOperator,
@@ -187,6 +206,9 @@ export class SqlLogicalCondition {
  * ORDER BY item.
  */
 export class SqlOrderByItem {
+	/** Optional trailing comment */
+	public trailingComment?: string;
+
 	constructor(
 		public readonly column: SqlColumnRef,
 		public readonly direction: SqlSortDirection
@@ -197,6 +219,9 @@ export class SqlOrderByItem {
  * JOIN clause.
  */
 export class SqlJoin {
+	/** Optional trailing comment */
+	public trailingComment?: string;
+
 	constructor(
 		public readonly type: SqlJoinType,
 		public readonly table: SqlTableRef,
@@ -209,6 +234,9 @@ export class SqlJoin {
  * Complete SQL SELECT statement AST.
  */
 export class SqlSelectStatement {
+	/** Comments that appear before the SELECT keyword */
+	public leadingComments: string[] = [];
+
 	constructor(
 		public readonly columns: readonly SqlSelectColumn[],
 		public readonly from: SqlTableRef,

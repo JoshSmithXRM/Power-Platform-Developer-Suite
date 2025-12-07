@@ -1,21 +1,32 @@
 import { SqlParseError } from '../errors/SqlParseError';
-import { KEYWORD_MAP, SqlToken } from '../valueObjects/SqlToken';
+import { KEYWORD_MAP, SqlComment, SqlToken } from '../valueObjects/SqlToken';
+
+/**
+ * Result of SQL lexical analysis.
+ * Contains both tokens and comments for full source reconstruction.
+ */
+export interface SqlLexerResult {
+	readonly tokens: SqlToken[];
+	readonly comments: SqlComment[];
+}
 
 /**
  * Domain Service: SQL Lexer
  *
  * Tokenizes SQL strings for parsing.
  * Handles keywords, identifiers, strings, numbers, and operators.
+ * Captures comments with positions for preservation during transpilation.
  *
  * Business Rules:
  * - Keywords are case-insensitive
  * - Identifiers can be quoted with square brackets [name] or double quotes "name"
  * - String literals use single quotes
- * - Line comments (--) and block comments are skipped
+ * - Line comments (--) and block comments are captured with positions
  */
 export class SqlLexer {
 	private position: number = 0;
 	private readonly sql: string;
+	private readonly comments: SqlComment[] = [];
 
 	constructor(sql: string) {
 		this.sql = sql;
@@ -23,12 +34,13 @@ export class SqlLexer {
 
 	/**
 	 * Tokenizes the entire SQL string.
+	 * Returns both tokens and comments for full source preservation.
 	 */
-	public tokenize(): SqlToken[] {
+	public tokenize(): SqlLexerResult {
 		const tokens: SqlToken[] = [];
 
 		while (!this.isAtEnd()) {
-			this.skipWhitespaceAndComments();
+			this.skipWhitespaceAndCaptureComments();
 			if (this.isAtEnd()) break;
 
 			const token = this.nextToken();
@@ -36,7 +48,7 @@ export class SqlLexer {
 		}
 
 		tokens.push(new SqlToken('EOF', '', this.position));
-		return tokens;
+		return { tokens, comments: this.comments };
 	}
 
 	/**
@@ -254,9 +266,10 @@ export class SqlLexer {
 	}
 
 	/**
-	 * Skips whitespace and comments.
+	 * Skips whitespace and captures comments with their positions.
+	 * Comments are stored in the comments array for later association with AST nodes.
 	 */
-	private skipWhitespaceAndComments(): void {
+	private skipWhitespaceAndCaptureComments(): void {
 		while (!this.isAtEnd()) {
 			const char = this.peek();
 
@@ -266,24 +279,47 @@ export class SqlLexer {
 				continue;
 			}
 
-			// Line comment: --
+			// Line comment: -- ...
 			if (char === '-' && this.peekNext() === '-') {
+				const startPosition = this.position;
+				this.advance(); // consume first -
+				this.advance(); // consume second -
+
+				let commentText = '';
 				while (!this.isAtEnd() && this.peek() !== '\n') {
+					commentText += this.peek();
 					this.advance();
+				}
+
+				// Store the comment with trimmed text
+				const trimmedText = commentText.trim();
+				if (trimmedText.length > 0) {
+					this.comments.push(new SqlComment(trimmedText, startPosition, false));
 				}
 				continue;
 			}
 
-			// Block comment: /* */
+			// Block comment: /* ... */
 			if (char === '/' && this.peekNext() === '*') {
-				this.advance();
-				this.advance();
+				const startPosition = this.position;
+				this.advance(); // consume /
+				this.advance(); // consume *
+
+				let commentText = '';
 				while (!this.isAtEnd() && !(this.peek() === '*' && this.peekNext() === '/')) {
+					commentText += this.peek();
 					this.advance();
 				}
+
 				if (!this.isAtEnd()) {
 					this.advance(); // consume *
 					this.advance(); // consume /
+				}
+
+				// Store the comment with trimmed text
+				const trimmedText = commentText.trim();
+				if (trimmedText.length > 0) {
+					this.comments.push(new SqlComment(trimmedText, startPosition, true));
 				}
 				continue;
 			}

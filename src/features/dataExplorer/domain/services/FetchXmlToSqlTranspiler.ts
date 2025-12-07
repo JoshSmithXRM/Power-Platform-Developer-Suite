@@ -41,6 +41,10 @@ interface ParsedAttribute {
 	groupby?: boolean | undefined;
 	/** Whether DISTINCT is applied to this aggregate */
 	distinct?: boolean | undefined;
+	/** End position in XML for comment association */
+	endPosition?: number | undefined;
+	/** Trailing comment text */
+	trailingComment?: string | undefined;
 }
 
 /**
@@ -63,6 +67,10 @@ interface ParsedCondition {
 	operator: string;
 	value?: string;
 	values?: string[];
+	/** End position in XML for comment association */
+	endPosition?: number | undefined;
+	/** Trailing comment text */
+	trailingComment?: string | undefined;
 }
 
 /**
@@ -73,6 +81,18 @@ interface ParsedCondition {
 interface ParsedFilter {
 	type: 'and' | 'or';
 	conditions: ParsedCondition[];
+	/** End position in XML for comment association */
+	endPosition?: number | undefined;
+	/** Trailing comment text */
+	trailingComment?: string | undefined;
+}
+
+/**
+ * Parsed comment from FetchXML.
+ */
+interface ParsedComment {
+	text: string;
+	position: number;
 }
 
 /**
@@ -81,6 +101,10 @@ interface ParsedFilter {
 interface ParsedOrder {
 	attribute: string;
 	descending: boolean;
+	/** End position in XML for comment association */
+	endPosition?: number | undefined;
+	/** Trailing comment text */
+	trailingComment?: string | undefined;
 }
 
 /**
@@ -109,6 +133,9 @@ export class FetchXmlToSqlTranspiler {
 
 			// Check for unsupported features (paging only now - we support aggregates)
 			this.checkUnsupportedFeatures(trimmed, warnings);
+
+			// Parse XML comments
+			const comments = this.parseXmlComments(trimmed);
 
 			// Parse fetch element attributes
 			const top = this.extractAttribute(trimmed, 'fetch', 'top');
@@ -141,6 +168,15 @@ export class FetchXmlToSqlTranspiler {
 			// Parse orders
 			const orders = this.parseOrders(trimmed);
 
+			// Associate comments with their nearest preceding elements
+			const leadingComments = this.associateComments(
+				trimmed,
+				comments,
+				attributes,
+				filter,
+				orders
+			);
+
 			// Build SQL
 			const sql = this.buildSql({
 				entityName,
@@ -151,6 +187,7 @@ export class FetchXmlToSqlTranspiler {
 				linkEntities,
 				filter,
 				orders,
+				leadingComments,
 			});
 
 			return {
@@ -245,15 +282,20 @@ export class FetchXmlToSqlTranspiler {
 
 	/**
 	 * Parses attribute elements from the main entity.
+	 * Captures end positions for comment association.
 	 */
 	private parseAttributes(xml: string): ParsedAttribute[] {
 		const attributes: ParsedAttribute[] = [];
 
-		// Get content of main entity (before link-entities)
+		// Get content of main entity (before link-entities) with its start offset
 		const entityMatch = xml.match(
 			/<entity[^>]*>([\s\S]*?)(?:<link-entity|<\/entity>)/i
 		);
 		const entityContent = entityMatch?.[1] ?? '';
+		// Calculate offset: find where entity content starts in original XML
+		const entityContentStart = entityMatch?.index !== undefined
+			? xml.indexOf(entityContent, entityMatch.index)
+			: 0;
 
 		// Parse attribute elements
 		const attrPattern =
@@ -269,12 +311,15 @@ export class FetchXmlToSqlTranspiler {
 			const distinctStr = this.extractAttrValue(attrString, 'distinct');
 
 			if (name) {
+				// Calculate end position in original XML
+				const endPosition = entityContentStart + match.index + match[0].length;
 				attributes.push({
 					name,
 					alias,
 					aggregate,
 					groupby: groupbyStr?.toLowerCase() === 'true',
 					distinct: distinctStr?.toLowerCase() === 'true',
+					endPosition,
 				});
 			}
 		}
@@ -379,6 +424,7 @@ export class FetchXmlToSqlTranspiler {
 	 * Parses filter element from FetchXML.
 	 * Note: Nested filters are flattened - all conditions are extracted
 	 * and joined with the parent filter's type (AND/OR).
+	 * Captures end position for comment association.
 	 */
 	private parseFilter(xml: string): ParsedFilter | null {
 		// Find the first filter element in the main entity
@@ -398,19 +444,28 @@ export class FetchXmlToSqlTranspiler {
 				| 'and'
 				| 'or') ?? 'and';
 
+		// Calculate filter start position for condition offsets
+		const filterStartIndex = filterMatch.index ?? 0;
+		const contentStart = xml.indexOf(content, filterStartIndex);
+
 		// Parse all conditions (including those in nested filters)
-		const conditions = this.parseConditions(content);
+		const conditions = this.parseConditions(content, contentStart);
+
+		// Calculate end position (after </filter>)
+		const endPosition = filterStartIndex + filterMatch[0].length;
 
 		return {
 			type: filterType,
 			conditions,
+			endPosition,
 		};
 	}
 
 	/**
 	 * Parses condition elements.
+	 * Captures end positions for comment association.
 	 */
-	private parseConditions(content: string): ParsedCondition[] {
+	private parseConditions(content: string, contentOffset: number = 0): ParsedCondition[] {
 		const conditions: ParsedCondition[] = [];
 
 		// Parse simple conditions (not inside nested filters)
@@ -427,7 +482,9 @@ export class FetchXmlToSqlTranspiler {
 			const value = this.extractAttrValue(attrString, 'value');
 
 			if (attribute && operator) {
-				const condition: ParsedCondition = { attribute, operator };
+				// Calculate end position in original XML
+				const endPosition = contentOffset + match.index + match[0].length;
+				const condition: ParsedCondition = { attribute, operator, endPosition };
 
 				if (value !== undefined) {
 					condition.value = value;
@@ -467,7 +524,34 @@ export class FetchXmlToSqlTranspiler {
 	}
 
 	/**
+	 * Parses XML comments from FetchXML.
+	 * Extracts all <!-- ... --> comments with their positions.
+	 */
+	private parseXmlComments(xml: string): ParsedComment[] {
+		const comments: ParsedComment[] = [];
+		const commentPattern = /<!--([\s\S]*?)-->/g;
+		let match;
+
+		while ((match = commentPattern.exec(xml)) !== null) {
+			const text = match[1]?.trim() ?? '';
+			if (text.length > 0) {
+				// Handle multi-line comments - split into separate lines
+				const lines = text.split('\n').map((line) => line.trim()).filter((line) => line);
+				for (const line of lines) {
+					comments.push({
+						text: line,
+						position: match.index,
+					});
+				}
+			}
+		}
+
+		return comments;
+	}
+
+	/**
 	 * Parses order elements.
+	 * Captures end positions for comment association.
 	 */
 	private parseOrders(xml: string): ParsedOrder[] {
 		const orders: ParsedOrder[] = [];
@@ -480,9 +564,12 @@ export class FetchXmlToSqlTranspiler {
 			const descendingStr = this.extractAttrValue(attrString, 'descending');
 
 			if (attribute) {
+				// Calculate end position
+				const endPosition = match.index + match[0].length;
 				orders.push({
 					attribute,
 					descending: descendingStr?.toLowerCase() === 'true',
+					endPosition,
 				});
 			}
 		}
@@ -491,7 +578,92 @@ export class FetchXmlToSqlTranspiler {
 	}
 
 	/**
+	 * Associates comments with their nearest preceding elements.
+	 * Comments appearing before <fetch> are returned as leading comments.
+	 * Comments appearing after elements are attached to those elements.
+	 *
+	 * @returns Leading comments (those before <fetch>)
+	 */
+	private associateComments(
+		xml: string,
+		comments: ParsedComment[],
+		attributes: ParsedAttribute[],
+		filter: ParsedFilter | null,
+		orders: ParsedOrder[]
+	): ParsedComment[] {
+		if (comments.length === 0) {
+			return [];
+		}
+
+		// Find where <fetch> starts - comments before this are leading comments
+		const fetchStart = xml.indexOf('<fetch');
+		const leadingComments: ParsedComment[] = [];
+
+		// Collect all elements with positions, sorted by position
+		interface PositionedElement {
+			endPosition: number;
+			element: ParsedAttribute | ParsedCondition | ParsedFilter | ParsedOrder;
+		}
+		const elements: PositionedElement[] = [];
+
+		for (const attr of attributes) {
+			if (attr.endPosition !== undefined) {
+				elements.push({ endPosition: attr.endPosition, element: attr });
+			}
+		}
+
+		if (filter) {
+			// Add individual conditions
+			for (const condition of filter.conditions) {
+				if (condition.endPosition !== undefined) {
+					elements.push({ endPosition: condition.endPosition, element: condition });
+				}
+			}
+			// Also add the filter itself (for comments after </filter>)
+			if (filter.endPosition !== undefined) {
+				elements.push({ endPosition: filter.endPosition, element: filter });
+			}
+		}
+
+		for (const order of orders) {
+			if (order.endPosition !== undefined) {
+				elements.push({ endPosition: order.endPosition, element: order });
+			}
+		}
+
+		// Sort elements by end position
+		elements.sort((a, b) => a.endPosition - b.endPosition);
+
+		// Associate each comment with the nearest preceding element
+		for (const comment of comments) {
+			if (comment.position < fetchStart) {
+				// Comment is before <fetch> - it's a leading comment
+				leadingComments.push(comment);
+				continue;
+			}
+
+			// Find the element that ends just before this comment
+			let bestMatch: PositionedElement | undefined;
+			for (const elem of elements) {
+				if (elem.endPosition <= comment.position) {
+					bestMatch = elem;
+				} else {
+					break; // Elements are sorted, no need to continue
+				}
+			}
+
+			if (bestMatch) {
+				// Attach comment to the element
+				bestMatch.element.trailingComment = comment.text;
+			}
+		}
+
+		return leadingComments;
+	}
+
+	/**
 	 * Builds SQL from parsed FetchXML components.
+	 * Generates multi-line SQL with inline comments for better readability.
 	 */
 	private buildSql(params: {
 		entityName: string;
@@ -502,60 +674,212 @@ export class FetchXmlToSqlTranspiler {
 		linkEntities: ParsedLinkEntity[];
 		filter: ParsedFilter | null;
 		orders: ParsedOrder[];
+		leadingComments?: ParsedComment[];
 	}): string {
-		const parts: string[] = [];
+		const lines: string[] = [];
 
-		// SELECT clause with optional DISTINCT
-		if (params.distinct) {
-			parts.push('SELECT DISTINCT');
-		} else {
-			parts.push('SELECT');
+		// Leading comments (before SELECT)
+		if (params.leadingComments && params.leadingComments.length > 0) {
+			for (const comment of params.leadingComments) {
+				lines.push(`-- ${comment.text}`);
+			}
 		}
 
+		// SELECT clause with optional DISTINCT and TOP
+		let selectLine = params.distinct ? 'SELECT DISTINCT' : 'SELECT';
 		if (params.top) {
-			parts.push(`TOP ${params.top}`);
+			selectLine += ` TOP ${params.top}`;
 		}
+		lines.push(selectLine);
 
-		// Columns (may include aggregate functions)
-		const columns = this.buildColumnList(params);
-		parts.push(columns);
+		// Columns - each on its own line with indentation
+		const columnLines = this.buildMultilineColumnList(params);
+		lines.push(...columnLines);
 
 		// FROM clause
-		parts.push(`FROM ${params.entityName}`);
+		lines.push(`FROM ${params.entityName}`);
 
-		// JOINs
+		// JOINs - each on its own line
 		for (const link of params.linkEntities) {
 			const joinType = link.linkType === 'outer' ? 'LEFT JOIN' : 'JOIN';
 			const aliasClause = link.alias ? ` ${link.alias}` : '';
-			parts.push(
+			lines.push(
 				`${joinType} ${link.name}${aliasClause} ON ${link.alias ?? link.name}.${link.from} = ${params.entityName}.${link.to}`
 			);
 		}
 
-		// WHERE clause
+		// WHERE clause - with inline comments on conditions
 		if (params.filter) {
-			const whereClause = this.buildWhereClause(params.filter);
-			if (whereClause) {
-				parts.push(`WHERE ${whereClause}`);
+			const whereLines = this.buildMultilineWhereClause(params.filter);
+			if (whereLines.length > 0) {
+				lines.push(...whereLines);
 			}
 		}
 
-		// GROUP BY clause - include columns marked with groupby=true
+		// GROUP BY clause
 		const groupByColumns = params.attributes.filter((attr) => attr.groupby);
 		if (groupByColumns.length > 0) {
 			const groupByList = groupByColumns.map((attr) => attr.name).join(', ');
-			parts.push(`GROUP BY ${groupByList}`);
+			lines.push(`GROUP BY ${groupByList}`);
 		}
 
-		// ORDER BY clause
+		// ORDER BY clause - with inline comments
 		if (params.orders.length > 0) {
-			const orderClauses = params.orders.map(
-				(o) => `${o.attribute} ${o.descending ? 'DESC' : 'ASC'}`
-			);
-			parts.push(`ORDER BY ${orderClauses.join(', ')}`);
+			const orderLines = this.buildMultilineOrderByClause(params.orders);
+			lines.push(...orderLines);
 		}
 
-		return parts.join(' ');
+		return lines.join('\n');
+	}
+
+	/**
+	 * Builds multi-line column list with inline comments.
+	 */
+	private buildMultilineColumnList(params: {
+		hasAllAttributes: boolean;
+		attributes: ParsedAttribute[];
+		linkEntities: ParsedLinkEntity[];
+	}): string[] {
+		const lines: string[] = [];
+
+		if (params.hasAllAttributes && params.linkEntities.length === 0) {
+			lines.push('  *');
+			return lines;
+		}
+
+		// Collect all column expressions with their comments
+		interface ColumnEntry {
+			expression: string;
+			comment?: string | undefined;
+		}
+		const columns: ColumnEntry[] = [];
+
+		// Main entity columns
+		if (params.hasAllAttributes) {
+			columns.push({ expression: '*' });
+		} else {
+			for (const attr of params.attributes) {
+				const columnExpr = this.buildColumnExpression(attr);
+				columns.push({ expression: columnExpr, comment: attr.trailingComment });
+			}
+		}
+
+		// Link entity columns
+		for (const link of params.linkEntities) {
+			const prefix = link.alias ?? link.name;
+			if (link.attributes.length === 0) {
+				columns.push({ expression: `${prefix}.*` });
+			} else {
+				for (const attr of link.attributes) {
+					const col = `${prefix}.${attr.name}`;
+					if (attr.alias) {
+						columns.push({ expression: `${col} AS ${attr.alias}`, comment: attr.trailingComment });
+					} else {
+						columns.push({ expression: col, comment: attr.trailingComment });
+					}
+				}
+			}
+		}
+
+		// Format columns - last one without comma
+		for (let i = 0; i < columns.length; i++) {
+			const col = columns[i];
+			if (col === undefined) continue;
+
+			const isLast = i === columns.length - 1;
+			let line = `  ${col.expression}${isLast ? '' : ','}`;
+
+			if (col.comment) {
+				line += ` -- ${col.comment}`;
+			}
+
+			lines.push(line);
+		}
+
+		// If no columns, default to *
+		if (lines.length === 0) {
+			lines.push('  *');
+		}
+
+		return lines;
+	}
+
+	/**
+	 * Builds multi-line WHERE clause with inline comments.
+	 */
+	private buildMultilineWhereClause(filter: ParsedFilter): string[] {
+		const lines: string[] = [];
+
+		if (filter.conditions.length === 0) {
+			return lines;
+		}
+
+		const connector = filter.type === 'or' ? 'OR' : 'AND';
+
+		for (let i = 0; i < filter.conditions.length; i++) {
+			const condition = filter.conditions[i];
+			if (condition === undefined) continue;
+
+			const conditionSql = this.buildConditionSql(condition);
+			if (!conditionSql) continue;
+
+			let line: string;
+			if (i === 0) {
+				// First condition starts with WHERE
+				line = `WHERE ${conditionSql}`;
+			} else {
+				// Subsequent conditions with AND/OR
+				line = `  ${connector} ${conditionSql}`;
+			}
+
+			// Add trailing comment if present
+			if (condition.trailingComment) {
+				line += ` -- ${condition.trailingComment}`;
+			}
+
+			lines.push(line);
+		}
+
+		// Add filter-level trailing comment after all conditions
+		if (filter.trailingComment && lines.length > 0) {
+			// Append to the last condition line
+			lines[lines.length - 1] += ` -- ${filter.trailingComment}`;
+		}
+
+		return lines;
+	}
+
+	/**
+	 * Builds multi-line ORDER BY clause with inline comments.
+	 */
+	private buildMultilineOrderByClause(orders: ParsedOrder[]): string[] {
+		const lines: string[] = [];
+
+		for (let i = 0; i < orders.length; i++) {
+			const order = orders[i];
+			if (order === undefined) continue;
+
+			const direction = order.descending ? 'DESC' : 'ASC';
+			const isLast = i === orders.length - 1;
+
+			let line: string;
+			if (i === 0) {
+				// First order starts with ORDER BY
+				line = `ORDER BY ${order.attribute} ${direction}${isLast ? '' : ','}`;
+			} else {
+				// Subsequent orders with indentation
+				line = `  ${order.attribute} ${direction}${isLast ? '' : ','}`;
+			}
+
+			// Add trailing comment if present
+			if (order.trailingComment) {
+				line += ` -- ${order.trailingComment}`;
+			}
+
+			lines.push(line);
+		}
+
+		return lines;
 	}
 
 	/**

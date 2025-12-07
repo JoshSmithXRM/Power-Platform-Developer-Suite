@@ -181,3 +181,20 @@ export const KEYWORD_MAP: ReadonlyMap<string, SqlTokenType> = new Map([
 	['MIN', 'MIN'],
 	['MAX', 'MAX'],
 ]);
+
+/**
+ * Value Object: SQL Comment
+ *
+ * Represents a comment extracted during lexical analysis.
+ * Tracks position for associating with nearby tokens/AST nodes.
+ */
+export class SqlComment {
+	constructor(
+		/** The comment text (without delimiters) */
+		public readonly text: string,
+		/** Character position where the comment starts in the source */
+		public readonly position: number,
+		/** Whether this is a block comment vs line comment */
+		public readonly isBlock: boolean
+	) {}
+}
