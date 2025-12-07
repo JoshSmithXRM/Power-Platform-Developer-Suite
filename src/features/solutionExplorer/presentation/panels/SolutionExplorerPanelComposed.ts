@@ -76,10 +76,10 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
 
 		// Initialize loading behavior for toolbar buttons
-		// Note: openMaker excluded - it only needs environmentId which is already known
+		// All buttons must be included so they get re-enabled after scaffold renders with isLoading: true
 		this.loadingBehavior = new LoadingStateBehavior(
 			panel,
-			LoadingStateBehavior.createButtonConfigs(['refresh']),
+			LoadingStateBehavior.createButtonConfigs(['openMaker', 'refresh']),
 			logger
 		);
 
@@ -443,11 +443,17 @@ export class SolutionExplorerPanelComposed extends EnvironmentScopedPanel<Soluti
 	 */
 	private showTableLoading(): void {
 		void this.panel.postMessage({
-			command: 'updateTableData',
+			command: 'updateVirtualTable',
 			data: {
-				viewModels: [],
+				rows: [],
 				columns: this.getTableConfig().columns,
-				isLoading: true
+				pagination: {
+					cachedCount: 0,
+					totalCount: 0,
+					isLoading: true,
+					currentPage: 0,
+					isFullyCached: false
+				}
 			}
 		});
 	}

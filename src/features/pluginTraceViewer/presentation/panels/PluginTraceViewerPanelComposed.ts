@@ -151,10 +151,10 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		this.detailSection = result.detailSection;
 
 		// Initialize loading behavior for toolbar buttons
-		// Note: openMaker excluded - it only needs environmentId which is already known
+		// All buttons must be included so they get re-enabled after scaffold renders with isLoading: true
 		this.loadingBehavior = new LoadingStateBehavior(
 			panel,
-			LoadingStateBehavior.createButtonConfigs(['refresh']),
+			LoadingStateBehavior.createButtonConfigs(['openMaker', 'refresh']),
 			logger
 		);
 
@@ -318,7 +318,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 
 		// Single scaffold render with all persisted state included
 		// No second render needed - handleRefresh() uses data-driven updateTableData
-		// isLoading: true renders spinner in table (button state managed by LoadingStateBehavior)
+		// isLoading: true renders spinner in table and disables all buttons
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
@@ -335,21 +335,29 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			}
 		});
 
-		// Build and send OData query preview for loaded filters
-		const loadedFilterCriteria = this.filterManagementBehavior.getAppliedFilterCriteria();
-		const filterMapper = new FilterCriteriaMapper(this.configService);
-		const domainFilter = filterMapper.toDomain(loadedFilterCriteria);
-		const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
-		await this.panel.postMessage({
-			command: 'updateODataPreview',
-			data: { query: odataQuery }
-		});
+		// Disable all buttons during initial load (scaffold rendered them disabled, this syncs state)
+		await this.loadingBehavior.setLoading(true);
 
-		// Load data - handleRefresh() manages button loading state and shows table loading
-		await this.handleRefresh();
+		try {
+			// Build and send OData query preview for loaded filters
+			const loadedFilterCriteria = this.filterManagementBehavior.getAppliedFilterCriteria();
+			const filterMapper = new FilterCriteriaMapper(this.configService);
+			const domainFilter = filterMapper.toDomain(loadedFilterCriteria);
+			const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
+			await this.panel.postMessage({
+				command: 'updateODataPreview',
+				data: { query: odataQuery }
+			});
 
-		// Load trace level (updates dropdown via message)
-		await this.loadTraceLevel();
+			// Load data - handleRefresh() manages refresh button spinner
+			await this.handleRefresh();
+
+			// Load trace level (updates dropdown via message)
+			await this.loadTraceLevel();
+		} finally {
+			// Re-enable all buttons after load completes
+			await this.loadingBehavior.setLoading(false);
+		}
 	}
 
 	private createCoordinator(): {
