@@ -1,6 +1,6 @@
 # Technical Debt Inventory
 
-**Total Items:** 8 (6 items resolved/reclassified earlier, 2 low-priority items, 1 accepted tradeoff added)
+**Total Items:** 9 (6 items resolved/reclassified earlier, 3 low-priority items, 1 accepted tradeoff added)
 
 ---
 
@@ -11,7 +11,7 @@
 | **Accepted Tradeoffs** | 5 | Keep indefinitely (conscious decisions) |
 | **Will Not Implement** | 1 | Rejected (over-engineering) |
 | **Scheduled** | 0 | Fix in next 1-2 sprints (all items resolved) |
-| **Low Priority** | 2 | Fix when naturally touching code |
+| **Low Priority** | 3 | Fix when naturally touching code |
 
 ---
 
@@ -84,7 +84,7 @@ Items with clear triggers or timelines for fixing.
 
 ---
 
-## 🔵 Low Priority (2 items)
+## 🔵 Low Priority (3 items)
 
 Fix when it becomes a problem or when naturally touching the code.
 
@@ -92,6 +92,7 @@ Fix when it becomes a problem or when naturally touching the code.
 |------|------|--------|---------|
 | [Notification Service Abstraction](low-priority/notification-service-abstraction.md) | Refactoring (consistency enforcement) | 4-6 hours | When refactoring 10+ notification callsites |
 | [FileSystemProvider Complexity](low-priority/filesystemprovider-complexity.md) | Refactoring (separation of concerns) | 4-6 hours | When adding new content modes or conflict features |
+| [Environment Repository Caching](low-priority/environment-repository-caching.md) | Performance (redundant loading) | 2-3 hours | When modifying EnvironmentRepository or SharedFactories |
 
 **Previously resolved items:**
 
@@ -107,17 +108,17 @@ Fix when it becomes a problem or when naturally touching the code.
 ### Debt by Category (Visual)
 
 ```
-Accepted Tradeoffs: █████  5 items (71%)
-Will Not Implement: █      1 item  (14%)
+Accepted Tradeoffs: █████  5 items (56%)
+Will Not Implement: █      1 item  (11%)
 Scheduled:          -      0 items (0%)
-Low Priority:       ██     2 items (25%)
+Low Priority:       ███    3 items (33%)
 ```
 
 ### Decision Quality
 
 | Metric | Value | Assessment |
 |--------|-------|------------|
-| **Items with zero bugs** | 8/8 (100%) | ✅ Excellent - all decisions validated |
+| **Items with zero bugs** | 9/9 (100%) | ✅ Excellent - all decisions validated |
 | **Patterns promoted to architecture docs** | 2 items | ✅ Industry standards (static factories, OData) |
 | **Rejected over-engineering** | 1 item | ✅ Good judgment (avoided cargo cult patterns) |
 | **Items resolved in last review** | 4 items | ✅ Proactive (DateTimeFilter, split guide, shared DTO, ESLint rule) |
@@ -125,7 +126,7 @@ Low Priority:       ██     2 items (25%)
 | **ESLint rule quality** | Prefix matching (future-proof) | ✅ Improved (12 suppressions eliminated) |
 | **Notification consistency** | 99% (1/95 fixed) | ✅ Excellent (abstraction deferred, not urgent) |
 
-**Overall Health:** 🟢 Excellent (8 items total: 5 accepted, 1 rejected over-engineering, 2 low-priority future improvements)
+**Overall Health:** 🟢 Excellent (9 items total: 5 accepted, 1 rejected over-engineering, 3 low-priority future improvements)
 
 ---
 
@@ -179,7 +180,8 @@ docs/technical-debt/
 │
 └── low-priority/                                # Opportunistic fix
     ├── notification-service-abstraction.md      # 95+ callsites, defer until refactoring
-    └── filesystemprovider-complexity.md         # ~800 lines, extract when adding features
+    ├── filesystemprovider-complexity.md         # ~800 lines, extract when adding features
+    └── environment-repository-caching.md        # Redundant getAll() calls, add TTL cache
 
 Reclassified as architectural patterns (moved to docs/architecture/):
 - static-factory-methods.md → STATIC_FACTORY_PATTERN.md
