@@ -23,9 +23,9 @@ interface NotebookCellData {
  * Serializer for .ppdsnb (Power Platform Developer Suite Notebook) files.
  *
  * Handles reading and writing notebook data in a custom JSON format.
- * Stores environment selection in notebook metadata for persistence.
+ * Supports SQL and FetchXML cells with environment selection persistence.
  */
-export class DataverseSqlNotebookSerializer implements vscode.NotebookSerializer {
+export class DataverseNotebookSerializer implements vscode.NotebookSerializer {
 	/**
 	 * Deserializes notebook content from file.
 	 *

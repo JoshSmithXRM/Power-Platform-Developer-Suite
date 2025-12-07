@@ -261,8 +261,8 @@
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.newDataverseSqlNotebook",
-                "title": "New Dataverse SQL Notebook",
+                "command": "power-platform-dev-suite.newDataverseNotebook",
+                "title": "New Dataverse Notebook",
                 "category": "Power Platform Developer Suite",
                 "icon": "$(notebook)"
             }

@@ -22,7 +22,7 @@ import { initializeMetadataBrowser } from './features/metadataBrowser/presentati
 import { initializePersistenceInspector } from './features/persistenceInspector/presentation/initialization/initializePersistenceInspector.js';
 import { initializeDataExplorer } from './features/dataExplorer/presentation/initialization/initializeDataExplorer.js';
 import { initializeWebResources } from './features/webResources/presentation/initialization/initializeWebResources.js';
-import { registerDataverseSqlNotebooks } from './features/dataExplorer/notebooks/registerNotebooks.js';
+import { registerDataverseNotebooks } from './features/dataExplorer/notebooks/registerNotebooks.js';
 
 /**
  * Shows environment picker and executes callback with selected environment ID.
@@ -93,15 +93,15 @@ export function activate(context: vscode.ExtensionContext): void {
 	);
 	vscode.window.registerTreeDataProvider('power-platform-dev-suite-environments', environmentsProvider);
 
-	// Register Dataverse SQL Notebooks
-	registerDataverseSqlNotebooks(context, {
+	// Register Dataverse Notebooks (SQL and FetchXML support)
+	registerDataverseNotebooks(context, {
 		getEnvironments: factories.getEnvironments,
 		dataverseApiServiceFactory: factories.dataverseApiServiceFactory,
 		logger: container.logger,
 	}).then((disposables) => {
 		context.subscriptions.push(...disposables);
 	}).catch((error) => {
-		container.logger.error('Failed to register Dataverse SQL Notebooks', error);
+		container.logger.error('Failed to register Dataverse Notebooks', error);
 	});
 
 	// Register Environment Setup commands

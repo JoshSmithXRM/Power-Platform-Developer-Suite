@@ -3,8 +3,8 @@ import * as vscode from 'vscode';
 import type { ILogger } from '../../../infrastructure/logging/ILogger';
 import { QueryResultViewModelMapper } from '../application/mappers/QueryResultViewModelMapper';
 
-import { DataverseSqlNotebookController } from './DataverseSqlNotebookController';
-import { DataverseSqlNotebookSerializer } from './DataverseSqlNotebookSerializer';
+import { DataverseNotebookController } from './DataverseNotebookController';
+import { DataverseNotebookSerializer } from './DataverseNotebookSerializer';
 
 /**
  * Environment info for notebook environment picker.
@@ -28,26 +28,27 @@ interface NotebookDependencies {
 }
 
 /**
- * Registers Dataverse SQL Notebook support.
+ * Registers Dataverse Notebook support.
  *
  * This function:
  * - Registers the notebook serializer for .ppdsnb files
- * - Creates the notebook controller for cell execution
+ * - Creates the notebook controller for cell execution (SQL and FetchXML)
  * - Registers environment selection command
  * - Registers new notebook command
  * - Sets up notebook editor change handlers
+ * - Enables auto-switching between SQL and FetchXML based on content
  *
  * @param context - VS Code extension context
  * @param deps - Dependencies for notebook functionality
  * @returns Disposables for cleanup
  */
-export async function registerDataverseSqlNotebooks(
+export async function registerDataverseNotebooks(
 	context: vscode.ExtensionContext,
 	deps: NotebookDependencies
 ): Promise<vscode.Disposable[]> {
 	const { getEnvironments, dataverseApiServiceFactory, logger } = deps;
 
-	logger.info('Registering Dataverse SQL Notebooks');
+	logger.info('Registering Dataverse Notebooks');
 
 	// Import dependencies lazily
 	const { DataverseApiService } = await import(
@@ -82,14 +83,14 @@ export async function registerDataverseSqlNotebooks(
 	const resultMapper = new QueryResultViewModelMapper();
 
 	// Register notebook serializer
-	const serializer = new DataverseSqlNotebookSerializer();
+	const serializer = new DataverseNotebookSerializer();
 	const serializerDisposable = vscode.workspace.registerNotebookSerializer(
 		'ppdsnb',
 		serializer
 	);
 
 	// Create notebook controller
-	const controller = new DataverseSqlNotebookController(
+	const controller = new DataverseNotebookController(
 		getEnvironments,
 		executeSqlUseCase,
 		executeFetchXmlUseCase,
@@ -105,7 +106,7 @@ export async function registerDataverseSqlNotebooks(
 
 	// Register new notebook command
 	const newNotebookCommand = vscode.commands.registerCommand(
-		'power-platform-dev-suite.newDataverseSqlNotebook',
+		'power-platform-dev-suite.newDataverseNotebook',
 		async () => {
 			await createNewDataverseNotebook(logger);
 		}
@@ -139,7 +140,7 @@ export async function registerDataverseSqlNotebooks(
 		controller.updateStatusBarVisibility(vscode.window.activeNotebookEditor);
 	}
 
-	logger.info('Dataverse SQL Notebooks registered successfully');
+	logger.info('Dataverse Notebooks registered successfully');
 
 	return [
 		serializerDisposable,
@@ -152,7 +153,8 @@ export async function registerDataverseSqlNotebooks(
 }
 
 /**
- * Creates a new Dataverse SQL notebook file.
+ * Creates a new Dataverse notebook file.
+ * New cells default to SQL but auto-switch to FetchXML if user types '<'.
  */
 async function createNewDataverseNotebook(logger: ILogger): Promise<void> {
 	try {
@@ -162,7 +164,7 @@ async function createNewDataverseNotebook(logger: ILogger): Promise<void> {
 			new vscode.NotebookData([
 				new vscode.NotebookCellData(
 					vscode.NotebookCellKind.Markup,
-					'# Power Platform Developer Suite Notebook\n\nSelect an environment using the status bar picker, then write SQL queries in the cells below.',
+					'# Power Platform Developer Suite Notebook\n\nSelect an environment using the status bar picker, then write SQL or FetchXML queries in the cells below.',
 					'markdown'
 				),
 				new vscode.NotebookCellData(
@@ -176,9 +178,9 @@ async function createNewDataverseNotebook(logger: ILogger): Promise<void> {
 		// Show the notebook
 		await vscode.window.showNotebookDocument(notebook);
 
-		logger.info('Created new Dataverse SQL notebook');
+		logger.info('Created new Dataverse notebook');
 	} catch (error) {
-		logger.error('Failed to create new Dataverse SQL notebook', error);
+		logger.error('Failed to create new Dataverse notebook', error);
 		vscode.window.showErrorMessage(
 			`Failed to create notebook: ${error instanceof Error ? error.message : String(error)}`
 		);
@@ -189,7 +191,7 @@ async function createNewDataverseNotebook(logger: ILogger): Promise<void> {
  * Options for opening a query in a notebook.
  */
 export interface OpenQueryInNotebookOptions {
-	/** SQL query to pre-populate in the notebook */
+	/** SQL or FetchXML query to pre-populate in the notebook */
 	sql: string;
 	/** Environment ID to use for execution */
 	environmentId: string;
@@ -200,8 +202,9 @@ export interface OpenQueryInNotebookOptions {
 }
 
 /**
- * Opens a SQL query in a new Dataverse SQL notebook.
+ * Opens a query in a new Dataverse notebook.
  * Called from Data Explorer panel "Open in Notebook" action.
+ * Auto-detects SQL vs FetchXML based on content.
  *
  * @param options - Query and environment to pre-populate
  */
@@ -209,6 +212,14 @@ export async function openQueryInNotebook(
 	options: OpenQueryInNotebookOptions
 ): Promise<void> {
 	const { sql, environmentId, environmentName, environmentUrl } = options;
+
+	// Detect if content is FetchXML
+	const trimmedQuery = sql.trim();
+	const isFetchXml = trimmedQuery.startsWith('<');
+	const language = isFetchXml ? 'fetchxml' : 'sql';
+	const defaultQuery = isFetchXml
+		? '<fetch top="10">\n  <entity name="account">\n    <attribute name="name" />\n  </entity>\n</fetch>'
+		: '-- Write your SQL query here\nSELECT TOP 10 * FROM account';
 
 	try {
 		// Create notebook with pre-populated content and environment metadata
@@ -220,8 +231,8 @@ export async function openQueryInNotebook(
 			),
 			new vscode.NotebookCellData(
 				vscode.NotebookCellKind.Code,
-				sql.trim() || '-- Write your SQL query here\nSELECT TOP 10 * FROM account',
-				'sql'
+				trimmedQuery || defaultQuery,
+				language
 			),
 		]);
 

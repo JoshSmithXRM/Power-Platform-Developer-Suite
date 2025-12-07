@@ -18,19 +18,27 @@ interface EnvironmentInfo {
 }
 
 /**
+ * Maximum content length to trigger auto-switch.
+ * Once content exceeds this, we respect the current language.
+ */
+const AUTO_SWITCH_THRESHOLD = 30;
+
+/**
  * Controller for executing Power Platform Developer Suite notebook cells.
  *
  * Supports both SQL and FetchXML cells:
  * - SQL cells are transpiled to FetchXML before execution
  * - FetchXML cells are executed directly
+ * - Auto-detects language based on first character (< = FetchXML, otherwise SQL)
  *
  * Handles:
  * - Cell execution against selected Dataverse environment
  * - Environment selection via status bar picker
+ * - Automatic language switching based on content
  * - Rich HTML output rendering
  * - Error handling and display
  */
-export class DataverseSqlNotebookController {
+export class DataverseNotebookController {
 	private readonly controllerId = 'ppdsnb-controller';
 	private readonly notebookType = 'ppdsnb';
 	private readonly label = 'Power Platform Developer Suite';
@@ -40,6 +48,7 @@ export class DataverseSqlNotebookController {
 	private selectedEnvironmentName: string | undefined;
 	private selectedEnvironmentUrl: string | undefined;
 	private statusBarItem: vscode.StatusBarItem;
+	private textChangeListener: vscode.Disposable | undefined;
 
 	constructor(
 		private readonly getEnvironments: () => Promise<EnvironmentInfo[]>,
@@ -48,7 +57,7 @@ export class DataverseSqlNotebookController {
 		private readonly resultMapper: QueryResultViewModelMapper,
 		private readonly logger: ILogger
 	) {
-		this.logger.info('Creating DataverseSqlNotebookController');
+		this.logger.info('Creating DataverseNotebookController');
 
 		// Create the notebook controller
 		this.controller = vscode.notebooks.createNotebookController(
@@ -68,6 +77,9 @@ export class DataverseSqlNotebookController {
 		);
 		this.statusBarItem.command = 'power-platform-dev-suite.selectNotebookEnvironment';
 		this.updateStatusBar();
+
+		// Register auto-switch listener for cell language detection
+		this.registerAutoSwitchListener();
 
 		// Check all open notebooks and show status bar if any are ppdsnb
 		this.checkOpenNotebooks();
@@ -113,7 +125,7 @@ export class DataverseSqlNotebookController {
 	private promptForEnvironmentIfNeeded(): void {
 		if (!this.selectedEnvironmentId) {
 			vscode.window.showInformationMessage(
-				'Select a Dataverse environment to run SQL queries.',
+				'Select a Dataverse environment to run queries.',
 				'Select Environment'
 			).then((selection) => {
 				if (selection === 'Select Environment') {
@@ -124,10 +136,71 @@ export class DataverseSqlNotebookController {
 	}
 
 	/**
+	 * Registers a listener to auto-switch cell language based on content.
+	 *
+	 * Detection logic:
+	 * - First non-whitespace character is '<' → FetchXML
+	 * - First non-whitespace character is anything else → SQL
+	 * - Only triggers when content is below threshold (new/fresh cells)
+	 */
+	private registerAutoSwitchListener(): void {
+		this.textChangeListener = vscode.workspace.onDidChangeTextDocument((event) => {
+			// Only handle notebook cell documents
+			if (event.document.uri.scheme !== 'vscode-notebook-cell') {
+				return;
+			}
+
+			// Check if this is one of our notebook cells
+			const notebook = vscode.workspace.notebookDocuments.find(
+				(nb) => nb.getCells().some((cell) => cell.document.uri.toString() === event.document.uri.toString())
+			);
+
+			if (!notebook || notebook.notebookType !== this.notebookType) {
+				return;
+			}
+
+			// Only auto-switch for minimal content (fresh cells)
+			const content = event.document.getText();
+			const trimmedContent = content.trim();
+
+			if (trimmedContent.length === 0 || trimmedContent.length > AUTO_SWITCH_THRESHOLD) {
+				return;
+			}
+
+			const currentLanguage = event.document.languageId;
+			const firstChar = trimmedContent.charAt(0);
+			const shouldBeFetchXml = firstChar === '<';
+
+			// Switch to FetchXML if content starts with '<' and not already fetchxml
+			if (shouldBeFetchXml && currentLanguage !== 'fetchxml') {
+				this.logger.debug('Auto-switching cell to FetchXML', {
+					firstChar,
+					currentLanguage,
+					contentLength: trimmedContent.length,
+				});
+				void vscode.languages.setTextDocumentLanguage(event.document, 'fetchxml');
+			}
+			// Switch to SQL if content doesn't start with '<' and currently fetchxml
+			else if (!shouldBeFetchXml && currentLanguage === 'fetchxml') {
+				this.logger.debug('Auto-switching cell to SQL', {
+					firstChar,
+					currentLanguage,
+					contentLength: trimmedContent.length,
+				});
+				void vscode.languages.setTextDocumentLanguage(event.document, 'sql');
+			}
+		});
+	}
+
+	/**
 	 * Gets the VS Code disposables for cleanup.
 	 */
 	public getDisposables(): vscode.Disposable[] {
-		return [this.controller, this.statusBarItem];
+		const disposables: vscode.Disposable[] = [this.controller, this.statusBarItem];
+		if (this.textChangeListener) {
+			disposables.push(this.textChangeListener);
+		}
+		return disposables;
 	}
 
 	/**
