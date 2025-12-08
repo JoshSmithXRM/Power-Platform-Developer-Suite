@@ -753,6 +753,17 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 			case 'queryAborted':
 				// Query was cancelled, nothing special to do
 				break;
+
+			// Filter section messages
+			case 'filtersUpdated':
+				// Show filter section and update filter list
+				setFilterSectionVisible(true);
+				updateFilterConditions(
+					message.data?.filterConditions ?? [],
+					message.data?.availableColumns ?? []
+				);
+				updateFilterCountBadge(message.data?.filterCount ?? 0);
+				break;
 		}
 	}
 
@@ -1012,8 +1023,8 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 				<input type="checkbox" class="column-checkbox"
 					data-column="${escapeHtml(col.logicalName)}"
 					${col.isSelected ? 'checked' : ''} />
+				<span class="column-logical-name">${escapeHtml(col.logicalName)}</span>
 				<span class="column-display-name">${escapeHtml(col.displayName)}</span>
-				<span class="column-logical-name">(${escapeHtml(col.logicalName)})</span>
 				<span class="column-type">${escapeHtml(col.attributeType)}</span>
 			</label>
 		`
@@ -1055,6 +1066,479 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 		}
 	}
 
+	// ============================================
+	// FILTER SECTION FUNCTIONS
+	// ============================================
+
+	/** Storage key for filter section collapse state */
+	const FILTER_SECTION_COLLAPSED_KEY = 'dataExplorer.filterSectionCollapsed';
+
+	/**
+	 * Initializes the filter section behavior using event delegation.
+	 */
+	function initFilterSection() {
+		// Add filter button
+		document.addEventListener('click', (e) => {
+			if (e.target.closest('#add-filter-btn')) {
+				handleAddFilter();
+			}
+
+			// Remove filter button
+			if (e.target.closest('.remove-filter-btn')) {
+				const btn = e.target.closest('.remove-filter-btn');
+				const conditionId = btn.dataset.conditionId;
+				if (conditionId) {
+					handleRemoveFilter(conditionId);
+				}
+			}
+
+			// Filter section toggle
+			if (e.target.closest('#filter-section-toggle')) {
+				toggleFilterSectionCollapse();
+			}
+		});
+
+		// Field dropdown change
+		document.addEventListener('change', (e) => {
+			if (e.target.classList.contains('filter-field-select')) {
+				const conditionId = e.target.dataset.conditionId;
+				const attribute = e.target.value;
+				const selectedOption = e.target.options[e.target.selectedIndex];
+				const attributeType = selectedOption?.dataset?.type || 'String';
+				if (conditionId) {
+					handleFilterFieldChange(conditionId, attribute, attributeType);
+				}
+			}
+
+			// Operator dropdown change
+			if (e.target.classList.contains('filter-operator-select')) {
+				const conditionId = e.target.dataset.conditionId;
+				const operator = e.target.value;
+				if (conditionId) {
+					handleFilterOperatorChange(conditionId, operator);
+				}
+			}
+
+			// Value input change (for select inputs)
+			if (e.target.classList.contains('filter-value-input') && e.target.tagName === 'SELECT') {
+				const conditionId = e.target.dataset.conditionId;
+				const value = e.target.value;
+				if (conditionId) {
+					handleFilterValueChange(conditionId, value);
+				}
+			}
+		});
+
+		// Value input change (for text/number/date inputs) - use input event for real-time updates
+		document.addEventListener('input', (e) => {
+			if (e.target.classList.contains('filter-value-input') && e.target.tagName === 'INPUT') {
+				const conditionId = e.target.dataset.conditionId;
+				const value = e.target.value;
+				if (conditionId) {
+					// Debounce value changes to avoid too many messages
+					clearTimeout(e.target._valueChangeTimeout);
+					e.target._valueChangeTimeout = setTimeout(() => {
+						handleFilterValueChange(conditionId, value);
+					}, 300);
+				}
+			}
+		});
+
+		// Restore collapse state
+		const savedState = localStorage.getItem(FILTER_SECTION_COLLAPSED_KEY);
+		if (savedState === 'true') {
+			setFilterSectionCollapsed(true);
+		}
+	}
+
+	/**
+	 * Handles adding a new filter condition.
+	 */
+	function handleAddFilter() {
+		postMessage('addFilterCondition', {});
+	}
+
+	/**
+	 * Handles removing a filter condition.
+	 * @param {string} conditionId
+	 */
+	function handleRemoveFilter(conditionId) {
+		postMessage('removeFilterCondition', { conditionId });
+	}
+
+	/**
+	 * Handles field selection change.
+	 * @param {string} conditionId
+	 * @param {string} attribute
+	 * @param {string} attributeType
+	 */
+	function handleFilterFieldChange(conditionId, attribute, attributeType) {
+		postMessage('updateFilterCondition', {
+			conditionId,
+			field: 'attribute',
+			attribute,
+			attributeType
+		});
+	}
+
+	/**
+	 * Handles operator selection change.
+	 * @param {string} conditionId
+	 * @param {string} operator
+	 */
+	function handleFilterOperatorChange(conditionId, operator) {
+		postMessage('updateFilterCondition', {
+			conditionId,
+			field: 'operator',
+			operator
+		});
+	}
+
+	/**
+	 * Handles value input change.
+	 * @param {string} conditionId
+	 * @param {string} value
+	 */
+	function handleFilterValueChange(conditionId, value) {
+		postMessage('updateFilterCondition', {
+			conditionId,
+			field: 'value',
+			value
+		});
+	}
+
+	/**
+	 * Toggles the filter section collapse state.
+	 */
+	function toggleFilterSectionCollapse() {
+		const toggleBtn = document.getElementById('filter-section-toggle');
+		if (!toggleBtn) return;
+
+		const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+		setFilterSectionCollapsed(isExpanded);
+	}
+
+	/**
+	 * Sets the filter section collapsed state.
+	 * @param {boolean} collapsed
+	 */
+	function setFilterSectionCollapsed(collapsed) {
+		const toggleBtn = document.getElementById('filter-section-toggle');
+		const content = document.getElementById('filter-section-content');
+
+		if (!toggleBtn || !content) return;
+
+		toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+
+		if (collapsed) {
+			content.classList.add('collapsed');
+		} else {
+			content.classList.remove('collapsed');
+		}
+
+		localStorage.setItem(FILTER_SECTION_COLLAPSED_KEY, collapsed.toString());
+	}
+
+	/**
+	 * Updates the filter count badge.
+	 * @param {number} count
+	 */
+	function updateFilterCountBadge(count) {
+		const badge = document.getElementById('filter-count-badge');
+		if (badge) {
+			badge.textContent = count > 0 ? `(${count})` : '';
+		}
+	}
+
+	/**
+	 * Updates the filter conditions list with new data.
+	 * @param {Array} filterConditions - Array of filter condition view models
+	 * @param {Array} availableColumns - Array of available columns for field dropdown
+	 */
+	function updateFilterConditions(filterConditions, availableColumns) {
+		const container = document.getElementById('filter-conditions-list');
+		if (!container) {
+			console.warn('Filter conditions list container not found');
+			return;
+		}
+
+		if (!filterConditions || filterConditions.length === 0) {
+			container.innerHTML = '<div class="filter-empty-state">No filters applied. Click "Add Condition" to filter results.</div>';
+			return;
+		}
+
+		// Render all filter condition rows
+		container.innerHTML = filterConditions
+			.map((condition, index) => renderFilterConditionRow(condition, index, availableColumns))
+			.join('');
+	}
+
+	/**
+	 * Renders a single filter condition row.
+	 * @param {Object} condition - Filter condition view model
+	 * @param {number} index - Index for logical label (WHERE vs AND)
+	 * @param {Array} availableColumns - Available columns for field dropdown
+	 * @returns {string} HTML string for the filter row
+	 */
+	function renderFilterConditionRow(condition, index, availableColumns) {
+		const logicalLabel = index === 0 ? 'WHERE' : 'AND';
+		const conditionId = escapeHtml(condition.id);
+
+		return `
+			<div class="filter-condition-row" data-condition-id="${conditionId}">
+				<span class="filter-logical-label">${logicalLabel}</span>
+				${renderFieldDropdown(condition, availableColumns)}
+				${renderOperatorDropdown(condition)}
+				${renderValueInput(condition)}
+				<button
+					class="remove-filter-btn"
+					type="button"
+					data-condition-id="${conditionId}"
+					title="Remove condition"
+					aria-label="Remove filter condition"
+				>
+					<span class="codicon codicon-close"></span>
+				</button>
+			</div>
+		`;
+	}
+
+	/**
+	 * Renders the field dropdown for a filter condition.
+	 * @param {Object} condition - Filter condition
+	 * @param {Array} availableColumns - Available columns
+	 * @returns {string} HTML string
+	 */
+	function renderFieldDropdown(condition, availableColumns) {
+		const options = availableColumns.map(col => {
+			const selected = col.logicalName === condition.attribute ? 'selected' : '';
+			return `<option value="${escapeHtml(col.logicalName)}" data-type="${escapeHtml(col.attributeType)}" ${selected}>${escapeHtml(col.logicalName)} (${escapeHtml(col.displayName)})</option>`;
+		}).join('');
+
+		return `
+			<select
+				class="filter-field-select"
+				data-condition-id="${escapeHtml(condition.id)}"
+				aria-label="Select field"
+			>
+				<option value="">-- Select field --</option>
+				${options}
+			</select>
+		`;
+	}
+
+	/**
+	 * Operator configurations by attribute type.
+	 */
+	const OPERATORS_BY_TYPE = {
+		'String': [
+			{ operator: 'eq', displayName: 'Equals' },
+			{ operator: 'ne', displayName: 'Not Equals' },
+			{ operator: 'like', displayName: 'Contains' },
+			{ operator: 'not-like', displayName: 'Does Not Contain' },
+			{ operator: 'begins-with', displayName: 'Begins With' },
+			{ operator: 'ends-with', displayName: 'Ends With' },
+			{ operator: 'null', displayName: 'Is Null' },
+			{ operator: 'not-null', displayName: 'Is Not Null' },
+		],
+		'Memo': [
+			{ operator: 'eq', displayName: 'Equals' },
+			{ operator: 'ne', displayName: 'Not Equals' },
+			{ operator: 'like', displayName: 'Contains' },
+			{ operator: 'null', displayName: 'Is Null' },
+			{ operator: 'not-null', displayName: 'Is Not Null' },
+		],
+		'Integer': [
+			{ operator: 'eq', displayName: 'Equals' },
+			{ operator: 'ne', displayName: 'Not Equals' },
+			{ operator: 'lt', displayName: 'Less Than' },
+			{ operator: 'le', displayName: 'Less Than or Equal' },
+			{ operator: 'gt', displayName: 'Greater Than' },
+			{ operator: 'ge', displayName: 'Greater Than or Equal' },
+			{ operator: 'null', displayName: 'Is Null' },
+			{ operator: 'not-null', displayName: 'Is Not Null' },
+		],
+		'Decimal': [
+			{ operator: 'eq', displayName: 'Equals' },
+			{ operator: 'ne', displayName: 'Not Equals' },
+			{ operator: 'lt', displayName: 'Less Than' },
+			{ operator: 'le', displayName: 'Less Than or Equal' },
+			{ operator: 'gt', displayName: 'Greater Than' },
+			{ operator: 'ge', displayName: 'Greater Than or Equal' },
+			{ operator: 'null', displayName: 'Is Null' },
+			{ operator: 'not-null', displayName: 'Is Not Null' },
+		],
+		'Money': [
+			{ operator: 'eq', displayName: 'Equals' },
+			{ operator: 'ne', displayName: 'Not Equals' },
+			{ operator: 'lt', displayName: 'Less Than' },
+			{ operator: 'le', displayName: 'Less Than or Equal' },
+			{ operator: 'gt', displayName: 'Greater Than' },
+			{ operator: 'ge', displayName: 'Greater Than or Equal' },
+			{ operator: 'null', displayName: 'Is Null' },
+			{ operator: 'not-null', displayName: 'Is Not Null' },
+		],
+		'DateTime': [
+			{ operator: 'eq', displayName: 'Equals' },
+			{ operator: 'ne', displayName: 'Not Equals' },
+			{ operator: 'lt', displayName: 'Before' },
+			{ operator: 'le', displayName: 'On or Before' },
+			{ operator: 'gt', displayName: 'After' },
+			{ operator: 'ge', displayName: 'On or After' },
+			{ operator: 'null', displayName: 'Is Null' },
+			{ operator: 'not-null', displayName: 'Is Not Null' },
+		],
+		'Boolean': [
+			{ operator: 'eq', displayName: 'Equals' },
+			{ operator: 'ne', displayName: 'Not Equals' },
+			{ operator: 'null', displayName: 'Is Null' },
+			{ operator: 'not-null', displayName: 'Is Not Null' },
+		],
+		'Lookup': [
+			{ operator: 'eq', displayName: 'Equals' },
+			{ operator: 'ne', displayName: 'Not Equals' },
+			{ operator: 'null', displayName: 'Is Null' },
+			{ operator: 'not-null', displayName: 'Is Not Null' },
+		],
+		'Picklist': [
+			{ operator: 'eq', displayName: 'Equals' },
+			{ operator: 'ne', displayName: 'Not Equals' },
+			{ operator: 'null', displayName: 'Is Null' },
+			{ operator: 'not-null', displayName: 'Is Not Null' },
+		],
+		'UniqueIdentifier': [
+			{ operator: 'eq', displayName: 'Equals' },
+			{ operator: 'ne', displayName: 'Not Equals' },
+			{ operator: 'null', displayName: 'Is Null' },
+			{ operator: 'not-null', displayName: 'Is Not Null' },
+		],
+		'Other': [
+			{ operator: 'eq', displayName: 'Equals' },
+			{ operator: 'ne', displayName: 'Not Equals' },
+			{ operator: 'null', displayName: 'Is Null' },
+			{ operator: 'not-null', displayName: 'Is Not Null' },
+		],
+	};
+
+	/**
+	 * Gets operators for an attribute type.
+	 * @param {string} attributeType
+	 * @returns {Array} Array of operator objects
+	 */
+	function getOperatorsForType(attributeType) {
+		return OPERATORS_BY_TYPE[attributeType] || OPERATORS_BY_TYPE['Other'];
+	}
+
+	/**
+	 * Renders the operator dropdown for a filter condition.
+	 * @param {Object} condition - Filter condition
+	 * @returns {string} HTML string
+	 */
+	function renderOperatorDropdown(condition) {
+		const attributeType = condition.attributeType || 'String';
+		const operators = getOperatorsForType(attributeType);
+
+		const options = operators.map(op => {
+			const selected = op.operator === condition.operator ? 'selected' : '';
+			return `<option value="${escapeHtml(op.operator)}" ${selected}>${escapeHtml(op.displayName)}</option>`;
+		}).join('');
+
+		return `
+			<select
+				class="filter-operator-select"
+				data-condition-id="${escapeHtml(condition.id)}"
+				aria-label="Select operator"
+			>
+				${options}
+			</select>
+		`;
+	}
+
+	/**
+	 * Renders the value input for a filter condition.
+	 * @param {Object} condition - Filter condition
+	 * @returns {string} HTML string
+	 */
+	function renderValueInput(condition) {
+		const nullOperators = ['null', 'not-null'];
+		if (nullOperators.includes(condition.operator)) {
+			return `<span class="filter-value-placeholder">(no value needed)</span>`;
+		}
+
+		const conditionId = escapeHtml(condition.id);
+		const value = condition.value !== null ? escapeHtml(condition.value) : '';
+		const attributeType = condition.attributeType || 'String';
+
+		switch (attributeType) {
+			case 'Integer':
+			case 'Decimal':
+			case 'Money':
+				return `
+					<input
+						type="number"
+						class="filter-value-input"
+						data-condition-id="${conditionId}"
+						value="${value}"
+						placeholder="Enter value..."
+						aria-label="Filter value"
+					/>
+				`;
+
+			case 'DateTime':
+				return `
+					<input
+						type="datetime-local"
+						class="filter-value-input"
+						data-condition-id="${conditionId}"
+						value="${value}"
+						aria-label="Filter value"
+					/>
+				`;
+
+			case 'Boolean':
+				const trueSelected = condition.value === 'true' ? 'selected' : '';
+				const falseSelected = condition.value === 'false' ? 'selected' : '';
+				return `
+					<select
+						class="filter-value-input"
+						data-condition-id="${conditionId}"
+						aria-label="Filter value"
+					>
+						<option value="">-- Select --</option>
+						<option value="true" ${trueSelected}>Yes</option>
+						<option value="false" ${falseSelected}>No</option>
+					</select>
+				`;
+
+			default:
+				return `
+					<input
+						type="text"
+						class="filter-value-input"
+						data-condition-id="${conditionId}"
+						value="${value}"
+						placeholder="Enter value..."
+						aria-label="Filter value"
+					/>
+				`;
+		}
+	}
+
+	/**
+	 * Shows or hides the filter section.
+	 * @param {boolean} visible
+	 */
+	function setFilterSectionVisible(visible) {
+		const section = document.getElementById('filter-section');
+		if (section) {
+			if (visible) {
+				section.classList.remove('filter-section-hidden');
+			} else {
+				section.classList.add('filter-section-hidden');
+			}
+		}
+	}
+
 	/**
 	 * Initializes the behavior when DOM is ready.
 	 */
@@ -1062,6 +1546,7 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 		console.log('VisualQueryBuilderBehavior initializing...');
 		initEntityPicker();
 		initColumnPicker();
+		initFilterSection();
 		initPreviewTabs();
 		initCopyButtons();
 		initPreviewCollapse();

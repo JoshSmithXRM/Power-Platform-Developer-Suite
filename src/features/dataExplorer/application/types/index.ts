@@ -4,9 +4,16 @@
  */
 export { VisualQuery } from '../../domain/valueObjects/VisualQuery';
 export { QueryColumn } from '../../domain/valueObjects/QueryColumn';
-export type { QueryCondition } from '../../domain/valueObjects/QueryCondition';
-export type { QueryFilterGroup } from '../../domain/valueObjects/QueryFilterGroup';
+export { QueryCondition } from '../../domain/valueObjects/QueryCondition';
+export { QueryFilterGroup } from '../../domain/valueObjects/QueryFilterGroup';
 export type { QuerySort } from '../../domain/valueObjects/QuerySort';
 
 export { FetchXmlGenerator } from '../../domain/services/FetchXmlGenerator';
 export { FetchXmlToSqlTranspiler } from '../../domain/services/FetchXmlToSqlTranspiler';
+
+// FetchXML operator types
+export type { FetchXmlConditionOperator } from '../../domain/valueObjects/FetchXmlOperator';
+export { FETCHXML_OPERATOR_METADATA } from '../../domain/valueObjects/FetchXmlOperator';
+
+// Attribute types
+export type { AttributeTypeHint } from '../../domain/valueObjects/AttributeSuggestion';

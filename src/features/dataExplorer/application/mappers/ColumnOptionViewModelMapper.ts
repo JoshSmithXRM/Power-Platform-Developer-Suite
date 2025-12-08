@@ -8,7 +8,7 @@ import type { ColumnOptionViewModel } from '../viewModels/ColumnOptionViewModel'
 export class ColumnOptionViewModelMapper {
 	/**
 	 * Maps attribute suggestions to column option view models.
-	 * Sorts alphabetically by display name.
+	 * Sorts alphabetically by logical name for consistency.
 	 *
 	 * @param attributes - Available attributes from metadata
 	 * @param selectedColumnNames - Names of currently selected columns (empty for SELECT *)
@@ -21,7 +21,7 @@ export class ColumnOptionViewModelMapper {
 		const selectedSet = new Set(selectedColumnNames);
 
 		return [...attributes]
-			.sort((a, b) => a.displayName.localeCompare(b.displayName))
+			.sort((a, b) => a.logicalName.localeCompare(b.logicalName))
 			.map((attr) => ({
 				logicalName: attr.logicalName,
 				displayName: attr.displayName,

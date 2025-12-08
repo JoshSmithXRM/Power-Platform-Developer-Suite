@@ -24,6 +24,7 @@ interface AttributeMetadataDto {
 	};
 	AttributeType: string;
 	IsCustomAttribute: boolean;
+	IsValidForRead: boolean;
 }
 
 interface EntityDefinitionsResponse {
@@ -65,27 +66,31 @@ export class DataverseIntelliSenseMetadataRepository implements IIntelliSenseMet
 
 	/**
 	 * Fetches attribute names for a specific entity with minimal payload.
+	 * Filters out attributes that aren't valid for read (virtual/computed columns).
 	 * Payload: ~10-15 KB for typical entity (100 attributes).
 	 */
 	public async getAttributeSuggestions(
 		environmentId: string,
 		entityLogicalName: string
 	): Promise<AttributeSuggestion[]> {
-		const endpoint = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes?$select=LogicalName,DisplayName,AttributeType,IsCustomAttribute`;
+		const endpoint = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes?$select=LogicalName,DisplayName,AttributeType,IsCustomAttribute,IsValidForRead`;
 
 		const response = await this.apiService.get<AttributesResponse>(
 			environmentId,
 			endpoint
 		);
 
-		return response.value.map(dto =>
-			AttributeSuggestion.create(
-				dto.LogicalName,
-				dto.DisplayName.UserLocalizedLabel?.Label ?? dto.LogicalName,
-				this.mapAttributeType(dto.AttributeType),
-				dto.IsCustomAttribute
-			)
-		);
+		// Filter out attributes that aren't valid for read (virtual/computed columns like isprivate)
+		return response.value
+			.filter(dto => dto.IsValidForRead === true)
+			.map(dto =>
+				AttributeSuggestion.create(
+					dto.LogicalName,
+					dto.DisplayName.UserLocalizedLabel?.Label ?? dto.LogicalName,
+					this.mapAttributeType(dto.AttributeType),
+					dto.IsCustomAttribute
+				)
+			);
 	}
 
 	/**

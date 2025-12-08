@@ -32,9 +32,31 @@ import { DataverseRecordUrlService } from '../../../../shared/infrastructure/ser
 import { CsvExportService, type TabularData } from '../../../../shared/infrastructure/services/CsvExportService';
 import type { DataExplorerIntelliSenseServices } from '../initialization/registerDataExplorerIntelliSense';
 import { openQueryInNotebook } from '../../notebooks/registerNotebooks';
-import { VisualQuery, FetchXmlGenerator, FetchXmlToSqlTranspiler, QueryColumn } from '../../application/types';
+import {
+	VisualQuery,
+	FetchXmlGenerator,
+	FetchXmlToSqlTranspiler,
+	QueryColumn,
+	QueryFilterGroup,
+	QueryCondition,
+} from '../../application/types';
+import type { FetchXmlConditionOperator, AttributeTypeHint } from '../../application/types';
 import type { AttributeSuggestion } from '../../domain/valueObjects/AttributeSuggestion';
 import { ColumnOptionViewModelMapper } from '../../application/mappers/ColumnOptionViewModelMapper';
+import type { FilterConditionViewModel } from '../../application/viewModels/FilterConditionViewModel';
+import { getDefaultOperator } from '../constants/FilterOperatorConfiguration';
+
+/**
+ * Internal state for a filter condition being edited in the UI.
+ * Holds mutable state before being converted to domain objects.
+ */
+interface FilterConditionState {
+	readonly id: string;
+	attribute: string;
+	attributeType: AttributeTypeHint;
+	operator: FetchXmlConditionOperator;
+	value: string | null;
+}
 
 /**
  * Commands supported by Data Explorer panel.
@@ -46,6 +68,9 @@ type DataExplorerCommands =
 	| 'environmentChange'
 	| 'selectEntity'
 	| 'selectColumns'
+	| 'addFilterCondition'
+	| 'removeFilterCondition'
+	| 'updateFilterCondition'
 	| 'openRecord'
 	| 'copyRecordUrl'
 	| 'warningModalResponse'
@@ -81,6 +106,8 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private currentAvailableColumns: readonly AttributeSuggestion[] = [];
 	private isLoadingColumns: boolean = false;
 	private readonly columnMapper: ColumnOptionViewModelMapper;
+	private currentFilterConditions: FilterConditionState[] = [];
+	private filterConditionCounter: number = 0;
 
 	/** Monotonic counter for query execution to discard stale results. */
 	private querySequence: number = 0;
@@ -196,7 +223,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Load environments first so they appear on initial render
 		const environments = await this.getEnvironments();
 
-		// Load persisted state (selected entity and columns)
+		// Load persisted state (selected entity, columns, and filters)
 		try {
 			const state = await this.panelStateRepository.load({
 				panelType: DataExplorerPanelComposed.viewType,
@@ -216,11 +243,28 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 					this.currentVisualQuery = this.currentVisualQuery.withSpecificColumns(queryColumns);
 				}
 
+				// Restore filter conditions
+				const savedFilters = state?.['filterConditions'];
+				const savedCounter = state?.['filterConditionCounter'];
+				if (Array.isArray(savedFilters)) {
+					this.currentFilterConditions = savedFilters
+						.filter((f): f is Record<string, unknown> => typeof f === 'object' && f !== null)
+						.map(f => ({
+							id: String(f['id'] ?? ''),
+							attribute: String(f['attribute'] ?? ''),
+							attributeType: (f['attributeType'] as AttributeTypeHint) ?? 'String',
+							operator: (f['operator'] as FetchXmlConditionOperator) ?? 'eq',
+							value: f['value'] === null ? null : String(f['value'] ?? ''),
+						}));
+					this.filterConditionCounter = typeof savedCounter === 'number' ? savedCounter : 0;
+				}
+
 				this.logger.debug('Loaded persisted query state', {
 					environmentId: this.currentEnvironmentId,
 					entity: savedEntity,
 					isSelectAll: this.currentVisualQuery.isSelectAll(),
 					columnCount: this.currentVisualQuery.getColumnCount(),
+					filterCount: this.currentFilterConditions.length,
 				});
 			}
 		} catch (error) {
@@ -252,6 +296,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			entities: this.currentEntities,
 			selectedEntity: this.currentVisualQuery?.entityName ?? null,
 			isLoadingEntities: this.isLoadingEntities,
+			filterConditions: this.mapFilterConditionsToViewModels(),
 			generatedFetchXml: fetchXml,
 			generatedSql: sql,
 		};
@@ -480,6 +525,41 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			await this.handleSelectColumns(selectAll ?? true, columns ?? []);
 		});
 
+		// Add filter condition
+		this.coordinator.registerHandler('addFilterCondition', async () => {
+			await this.handleAddFilterCondition();
+		});
+
+		// Remove filter condition
+		this.coordinator.registerHandler('removeFilterCondition', async (data) => {
+			const { conditionId } = data as { conditionId?: string };
+			if (conditionId) {
+				await this.handleRemoveFilterCondition(conditionId);
+			}
+		});
+
+		// Update filter condition
+		this.coordinator.registerHandler('updateFilterCondition', async (data) => {
+			const payload = data as {
+				conditionId?: string;
+				field?: 'attribute' | 'operator' | 'value';
+				attribute?: string;
+				attributeType?: string;
+				operator?: string;
+				value?: string;
+			};
+			if (payload.conditionId !== undefined && payload.field !== undefined) {
+				await this.handleUpdateFilterCondition({
+					conditionId: payload.conditionId,
+					field: payload.field,
+					attribute: payload.attribute,
+					attributeType: payload.attributeType,
+					operator: payload.operator,
+					value: payload.value,
+				});
+			}
+		});
+
 		// Open record in browser
 		this.coordinator.registerHandler('openRecord', async (data) => {
 			const { entityType, recordId } = data as { entityType?: string; recordId?: string };
@@ -542,10 +622,12 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Always load entities - this is the single entry point for entity loading
 		await this.loadEntitiesForEnvironment();
 
-		// If entity was restored from persisted state, also load its columns
+		// If entity was restored from persisted state, also load its columns and filters
 		if (this.currentVisualQuery) {
-			await this.updateQueryPreview();
 			await this.loadAttributesForEntity(this.currentVisualQuery.entityName);
+			// Rebuild filters after attributes are loaded (needed for filter field dropdown)
+			await this.rebuildVisualQueryFilters();
+			await this.sendFiltersUpdate();
 		}
 	}
 
@@ -573,6 +655,9 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 		// Create new visual query for the selected entity
 		this.currentVisualQuery = new VisualQuery(entityLogicalName);
+		// Clear filter conditions when changing entity
+		this.currentFilterConditions = [];
+		this.filterConditionCounter = 0;
 		this.logger.debug('Created VisualQuery', { entityName: this.currentVisualQuery.entityName });
 
 		// Update query preview
@@ -580,6 +665,9 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 		// Load attributes for column picker
 		await this.loadAttributesForEntity(entityLogicalName);
+
+		// Notify webview about filter changes
+		await this.sendFiltersUpdate();
 
 		// Persist selection
 		void this.saveQueryStateToStorage();
@@ -660,6 +748,194 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	}
 
 	/**
+	 * Handles adding a new filter condition.
+	 */
+	private async handleAddFilterCondition(): Promise<void> {
+		if (this.currentVisualQuery === null) {
+			return;
+		}
+
+		// Create new condition with default values
+		const newCondition: FilterConditionState = {
+			id: `filter-${++this.filterConditionCounter}`,
+			attribute: '',
+			attributeType: 'String',
+			operator: getDefaultOperator('String'),
+			value: null,
+		};
+
+		this.currentFilterConditions.push(newCondition);
+		this.logger.debug('Added filter condition', { conditionId: newCondition.id });
+
+		// Update visual query with current filters
+		await this.rebuildVisualQueryFilters();
+		await this.sendFiltersUpdate();
+		void this.saveQueryStateToStorage();
+	}
+
+	/**
+	 * Handles removing a filter condition.
+	 */
+	private async handleRemoveFilterCondition(conditionId: string): Promise<void> {
+		const index = this.currentFilterConditions.findIndex(c => c.id === conditionId);
+		if (index === -1) {
+			this.logger.warn('Filter condition not found', { conditionId });
+			return;
+		}
+
+		this.currentFilterConditions.splice(index, 1);
+		this.logger.debug('Removed filter condition', { conditionId });
+
+		await this.rebuildVisualQueryFilters();
+		await this.sendFiltersUpdate();
+		void this.saveQueryStateToStorage();
+	}
+
+	/**
+	 * Handles updating a filter condition field.
+	 */
+	private async handleUpdateFilterCondition(payload: {
+		conditionId: string;
+		field: 'attribute' | 'operator' | 'value';
+		attribute?: string | undefined;
+		attributeType?: string | undefined;
+		operator?: string | undefined;
+		value?: string | undefined;
+	}): Promise<void> {
+		const condition = this.currentFilterConditions.find(c => c.id === payload.conditionId);
+		if (condition === undefined) {
+			this.logger.warn('Filter condition not found for update', { conditionId: payload.conditionId });
+			return;
+		}
+
+		switch (payload.field) {
+			case 'attribute':
+				condition.attribute = payload.attribute ?? '';
+				condition.attributeType = (payload.attributeType as AttributeTypeHint) ?? 'String';
+				// Reset operator to default for new attribute type
+				condition.operator = getDefaultOperator(condition.attributeType);
+				condition.value = null;
+				break;
+			case 'operator':
+				condition.operator = (payload.operator as FetchXmlConditionOperator) ?? 'eq';
+				// Clear value if operator doesn't require one
+				if (condition.operator === 'null' || condition.operator === 'not-null') {
+					condition.value = null;
+				}
+				break;
+			case 'value':
+				condition.value = payload.value ?? null;
+				break;
+		}
+
+		this.logger.debug('Updated filter condition', {
+			conditionId: payload.conditionId,
+			field: payload.field,
+		});
+
+		await this.rebuildVisualQueryFilters();
+		// Only re-render filter list when field/operator changes (not value)
+		// Value changes don't need a full re-render - it would steal focus from the input
+		if (payload.field !== 'value') {
+			await this.sendFiltersUpdate();
+		}
+		void this.saveQueryStateToStorage();
+	}
+
+	/**
+	 * Rebuilds the VisualQuery filter from current filter conditions.
+	 */
+	private async rebuildVisualQueryFilters(): Promise<void> {
+		if (this.currentVisualQuery === null) {
+			return;
+		}
+
+		// Build valid conditions from current state
+		// Filter out incomplete conditions:
+		// - Must have an attribute selected
+		// - Must have a value (unless using null/not-null operators)
+		const validConditions = this.currentFilterConditions
+			.filter(c => {
+				if (c.attribute === '') return false;
+				// Null operators don't require a value
+				if (c.operator === 'null' || c.operator === 'not-null') return true;
+				// Other operators require a non-empty value
+				return c.value !== null && c.value !== '';
+			})
+			.map(c => {
+				try {
+					// Determine value based on operator
+					const value = (c.operator === 'null' || c.operator === 'not-null')
+						? null
+						: c.value;
+					return new QueryCondition(c.attribute, c.operator, value);
+				} catch (error) {
+					// Invalid condition, skip
+					this.logger.debug('Skipping invalid filter condition', { attribute: c.attribute, error });
+					return null;
+				}
+			})
+			.filter((c): c is QueryCondition => c !== null);
+
+		// Create filter group or clear filter
+		if (validConditions.length > 0) {
+			const filterGroup = new QueryFilterGroup('and', validConditions);
+			this.currentVisualQuery = this.currentVisualQuery.withFilter(filterGroup);
+		} else {
+			this.currentVisualQuery = this.currentVisualQuery.withFilter(null);
+		}
+
+		await this.updateQueryPreview();
+	}
+
+	/**
+	 * Sends filter update notification to webview with full filter data.
+	 */
+	private async sendFiltersUpdate(): Promise<void> {
+		// Map available columns to simple objects for webview, sorted by logical name
+		const availableColumns = [...this.currentAvailableColumns]
+			.sort((a, b) => a.logicalName.localeCompare(b.logicalName))
+			.map(col => ({
+				logicalName: col.logicalName,
+				displayName: col.displayName,
+				attributeType: col.attributeType,
+			}));
+
+		await this.panel.postMessage({
+			command: 'filtersUpdated',
+			data: {
+				filterCount: this.currentFilterConditions.length,
+				filterConditions: this.mapFilterConditionsToViewModels(),
+				availableColumns,
+			},
+		});
+	}
+
+	/**
+	 * Maps current filter conditions to view models.
+	 */
+	private mapFilterConditionsToViewModels(): readonly FilterConditionViewModel[] {
+		return this.currentFilterConditions.map(c => ({
+			id: c.id,
+			attribute: c.attribute,
+			attributeDisplayName: this.getAttributeDisplayName(c.attribute),
+			attributeType: c.attributeType,
+			operator: c.operator,
+			operatorDisplayName: c.operator, // Simplified for MVP
+			value: c.value,
+			enabled: true,
+		}));
+	}
+
+	/**
+	 * Gets the display name for an attribute.
+	 */
+	private getAttributeDisplayName(logicalName: string): string {
+		const attr = this.currentAvailableColumns.find(a => a.logicalName === logicalName);
+		return attr?.displayName ?? logicalName;
+	}
+
+	/**
 	 * Updates the query preview in the webview.
 	 */
 	private async updateQueryPreview(): Promise<void> {
@@ -688,7 +964,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	}
 
 	/**
-	 * Persists current query state (selected entity) to panel state.
+	 * Persists current query state (entity, columns, filters) to panel state.
 	 */
 	private async saveQueryStateToStorage(): Promise<void> {
 		try {
@@ -696,6 +972,15 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				panelType: DataExplorerPanelComposed.viewType,
 				environmentId: this.currentEnvironmentId,
 			});
+
+			// Serialize filter conditions for persistence
+			const filterConditions = this.currentFilterConditions.map(c => ({
+				id: c.id,
+				attribute: c.attribute,
+				attributeType: c.attributeType,
+				operator: c.operator,
+				value: c.value,
+			}));
 
 			await this.panelStateRepository.save(
 				{
@@ -707,6 +992,8 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 					selectedEntity: this.currentVisualQuery?.entityName ?? null,
 					isSelectAll: this.currentVisualQuery?.isSelectAll() ?? true,
 					selectedColumns: this.currentVisualQuery?.getColumnNames() ?? [],
+					filterConditions,
+					filterConditionCounter: this.filterConditionCounter,
 					lastUpdated: new Date().toISOString(),
 				}
 			);
@@ -742,6 +1029,8 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Clear previous results and reset visual query
 			this.currentResult = null;
 			this.currentVisualQuery = null;
+			this.currentFilterConditions = [];
+			this.filterConditionCounter = 0;
 			await this.panel.postMessage({
 				command: 'clearResults',
 			});
@@ -762,6 +1051,8 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
 		// Reset to defaults first
 		this.currentVisualQuery = null;
+		this.currentFilterConditions = [];
+		this.filterConditionCounter = 0;
 
 		try {
 			const state = await this.panelStateRepository.load({
@@ -784,11 +1075,28 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 						this.currentVisualQuery = this.currentVisualQuery.withSpecificColumns(queryColumns);
 					}
 
+					// Restore filter conditions
+					const savedFilters = state['filterConditions'];
+					const savedCounter = state['filterConditionCounter'];
+					if (Array.isArray(savedFilters)) {
+						this.currentFilterConditions = savedFilters
+							.filter((f): f is Record<string, unknown> => typeof f === 'object' && f !== null)
+							.map(f => ({
+								id: String(f['id'] ?? ''),
+								attribute: String(f['attribute'] ?? ''),
+								attributeType: (f['attributeType'] as AttributeTypeHint) ?? 'String',
+								operator: (f['operator'] as FetchXmlConditionOperator) ?? 'eq',
+								value: f['value'] === null ? null : String(f['value'] ?? ''),
+							}));
+						this.filterConditionCounter = typeof savedCounter === 'number' ? savedCounter : 0;
+					}
+
 					this.logger.debug('Loaded persisted state for environment', {
 						environmentId,
 						entity: savedEntity,
 						isSelectAll: this.currentVisualQuery.isSelectAll(),
 						columnCount: this.currentVisualQuery.getColumnCount(),
+						filterCount: this.currentFilterConditions.length,
 					});
 				}
 			}
@@ -796,8 +1104,8 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
 		}
 
-		// Update query preview with loaded state
-		await this.updateQueryPreview();
+		// Rebuild filters and update query preview with loaded state
+		await this.rebuildVisualQueryFilters();
 	}
 
 	/**

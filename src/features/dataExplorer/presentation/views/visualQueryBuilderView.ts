@@ -1,5 +1,8 @@
 import { escapeHtml } from '../../../../shared/infrastructure/ui/views/htmlHelpers';
 import type { ColumnOptionViewModel } from '../../application/viewModels/ColumnOptionViewModel';
+import type { FilterConditionViewModel } from '../../application/viewModels/FilterConditionViewModel';
+import type { AttributeTypeHint } from '../../application/types';
+import { getOperatorsForAttributeType } from '../constants/FilterOperatorConfiguration';
 
 /**
  * Entity option for the entity picker dropdown.
@@ -26,6 +29,8 @@ export interface VisualQueryBuilderRenderData {
 	readonly isSelectAllColumns: boolean;
 	/** Whether columns are currently loading */
 	readonly isLoadingColumns: boolean;
+	/** Filter conditions for the query */
+	readonly filterConditions: readonly FilterConditionViewModel[];
 	/** Generated FetchXML from the visual query */
 	readonly generatedFetchXml: string;
 	/** Generated SQL from the visual query */
@@ -55,6 +60,7 @@ export function renderVisualQueryBuilderSection(data: VisualQueryBuilderRenderDa
 			<div class="query-builder-container" id="query-builder-container">
 				${renderEntityPicker(data)}
 				${renderColumnPicker(data)}
+				${renderFilterSection(data)}
 				${renderQueryPreview(data)}
 			</div>
 		</div>
@@ -178,6 +184,7 @@ function renderColumnPicker(data: VisualQueryBuilderRenderData): string {
 
 /**
  * Renders a single column option with checkbox.
+ * Shows: logicalName DisplayName Type (logical name first for consistency with sort order)
  */
 function renderColumnOption(column: ColumnOptionViewModel): string {
 	const escapedLogical = escapeHtml(column.logicalName);
@@ -193,11 +200,225 @@ function renderColumnOption(column: ColumnOptionViewModel): string {
 				data-column="${escapedLogical}"
 				${checkedAttr}
 			/>
+			<span class="column-logical-name">${escapedLogical}</span>
 			<span class="column-display-name">${escapedDisplay}</span>
-			<span class="column-logical-name">(${escapedLogical})</span>
 			<span class="column-type">${escapedType}</span>
 		</label>
 	`;
+}
+
+/**
+ * Renders the filter section with condition rows.
+ * Collapsible, hidden when no entity is selected.
+ * For MVP: AND logic only (no OR groups).
+ */
+function renderFilterSection(data: VisualQueryBuilderRenderData): string {
+	const isHidden = data.selectedEntity === null;
+	const hiddenClass = isHidden ? ' filter-section-hidden' : '';
+	const filterCount = data.filterConditions.length;
+	const countBadge = filterCount > 0 ? `(${filterCount})` : '';
+
+	return `
+		<div class="filter-section${hiddenClass}" id="filter-section">
+			<button
+				class="filter-section-toggle"
+				id="filter-section-toggle"
+				aria-expanded="true"
+				aria-controls="filter-section-content"
+				title="Toggle filters"
+			>
+				<span class="filter-toggle-icon codicon codicon-chevron-down"></span>
+				<span class="filter-section-title">Filters <span id="filter-count-badge">${countBadge}</span></span>
+			</button>
+			<div class="filter-section-content" id="filter-section-content">
+				<div class="filter-conditions-list" id="filter-conditions-list">
+					${renderFilterConditions(data)}
+				</div>
+				<div class="filter-actions">
+					<button
+						class="add-filter-btn"
+						id="add-filter-btn"
+						type="button"
+						${isHidden ? 'disabled' : ''}
+						title="Add filter condition"
+					>
+						<span class="codicon codicon-add"></span>
+						<span>Add Condition</span>
+					</button>
+				</div>
+			</div>
+		</div>
+	`;
+}
+
+/**
+ * Renders the list of filter conditions.
+ */
+function renderFilterConditions(data: VisualQueryBuilderRenderData): string {
+	if (data.selectedEntity === null) {
+		return '<div class="filter-empty-state">Select an entity to add filters</div>';
+	}
+
+	if (data.filterConditions.length === 0) {
+		return '<div class="filter-empty-state">No filters applied. Click "Add Condition" to filter results.</div>';
+	}
+
+	return data.filterConditions
+		.map((condition, index) => renderFilterConditionRow(condition, index, data.availableColumns))
+		.join('');
+}
+
+/**
+ * Renders a single filter condition row.
+ * Contains: field dropdown, operator dropdown, value input, remove button.
+ */
+function renderFilterConditionRow(
+	condition: FilterConditionViewModel,
+	index: number,
+	availableColumns: readonly ColumnOptionViewModel[]
+): string {
+	const escapedId = escapeHtml(condition.id);
+	const logicalLabel = index === 0 ? 'WHERE' : 'AND';
+
+	return `
+		<div class="filter-condition-row" data-condition-id="${escapedId}">
+			<span class="filter-logical-label">${logicalLabel}</span>
+			${renderFieldDropdown(condition, availableColumns)}
+			${renderOperatorDropdown(condition)}
+			${renderValueInput(condition)}
+			<button
+				class="remove-filter-btn"
+				type="button"
+				data-condition-id="${escapedId}"
+				title="Remove condition"
+				aria-label="Remove filter condition"
+			>
+				<span class="codicon codicon-close"></span>
+			</button>
+		</div>
+	`;
+}
+
+/**
+ * Renders the field dropdown for a filter condition.
+ */
+function renderFieldDropdown(
+	condition: FilterConditionViewModel,
+	availableColumns: readonly ColumnOptionViewModel[]
+): string {
+	const options = availableColumns.map((col) => {
+		const escapedLogical = escapeHtml(col.logicalName);
+		const escapedDisplay = escapeHtml(col.displayName);
+		const selected = col.logicalName === condition.attribute ? 'selected' : '';
+		return `<option value="${escapedLogical}" data-type="${escapeHtml(col.attributeType)}" ${selected}>${escapedLogical} (${escapedDisplay})</option>`;
+	}).join('');
+
+	return `
+		<select
+			class="filter-field-select"
+			data-condition-id="${escapeHtml(condition.id)}"
+			aria-label="Select field"
+		>
+			<option value="">-- Select field --</option>
+			${options}
+		</select>
+	`;
+}
+
+/**
+ * Renders the operator dropdown for a filter condition.
+ */
+function renderOperatorDropdown(condition: FilterConditionViewModel): string {
+	const attributeType = condition.attributeType as AttributeTypeHint || 'String';
+	const operators = getOperatorsForAttributeType(attributeType);
+
+	const options = operators.map((op) => {
+		const selected = op.operator === condition.operator ? 'selected' : '';
+		return `<option value="${escapeHtml(op.operator)}" ${selected}>${escapeHtml(op.displayName)}</option>`;
+	}).join('');
+
+	return `
+		<select
+			class="filter-operator-select"
+			data-condition-id="${escapeHtml(condition.id)}"
+			aria-label="Select operator"
+		>
+			${options}
+		</select>
+	`;
+}
+
+/**
+ * Renders the value input for a filter condition.
+ * Type varies based on attribute type and operator.
+ */
+function renderValueInput(condition: FilterConditionViewModel): string {
+	// Check if operator requires a value
+	const nullOperators = ['null', 'not-null'];
+	if (nullOperators.includes(condition.operator)) {
+		return `<span class="filter-value-placeholder">(no value needed)</span>`;
+	}
+
+	const escapedId = escapeHtml(condition.id);
+	const escapedValue = condition.value !== null ? escapeHtml(condition.value) : '';
+	const attributeType = condition.attributeType as AttributeTypeHint || 'String';
+
+	// Render input based on attribute type
+	switch (attributeType) {
+		case 'Integer':
+		case 'Decimal':
+		case 'Money':
+			return `
+				<input
+					type="number"
+					class="filter-value-input"
+					data-condition-id="${escapedId}"
+					value="${escapedValue}"
+					placeholder="Enter value..."
+					aria-label="Filter value"
+				/>
+			`;
+
+		case 'DateTime':
+			return `
+				<input
+					type="datetime-local"
+					class="filter-value-input"
+					data-condition-id="${escapedId}"
+					value="${escapedValue}"
+					aria-label="Filter value"
+				/>
+			`;
+
+		case 'Boolean': {
+			const trueSelected = condition.value === 'true' ? 'selected' : '';
+			const falseSelected = condition.value === 'false' ? 'selected' : '';
+			return `
+				<select
+					class="filter-value-input"
+					data-condition-id="${escapedId}"
+					aria-label="Filter value"
+				>
+					<option value="">-- Select --</option>
+					<option value="true" ${trueSelected}>Yes</option>
+					<option value="false" ${falseSelected}>No</option>
+				</select>
+			`;
+		}
+
+		default:
+			// Text/String/Other types
+			return `
+				<input
+					type="text"
+					class="filter-value-input"
+					data-condition-id="${escapedId}"
+					value="${escapedValue}"
+					placeholder="Enter value..."
+					aria-label="Filter value"
+				/>
+			`;
+	}
 }
 
 /**

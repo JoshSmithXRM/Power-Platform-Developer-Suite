@@ -19,7 +19,7 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 | 3 | Core Visual Builder - Columns, Filters MVP, Sort | 🔄 In Progress |
 | 3.0 | → Panel Layout & UX Fixes | ✅ Complete |
 | 3.2 | → Column Selector | ✅ Complete |
-| 3.3 | → Filter Builder | ⬜ Pending |
+| 3.3 | → Filter Builder (MVP) | ✅ Complete |
 | 3.4 | → Sort Section | ⬜ Pending |
 | 4 | Preview Section & Action Buttons | ⬜ Pending |
 | 5 | Toolbar Redesign | ⬜ Pending |
@@ -145,20 +145,39 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 - [x] Collapse state persisted to localStorage
 - [ ] ~~Allow drag-and-drop reordering~~ (deferred to future)
 
-### 3.3 Filter Builder Section (MVP)
+### 3.3 Filter Builder Section (MVP) ✅ COMPLETE
 
-- [ ] Create filter row component (field dropdown, operator dropdown, value input)
-- [ ] Field dropdown: populated from entity attributes
-- [ ] Operator dropdown: varies by field type (text, number, date, lookup, optionset)
-  - Text: eq, ne, like, not-like, begins-with, ends-with, contains, null, not-null
+- [x] Create filter row component (field dropdown, operator dropdown, value input)
+- [x] Field dropdown: populated from entity attributes
+- [x] Operator dropdown: varies by field type (text, number, date, lookup, optionset)
+  - Text: eq, ne, like, not-like, begins-with, ends-with, null, not-null
   - Number: eq, ne, gt, ge, lt, le, null, not-null
-  - Date: eq, on, on-or-before, on-or-after, today, yesterday, last-x-days, etc.
-  - Lookup: eq, ne, null, not-null, eq-userid, ne-userid
+  - Date: eq, ne, gt, ge, lt, le, null, not-null
+  - Lookup: eq, ne, null, not-null
   - OptionSet: eq, ne, in, not-in, null, not-null
-- [ ] Value input: varies by field type (text input, number input, date picker, lookup picker, optionset dropdown)
-- [ ] Add filter button
-- [ ] Remove filter button (X)
-- [ ] All filters use AND logic (MVP)
+- [x] Value input: varies by field type (text input, number input, date picker, boolean dropdown)
+- [x] Add filter button
+- [x] Remove filter button (X)
+- [x] All filters use AND logic (MVP)
+- [x] Filter persistence (save/restore with entity and columns)
+- [x] Filter preview integration (filters appear in FetchXML/SQL preview)
+- [x] Focus loss bug fixed (value changes don't re-render filter list)
+
+**Implementation Files:**
+- `FilterConditionViewModel.ts` - ViewModel for filter row data
+- `FilterOperatorConfiguration.ts` - Operators by attribute type
+- `visualQueryBuilderView.ts` - Filter section HTML rendering
+- `data-explorer.css` - Filter section CSS styles
+- `VisualQueryBuilderBehavior.js` - Webview behavior for filter interactions
+- `DataExplorerPanelComposed.ts` - Panel handler for filter commands
+
+### 3.3.1 Column Display & Ordering Polish ✅ COMPLETE
+
+- [x] Sort columns by logical name (not display name) for consistency
+- [x] Column picker: show `logicalName DisplayName Type` (logical name first, prominent)
+- [x] Filter dropdown: show `logicalName (DisplayName)` format
+- [x] Plugin Trace Viewer: sort filter fields by OData name for consistency
+- [x] Filter out `IsValidForRead=false` columns (prevents query errors on virtual columns)
 
 ### 3.4 Sort Section
 

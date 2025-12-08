@@ -2,6 +2,7 @@ import type { ISection } from '../../../../shared/infrastructure/ui/sections/ISe
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
 import type { SectionRenderData } from '../../../../shared/infrastructure/ui/types/SectionRenderData';
 import type { ColumnOptionViewModel } from '../../application/viewModels/ColumnOptionViewModel';
+import type { FilterConditionViewModel } from '../../application/viewModels/FilterConditionViewModel';
 import {
 	renderVisualQueryBuilderSection,
 	type EntityOption,
@@ -34,6 +35,8 @@ export class VisualQueryBuilderSection implements ISection {
 			(customData['availableColumns'] as readonly ColumnOptionViewModel[]) ?? [];
 		const isSelectAllColumns = (customData['isSelectAllColumns'] as boolean) ?? true;
 		const isLoadingColumns = (customData['isLoadingColumns'] as boolean) ?? false;
+		const filterConditions =
+			(customData['filterConditions'] as readonly FilterConditionViewModel[]) ?? [];
 		const generatedFetchXml = (customData['generatedFetchXml'] as string) ?? '';
 		const generatedSql = (customData['generatedSql'] as string) ?? '';
 		const errorMessage = customData['errorMessage'] as string | undefined;
@@ -45,6 +48,7 @@ export class VisualQueryBuilderSection implements ISection {
 			availableColumns,
 			isSelectAllColumns,
 			isLoadingColumns,
+			filterConditions,
 			generatedFetchXml,
 			generatedSql,
 			errorMessage,
