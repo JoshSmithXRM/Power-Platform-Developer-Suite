@@ -9,12 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Data Explorer - Visual Query Builder** - Point-and-click query building for Dataverse
+  - Entity picker with searchable dropdown (grouped by Standard/Custom)
+  - Column selector with multi-select checkboxes and search
+  - Filter builder with type-aware operators (text, number, date, lookup, optionset)
+  - Sort section with attribute dropdown and direction toggle
+  - Query options: Top N (1-5000) and Distinct
+  - Live FetchXML/SQL preview tabs (read-only)
+  - Execute and Clear buttons in toolbar
+  - Full state persistence per environment
+
+- **Data Explorer - Export/Import Toolbar** - Save and load queries
+  - Export results: CSV, JSON
+  - Export query: FetchXML (.xml), SQL (.sql), Notebook (.ppdsnb)
+  - Import: FetchXML and SQL files populate Visual Query Builder
+  - Uses existing FetchXmlParser for round-trip fidelity
+
+- **Data Explorer - Notebook Integration** - Bidirectional workflow between notebooks and panel
+  - CodeLens "Open in Data Explorer" above SQL/FetchXML cells
+  - Parses query and populates Visual Query Builder
+  - Panel → Notebook: "Export as Notebook" creates .ppdsnb with current query
+
+- **Data Explorer - IntelliSense** - Context-aware autocomplete in VS Code editor
+  - SQL IntelliSense: entity names after FROM/JOIN, attributes after SELECT/WHERE/ORDER BY
+  - FetchXML IntelliSense: elements, attributes, operators with Dataverse-specific suggestions
+  - Metadata caching per environment for fast completions
+  - Works in standalone .sql files and notebook cells
+
+- **Data Explorer - Notebooks (.ppdsnb)** - SQL/FetchXML notebook format for Dataverse
+  - Combined SQL and FetchXML cells in single notebook
+  - SQL cells transpile to FetchXML before execution
+  - FetchXML cells execute directly against Dataverse
+  - Clickable record links in output (open in browser)
+  - Environment stored in notebook metadata
+  - IntelliSense works in notebook cells
+
+- **Data Explorer - Aggregates & JOINs** - Advanced SQL query support
+  - Aggregate functions: COUNT(*), COUNT(column), COUNT(DISTINCT), SUM, AVG, MIN, MAX
+  - GROUP BY clause (single and multiple columns)
+  - DISTINCT keyword
+  - INNER JOIN and LEFT JOIN with table aliases
+  - Qualified column references (e.g., `a.name` when `FROM account a`)
+
 - **Cell Selection (Excel-style)** - Click-and-drag cell selection across all data tables
   - Click cell to select, drag for rectangular range, Shift+click to extend
   - Ctrl+A selects all cells in table, Ctrl+C copies as TSV
   - Headers included in copy when entire table is selected
-  - Works in: Solution Explorer, Web Resources, Import Jobs, Plugin Traces, Environment Variables, Connection References, Metadata Browser
-  - Note: Data Explorer cell selection deferred (timing issue with webpack bundle)
+  - Works in all 8 panels: Data Explorer, Solution Explorer, Web Resources, Import Jobs, Plugin Traces, Environment Variables, Connection References, Metadata Browser
 
 - **Web Resources - Conflict Detection** - Prevents accidental overwrites
   - Detects when server content is newer than your locally opened version
