@@ -75,7 +75,7 @@
         "notebooks": [
             {
                 "type": "ppdsnb",
-                "displayName": "Dataverse Notebook",
+                "displayName": "Power Platform Developer Suite Notebook",
                 "selector": [
                     {
                         "filenamePattern": "*.ppdsnb"

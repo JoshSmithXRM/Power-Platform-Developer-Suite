@@ -1980,7 +1980,11 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 		initCopyButtons();
 		initPreviewCollapse();
 		initQueryBuilderCollapse();
-		initQueryActionBar();
+		initKeyboardShortcuts();
+		// Initialize shared dropdown component (from DropdownComponent.js)
+		if (typeof initializeDropdowns === 'function') {
+			initializeDropdowns();
+		}
 		window.addEventListener('message', handleMessage);
 		console.log('VisualQueryBuilderBehavior initialized');
 
@@ -1989,105 +1993,21 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 	}
 
 	// ============================================
-	// QUERY ACTION BAR FUNCTIONS
+	// KEYBOARD SHORTCUTS
 	// ============================================
 
 	/**
-	 * Initializes the query action bar behavior (Execute and Clear buttons).
+	 * Initializes keyboard shortcuts for the query builder.
+	 * Ctrl+Enter executes the query.
 	 */
-	function initQueryActionBar() {
-		// Execute button click
-		document.addEventListener('click', (e) => {
-			if (e.target.closest('#execute-query-btn')) {
-				const btn = document.getElementById('execute-query-btn');
-				if (btn && !btn.disabled) {
-					handleExecuteQuery();
-				}
-			}
-
-			// Clear button click
-			if (e.target.closest('#clear-query-btn')) {
-				const btn = document.getElementById('clear-query-btn');
-				if (btn && !btn.disabled) {
-					handleClearQuery();
-				}
-			}
-		});
-
-		// Ctrl+Enter keyboard shortcut for Execute
+	function initKeyboardShortcuts() {
 		document.addEventListener('keydown', (e) => {
+			// Ctrl+Enter to execute query
 			if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-				const btn = document.getElementById('execute-query-btn');
-				if (btn && !btn.disabled) {
-					e.preventDefault();
-					handleExecuteQuery();
-				}
+				e.preventDefault();
+				postMessage('executeQuery', {});
 			}
 		});
-	}
-
-	/**
-	 * Handles the Execute Query button click.
-	 */
-	function handleExecuteQuery() {
-		postMessage('executeQuery', {});
-	}
-
-	/**
-	 * Handles the Clear button click.
-	 * Sends clearQuery command to reset: columns, filters, sort, options, results.
-	 * Entity selection is preserved.
-	 */
-	function handleClearQuery() {
-		postMessage('clearQuery', {});
-	}
-
-	/**
-	 * Sets the Execute button loading state.
-	 * @param {boolean} isLoading - Whether query is executing
-	 */
-	function setExecuteButtonLoading(isLoading) {
-		const btn = document.getElementById('execute-query-btn');
-		if (!btn) return;
-
-		btn.disabled = isLoading;
-
-		// Update button content
-		const iconSpan = btn.querySelector('.codicon');
-		const textSpan = btn.querySelector('span:not(.codicon)');
-
-		if (iconSpan) {
-			if (isLoading) {
-				iconSpan.className = 'codicon codicon-loading codicon-modifier-spin';
-			} else {
-				iconSpan.className = 'codicon codicon-play';
-			}
-		}
-
-		if (textSpan) {
-			textSpan.textContent = isLoading ? 'Executing...' : 'Execute Query';
-		}
-	}
-
-	/**
-	 * Updates the action bar button states based on entity selection.
-	 * @param {boolean} hasEntity - Whether an entity is selected
-	 */
-	function updateActionBarState(hasEntity) {
-		const executeBtn = document.getElementById('execute-query-btn');
-		const clearBtn = document.getElementById('clear-query-btn');
-
-		if (executeBtn) {
-			// Only update disabled if not currently loading
-			const isLoading = executeBtn.querySelector('.codicon-loading');
-			if (!isLoading) {
-				executeBtn.disabled = !hasEntity;
-			}
-		}
-
-		if (clearBtn) {
-			clearBtn.disabled = !hasEntity;
-		}
 	}
 
 	// ============================================

@@ -75,7 +75,6 @@ export function renderVisualQueryBuilderSection(data: VisualQueryBuilderRenderDa
 				${renderSortSection(data)}
 				${renderQueryPreview(data)}
 			</div>
-			${renderQueryActionBar(data)}
 		</div>
 		<div class="query-results-section">
 			<div id="results-table-container" data-selection-zone="results-table">
@@ -781,42 +780,6 @@ function renderWarningModal(): string {
 					<button id="modal-btn-primary" class="modal-btn modal-btn-primary" type="button"></button>
 				</div>
 			</div>
-		</div>
-	`;
-}
-
-/**
- * Renders the sticky action bar with Execute and Clear buttons.
- * Always visible at the bottom of the query builder section.
- */
-function renderQueryActionBar(data: VisualQueryBuilderRenderData): string {
-	const isDisabled = data.selectedEntity === null;
-	const isExecuting = data.isExecuting === true;
-	const disabledAttr = isDisabled || isExecuting ? 'disabled' : '';
-	const clearDisabledAttr = isDisabled ? 'disabled' : '';
-
-	return `
-		<div class="query-action-bar" id="query-action-bar">
-			<button
-				id="execute-query-btn"
-				class="action-btn action-btn-primary"
-				type="button"
-				${disabledAttr}
-				title="Execute Query (Ctrl+Enter)"
-			>
-				${isExecuting ? '<span class="codicon codicon-loading codicon-modifier-spin"></span>' : '<span class="codicon codicon-play"></span>'}
-				<span>${isExecuting ? 'Executing...' : 'Execute Query'}</span>
-			</button>
-			<button
-				id="clear-query-btn"
-				class="action-btn action-btn-secondary"
-				type="button"
-				${clearDisabledAttr}
-				title="Clear query options, filters, and results"
-			>
-				<span class="codicon codicon-clear-all"></span>
-				<span>Clear</span>
-			</button>
 		</div>
 	`;
 }

@@ -82,14 +82,18 @@ export class CsvExportService {
 		this.logger.debug('Showing save dialog', { suggestedFilename });
 
 		try {
-			const uri = await vscode.window.showSaveDialog({
+			const selectedUri = await vscode.window.showSaveDialog({
 				defaultUri: vscode.Uri.file(suggestedFilename),
 				filters: this.getFileFilters(suggestedFilename),
 			});
 
-			if (!uri) {
+			if (!selectedUri) {
 				throw new Error('Save dialog cancelled by user');
 			}
+
+			// Ensure the expected file extension is present
+			const expectedExtension = this.getExpectedExtension(suggestedFilename);
+			const uri = this.ensureFileExtension(selectedUri, expectedExtension);
 
 			await fs.writeFile(uri.fsPath, content, 'utf-8');
 
@@ -152,5 +156,34 @@ export class CsvExportService {
 		return {
 			'All Files': ['*'],
 		};
+	}
+
+	/**
+	 * Extracts expected extension from suggested filename.
+	 */
+	private getExpectedExtension(suggestedFilename: string): string {
+		const parts = suggestedFilename.split('.');
+		if (parts.length > 1) {
+			const ext = parts.pop();
+			if (ext) {
+				return `.${ext.toLowerCase()}`;
+			}
+		}
+		return '';
+	}
+
+	/**
+	 * Ensures a file URI has the expected extension.
+	 * If the URI doesn't end with the expected extension, appends it.
+	 */
+	private ensureFileExtension(uri: vscode.Uri, extension: string): vscode.Uri {
+		if (!extension) {
+			return uri;
+		}
+		const fsPath = uri.fsPath;
+		if (!fsPath.toLowerCase().endsWith(extension.toLowerCase())) {
+			return vscode.Uri.file(fsPath + extension);
+		}
+		return uri;
 	}
 }

@@ -27,6 +27,8 @@ import { SqlParseErrorViewModelMapper } from '../../application/mappers/SqlParse
 import { FetchXmlValidationError } from '../../domain/errors/FetchXmlValidationError';
 import type { QueryResult } from '../../domain/entities/QueryResult';
 import { VisualQueryBuilderSection } from '../sections/VisualQueryBuilderSection';
+import { DataExplorerExportDropdownSection } from '../sections/DataExplorerExportDropdownSection';
+import { DataExplorerImportDropdownSection } from '../sections/DataExplorerImportDropdownSection';
 import type { EntityOption } from '../views/visualQueryBuilderView';
 import { DataverseRecordUrlService } from '../../../../shared/infrastructure/services/DataverseRecordUrlService';
 import { CsvExportService, type TabularData } from '../../../../shared/infrastructure/services/CsvExportService';
@@ -35,7 +37,10 @@ import { openQueryInNotebook } from '../../notebooks/registerNotebooks';
 import {
 	VisualQuery,
 	FetchXmlGenerator,
+	FetchXmlParser,
 	FetchXmlToSqlTranspiler,
+	SqlParser,
+	SqlToFetchXmlTranspiler,
 	QueryColumn,
 	QueryFilterGroup,
 	QueryCondition,
@@ -80,7 +85,16 @@ type DataExplorerCommands =
 	| 'copyRecordUrl'
 	| 'warningModalResponse'
 	| 'copySuccess'
-	| 'webviewReady';
+	| 'webviewReady'
+	// Export commands
+	| 'exportResultsCsv'
+	| 'exportResultsJson'
+	| 'exportQueryFetchXml'
+	| 'exportQuerySql'
+	| 'exportQueryNotebook'
+	// Import commands
+	| 'importFetchXml'
+	| 'importSql';
 
 /**
  * Type-safe actions for the row limit warning modal.
@@ -102,7 +116,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private readonly recordUrlService: DataverseRecordUrlService;
 	private readonly csvExportService: CsvExportService;
 	private readonly fetchXmlGenerator: FetchXmlGenerator;
+	private readonly fetchXmlParser: FetchXmlParser;
 	private readonly fetchXmlToSqlTranspiler: FetchXmlToSqlTranspiler;
+	private readonly sqlParser: SqlParser;
+	private readonly sqlToFetchXmlTranspiler: SqlToFetchXmlTranspiler;
 	private currentEnvironmentId: string;
 	private currentVisualQuery: VisualQuery | null = null;
 	private currentEntities: readonly EntityOption[] = [];
@@ -151,7 +168,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		this.recordUrlService = new DataverseRecordUrlService();
 		this.csvExportService = new CsvExportService(logger);
 		this.fetchXmlGenerator = new FetchXmlGenerator();
+		this.fetchXmlParser = new FetchXmlParser();
 		this.fetchXmlToSqlTranspiler = new FetchXmlToSqlTranspiler();
+		this.sqlParser = new SqlParser();
+		this.sqlToFetchXmlTranspiler = new SqlToFetchXmlTranspiler();
 		this.columnMapper = new ColumnOptionViewModelMapper();
 		logger.debug('DataExplorerPanel: Initialized with visual query builder');
 
@@ -428,26 +448,29 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		const visualQueryBuilderSection = new VisualQueryBuilderSection();
 
 		// Note: Button IDs must match command names registered in registerCommandHandlers()
-		// Execute button is in the sticky action bar, not the toolbar
 		const actionButtons = new ActionButtonsSection(
 			{
 				buttons: [
-					{ id: 'openInNotebook', label: 'Open in Notebook' },
-					{ id: 'exportCsv', label: 'Export CSV' },
+					{ id: 'executeQuery', label: 'Execute' },
+					{ id: 'clearQuery', label: 'Clear' },
 				],
 			},
 			SectionPosition.Toolbar
 		);
 
+		const exportDropdown = new DataExplorerExportDropdownSection();
+		const importDropdown = new DataExplorerImportDropdownSection();
+
+		// Toolbar order: Execute, Clear, Export, Import, Environment (anchored right)
 		const compositionBehavior = new SectionCompositionBehavior(
-			[actionButtons, environmentSelector, visualQueryBuilderSection],
+			[actionButtons, exportDropdown, importDropdown, environmentSelector, visualQueryBuilderSection],
 			PanelLayout.SingleColumn
 		);
 
 		const cssUris = resolveCssModules(
 			{
 				base: true,
-				components: ['buttons', 'inputs'],
+				components: ['buttons', 'inputs', 'dropdown'],
 				sections: ['environment-selector', 'action-buttons', 'datatable'],
 			},
 			this.extensionUri,
@@ -479,6 +502,18 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 							'webview',
 							'js',
 							'messaging.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
+							'resources',
+							'webview',
+							'js',
+							'components',
+							'DropdownComponent.js'
 						)
 					)
 					.toString(),
@@ -708,6 +743,41 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		this.coordinator.registerHandler('webviewReady', async () => {
 			this.logger.debug('Webview ready, sending entities');
 			await this.sendEntitiesToWebview();
+		});
+
+		// Export Results as CSV
+		this.coordinator.registerHandler('exportResultsCsv', async () => {
+			await this.handleExportResultsCsv();
+		});
+
+		// Export Results as JSON
+		this.coordinator.registerHandler('exportResultsJson', async () => {
+			await this.handleExportResultsJson();
+		});
+
+		// Export Query as FetchXML
+		this.coordinator.registerHandler('exportQueryFetchXml', async () => {
+			await this.handleExportQueryFetchXml();
+		});
+
+		// Export Query as SQL
+		this.coordinator.registerHandler('exportQuerySql', async () => {
+			await this.handleExportQuerySql();
+		});
+
+		// Export Query as Notebook (reuse existing openInNotebook logic)
+		this.coordinator.registerHandler('exportQueryNotebook', async () => {
+			await this.handleOpenInNotebook();
+		});
+
+		// Import FetchXML file
+		this.coordinator.registerHandler('importFetchXml', async () => {
+			await this.handleImportFetchXml();
+		});
+
+		// Import SQL file
+		this.coordinator.registerHandler('importSql', async () => {
+			await this.handleImportSql();
 		});
 	}
 
@@ -1706,5 +1776,360 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			this.logger.error('Failed to open query in notebook', error);
 			await vscode.window.showErrorMessage('Failed to open query in notebook');
 		}
+	}
+
+	// ============================================
+	// EXPORT HANDLERS
+	// ============================================
+
+	/**
+	 * Exports current query results to CSV file.
+	 * Uses existing CSV export service.
+	 */
+	private async handleExportResultsCsv(): Promise<void> {
+		// Reuse existing handleExportCsv logic
+		await this.handleExportCsv();
+	}
+
+	/**
+	 * Exports current query results to JSON file.
+	 */
+	private async handleExportResultsJson(): Promise<void> {
+		if (!this.currentResult) {
+			await vscode.window.showWarningMessage('No query results to export. Please execute a query first.');
+			return;
+		}
+
+		const rowCount = this.currentResult.getRowCount();
+		if (rowCount === 0) {
+			await vscode.window.showWarningMessage('No data to export. Query returned 0 rows.');
+			return;
+		}
+
+		this.logger.debug('Exporting query results to JSON', { rowCount });
+
+		try {
+			// Map QueryResult to JSON-serializable format
+			const viewModel = this.resultMapper.toViewModel(this.currentResult);
+			const jsonData = viewModel.rows.map((row) => {
+				const obj: Record<string, unknown> = {};
+				for (const col of viewModel.columns) {
+					obj[col.name] = row[col.name] ?? null;
+				}
+				return obj;
+			});
+
+			// Generate JSON content
+			const jsonContent = this.csvExportService.toJson(jsonData);
+
+			// Generate suggested filename
+			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+			const entityName = viewModel.entityLogicalName ?? 'query';
+			const suggestedFilename = `${entityName}_results_${timestamp}.json`;
+
+			// Save to file
+			const savedPath = await this.csvExportService.saveToFile(jsonContent, suggestedFilename);
+
+			void vscode.window.showInformationMessage(
+				`Exported ${rowCount} rows to ${savedPath}`
+			);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+
+			if (errorMessage.includes('cancelled by user')) {
+				this.logger.debug('JSON export cancelled by user');
+				return;
+			}
+
+			this.logger.error('Failed to export JSON', error);
+			await vscode.window.showErrorMessage(`Failed to export JSON: ${errorMessage}`);
+		}
+	}
+
+	/**
+	 * Exports current query as FetchXML file.
+	 */
+	private async handleExportQueryFetchXml(): Promise<void> {
+		if (!this.currentVisualQuery) {
+			await vscode.window.showWarningMessage('Please select an entity first.');
+			return;
+		}
+
+		this.logger.debug('Exporting query as FetchXML');
+
+		try {
+			const fetchXml = this.fetchXmlGenerator.generate(this.currentVisualQuery);
+
+			// Generate suggested filename
+			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+			const entityName = this.currentVisualQuery.entityName;
+			const suggestedFilename = `${entityName}_query_${timestamp}.xml`;
+
+			// Save to file using custom filters for XML
+			const selectedUri = await vscode.window.showSaveDialog({
+				defaultUri: vscode.Uri.file(suggestedFilename),
+				filters: {
+					'FetchXML': ['xml'],
+					'All Files': ['*'],
+				},
+			});
+
+			if (!selectedUri) {
+				this.logger.debug('FetchXML export cancelled by user');
+				return;
+			}
+
+			// Ensure .xml extension is present
+			const uri = this.ensureFileExtension(selectedUri, '.xml');
+
+			await vscode.workspace.fs.writeFile(uri, Buffer.from(fetchXml, 'utf-8'));
+
+			void vscode.window.showInformationMessage(
+				`Exported FetchXML to ${uri.fsPath}`
+			);
+		} catch (error) {
+			this.logger.error('Failed to export FetchXML', error);
+			await vscode.window.showErrorMessage(`Failed to export FetchXML: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	/**
+	 * Exports current query as SQL file.
+	 */
+	private async handleExportQuerySql(): Promise<void> {
+		if (!this.currentVisualQuery) {
+			await vscode.window.showWarningMessage('Please select an entity first.');
+			return;
+		}
+
+		this.logger.debug('Exporting query as SQL');
+
+		try {
+			const sql = this.generateSqlFromVisualQuery();
+
+			if (!sql) {
+				await vscode.window.showWarningMessage('Could not generate SQL from query.');
+				return;
+			}
+
+			// Generate suggested filename
+			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+			const entityName = this.currentVisualQuery.entityName;
+			const suggestedFilename = `${entityName}_query_${timestamp}.sql`;
+
+			// Save to file
+			const selectedUri = await vscode.window.showSaveDialog({
+				defaultUri: vscode.Uri.file(suggestedFilename),
+				filters: {
+					'SQL': ['sql'],
+					'All Files': ['*'],
+				},
+			});
+
+			if (!selectedUri) {
+				this.logger.debug('SQL export cancelled by user');
+				return;
+			}
+
+			// Ensure .sql extension is present
+			const uri = this.ensureFileExtension(selectedUri, '.sql');
+
+			await vscode.workspace.fs.writeFile(uri, Buffer.from(sql, 'utf-8'));
+
+			void vscode.window.showInformationMessage(
+				`Exported SQL to ${uri.fsPath}`
+			);
+		} catch (error) {
+			this.logger.error('Failed to export SQL', error);
+			await vscode.window.showErrorMessage(`Failed to export SQL: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	// ============================================
+	// IMPORT HANDLERS
+	// ============================================
+
+	/**
+	 * Imports a FetchXML file and loads it into the Visual Query Builder.
+	 */
+	private async handleImportFetchXml(): Promise<void> {
+		this.logger.debug('Import FetchXML file');
+
+		try {
+			// Show file picker
+			const uris = await vscode.window.showOpenDialog({
+				canSelectMany: false,
+				filters: {
+					'FetchXML': ['xml'],
+					'All Files': ['*'],
+				},
+				title: 'Import FetchXML File',
+			});
+
+			const selectedUri = uris?.[0];
+			if (!selectedUri) {
+				this.logger.debug('FetchXML import cancelled by user');
+				return;
+			}
+
+			// Read file content
+			const fileContent = await vscode.workspace.fs.readFile(selectedUri);
+			const fetchXml = Buffer.from(fileContent).toString('utf-8');
+
+			// Parse FetchXML to VisualQuery
+			await this.loadVisualQueryFromFetchXml(fetchXml);
+
+		} catch (error) {
+			this.logger.error('Failed to import FetchXML', error);
+			await vscode.window.showErrorMessage(`Failed to import FetchXML: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	/**
+	 * Imports a SQL file, converts to FetchXML, and loads into the Visual Query Builder.
+	 */
+	private async handleImportSql(): Promise<void> {
+		this.logger.debug('Import SQL file');
+
+		try {
+			// Show file picker
+			const uris = await vscode.window.showOpenDialog({
+				canSelectMany: false,
+				filters: {
+					'SQL': ['sql'],
+					'All Files': ['*'],
+				},
+				title: 'Import SQL File',
+			});
+
+			const selectedUri = uris?.[0];
+			if (!selectedUri) {
+				this.logger.debug('SQL import cancelled by user');
+				return;
+			}
+
+			// Read file content
+			const fileContent = await vscode.workspace.fs.readFile(selectedUri);
+			const sql = Buffer.from(fileContent).toString('utf-8');
+
+			// Parse SQL to AST
+			const ast = this.sqlParser.parse(sql);
+
+			// Transpile to FetchXML
+			const fetchXml = this.sqlToFetchXmlTranspiler.transpile(ast);
+
+			// Load FetchXML into Visual Query Builder
+			await this.loadVisualQueryFromFetchXml(fetchXml);
+
+		} catch (error) {
+			this.logger.error('Failed to import SQL', error);
+			await vscode.window.showErrorMessage(`Failed to import SQL: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	/**
+	 * Loads a FetchXML string into the Visual Query Builder.
+	 * Parses the FetchXML and updates the UI state.
+	 */
+	private async loadVisualQueryFromFetchXml(fetchXml: string): Promise<void> {
+		// Parse FetchXML to VisualQuery
+		const visualQuery = this.fetchXmlParser.parse(fetchXml);
+		const entityName = visualQuery.entityName;
+
+		this.logger.debug('Parsed FetchXML for import', { entityName });
+
+		// Check if entity exists in current environment
+		const entityExists = this.currentEntities.some(
+			(e) => e.logicalName === entityName
+		);
+
+		if (!entityExists) {
+			await vscode.window.showErrorMessage(
+				`Entity "${entityName}" does not exist in the current environment.`
+			);
+			return;
+		}
+
+		// Update visual query state
+		this.currentVisualQuery = visualQuery;
+
+		// Clear and rebuild filter conditions from the parsed query
+		this.currentFilterConditions = [];
+		const filter = visualQuery.filter;
+		if (filter) {
+			for (const condition of filter.conditions) {
+				this.filterConditionCounter++;
+				const value = condition.value;
+				this.currentFilterConditions.push({
+					id: `filter-${this.filterConditionCounter}`,
+					attribute: condition.attribute,
+					attributeType: 'String', // Default - will be refined when columns load
+					operator: condition.operator,
+					value: Array.isArray(value) ? value.join(', ') : value,
+				});
+			}
+		}
+
+		// Update sort state
+		const firstSort = visualQuery.sorts[0];
+		if (firstSort !== undefined) {
+			this.currentSortAttribute = firstSort.attribute;
+			this.currentSortDescending = firstSort.descending;
+		} else {
+			this.currentSortAttribute = null;
+			this.currentSortDescending = false;
+		}
+
+		// Update query options
+		this.currentTopN = visualQuery.top;
+		this.currentDistinct = visualQuery.distinct;
+
+		// Load attributes for the entity
+		await this.loadAttributesForEntity(entityName);
+
+		// Rebuild filters with proper attribute types
+		await this.rebuildVisualQueryFilters();
+
+		// Send entity selection to webview
+		await this.panel.postMessage({
+			command: 'entitiesLoaded',
+			data: {
+				entities: this.currentEntities,
+				selectedEntity: entityName,
+			},
+		});
+
+		// Update UI
+		await this.sendFiltersUpdate();
+		await this.sendSortUpdate();
+		await this.sendQueryOptionsUpdate();
+		await this.updateQueryPreview();
+
+		// Persist state
+		void this.saveQueryStateToStorage();
+
+		void vscode.window.showInformationMessage(
+			`Imported query for "${entityName}"`
+		);
+	}
+
+	// ============================================
+	// UTILITY METHODS
+	// ============================================
+
+	/**
+	 * Ensures a file URI has the expected extension.
+	 * If the URI doesn't end with the expected extension, appends it.
+	 *
+	 * @param uri - The file URI from save dialog
+	 * @param extension - The expected extension (e.g., '.xml', '.sql')
+	 * @returns URI with the extension guaranteed
+	 */
+	private ensureFileExtension(uri: vscode.Uri, extension: string): vscode.Uri {
+		const fsPath = uri.fsPath;
+		if (!fsPath.toLowerCase().endsWith(extension.toLowerCase())) {
+			return vscode.Uri.file(fsPath + extension);
+		}
+		return uri;
 	}
 }
