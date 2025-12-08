@@ -501,12 +501,70 @@ export function activate(context: vscode.ExtensionContext): void {
 			await showEnvironmentPickerAndExecute(
 				container.environmentRepository,
 				'Select an environment to open Data Explorer',
-				async (envId) => initializeDataExplorer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, envId)
+				async (envId) => { void await initializeDataExplorer(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, envId); }
 			);
 		} catch (error) {
 			container.logger.error('Failed to open Data Explorer with environment picker', error);
 			vscode.window.showErrorMessage(
 				`Failed to open Data Explorer: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	const openCellInDataExplorerCommand = vscode.commands.registerCommand('power-platform-dev-suite.openCellInDataExplorer', async () => {
+		try {
+			// Get active notebook editor
+			const editor = vscode.window.activeNotebookEditor;
+			if (!editor || editor.notebook.notebookType !== 'ppdsnb') {
+				vscode.window.showWarningMessage('This command is only available for Dataverse notebooks.');
+				return;
+			}
+
+			// Get selected cell
+			const selections = editor.selections;
+			const firstSelection = selections[0];
+			if (!firstSelection) {
+				vscode.window.showWarningMessage('No cell selected.');
+				return;
+			}
+
+			const cell = editor.notebook.cellAt(firstSelection.start);
+			if (cell.kind !== vscode.NotebookCellKind.Code) {
+				vscode.window.showWarningMessage('Please select a code cell.');
+				return;
+			}
+
+			// Get cell content and language
+			const query = cell.document.getText().trim();
+			if (!query) {
+				vscode.window.showWarningMessage('Cell is empty.');
+				return;
+			}
+
+			const cellLanguage = cell.document.languageId;
+			const language: 'sql' | 'fetchxml' = cellLanguage === 'fetchxml' ? 'fetchxml' : 'sql';
+
+			// Get environment from notebook metadata
+			const notebookMetadata = editor.notebook.metadata;
+			const environmentId = notebookMetadata?.['environmentId'] as string | undefined;
+
+			// Open Data Explorer with the environment (creates new or shows existing for that env)
+			const panel = await initializeDataExplorer(
+				context,
+				factories.getEnvironments,
+				factories.getEnvironmentById,
+				factories.dataverseApiServiceFactory,
+				container.logger,
+				environmentId
+			);
+
+			// Load the query into the Visual Query Builder
+			await panel.loadQueryFromExternal(query, language);
+
+		} catch (error) {
+			container.logger.error('Failed to open cell in Data Explorer', error);
+			vscode.window.showErrorMessage(
+				`Failed to open in Data Explorer: ${error instanceof Error ? error.message : String(error)}`
 			);
 		}
 	});
@@ -566,6 +624,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		metadataBrowserPickEnvironmentCommand,
 		dataExplorerCommand,
 		dataExplorerPickEnvironmentCommand,
+		openCellInDataExplorerCommand,
 		webResourcesCommand,
 		webResourcesPickEnvironmentCommand,
 		removeEnvironmentCommand,

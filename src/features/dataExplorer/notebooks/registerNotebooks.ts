@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../infrastructure/logging/ILogger';
+import { CsvExportService } from '../../../shared/infrastructure/services/CsvExportService';
 import { QueryResultViewModelMapper } from '../application/mappers/QueryResultViewModelMapper';
 import { FetchXmlToSqlTranspiler } from '../domain/services/FetchXmlToSqlTranspiler';
 import { SqlParser } from '../domain/services/SqlParser';
@@ -151,6 +152,25 @@ export async function registerDataverseNotebooks(
 		controller.updateStatusBarVisibility(vscode.window.activeNotebookEditor);
 	}
 
+	// Create CSV export service for export commands
+	const csvExportService = new CsvExportService(logger);
+
+	// Register export cell results to CSV command
+	const exportCsvCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.exportNotebookCellResultsToCsv',
+		async () => {
+			await exportCellResults(controller, csvExportService, logger, 'csv');
+		}
+	);
+
+	// Register export cell results to JSON command
+	const exportJsonCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.exportNotebookCellResultsToJson',
+		async () => {
+			await exportCellResults(controller, csvExportService, logger, 'json');
+		}
+	);
+
 	logger.info('Power Platform Developer Suite Notebooks registered successfully');
 
 	return [
@@ -159,6 +179,8 @@ export async function registerDataverseNotebooks(
 		selectEnvCommand,
 		newNotebookCommand,
 		toggleLanguageCommand,
+		exportCsvCommand,
+		exportJsonCommand,
 		editorChangeDisposable,
 		notebookOpenDisposable,
 	];
@@ -377,6 +399,94 @@ async function toggleCellLanguage(logger: ILogger): Promise<void> {
 		logger.error('Failed to toggle cell language', error);
 		vscode.window.showErrorMessage(
 			`Failed to toggle language: ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+}
+
+/**
+ * Exports the active cell's query results to CSV or JSON format.
+ * Shows a save dialog and writes the file.
+ *
+ * @param controller - The notebook controller with stored results
+ * @param csvExportService - Service for export operations
+ * @param logger - Logger for diagnostics
+ * @param format - Export format ('csv' or 'json')
+ */
+async function exportCellResults(
+	controller: DataverseNotebookController,
+	csvExportService: CsvExportService,
+	logger: ILogger,
+	format: 'csv' | 'json'
+): Promise<void> {
+	try {
+		const editor = vscode.window.activeNotebookEditor;
+		if (!editor || editor.notebook.notebookType !== 'ppdsnb') {
+			vscode.window.showWarningMessage('This command is only available for Dataverse notebooks.');
+			return;
+		}
+
+		// Get selected cell
+		const selections = editor.selections;
+		const firstSelection = selections[0];
+		if (!firstSelection) {
+			vscode.window.showWarningMessage('No cell selected.');
+			return;
+		}
+
+		const cell = editor.notebook.cellAt(firstSelection.start);
+		if (cell.kind !== vscode.NotebookCellKind.Code) {
+			vscode.window.showWarningMessage('Please select a code cell.');
+			return;
+		}
+
+		// Get stored results for this cell
+		const cellUri = cell.document.uri.toString();
+		const results = controller.getCellResults(cellUri);
+
+		if (!results) {
+			vscode.window.showWarningMessage('No results to export. Execute the cell first.');
+			return;
+		}
+
+		if (results.rows.length === 0) {
+			vscode.window.showWarningMessage('No data to export. The query returned no results.');
+			return;
+		}
+
+		// Generate export content
+		const entityName = results.entityLogicalName ?? 'query_results';
+		const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+		let content: string;
+		let filename: string;
+
+		if (format === 'csv') {
+			const tabularData = controller.resultsToTabularData(results);
+			content = csvExportService.toCsv(tabularData);
+			filename = `${entityName}_${timestamp}.csv`;
+		} else {
+			const jsonArray = controller.resultsToJsonArray(results);
+			content = csvExportService.toJson(jsonArray);
+			filename = `${entityName}_${timestamp}.json`;
+		}
+
+		// Save to file
+		const savedPath = await csvExportService.saveToFile(content, filename);
+		vscode.window.showInformationMessage(`Exported ${results.rows.length} rows to ${savedPath}`);
+
+		logger.info('Exported notebook cell results', {
+			format,
+			rowCount: results.rows.length,
+			path: savedPath,
+		});
+	} catch (error) {
+		// User cancellation is expected - don't show error
+		if (error instanceof Error && error.message.includes('cancelled')) {
+			return;
+		}
+
+		logger.error('Failed to export cell results', error);
+		vscode.window.showErrorMessage(
+			`Failed to export: ${error instanceof Error ? error.message : String(error)}`
 		);
 	}
 }

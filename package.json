@@ -256,11 +256,6 @@
                 "category": "Power Platform Developer Suite"
             },
             {
-                "command": "power-platform-dev-suite.executeQueryFromEditor",
-                "title": "Execute Query from Editor",
-                "category": "Power Platform Developer Suite"
-            },
-            {
                 "command": "power-platform-dev-suite.newDataverseNotebook",
                 "title": "New Notebook",
                 "category": "Power Platform Developer Suite",
@@ -271,14 +266,24 @@
                 "title": "Toggle SQL/FetchXML",
                 "category": "Power Platform Developer Suite",
                 "icon": "$(arrow-swap)"
-            }
-        ],
-        "keybindings": [
+            },
             {
-                "command": "power-platform-dev-suite.executeQueryFromEditor",
-                "key": "ctrl+enter",
-                "mac": "cmd+enter",
-                "when": "editorLangId == sql && ppds.dataExplorerPanelVisible"
+                "command": "power-platform-dev-suite.openCellInDataExplorer",
+                "title": "Open in Data Explorer",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(table)"
+            },
+            {
+                "command": "power-platform-dev-suite.exportNotebookCellResultsToCsv",
+                "title": "Export Results to CSV",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(file)"
+            },
+            {
+                "command": "power-platform-dev-suite.exportNotebookCellResultsToJson",
+                "title": "Export Results to JSON",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(json)"
             }
         ],
         "viewsContainers": {
@@ -447,7 +452,22 @@
                 {
                     "command": "power-platform-dev-suite.toggleNotebookCellLanguage",
                     "when": "notebookType == 'ppdsnb'",
-                    "group": "inline"
+                    "group": "inline@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.openCellInDataExplorer",
+                    "when": "notebookType == 'ppdsnb' && notebookCellType == 'code'",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "power-platform-dev-suite.exportNotebookCellResultsToCsv",
+                    "when": "notebookType == 'ppdsnb' && notebookCellType == 'code'",
+                    "group": "export@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.exportNotebookCellResultsToJson",
+                    "when": "notebookType == 'ppdsnb' && notebookCellType == 'code'",
+                    "group": "export@2"
                 }
             ]
         },

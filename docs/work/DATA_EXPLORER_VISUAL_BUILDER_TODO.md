@@ -25,7 +25,7 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 | 4 | Sticky Action Bar (Execute/Clear) | ✅ Complete |
 | 5 | Toolbar Redesign (Export/Import) | 🔄 In Progress |
 | 6 | View Management - Load/Save Views | 📦 Deferred (needs layoutxml) |
-| 7 | Notebook ↔ Panel Integration | ⬜ Pending |
+| 7 | Notebook ↔ Panel Integration | ✅ Complete |
 | 8 | Advanced Features - AND/OR Groups, Joins | 📦 Deferred |
 | 9 | Cleanup & Polish | ⬜ Pending |
 
@@ -257,31 +257,40 @@ When implemented:
 
 ---
 
-## Step 7: Notebook ↔ Panel Integration
+## Step 7: Notebook ↔ Panel Integration ✅ COMPLETE
 
-### 7.1 Notebook → Panel (CodeLens)
+### 7.1 Notebook → Panel (Cell Toolbar Button) ✅ COMPLETE
 
-- [ ] Register CodeLens provider for `.ppdsnb` notebooks
-- [ ] Show "Open in Data Explorer" above SQL/FetchXML cells
-- [ ] On click: send query + environment to panel
-- [ ] Panel receives: parse if FetchXML, show in preview, execute
+- [x] Register `openCellInDataExplorer` command
+- [x] Add "Open in Data Explorer" button to notebook cell toolbar (`notebook/cell/title` menu)
+- [x] On click: get cell content (SQL or FetchXML) + environment from notebook metadata
+- [x] Send to Data Explorer panel: parse query, populate Visual Query Builder
+- [x] Uses `$(table)` icon for the toolbar button
 
-### 7.2 Notebook → Panel (Context Menu)
+### 7.2 Notebook → Panel (Context Menu) ✅ COMPLETE
 
-- [ ] Add context menu item: "Open in Data Explorer"
-- [ ] Same behavior as CodeLens
+- [x] Add context menu item in `notebook/cell/context` menu
+- [x] Same behavior as toolbar button
 
-### 7.3 Panel → Notebook (Enhanced)
+### 7.3 Panel → Notebook (Already Working)
 
-- [ ] Existing "Open in Notebook" creates new notebook
-- [ ] Include current environment in notebook metadata
-- [ ] Pre-populate with generated SQL or FetchXML (user choice?)
+- [x] Existing "Open in Notebook" creates new notebook (already implemented in earlier step)
+- [x] Include current environment in notebook metadata (already implemented)
+- [ ] Optional: Let user choose SQL vs FetchXML format (deferred)
 
-### 7.4 Environment Transfer
+### 7.5 Notebook Cell Export ✅ COMPLETE
 
-- [ ] When sending from notebook to panel: include environment ID
-- [ ] Panel auto-selects that environment
-- [ ] If environment not available: show error, use current
+- [x] Store query results by cell URI after execution
+- [x] Add `exportNotebookCellResultsToCsv` command
+- [x] Add `exportNotebookCellResultsToJson` command
+- [x] Add commands to `notebook/cell/context` menu
+- [x] Reuse existing `CsvExportService` for export functionality
+
+### 7.4 Environment Transfer ✅ COMPLETE
+
+- [x] When sending from notebook to panel: read `environmentId` from notebook metadata
+- [x] Panel opens for that environment (creates new or shows existing panel for that env)
+- [x] If no environment in notebook: uses `undefined`, panel prompts for selection
 
 ---
 

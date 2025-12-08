@@ -26,9 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Uses existing FetchXmlParser for round-trip fidelity
 
 - **Data Explorer - Notebook Integration** - Bidirectional workflow between notebooks and panel
-  - CodeLens "Open in Data Explorer" above SQL/FetchXML cells
-  - Parses query and populates Visual Query Builder
+  - Cell toolbar button "Open in Data Explorer" for SQL/FetchXML cells
+  - Context menu "Open in Data Explorer" (right-click on cell)
+  - Parses query and populates Visual Query Builder with environment from notebook metadata
   - Panel → Notebook: "Export as Notebook" creates .ppdsnb with current query
+  - Export cell results: CSV and JSON export via cell context menu
 
 - **Data Explorer - IntelliSense** - Context-aware autocomplete in VS Code editor
   - SQL IntelliSense: entity names after FROM/JOIN, attributes after SELECT/WHERE/ORDER BY

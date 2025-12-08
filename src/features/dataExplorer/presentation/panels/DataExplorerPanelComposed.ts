@@ -2113,6 +2113,53 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		);
 	}
 
+	/**
+	 * Loads a query from an external source (e.g., notebook cell) into the Visual Query Builder.
+	 * Handles both SQL and FetchXML input.
+	 *
+	 * @param query - The query string (SQL or FetchXML)
+	 * @param language - The query language ('sql' or 'fetchxml')
+	 */
+	public async loadQueryFromExternal(query: string, language: 'sql' | 'fetchxml'): Promise<void> {
+		// Ensure entities are loaded (handles case where panel just opened and hasn't finished init)
+		if (this.currentEntities.length === 0) {
+			try {
+				const entitySuggestions = await this.intelliSenseServices.metadataCache.getEntitySuggestions(
+					this.currentEnvironmentId
+				);
+				this.currentEntities = entitySuggestions
+					.map((e) => ({
+						logicalName: e.logicalName,
+						displayName: e.displayName,
+						isCustomEntity: e.isCustomEntity,
+					}))
+					.sort((a, b) => a.displayName.localeCompare(b.displayName));
+			} catch (error) {
+				this.logger.error('Failed to load entities for external query', error);
+				await vscode.window.showErrorMessage('Failed to load entity metadata. Please try again.');
+				return;
+			}
+		}
+
+		let fetchXml: string;
+
+		if (language === 'sql') {
+			// Transpile SQL to FetchXML
+			try {
+				const ast = this.sqlParser.parse(query);
+				fetchXml = this.sqlToFetchXmlTranspiler.transpile(ast);
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				await vscode.window.showErrorMessage(`Failed to parse SQL: ${errorMessage}`);
+				return;
+			}
+		} else {
+			fetchXml = query;
+		}
+
+		await this.loadVisualQueryFromFetchXml(fetchXml);
+	}
+
 	// ============================================
 	// UTILITY METHODS
 	// ============================================

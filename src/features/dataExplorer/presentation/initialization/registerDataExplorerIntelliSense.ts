@@ -13,8 +13,6 @@ import { GetFetchXmlElementSuggestionsUseCase } from '../../application/useCases
 import { GetOperatorSuggestionsUseCase } from '../../application/useCases/GetOperatorSuggestionsUseCase';
 import { DataverseCompletionProvider } from '../providers/DataverseCompletionProvider';
 import { FetchXmlCompletionProvider } from '../providers/FetchXmlCompletionProvider';
-import { SqlEditorService } from '../services/SqlEditorService';
-import { SqlEditorWatcher } from '../services/SqlEditorWatcher';
 
 /**
  * Services returned by IntelliSense registration for panel integration.
@@ -24,10 +22,6 @@ export interface DataExplorerIntelliSenseServices {
 	contextService: IntelliSenseContextService;
 	/** Metadata cache for entity/attribute suggestions. */
 	metadataCache: IntelliSenseMetadataCache;
-	/** Service for opening SQL editors. */
-	editorService: SqlEditorService;
-	/** Watcher for SQL editor content changes. */
-	editorWatcher: SqlEditorWatcher;
 }
 
 /**
@@ -73,11 +67,10 @@ export function resetIntelliSenseServicesForTesting(): void {
  *
  * This function:
  * - Creates the IntelliSenseContextService singleton
- * - Registers the completion provider for ALL SQL files
- * - Creates SqlEditorService and SqlEditorWatcher
+ * - Registers completion providers for SQL and FetchXML files
  * - Returns services for panel integration
  *
- * The completion provider only provides Dataverse completions when
+ * The completion providers only provide Dataverse completions when
  * an environment is active (via IntelliSenseContextService).
  *
  * @param context - VS Code extension context for disposable registration
@@ -154,43 +147,7 @@ export function registerDataExplorerIntelliSense(
 	);
 	context.subscriptions.push(fetchXmlProviderDisposable);
 
-	// 7. Create editor service and watcher
-	const editorService = new SqlEditorService(logger);
-	const editorWatcher = new SqlEditorWatcher(logger);
-	context.subscriptions.push(editorService);
-	context.subscriptions.push(editorWatcher);
-
-	// 8. Register Ctrl+Enter command for executing queries from editor
-	const executeQueryCommand = vscode.commands.registerCommand(
-		'power-platform-dev-suite.executeQueryFromEditor',
-		() => {
-			// Get SQL from the watcher's last active content or current editor
-			const sql =
-				editorWatcher.getLastActiveSqlContent() ??
-				editorService.getActiveSqlContent();
-
-			if (sql === null || sql.trim() === '') {
-				vscode.window.showWarningMessage(
-					'No SQL query to execute. Open a SQL file or type a query.'
-				);
-				return;
-			}
-
-			if (!contextService.hasActiveEnvironment()) {
-				vscode.window.showWarningMessage(
-					'No environment selected. Open Data Explorer and select an environment first.'
-				);
-				return;
-			}
-
-			// Request query execution - panel will receive this via subscription
-			contextService.requestQueryExecution(sql);
-			logger.debug('Query execution requested from editor', { sqlLength: sql.length });
-		}
-	);
-	context.subscriptions.push(executeQueryCommand);
-
-	// 9. Register cache disposal
+	// 7. Register cache disposal
 	context.subscriptions.push({ dispose: () => metadataCache.dispose() });
 
 	logger.info('Data Explorer IntelliSense registered successfully');
@@ -199,8 +156,6 @@ export function registerDataExplorerIntelliSense(
 	const services: DataExplorerIntelliSenseServices = {
 		contextService,
 		metadataCache,
-		editorService,
-		editorWatcher,
 	};
 	registry.setServices(services);
 

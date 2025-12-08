@@ -50,6 +50,9 @@ export class DataverseNotebookController {
 	private statusBarItem: vscode.StatusBarItem;
 	private textChangeListener: vscode.Disposable | undefined;
 
+	/** Stores last query results by cell URI for export functionality */
+	private readonly cellResults = new Map<string, QueryResultViewModel>();
+
 	constructor(
 		private readonly getEnvironments: () => Promise<EnvironmentInfo[]>,
 		private readonly executeSqlUseCase: ExecuteSqlQueryUseCase,
@@ -410,6 +413,9 @@ export class DataverseNotebookController {
 			// Map to view model
 			const viewModel = this.resultMapper.toViewModel(result);
 
+			// Store results for export functionality
+			this.cellResults.set(cell.document.uri.toString(), viewModel);
+
 			// Render as HTML table with clickable record links
 			const html = this.renderResultsHtml(viewModel, this.selectedEnvironmentUrl);
 
@@ -741,5 +747,56 @@ export class DataverseNotebookController {
 		}
 
 		return `Error: ${String(error)}`;
+	}
+
+	/**
+	 * Gets the stored results for a cell by its document URI.
+	 * Used by export commands to retrieve results for export.
+	 *
+	 * @param cellUri - The cell document URI string
+	 * @returns The query results if available, undefined otherwise
+	 */
+	public getCellResults(cellUri: string): QueryResultViewModel | undefined {
+		return this.cellResults.get(cellUri);
+	}
+
+	/**
+	 * Checks if a cell has stored results available for export.
+	 *
+	 * @param cellUri - The cell document URI string
+	 * @returns True if results exist for the cell
+	 */
+	public hasCellResults(cellUri: string): boolean {
+		return this.cellResults.has(cellUri);
+	}
+
+	/**
+	 * Converts query results to tabular data format for CSV export.
+	 *
+	 * @param viewModel - The query results
+	 * @returns Tabular data with headers and rows
+	 */
+	public resultsToTabularData(viewModel: QueryResultViewModel): { headers: string[]; rows: string[][] } {
+		const headers = viewModel.columns.map((col) => col.header);
+		const rows = viewModel.rows.map((row) =>
+			viewModel.columns.map((col) => String(row[col.name] ?? ''))
+		);
+		return { headers, rows };
+	}
+
+	/**
+	 * Converts query results to array of objects for JSON export.
+	 *
+	 * @param viewModel - The query results
+	 * @returns Array of row objects
+	 */
+	public resultsToJsonArray(viewModel: QueryResultViewModel): Record<string, unknown>[] {
+		return viewModel.rows.map((row) => {
+			const obj: Record<string, unknown> = {};
+			for (const col of viewModel.columns) {
+				obj[col.name] = row[col.name];
+			}
+			return obj;
+		});
 	}
 }
