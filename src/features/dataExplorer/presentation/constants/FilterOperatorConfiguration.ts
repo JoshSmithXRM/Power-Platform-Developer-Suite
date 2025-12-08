@@ -77,23 +77,3 @@ export function getOperatorsForAttributeType(attributeType: AttributeTypeHint): 
 export function getDefaultOperator(_attributeType: AttributeTypeHint): FetchXmlConditionOperator {
 	return 'eq';
 }
-
-/**
- * Gets the input type for an attribute type.
- * Used to render the appropriate value input in the filter row.
- */
-export function getInputTypeForAttribute(attributeType: AttributeTypeHint): 'text' | 'number' | 'date' | 'select' {
-	switch (attributeType) {
-		case 'Integer':
-		case 'Decimal':
-		case 'Money':
-			return 'number';
-		case 'DateTime':
-			return 'date';
-		case 'Picklist':
-		case 'Boolean':
-			return 'select';
-		default:
-			return 'text';
-	}
-}
