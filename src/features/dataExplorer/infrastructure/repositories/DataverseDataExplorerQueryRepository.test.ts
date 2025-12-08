@@ -691,6 +691,270 @@ describe('DataverseDataExplorerQueryRepository', () => {
 		});
 	});
 
+	describe('lookup column handling', () => {
+		it('should return lookup values with GUID in column and name in name column', async () => {
+			// Regression test: lookup columns should show GUID, with separate name column
+			const fetchXml = `<fetch>
+  <entity name="account">
+    <attribute name="name" />
+    <attribute name="primarycontactid" />
+  </entity>
+</fetch>`;
+
+			// Dataverse returns lookup with FormattedValue annotation
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#accounts',
+				value: [
+					{
+						name: 'Contoso Ltd',
+						'_primarycontactid_value': '12345678-1234-1234-1234-123456789012',
+						'_primarycontactid_value@OData.Community.Display.V1.FormattedValue': 'John Smith',
+						'_primarycontactid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'contact',
+					},
+				],
+			});
+
+			const result = await repository.executeQuery(
+				'env-123',
+				'accounts',
+				fetchXml
+			);
+
+			// Verify domain layer correctly identifies lookup type
+			expect(result.columns.length).toBe(2);
+			const lookupColumn = result.columns.find(c => c.logicalName === 'primarycontactid');
+			expect(lookupColumn).toBeDefined();
+			expect(lookupColumn!.dataType).toBe('lookup');
+
+			// Verify rows have QueryLookupValue with id and name
+			const row = result.rows[0];
+			expect(row).toBeDefined();
+
+			const lookupValue = row?.getValue('primarycontactid');
+			expect(lookupValue).toHaveProperty('id', '12345678-1234-1234-1234-123456789012');
+			expect(lookupValue).toHaveProperty('name', 'John Smith');
+			expect(lookupValue).toHaveProperty('entityType', 'contact');
+		});
+
+		it('should create both GUID and name columns in ViewModel for lookup', async () => {
+			// End-to-end test: verify ViewModel has separate columns for lookup
+			const fetchXml = `<fetch>
+  <entity name="account">
+    <attribute name="name" />
+    <attribute name="primarycontactid" />
+  </entity>
+</fetch>`;
+
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#accounts',
+				value: [
+					{
+						name: 'Contoso Ltd',
+						'_primarycontactid_value': '12345678-1234-1234-1234-123456789012',
+						'_primarycontactid_value@OData.Community.Display.V1.FormattedValue': 'John Smith',
+						'_primarycontactid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'contact',
+					},
+				],
+			});
+
+			const result = await repository.executeQuery('env-123', 'accounts', fetchXml);
+
+			// Map through the mapper
+			const mapper = new QueryResultViewModelMapper();
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have 3 columns: name, primarycontactid, primarycontactidname (lookup virtual)
+			expect(viewModel.columns).toHaveLength(3);
+			expect(viewModel.columns.map(c => c.name)).toContain('name');
+			expect(viewModel.columns.map(c => c.name)).toContain('primarycontactid');
+			expect(viewModel.columns.map(c => c.name)).toContain('primarycontactidname');
+
+			// Row should have GUID in primarycontactid column
+			expect(viewModel.rows[0]!['primarycontactid']).toBe('12345678-1234-1234-1234-123456789012');
+			// Row should have display name in primarycontactidname column
+			expect(viewModel.rows[0]!['primarycontactidname']).toBe('John Smith');
+			// Regular string column should work as before
+			expect(viewModel.rows[0]!['name']).toBe('Contoso Ltd');
+
+			// rowLookups should be populated for BOTH columns (both clickable)
+			const expectedLookupInfo = {
+				entityType: 'contact',
+				id: '12345678-1234-1234-1234-123456789012',
+			};
+			expect(viewModel.rowLookups[0]!['primarycontactid']).toEqual(expectedLookupInfo);
+			expect(viewModel.rowLookups[0]!['primarycontactidname']).toEqual(expectedLookupInfo);
+		});
+
+		it('should handle null lookup values when type is inferred from other rows', async () => {
+			// When some rows have lookup values and others don't, the type is still inferred
+			const fetchXml = `<fetch>
+  <entity name="account">
+    <attribute name="name" />
+    <attribute name="primarycontactid" />
+  </entity>
+</fetch>`;
+
+			// First row has null, second row has a value (helps infer type)
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#accounts',
+				value: [
+					{
+						name: 'Account Without Contact',
+						// primarycontactid is null - no _value field returned
+					},
+					{
+						name: 'Account With Contact',
+						'_primarycontactid_value': 'contact-guid',
+						'_primarycontactid_value@OData.Community.Display.V1.FormattedValue': 'Jane Doe',
+						'_primarycontactid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'contact',
+					},
+				],
+			});
+
+			const result = await repository.executeQuery('env-123', 'accounts', fetchXml);
+
+			const mapper = new QueryResultViewModelMapper();
+			const viewModel = mapper.toViewModel(result);
+
+			// Column type is inferred from rows with data
+			expect(viewModel.columns.map(c => c.name)).toContain('primarycontactid');
+			expect(viewModel.columns.map(c => c.name)).toContain('primarycontactidname');
+
+			// First row (null lookup) should show empty strings
+			expect(viewModel.rows[0]!['primarycontactid']).toBe('');
+			expect(viewModel.rows[0]!['primarycontactidname']).toBe('');
+
+			// Second row should have proper values
+			expect(viewModel.rows[1]!['primarycontactid']).toBe('contact-guid');
+			expect(viewModel.rows[1]!['primarycontactidname']).toBe('Jane Doe');
+		});
+	});
+
+	describe('optionset column handling', () => {
+		it('should return optionset values with proper formatting for accountcategorycode', async () => {
+			// Regression test: optionset columns should show raw value, with separate name column
+			// accountcategorycode: 1 = "Preferred Customer", 2 = "Standard"
+			const fetchXml = `<fetch>
+  <entity name="account">
+    <attribute name="name" />
+    <attribute name="accountcategorycode" />
+  </entity>
+</fetch>`;
+
+			// Dataverse returns optionset with FormattedValue annotation
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#accounts',
+				value: [
+					{
+						name: 'Contoso Ltd',
+						accountcategorycode: 1,
+						'accountcategorycode@OData.Community.Display.V1.FormattedValue': 'Preferred Customer',
+					},
+					{
+						name: 'Fabrikam Inc',
+						accountcategorycode: 2,
+						'accountcategorycode@OData.Community.Display.V1.FormattedValue': 'Standard',
+					},
+				],
+			});
+
+			const result = await repository.executeQuery(
+				'env-123',
+				'accounts',
+				fetchXml
+			);
+
+			// Verify domain layer correctly identifies optionset type
+			expect(result.columns.length).toBe(2);
+			const optionsetColumn = result.columns.find(c => c.logicalName === 'accountcategorycode');
+			expect(optionsetColumn).toBeDefined();
+			expect(optionsetColumn!.dataType).toBe('optionset');
+
+			// Verify rows have QueryFormattedValue with raw value preserved
+			const row1 = result.rows[0];
+			const row2 = result.rows[1];
+			expect(row1).toBeDefined();
+			expect(row2).toBeDefined();
+
+			const value1 = row1?.getValue('accountcategorycode');
+			const value2 = row2?.getValue('accountcategorycode');
+
+			// Values should be QueryFormattedValue objects
+			expect(value1).toHaveProperty('value', 1);
+			expect(value1).toHaveProperty('formattedValue', 'Preferred Customer');
+			expect(value2).toHaveProperty('value', 2);
+			expect(value2).toHaveProperty('formattedValue', 'Standard');
+		});
+
+		it('should create both value and name columns in ViewModel for optionset', async () => {
+			// End-to-end test: verify ViewModel has separate columns for optionset
+			const fetchXml = `<fetch>
+  <entity name="account">
+    <attribute name="name" />
+    <attribute name="accountcategorycode" />
+  </entity>
+</fetch>`;
+
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#accounts',
+				value: [
+					{
+						name: 'Contoso Ltd',
+						accountcategorycode: 1,
+						'accountcategorycode@OData.Community.Display.V1.FormattedValue': 'Preferred Customer',
+					},
+				],
+			});
+
+			const result = await repository.executeQuery('env-123', 'accounts', fetchXml);
+
+			// Map through the mapper
+			const mapper = new QueryResultViewModelMapper();
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have 3 columns: name, accountcategorycode, accountcategorycodename
+			expect(viewModel.columns).toHaveLength(3);
+			expect(viewModel.columns.map(c => c.name)).toContain('name');
+			expect(viewModel.columns.map(c => c.name)).toContain('accountcategorycode');
+			expect(viewModel.columns.map(c => c.name)).toContain('accountcategorycodename');
+
+			// Row should have raw numeric value in accountcategorycode column
+			expect(viewModel.rows[0]!['accountcategorycode']).toBe('1');
+			// Row should have label in accountcategorycodename column
+			expect(viewModel.rows[0]!['accountcategorycodename']).toBe('Preferred Customer');
+			// Regular string column should work as before
+			expect(viewModel.rows[0]!['name']).toBe('Contoso Ltd');
+		});
+
+		it('should handle null optionset values', async () => {
+			const fetchXml = `<fetch>
+  <entity name="account">
+    <attribute name="accountcategorycode" />
+  </entity>
+</fetch>`;
+
+			// Optionset with null value - no FormattedValue annotation returned
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#accounts',
+				value: [
+					{
+						// accountcategorycode is null (not included in response)
+					},
+				],
+			});
+
+			const result = await repository.executeQuery('env-123', 'accounts', fetchXml);
+
+			const mapper = new QueryResultViewModelMapper();
+			const viewModel = mapper.toViewModel(result);
+
+			// Column should still exist even if value is null
+			expect(viewModel.columns.map(c => c.name)).toContain('accountcategorycode');
+			// Value should be empty string for null
+			expect(viewModel.rows[0]!['accountcategorycode']).toBe('');
+		});
+	});
+
 	describe('link-entity column handling', () => {
 		it('should extract link-entity columns with alias prefix from FetchXML', async () => {
 			const fetchXml = `<fetch top="100">
