@@ -122,6 +122,11 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 **Bug:** Columns don't load when panel restores with saved entity selection.
 - [x] Fix: In state restoration, if `selectedEntity` exists, call `loadAttributesForEntity()`
 
+**Additional UX Fixes:**
+- [x] Fix Ctrl+A not working in search inputs (KeyboardSelectionBehavior)
+- [x] Persist and restore full query state (entity + selected columns)
+- [x] Use consistent search box pattern with 🔍 emoji placeholder
+
 ### 3.1 View Selector Section (Placeholder for Step 6)
 
 - [ ] Create view selector dropdown (System Views | Personal Views groups)
