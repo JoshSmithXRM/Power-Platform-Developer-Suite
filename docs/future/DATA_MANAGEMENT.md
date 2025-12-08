@@ -168,24 +168,69 @@ Support data modification statements with safety features.
 
 ---
 
-### Data Explorer - View Management (UserQuery Save/Load)
+### Data Explorer - Load Views (Insert FetchXML from Existing Views)
+**Status**: Planned
+**Target Version**: v0.5.0 or v0.6.0
+**Priority**: Medium
+**Estimated Effort**: 8-12 hours
+**Value**: Leverage existing System/Personal Views instead of building queries from scratch
+**Source**: User feedback (2025-12-08)
+
+**Description**:
+Allow users to browse existing System Views (savedquery) and Personal Views (userquery) for an entity, then insert the FetchXML into notebooks or populate the Visual Query Builder.
+
+**Core Features**:
+- **Notebook Integration**: Right-click → "Insert FetchXML from View" or cell toolbar button
+- **Visual Builder Integration**: "Load from View" dropdown to populate builder
+- Browse System Views and Personal Views for selected entity
+- Preview view name, description, and column count before inserting
+- Insert raw FetchXML into notebook cell (works for both SQL and FetchXML cells)
+
+**Why This Is Simpler Than Full View Management**:
+- **Read-only** - No risk of breaking existing views
+- **No layoutxml needed** - Only reading fetchxml, not generating column layouts
+- **No Save complexity** - Just loading, not creating userquery records
+
+**User Value**:
+1. **Discovery** - Learn what views already exist in the environment
+2. **Learning** - See real FetchXML examples from their own data
+3. **Time saving** - Start from existing queries instead of building from scratch
+4. **Consistency** - Use same queries the Dynamics UI uses
+
+**Technical Approach**:
+1. Query `savedquery` for System Views (filter by returnedtypecode = entity)
+2. Query `userquery` for Personal Views (filter by returnedtypecode = entity)
+3. Present in VS Code Quick Pick (grouped by type)
+4. Extract `fetchxml` attribute and insert into editor/builder
+
+**API Queries**:
+```
+GET /savedqueries?$filter=returnedtypecode eq 'account'&$select=name,description,fetchxml
+GET /userqueries?$filter=returnedtypecode eq 'account'&$select=name,description,fetchxml
+```
+
+---
+
+### Data Explorer - Save as Personal View (UserQuery Creation)
 **Status**: Deferred
 **Target Version**: v1.0+
 **Reason**: Requires layoutxml generation (column widths, order, visibility)
 
 **Description**:
-Save Visual Query Builder queries as Personal Views (UserQuery) in Dataverse, and load existing views.
+Save Visual Query Builder queries as Personal Views (UserQuery) in Dataverse so they appear in Dynamics Advanced Find.
 
 **Core Features**:
-- View selector dropdown (System Views | Personal Views)
-- Save as Personal View (creates userquery record)
-- Load existing Personal Views
+- Save current query as Personal View
+- Generate proper layoutxml for column display in Dynamics
 - Views appear in Dynamics Advanced Find
 
 **Technical Complexity**:
 - layoutxml generation required for proper column display in Dynamics
 - Need to calculate column widths, order, visibility
-- System Views require solution context
+- Different from "Load Views" which is read-only
+
+**Depends On**:
+- Load Views feature (v0.5.0/v0.6.0) provides foundation
 
 ---
 
@@ -293,4 +338,4 @@ Bulk update or delete records with preview and confirmation.
 
 ---
 
-**Last Updated**: 2025-12-08
+**Last Updated**: 2025-12-08 (Added Load Views from user feedback)
