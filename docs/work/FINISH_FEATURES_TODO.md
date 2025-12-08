@@ -90,7 +90,7 @@ All features for v0.3.0 are complete. Ready for pre-merge checklist.
 ## Pre-Merge Checklist
 
 Before merging this branch:
-- [ ] Update `docs/future/DATA_MANAGEMENT.md` - mark implemented items (DONE)
+- [x] Update `docs/future/DATA_MANAGEMENT.md` - mark implemented items
 - [ ] Run `/code-review` for final approval
 - [ ] Run `/prepare-release` to bump version and update CHANGELOG
 - [ ] Delete this tracking doc after PR merge

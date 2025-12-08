@@ -104,35 +104,26 @@ WHERE a.revenue > 1000000
 
 ---
 
-## In Progress
-
 ### Data Explorer - Visual Query Builder
-**Status**: In Progress
-**Target Version**: v0.3.0
-**Priority**: High
-**Tracking**: `docs/work/DATA_EXPLORER_VISUAL_BUILDER_TODO.md`
+**Status**: Implemented (v0.3.0)
+**Completed**: 2025-12-08
 
 **Description**:
 Transform the Data Explorer panel from a code-based query editor to a Visual Query Builder (like Advanced Find), while keeping notebooks as the primary code editing experience.
 
-**Completed**:
-- Visual Query Builder UI (entity, columns, filters, sort, options)
-- FetchXML parser (populate builder from FetchXML)
-- Sticky Execute/Clear action bar
-- Query preview (FetchXML/SQL tabs)
+**What's Implemented**:
+- Visual Query Builder UI (entity picker, column selector, filter builder, sort, options)
+- FetchXML parser/generator (bidirectional: populate builder ↔ generate FetchXML)
+- Query preview tabs (FetchXML/SQL - read-only)
+- Toolbar with Execute, Clear, Export, and Import dropdowns
+- Export: Results (CSV, JSON) and Query (FetchXML, SQL, Notebook)
+- Import: FetchXML and SQL files → parse and populate Visual Query Builder
+- Notebook ↔ Panel integration (cell toolbar button, context menu)
+- Cell export (CSV/JSON from notebook cell results)
+- Environment isolation (notebook and panel environments independent)
+- State persistence (entity, columns, filters, sort, options saved per environment)
 
-**In Progress**:
-- Export dropdown (CSV, JSON, FetchXML, SQL, Notebook)
-- Import dropdown (FetchXML, SQL files → populate VQB)
-
-**Remaining**:
-- Notebook ↔ Panel integration (CodeLens "Open in Data Explorer")
-- Cleanup & polish
-
-**Value**:
-- Not all users are comfortable writing SQL
-- Point-and-click query building for Dataverse
-- Seamless export/import workflow
+**Implementation**: `src/features/dataExplorer/`
 
 ---
 
