@@ -110,6 +110,10 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		this.panel.reveal(column);
 	}
 
+	protected getCurrentEnvironmentId(): string {
+		return this.currentEnvironmentId;
+	}
+
 	public static async createOrShow(
 		extensionUri: vscode.Uri,
 		getEnvironments: () => Promise<EnvironmentOption[]>,

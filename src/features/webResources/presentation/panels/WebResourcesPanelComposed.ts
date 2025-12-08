@@ -230,6 +230,10 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.panel.reveal(column);
 	}
 
+	protected getCurrentEnvironmentId(): string {
+		return this.currentEnvironmentId;
+	}
+
 	/**
 	 * Cleans up resources when the panel is disposed.
 	 * Cancels any background loading and clears caches.

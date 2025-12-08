@@ -128,6 +128,10 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 		this.panel.reveal(column);
 	}
 
+	protected getCurrentEnvironmentId(): string {
+		return this.currentEnvironmentId;
+	}
+
 	/**
 	 * Factory method implementing singleton pattern per environment.
 	 * Each environment gets its own panel instance to maintain independent state.

@@ -95,6 +95,10 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 		this.panel.reveal(column);
 	}
 
+	protected getCurrentEnvironmentId(): string {
+		return this.currentEnvironmentId;
+	}
+
 	public static async createOrShow(
 		extensionUri: vscode.Uri,
 		getEnvironments: () => Promise<EnvironmentOption[]>,

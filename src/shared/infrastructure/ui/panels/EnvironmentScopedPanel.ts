@@ -211,7 +211,7 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 				config.onDispose(newPanel);
 			}
 		} : undefined;
-		this.registerDisposal(safePanel, targetEnvironmentId, panelsMap, onDisposeCallback, shouldRegister);
+		this.registerDisposal(safePanel, newPanel, panelsMap, onDisposeCallback, shouldRegister);
 
 		return newPanel;
 	}
@@ -254,18 +254,20 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 	 * Registers disposal handler for the panel.
 	 * Removes panel from map when disposed (if it was registered).
 	 */
-	private static registerDisposal<TPanel>(
+	private static registerDisposal<TPanel extends EnvironmentScopedPanel<TPanel>>(
 		panel: SafeWebviewPanel,
-		environmentId: string,
+		panelInstance: TPanel,
 		panelsMap: Map<string, TPanel>,
 		onDispose?: () => void,
 		wasRegistered: boolean = true
 	): void {
-		const envId = environmentId; // Capture for closure
 		panel.onDidDispose(() => {
 			// Only remove from map if this panel was registered
 			if (wasRegistered) {
-				panelsMap.delete(envId);
+				// Use current environment ID from panel instance, not captured at creation time.
+				// This ensures correct cleanup when user switches environments within the panel.
+				const currentEnvId = panelInstance.getCurrentEnvironmentId();
+				panelsMap.delete(currentEnvId);
 			}
 			if (onDispose) {
 				onDispose();
@@ -278,6 +280,12 @@ export abstract class EnvironmentScopedPanel<TPanel extends EnvironmentScopedPan
 	 * @param column - The view column to reveal the panel in
 	 */
 	protected abstract reveal(column: vscode.ViewColumn): void;
+
+	/**
+	 * Returns the current environment ID for this panel.
+	 * Used by disposal handler to clean up the correct map entry.
+	 */
+	protected abstract getCurrentEnvironmentId(): string;
 
 	/**
 	 * Re-registers the panel in the panels map when environment changes.
