@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Error Message Length** - Increased sanitized error message limit from 200 to 500 characters
+  - Allows full Dataverse API error messages to display without truncation
+  - Helps debugging type mismatch errors (e.g., optionset expecting integer, not string)
+
+### Fixed
+
+- **Data Explorer - Entities Not Loading** - Fixed bug where entity picker remained empty
+  - Origin check in webview message handler incorrectly rejected `vscode-webview://` origins
+  - Messages like `entitiesLoaded` were silently dropped, leaving the entity dropdown empty
+  - Now correctly accepts messages from VS Code webview context
+
+- **Data Explorer - Column Value Formatting** - Fixed confusing display of optionset and lookup columns
+  - Optionset columns (e.g., `accountcategorycode`) now show raw numeric value (1, 2) instead of label
+  - Virtual `name` column (e.g., `accountcategorycodename`) shows the label ("Preferred Customer")
+  - Lookup columns (e.g., `primarycontactid`) now show GUID instead of display name
+  - Virtual `name` column (e.g., `primarycontactidname`) shows the display name ("John Smith")
+  - Both id and name columns for lookups are clickable links to the referenced record
+
 ## [0.3.0] - 2025-12-08
 
 ### Added

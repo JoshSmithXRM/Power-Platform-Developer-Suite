@@ -72,11 +72,11 @@ describe('ErrorSanitizer', () => {
         });
 
         it('should truncate very long error messages', () => {
-            const longMessage = 'Error: ' + 'A'.repeat(250);
+            const longMessage = 'Error: ' + 'A'.repeat(550);
             const error = new Error(longMessage);
             const result = ErrorSanitizer.sanitize(error);
 
-            expect(result.length).toBeLessThanOrEqual(203); // 200 + '...'
+            expect(result.length).toBeLessThanOrEqual(503); // 500 + '...'
             expect(result).toContain('...');
         });
 
