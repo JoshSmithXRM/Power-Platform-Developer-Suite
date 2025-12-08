@@ -6,7 +6,7 @@ export { VisualQuery } from '../../domain/valueObjects/VisualQuery';
 export { QueryColumn } from '../../domain/valueObjects/QueryColumn';
 export { QueryCondition } from '../../domain/valueObjects/QueryCondition';
 export { QueryFilterGroup } from '../../domain/valueObjects/QueryFilterGroup';
-export type { QuerySort } from '../../domain/valueObjects/QuerySort';
+export { QuerySort } from '../../domain/valueObjects/QuerySort';
 
 export { FetchXmlGenerator } from '../../domain/services/FetchXmlGenerator';
 export { FetchXmlToSqlTranspiler } from '../../domain/services/FetchXmlToSqlTranspiler';

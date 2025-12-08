@@ -408,7 +408,38 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 			wireSorting(table);
 			wireRecordLinks(table);
 			wireResultsSearch(table);
+			// Initialize cell selection for Excel-style selection and copy
+			initializeCellSelection(table, columns, rows);
 		}
+	}
+
+	/**
+	 * Initializes cell selection behavior for the query results table.
+	 * @param {HTMLTableElement} table - The table element
+	 * @param {Array} columns - Column definitions from query results
+	 * @param {Array} rows - Row data from query results
+	 */
+	function initializeCellSelection(table, columns, rows) {
+		if (!window.CellSelectionBehavior) {
+			return;
+		}
+
+		// Map columns to the format CellSelectionBehavior expects
+		const columnConfig = columns.map(col => ({
+			key: col.name,
+			header: col.header
+		}));
+
+		window.CellSelectionBehavior.attach(table, {
+			columns: columnConfig,
+			getRowData: (rowIndex) => {
+				if (rowIndex < 0 || rowIndex >= rows.length) {
+					return null;
+				}
+				return rows[rowIndex];
+			},
+			getTotalRowCount: () => rows.length
+		});
 	}
 
 	/**
@@ -718,6 +749,7 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 			// Column picker messages
 			case 'attributesLoaded':
 				updateColumnPicker(message.data?.columns, message.data?.isSelectAll ?? true);
+				updateSortDropdownOptions(message.data?.columns ?? []);
 				setColumnPickerLoading(false);
 				break;
 
@@ -763,7 +795,95 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 					message.data?.availableColumns ?? []
 				);
 				updateFilterCountBadge(message.data?.filterCount ?? 0);
+				// Also show sort and query options when filters are shown
+				setSortSectionVisible(true);
+				setQueryOptionsSectionVisible(true);
 				break;
+
+			// Sort section messages
+			case 'sortUpdated':
+				updateSortUI(message.data);
+				break;
+
+			// Query options messages
+			case 'queryOptionsUpdated':
+				updateQueryOptionsUI(message.data);
+				break;
+		}
+	}
+
+	/**
+	 * Updates the sort UI with new sort state.
+	 * @param {Object} data - Sort data { sortAttribute, sortDescending }
+	 */
+	function updateSortUI(data) {
+		const { sortAttribute, sortDescending } = data;
+
+		// Update attribute dropdown
+		const attrSelect = document.getElementById('sort-attribute-select');
+		if (attrSelect) {
+			attrSelect.value = sortAttribute || '';
+		}
+
+		// Update direction dropdown
+		const dirSelect = document.getElementById('sort-direction-select');
+		if (dirSelect) {
+			dirSelect.value = sortDescending ? 'desc' : 'asc';
+			dirSelect.disabled = !sortAttribute;
+		}
+
+		// Update badge
+		updateSortCountBadge(sortAttribute);
+	}
+
+	/**
+	 * Updates the query options UI with new state.
+	 * @param {Object} data - Options data { topN, distinct }
+	 */
+	function updateQueryOptionsUI(data) {
+		const { topN, distinct } = data;
+
+		// Update Top N input
+		const topNInput = document.getElementById('top-n-input');
+		if (topNInput) {
+			topNInput.value = topN !== null && topN !== undefined ? topN.toString() : '';
+		}
+
+		// Update Distinct checkbox
+		const distinctCheckbox = document.getElementById('distinct-checkbox');
+		if (distinctCheckbox) {
+			distinctCheckbox.checked = distinct === true;
+		}
+
+		// Update header summary
+		updateQueryOptionsSummary(topN, distinct);
+	}
+
+	/**
+	 * Updates the query options header summary text.
+	 * @param {number|null} topN
+	 * @param {boolean} distinct
+	 */
+	function updateQueryOptionsSummary(topN, distinct) {
+		const titleEl = document.querySelector('.query-options-title');
+		if (!titleEl) {
+			return;
+		}
+
+		// Build summary parts
+		const parts = [];
+		if (topN !== null && topN !== undefined) {
+			parts.push(`Top ${topN}`);
+		}
+		if (distinct === true) {
+			parts.push('Distinct');
+		}
+
+		// Update title with or without summary
+		if (parts.length > 0) {
+			titleEl.innerHTML = `Options <span style="color: var(--vscode-descriptionForeground);">(${parts.join(', ')})</span>`;
+		} else {
+			titleEl.textContent = 'Options';
 		}
 	}
 
@@ -1539,6 +1659,279 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 		}
 	}
 
+	// ============================================
+	// SORT SECTION FUNCTIONS
+	// ============================================
+
+	/** Storage key for sort section collapse state */
+	const SORT_SECTION_COLLAPSED_KEY = 'dataExplorer.sortSectionCollapsed';
+
+	/**
+	 * Initializes the sort section behavior using event delegation.
+	 */
+	function initSortSection() {
+		// Sort section toggle
+		document.addEventListener('click', (e) => {
+			if (e.target.closest('#sort-section-toggle')) {
+				toggleSortSectionCollapse();
+			}
+
+			// Clear sort button
+			if (e.target.closest('#clear-sort-btn')) {
+				handleClearSort();
+			}
+		});
+
+		// Sort attribute dropdown change
+		document.addEventListener('change', (e) => {
+			if (e.target.id === 'sort-attribute-select') {
+				handleSortAttributeChange(e.target.value);
+			}
+
+			// Sort direction dropdown change
+			if (e.target.id === 'sort-direction-select') {
+				handleSortDirectionChange(e.target.value);
+			}
+		});
+
+		// Restore collapse state
+		const savedState = localStorage.getItem(SORT_SECTION_COLLAPSED_KEY);
+		if (savedState === 'true') {
+			setSortSectionCollapsed(true);
+		}
+	}
+
+	/**
+	 * Handles sort attribute selection change.
+	 * @param {string} attribute
+	 */
+	function handleSortAttributeChange(attribute) {
+		postMessage('updateSort', { attribute });
+	}
+
+	/**
+	 * Handles sort direction change.
+	 * @param {string} direction - 'asc' or 'desc'
+	 */
+	function handleSortDirectionChange(direction) {
+		postMessage('updateSort', { descending: direction === 'desc' });
+	}
+
+	/**
+	 * Handles clearing the sort.
+	 */
+	function handleClearSort() {
+		postMessage('clearSort', {});
+	}
+
+	/**
+	 * Toggles the sort section collapse state.
+	 */
+	function toggleSortSectionCollapse() {
+		const toggleBtn = document.getElementById('sort-section-toggle');
+		if (!toggleBtn) return;
+
+		const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+		setSortSectionCollapsed(isExpanded);
+	}
+
+	/**
+	 * Sets the sort section collapsed state.
+	 * @param {boolean} collapsed
+	 */
+	function setSortSectionCollapsed(collapsed) {
+		const toggleBtn = document.getElementById('sort-section-toggle');
+		const content = document.getElementById('sort-section-content');
+
+		if (!toggleBtn || !content) return;
+
+		toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+
+		if (collapsed) {
+			content.classList.add('collapsed');
+		} else {
+			content.classList.remove('collapsed');
+		}
+
+		localStorage.setItem(SORT_SECTION_COLLAPSED_KEY, collapsed.toString());
+	}
+
+	/**
+	 * Updates the sort count badge.
+	 * @param {string|null} sortAttribute
+	 */
+	function updateSortCountBadge(sortAttribute) {
+		const badge = document.getElementById('sort-count-badge');
+		if (badge) {
+			badge.textContent = sortAttribute ? '(1)' : '';
+		}
+	}
+
+	/**
+	 * Shows or hides the sort section.
+	 * @param {boolean} visible
+	 */
+	function setSortSectionVisible(visible) {
+		const section = document.getElementById('sort-section');
+		if (section) {
+			if (visible) {
+				section.classList.remove('sort-section-hidden');
+			} else {
+				section.classList.add('sort-section-hidden');
+			}
+		}
+	}
+
+	/**
+	 * Updates the sort dropdown options when columns are loaded.
+	 * @param {Array} columns - Column definitions [{logicalName, displayName}]
+	 */
+	function updateSortDropdownOptions(columns) {
+		const select = document.getElementById('sort-attribute-select');
+		if (!select) {
+			return;
+		}
+
+		// Get current selected value to preserve it
+		const currentValue = select.value;
+
+		// Clear existing options except the first one (-- No sorting --)
+		while (select.options.length > 1) {
+			select.remove(1);
+		}
+
+		// Sort columns by logical name and add options
+		const sortedColumns = [...columns].sort((a, b) =>
+			(a.logicalName || '').localeCompare(b.logicalName || '')
+		);
+
+		for (const col of sortedColumns) {
+			const option = document.createElement('option');
+			option.value = col.logicalName;
+			option.textContent = `${col.logicalName} (${col.displayName})`;
+			select.appendChild(option);
+		}
+
+		// Restore selected value if it still exists
+		if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
+			select.value = currentValue;
+		}
+
+		// Show the sort section now that we have columns
+		setSortSectionVisible(true);
+		// Also show query options section
+		setQueryOptionsSectionVisible(true);
+	}
+
+	// ============================================
+	// QUERY OPTIONS SECTION FUNCTIONS
+	// ============================================
+
+	/** Storage key for query options section collapse state */
+	const QUERY_OPTIONS_COLLAPSED_KEY = 'dataExplorer.queryOptionsCollapsed';
+
+	/**
+	 * Initializes the query options section behavior using event delegation.
+	 */
+	function initQueryOptions() {
+		// Query options toggle
+		document.addEventListener('click', (e) => {
+			if (e.target.closest('#query-options-toggle')) {
+				toggleQueryOptionsCollapse();
+			}
+		});
+
+		// Top N input change
+		document.addEventListener('input', (e) => {
+			if (e.target.id === 'top-n-input') {
+				// Debounce value changes
+				clearTimeout(e.target._topNChangeTimeout);
+				e.target._topNChangeTimeout = setTimeout(() => {
+					handleTopNChange(e.target.value);
+				}, 300);
+			}
+		});
+
+		// Distinct checkbox change
+		document.addEventListener('change', (e) => {
+			if (e.target.id === 'distinct-checkbox') {
+				handleDistinctChange(e.target.checked);
+			}
+		});
+
+		// Restore collapse state
+		const savedState = localStorage.getItem(QUERY_OPTIONS_COLLAPSED_KEY);
+		if (savedState === 'true') {
+			setQueryOptionsCollapsed(true);
+		}
+	}
+
+	/**
+	 * Handles Top N value change.
+	 * @param {string} value
+	 */
+	function handleTopNChange(value) {
+		const numValue = value ? parseInt(value, 10) : null;
+		if (numValue === null || (numValue > 0 && numValue <= 5000)) {
+			postMessage('updateQueryOptions', { topN: numValue });
+		}
+	}
+
+	/**
+	 * Handles distinct checkbox change.
+	 * @param {boolean} checked
+	 */
+	function handleDistinctChange(checked) {
+		postMessage('updateQueryOptions', { distinct: checked });
+	}
+
+	/**
+	 * Toggles the query options section collapse state.
+	 */
+	function toggleQueryOptionsCollapse() {
+		const toggleBtn = document.getElementById('query-options-toggle');
+		if (!toggleBtn) return;
+
+		const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+		setQueryOptionsCollapsed(isExpanded);
+	}
+
+	/**
+	 * Sets the query options section collapsed state.
+	 * @param {boolean} collapsed
+	 */
+	function setQueryOptionsCollapsed(collapsed) {
+		const toggleBtn = document.getElementById('query-options-toggle');
+		const content = document.getElementById('query-options-content');
+
+		if (!toggleBtn || !content) return;
+
+		toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+
+		if (collapsed) {
+			content.classList.add('collapsed');
+		} else {
+			content.classList.remove('collapsed');
+		}
+
+		localStorage.setItem(QUERY_OPTIONS_COLLAPSED_KEY, collapsed.toString());
+	}
+
+	/**
+	 * Shows or hides the query options section.
+	 * @param {boolean} visible
+	 */
+	function setQueryOptionsSectionVisible(visible) {
+		const section = document.getElementById('query-options-section');
+		if (section) {
+			if (visible) {
+				section.classList.remove('query-options-hidden');
+			} else {
+				section.classList.add('query-options-hidden');
+			}
+		}
+	}
+
 	/**
 	 * Initializes the behavior when DOM is ready.
 	 */
@@ -1547,6 +1940,8 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 		initEntityPicker();
 		initColumnPicker();
 		initFilterSection();
+		initSortSection();
+		initQueryOptions();
 		initPreviewTabs();
 		initCopyButtons();
 		initPreviewCollapse();

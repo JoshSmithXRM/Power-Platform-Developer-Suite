@@ -31,6 +31,14 @@ export interface VisualQueryBuilderRenderData {
 	readonly isLoadingColumns: boolean;
 	/** Filter conditions for the query */
 	readonly filterConditions: readonly FilterConditionViewModel[];
+	/** Current sort attribute (null = no sort) */
+	readonly sortAttribute: string | null;
+	/** Sort direction (true = descending, false = ascending) */
+	readonly sortDescending: boolean;
+	/** Top N limit (null = no limit) */
+	readonly topN: number | null;
+	/** Whether to return distinct results */
+	readonly distinct: boolean;
 	/** Generated FetchXML from the visual query */
 	readonly generatedFetchXml: string;
 	/** Generated SQL from the visual query */
@@ -59,8 +67,10 @@ export function renderVisualQueryBuilderSection(data: VisualQueryBuilderRenderDa
 			</button>
 			<div class="query-builder-container" id="query-builder-container">
 				${renderEntityPicker(data)}
+				${renderQueryOptionsSection(data)}
 				${renderColumnPicker(data)}
 				${renderFilterSection(data)}
+				${renderSortSection(data)}
 				${renderQueryPreview(data)}
 			</div>
 		</div>
@@ -419,6 +429,181 @@ function renderValueInput(condition: FilterConditionViewModel): string {
 				/>
 			`;
 	}
+}
+
+/**
+ * Renders the sort section with attribute dropdown and direction toggle.
+ * Collapsible, hidden when no entity is selected.
+ * For MVP: Single sort only.
+ */
+function renderSortSection(data: VisualQueryBuilderRenderData): string {
+	const isHidden = data.selectedEntity === null;
+	const hiddenClass = isHidden ? ' sort-section-hidden' : '';
+	const hasSortBadge = data.sortAttribute !== null ? '(1)' : '';
+
+	return `
+		<div class="sort-section${hiddenClass}" id="sort-section">
+			<button
+				class="sort-section-toggle"
+				id="sort-section-toggle"
+				aria-expanded="true"
+				aria-controls="sort-section-content"
+				title="Toggle sort"
+			>
+				<span class="sort-toggle-icon codicon codicon-chevron-down"></span>
+				<span class="sort-section-title">Sort <span id="sort-count-badge">${hasSortBadge}</span></span>
+			</button>
+			<div class="sort-section-content" id="sort-section-content">
+				${renderSortRow(data)}
+			</div>
+		</div>
+	`;
+}
+
+/**
+ * Renders the sort row with attribute dropdown and direction toggle.
+ */
+function renderSortRow(data: VisualQueryBuilderRenderData): string {
+	if (data.selectedEntity === null) {
+		return '<div class="sort-empty-state">Select an entity to configure sorting</div>';
+	}
+
+	const attributeOptions = data.availableColumns.map((col) => {
+		const escapedLogical = escapeHtml(col.logicalName);
+		const escapedDisplay = escapeHtml(col.displayName);
+		const selected = col.logicalName === data.sortAttribute ? 'selected' : '';
+		return `<option value="${escapedLogical}" ${selected}>${escapedLogical} (${escapedDisplay})</option>`;
+	}).join('');
+
+	const ascSelected = !data.sortDescending ? 'selected' : '';
+	const descSelected = data.sortDescending ? 'selected' : '';
+
+	const showClearBtn = data.sortAttribute !== null;
+
+	return `
+		<div class="sort-row">
+			<span class="sort-order-label">ORDER BY</span>
+			<select
+				id="sort-attribute-select"
+				class="sort-attribute-select"
+				aria-label="Select sort attribute"
+			>
+				<option value="">-- No sorting --</option>
+				${attributeOptions}
+			</select>
+			<select
+				id="sort-direction-select"
+				class="sort-direction-select"
+				aria-label="Sort direction"
+				${data.sortAttribute === null ? 'disabled' : ''}
+			>
+				<option value="asc" ${ascSelected}>Ascending</option>
+				<option value="desc" ${descSelected}>Descending</option>
+			</select>
+			${showClearBtn ? `
+				<button
+					class="clear-sort-btn"
+					id="clear-sort-btn"
+					type="button"
+					title="Clear sort"
+					aria-label="Clear sort"
+				>
+					<span class="codicon codicon-close"></span>
+				</button>
+			` : ''}
+		</div>
+	`;
+}
+
+/**
+ * Renders the query options section with Top N and Distinct options.
+ * Collapsible, hidden when no entity is selected.
+ */
+function renderQueryOptionsSection(data: VisualQueryBuilderRenderData): string {
+	const isHidden = data.selectedEntity === null;
+	const hiddenClass = isHidden ? ' query-options-hidden' : '';
+
+	// Show current options in the header
+	const optionsSummary = buildOptionsSummary(data);
+
+	return `
+		<div class="query-options-section${hiddenClass}" id="query-options-section">
+			<button
+				class="query-options-toggle"
+				id="query-options-toggle"
+				aria-expanded="true"
+				aria-controls="query-options-content"
+				title="Toggle query options"
+			>
+				<span class="query-options-toggle-icon codicon codicon-chevron-down"></span>
+				<span class="query-options-title">Options${optionsSummary}</span>
+			</button>
+			<div class="query-options-content" id="query-options-content">
+				${renderQueryOptionsRow(data)}
+			</div>
+		</div>
+	`;
+}
+
+/**
+ * Builds a summary of active options for the header.
+ */
+function buildOptionsSummary(data: VisualQueryBuilderRenderData): string {
+	const parts: string[] = [];
+
+	if (data.topN !== null) {
+		parts.push(`Top ${data.topN}`);
+	}
+	if (data.distinct) {
+		parts.push('Distinct');
+	}
+
+	if (parts.length === 0) {
+		return '';
+	}
+
+	return ` <span style="color: var(--vscode-descriptionForeground);">(${parts.join(', ')})</span>`;
+}
+
+/**
+ * Renders the query options row.
+ */
+function renderQueryOptionsRow(data: VisualQueryBuilderRenderData): string {
+	if (data.selectedEntity === null) {
+		return '<div class="sort-empty-state">Select an entity to configure options</div>';
+	}
+
+	const topNValue = data.topN !== null ? data.topN.toString() : '';
+	const distinctChecked = data.distinct ? 'checked' : '';
+
+	return `
+		<div class="query-options-row">
+			<div class="top-n-option">
+				<span class="top-n-label">TOP</span>
+				<input
+					type="number"
+					id="top-n-input"
+					class="top-n-input"
+					value="${topNValue}"
+					min="1"
+					max="5000"
+					placeholder="100"
+					aria-label="Top N results"
+				/>
+				<span class="top-n-suffix">rows</span>
+			</div>
+			<div class="distinct-option">
+				<input
+					type="checkbox"
+					id="distinct-checkbox"
+					class="distinct-checkbox"
+					${distinctChecked}
+					aria-label="Return distinct results"
+				/>
+				<label for="distinct-checkbox" class="distinct-label">DISTINCT</label>
+			</div>
+		</div>
+	`;
 }
 
 /**

@@ -16,11 +16,12 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 |------|-------------|--------|
 | 1 | Foundation - Domain Model & FetchXML Parser/Generator | ✅ Complete |
 | 2 | Panel Restructure - Remove Old Editor, Add Entity Picker | ✅ Complete |
-| 3 | Core Visual Builder - Columns, Filters MVP, Sort | 🔄 In Progress |
+| 3 | Core Visual Builder - Columns, Filters MVP, Sort | ✅ Complete |
 | 3.0 | → Panel Layout & UX Fixes | ✅ Complete |
 | 3.2 | → Column Selector | ✅ Complete |
 | 3.3 | → Filter Builder (MVP) | ✅ Complete |
-| 3.4 | → Sort Section | ⬜ Pending |
+| 3.4 | → Sort Section | ✅ Complete |
+| 3.5 | → Query Options (Top N, Distinct) | ✅ Complete |
 | 4 | Preview Section & Action Buttons | ⬜ Pending |
 | 5 | Toolbar Redesign | ⬜ Pending |
 | 6 | View Management - Load/Save Views | ⬜ Pending |
@@ -179,16 +180,25 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 - [x] Plugin Trace Viewer: sort filter fields by OData name for consistency
 - [x] Filter out `IsValidForRead=false` columns (prevents query errors on virtual columns)
 
-### 3.4 Sort Section
+### 3.4 Sort Section ✅ COMPLETE
 
-- [ ] Create sort row (attribute dropdown, direction toggle)
-- [ ] Single sort for MVP
-- [ ] Ascending/Descending toggle
+- [x] Create sort row (attribute dropdown, direction toggle)
+- [x] Single sort for MVP
+- [x] Ascending/Descending toggle
+- [x] Collapsible section with count badge
+- [x] Clear sort button
+- [x] Sort persistence (save/restore with entity)
+- [x] FetchXML preview includes `<order>` element
+- [x] Collapse state persisted to localStorage
 
-### 3.5 Query Options
+### 3.5 Query Options ✅ COMPLETE
 
-- [ ] Top N input (default: 100)
-- [ ] Distinct checkbox
+- [x] Top N input (default: empty, placeholder 100)
+- [x] Distinct checkbox
+- [x] Top N validation (1-5000)
+- [x] Options persistence (save/restore with entity)
+- [x] FetchXML preview includes `top` and `distinct` attributes
+- [x] Collapsible section with summary in header
 
 ---
 

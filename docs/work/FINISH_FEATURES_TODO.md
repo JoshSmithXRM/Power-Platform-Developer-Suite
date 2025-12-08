@@ -55,6 +55,8 @@ All planned features implemented:
 | 1+ | Notebook improvements (links, FetchXML cells) | **DONE** (2025-12-06) |
 | 3a | Aggregates (DISTINCT, COUNT, SUM, AVG, MIN, MAX, GROUP BY) | **DONE** (2025-12-06) |
 | 3b | Basic JOINs (INNER JOIN, LEFT JOIN) | **DONE** (2025-12-06) |
+| 5.3 | Visual Query Builder - Core (Entity, Columns, Filters, Sort, Options) | **DONE** (2025-12-08) |
+| - | Cell Selection (Excel-style) - all panels except Data Explorer | **DONE** (2025-12-08) |
 
 ### Remaining Phases
 
@@ -74,13 +76,13 @@ Moved to `docs/future/DATA_MANAGEMENT.md`:
 
 ---
 
-## Total Remaining: ~34-48 hours
+## Total Remaining: ~26-38 hours
 
 | Item | Effort |
 |------|--------|
 | Query History | 6-8h |
 | INSERT/UPDATE/DELETE | 12-16h |
-| Visual Query Builder | 16-24h |
+| Visual Query Builder (Steps 4-9) | 8-14h |
 
 ---
 
@@ -109,4 +111,4 @@ Before merging this branch:
 
 ---
 
-**Last Updated:** 2025-12-07
+**Last Updated:** 2025-12-08

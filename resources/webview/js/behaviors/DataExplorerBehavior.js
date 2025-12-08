@@ -278,7 +278,38 @@ function updateQueryResults(data) {
 		wireRecordLinks(table);
 		// Wire up search filter
 		wireResultsSearch(table);
+		// Initialize cell selection for the dynamically created table
+		initializeCellSelection(table, columns, rows);
 	}
+}
+
+/**
+ * Initializes cell selection behavior for the query results table.
+ * @param {HTMLTableElement} table - The table element
+ * @param {Array} columns - Column definitions from query results
+ * @param {Array} rows - Row data from query results
+ */
+function initializeCellSelection(table, columns, rows) {
+	if (!window.CellSelectionBehavior) {
+		return;
+	}
+
+	// Map columns to the format CellSelectionBehavior expects
+	const columnConfig = columns.map(col => ({
+		key: col.name,
+		header: col.header
+	}));
+
+	window.CellSelectionBehavior.attach(table, {
+		columns: columnConfig,
+		getRowData: (rowIndex) => {
+			if (rowIndex < 0 || rowIndex >= rows.length) {
+				return null;
+			}
+			return rows[rowIndex];
+		},
+		getTotalRowCount: () => rows.length
+	});
 }
 
 /**

@@ -260,6 +260,43 @@ td[title] {
 }
 
 /* ===========================================
+   Cell Selection Styles (Excel-style)
+   Used by CellSelectionBehavior.js
+   =========================================== */
+
+/* Selected cell background */
+td.cell-selected {
+	background: var(--vscode-editor-selectionBackground) !important;
+}
+
+/* Selection range border - only on edges */
+td.cell-selected-top {
+	border-top: 2px solid var(--vscode-focusBorder) !important;
+}
+
+td.cell-selected-bottom {
+	border-bottom: 2px solid var(--vscode-focusBorder) !important;
+}
+
+td.cell-selected-left {
+	border-left: 2px solid var(--vscode-focusBorder) !important;
+}
+
+td.cell-selected-right {
+	border-right: 2px solid var(--vscode-focusBorder) !important;
+}
+
+/* Cursor change during drag selection */
+tbody.selecting {
+	cursor: cell !important;
+}
+
+tbody.selecting * {
+	user-select: none !important;
+	-webkit-user-select: none !important;
+}
+
+/* ===========================================
    Prevent Browser Text Selection on Tables
    Ctrl+A uses programmatic row selection instead
    =========================================== */

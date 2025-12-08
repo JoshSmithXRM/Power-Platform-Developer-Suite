@@ -39,6 +39,7 @@ import {
 	QueryColumn,
 	QueryFilterGroup,
 	QueryCondition,
+	QuerySort,
 } from '../../application/types';
 import type { FetchXmlConditionOperator, AttributeTypeHint } from '../../application/types';
 import type { AttributeSuggestion } from '../../domain/valueObjects/AttributeSuggestion';
@@ -71,6 +72,9 @@ type DataExplorerCommands =
 	| 'addFilterCondition'
 	| 'removeFilterCondition'
 	| 'updateFilterCondition'
+	| 'updateSort'
+	| 'clearSort'
+	| 'updateQueryOptions'
 	| 'openRecord'
 	| 'copyRecordUrl'
 	| 'warningModalResponse'
@@ -108,6 +112,14 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private readonly columnMapper: ColumnOptionViewModelMapper;
 	private currentFilterConditions: FilterConditionState[] = [];
 	private filterConditionCounter: number = 0;
+	/** Current sort attribute (null = no sort) */
+	private currentSortAttribute: string | null = null;
+	/** Current sort direction (true = descending, false = ascending) */
+	private currentSortDescending: boolean = false;
+	/** Current Top N limit (null = no limit) */
+	private currentTopN: number | null = null;
+	/** Whether to return distinct results */
+	private currentDistinct: boolean = false;
 
 	/** Monotonic counter for query execution to discard stale results. */
 	private querySequence: number = 0;
@@ -259,12 +271,35 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 					this.filterConditionCounter = typeof savedCounter === 'number' ? savedCounter : 0;
 				}
 
+				// Restore sort configuration
+				const savedSortAttribute = state?.['sortAttribute'];
+				const savedSortDescending = state?.['sortDescending'];
+				if (typeof savedSortAttribute === 'string') {
+					this.currentSortAttribute = savedSortAttribute;
+				}
+				if (typeof savedSortDescending === 'boolean') {
+					this.currentSortDescending = savedSortDescending;
+				}
+
+				// Restore query options (Top N, Distinct)
+				const savedTopN = state?.['topN'];
+				const savedDistinct = state?.['distinct'];
+				if (typeof savedTopN === 'number') {
+					this.currentTopN = savedTopN;
+				}
+				if (typeof savedDistinct === 'boolean') {
+					this.currentDistinct = savedDistinct;
+				}
+
 				this.logger.debug('Loaded persisted query state', {
 					environmentId: this.currentEnvironmentId,
 					entity: savedEntity,
 					isSelectAll: this.currentVisualQuery.isSelectAll(),
 					columnCount: this.currentVisualQuery.getColumnCount(),
 					filterCount: this.currentFilterConditions.length,
+					sortAttribute: this.currentSortAttribute,
+					topN: this.currentTopN,
+					distinct: this.currentDistinct,
 				});
 			}
 		} catch (error) {
@@ -292,11 +327,24 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			: '';
 		const sql = this.generateSqlFromVisualQuery();
 
+		// Map available columns for sort/filter dropdowns, sorted by logical name
+		const availableColumns = [...this.currentAvailableColumns]
+			.sort((a, b) => a.logicalName.localeCompare(b.logicalName))
+			.map(col => ({
+				logicalName: col.logicalName,
+				displayName: col.displayName,
+			}));
+
 		return {
 			entities: this.currentEntities,
 			selectedEntity: this.currentVisualQuery?.entityName ?? null,
 			isLoadingEntities: this.isLoadingEntities,
+			availableColumns,
 			filterConditions: this.mapFilterConditionsToViewModels(),
+			sortAttribute: this.currentSortAttribute,
+			sortDescending: this.currentSortDescending,
+			topN: this.currentTopN,
+			distinct: this.currentDistinct,
 			generatedFetchXml: fetchXml,
 			generatedSql: sql,
 		};
@@ -433,6 +481,18 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 					.asWebviewUri(
 						vscode.Uri.joinPath(
 							this.extensionUri,
+							'resources',
+							'webview',
+							'js',
+							'behaviors',
+							'CellSelectionBehavior.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
 							'dist',
 							'webview',
 							'TableRenderer.js'
@@ -456,6 +516,16 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 							'dist',
 							'webview',
 							'VisualQueryBuilderBehavior.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
+							'dist',
+							'webview',
+							'DataExplorerBehavior.js'
 						)
 					)
 					.toString(),
@@ -560,6 +630,23 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			}
 		});
 
+		// Update sort configuration
+		this.coordinator.registerHandler('updateSort', async (data) => {
+			const payload = data as { attribute?: string; descending?: boolean };
+			await this.handleUpdateSort(payload);
+		});
+
+		// Clear sort configuration
+		this.coordinator.registerHandler('clearSort', async () => {
+			await this.handleClearSort();
+		});
+
+		// Update query options (Top N, Distinct)
+		this.coordinator.registerHandler('updateQueryOptions', async (data) => {
+			const payload = data as { topN?: number | null; distinct?: boolean };
+			await this.handleUpdateQueryOptions(payload);
+		});
+
 		// Open record in browser
 		this.coordinator.registerHandler('openRecord', async (data) => {
 			const { entityType, recordId } = data as { entityType?: string; recordId?: string };
@@ -628,6 +715,9 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Rebuild filters after attributes are loaded (needed for filter field dropdown)
 			await this.rebuildVisualQueryFilters();
 			await this.sendFiltersUpdate();
+			// Send sort/options updates AFTER columns are loaded (dropdown needs options first)
+			await this.sendSortUpdate();
+			await this.sendQueryOptionsUpdate();
 		}
 	}
 
@@ -658,6 +748,11 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Clear filter conditions when changing entity
 		this.currentFilterConditions = [];
 		this.filterConditionCounter = 0;
+		// Clear sort and query options when changing entity
+		this.currentSortAttribute = null;
+		this.currentSortDescending = false;
+		this.currentTopN = null;
+		this.currentDistinct = false;
 		this.logger.debug('Created VisualQuery', { entityName: this.currentVisualQuery.entityName });
 
 		// Update query preview
@@ -843,6 +938,128 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	}
 
 	/**
+	 * Handles sort configuration updates.
+	 */
+	private async handleUpdateSort(payload: { attribute?: string; descending?: boolean }): Promise<void> {
+		this.logger.debug('Updating sort', payload);
+
+		// Handle attribute change
+		if (payload.attribute !== undefined) {
+			this.currentSortAttribute = payload.attribute === '' ? null : payload.attribute;
+		}
+
+		// Handle direction change
+		if (payload.descending !== undefined) {
+			this.currentSortDescending = payload.descending;
+		}
+
+		// Rebuild visual query with sort and update UI
+		await this.rebuildVisualQuerySort();
+		await this.sendSortUpdate();
+		void this.saveQueryStateToStorage();
+	}
+
+	/**
+	 * Clears the current sort configuration.
+	 */
+	private async handleClearSort(): Promise<void> {
+		this.logger.debug('Clearing sort');
+
+		this.currentSortAttribute = null;
+		this.currentSortDescending = false;
+
+		await this.rebuildVisualQuerySort();
+		await this.sendSortUpdate();
+		void this.saveQueryStateToStorage();
+	}
+
+	/**
+	 * Handles query options updates (Top N, Distinct).
+	 */
+	private async handleUpdateQueryOptions(payload: { topN?: number | null; distinct?: boolean }): Promise<void> {
+		this.logger.debug('Updating query options', payload);
+
+		// Handle Top N change
+		if (payload.topN !== undefined) {
+			// Validate Top N: must be positive and <= 5000
+			if (payload.topN === null) {
+				this.currentTopN = null;
+			} else if (payload.topN > 0 && payload.topN <= 5000) {
+				this.currentTopN = payload.topN;
+			}
+		}
+
+		// Handle Distinct change
+		if (payload.distinct !== undefined) {
+			this.currentDistinct = payload.distinct;
+		}
+
+		// Rebuild visual query with options and update UI
+		await this.rebuildVisualQueryOptions();
+		await this.sendQueryOptionsUpdate();
+		void this.saveQueryStateToStorage();
+	}
+
+	/**
+	 * Rebuilds the VisualQuery sort from current sort state.
+	 */
+	private async rebuildVisualQuerySort(): Promise<void> {
+		if (this.currentVisualQuery === null) {
+			return;
+		}
+
+		if (this.currentSortAttribute !== null) {
+			const sort = new QuerySort(this.currentSortAttribute, this.currentSortDescending);
+			this.currentVisualQuery = this.currentVisualQuery.withSorts([sort]);
+		} else {
+			this.currentVisualQuery = this.currentVisualQuery.withSorts([]);
+		}
+
+		await this.updateQueryPreview();
+	}
+
+	/**
+	 * Rebuilds the VisualQuery options (Top N, Distinct).
+	 */
+	private async rebuildVisualQueryOptions(): Promise<void> {
+		if (this.currentVisualQuery === null) {
+			return;
+		}
+
+		this.currentVisualQuery = this.currentVisualQuery
+			.withTop(this.currentTopN)
+			.withDistinct(this.currentDistinct);
+
+		await this.updateQueryPreview();
+	}
+
+	/**
+	 * Sends sort update notification to webview.
+	 */
+	private async sendSortUpdate(): Promise<void> {
+		await this.panel.postMessage({
+			command: 'sortUpdated',
+			data: {
+				sortAttribute: this.currentSortAttribute,
+				sortDescending: this.currentSortDescending,
+			},
+		});
+	}
+
+	/**
+	 * Sends query options update notification to webview.
+	 */
+	private async sendQueryOptionsUpdate(): Promise<void> {
+		await this.panel.postMessage({
+			command: 'queryOptionsUpdated',
+			data: {
+				topN: this.currentTopN,
+				distinct: this.currentDistinct,
+			},
+		});
+	}
+
+	/**
 	 * Rebuilds the VisualQuery filter from current filter conditions.
 	 */
 	private async rebuildVisualQueryFilters(): Promise<void> {
@@ -994,6 +1211,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 					selectedColumns: this.currentVisualQuery?.getColumnNames() ?? [],
 					filterConditions,
 					filterConditionCounter: this.filterConditionCounter,
+					sortAttribute: this.currentSortAttribute,
+					sortDescending: this.currentSortDescending,
+					topN: this.currentTopN,
+					distinct: this.currentDistinct,
 					lastUpdated: new Date().toISOString(),
 				}
 			);
@@ -1053,6 +1274,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		this.currentVisualQuery = null;
 		this.currentFilterConditions = [];
 		this.filterConditionCounter = 0;
+		this.currentSortAttribute = null;
+		this.currentSortDescending = false;
+		this.currentTopN = null;
+		this.currentDistinct = false;
 
 		try {
 			const state = await this.panelStateRepository.load({
@@ -1091,12 +1316,34 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 						this.filterConditionCounter = typeof savedCounter === 'number' ? savedCounter : 0;
 					}
 
+					// Restore sort configuration
+					const savedSortAttribute = state['sortAttribute'];
+					const savedSortDescending = state['sortDescending'];
+					if (typeof savedSortAttribute === 'string') {
+						this.currentSortAttribute = savedSortAttribute;
+					}
+					if (typeof savedSortDescending === 'boolean') {
+						this.currentSortDescending = savedSortDescending;
+					}
+
+					// Restore query options (Top N, Distinct)
+					const savedTopN = state['topN'];
+					const savedDistinct = state['distinct'];
+					if (typeof savedTopN === 'number') {
+						this.currentTopN = savedTopN;
+					}
+					if (typeof savedDistinct === 'boolean') {
+						this.currentDistinct = savedDistinct;
+					}
+
 					this.logger.debug('Loaded persisted state for environment', {
 						environmentId,
 						entity: savedEntity,
 						isSelectAll: this.currentVisualQuery.isSelectAll(),
 						columnCount: this.currentVisualQuery.getColumnCount(),
 						filterCount: this.currentFilterConditions.length,
+						sortAttribute: this.currentSortAttribute,
+						topN: this.currentTopN,
 					});
 				}
 			}
@@ -1104,8 +1351,14 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
 		}
 
-		// Rebuild filters and update query preview with loaded state
+		// Rebuild filters, sort, and options with loaded state
 		await this.rebuildVisualQueryFilters();
+		await this.rebuildVisualQuerySort();
+		await this.rebuildVisualQueryOptions();
+
+		// Send UI updates to reflect restored state
+		await this.sendSortUpdate();
+		await this.sendQueryOptionsUpdate();
 	}
 
 	/**

@@ -1225,6 +1225,318 @@ select.filter-value-input {
 	}
 }
 
+/* ============================================
+   SORT SECTION
+   Visual query builder sort configuration (MVP - single sort)
+   ============================================ */
+
+.sort-section {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 4px;
+	background: var(--vscode-input-background);
+}
+
+.sort-section.sort-section-hidden {
+	display: none;
+}
+
+/* Collapsible Toggle Header */
+.sort-section-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	font-size: 13px;
+	font-weight: 500;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background);
+	border: none;
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease;
+}
+
+.sort-section-toggle:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.sort-section-toggle:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.sort-toggle-icon {
+	transition: transform 0.15s ease;
+}
+
+.sort-section-toggle[aria-expanded='false'] .sort-toggle-icon {
+	transform: rotate(-90deg);
+}
+
+.sort-section-title {
+	flex: 1;
+}
+
+#sort-count-badge {
+	font-weight: normal;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Collapsible Content */
+.sort-section-content {
+	display: flex;
+	flex-direction: column;
+	border-top: 1px solid var(--vscode-panel-border);
+	padding: 12px;
+	gap: 12px;
+}
+
+.sort-section-content.collapsed {
+	display: none;
+}
+
+/* Sort Row */
+.sort-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+}
+
+/* Order By Label */
+.sort-order-label {
+	flex: 0 0 70px;
+	font-size: 12px;
+	font-weight: 600;
+	color: #569CD6; /* SQL keyword color */
+	text-transform: uppercase;
+}
+
+/* Attribute Dropdown */
+.sort-attribute-select {
+	flex: 1;
+	min-width: 150px;
+	max-width: 250px;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-dropdown-foreground);
+	background: var(--vscode-dropdown-background);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 3px;
+	outline: none;
+	cursor: pointer;
+}
+
+.sort-attribute-select:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+/* Direction Dropdown */
+.sort-direction-select {
+	flex: 0 0 auto;
+	min-width: 100px;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-dropdown-foreground);
+	background: var(--vscode-dropdown-background);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 3px;
+	outline: none;
+	cursor: pointer;
+}
+
+.sort-direction-select:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+/* Clear Sort Button */
+.clear-sort-btn {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 1px solid var(--vscode-input-border);
+	background: transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	border-radius: 4px;
+	opacity: 0.6;
+	transition: all 0.15s ease;
+}
+
+.clear-sort-btn:hover {
+	opacity: 1;
+	background: var(--vscode-inputValidation-errorBackground);
+	border-color: var(--vscode-inputValidation-errorBorder);
+	color: var(--vscode-errorForeground);
+}
+
+.clear-sort-btn .codicon {
+	font-size: 12px;
+}
+
+/* Sort Empty State */
+.sort-empty-state {
+	padding: 16px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+	font-size: 12px;
+}
+
+/* ============================================
+   QUERY OPTIONS SECTION
+   Top N and Distinct options
+   ============================================ */
+
+.query-options-section {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 4px;
+	background: var(--vscode-input-background);
+}
+
+.query-options-section.query-options-hidden {
+	display: none;
+}
+
+/* Collapsible Toggle Header */
+.query-options-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	font-size: 13px;
+	font-weight: 500;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background);
+	border: none;
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease;
+}
+
+.query-options-toggle:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.query-options-toggle:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.query-options-toggle-icon {
+	transition: transform 0.15s ease;
+}
+
+.query-options-toggle[aria-expanded='false'] .query-options-toggle-icon {
+	transform: rotate(-90deg);
+}
+
+.query-options-title {
+	flex: 1;
+}
+
+/* Collapsible Content */
+.query-options-content {
+	display: flex;
+	flex-direction: column;
+	border-top: 1px solid var(--vscode-panel-border);
+	padding: 12px;
+	gap: 12px;
+}
+
+.query-options-content.collapsed {
+	display: none;
+}
+
+/* Options Row - styled like filter-condition-row */
+.query-options-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	flex-wrap: wrap;
+}
+
+/* Top N Option */
+.top-n-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.top-n-label {
+	flex: 0 0 auto;
+	font-size: 12px;
+	font-weight: 600;
+	color: #569CD6; /* SQL keyword color to match WHERE/ORDER BY */
+	white-space: nowrap;
+}
+
+.top-n-input {
+	width: 80px;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-input-foreground);
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 3px;
+	outline: none;
+}
+
+.top-n-input:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+.top-n-input::-webkit-inner-spin-button,
+.top-n-input::-webkit-outer-spin-button {
+	opacity: 1;
+}
+
+.top-n-suffix {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Distinct Option */
+.distinct-option {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.distinct-checkbox {
+	margin: 0;
+	cursor: pointer;
+}
+
+.distinct-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: #569CD6; /* SQL keyword color */
+	cursor: pointer;
+}
+
 /* Query Preview Section */
 .query-preview-section {
 	display: flex;

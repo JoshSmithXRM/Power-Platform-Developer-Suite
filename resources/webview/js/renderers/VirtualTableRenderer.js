@@ -93,6 +93,9 @@
 		setupRowSelectionHandler(tbody);
 		setupSortingHandler();
 
+		// Initialize cell selection behavior
+		initializeCellSelection(tbody);
+
 		// Check if table is in loading state - don't overwrite loading row
 		const isLoading = tbody.getAttribute('data-loading') === 'true';
 		if (isLoading) {
@@ -127,6 +130,23 @@
 
 		// Initial render
 		renderVisibleRows(tbody);
+	}
+
+	/**
+	 * Initializes cell selection behavior for Excel-style selection.
+	 * @param {HTMLElement} tbody - The virtual table body element
+	 */
+	function initializeCellSelection(tbody) {
+		const table = tbody.closest('table');
+		if (!table || !window.CellSelectionBehavior) {
+			return;
+		}
+
+		window.CellSelectionBehavior.attach(table, {
+			columns: columns,
+			getRowData: (rowIndex) => filteredRows[rowIndex] || null,
+			getTotalRowCount: () => filteredRows.length
+		});
 	}
 
 	/**
@@ -535,6 +555,9 @@
 		}
 
 		applyRowStriping(tbody);
+
+		// Refresh cell selection visuals after render
+		window.CellSelectionBehavior?.refresh?.();
 	}
 
 	/**
@@ -828,9 +851,14 @@
 		selectedRowId = null;
 		selectedRowIds.clear();
 
+		// Clear cell selection on new data
+		window.CellSelectionBehavior?.clearSelection?.();
+
 		// Update columns if provided
 		if (data.columns) {
 			columns = data.columns;
+			// Update CellSelectionBehavior columns
+			window.CellSelectionBehavior?.updateColumns?.(columns);
 		}
 
 		// Update pagination state for server search fallback

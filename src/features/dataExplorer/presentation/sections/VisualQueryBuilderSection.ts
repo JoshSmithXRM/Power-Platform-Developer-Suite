@@ -37,6 +37,10 @@ export class VisualQueryBuilderSection implements ISection {
 		const isLoadingColumns = (customData['isLoadingColumns'] as boolean) ?? false;
 		const filterConditions =
 			(customData['filterConditions'] as readonly FilterConditionViewModel[]) ?? [];
+		const sortAttribute = (customData['sortAttribute'] as string | null) ?? null;
+		const sortDescending = (customData['sortDescending'] as boolean) ?? false;
+		const topN = (customData['topN'] as number | null) ?? null;
+		const distinct = (customData['distinct'] as boolean) ?? false;
 		const generatedFetchXml = (customData['generatedFetchXml'] as string) ?? '';
 		const generatedSql = (customData['generatedSql'] as string) ?? '';
 		const errorMessage = customData['errorMessage'] as string | undefined;
@@ -49,6 +53,10 @@ export class VisualQueryBuilderSection implements ISection {
 			isSelectAllColumns,
 			isLoadingColumns,
 			filterConditions,
+			sortAttribute,
+			sortDescending,
+			topN,
+			distinct,
 			generatedFetchXml,
 			generatedSql,
 			errorMessage,
